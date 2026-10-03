@@ -110,6 +110,9 @@ export function createVercelProviderAdapter(deps: {
       resumable: false,
       persistentWorkspace: true,
       destroysOnStop: false,
+      // Its billing binding lives in the Sandbox DO across allocations, so cleanup
+      // stays awaited and owned-only.
+      allocationScopedStop: false,
       ensureBillingAdmission: unavailable,
       create: unavailable,
       launch: unavailable,
@@ -161,6 +164,9 @@ export function createVercelProviderAdapter(deps: {
     resumable: false,
     persistentWorkspace: true,
     destroysOnStop: false,
+    // Its billing binding lives in the Sandbox DO across allocations, so cleanup
+    // stays awaited and owned-only.
+    allocationScopedStop: false,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
       const created = await restClient

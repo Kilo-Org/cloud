@@ -134,6 +134,7 @@ function createFakeProvider(): { adapter: ProviderAdapter; createCalls: number }
     resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
+    allocationScopedStop: false,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;

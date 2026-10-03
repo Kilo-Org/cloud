@@ -48,6 +48,8 @@ const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNam
   .SANDBOX_CONTROL;
 
 type FakeProviderOptions = {
+  /** Model a provider whose stop reaches only one allocation (Containers, Vercel). */
+  allocationScopedStop?: boolean;
   failFirstCreate?: boolean;
   gateCreate?: boolean;
   gateLaunch?: boolean;
@@ -88,6 +90,7 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
+    allocationScopedStop: options.allocationScopedStop ?? false,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;
@@ -1304,6 +1307,38 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
   });
 
+  it.each([true, false])(
+    'fences a late create result after replacement when allocationScopedStop is %s',
+    async allocationScopedStop => {
+      const provider = createFakeProvider({ gateCreate: true, allocationScopedStop });
+      const stub = sandboxNamespace.getByName(SANDBOX_ID);
+      await insertPreparingRoute(stub, {
+        sessionId: 'sess-late-create',
+        attemptDeadlineAt: Date.now() + 12 * MINUTE,
+      });
+      await startAllocation(provider);
+      await waitFor(() => expect(provider.createGates).toHaveLength(1));
+
+      // Simulate losing the in-flight marker on eviction, as in the abandoned-launch tests.
+      await runInDurableObject(stub, instance => {
+        Object.assign(instance, { createInFlight: false });
+      });
+      await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+      await runAlarm(stub);
+      await waitFor(() => expect(provider.createGates).toHaveLength(2));
+      const replacement = await readState(stub);
+
+      await releaseGate(stub, () => provider.createGates[0]({ providerRef: provider.refs[0] }));
+      expect(provider.stopCalls).toEqual(allocationScopedStop ? [provider.refs[0]] : []);
+      expect((await readState(stub)).allocationId).toBe(replacement.allocationId);
+      expect(provider.launchEnvs).toEqual([]);
+
+      await releaseGate(stub, () => provider.createGates[1]({ providerRef: provider.refs[1] }));
+      await awaitStarting(provider, stub);
+      expect((await readState(stub)).providerRef).toBe(provider.refs[1]);
+    }
+  );
+
   it('bounds create and launch together by the create deadline', async () => {
     const provider = createFakeProvider({ gateCreate: true, gateLaunch: true });
     const stub = await startAllocation(provider);
@@ -1408,6 +1443,96 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const state = await readState(stub);
     expect(state.kind).toBe('connected');
     expect(state.providerRef).toBe(provider.refs[0]);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it('keeps a connected sandbox whose launch failed even when stop reaches one allocation', async () => {
+    const provider = createFakeProvider({ gateLaunch: true, allocationScopedStop: true });
+    const stub = await startAllocation(provider);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await wrapper.hello({ wrapperId: 'wr_n5_scoped', allocationId });
+
+    await releaseGate(stub, () => provider.launchGates[0](new Error('launch failed')));
+
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it('retries a failed launch on a new allocation while the failed one is still stopping', async () => {
+    const provider = createFakeProvider({
+      gateLaunch: true,
+      gateStop: true,
+      allocationScopedStop: true,
+    });
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await insertPreparingRoute(stub, {
+      sessionId: 'sess-launch-failed',
+      attemptDeadlineAt: Date.now() + 12 * MINUTE,
+    });
+    await startAllocation(provider);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    const failed = await readState(stub);
+
+    await releaseGate(stub, () => provider.launchGates[0](new Error('launch failed')));
+    await waitFor(() => expect(provider.stopCalls).toEqual([provider.refs[0]]));
+    await waitFor(async () =>
+      expect((await readState(stub)).allocationId).not.toBe(failed.allocationId)
+    );
+    expect((await readState(stub)).allocationId).not.toBe(failed.allocationId);
+
+    // The failed allocation's stop never answers; the retry must not wait for it.
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    await waitFor(() => expect(provider.launchGates).toHaveLength(2));
+    expect(provider.stopGates).toHaveLength(1);
+  });
+
+  /**
+   * An eviction drops the in-memory in-flight marker, so the next alarm past the
+   * create deadline abandons an attempt that already persisted its ref.
+   */
+  async function abandonAfterEviction(provider: FakeProvider) {
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await insertPreparingRoute(stub, {
+      sessionId: 'sess-abandoned',
+      attemptDeadlineAt: Date.now() + 12 * MINUTE,
+    });
+    await startAllocation(provider);
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    const abandoned = await readState(stub);
+    expect(abandoned.providerRef).toBe(provider.refs[0]);
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, { createInFlight: false });
+    });
+    await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.createCalls).toBe(2));
+    return { stub, abandoned };
+  }
+
+  it('stops the ref of an attempt abandoned after an eviction, without holding up the next one', async () => {
+    // The stop never answers; the next create must not wait for it.
+    const provider = createFakeProvider({
+      gateLaunch: true,
+      gateStop: true,
+      allocationScopedStop: true,
+    });
+    const { stub, abandoned } = await abandonAfterEviction(provider);
+
+    await waitFor(() => expect(provider.stopCalls).toEqual([abandoned.providerRef]));
+    await waitFor(() => expect(provider.launchGates).toHaveLength(2));
+    const state = await readState(stub);
+    expect(state.allocationId).not.toBe(abandoned.allocationId);
+    expect(state.providerRef).toBe(provider.refs[1]);
+  });
+
+  it('does not stop an abandoned ref when stop would reach the replacement too', async () => {
+    const provider = createFakeProvider({ gateLaunch: true, allocationScopedStop: false });
+    await abandonAfterEviction(provider);
+
     expect(provider.stopCalls).toEqual([]);
   });
 

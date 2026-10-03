@@ -45,11 +45,22 @@ function mapObservation(
   return 'active';
 }
 
+/**
+ * The container Durable Object name for a ref. Each allocation gets a fresh
+ * container, so a wedged or stale one never blocks its replacement. Refs from
+ * before per-allocation containers keep the logical sandbox's shared one.
+ */
+export function containerNameForRef(ref: CloudflareProviderRef, logicalSandboxId: string): string {
+  return ref.container === 'allocation' ? `${ref.sandboxId}:${ref.instanceId}` : logicalSandboxId;
+}
+
 export function createCloudflareContainersProviderAdapter(deps: {
   logicalSandboxId: string;
   allocationName: string;
   instance?: ContainerInstanceSize;
-  getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
+  /** The managed outbound identity that contained credential grants are bound to. */
+  outboundContainerId?: string;
+  getContainer: (name: string) => DurableObjectStub<SandboxContainers>;
 }): ProviderAdapter {
   const instance = deps.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
   const encodeIntentProviderRef = (intent: ProviderAllocationIntent): string =>
@@ -57,7 +68,10 @@ export function createCloudflareContainersProviderAdapter(deps: {
       sandboxId: intent.allocationName ?? deps.logicalSandboxId,
       containment: Boolean(intent.containment?.kilocode || intent.containment?.github),
       instanceId: intent.intentId,
+      container: 'allocation',
     });
+  const containerFor = (ref: CloudflareProviderRef): DurableObjectStub<SandboxContainers> =>
+    deps.getContainer(containerNameForRef(ref, deps.logicalSandboxId));
 
   const resolveProviderRef = (
     ref: string | null,
@@ -82,7 +96,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
     } catch {
       throw new ProviderCreationError('invalid_configuration');
     }
-    const container = deps.getContainer(deps.logicalSandboxId);
+    const container = containerFor(parsed);
     let blocked = false;
     try {
       blocked = await container.isBillingBlocked();
@@ -112,6 +126,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
     resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
+    // A per-allocation container answers only for its own ref; a legacy shared
+    // container is fenced by `allocationRef`, so neither stop reaches another.
+    allocationScopedStop: true,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);
@@ -123,7 +140,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       if (owned === null) {
         throw new ProviderCreationError('invalid_configuration');
       }
-      const container = deps.getContainer(deps.logicalSandboxId);
+      const container = containerFor(owned);
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
         String(containersBillingIdentity(instance).capacity.memoryMiB);
@@ -131,6 +148,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
         allocationRef: ref,
         instance,
         containment: owned.containment,
+        ...(deps.outboundContainerId === undefined
+          ? {}
+          : { outboundContainerId: deps.outboundContainerId }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
@@ -145,10 +165,11 @@ export function createCloudflareContainersProviderAdapter(deps: {
     },
     async observe(ref, intent) {
       const providerRef = resolveProviderRef(ref, intent);
-      if (providerRef === null) return { status: 'unknown' };
+      const decoded = decodeCloudflareProviderRef(providerRef);
+      if (providerRef === null || decoded === null) return { status: 'unknown' };
       try {
         const observation = await withDORetry(
-          () => deps.getContainer(deps.logicalSandboxId),
+          () => containerFor(decoded),
           stub => stub.observe(providerRef),
           'observeSandboxContainers'
         );
@@ -164,14 +185,15 @@ export function createCloudflareContainersProviderAdapter(deps: {
         allocationName: deps.logicalSandboxId,
         intentId: intent?.intentId,
       };
-      if (resolved === null || decodeOwnedProviderRef(resolved) === null) {
+      const owned = decodeOwnedProviderRef(resolved);
+      if (resolved === null || owned === null) {
         logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });
         return 'retryable';
       }
       const startedAt = Date.now();
       logControlDiagnostic('native_stop', { ...diagnostic, result: 'started' });
       try {
-        const result = await deps.getContainer(deps.logicalSandboxId).stop(resolved);
+        const result = await containerFor(owned).stop(resolved);
         logControlDiagnostic('native_stop', {
           ...diagnostic,
           result,
@@ -203,7 +225,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         return;
       }
       await withDORetry(
-        () => deps.getContainer(deps.logicalSandboxId),
+        () => containerFor(decoded),
         stub => stub.ensureLeaseAtLeast(ref, ms),
         'ensureSandboxContainersLease'
       );
@@ -218,9 +240,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const decoded = decodeCloudflareProviderRef(ref);
       if (decoded === null) return `cloudflare-containers ${ref}`;
       try {
-        return await deps
-          .getContainer(deps.logicalSandboxId)
-          .readLog(ref, CONTROL_WRAPPER_LOG_PATH, LOG_MAX_BYTES);
+        return await containerFor(decoded).readLog(ref, CONTROL_WRAPPER_LOG_PATH, LOG_MAX_BYTES);
       } catch {
         return `cloudflare-containers ${ref} logs unavailable`;
       }

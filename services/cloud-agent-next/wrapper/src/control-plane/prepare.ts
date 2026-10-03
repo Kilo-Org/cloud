@@ -22,7 +22,12 @@ import {
   type ProcessOutputStream,
 } from '../utils.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
-import { formatGitResultFailure, gitOperationError, type GitRouteClass } from '../git-errors.js';
+import {
+  cleanTerminalOutput,
+  formatGitResultFailure,
+  gitOperationError,
+  type GitRouteClass,
+} from '../git-errors.js';
 import { authenticatedGitUrl } from '../control/git-url.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
 import {
@@ -30,7 +35,6 @@ import {
   type WorktreeKiloAuth,
 } from '../control/worktree-runtime.js';
 import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
-import { stripAnsi } from '../event-parser.js';
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
@@ -481,7 +485,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         properties: { command: commandNumber, commandCount: commands.length },
       });
       const output = createOutputRedactor(
-        text => redact(stripAnsi(text)),
+        text => redact(cleanTerminalOutput(text)),
         text => {
           if (signal.aborted) return;
           const cleaned = text.trim();
@@ -491,7 +495,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             type: CONTROL_PLANE_SETUP_EVENTS.output,
             properties: {
               command: commandNumber,
-              output: cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT),
+              output: `${cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT - 1)}\n`,
             },
           });
         }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { queryAnalyticsEngine, sqlDateTime, sqlString } from '@/lib/cloudflare/analytics-engine';
 import { getMonitoredModels } from '@/lib/ai-gateway/preferred-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
@@ -57,15 +57,11 @@ const BASELINE_WINDOW_COUNT = 6;
 const BucketSchema = z.enum(['current', 'previous', 'baseline']);
 type Bucket = z.infer<typeof BucketSchema>;
 
-const AnalyticsEngineResponseSchema = z.object({
-  data: z.array(
-    z.object({
-      model: z.string(),
-      bucket: BucketSchema,
-      requests: z.coerce.number(),
-      unique_users: z.coerce.number(),
-    })
-  ),
+const ModelBucketRowSchema = z.object({
+  model: z.string(),
+  bucket: BucketSchema,
+  requests: z.coerce.number(),
+  unique_users: z.coerce.number(),
 });
 
 type BucketStats = { requests: number; uniqueUsers: number };
@@ -81,14 +77,6 @@ function emptyModelStats(): ModelStats {
 
 function toAnalyticsEngineModelId(model: string): string {
   return normalizeModelId(model.toLowerCase());
-}
-
-function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
-function sqlDateTime(ms: number): string {
-  return `toDateTime(${Math.floor(ms / 1000)})`;
 }
 
 function buildHealthQuery(anchorMs: number, modelIds: readonly string[]): string {
@@ -120,29 +108,13 @@ async function queryModelStats(
   anchorMs: number,
   modelIds: readonly string[]
 ): Promise<Map<string, ModelStats>> {
-  const accountId = getEnvVariable('R2_ACCOUNT_ID');
-  const token = getEnvVariable('CF_ANALYTICS_ENGINE_TOKEN');
-  if (!accountId || !token) {
-    throw new Error('Missing Cloudflare Analytics Engine configuration');
-  }
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: buildHealthQuery(anchorMs, modelIds),
-      signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
-    }
+  const rows = await queryAnalyticsEngine(
+    buildHealthQuery(anchorMs, modelIds),
+    ModelBucketRowSchema,
+    { timeoutMs: QUERY_TIMEOUT_MS }
   );
-
-  if (!response.ok) {
-    throw new Error(`Analytics Engine query failed (${response.status}): ${await response.text()}`);
-  }
-
-  const { data } = AnalyticsEngineResponseSchema.parse(await response.json());
   const statsByModel = new Map<string, ModelStats>();
-  for (const row of data) {
+  for (const row of rows) {
     const stats = statsByModel.get(row.model) ?? emptyModelStats();
     stats[row.bucket] = { requests: row.requests, uniqueUsers: row.unique_users };
     statsByModel.set(row.model, stats);

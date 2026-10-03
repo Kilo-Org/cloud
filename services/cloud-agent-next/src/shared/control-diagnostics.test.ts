@@ -8,6 +8,56 @@ import {
 } from './control-diagnostics.js';
 
 describe('control diagnostic schema compatibility', () => {
+  it('retains no-progress tool and workload counters without accepting tool content', () => {
+    const deadline = createControlDiagnosticRecord(
+      'session.execution',
+      {
+        phase: 'deadline_expired',
+        reason: 'no_progress',
+        rootKiloSessionId: 'ses_root',
+        kiloSessionId: 'ses_child',
+        eventType: 'message.part.updated',
+        partId: 'part_1',
+        toolStatus: 'running',
+        toolObservedAt: 10,
+        outputBytes: 0,
+        command: 'secret',
+      },
+      20
+    );
+    const workload = createControlDiagnosticRecord(
+      'control.workload',
+      {
+        phase: 'completed',
+        workloadPhase: 'stats',
+        scopeId: 'scope_1',
+        memoryMaxEvents: 4,
+        cpuUsageUsec: 900,
+        cpuThrottledUsec: 75,
+        ioReadBytes: 130,
+        toolCpuUsageUsec: 800,
+        serverCpuUsageUsec: 100,
+        toolIoReadBytes: 120,
+      },
+      21
+    );
+    const records = controlLogBatchSchema.parse({
+      version: 1,
+      sequence: 1,
+      droppedRecords: 0,
+      records: [deadline, workload],
+    }).records;
+    expect(records[0]?.fields).toMatchObject({ partId: 'part_1', toolStatus: 'running' });
+    expect(records[1]?.fields).toMatchObject({
+      cpuUsageUsec: 900,
+      memoryMaxEvents: 4,
+      toolCpuUsageUsec: 800,
+      serverCpuUsageUsec: 100,
+      toolIoReadBytes: 120,
+    });
+    expect(JSON.stringify(records)).not.toContain('secret');
+  });
+
   it('accepts records written before publication diagnostics were extended', () => {
     expect(
       controlLogBatchSchema.parse({

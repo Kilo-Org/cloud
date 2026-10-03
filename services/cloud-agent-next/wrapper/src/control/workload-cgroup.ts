@@ -86,10 +86,17 @@ export type WorkloadProcessEntry = { pid: number; ppid: number; argv: string[] }
 export type WorkloadStats = {
   currentBytes?: number;
   peakBytes?: number;
+  memoryMaxEvents?: number;
+  memoryOomEvents?: number;
   oomKills: number;
   oomGroupKills: number;
   pressureSomeTotal?: number;
   pressureFullTotal?: number;
+  cpuUsageUsec?: number;
+  cpuThrottledUsec?: number;
+  cpuThrottleCount?: number;
+  ioReadBytes?: number;
+  ioWriteBytes?: number;
 };
 
 export class WorkloadUnavailableError extends Error {
@@ -139,6 +146,17 @@ export function createWorkloadReporter(report?: ControlDiagnosticReporter): Work
         fields.peakBytes ?? '',
         fields.pressureSomeTotal ?? '',
         fields.pressureFullTotal ?? '',
+        fields.memoryMaxEvents ?? '',
+        fields.memoryOomEvents ?? '',
+        fields.cpuUsageUsec ?? '',
+        fields.cpuThrottledUsec ?? '',
+        fields.cpuThrottleCount ?? '',
+        fields.ioReadBytes ?? '',
+        fields.ioWriteBytes ?? '',
+        fields.toolCpuUsageUsec ?? '',
+        fields.serverCpuUsageUsec ?? '',
+        fields.toolIoReadBytes ?? '',
+        fields.toolIoWriteBytes ?? '',
         fields.toolCount ?? '',
         fields.serverCount ?? '',
         fields.migratedCount ?? '',
@@ -259,6 +277,8 @@ export function readWorkloadStats(reference: string): WorkloadStats {
   const peak = readControl(path.join(reference, 'memory.peak'));
   const pressure = readControl(path.join(reference, 'memory.pressure'));
   const events = readControl(path.join(reference, 'memory.events'));
+  const cpu = readControl(path.join(reference, 'cpu.stat'));
+  const io = readControl(path.join(reference, 'io.stat'));
   if (current.ok) {
     const parsed = Number.parseInt(current.text.trim(), 10);
     if (Number.isSafeInteger(parsed) && parsed >= 0) stats.currentBytes = parsed;
@@ -278,7 +298,34 @@ export function readWorkloadStats(reference: string): WorkloadStats {
       if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
       if (key === 'oom_kill') stats.oomKills = parsed;
       if (key === 'oom_group_kill') stats.oomGroupKills = parsed;
+      if (key === 'max') stats.memoryMaxEvents = parsed;
+      if (key === 'oom') stats.memoryOomEvents = parsed;
     }
+  }
+  if (cpu.ok) {
+    for (const line of cpu.text.split('\n')) {
+      const [key, value] = line.trim().split(/\s+/);
+      const parsed = Number(value);
+      if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+      if (key === 'usage_usec') stats.cpuUsageUsec = parsed;
+      if (key === 'throttled_usec') stats.cpuThrottledUsec = parsed;
+      if (key === 'nr_throttled') stats.cpuThrottleCount = parsed;
+    }
+  }
+  if (io.ok) {
+    let readBytes = 0;
+    let writeBytes = 0;
+    for (const line of io.text.split('\n')) {
+      for (const token of line.trim().split(/\s+/).slice(1)) {
+        const [key, value] = token.split('=');
+        const parsed = Number(value);
+        if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+        if (key === 'rbytes') readBytes += parsed;
+        if (key === 'wbytes') writeBytes += parsed;
+      }
+    }
+    if (Number.isSafeInteger(readBytes)) stats.ioReadBytes = readBytes;
+    if (Number.isSafeInteger(writeBytes)) stats.ioWriteBytes = writeBytes;
   }
   return stats;
 }

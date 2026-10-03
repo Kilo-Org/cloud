@@ -8,8 +8,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 
-import { renderActiveAgentsWidget } from './active-agents-widget';
+import {
+  LARGE_MIN_HEIGHT_DP,
+  renderActiveAgentsWidget,
+  ROW_LABEL_MIN_WIDTH_DP,
+} from './active-agents-widget';
 import { buildAndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
+import widgetConfig from './widget-config.json';
 
 // Stub the widget primitives so the layout functions return inspectable trees
 // without loading react-native. The real components are exercised by prebuild.
@@ -32,6 +37,7 @@ type MockElement = {
     clickAction?: string;
     clickActionData?: { uri?: string };
     accessibilityLabel?: string;
+    allowFontScaling?: boolean;
     style?: { backgroundColor?: string; justifyContent?: string; height?: number };
     children?: unknown;
   };
@@ -158,6 +164,32 @@ function collectStyles(node: unknown): Record<string, unknown>[] {
   return styles;
 }
 
+/** Every text-bearing element, in tree order. Only `TextWidget` carries `text`. */
+function collectTextElements(node: unknown): MockElement[] {
+  const found: MockElement[] = [];
+  const visit = (current: unknown): void => {
+    if (current == null) {
+      return;
+    }
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        visit(item);
+      }
+      return;
+    }
+    if (typeof current !== 'object') {
+      return;
+    }
+    const element = current as MockElement;
+    if (typeof element.props.text === 'string') {
+      found.push(element);
+    }
+    visit(element.props.children);
+  };
+  visit(node);
+  return found;
+}
+
 type Cell = { width: number; height?: number; rtl?: boolean };
 
 /** The count row whose own label is `label`, found through its direct children. */
@@ -257,8 +289,11 @@ describe('renderActiveAgentsWidget', () => {
   });
 
   // Two cells wide and one tall: too narrow to run the states across, so they
-  // stack beside the mark and each one keeps its word.
-  it('stacks every state beside the mark in a short narrow cell', () => {
+  // stack beside the mark and each one keeps its word. The 48 dp chip cannot
+  // fit under four stacked rows in a ~100 dp cell — it was cut at the cell edge
+  // — so the short narrow bucket drops it and the whole surface keeps its own
+  // deep link. The chip returns as soon as the cell is tall enough.
+  it('stacks every state beside the mark in a short narrow cell, without the clipped chip', () => {
     const props = buildAndroidWidgetProps(
       snapshotFor([{ status: 'permission' }, { status: 'busy' }], 0),
       {},
@@ -267,7 +302,8 @@ describe('renderActiveAgentsWidget', () => {
       formatAgo
     );
 
-    expect(collectText(render(props, { width: 150, height: 100 }).light)).toEqual([
+    const rep = render(props, { width: 150, height: 100 });
+    expect(collectText(rep.light)).toEqual([
       '1',
       'Needs input',
       '1',
@@ -276,8 +312,40 @@ describe('renderActiveAgentsWidget', () => {
       'Scheduled',
       '0',
       'Idle',
-      'Approve',
     ]);
+    expect(
+      findElement(rep.light, element => element.props.clickAction === 'approve')
+    ).toBeUndefined();
+    // The body still opens Kilo, so the dropped chip leaves no dead tap.
+    expect(rep.light.props.clickAction).toBe('OPEN_URI');
+    expect(rep.light.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
+
+    // A taller cell has room for the chip: at 200 dp the stack bucket fits the
+    // rows and the 48 dp target.
+    const taller = render(props, { width: 150, height: 200 });
+    expect(collectText(taller.light)).toContain('Approve');
+  });
+
+  // The empty and idle-only states were the ones whose New agent chip was cut
+  // at the cell edge: the chip plus the reserved line and the body needed more
+  // than the one-cell height. The short bucket drops the chrome instead, and
+  // the deep link still opens Kilo.
+  it('drops the New agent chip rather than clipping it in a short empty cell', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
+
+    const short = render(props, { width: 150, height: 100 }).light;
+    expect(collectText(short)).toEqual(['No agents waiting']);
+    expect(
+      findElement(short, element => element.props.clickAction === 'new-agent')
+    ).toBeUndefined();
+    expect(short.props.clickAction).toBe('OPEN_URI');
+
+    // The tall cell draws the chip, centred in its full 48 dp target.
+    const tall = render(props, { width: 250, height: 200 }).light;
+    expect(collectText(tall)).toEqual(['No agents waiting', 'New agent']);
+    expect(
+      findElement(tall, element => element.props.clickAction === 'new-agent')?.props.style?.height
+    ).toBe(48);
   });
 
   it('draws every state at a small width too, zeros included', () => {
@@ -555,6 +623,65 @@ describe('renderActiveAgentsWidget', () => {
     expect(rep.light.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
     expect(rep.dark.props.clickAction).toBe('OPEN_URI');
     expect(rep.dark.props.clickActionData).toEqual({ uri: 'kiloapp:///cloud/sessions' });
+  });
+
+  // A widget cell is a fixed frame with no scrolling and no reflow, so text that
+  // scaled with the system font size pushed the mark, the reserved newest line,
+  // and the 48 dp chip outside it at Large system text. Every label is pinned to
+  // its own dp size instead, in every bucket and on both themes.
+  it('pins every label to the cell size so Large system text cannot overflow it', () => {
+    const wake = new Date(NOW + 7_200_000).toISOString();
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    const props = buildAndroidWidgetProps(
+      snapshotFor(
+        [
+          { status: 'permission' },
+          { status: 'busy', statusUpdatedAt: NEWEST_AT },
+          { status: 'scheduled', scheduledAt: wake },
+        ],
+        0
+      ),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+
+    // One cell of each bucket, and the resize cap's own corner.
+    for (const cell of [
+      { width: 120, height: 100 },
+      { width: 250, height: 100 },
+      { width: 250, height: 200 },
+      { width: 250, height: 260 },
+      { width: 400, height: 400 },
+    ]) {
+      const rep = render(props, cell);
+      for (const [theme, surface] of Object.entries(rep)) {
+        const labels = collectTextElements(surface);
+        expect(labels.length).toBeGreaterThan(0);
+        for (const label of labels) {
+          expect(
+            label.props.allowFontScaling,
+            `${theme} text \`${label.props.text}\` at ${cell.width}x${cell.height}`
+          ).toBe(false);
+        }
+      }
+    }
+  });
+});
+
+// The labelled row and the large card are unreachable if the resize cap stops a
+// step short of their bounds, however correct the buckets are.
+describe('the widget resize cap', () => {
+  it('reaches the labelled row and the large card', () => {
+    const widget = widgetConfig.widgets.find(entry => entry.name === 'ActiveAgentsWidget');
+
+    expect(Number.parseInt(widget?.maxResizeWidth ?? '0', 10)).toBeGreaterThanOrEqual(
+      ROW_LABEL_MIN_WIDTH_DP
+    );
+    expect(Number.parseInt(widget?.maxResizeHeight ?? '0', 10)).toBeGreaterThanOrEqual(
+      LARGE_MIN_HEIGHT_DP
+    );
   });
 });
 

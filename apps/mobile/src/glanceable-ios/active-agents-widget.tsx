@@ -8,6 +8,7 @@ import {
   containerBackground,
   controlSize,
   cornerRadius,
+  type dynamicTypeSize,
   environment,
   font,
   foregroundStyle,
@@ -105,9 +106,25 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
       : String(value);
 
   const family = widgetEnvironment.widgetFamily;
-  const counts = props.countLines ?? [];
+  // Guarded, not a bare `?? []`: a widget extension can evaluate this layout
+  // against props a *different* app version wrote to the app group (a placed
+  // widget keeps its stored timeline across an app update), and a non-array or
+  // a null row would throw out of `counts.map` — which expo-widgets renders as
+  // a red error box in every family, the gallery placeholder included.
+  const counts = (Array.isArray(props.countLines) ? props.countLines : []).filter(
+    // eslint-disable-next-line anti-slop/no-runtime-typeof, typescript-eslint/no-unnecessary-condition -- the widget process reads raw app-group JSON, not the typed props vitest renders
+    line => line !== null && typeof line === 'object'
+  );
   const primaryLabel = props.primaryLabel ?? null;
   const primaryKind = props.primaryKind ?? null;
+  // The Home Screen families share the card's single content-row height budget,
+  // so all three draw the count rows small enough that four rows, the reserved
+  // slot and the action row still fit at the Dynamic Type ceiling set below.
+  // The small square is the tightest: its 158 pt frame leaves about 126 pt of
+  // content, so its four rows step down to `caption2` and the medium row and
+  // the tall large card keep the larger `caption` and `subheadline`.
+  const denseRows = family !== 'systemLarge';
+  const squareRows = family === 'systemSmall';
   // Only the medium row is wide enough for a wait beside the label; in the
   // small square the pair wraps and truncates both halves.
   const wide = family === 'systemMedium';
@@ -130,6 +147,18 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     scheduled: { icon: 'clock', color: PlatformColor('label') },
     idle: { icon: 'circle', color: PlatformColor('label') },
   } as const;
+
+  // Total, never a bare index: a stale timeline entry or an older app version
+  // can name a kind this build does not draw, and `GLYPH[unknown].icon` would
+  // throw during stringified evaluation — the red error box the widget shows in
+  // every family when the layout raises. An unknown kind falls back to the
+  // neutral idle mark instead of blanking the surface.
+  const glyphFor = (kind: string | null | undefined) => {
+    if (kind !== null && kind !== undefined && Object.hasOwn(GLYPH, kind)) {
+      return GLYPH[kind as keyof typeof GLYPH];
+    }
+    return GLYPH.idle;
+  };
 
   const primaryForeground = foregroundStyle(PlatformColor('label'));
   // `secondaryLabel` in both appearances: `tertiaryLabel` on the light widget
@@ -167,11 +196,17 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     isPrimary: boolean,
     compact: boolean
   ) => {
-    const glyph = GLYPH[line.kind as keyof typeof GLYPH];
+    const glyph = glyphFor(line.kind);
     // Every row shares one type size and one glyph size so the counts and the
     // labels line up on a grid; only the label colour ranks them, because a
-    // second font size in a three-row list reads as a mistake.
-    const textStyle = compact ? 'caption' : 'subheadline';
+    // second font size in a three-row list reads as a mistake. The small square
+    // draws the rows at `caption2`, the medium row at `caption`, and only the
+    // tall large card keeps the larger `subheadline`; `compact` is the Lock
+    // Screen rectangle.
+    let textStyle: 'caption' | 'caption2' | 'subheadline' = 'subheadline';
+    if (compact || denseRows) {
+      textStyle = squareRows && !compact ? 'caption2' : 'caption';
+    }
     // One time at most per row: a needs-input wait or a scheduled wake, never
     // both. The wait renders as a relative duration ("28 min") and the wake as
     // an absolute clock time ("9:00 AM"): a wait is an interval the user is
@@ -238,8 +273,8 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
       <VStack alignment="center" spacing={0} modifiers={[widgetURL('kiloapp:///cloud/sessions')]}>
         {primaryKind === null ? null : (
           <Image
-            systemName={GLYPH[primaryKind as keyof typeof GLYPH].icon}
-            color={GLYPH[primaryKind as keyof typeof GLYPH].color}
+            systemName={glyphFor(primaryKind).icon}
+            color={glyphFor(primaryKind).color}
             size={17}
           />
         )}
@@ -267,9 +302,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         spacing={4}
         modifiers={[widgetURL('kiloapp:///cloud/sessions'), ...a11y]}
       >
-        {primaryKind === null ? null : (
-          <Image systemName={GLYPH[primaryKind as keyof typeof GLYPH].icon} size={12} />
-        )}
+        {primaryKind === null ? null : <Image systemName={glyphFor(primaryKind).icon} size={12} />}
         <Text>{label}</Text>
       </HStack>
     );
@@ -298,7 +331,10 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   }
 
   const systemRows = hasCounts ? (
-    <VStack alignment="leading" spacing={wide ? 6 : 4}>
+    // The Home Screen families keep the four rows inside one fixed card height,
+    // so the medium row and the small square run them tighter than the tall
+    // large card, whose extra height affords the wider gap.
+    <VStack alignment="leading" spacing={family === 'systemLarge' ? 4 : 2}>
       {counts.map(line => countRow(line, line.kind === primaryKind, false))}
     </VStack>
   ) : (
@@ -317,17 +353,36 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // process evaluates it against widget globals, so a module-scope binding
   // would be a `ReferenceError` at render. The literal copy fallbacks follow
   // the same rule as `COPY` above: the widget process is the only consumer.
-  const NEWEST_SLOT_HEIGHT = 14;
+  const NEWEST_SLOT_HEIGHT = 16;
   // The press patch carries which action was pressed, so the slot names it
   // instead of always reading "Approving…" under a New agent tap. The baked
   // fallbacks carry the typographic ellipsis their catalog keys use
   // (`common.starting`, `glanceable.approving`), so the gallery placeholder
   // matches the pushed copy in this same reserved slot.
+  //
+  // A press marker never draws on a settled surface. A widget button's App
+  // Intent runs in the widget extension and does not foreground the app, so the
+  // marker it writes into the stored timeline is cleared only by the next sweep
+  // (see `hasPressMarker` in widget-actions). Until then it must not hold
+  // "Starting…" beside populated counts: a marker that names a known action —
+  // the owner's stored `pendingAction: 'new-agent'`, `pendingActionVisible:
+  // true` on an idle-only tray — still drew the lingering start line. The line
+  // draws only where no count rows are drawn, so it cannot contradict data the
+  // app has already answered with; the sweep clears the marker from the
+  // timeline, and the app's own `newestTitle` still reaches the slot on every
+  // surface.
+  const pendingActionKind: GlanceableWidgetAction | null =
+    props.pendingAction === 'approve' || props.pendingAction === 'new-agent'
+      ? props.pendingAction
+      : null;
   const pressCopy =
-    props.pendingAction === 'new-agent'
+    pendingActionKind === 'new-agent'
       ? (COPY.starting ?? 'Starting…')
       : (COPY.approving ?? 'Approving…');
-  const newestLine = props.pendingActionVisible === true ? pressCopy : (props.newestTitle ?? null);
+  const newestLine =
+    props.pendingActionVisible === true && pendingActionKind !== null && counts.length === 0
+      ? pressCopy
+      : (props.newestTitle ?? null);
   const actions = props.actions ?? { approve: false, newAgent: false };
   // The slot is laid out whether or not it carries a line, so a title arriving
   // after a process restart, the press line taking the slot, and the answer
@@ -387,9 +442,25 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     </HStack>
   );
 
+  // Home Screen text cannot grow without bound: the four count rows, the
+  // reserved slot and the action row share one fixed card height, so the small
+  // square and the medium row cap growth at the default body size and the tall
+  // large card caps at an accessibility size. The factory is read off the
+  // widget global, not the imported binding: the stringified layout is
+  // evaluated in the widget process against widget globals, and the vitest
+  // swift-ui mock does not list `dynamicTypeSize`, so the import is only a type
+  // and a missing factory (an older `@expo/ui`, or the test harness) simply
+  // leaves the text uncapped.
+  const typeCeiling = family === 'systemLarge' ? 'accessibility2' : 'large';
+  const widgetGlobals = globalThis as typeof globalThis & {
+    dynamicTypeSize?: typeof dynamicTypeSize;
+  };
+  const typeCap = widgetGlobals.dynamicTypeSize;
+  const typeModifiers = typeCap === undefined ? [] : [typeCap({ max: typeCeiling })];
   const systemModifiers = [
     widgetURL('kiloapp:///cloud/sessions'),
     containerBackground(PlatformColor('systemBackground'), 'widget'),
+    ...typeModifiers,
     ...a11y,
   ];
 
@@ -412,8 +483,8 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     return (
       <HStack alignment="center" spacing={6}>
         <Image
-          systemName={GLYPH[newestResultKind].icon}
-          color={GLYPH[newestResultKind].color}
+          systemName={glyphFor(newestResultKind).icon}
+          color={glyphFor(newestResultKind).color}
           size={13}
         />
         <Text
@@ -464,7 +535,7 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     return (
       <VStack alignment="leading" spacing={10} modifiers={systemModifiers}>
         <HStack alignment="center" spacing={8}>
-          {logo(26)}
+          {logo(24)}
           <Spacer />
         </HStack>
         <Spacer />
@@ -477,12 +548,14 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
 
   // The medium family is wide, not tall: the mark sits beside the rows and the
   // whole block centres, the same composition as the Live Activity banner. A
-  // vertical layout there left the right half of the card empty.
+  // vertical layout there left the right half of the card empty. The body
+  // column's spacing is tightened so the four rows, the reserved slot and the
+  // action row stay inside the card's ~126 pt content box.
   if (wide) {
     return (
-      <HStack alignment="center" spacing={14} modifiers={systemModifiers}>
-        {logo(34)}
-        <VStack alignment="leading" spacing={6}>
+      <HStack alignment="center" spacing={12} modifiers={systemModifiers}>
+        {logo(28)}
+        <VStack alignment="leading" spacing={3}>
           {systemRows}
           {newestSlot}
           {actions.approve || actions.newAgent ? actionButtons : null}
@@ -491,21 +564,21 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     );
   }
 
+  // The small square is the tightest Home Screen family: four `caption2` count
+  // rows, the reserved slot and the action row need about 112 pt of the ~126 pt
+  // content box. The mark cannot also fit above them — that was what overflowed
+  // and clipped both the mark and the button — so it sits beside the body, the
+  // same composition as the medium row, and every element stays inside the
+  // frame.
   return (
-    <VStack alignment="leading" spacing={8} modifiers={systemModifiers}>
-      <HStack alignment="center" spacing={8}>
-        {logo(26)}
-        <Spacer />
-      </HStack>
-      {/* The mark sits at the top and the counts at the bottom, so the card
-          reads as one composed block. The newest slot reserves its line in
-          every state, so an arriving title or an action's progress line moves
-          nothing above it. */}
-      <Spacer />
-      {systemRows}
-      {newestSlot}
-      {actions.approve || actions.newAgent ? actionButtons : null}
-    </VStack>
+    <HStack alignment="center" spacing={8} modifiers={systemModifiers}>
+      {logo(18)}
+      <VStack alignment="leading" spacing={3}>
+        {systemRows}
+        {newestSlot}
+        {actions.approve || actions.newAgent ? actionButtons : null}
+      </VStack>
+    </HStack>
   );
 };
 

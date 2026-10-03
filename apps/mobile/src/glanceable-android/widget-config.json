@@ -6,8 +6,8 @@
       "minHeight": "40dp",
       "targetCellWidth": 4,
       "targetCellHeight": 4,
-      "maxResizeWidth": "360dp",
-      "maxResizeHeight": "360dp",
+      "maxResizeWidth": "400dp",
+      "maxResizeHeight": "400dp",
       "resizeMode": "horizontal|vertical",
       "updatePeriodMillis": 1800000
     }

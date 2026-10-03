@@ -20,7 +20,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import {
-  SANDBOX_STATUS_POLL_INTERVAL_MS,
   observeSandboxStatus,
   sandboxStatusPresentation,
   type SandboxStatusPresentation,
@@ -211,8 +210,7 @@ export function SandboxStatusIndicator({
           : trpcClient.cloudAgentNext.getSandboxStatus.query({ cloudAgentSessionId }, { signal })
       ),
     enabled: observation.enabled,
-    refetchInterval: observation.enabled ? SANDBOX_STATUS_POLL_INTERVAL_MS : false,
-    refetchIntervalInBackground: false,
+    refetchInterval: false,
     refetchOnWindowFocus: 'always',
     refetchOnReconnect: 'always',
     refetchOnMount: 'always',

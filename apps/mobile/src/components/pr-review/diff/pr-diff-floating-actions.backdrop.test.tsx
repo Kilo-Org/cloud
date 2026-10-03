@@ -39,9 +39,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 vi.mock('@/components/ui/icons', () => ({
-  Check: () => null,
   MessageCirclePlus: () => null,
-  X: () => null,
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({

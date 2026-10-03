@@ -82,7 +82,6 @@ import {
   useSessionAutoApproveEnabled,
 } from '@/components/agents/session-auto-approve';
 import { SessionPrBadge } from '@/components/agents/session-pr-badge';
-import { normalizePrBadgeState } from '@/components/agents/session-pr-badge-model';
 import { selectSessionCostInputs } from '@/components/agents/session-list-helpers';
 import { buildRemoteAttachmentParts } from '@/components/agents/mobile-session-manager-helpers';
 import { isCancelQueuedUpgradeRequired } from '@/components/agents/mobile-session-manager';
@@ -1798,21 +1797,8 @@ export function SessionDetailContent({
       />
     </View>
   );
-  // The PR badge shares the goal row, and only an active goal with a still-open
-  // PR shows it: the pill belongs to the running objective's trailing slot. A
-  // paused/completed/blocked goal keeps its own status, text, reason, chevron,
-  // and actions intact but renders no pill, and a merged/closed PR renders none
-  // either, so no trailing gutter is reserved. `normalizePrBadgeState` still maps
-  // the backend's `unknown` (a linked PR not yet in the branch cache) onto the
-  // badge model, but `unknown` is not active here: only open/draft counts, so the
-  // pill does not reserve space while the PR resolves. The row mounts whenever a
-  // goal exists or the pill shows; a no-goal, no-pill session reserves no row and
-  // the transcript never jumps when the fetch lands with nothing.
   const associatedPr = fetchedData?.associatedPr ?? null;
-  const prState = associatedPr === null ? null : normalizePrBadgeState(associatedPr.state);
-  const isActivePr = prState === 'open' || prState === 'draft';
-  const showPrBadge = sessionGoal?.status === 'active' && isActivePr;
-  const prBadge = <SessionPrBadge pr={associatedPr} loading={false} />;
+  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : undefined;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -2236,7 +2222,7 @@ export function SessionDetailContent({
               />
             </Animated.View>
           ) : null}
-          {sessionGoal !== null || showPrBadge ? (
+          {sessionGoal !== null ? (
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
@@ -2245,7 +2231,7 @@ export function SessionDetailContent({
               <SessionGoalSection
                 goal={sessionGoal}
                 collapsed={goalCollapsed}
-                trailing={showPrBadge ? prBadge : undefined}
+                trailing={prBadge}
                 onToggleCollapsed={() => {
                   toggleSessionGoalCollapsed(sessionId);
                 }}

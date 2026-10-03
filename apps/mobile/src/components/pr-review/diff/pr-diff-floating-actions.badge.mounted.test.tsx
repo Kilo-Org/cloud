@@ -1,17 +1,16 @@
 // Spot check e1-select-line / e1-line1-comment: the Finish review count badge
-// rode the control's top-right corner (`absolute -right-1.5 -top-1.5`), so the
-// opaque pill drew over the icon (and, as an absolute node, grew over it at
-// large text scales). The earlier repairs pinned the bar's container and
-// footer classes, never the badge's own placement inside the button, so the
-// overlap survived them. This file mounts the real `PrDiffFloatingActions`
-// inside the real `Button` (the composed render path the e1 screenshots show:
-// a GitLab MR, a line selected so the Comment row is up, a non-empty pending
-// queue) and pins what makes the overlap structurally impossible: the badge is
-// an in-flow sibling AFTER the Check icon in the button's `flex-row
-// items-center justify-center gap-2` line, no node in the whole tree is
-// absolute, and a two-digit count behaves the same. Mutation-inversion gate:
-// re-anchoring the badge with an `absolute` corner (or wrapping the icon in a
-// `relative` View) must fail tests 1–3.
+// rode the label's top-right corner (`absolute -right-2.5 -top-2.5`), so the
+// opaque pill drew over the last glyphs of the label. The earlier repairs
+// pinned the bar's container and footer classes, never the badge's own
+// placement inside the button, so the overlap survived them. This file mounts
+// the real `PrDiffFloatingActions` inside the real `Button` (the composed
+// render path the e1 screenshots show: a GitLab MR, a line selected so the
+// Comment row is up, a non-empty pending queue) and pins what makes the
+// overlap structurally impossible: the badge is an in-flow sibling AFTER the
+// label in the button's `flex-row items-center justify-center gap-2` line,
+// no node in the whole tree is absolute, and a two-digit count behaves the
+// same. Mutation-inversion gate: re-wrapping the label in a `relative` View
+// with an `absolute` badge must fail tests 1–3.
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -56,9 +55,7 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 vi.mock('@/components/ui/icons', () => ({
-  Check: 'Check',
   MessageCirclePlus: () => null,
-  X: 'X',
 }));
 // The real Button reaches the UI spinner through its loading arm; the real
 // spinner pulls the motion policy (expo-battery), which this harness does not
@@ -193,11 +190,11 @@ function finishReviewButton(
 }
 
 describe('Finish review count badge placement (spot check e1)', () => {
-  it('lays the badge out in-flow after the icon, never over it', () => {
+  it('lays the badge out in-flow after the label, never over it', () => {
     const renderer = mountBar(3);
     const button = finishReviewButton(renderer);
     const buttonClasses = classesOf(button);
-    // The button is the row that spaces icon and badge apart.
+    // The button is the row that spaces label and badge apart.
     expect(buttonClasses).toContain('flex-row');
     expect(buttonClasses).toContain('items-center');
     expect(buttonClasses).toContain('justify-center');
@@ -205,18 +202,19 @@ describe('Finish review count badge placement (spot check e1)', () => {
 
     const kids = instanceChildren(button);
     expect(kids).toHaveLength(2);
-    const icon = hostRoot(childAt(button, 0));
-    expect(String(icon.type)).toBe('Check');
+    const label = hostRoot(childAt(button, 0));
+    expect(String(label.type)).toBe('RNText');
+    expect(hostText(label)).toBe('Finish review');
     const badge = childAt(button, 1);
     expect(String(badge.type)).toBe('View');
     expect(classesOf(badge)).toContain('rounded-full');
-    // The defect: the badge was anchored to the icon's corner with negative
-    // offsets, so it drew over the icon. In-flow it cannot.
+    // The defect: the badge was anchored to the label's corner with negative
+    // offsets, so it drew over the last glyphs. In-flow it cannot.
     expect(classesOf(badge)).not.toContain('absolute');
     expect(styleOf(badge).position).not.toBe('absolute');
     expect(styleOf(badge).right).toBeUndefined();
     expect(styleOf(badge).top).toBeUndefined();
-    // The badge is a direct sibling of the icon in the button row, after it.
+    // The badge is a direct sibling of the label in the button row, after it.
     expect(badge.parent).toBe(button);
     expect(hostText(hostRoot(childAt(badge, 0)))).toBe('3');
   });
@@ -242,11 +240,11 @@ describe('Finish review count badge placement (spot check e1)', () => {
     expect(hostText(hostRoot(childAt(badge, 0)))).toBe('12');
   });
 
-  it('renders the icon alone when the pending queue is empty', () => {
+  it('renders the label alone when the pending queue is empty', () => {
     const renderer = mountBar(0);
     const button = finishReviewButton(renderer);
     expect(instanceChildren(button)).toHaveLength(1);
-    expect(String(hostRoot(childAt(button, 0)).type)).toBe('Check');
+    expect(hostText(hostRoot(childAt(button, 0)))).toBe('Finish review');
     const badges = renderer.root.findAll(node => classesOf(node).includes('rounded-full'));
     expect(badges).toHaveLength(0);
   });

@@ -186,10 +186,8 @@ it.each(cases)('bounds the existing stop snapshot: $name', async scenario => {
         pending.push(promise);
       },
     });
-    const persistStop = vi.fn(async (received: unknown, stoppedAtMs?: number) => {
+    const persistStop = vi.fn(async (_received: unknown, _stoppedAtMs?: number) => {
       order.push('persist_stop');
-      expect(received).toEqual(params);
-      expect(stoppedAtMs).toBe(scenario.stoppedAtMs ?? 1000);
       return undefined;
     });
     lifecycle.attachHeartbeat({
@@ -221,6 +219,7 @@ it.each(cases)('bounds the existing stop snapshot: $name', async scenario => {
       expect(timers).not.toHaveBeenCalled();
       expect(order).toEqual(['cleanup', 'existing_state_read', 'persist_stop']);
       expect(persistStop).toHaveBeenCalledOnce();
+      expect(persistStop).toHaveBeenCalledWith(params, scenario.stoppedAtMs ?? 1000);
       expect(await ctx.storage.list()).toEqual(before);
       const logs = output.mock.calls
         .flat()

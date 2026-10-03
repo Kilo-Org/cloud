@@ -123,6 +123,11 @@ describe('filterLiveSidebarSessions', () => {
     ).toEqual(['ses_remote']);
   });
 
+  it('matches nothing for a query that reduces to an empty needle', () => {
+    expect(filterLiveSidebarSessions(liveSessions, { ...noQuery, searchQuery: '#' })).toEqual([]);
+    expect(filterLiveSidebarSessions(liveSessions, { ...noQuery, searchQuery: '   ' })).toEqual([]);
+  });
+
   it('matches the search against the branch', () => {
     const withBranch = [
       ...liveSessions,

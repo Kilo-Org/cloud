@@ -58,23 +58,27 @@ function livePlatformBucket(createdOnPlatform: string | undefined): string | nul
  * stored list's query, including "other" matching any origin the platform
  * catalogue does not name.
  */
+function matchesLivePlatformBucket(
+  session: LiveSidebarSession,
+  selectedPlatforms: ReadonlySet<string>
+): boolean {
+  const bucket = livePlatformBucket(session.createdOnPlatform);
+  if (bucket === null) return false;
+  return selectedPlatforms.has(bucket);
+}
+
 export function matchesLivePlatformFilter(
   session: LiveSidebarSession,
   platformFilter: readonly string[]
 ): boolean {
   if (platformFilter.length === 0) return true;
-  const bucket = livePlatformBucket(session.createdOnPlatform);
-  if (bucket === null) return false;
-  const selected = new Set(platformFilterValues(platformFilter));
-  return selected.has(bucket);
+  return matchesLivePlatformBucket(session, new Set(platformFilterValues(platformFilter)));
 }
 
 /** Matches what the stored list matches: id, title, repository, and branch. */
 function matchesLiveSearch(session: LiveSidebarSession, needle: string): boolean {
-  const normalizedNeedle = needle.startsWith('#') ? needle.slice(1) : needle;
-  if (normalizedNeedle.length === 0) return true;
   return [session.title, session.id, session.gitUrl, session.gitBranch].some(value =>
-    value?.toLowerCase().includes(normalizedNeedle)
+    value?.toLowerCase().includes(needle)
   );
 }
 
@@ -92,16 +96,22 @@ export function filterLiveSidebarSessions<T extends LiveSidebarSession>(
   sessions: readonly T[],
   query: LiveSidebarQuery
 ): T[] {
-  const needle = query.searchQuery.trim().toLowerCase();
+  // Mirrors the stored search: trim, lower-case, one leading `#` stripped. A
+  // query that reduces to an empty needle matches nothing rather than
+  // everything, which is what the stored search does with it.
+  const trimmedQuery = query.searchQuery.trim().toLowerCase();
+  const needle = trimmedQuery.startsWith('#') ? trimmedQuery.slice(1) : trimmedQuery;
+  const isSearchActive = query.searchQuery.length > 0;
+  const selectedPlatforms = new Set(platformFilterValues(query.platformFilter));
   const selectedProjects = new Set(query.projectFilter.map(normalizeGitUrl));
   return sessions.filter(session => {
+    const platformMatches =
+      selectedPlatforms.size === 0 || matchesLivePlatformBucket(session, selectedPlatforms);
     const projectMatches =
       selectedProjects.size === 0 ||
       (session.gitUrl != null && selectedProjects.has(normalizeGitUrl(session.gitUrl)));
-    return (
-      matchesLivePlatformFilter(session, query.platformFilter) &&
-      projectMatches &&
-      (!needle || matchesLiveSearch(session, needle))
-    );
+    const searchMatches =
+      !isSearchActive || (needle.length > 0 && matchesLiveSearch(session, needle));
+    return platformMatches && projectMatches && searchMatches;
   });
 }

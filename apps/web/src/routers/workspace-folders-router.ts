@@ -137,9 +137,9 @@ function assertOwnedLiveWorktree(
 async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, worktreeId: string) {
   let [worktree] = await worktreeForUpdate(tx, worktreeId);
   if (!worktree) {
-    const roots = await ownedRootSessions(tx, scope, worktreeId).for('update');
-    let firstRoot: (typeof roots)[number] | undefined;
-    for (const root of roots) {
+    const candidates = await ownedRootSessions(tx, scope, worktreeId);
+    let firstRoot: (typeof candidates)[number] | undefined;
+    for (const root of candidates) {
       if (!workspaceSessionIdSchema.safeParse(root.cloudAgentSessionId).success) continue;
       if (!firstRoot || root.createdAt < firstRoot.createdAt) firstRoot = root;
     }
@@ -159,7 +159,12 @@ async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, w
   }
 
   assertOwnedLiveWorktree(worktree, scope);
-  await ownedRootSessions(tx, scope, worktreeId).for('update');
+  const roots = await ownedRootSessions(tx, scope, worktreeId).for('update');
+  if (
+    !roots.some(root => workspaceSessionIdSchema.safeParse(root.cloudAgentSessionId).success)
+  ) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+  }
 }
 
 export const workspaceFoldersRouter = createTRPCRouter({

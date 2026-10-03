@@ -17,7 +17,8 @@ import { ArrowDown, GitBranch, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { KiloSessionId, SessionCommit } from '@kilocode/cloud-agent-sdk';
 import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
@@ -57,6 +58,7 @@ import { SessionContinuationPanel } from './SessionContinuationPanel';
 import { CloudAgentTerminalPane } from './CloudAgentTerminalDock';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
 import { OlderMessagesHeader } from './OlderMessagesHeader';
+import { resolveTranscriptPhase, transcriptReadyForEffects } from './transcript-switch';
 import {
   OLDER_MESSAGES_NEAR_BOTTOM_PX,
   shouldAnnounceOlderMessagesArrival,
@@ -103,7 +105,7 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
-import type { AgentMode } from './types';
+import type { AgentMode, StoredMessage } from './types';
 import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { WorkspaceTabId } from './workspace-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
@@ -239,6 +241,7 @@ export default function CloudChatPage({
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
   const anchorMessageIdFromParams = searchParams?.get('at') ?? null;
+  const [lastStartedSessionId, setLastStartedSessionId] = useState<string | null>(null);
   useEffect(() => {
     childSessionDrawerFocusTargetRef.current = null;
     setChildSessionStack([]);
@@ -246,8 +249,10 @@ export default function CloudChatPage({
     setPreparationDrawerAttemptId(null);
     closeChangesView();
     if (sessionIdFromParams) {
+      setLastStartedSessionId(sessionIdFromParams);
       void manager.switchSession(sessionIdFromParams as KiloSessionId);
     } else {
+      setLastStartedSessionId(null);
       manager.destroy();
     }
   }, [sessionIdFromParams, manager, closeChangesView]);
@@ -290,6 +295,17 @@ export default function CloudChatPage({
   const totalCostUsd = isCurrentSession
     ? getSessionTotalCostUsd(fetchedSessionData?.totalCostMicrodollars, liveTotalCostUsd)
     : 0;
+  const transcriptMessageCount = staticMessages.length + dynamicMessages.length;
+  const terminalOpenFailure = statusIndicator?.type === 'error';
+  const transcriptPhase = resolveTranscriptPhase({
+    requestedSessionId: sessionIdFromParams,
+    lastStartedSessionId,
+    ownerSessionId: fetchedSessionData?.kiloSessionId ?? null,
+    isLoading,
+    hasMessages: transcriptMessageCount > 0,
+    terminalOpenFailure,
+  });
+  const transcriptReady = transcriptReadyForEffects(transcriptPhase);
   const getCurrentSessionCostBreakdown = useCallback(
     () =>
       getSessionCostBreakdown(
@@ -352,11 +368,36 @@ export default function CloudChatPage({
   const fileScope = JSON.stringify([currentUserId, organizationId, sessionIdFromParams, sessionId]);
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
-  const commitsAfterMessage = useMemo(
-    () =>
-      commitsByMessageAnchor([...staticMessages, ...dynamicMessages], filesVisible ? commits : []),
-    [commits, dynamicMessages, filesVisible, staticMessages]
+  const [commitsCache, setCommitsCache] = useState<{
+    infos: StoredMessage['info'][];
+    commits: readonly SessionCommit[];
+    filesVisible: boolean;
+    value: ReadonlyMap<string, readonly SessionCommit[]>;
+  } | null>(null);
+  const messageInfosForCommits = [...staticMessages, ...dynamicMessages].map(
+    message => message.info
   );
+  let commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>;
+  if (
+    commitsCache !== null &&
+    commitsCache.filesVisible === filesVisible &&
+    commitsCache.commits === commits &&
+    commitsCache.infos.length === messageInfosForCommits.length &&
+    commitsCache.infos.every((info, index) => info === messageInfosForCommits[index])
+  ) {
+    commitsAfterMessage = commitsCache.value;
+  } else {
+    commitsAfterMessage = commitsByMessageAnchor(
+      [...staticMessages, ...dynamicMessages],
+      filesVisible ? commits : []
+    );
+    setCommitsCache({
+      infos: messageInfosForCommits,
+      commits,
+      filesVisible,
+      value: commitsAfterMessage,
+    });
+  }
   const currentTodos = useMemo(
     () => (isCurrentSession ? getCurrentTodos([...staticMessages, ...dynamicMessages]) : null),
     [dynamicMessages, isCurrentSession, staticMessages]
@@ -504,6 +545,7 @@ export default function CloudChatPage({
     lastScrollTopRef,
     resetKey: sessionIdFromParams,
     overflowCheckKey: `${chatTabActive}:${staticMessages.length + dynamicMessages.length}`,
+    ready: transcriptReady,
   });
 
   const autoScrollFrameRef = useRef(0);
@@ -571,11 +613,11 @@ export default function CloudChatPage({
   }, [chatUI.shouldAutoScroll]);
 
   useEffect(() => {
-    if (!chatTabActive) cancelScheduledAutoScroll();
-  }, [cancelScheduledAutoScroll, chatTabActive]);
+    if (!chatTabActive || transcriptPhase === 'opening') cancelScheduledAutoScroll();
+  }, [cancelScheduledAutoScroll, chatTabActive, transcriptPhase]);
 
   useEffect(() => {
-    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
+    if (!transcriptReady || !chatTabActive || !chatUI.shouldAutoScroll) return;
     scheduleScrollToBottom();
   }, [
     staticMessages,
@@ -583,10 +625,11 @@ export default function CloudChatPage({
     chatTabActive,
     chatUI.shouldAutoScroll,
     scheduleScrollToBottom,
+    transcriptReady,
   ]);
 
   useEffect(() => {
-    if (!chatTabActive || !chatUI.shouldAutoScroll) return;
+    if (!transcriptReady || !chatTabActive || !chatUI.shouldAutoScroll) return;
     if (typeof ResizeObserver === 'undefined') return;
 
     const content = messagesContentRef.current;
@@ -597,7 +640,7 @@ export default function CloudChatPage({
     });
     observer.observe(content);
     return () => observer.disconnect();
-  }, [chatTabActive, chatUI.shouldAutoScroll, scheduleScrollToBottom]);
+  }, [chatTabActive, chatUI.shouldAutoScroll, scheduleScrollToBottom, transcriptReady]);
 
   useEffect(() => {
     if (!sessionIdFromParams) return;
@@ -616,27 +659,33 @@ export default function CloudChatPage({
     olderArrivalNewestKeyRef.current = null;
     setOlderArrivalAnnouncement('');
     setShowScrollButton(false);
-    if (!resuming) scheduleScrollToBottom();
-  }, [anchorMessageIdFromParams, sessionIdFromParams, setChatUI, scheduleScrollToBottom]);
+  }, [anchorMessageIdFromParams, sessionIdFromParams, setChatUI]);
 
   useEffect(() => {
-    const newest = dynamicMessages.at(-1)?.info.id ?? staticMessages.at(-1)?.info.id ?? null;
-    const nextCount = staticMessages.length + dynamicMessages.length;
+    if (!transcriptReady || anchorMessageIdFromParams) return;
+    scheduleScrollToBottom();
+  }, [anchorMessageIdFromParams, scheduleScrollToBottom, transcriptReady]);
+
+  const newestTranscriptMessageId =
+    dynamicMessages.at(-1)?.info.id ?? staticMessages.at(-1)?.info.id ?? null;
+
+  useEffect(() => {
+    if (!transcriptReady) return;
     if (
       shouldAnnounceOlderMessagesArrival({
         wasInitialized: olderArrivalInitializedRef.current,
         previousCount: olderArrivalCountRef.current,
-        nextCount,
+        nextCount: transcriptMessageCount,
         previousNewestKey: olderArrivalNewestKeyRef.current,
-        nextNewestKey: newest,
+        nextNewestKey: newestTranscriptMessageId,
       })
     ) {
       setOlderArrivalAnnouncement('Earlier messages loaded');
     }
     olderArrivalInitializedRef.current = true;
-    olderArrivalCountRef.current = nextCount;
-    olderArrivalNewestKeyRef.current = newest;
-  }, [dynamicMessages, staticMessages]);
+    olderArrivalCountRef.current = transcriptMessageCount;
+    olderArrivalNewestKeyRef.current = newestTranscriptMessageId;
+  }, [newestTranscriptMessageId, transcriptMessageCount, transcriptReady]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -1278,6 +1327,7 @@ export default function CloudChatPage({
   // at `scrollTop = 0`, so leaving the paused resume behind would strand the
   // reader on the oldest loaded message with follow off.
   useLayoutEffect(() => {
+    if (!transcriptReady) return;
     if (!chatTabActive || !sessionIdFromParams || !anchorMessageIdFromParams) return;
     if (isLoading) return;
 
@@ -1370,6 +1420,7 @@ export default function CloudChatPage({
     sessionIdFromParams,
     setChatUI,
     staticMessages,
+    transcriptReady,
   ]);
   // A running preparation row already shows live progress inline, so the
   // trailing progress row would repeat the same message beneath it.
@@ -1384,13 +1435,14 @@ export default function CloudChatPage({
       ? { sessionId: sessionIdFromParams, message: statusIndicator.message }
       : null;
 
-  const placeholder = isLoading
-    ? 'Loading session…'
-    : cloudStatus?.type === 'preparing'
-      ? 'Setting up environment…'
-      : cloudStatus?.type === 'finalizing'
-        ? 'Wrapping up…'
-        : 'Ask anything…';
+  const placeholder =
+    transcriptPhase === 'opening' || isLoading
+      ? 'Loading session…'
+      : cloudStatus?.type === 'preparing'
+        ? 'Setting up environment…'
+        : cloudStatus?.type === 'finalizing'
+          ? 'Wrapping up…'
+          : 'Ask anything…';
 
   const canOpenTerminal =
     !sessionIdFromParams && selectedWorktreeId
@@ -1479,7 +1531,9 @@ export default function CloudChatPage({
                 onValueChange={handleWorkspaceValueChange}
                 className="flex min-h-0 flex-1 flex-col"
               >
-                {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
+                {(transcriptPhase === 'opening' || showLoadingIndicator) && (
+                  <div className="bg-primary h-0.5 w-full animate-pulse" />
+                )}
 
                 <div className="flex shrink-0 flex-wrap items-center gap-x-2 border-b px-3 py-2 sm:flex-nowrap">
                   <MobileSidebarToggle variant="inline" label="Worktrees" />
@@ -1575,43 +1629,59 @@ export default function CloudChatPage({
                           <div
                             ref={scrollContainerRef}
                             hidden={!chatTabActive}
-                            className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
+                            className={`absolute inset-0 overflow-y-auto px-[max(1rem,calc(50%_-_27rem))] py-2 transition-opacity duration-150 ${showLoadingIndicator && transcriptPhase === 'live' ? 'pointer-events-none opacity-40' : 'opacity-100'}`}
                             onScroll={handleScroll}
                           >
                             <div ref={messagesContentRef}>
                               <div className="sr-only" aria-live="polite">
                                 {olderArrivalAnnouncement}
                               </div>
-                              <OlderMessagesHeader
-                                isLoadingOlderMessages={isLoadingOlderMessages}
-                                olderMessagesError={olderMessagesError}
-                                olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-                                onRetry={requestOlderMessages}
-                              />
-                              <ConversationMessages
-                                active={chatTabActive}
-                                isStreaming={isStreaming}
-                                staticMessages={staticMessages}
-                                dynamicMessages={dynamicMessages}
-                                pendingMessages={pendingMessages}
-                                preparationByMessageId={preparationByMessageId}
-                                commitsAfterMessage={commitsAfterMessage}
-                                getChildMessages={getChildMessages}
-                                onOpenChildSession={handleOpenTopLevelChildSession}
-                                onOpenPreparationDetails={handleOpenPreparationDetails}
-                              />
-
-                              {chatTabActive && (
-                                <WorkingIndicator
-                                  messages={dynamicMessages}
-                                  isStreaming={isStreaming}
+                              {transcriptPhase !== 'opening' && (
+                                <OlderMessagesHeader
+                                  isLoadingOlderMessages={isLoadingOlderMessages}
+                                  olderMessagesError={olderMessagesError}
+                                  olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+                                  onRetry={requestOlderMessages}
                                 />
                               )}
-                              {!billingFailure &&
-                                visibleStatusIndicator &&
-                                visibleStatusIndicator.type !== 'error' && (
-                                  <SessionStatusIndicator indicator={visibleStatusIndicator} />
-                                )}
+                              {transcriptPhase === 'opening' ? (
+                                <div
+                                  role="status"
+                                  aria-busy="true"
+                                  className="flex flex-col gap-3 py-2"
+                                >
+                                  <span className="sr-only">Loading session…</span>
+                                  <Skeleton className="h-3 w-2/3 motion-reduce:animate-none" />
+                                  <Skeleton className="h-3 w-1/2 motion-reduce:animate-none" />
+                                </div>
+                              ) : transcriptPhase === 'failed' ? null : (
+                                <>
+                                  <ConversationMessages
+                                    active={chatTabActive}
+                                    isStreaming={isStreaming}
+                                    staticMessages={staticMessages}
+                                    dynamicMessages={dynamicMessages}
+                                    pendingMessages={pendingMessages}
+                                    preparationByMessageId={preparationByMessageId}
+                                    commitsAfterMessage={commitsAfterMessage}
+                                    getChildMessages={getChildMessages}
+                                    onOpenChildSession={handleOpenTopLevelChildSession}
+                                    onOpenPreparationDetails={handleOpenPreparationDetails}
+                                  />
+
+                                  {chatTabActive && (
+                                    <WorkingIndicator
+                                      messages={dynamicMessages}
+                                      isStreaming={isStreaming}
+                                    />
+                                  )}
+                                  {!billingFailure &&
+                                    visibleStatusIndicator &&
+                                    visibleStatusIndicator.type !== 'error' && (
+                                      <SessionStatusIndicator indicator={visibleStatusIndicator} />
+                                    )}
+                                </>
+                              )}
 
                               <div ref={messagesEndRef} />
                             </div>
@@ -1631,12 +1701,15 @@ export default function CloudChatPage({
 
                       <div hidden={!chatTabActive} className={chatTabActive ? '' : 'hidden'}>
                         {isReadOnly ? (
-                          !isLoading && sessionIdFromParams && fetchedSessionData ? (
+                          !isLoading &&
+                          sessionIdFromParams &&
+                          fetchedSessionData &&
+                          transcriptPhase !== 'opening' ? (
                             <SessionContinuationPanel sessionId={sessionIdFromParams} />
                           ) : null
                         ) : (
                           <>
-                            {activeQuestion && (
+                            {activeQuestion && transcriptPhase !== 'opening' && (
                               <div className="border-t px-[max(1rem,calc(50%_-_27rem))] py-4">
                                 <QuestionToolCard
                                   key={activeQuestion.requestId}
@@ -1646,7 +1719,7 @@ export default function CloudChatPage({
                                 />
                               </div>
                             )}
-                            {activePermission && (
+                            {activePermission && transcriptPhase !== 'opening' && (
                               <div className="flex items-center border-t p-4">
                                 <PermissionCard
                                   key={activePermission.requestId}
@@ -1659,7 +1732,7 @@ export default function CloudChatPage({
                               </div>
                             )}
                             <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                              {billingFailure && (
+                              {transcriptPhase !== 'opening' && billingFailure && (
                                 <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2">
                                   <CloudAgentBillingError
                                     failure={billingFailure}
@@ -1721,11 +1794,16 @@ export default function CloudChatPage({
                                   },
                                 }}
                               />
-                              {!billingFailure && statusIndicator?.type === 'error' && (
-                                <div className="px-[max(1rem,calc(50%_-_27rem))] pb-2" role="alert">
-                                  <SessionStatusIndicator indicator={statusIndicator} />
-                                </div>
-                              )}
+                              {transcriptPhase !== 'opening' &&
+                                !billingFailure &&
+                                statusIndicator?.type === 'error' && (
+                                  <div
+                                    className="px-[max(1rem,calc(50%_-_27rem))] pb-2"
+                                    role="alert"
+                                  >
+                                    <SessionStatusIndicator indicator={statusIndicator} />
+                                  </div>
+                                )}
                               {(sessionConfig?.repository ||
                                 sessionBranchDisplay.kind !== 'unavailable' ||
                                 (contextUsage !== undefined && contextWindow !== undefined)) && (

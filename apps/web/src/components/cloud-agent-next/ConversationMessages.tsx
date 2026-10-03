@@ -73,7 +73,6 @@ const ConversationMessageGroup = memo(
     previous.deliveryState === next.deliveryState &&
     previous.preparations === next.preparations &&
     previous.commits === next.commits &&
-    previous.getChildMessages === next.getChildMessages &&
     previous.onOpenChildSession === next.onOpenChildSession &&
     previous.onOpenPreparationDetails === next.onOpenPreparationDetails &&
     previous.messages.length === next.messages.length &&
@@ -128,5 +127,18 @@ export const ConversationMessages = memo(
       );
     });
   },
-  (previous, next) => !previous.active && !next.active
+  (previous, next) => {
+    if (!previous.active && !next.active) return true;
+    return (
+      previous.active === next.active &&
+      previous.isStreaming === next.isStreaming &&
+      previous.staticMessages === next.staticMessages &&
+      previous.dynamicMessages === next.dynamicMessages &&
+      previous.pendingMessages === next.pendingMessages &&
+      previous.preparationByMessageId === next.preparationByMessageId &&
+      previous.commitsAfterMessage === next.commitsAfterMessage &&
+      previous.onOpenChildSession === next.onOpenChildSession &&
+      previous.onOpenPreparationDetails === next.onOpenPreparationDetails
+    );
+  }
 );

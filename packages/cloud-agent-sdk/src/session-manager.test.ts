@@ -3592,13 +3592,264 @@ describe('createSessionManager', () => {
         mgr.atoms.childMessages
       );
 
-      // The atom must emit a new function so subscribers re-render (the
-      // live-sheet freeze path). Without reading `partsRevision`, the cached
-      // function reference is returned and this assertion fails.
+      // A changed child row must emit a new getter so the drawer's
+      // subscription re-renders. Reuse is keyed on the non-root row signature,
+      // so this child part delta forces a new function.
       expect(childMessagesAfter).not.toBe(childMessagesBefore);
       expect((childMessagesAfter('child-1')[0]?.parts[0] as TextPart | undefined)?.text).toBe(
         'hello'
       );
+    });
+
+    it('keeps the childMessages getter and child rows stable across root-row deltas', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const child = createStoredMessage('msg-child', 'child-1', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child',
+        sessionID: 'child-1',
+        messageID: child.info.id,
+        text: 'child text',
+      });
+      const root = createStoredAssistantMessage('msg-root', 'ses-root');
+      const rootPart = stubTextPart({
+        id: 'part-root',
+        sessionID: 'ses-root',
+        messageID: root.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(child.info);
+      latestStorage.upsertPart(child.info.id, childPart);
+      latestStorage.upsertMessage(root.info);
+      latestStorage.upsertPart(root.info.id, rootPart);
+
+      const before = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+
+      latestStorage.applyPartDelta(root.info.id, rootPart.id, 'text', 'lo');
+
+      const afterDelta = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(afterDelta).toBe(before);
+      expect((afterDelta('child-1')[0]?.parts[0] as TextPart | undefined)?.text).toBe('child text');
+
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-root', 'ses-root', {
+          time: { created: 1, completed: 2 },
+        }).info
+      );
+
+      const afterInfo = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(afterInfo).toBe(before);
+
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-root-2', 'ses-root').info);
+
+      const afterInsert = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(afterInsert).toBe(before);
+    });
+
+    it('keeps static rows and the completed row stable while the streaming row moves', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const completed = createStoredAssistantMessage('msg-completed', 'ses-root', {
+        time: { created: 1, completed: 2 },
+      });
+      const streaming = createStoredAssistantMessage('msg-streaming', 'ses-root');
+      const completedPart = stubTextPart({
+        id: 'part-completed',
+        sessionID: 'ses-root',
+        messageID: completed.info.id,
+        text: 'done',
+      });
+      const streamingPart = stubTextPart({
+        id: 'part-streaming',
+        sessionID: 'ses-root',
+        messageID: streaming.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(completed.info);
+      latestStorage.upsertMessage(streaming.info);
+      latestStorage.upsertPart(completed.info.id, completedPart);
+      latestStorage.upsertPart(streaming.info.id, streamingPart);
+
+      const staticBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticBefore.map(message => message.info.id)).toEqual([completed.info.id]);
+      expect(dynamicBefore.map(message => message.info.id)).toEqual([streaming.info.id]);
+
+      latestStorage.applyPartDelta(streaming.info.id, streamingPart.id, 'text', 'lo');
+
+      const staticAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticAfter).toBe(staticBefore);
+      expect(staticAfter[0]).toBe(staticBefore[0]);
+      expect(dynamicAfter).not.toBe(dynamicBefore);
+      expect((dynamicAfter[0]?.parts[0] as TextPart | undefined)?.text).toBe('hello');
+    });
+
+    it('keeps root message arrays stable across a child-only delta', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const root = createStoredAssistantMessage('msg-root', 'ses-root');
+      const rootPart = stubTextPart({
+        id: 'part-root',
+        sessionID: 'ses-root',
+        messageID: root.info.id,
+        text: 'root text',
+      });
+      const child = createStoredMessage('msg-child', 'child-1', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child',
+        sessionID: 'child-1',
+        messageID: child.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(root.info);
+      latestStorage.upsertPart(root.info.id, rootPart);
+      latestStorage.upsertMessage(child.info);
+      latestStorage.upsertPart(child.info.id, childPart);
+
+      const listBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const staticBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+
+      latestStorage.applyPartDelta(child.info.id, childPart.id, 'text', 'lo');
+
+      expect(atomValue(config.store, mgr.atoms.messagesList)).toBe(listBefore);
+      expect(atomValue(config.store, mgr.atoms.staticMessages)).toBe(staticBefore);
+      expect(atomValue(config.store, mgr.atoms.dynamicMessages)).toBe(dynamicBefore);
+    });
+
+    it('moves a completed streaming row from the dynamic tail to the static prefix', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const streaming = createStoredAssistantMessage('msg-streaming', 'ses-root');
+      latestStorage.upsertMessage(streaming.info);
+
+      const staticBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticBefore).toEqual([]);
+      expect(dynamicBefore.map(message => message.info.id)).toEqual([streaming.info.id]);
+
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-streaming', 'ses-root', {
+          time: { created: 1, completed: 2 },
+        }).info
+      );
+
+      const staticAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticAfter).not.toBe(staticBefore);
+      expect(staticAfter.map(message => message.info.id)).toEqual([streaming.info.id]);
+      expect(dynamicAfter).not.toBe(dynamicBefore);
+      expect(dynamicAfter).toEqual([]);
+    });
+
+    it('returns no rows for the previous root id after switching away from a root-only session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-root', 'ses-root').info);
+      const before = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(before('ses-root')).toEqual([]);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-next' });
+      });
+      await mgr.switchSession(kiloId('ses-next'));
+
+      const after = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(after).not.toBe(before);
+      expect(after('ses-root')).toEqual([]);
+    });
+
+    it('drops cleared child rows and never surfaces a cleared root row through the reused getter', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      const child = createStoredMessage('msg-child', 'child-1', 'assistant');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-root', 'ses-root').info);
+      latestStorage.upsertMessage(child.info);
+
+      const before = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(before('child-1').map(message => message.info.id)).toEqual(['msg-child']);
+      expect(before('ses-root')).toEqual([]);
+
+      latestStorage.clear();
+
+      const after = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(after).not.toBe(before);
+      expect(after('child-1')).toEqual([]);
+      expect(after('ses-root')).toEqual([]);
     });
   });
 

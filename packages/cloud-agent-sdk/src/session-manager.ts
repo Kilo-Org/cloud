@@ -1100,55 +1100,133 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  function sameMessageRows(
+    previous: readonly StoredMessage[],
+    next: readonly StoredMessage[]
+  ): boolean {
+    if (previous.length !== next.length) return false;
+    for (let i = 0; i < next.length; i++) {
+      if (previous[i] !== next[i]) return false;
+    }
+    return true;
+  }
+
+  let previousMessagesList: StoredMessage[] | null = null;
   const messagesListAtom = atom<StoredMessage[]>(get => {
     const storage = get(sessionStorageAtom);
-    if (!storage) return [];
-    const ids = get(storage.atoms.messageIds);
-    const msgMap = get(storage.atoms.messages);
-    const partsMap = get(storage.atoms.parts);
-    get(storage.atoms.partsRevision);
-    const rootSessionId = get(rootSessionIdAtom);
     const out: StoredMessage[] = [];
-    for (const id of ids) {
-      const info = msgMap.get(id);
-      if (!info) continue;
-      if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
-      out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
+    if (storage) {
+      const ids = get(storage.atoms.messageIds);
+      const msgMap = get(storage.atoms.messages);
+      const partsMap = get(storage.atoms.parts);
+      get(storage.atoms.partsRevision);
+      const rootSessionId = get(rootSessionIdAtom);
+      for (const id of ids) {
+        const info = msgMap.get(id);
+        if (!info) continue;
+        if (rootSessionId !== null && info.sessionID !== rootSessionId) continue;
+        out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
+      }
+      pruneStoredMessageMemo(ids);
     }
-    pruneStoredMessageMemo(ids);
+    if (previousMessagesList !== null && sameMessageRows(previousMessagesList, out)) {
+      return previousMessagesList;
+    }
+    previousMessagesList = out;
     return out;
   });
 
   const notStreaming = (msg: StoredMessage) => !isMessageStreaming(msg);
-  const staticMessagesAtom = atom(
-    get => splitByContiguousPrefix(get(messagesListAtom), notStreaming).staticItems
-  );
-  const dynamicMessagesAtom = atom(
-    get => splitByContiguousPrefix(get(messagesListAtom), notStreaming).dynamicItems
-  );
+  let previousStaticMessages: StoredMessage[] | null = null;
+  const staticMessagesAtom = atom(get => {
+    const next = splitByContiguousPrefix(get(messagesListAtom), notStreaming).staticItems;
+    if (previousStaticMessages !== null && sameMessageRows(previousStaticMessages, next)) {
+      return previousStaticMessages;
+    }
+    previousStaticMessages = next;
+    return next;
+  });
+  let previousDynamicMessages: StoredMessage[] | null = null;
+  const dynamicMessagesAtom = atom(get => {
+    const next = splitByContiguousPrefix(get(messagesListAtom), notStreaming).dynamicItems;
+    if (previousDynamicMessages !== null && sameMessageRows(previousDynamicMessages, next)) {
+      return previousDynamicMessages;
+    }
+    previousDynamicMessages = next;
+    return next;
+  });
   const totalCostAtom = atom(get => {
     let t = 0;
     for (const m of get(messagesListAtom)) if (m.info.role === 'assistant') t += m.info.cost;
     return t;
   });
   const contextUsageAtom = atom(get => findLatestContextUsage(get(messagesListAtom)));
+
+  type ChildSessionRowProjection = { id: string; info: MessageInfo; parts: Part[] };
+  const EMPTY_CHILD_MESSAGES_GETTER = (): StoredMessage[] => [];
+  let childMessagesStorage: JotaiSessionStorage | null = null;
+  let childMessagesRootSessionId: string | null = null;
+  let childMessagesProjection: ChildSessionRowProjection[] = [];
+  let childMessagesGetter: ((childSessionId: string) => StoredMessage[]) | null = null;
+
   const childMessagesAtom = atom(get => {
     const storage = get(sessionStorageAtom);
-    if (!storage) return (): StoredMessage[] => [];
+    const rootSessionId = get(rootSessionIdAtom);
+    if (!storage) {
+      childMessagesStorage = null;
+      childMessagesRootSessionId = rootSessionId;
+      childMessagesProjection = [];
+      childMessagesGetter = EMPTY_CHILD_MESSAGES_GETTER;
+      return EMPTY_CHILD_MESSAGES_GETTER;
+    }
     const ids = get(storage.atoms.messageIds);
     const msgMap = get(storage.atoms.messages);
     const partsMap = get(storage.atoms.parts);
     get(storage.atoms.partsRevision);
     pruneStoredMessageMemo(ids);
-    return (childSessionId: string): StoredMessage[] => {
+
+    const projection: ChildSessionRowProjection[] = [];
+    for (const id of ids) {
+      const info = msgMap.get(id);
+      if (!info) continue;
+      if (rootSessionId !== null && info.sessionID === rootSessionId) continue;
+      projection.push({ id, info, parts: partsMap.get(id) ?? EMPTY_PARTS });
+    }
+
+    const lifetimeMatches =
+      childMessagesGetter !== null &&
+      childMessagesStorage === storage &&
+      childMessagesRootSessionId === rootSessionId;
+    const signatureMatches =
+      childMessagesProjection.length === projection.length &&
+      projection.every((row, index) => {
+        const previousRow = childMessagesProjection[index];
+        return (
+          previousRow !== undefined &&
+          previousRow.id === row.id &&
+          previousRow.info === row.info &&
+          previousRow.parts === row.parts
+        );
+      });
+
+    if (lifetimeMatches && signatureMatches && childMessagesGetter !== null) {
+      return childMessagesGetter;
+    }
+
+    const rows = projection;
+    childMessagesStorage = storage;
+    childMessagesRootSessionId = rootSessionId;
+    childMessagesProjection = projection;
+    childMessagesGetter = (childSessionId: string): StoredMessage[] => {
       const out: StoredMessage[] = [];
-      for (const id of ids) {
-        const info = msgMap.get(id);
-        if (info?.sessionID === childSessionId)
-          out.push(memoizedStoredMessage(id, info, partsMap.get(id) ?? EMPTY_PARTS));
+      for (const row of rows) {
+        if (row.info.sessionID === childSessionId) {
+          out.push(memoizedStoredMessage(row.id, row.info, row.parts));
+        }
       }
       return out;
     };
+    return childMessagesGetter;
   });
   const childSessionHydrationStateAtom = atom(get => {
     const states = get(childSessionHydrationStatesAtom);

@@ -1,6 +1,6 @@
 {
-  "id": "47115ded-953d-4ed8-b325-c553bfead27b",
-  "prevId": "dcee82f6-a2c5-4c65-b238-2b6d284d5e0c",
+  "id": "9fb1cda5-eb55-4dd5-b5c3-a0783c1d9615",
+  "prevId": "93cd3c88-5995-4cc0-b184-2d2938656d3b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1586,6 +1586,18 @@
         "error": {
           "name": "error",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_r2_key": {
+          "name": "request_r2_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response_r2_key": {
+          "name": "response_r2_key",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -4360,24 +4372,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "pr_head_ref": {
-          "name": "pr_head_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_head_sha": {
-          "name": "pr_head_sha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_link_verified_at": {
-          "name": "pr_link_verified_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -4591,27 +4585,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "IDX_cli_sessions_v2_git_url_pr_number": {
-          "name": "IDX_cli_sessions_v2_git_url_pr_number",
-          "columns": [
-            {
-              "expression": "git_url",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "pr_number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -4771,6 +4744,12 @@
         "completed_at": {
           "name": "completed_at",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publication_status": {
+          "name": "publication_status",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -4937,6 +4916,10 @@
         "cloud_agent_code_review_attempts_attempt_number_check": {
           "name": "cloud_agent_code_review_attempts_attempt_number_check",
           "value": "\"cloud_agent_code_review_attempts\".\"attempt_number\" >= 1"
+        },
+        "cloud_agent_code_review_attempts_publication_status_check": {
+          "name": "cloud_agent_code_review_attempts_publication_status_check",
+          "value": "\"cloud_agent_code_review_attempts\".\"publication_status\" IN ('published', 'unchanged', 'missing', 'unknown', 'not_applicable')"
         }
       },
       "isRLSEnabled": false
@@ -5141,6 +5124,12 @@
         "previous_summary_head_sha": {
           "name": "previous_summary_head_sha",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "previous_summary_observed": {
+          "name": "previous_summary_observed",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
@@ -12778,7 +12767,7 @@
               "nulls": "last"
             },
             {
-              "expression": "pr_number",
+              "expression": "git_branch",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -12791,7 +12780,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
+          "where": "\"github_branch_pull_requests\".\"owned_by_organization_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -12806,7 +12795,7 @@
               "nulls": "last"
             },
             {
-              "expression": "pr_number",
+              "expression": "git_branch",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -12819,7 +12808,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
+          "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -12834,7 +12823,7 @@
               "nulls": "last"
             },
             {
-              "expression": "pr_number",
+              "expression": "git_branch",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

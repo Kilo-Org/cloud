@@ -1,6 +1,6 @@
 {
-  "id": "93cd3c88-5995-4cc0-b184-2d2938656d3b",
-  "prevId": "1f5b0465-2490-405f-85aa-ffcb28e070b1",
+  "id": "d7076853-a00f-4c17-9f43-e44064681749",
+  "prevId": "0c987829-fdfe-42ab-8df4-a16b6ce7ea18",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1261,6 +1261,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'::jsonb"
+        },
+        "auto_free": {
+          "name": "auto_free",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -4372,6 +4378,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "pr_head_ref": {
+          "name": "pr_head_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_head_sha": {
+          "name": "pr_head_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_link_verified_at": {
+          "name": "pr_link_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -4747,6 +4771,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "publication_status": {
+          "name": "publication_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -4910,6 +4940,10 @@
         "cloud_agent_code_review_attempts_attempt_number_check": {
           "name": "cloud_agent_code_review_attempts_attempt_number_check",
           "value": "\"cloud_agent_code_review_attempts\".\"attempt_number\" >= 1"
+        },
+        "cloud_agent_code_review_attempts_publication_status_check": {
+          "name": "cloud_agent_code_review_attempts_publication_status_check",
+          "value": "\"cloud_agent_code_review_attempts\".\"publication_status\" IN ('published', 'unchanged', 'missing', 'unknown', 'not_applicable')"
         }
       },
       "isRLSEnabled": false
@@ -5114,6 +5148,12 @@
         "previous_summary_head_sha": {
           "name": "previous_summary_head_sha",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "previous_summary_observed": {
+          "name": "previous_summary_observed",
+          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
@@ -5369,6 +5409,54 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_completed_at": {
+          "name": "idx_cloud_agent_code_reviews_completed_at",
+          "columns": [
+            {
+              "expression": "completed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"completed_at\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_started_at": {
+          "name": "idx_cloud_agent_code_reviews_started_at",
+          "columns": [
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"started_at\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_terminal_missing_completed_at": {
+          "name": "idx_cloud_agent_code_reviews_terminal_missing_completed_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"status\" IN ('completed', 'failed', 'cancelled', 'interrupted') AND \"cloud_agent_code_reviews\".\"completed_at\" IS NULL",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -12751,7 +12839,7 @@
               "nulls": "last"
             },
             {
-              "expression": "git_branch",
+              "expression": "pr_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -12764,7 +12852,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"owned_by_organization_id\" is not null",
+          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -12779,7 +12867,7 @@
               "nulls": "last"
             },
             {
-              "expression": "git_branch",
+              "expression": "pr_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -12792,7 +12880,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" is not null",
+          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -12807,7 +12895,7 @@
               "nulls": "last"
             },
             {
-              "expression": "git_branch",
+              "expression": "pr_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

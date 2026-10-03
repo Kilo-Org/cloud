@@ -19,7 +19,6 @@ export type RenderProps = {
   placeholder?: string;
   returnSendsMessage?: boolean;
   sendDisabledReason?: string | null;
-  sendDisabledReasonTone?: 'error' | 'neutral' | null;
   voiceInputAvailable?: boolean;
 };
 

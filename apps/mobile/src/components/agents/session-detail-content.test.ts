@@ -61,6 +61,11 @@ import type * as SessionTranscript from '@/components/agents/session-transcript'
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
+  SEND_REASON_MAX_FONT_SCALE,
+  SESSION_FOOTER_ROW_ITEM_PADDING,
+} from '@/components/agents/session-working-state';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import {
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
@@ -1014,6 +1019,28 @@ function renderedTextOutsideSheet(root: ReactTestInstance): string {
 
 function reasoningRenderers(renderer: ReactTestRenderer) {
   return renderer.root.findAll(node => Object.is(node.type, 'ReasoningPartRenderer'));
+}
+
+/**
+ * The fixed footer row wrapper. The row renders one item at a time — the
+ * working spinner, then the status indicator, then the cannot-send reason — so
+ * the wrapper is what the row's own position and opacity contracts hold for,
+ * and its children are the ladder's observable result.
+ */
+function indicatorRowOf(view: { renderer: ReactTestRenderer }) {
+  const rows = view.renderer.root.findAll(
+    node =>
+      Object.is(node.type, 'AnimatedView') && String(node.props.className ?? '') === 'bg-background'
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new Error('Missing the fixed indicator row wrapper');
+  }
+  return row;
+}
+
+function footerRowItems(view: { renderer: ReactTestRenderer }) {
+  return indicatorRowOf(view).children.filter(child => typeof child !== 'string');
 }
 
 function pressHeaderBack(renderer: ReactTestRenderer) {
@@ -2838,7 +2865,7 @@ describe('hide thinking preference', () => {
     expect(renderedText(view.renderer.root)).toContain('Visible answer');
   });
 
-  it('drops a reasoning-only message from the transcript but keeps it in the working indicator', async () => {
+  it('drops a reasoning-only message from the transcript while a status line holds the row', async () => {
     hideThinking.current = true;
     const message = partMessage('msg-think-only', [
       reasoningPart('reasoning-only', 'msg-think-only'),
@@ -2857,7 +2884,26 @@ describe('hide thinking preference', () => {
       view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
     ).toHaveLength(0);
     expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+    // The dropped reasoning row still reaches the transcript's status surface,
+    // so the row is not empty; the ladder shows that status line, not a spinner.
+    expect(indicatorNodes(view).length).toBeGreaterThan(0);
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+  });
 
+  it('hands the raw message list to the working spinner, not the displayed list', async () => {
+    hideThinking.current = true;
+    const message = partMessage('msg-think-only', [
+      reasoningPart('reasoning-only', 'msg-think-only'),
+    ]);
+    const view = await mountDetails([message]);
+    // The spinner's label derives from the last assistant part, so a hidden
+    // reasoning row must still reach it. The ladder mounts the spinner only
+    // while no status line outranks it, so this mount streams with none.
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
     const indicator = view.renderer.root.findByType(WorkingIndicator);
     const indicatorMessages = indicator.props.messages as StoredMessage[];
     expect(indicatorMessages.some(candidate => candidate.info.id === 'msg-think-only')).toBe(true);
@@ -3616,17 +3662,6 @@ describe('SessionDetailContent fixed indicator row', () => {
     goalMountOptions = {};
   });
 
-  function indicatorRowOf(view: Awaited<ReturnType<typeof mountDetails>>) {
-    let node: ReactTestInstance | null = view.renderer.root.findByType(WorkingIndicator);
-    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
-      node = node.parent;
-    }
-    if (node === null) {
-      throw new Error('Missing the fixed indicator row wrapper');
-    }
-    return node;
-  }
-
   it.each([
     { type: 'error', message: 'simulated error' },
     { type: 'warning', message: 'Retrying… simulated error' },
@@ -3650,15 +3685,71 @@ describe('SessionDetailContent fixed indicator row', () => {
     }
   );
 
-  it('renders no fixed indicator row for an empty transcript', async () => {
+  it('renders no progress item for an empty transcript, keeping only the send reason', async () => {
     const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+    // The empty/connecting body states progress itself, so the row drops it and
+    // keeps the one line only it can state: why send is unavailable. The
+    // has-messages gate must not take the load-failure line with it.
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.props.message).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+  });
+
+  it('states the cannot-send reason in the row with the row item typography', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    // Read-only is a permanent fact and no status indicator competes with it,
+    // so the reason is the row's item.
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    const reason = items[0];
+    expect(Object.is(reason?.type, AccessibleStatus)).toBe(true);
+    expect(reason?.props.message).toBe(i18n.t('agentChat.session.readOnly'));
+    expect(reason?.props.maxFontSizeMultiplier).toBe(SEND_REASON_MAX_FONT_SCALE);
+    const className = String(reason?.props.className ?? '');
+    // The row's own typography, not the composer's narrower one: a shorter item
+    // would shift the row every time the ladder swaps to or from it.
+    expect(className).toContain(SESSION_FOOTER_ROW_ITEM_PADDING);
+    expect(className).toContain('text-sm');
+    // The reason must not be clipped: a longer translation keeps its actionable
+    // tail ("Retry first.") on a phone width.
+    expect(reason?.props.numberOfLines).toBeUndefined();
+    expect(reason?.props.ellipsizeMode).toBeUndefined();
+  });
+
+  it('lets the status indicator outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     act(() => {
       view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
         view.manager.atoms.statusIndicator,
         { type: 'error', message: 'simulated error', timestamp: 0 }
       );
     });
-    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, 'SessionStatusIndicator')).toBe(true);
+  });
+
+  it('lets the working spinner outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, WorkingIndicator)).toBe(true);
   });
 });
 

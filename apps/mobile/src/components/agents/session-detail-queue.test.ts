@@ -399,9 +399,11 @@ vi.mock('@/components/agents/mobile-session-manager-helpers', () => ({
   buildRemoteAttachmentParts: vi.fn(),
 }));
 vi.mock('@/components/agents/session-working-state', () => ({
+  SEND_REASON_MAX_FONT_SCALE: 1.6,
+  SESSION_FOOTER_ROW_ITEM_PADDING: 'px-4 py-2',
+  resolveSessionFooterRowItem: () => null,
   shouldShowAgentWorkingIndicator: () => false,
   shouldShowFooterWorkingIndicator: () => false,
-  shouldShowSessionFooterRow: () => false,
 }));
 vi.mock('@/components/agents/session-keep-awake', () => ({
   shouldKeepSessionAwake: () => false,

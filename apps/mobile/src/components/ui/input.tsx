@@ -23,8 +23,9 @@ const INPUT_BOX_VERTICAL_STYLE: TextStyle = {
   textAlignVertical: 'center',
 };
 
-// Multiline callers retain their own height and line height.
-const INPUT_MULTILINE_INSET_CLASS = 'px-3 py-2.5';
+// Android TextInput ignores logical paddingInline; physical defaults remain
+// overrideable by the caller's later px/py classes through tailwind-merge.
+const INPUT_MULTILINE_INSET_CLASS = 'pl-3 pr-3 pt-2.5 pb-2.5';
 
 /**
  * The one single-line box: `min-h-[44px] px-3 leading-[normal]`, no vertical

@@ -131,7 +131,8 @@ Nothing else may read the keyboard: no surface adds a listener beside the provid
 - Use the shared `Input` for every single-line field.
 - `Input` removes vertical padding, centers Android text, and defaults iOS line breaks to `clip`.
 - A single-line caller can change horizontal padding, text size, and minimum height.
-- A multiline caller keeps its alignment and line breaks; its padding classes can override the shared `px-3 py-2.5` inset.
+- A multiline caller keeps its alignment and line breaks; its padding classes override the shared physical inset.
+- Multiline defaults use `pl-3 pr-3 pt-2.5 pb-2.5`; Android `TextInput` does not apply logical `paddingInline`.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules

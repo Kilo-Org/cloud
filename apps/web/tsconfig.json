@@ -47,7 +47,6 @@
     "jest.config.ts",
     "knip.ts",
     "sentry.edge.config.ts",
-    "sentry.server.config.ts",
     ".next/dev/types/**/*.ts",
     "dev/discord-gateway-cron.ts"
   ],

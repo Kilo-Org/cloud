@@ -13,7 +13,7 @@ import { load } from 'js-yaml';
 // evaluate different paths than the first attempt reported.
 
 const actionRef = 'dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d';
-const filterNames = ['kilocode_backend', 'cloud_agent_next'];
+const filterNames = ['kilocode_backend', 'cloud_agent_next', 'ai_gateway'];
 const fallbackOutput = name =>
   `\${{ steps.filter.outputs.${name} || steps.filter_retry.outputs.${name} }}`;
 

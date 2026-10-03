@@ -45,7 +45,7 @@ import { ConversationMessages } from './ConversationMessages';
 import { CurrentTaskList } from './CurrentTaskList';
 import { getCurrentTodos } from './current-todos';
 import { getUserTextContent } from './MessageBubble';
-import { retryFailedMessage } from './retry-failed-message';
+import { parseFailedCommandRow, retryFailedMessage } from './retry-failed-message';
 import { isUserMessage } from './types';
 import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
@@ -815,7 +815,12 @@ export default function CloudChatPage({
   );
 
   const handleSendSlashCommand = useCallback(
-    async (command: string, args: string, attachments?: CloudAgentAttachments) => {
+    async (
+      command: string,
+      args: string,
+      attachments?: CloudAgentAttachments,
+      onOptimisticSend?: () => void
+    ) => {
       // A command send takes the position over exactly as a message send does,
       // and only once it is accepted: end a resume still looking for its anchor,
       // or the effect re-pauses follow and cancels the scroll for this
@@ -824,6 +829,7 @@ export default function CloudChatPage({
       const acceptedPromise = manager.send({
         payload: { type: 'command', command, arguments: args },
         attachments: supportsAttachments ? attachments : undefined,
+        onOptimisticSend,
       });
       // Pins the tail when the list already follows; a no-op under a resume.
       scheduleScrollToBottom();
@@ -853,11 +859,6 @@ export default function CloudChatPage({
       if (!isUserMessage(message.info)) return;
       const prompt = getUserTextContent(message.parts);
       if (prompt === '') return;
-      // A failed row from a slash command carries the literal command text
-      // (`/cmd args`), but `handleSendMessage` always sends a `prompt`
-      // payload. Re-sending it there would deliver the literal text instead
-      // of executing the command, so command rows are copy-only.
-      if (/^\s*\/[\w.-]+(?:\s+[\s\S]*)?\s*$/.test(prompt)) return;
       // The row belongs to the session this page opened. The re-send is
       // awaited and the user can switch chats while it is in flight, so the
       // owner is captured here: a resolution recorded after the switch would
@@ -866,14 +867,34 @@ export default function CloudChatPage({
         sessionIdFromParams && isCurrentSession ? (sessionIdFromParams as KiloSessionId) : null;
       if (!ownerSessionId) return;
       const messageId = message.info.id;
+      // A failed slash-command row re-sends through the command payload, the
+      // same path the composer uses at submit time. Plain text falls back to
+      // the prompt payload: unknown slash-looking text was sent as plain text
+      // originally, so retrying it as a command would change the send.
+      const commandRow = parseFailedCommandRow(prompt, availableCommands);
       await retryFailedMessage({
         messageId,
         ownerSessionId,
         recovery: manager,
-        send: onOptimisticSend => handleSendMessage(prompt, undefined, onOptimisticSend),
+        send: onOptimisticSend =>
+          commandRow
+            ? handleSendSlashCommand(
+                commandRow.command,
+                commandRow.args,
+                undefined,
+                onOptimisticSend
+              )
+            : handleSendMessage(prompt, undefined, onOptimisticSend),
       });
     },
-    [handleSendMessage, isCurrentSession, manager, sessionIdFromParams]
+    [
+      availableCommands,
+      handleSendMessage,
+      handleSendSlashCommand,
+      isCurrentSession,
+      manager,
+      sessionIdFromParams,
+    ]
   );
 
   const composerCopyTokenRef = useRef(0);
@@ -884,6 +905,9 @@ export default function CloudChatPage({
   const handleCopyFailedToComposer = useCallback((text: string) => {
     composerCopyTokenRef.current += 1;
     setRequestedComposerText({ text, token: composerCopyTokenRef.current });
+  }, []);
+  const handleConsumeRequestedComposerText = useCallback((token: number) => {
+    setRequestedComposerText(current => (current?.token === token ? null : current));
   }, []);
 
   const handleStopExecution = useCallback(() => {
@@ -1843,6 +1867,7 @@ export default function CloudChatPage({
                                 showToolbar={Boolean(sessionIdFromParams)}
                                 initialValue={failedPrompt ?? undefined}
                                 requestedValue={requestedComposerText}
+                                onConsumeRequestedValue={handleConsumeRequestedComposerText}
                                 customModeOptions={customModeOptions}
                                 modelPickerDisabled={
                                   modelPickerLocked || sessionModels.modelPickerDisabled

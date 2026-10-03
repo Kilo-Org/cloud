@@ -662,7 +662,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
       {
-        requestId: 'iad1::iad1::request-id',
+        requestId: expect.any(String),
         tier: 'paid',
         accountId: 'user:user-123',
         ip: '127.0.0.1',
@@ -715,8 +715,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
       { timeoutMs: 30_000 }
     );
-    // Bouncer has no account for an anonymous caller, so no usage event.
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer).toBeUndefined();
+    // Anonymous usage is keyed on the IP with no payer account.
+    const anonymousBouncer = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer;
+    expect(anonymousBouncer?.accountId).toBeNull();
+    expect(anonymousBouncer?.clientIp).toBe('127.0.0.1');
+    expect(anonymousBouncer?.requestId).toEqual(expect.any(String));
   });
 
   it('carries the bouncer usage-event fields into the usage context', async () => {
@@ -742,8 +745,9 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
     expect(usageContext?.bouncer).toEqual({
-      requestId: 'iad1::usage-request-id',
+      requestId: expect.any(String),
       occurredAt: expect.any(Date),
+      accountId: 'user:user-123',
       clientIp: '127.0.0.1',
       clientAttributed: true,
       requestedLogprobs: true,

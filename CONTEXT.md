@@ -22,6 +22,10 @@ Covered domains must use this contract's canonical terms in code, docs, task des
 
 | Term | Agent meaning | Use this when | Avoid |
 |---|---|---|---|
+| **Apple subscription chain** | One original subscription purchase and its related renewals | Referring to the purchase identity that Bouncer correlates across payers | Apple ID, store account |
+| **Refund request** | A customer's request before the store grants or declines a refund | Referring to pending or declined requests | Completed refund |
+| **Refund** | A refund that the store grants for a transaction | Referring to a granted refund | Refund request |
+| **Refund reversal** | The store's cancellation of a granted refund for the same transaction | Referring to a reversal of a matching refund | Unrelated refund credit |
 | **Code Reviewer** | Agent that reviews pull requests and merge requests and may raise Code Review Findings | Naming the product capability, settings, review execution, and analytics | Security Agent, review bot |
 | **Code Review Finding** | Model-generated issue newly raised by Code Reviewer during one review execution | Referring to Code Reviewer output or its controlled analytics taxonomy | Security Finding, confirmed bug, verified vulnerability |
 | **Review Analytics** | Organization-only, opt-in prospective collection of bounded classifications for completed reviews and newly raised Code Review Findings | Referring to the Code Reviewer Analytics tab, collection setting, coverage, or aggregate metrics | Security Agent analytics, historical backfill |

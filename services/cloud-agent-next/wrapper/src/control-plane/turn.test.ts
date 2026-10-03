@@ -23,6 +23,8 @@ const SESSION_ID = 'workspace_test';
 
 const SESSION_TIMERS = {
   heartbeatIntervalMs: 1000,
+  heartbeatAckTimeoutMs: 3000,
+  heartbeatNegotiationMs: 100,
   cloneMs: 1000,
   kiloRuntimeStartMs: 1000,
   kiloSessionMs: 1000,

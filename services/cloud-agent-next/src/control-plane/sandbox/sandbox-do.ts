@@ -242,6 +242,7 @@ const wrapperSocketAttachmentSchema = z.object({
   allocationId: z.string().optional(),
   connectionId: z.string().optional(),
   wrapperId: z.string().optional(),
+  heartbeatAck: z.literal(true).optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
@@ -2915,6 +2916,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const attachment = this.readAttachment(ws);
 
     if (frame.type === 'hello') {
+      if (attachment?.connectionId !== undefined) return;
       const credential = typeof attachment?.credential === 'string' ? attachment.credential : null;
       const accepted = await this.validateAllocationCredential(frame.allocationId, credential);
       if (!accepted) {
@@ -2929,10 +2931,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
         allocationId: frame.allocationId,
         connectionId,
         wrapperId: frame.wrapperId,
+        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.
-      this.sendFrame(ws, { type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      this.sendFrame(ws, {
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+      });
       await this.applyEvent({
         type: 'hello-accepted',
         at: Date.now(),
@@ -2955,6 +2962,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
 
     if (frame.type === 'heartbeat') {
+      if (
+        !connectionMatches(
+          await this.readAllocation(),
+          attachment.allocationId,
+          attachment.connectionId
+        )
+      )
+        return;
       await this.applyEvent({
         type: 'heartbeat',
         at: Date.now(),
@@ -2962,6 +2977,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId: attachment.connectionId,
         active: frame.active,
       });
+      if (
+        attachment.heartbeatAck &&
+        connectionMatches(
+          await this.readAllocation(),
+          attachment.allocationId,
+          attachment.connectionId
+        ) &&
+        ws.readyState === WebSocket.OPEN &&
+        this.readAttachment(ws)?.connectionId === attachment.connectionId
+      ) {
+        this.sendFrame(ws, { type: 'heartbeat_ack' });
+      }
       return;
     }
 

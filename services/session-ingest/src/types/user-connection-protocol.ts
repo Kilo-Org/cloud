@@ -71,6 +71,11 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
             platform: z.string().min(1).max(32),
             prUrl: z.string().max(2048),
             prNumber: z.number().int().positive(),
+            // Branch the session pushed and the commit it pushed to that
+            // branch. Optional for older CLIs; when present they are the
+            // per-session evidence a link is verified against.
+            headRef: z.string().min(1).max(256).optional(),
+            headSha: z.string().min(1).max(64).optional(),
           })
           .optional(),
       })

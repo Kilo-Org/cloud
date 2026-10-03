@@ -34,9 +34,13 @@ function makePayload(overrides: {
   title?: string;
   cloneUrl?: string;
   htmlUrl?: string;
+  /** Base repository full name. */
   repo?: string;
+  /** Head repository full name — set to a fork to model a cross-repo PR. */
+  headRepo?: string;
 }): PullRequestPayload {
   const repo = overrides.repo ?? REPO;
+  const headRepo = overrides.headRepo ?? repo;
   return {
     action: overrides.action,
     pull_request: {
@@ -51,9 +55,9 @@ function makePayload(overrides: {
         sha: overrides.headSha,
         ref: overrides.headRef,
         repo: {
-          full_name: repo,
-          clone_url: overrides.cloneUrl ?? `https://github.com/${repo}.git`,
-          html_url: overrides.htmlUrl ?? `https://github.com/${repo}`,
+          full_name: headRepo,
+          clone_url: overrides.cloneUrl ?? `https://github.com/${headRepo}.git`,
+          html_url: overrides.htmlUrl ?? `https://github.com/${headRepo}`,
         },
       },
       base: { sha: 'base-sha', ref: 'main' },
@@ -68,32 +72,30 @@ function makePayload(overrides: {
   };
 }
 
-async function readUserRow(args: { userId: string; gitUrl?: string; branch: string }) {
-  const rows = await db
+async function readUserRow(args: { userId: string; prNumber: number; gitUrl?: string }) {
+  return db
     .select()
     .from(github_branch_pull_requests)
     .where(
       and(
         eq(github_branch_pull_requests.git_url, args.gitUrl ?? NORMALIZED_GIT_URL),
-        eq(github_branch_pull_requests.git_branch, args.branch),
+        eq(github_branch_pull_requests.pr_number, args.prNumber),
         eq(github_branch_pull_requests.owned_by_user_id, args.userId)
       )
     );
-  return rows;
 }
 
-async function readOrgRow(args: { orgId: string; gitUrl?: string; branch: string }) {
-  const rows = await db
+async function readOrgRow(args: { orgId: string; prNumber: number; gitUrl?: string }) {
+  return db
     .select()
     .from(github_branch_pull_requests)
     .where(
       and(
         eq(github_branch_pull_requests.git_url, args.gitUrl ?? NORMALIZED_GIT_URL),
-        eq(github_branch_pull_requests.git_branch, args.branch),
+        eq(github_branch_pull_requests.pr_number, args.prNumber),
         eq(github_branch_pull_requests.owned_by_organization_id, args.orgId)
       )
     );
-  return rows;
 }
 
 describe('upsertCliSessionPullRequestsFromWebhook', () => {
@@ -105,40 +107,46 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
   let sessionCounter = 0;
 
   /**
-   * The upsert short-circuits unless a `cli_sessions_v2` row exists in the
-   * delivering tenant for the same `(git_url, git_branch)`. Tests that want
-   * to exercise the write path call `seedSession` first.
+   * Seed a session that verifiably links `prNumber` on `(gitUrl, branch)`.
+   *
+   * `prHeadSha` defaults to null: the older-CLI fallback matches on the stored
+   * head ref, which keeps state-machine tests robust to changing payload SHAs.
+   * Tests that exercise SHA evidence pass an explicit `prHeadSha`.
    */
   async function seedSession(args: {
     branch: string;
     owner: WebhookInstallationOwner;
+    prNumber: number;
     gitUrl?: string;
     platform?: string;
+    prHeadRef?: string | null;
+    prHeadSha?: string | null;
   }) {
     const sessionId = `ses_test_upsert_pr_${Date.now()}_${sessionCounter++}`;
-    const platform = args.platform ?? 'cloud-agent-web';
-    if (args.owner.kind === 'user') {
-      await db.insert(cli_sessions_v2).values({
-        session_id: sessionId,
-        kilo_user_id: args.owner.userId,
-        organization_id: null,
-        git_url: args.gitUrl ?? NORMALIZED_GIT_URL,
-        git_branch: args.branch,
-        created_on_platform: platform,
-      });
-    } else {
-      // Org-owned sessions still need a kilo_user_id (notNull); reuse the
-      // shared test user for that.
-      await db.insert(cli_sessions_v2).values({
-        session_id: sessionId,
-        kilo_user_id: testUserId,
-        organization_id: args.owner.organizationId,
-        git_url: args.gitUrl ?? NORMALIZED_GIT_URL,
-        git_branch: args.branch,
-        created_on_platform: platform,
-      });
-    }
+    const gitUrl = args.gitUrl ?? NORMALIZED_GIT_URL;
+    const ownerUserId = args.owner.kind === 'user' ? args.owner.userId : testUserId;
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: ownerUserId,
+      organization_id: args.owner.kind === 'organization' ? args.owner.organizationId : null,
+      git_url: gitUrl,
+      git_branch: args.branch,
+      created_on_platform: args.platform ?? 'cloud-agent-web',
+      pr_url: `${gitUrl}/pull/${args.prNumber}`,
+      pr_number: args.prNumber,
+      pr_head_ref: args.prHeadRef === undefined ? args.branch : args.prHeadRef,
+      pr_head_sha: args.prHeadSha ?? null,
+    });
     sessionIdsToCleanup.push(sessionId);
+    return sessionId;
+  }
+
+  async function sessionVerifiedAt(sessionId: string) {
+    const [row] = await db
+      .select({ verified: cli_sessions_v2.pr_link_verified_at })
+      .from(cli_sessions_v2)
+      .where(eq(cli_sessions_v2.session_id, sessionId));
+    return row?.verified ?? null;
   }
 
   beforeAll(async () => {
@@ -167,8 +175,12 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     }
   });
 
-  it('inserts a cache row on opened', async () => {
-    await seedSession({ branch: 'feature/alpha', owner: testOwner });
+  it('inserts a cache row on opened and marks the linking session verified', async () => {
+    const sessionId = await seedSession({
+      branch: 'feature/alpha',
+      owner: testOwner,
+      prNumber: 101,
+    });
     const written = await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -181,7 +193,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     );
 
     expect(written).toBe(1);
-    const rows = await readUserRow({ userId: testUserId, branch: 'feature/alpha' });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 101 });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       git_url: NORMALIZED_GIT_URL,
@@ -191,11 +203,110 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       pr_head_sha: 'sha-alpha',
       owned_by_organization_id: null,
     });
+    expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+  });
+
+  it('matches on the stored head SHA when the session reported one', async () => {
+    const sessionId = await seedSession({
+      branch: 'feature/sha-evidence',
+      owner: testOwner,
+      prNumber: 120,
+      prHeadSha: 'sha-evidence',
+    });
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 120,
+        headRef: 'feature/sha-evidence',
+        headSha: 'sha-evidence',
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(1);
+    expect((await readUserRow({ userId: testUserId, prNumber: 120 }))[0].pr_head_sha).toBe(
+      'sha-evidence'
+    );
+    expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+  });
+
+  it('verifies a legacy session that stored no head ref or sha via its branch', async () => {
+    // Pre-headRef CLI: the stored link has neither pr_head_ref nor pr_head_sha.
+    // The session's own PR number/repo match and its branch is the webhook head
+    // ref, so it must still be marked verified (otherwise its badge can never
+    // appear without a manual refresh).
+    const sessionId = await seedSession({
+      branch: 'feature/legacy-evidence',
+      owner: testOwner,
+      prNumber: 123,
+      prHeadRef: null,
+      prHeadSha: null,
+    });
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 123,
+        headRef: 'feature/legacy-evidence',
+        headSha: 'sha-legacy-1',
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(1);
+    expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+  });
+
+  it('does not verify a legacy session when the webhook head ref is another branch', async () => {
+    const sessionId = await seedSession({
+      branch: 'feature/legacy-branch',
+      owner: testOwner,
+      prNumber: 124,
+      prHeadRef: null,
+      prHeadSha: null,
+    });
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 124,
+        headRef: 'feature/someone-else',
+        headSha: 'sha-other',
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(0);
+    expect(await sessionVerifiedAt(sessionId)).toBeNull();
+  });
+
+  it('does not match when the stored head SHA differs from the payload head SHA', async () => {
+    const sessionId = await seedSession({
+      branch: 'feature/sha-mismatch',
+      owner: testOwner,
+      prNumber: 121,
+      prHeadSha: 'sha-stored',
+    });
+
+    const written = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'synchronize',
+        prNumber: 121,
+        headRef: 'feature/sha-mismatch',
+        headSha: 'sha-other-commit',
+      }),
+      testOwner
+    );
+
+    expect(written).toBe(0);
+    expect(await readUserRow({ userId: testUserId, prNumber: 121 })).toHaveLength(0);
+    expect(await sessionVerifiedAt(sessionId)).toBeNull();
   });
 
   it('inserts a draft state for an opened draft pull request', async () => {
     const branch = 'feature/draft-open';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 110 });
 
     const written = await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -210,37 +321,61 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     );
 
     expect(written).toBe(1);
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 110 });
     expect(rows[0].pr_state).toBe('draft');
   });
 
-  it('writes exactly one row per (repo, branch, tenant) regardless of how many deliveries fire', async () => {
+  it('keys the cache by PR identity: re-deliveries collapse, a new PR is a new row', async () => {
     const branch = 'feature/one-row';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 301 });
+    await seedSession({ branch, owner: testOwner, prNumber: 302 });
 
-    for (const prNumber of [301, 302, 303]) {
-      await upsertCliSessionPullRequestsFromWebhook(
-        makePayload({
-          action: 'synchronize',
-          prNumber,
-          state: 'open',
-          headRef: branch,
-          headSha: `sha-${prNumber}`,
-        }),
-        testOwner
-      );
-    }
+    // Two deliveries for the same PR must collapse to one row.
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 301,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-301-a',
+      }),
+      testOwner
+    );
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'synchronize',
+        prNumber: 301,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-301-b',
+      }),
+      testOwner
+    );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
-    expect(rows).toHaveLength(1);
-    // Latest payload wins for non-state fields.
-    expect(rows[0].pr_number).toBe(303);
-    expect(rows[0].pr_head_sha).toBe('sha-303');
+    const rows301 = await readUserRow({ userId: testUserId, prNumber: 301 });
+    expect(rows301).toHaveLength(1);
+    expect(rows301[0].pr_head_sha).toBe('sha-301-b');
+
+    // A different PR on the same branch is its own identity, not an overwrite.
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 302,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-302',
+      }),
+      testOwner
+    );
+    const rows302 = await readUserRow({ userId: testUserId, prNumber: 302 });
+    expect(rows302).toHaveLength(1);
+    expect(rows301).toHaveLength(1);
+    expect(rows301[0].pr_number).toBe(301);
   });
 
   it('accepts the different clone_url shapes by normalizing on write', async () => {
     const branch = 'feature/normalize-shapes';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 401 });
 
     // First delivery: https URL with .git.
     await upsertCliSessionPullRequestsFromWebhook(
@@ -255,8 +390,8 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    // Second delivery: ssh URL on the same repo+branch — must collapse to the
-    // same cache row because normalize() canonicalizes both.
+    // Second delivery: ssh URL on the same repo+PR — must collapse to the same
+    // cache row because the repo normalizes to the same identity.
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'synchronize',
@@ -269,14 +404,14 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 401 });
     expect(rows).toHaveLength(1);
     expect(rows[0].git_url).toBe(NORMALIZED_GIT_URL);
     expect(rows[0].pr_head_sha).toBe('sha-401-b');
   });
 
   it('sets pr_state=merged when closed with merged:true', async () => {
-    await seedSession({ branch: 'feature/beta', owner: testOwner });
+    await seedSession({ branch: 'feature/beta', owner: testOwner, prNumber: 102 });
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -300,12 +435,12 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch: 'feature/beta' });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 102 });
     expect(rows[0].pr_state).toBe('merged');
   });
 
   it('sets pr_state=closed when closed with merged:false', async () => {
-    await seedSession({ branch: 'feature/gamma', owner: testOwner });
+    await seedSession({ branch: 'feature/gamma', owner: testOwner, prNumber: 103 });
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -329,12 +464,12 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch: 'feature/gamma' });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 103 });
     expect(rows[0].pr_state).toBe('closed');
   });
 
   it('updates pr_head_sha on synchronize', async () => {
-    await seedSession({ branch: 'feature/delta', owner: testOwner });
+    await seedSession({ branch: 'feature/delta', owner: testOwner, prNumber: 104 });
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -357,13 +492,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch: 'feature/delta' });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 104 });
     expect(rows[0].pr_head_sha).toBe('sha-delta-2');
   });
 
   it('updates a draft PR to open when it becomes ready for review', async () => {
     const branch = 'feature/ready-for-review';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 109 });
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -389,13 +524,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     );
 
     expect(written).toBe(1);
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 109 });
     expect(rows[0].pr_state).toBe('open');
   });
 
   it('updates an open PR to draft when it is converted to draft', async () => {
     const branch = 'feature/converted-to-draft';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 111 });
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -421,13 +556,48 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     );
 
     expect(written).toBe(1);
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 111 });
     expect(rows[0].pr_state).toBe('draft');
   });
 
-  it('starts a new open state when a branch is reused after a merged pull request', async () => {
+  it('does not let a PR opened by someone else on a reused branch overwrite the session PR', async () => {
+    const branch = 'feature/reused-branch';
+    // The session links PR 500 and reported only a head ref (no head SHA).
+    await seedSession({ branch, owner: testOwner, prNumber: 500, prHeadSha: null });
+
+    // Someone else opens PR 501 on the same branch name. Different PR number
+    // means no session evidence: nothing is written.
+    const foreign = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 501,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-someone-else',
+      }),
+      testOwner
+    );
+    expect(foreign).toBe(0);
+    expect(await readUserRow({ userId: testUserId, prNumber: 501 })).toHaveLength(0);
+
+    // The session's own PR still links.
+    const own = await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'opened',
+        prNumber: 500,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-own',
+      }),
+      testOwner
+    );
+    expect(own).toBe(1);
+    expect(await readUserRow({ userId: testUserId, prNumber: 500 })).toHaveLength(1);
+  });
+
+  it('keeps distinct rows when a branch is reused after a merged pull request', async () => {
     const branch = 'feature/reused-after-merge';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 208 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -441,6 +611,9 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       }),
       testOwner
     );
+
+    // A new session links the replacement PR on the same branch name.
+    await seedSession({ branch, owner: testOwner, prNumber: 209 });
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -453,9 +626,12 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
+    const oldRow = await readUserRow({ userId: testUserId, prNumber: 208 });
+    const newRow = await readUserRow({ userId: testUserId, prNumber: 209 });
+    expect(oldRow).toHaveLength(1);
+    expect(oldRow[0]).toMatchObject({ pr_state: 'merged', pr_title: 'Merged old PR' });
+    expect(newRow).toHaveLength(1);
+    expect(newRow[0]).toMatchObject({
       pr_number: 209,
       pr_url: `https://github.com/${REPO}/pull/209`,
       pr_title: 'Open new PR',
@@ -466,7 +642,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
 
   it('starts a new open state when a branch is reused after a closed pull request', async () => {
     const branch = 'feature/reused-after-close';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 210 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -480,6 +656,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       }),
       testOwner
     );
+    await seedSession({ branch, owner: testOwner, prNumber: 211 });
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'opened',
@@ -492,7 +669,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 211 });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       pr_number: 211,
@@ -505,7 +682,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
 
   it('does not demote pr_state=merged back to open on an out-of-order redelivery', async () => {
     const branch = 'feature/monotonic-merged';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 200 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -543,7 +720,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 200 });
     expect(rows[0].pr_state).toBe('merged');
     // Non-state fields still track the latest payload — only pr_state is monotonic.
     expect(rows[0].pr_head_sha).toBe('sha-200-late');
@@ -551,7 +728,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
 
   it('does not demote pr_state=closed back to open on an out-of-order redelivery', async () => {
     const branch = 'feature/monotonic-closed';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 201 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -576,13 +753,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 201 });
     expect(rows[0].pr_state).toBe('closed');
   });
 
   it('does not demote pr_state=closed to draft on a stale converted_to_draft delivery', async () => {
     const branch = 'feature/monotonic-closed-draft';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 207 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -607,13 +784,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 207 });
     expect(rows[0].pr_state).toBe('closed');
   });
 
   it('allows closed -> open transition on reopened action', async () => {
     const branch = 'feature/reopened';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 203 });
 
     // A closed, unmerged PR gets reopened — the monotonic guard must NOT
     // trap pr_state at 'closed' in this case; `reopened` is exempt.
@@ -639,14 +816,14 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 203 });
     expect(rows[0].pr_state).toBe('open');
     expect(rows[0].pr_head_sha).toBe('sha-203-reopen');
   });
 
   it('heals pr_state from closed -> open on synchronize when the reopened webhook was missed', async () => {
     const branch = 'feature/missed-reopen-then-sync';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 210 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -675,14 +852,14 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 210 });
     expect(rows[0].pr_state).toBe('open');
     expect(rows[0].pr_head_sha).toBe('sha-210-new-commit');
   });
 
   it('does not heal pr_state from closed -> open on a stale synchronize redelivery with the same head sha', async () => {
     const branch = 'feature/stale-sync-same-sha';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 211 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -709,13 +886,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 211 });
     expect(rows[0].pr_state).toBe('closed');
   });
 
   it('does not regress pr_state from merged -> closed on stale closed-unmerged redelivery', async () => {
     const branch = 'feature/monotonic-merged-closed';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 204 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -740,13 +917,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 204 });
     expect(rows[0].pr_state).toBe('merged');
   });
 
   it('does not regress pr_state from merged -> open on stale opened/synchronize redelivery', async () => {
     const branch = 'feature/monotonic-merged-open';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 205 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -770,13 +947,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 205 });
     expect(rows[0].pr_state).toBe('merged');
   });
 
   it('does not regress pr_state from merged -> draft on stale converted_to_draft delivery', async () => {
     const branch = 'feature/monotonic-merged-draft';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 206 });
 
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
@@ -801,13 +978,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 206 });
     expect(rows[0].pr_state).toBe('merged');
   });
 
   it('still allows legitimate closed -> merged transitions', async () => {
     const branch = 'feature/close-then-merge';
-    await seedSession({ branch, owner: testOwner });
+    await seedSession({ branch, owner: testOwner, prNumber: 202 });
 
     // Some PRs emit closed(merged:false) then closed(merged:true) - the second
     // still applies because terminal-state guards only block stale active states.
@@ -834,12 +1011,12 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       testOwner
     );
 
-    const rows = await readUserRow({ userId: testUserId, branch });
+    const rows = await readUserRow({ userId: testUserId, prNumber: 202 });
     expect(rows[0].pr_state).toBe('merged');
   });
 
-  describe('matching session gate', () => {
-    it('skips the upsert when no cli_sessions_v2 row references (git_url, branch) in this tenant', async () => {
+  describe('per-session verified gate', () => {
+    it('skips the upsert when no cli_sessions_v2 row links the PR in this tenant', async () => {
       const written = await upsertCliSessionPullRequestsFromWebhook(
         makePayload({
           action: 'opened',
@@ -852,11 +1029,11 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       );
       expect(written).toBe(0);
 
-      const rows = await readUserRow({ userId: testUserId, branch: 'feature/no-session' });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 700 });
       expect(rows).toHaveLength(0);
     });
 
-    it('writes the row once a session is created and a follow-up webhook arrives', async () => {
+    it('writes the row once a session links the PR and a follow-up webhook arrives', async () => {
       const branch = 'feature/session-created-later';
 
       // First webhook: no session yet → skipped.
@@ -871,10 +1048,10 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
       expect(first).toBe(0);
-      expect(await readUserRow({ userId: testUserId, branch })).toHaveLength(0);
+      expect(await readUserRow({ userId: testUserId, prNumber: 701 })).toHaveLength(0);
 
-      // Session is created (e.g. user starts an agent on this branch).
-      await seedSession({ branch, owner: testOwner });
+      // Session is created with a stored link to this PR.
+      await seedSession({ branch, owner: testOwner, prNumber: 701 });
 
       // Next webhook (e.g. synchronize on next push) populates the row.
       const second = await upsertCliSessionPullRequestsFromWebhook(
@@ -888,7 +1065,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
       expect(second).toBe(1);
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 701 });
       expect(rows).toHaveLength(1);
       expect(rows[0].pr_head_sha).toBe('sha-701-b');
     });
@@ -903,6 +1080,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       await seedSession({
         branch,
         owner: { kind: 'user', userId: otherUser.id },
+        prNumber: 702,
       });
 
       const written = await upsertCliSessionPullRequestsFromWebhook(
@@ -916,7 +1094,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
       expect(written).toBe(0);
-      expect(await readUserRow({ userId: testUserId, branch })).toHaveLength(0);
+      expect(await readUserRow({ userId: testUserId, prNumber: 702 })).toHaveLength(0);
     });
 
     it('does not match an org-owned session when the webhook is for a user-owned install', async () => {
@@ -927,10 +1105,11 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       const branch = 'feature/org-vs-user-mismatch';
 
       // Session is owned by an org — a user-install webhook for the same
-      // (url, branch) should not match it.
+      // PR should not match it.
       await seedSession({
         branch,
         owner: { kind: 'organization', organizationId: org.id },
+        prNumber: 703,
       });
 
       const written = await upsertCliSessionPullRequestsFromWebhook(
@@ -945,6 +1124,99 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       );
       expect(written).toBe(0);
     });
+
+    it('does not match a session on the same branch name in another repository', async () => {
+      const branch = 'feature/other-repo-same-branch';
+      // Session links the same PR number and branch but in a different repo.
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 704,
+        gitUrl: 'https://github.com/other/widgets',
+      });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'opened',
+          prNumber: 704,
+          state: 'open',
+          headRef: branch,
+          headSha: 'sha-704',
+        }),
+        testOwner
+      );
+      expect(written).toBe(0);
+      expect(await readUserRow({ userId: testUserId, prNumber: 704 })).toHaveLength(0);
+    });
+
+    it('does not match a fork PR whose head repo differs from the base repo', async () => {
+      const branch = 'feature/fork-same-branch';
+      await seedSession({ branch, owner: testOwner, prNumber: 705 });
+
+      // Base repo is acme/widgets, head repo is a fork with the same branch.
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'opened',
+          prNumber: 705,
+          state: 'open',
+          headRef: branch,
+          headSha: 'sha-705',
+          headRepo: 'fork/widgets',
+        }),
+        testOwner
+      );
+      expect(written).toBe(0);
+      expect(await readUserRow({ userId: testUserId, prNumber: 705 })).toHaveLength(0);
+    });
+
+    it('verifies a session on a platform outside the old review-decision set', async () => {
+      const branch = 'feature/platform-agnostic-gate';
+      // `cli`, `vscode` and `agent-manager` sessions surface the PR badge but
+      // were previously excluded by the `created_on_platform` gate, so they
+      // could never have `pr_link_verified_at` set and never showed their own
+      // PR. Verification is per-session evidence, not platform.
+      const sessionId = await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 706,
+        platform: 'vscode',
+      });
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({
+          action: 'opened',
+          prNumber: 706,
+          state: 'open',
+          headRef: branch,
+          headSha: 'sha-706',
+        }),
+        testOwner
+      );
+      expect(written).toBe(1);
+      expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+    });
+
+    it.each(['cli', 'agent-manager'] as const)(
+      'verifies a %s session without a platform gate',
+      async platform => {
+        const branch = `feature/platform-${platform}`;
+        const prNumber = platform === 'cli' ? 707 : 708;
+        const sessionId = await seedSession({ branch, owner: testOwner, prNumber, platform });
+
+        const written = await upsertCliSessionPullRequestsFromWebhook(
+          makePayload({
+            action: 'opened',
+            prNumber,
+            state: 'open',
+            headRef: branch,
+            headSha: `sha-${prNumber}`,
+          }),
+          testOwner
+        );
+        expect(written).toBe(1);
+        expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+      }
+    );
   });
 
   describe('cross-tenant isolation', () => {
@@ -952,13 +1224,13 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     const SHARED_BRANCH = 'feature/shared-branch';
     const SHARED_NORMALIZED = `https://github.com/${SHARED_REPO}`;
 
-    function makeSharedPayload(): PullRequestPayload {
+    function makeSharedPayload(prNumber: number): PullRequestPayload {
       return makePayload({
         action: 'opened',
-        prNumber: 9001,
+        prNumber,
         state: 'open',
         headRef: SHARED_BRANCH,
-        headSha: 'sha-xtenant',
+        headSha: `sha-${prNumber}`,
         repo: SHARED_REPO,
       });
     }
@@ -969,32 +1241,32 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       const orgA = await createTestOrganization('org-a-xtenant', orgOwner.id, 0);
       const orgB = await createTestOrganization('org-b-xtenant', orgOwner.id, 0);
       orgIdsToCleanup.push(orgA.id, orgB.id);
-      // Only orgA has a session on this branch — orgB has none, so even if it
-      // received the same webhook it would skip the write (extra defense
-      // beyond the tenant column itself).
+      // Only orgA has a session linking this PR — orgB has none, so even if it
+      // received the same webhook it would skip the write.
       await seedSession({
         branch: SHARED_BRANCH,
         owner: { kind: 'organization', organizationId: orgA.id },
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
       });
 
-      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
+      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(9001), {
         kind: 'organization',
         organizationId: orgA.id,
       });
 
       const rowsA = await readOrgRow({
         orgId: orgA.id,
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
-        branch: SHARED_BRANCH,
       });
       expect(rowsA).toHaveLength(1);
       expect(rowsA[0].pr_number).toBe(9001);
 
       const rowsB = await readOrgRow({
         orgId: orgB.id,
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
-        branch: SHARED_BRANCH,
       });
       expect(rowsB).toHaveLength(0);
     });
@@ -1003,42 +1275,38 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       const userA = await insertTestUser();
       const userB = await insertTestUser();
       userIdsToCleanup.push(userA.id, userB.id);
+      // Disjoint PR numbers so each tenant's row is unambiguous.
       await seedSession({
         branch: SHARED_BRANCH,
         owner: { kind: 'user', userId: userA.id },
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
       });
       await seedSession({
         branch: SHARED_BRANCH,
         owner: { kind: 'user', userId: userB.id },
+        prNumber: 9002,
         gitUrl: SHARED_NORMALIZED,
       });
 
-      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
+      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(9001), {
         kind: 'user',
         userId: userA.id,
       });
-      await upsertCliSessionPullRequestsFromWebhook(
-        makePayload({
-          action: 'opened',
-          prNumber: 9002,
-          state: 'open',
-          headRef: SHARED_BRANCH,
-          headSha: 'sha-xtenant-b',
-          repo: SHARED_REPO,
-        }),
-        { kind: 'user', userId: userB.id }
-      );
+      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(9002), {
+        kind: 'user',
+        userId: userB.id,
+      });
 
       const rowsA = await readUserRow({
         userId: userA.id,
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
-        branch: SHARED_BRANCH,
       });
       const rowsB = await readUserRow({
         userId: userB.id,
+        prNumber: 9002,
         gitUrl: SHARED_NORMALIZED,
-        branch: SHARED_BRANCH,
       });
       expect(rowsA).toHaveLength(1);
       expect(rowsB).toHaveLength(1);
@@ -1052,7 +1320,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         .where(
           and(
             eq(github_branch_pull_requests.git_url, SHARED_NORMALIZED),
-            eq(github_branch_pull_requests.git_branch, SHARED_BRANCH),
+            inArray(github_branch_pull_requests.pr_number, [9001, 9002]),
             inArray(github_branch_pull_requests.owned_by_user_id, [userA.id, userB.id])
           )
         );
@@ -1062,25 +1330,25 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       }
     });
 
-    it('only one row exists for the delivering user, regardless of how many sessions on that branch', async () => {
-      // Pre-existing unrelated cache rows for another tenant must not be
-      // affected by this tenant's upsert.
+    it('only one row exists for the delivering user, regardless of how many sessions link the PR', async () => {
       const userA = await insertTestUser();
       userIdsToCleanup.push(userA.id);
-      // Two sessions on the same branch — the upsert must still produce
+      // Two sessions linking the same PR — the upsert must still produce
       // exactly one cache row.
       await seedSession({
         branch: SHARED_BRANCH,
         owner: { kind: 'user', userId: userA.id },
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
       });
       await seedSession({
         branch: SHARED_BRANCH,
         owner: { kind: 'user', userId: userA.id },
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
       });
 
-      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
+      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(9001), {
         kind: 'user',
         userId: userA.id,
       });
@@ -1104,30 +1372,28 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         .where(
           and(
             eq(github_branch_pull_requests.git_url, SHARED_NORMALIZED),
-            eq(github_branch_pull_requests.git_branch, SHARED_BRANCH),
+            eq(github_branch_pull_requests.pr_number, 9001),
             eq(github_branch_pull_requests.owned_by_user_id, userA.id)
           )
         );
       expect(countRows[0].c).toBe(1);
     });
 
-    it('partial unique indexes prevent duplicate rows for the same (url, branch, owner)', async () => {
-      // Sanity check that the XOR-partial-unique design is doing its job:
-      // inserting two distinct payloads for the same tenant collapses into
-      // one row — and that row has exactly one of the owner columns set.
+    it('partial unique indexes prevent duplicate rows for the same (url, pr_number, owner)', async () => {
       const userA = await insertTestUser();
       userIdsToCleanup.push(userA.id);
       await seedSession({
         branch: SHARED_BRANCH,
         owner: { kind: 'user', userId: userA.id },
+        prNumber: 9001,
         gitUrl: SHARED_NORMALIZED,
       });
 
-      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
+      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(9001), {
         kind: 'user',
         userId: userA.id,
       });
-      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(), {
+      await upsertCliSessionPullRequestsFromWebhook(makeSharedPayload(9001), {
         kind: 'user',
         userId: userA.id,
       });
@@ -1138,7 +1404,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         .where(
           and(
             eq(github_branch_pull_requests.git_url, SHARED_NORMALIZED),
-            eq(github_branch_pull_requests.git_branch, SHARED_BRANCH),
+            eq(github_branch_pull_requests.pr_number, 9001),
             eq(github_branch_pull_requests.owned_by_user_id, userA.id),
             isNotNull(github_branch_pull_requests.owned_by_user_id)
           )
@@ -1151,7 +1417,12 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
   describe('review_decision_pending flag', () => {
     it('opened sets review_decision_pending=true and does not call GraphQL', async () => {
       const branch = 'feature/rd-pending-opened';
-      await seedSession({ branch, owner: testOwner, platform: 'cloud-agent-web' });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 801,
+        platform: 'cloud-agent-web',
+      });
 
       await upsertCliSessionPullRequestsFromWebhook(
         makePayload({
@@ -1164,14 +1435,19 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 801 });
       expect(rows[0].review_decision_pending).toBe(true);
       expect(rows[0].pr_review_decision).toBeNull();
     });
 
     it('synchronize sets review_decision_pending=true', async () => {
       const branch = 'feature/rd-pending-sync';
-      await seedSession({ branch, owner: testOwner, platform: 'cloud-agent-web' });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 802,
+        platform: 'cloud-agent-web',
+      });
 
       await upsertCliSessionPullRequestsFromWebhook(
         makePayload({
@@ -1194,13 +1470,18 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 802 });
       expect(rows[0].review_decision_pending).toBe(true);
     });
 
     it('reopened sets review_decision_pending=true', async () => {
       const branch = 'feature/rd-pending-reopen';
-      await seedSession({ branch, owner: testOwner, platform: 'cloud-agent-web' });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 803,
+        platform: 'cloud-agent-web',
+      });
 
       await upsertCliSessionPullRequestsFromWebhook(
         makePayload({
@@ -1224,13 +1505,18 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 803 });
       expect(rows[0].review_decision_pending).toBe(true);
     });
 
     it('edited does not flip review_decision_pending', async () => {
       const branch = 'feature/rd-pending-edited';
-      await seedSession({ branch, owner: testOwner, platform: 'cloud-agent-web' });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 804,
+        platform: 'cloud-agent-web',
+      });
 
       // Seed a row with pending=false to verify edited leaves it alone.
       await db.insert(github_branch_pull_requests).values({
@@ -1255,14 +1541,19 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 804 });
       expect(rows[0].review_decision_pending).toBe(false);
       expect(rows[0].pr_review_decision).toBe('approved');
     });
 
     it('closed does not flip review_decision_pending', async () => {
       const branch = 'feature/rd-pending-closed';
-      await seedSession({ branch, owner: testOwner, platform: 'cloud-agent-web' });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 805,
+        platform: 'cloud-agent-web',
+      });
 
       await db.insert(github_branch_pull_requests).values({
         git_url: NORMALIZED_GIT_URL,
@@ -1286,14 +1577,19 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 805 });
       expect(rows[0].review_decision_pending).toBe(false);
       expect(rows[0].pr_review_decision).toBe('approved');
     });
 
     it('existing pr_review_decision is preserved on synchronize (not overwritten)', async () => {
       const branch = 'feature/rd-preserve-decision';
-      await seedSession({ branch, owner: testOwner, platform: 'cloud-agent-web' });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 806,
+        platform: 'cloud-agent-web',
+      });
 
       await db.insert(github_branch_pull_requests).values({
         git_url: NORMALIZED_GIT_URL,
@@ -1316,15 +1612,20 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 806 });
       // Decision preserved, but pending flag is now true for the batch to refetch.
       expect(rows[0].pr_review_decision).toBe('approved');
       expect(rows[0].review_decision_pending).toBe(true);
     });
 
-    it('session on unsupported platform → skips the upsert entirely, no row written', async () => {
-      const branch = 'feature/rd-unsupported';
-      await seedSession({ branch, owner: testOwner, platform: 'vscode' });
+    it('session on a non-cloud-agent platform is verified and writes the row', async () => {
+      const branch = 'feature/platform-rd-non-cloud';
+      const sessionId = await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 807,
+        platform: 'vscode',
+      });
 
       const written = await upsertCliSessionPullRequestsFromWebhook(
         makePayload({
@@ -1337,14 +1638,27 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      expect(written).toBe(0);
-      expect(await readUserRow({ userId: testUserId, branch })).toHaveLength(0);
+      expect(written).toBe(1);
+      expect(await sessionVerifiedAt(sessionId)).not.toBeNull();
+      const rows = await readUserRow({ userId: testUserId, prNumber: 807 });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].review_decision_pending).toBe(true);
     });
 
     it('mixed sessions (cloud-agent-web + vscode) → row is written with pending=true', async () => {
       const branch = 'feature/rd-mixed';
-      await seedSession({ branch, owner: testOwner, platform: 'cloud-agent-web' });
-      await seedSession({ branch, owner: testOwner, platform: 'vscode' });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 808,
+        platform: 'cloud-agent-web',
+      });
+      await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 808,
+        platform: 'vscode',
+      });
 
       await upsertCliSessionPullRequestsFromWebhook(
         makePayload({
@@ -1357,7 +1671,7 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
         testOwner
       );
 
-      const rows = await readUserRow({ userId: testUserId, branch });
+      const rows = await readUserRow({ userId: testUserId, prNumber: 808 });
       expect(rows[0].review_decision_pending).toBe(true);
     });
   });

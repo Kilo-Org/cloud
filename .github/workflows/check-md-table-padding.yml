@@ -9,6 +9,11 @@ on:
 jobs:
   check:
     name: Check markdown table padding
+    # Guard: a manual dispatch from a fork would otherwise run this check
+    # against the fork's own files. For pull_request events github.repository is
+    # already the base repo, so the guard is a no-op there and only blocks the
+    # fork-triggerable path.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

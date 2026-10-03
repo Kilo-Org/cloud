@@ -26,6 +26,7 @@ import { ChatHeader } from './ChatHeader';
 import { isSandboxStatusEligible } from './sandbox-status';
 import { resolveSessionBranchDisplay } from './session-context-display';
 import { ChatInput } from './ChatInput';
+import { useSessionComposerFocus } from './useSessionComposerFocus';
 import {
   dedupeCustomModeOptions,
   ensureSelectedCustomOption,
@@ -207,6 +208,7 @@ export default function CloudChatPage({
     openWorktreeChats,
     closedWorktreeChats,
     openSession,
+    composerFocusRequest,
     closeSession,
     renameSession,
     deletingSessionIds,
@@ -1449,6 +1451,18 @@ export default function CloudChatPage({
       ? worktreeChats.some(chat => Boolean(chat.cloudAgentSessionId))
       : Boolean(sessionId) && !isReadOnly;
 
+  const composerTextareaDisabled =
+    activeSessionType === 'cloud-agent'
+      ? isReadOnly || isLoading || transcriptPhase === 'opening'
+      : !canSend;
+  const composerInputRef = useSessionComposerFocus(
+    composerFocusRequest,
+    sessionIdFromParams,
+    isCurrentSession && !isLoading && transcriptPhase !== 'opening',
+    isReadOnly || Boolean(activeQuestion || activePermission) || !chatTabActive || changesViewOpen,
+    composerTextareaDisabled
+  );
+
   const sessionActions = (
     <ChatHeader
       cloudAgentSessionId={sessionId ?? 'Starting session…'}
@@ -1754,6 +1768,7 @@ export default function CloudChatPage({
                                 <CurrentTaskList todos={currentTodos} />
                               </div>
                               <ChatInput
+                                inputRef={composerInputRef}
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}
                                 onNewChat={
@@ -1766,11 +1781,7 @@ export default function CloudChatPage({
                                   transcriptPhase === 'opening' ||
                                   activeSessionType === null
                                 }
-                                textareaDisabled={
-                                  activeSessionType === 'cloud-agent'
-                                    ? isReadOnly || isLoading || transcriptPhase === 'opening'
-                                    : !canSend
-                                }
+                                textareaDisabled={composerTextareaDisabled}
                                 isStreaming={isStreaming && !activeSuggestion}
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}

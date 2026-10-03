@@ -55,6 +55,7 @@ type ChatInputProps = {
   onStop?: () => void;
   disabled?: boolean;
   textareaDisabled?: boolean;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   isStreaming?: boolean;
   placeholder?: string;
   slashCommands?: SlashCommand[];
@@ -105,6 +106,7 @@ export function ChatInput({
   onStop,
   disabled = false,
   textareaDisabled = disabled,
+  inputRef,
   isStreaming = false,
   placeholder = 'Type your message...',
   slashCommands = [],
@@ -132,7 +134,8 @@ export function ChatInput({
   const [isAttachmentSubmissionPending, setIsAttachmentSubmissionPending] = useState(false);
   const valueRef = useRef('');
   const attachmentSubmissionPendingRef = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = inputRef ?? internalTextareaRef;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
 

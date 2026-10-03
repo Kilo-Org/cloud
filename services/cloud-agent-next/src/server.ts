@@ -367,16 +367,24 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
   ]) {
     headers.delete(name);
   }
+  const attributionHeaders = new Set([
+    'x-kilocode-feature',
+    'x-kilocode-editorname',
+    'x-kilocode-mode',
+    'x-kilocode-machineid',
+    'x-kilocode-taskid',
+    'x-kilocode-projectid',
+    'x-kilocode-version',
+    'x-kilo-session',
+    'x-kilo-request',
+  ]);
   for (const name of [...headers.keys()]) {
     if (
       name.startsWith('proxy-') ||
       name.startsWith('x-forwarded-') ||
       name.startsWith('x-internal-') ||
-      name.startsWith('x-kilo-') ||
-      // Feature is attribution, not a credential: the gateway's
-      // `validateFeatureHeader` owns value validation, so forward the
-      // sandbox-supplied value like any other client instead of restoring it.
-      (name.startsWith('x-kilocode-') && name !== 'x-kilocode-feature') ||
+      ((name.startsWith('x-kilo-') || name.startsWith('x-kilocode-')) &&
+        !attributionHeaders.has(name)) ||
       name === 'forwarded' ||
       name === 'x-real-ip' ||
       name === 'x-kilocode-organizationid'

@@ -20,7 +20,6 @@ import {
   registerConversationListCacheHandlers,
 } from '../hooks/useConversations';
 
-// ── Layout component ────────────────────────────────────────────────
 type KiloChatLayoutProps = {
   currentUserId: string | null;
   sandboxId: string | null;

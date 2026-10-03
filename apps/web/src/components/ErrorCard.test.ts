@@ -53,7 +53,6 @@ function getErrorMessages(error: unknown): string[] {
 
   if (isTRPCError(error)) {
     if (error.data?.zodError) {
-      // Handle flattened Zod errors from TRPC
       const zodErrors = formatZodErrors(error.data.zodError);
       if (zodErrors.length > 0) {
         errorMessages = zodErrors;

@@ -112,7 +112,6 @@ export function useSignInFlow({
   const isHintLoaded = storybookInitialState ? true : realHint.isLoaded;
   const [isInviteCleared, setIsInviteCleared] = useState(false);
 
-  // Determine tier based on hint and params
   const tier = useMemo<Tier>(() => {
     if (storybookInitialState?.tier) {
       return storybookInitialState.tier;
@@ -149,7 +148,6 @@ export function useSignInFlow({
   );
   const email = storybookInitialState?.email ?? emailState;
 
-  // Initialize email from params or hint
   useEffect(() => {
     if (storybookInitialState) return;
     if (isInviteCleared) return;
@@ -331,7 +329,6 @@ export function useSignInFlow({
     [clearPendingSso, retireTurnstileWidget]
   );
 
-  // Extract invite info from params
   const inviteOrgId = useMemo(() => {
     if (tier === 'invite' && params.org) {
       return params.org;
@@ -653,7 +650,6 @@ export function useSignInFlow({
           return;
         }
 
-        // Handle SSO redirect (from returning user or invite)
         const pendingSSOOrgId = pendingSSOOrgIdRef.current;
         if (pendingSSOOrgId) {
           pendingSSOOrgIdRef.current = null; // Clear after use
@@ -784,7 +780,6 @@ export function useSignInFlow({
             return false;
           }
         }
-        // Handle magic link
         return sendMagicLinkAndGetRedirectOutcome();
       }
 
@@ -845,7 +840,6 @@ export function useSignInFlow({
     clearPendingSso();
     setIsInviteCleared(true);
     setEmailState('');
-    // Clear invite params by navigating without them
     const newParams = new URLSearchParams(params);
     newParams.delete('email');
     newParams.delete('org');

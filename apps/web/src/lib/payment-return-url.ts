@@ -10,13 +10,11 @@ const RETURN_URL_COOKIE_MAX_AGE = 60 * 30; // 30 minutes
  */
 export function isValidReturnUrl(url: string): boolean {
   try {
-    // Parse the URL
     new URL(url, 'http://localhost'); // Use a base URL for relative paths
 
     // Only allow relative paths (no protocol or host)
     // This ensures we only redirect within our own application
     if (url.startsWith('/') && !url.startsWith('//')) {
-      // Additional checks for relative URLs
       // Prevent protocol-relative URLs like //evil.com
       // Prevent javascript: or data: URLs
       if (url.match(/^\/[^/]/)) {
@@ -26,7 +24,6 @@ export function isValidReturnUrl(url: string): boolean {
 
     return false;
   } catch {
-    // If URL parsing fails, it's not valid
     return false;
   }
 }
@@ -67,10 +64,8 @@ export async function getAndClearPaymentReturnUrl(): Promise<string | null> {
     return null;
   }
 
-  // Clear the cookie immediately
   cookieStore.delete(RETURN_URL_COOKIE_NAME);
 
-  // Validate the URL before returning it
   if (!isValidReturnUrl(returnUrlCookie.value)) {
     console.warn('[PAYMENT-RETURN-URL] Invalid return URL in cookie:', returnUrlCookie.value);
     return null;

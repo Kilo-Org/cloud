@@ -9,8 +9,6 @@ import {
 import type { TownEvent } from './ActivityFeed';
 import { COLLAPSED_SIZE, useTerminalBar } from './TerminalBarContext';
 
-// ── Resource types ───────────────────────────────────────────────────────
-
 export type ResourceRef =
   | { type: 'bead'; beadId: string; rigId: string }
   | { type: 'agent'; agentId: string; rigId: string; townId?: string }

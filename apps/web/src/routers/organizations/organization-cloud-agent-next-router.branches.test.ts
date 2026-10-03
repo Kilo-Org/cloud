@@ -17,8 +17,6 @@ import { organizationCloudAgentNextRouter } from './organization-cloud-agent-nex
 const ORG_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 const USER_ID = 'user-1';
 
-// ----- mocked seams (all factories delegate lazily) ----------------------------
-
 // The global `jest` binding comes from @types/jest, whose `fn` takes either no
 // type arguments or the (return, args) pair — not the single function type that
 // `@jest/globals`' `jest.fn` accepts. We cannot import `jest` here without
@@ -137,8 +135,6 @@ jest.mock('@/lib/provider-review/bitbucket-read', () => ({
   fetchPage: (...a: unknown[]) => mockFetchPage(...a),
   requestBitbucketJson: (...a: unknown[]) => mockRequestBitbucketJson(...a),
 }));
-
-// ----- fixtures ---------------------------------------------------------------
 
 const activeIntegration = { id: 'int-1', integration_status: 'active' };
 

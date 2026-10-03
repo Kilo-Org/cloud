@@ -41,11 +41,7 @@ import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, gt, isNull, sql, inArray } from 'drizzle-orm';
 import { computeExpiration, type ExpiringTransaction } from '@/lib/creditExpiration';
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 const DEFAULT_EXPIRE_IN_DAYS = 30;
-
-// ── Types ────────────────────────────────────────────────────────────────────
 
 type CsvRow = {
   category: string;
@@ -64,8 +60,6 @@ type RowLookup = {
   expiryDate: Date;
   expiryDateIso: string;
 };
-
-// ── CSV parsing ──────────────────────────────────────────────────────────────
 
 function parseCsv(inputPath: string): {
   rows: CsvRow[];
@@ -140,8 +134,6 @@ function parseCsv(inputPath: string): {
   return { rows, lookup, categoriesToQuery };
 }
 
-// ── Credit resolution ────────────────────────────────────────────────────────
-
 function resolveCredit(
   lookup: Map<PairKey, RowLookup>,
   category: string,
@@ -170,8 +162,6 @@ function resolveCreditOrThrow(
   }
   return resolved;
 }
-
-// ── Arg parsing ──────────────────────────────────────────────────────────────
 
 function parseArgs(): {
   execute: boolean;
@@ -218,8 +208,6 @@ function parseArgs(): {
 
   return { execute, yes, batchSize, concurrency, input };
 }
-
-// ── Process a single user ────────────────────────────────────────────────────
 
 async function processUser(
   userId: string,
@@ -477,8 +465,6 @@ async function processUser(
     projectedExpiration: projectedExpirationForExpired,
   };
 }
-
-// ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   const { execute, yes, batchSize, concurrency, input } = parseArgs();

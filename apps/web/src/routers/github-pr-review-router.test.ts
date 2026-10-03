@@ -1856,7 +1856,6 @@ describe('githubPrReviewRouter GraphQL mutations', () => {
 // wrapper surfaces already-classified TRPCError unchanged).
 void TRPCError;
 
-// ----- P1-A-08c: PR operation ledger --------------------------------------
 //
 // With an `operationKey`, the four PR mutations admit a `pr`-domain ledger
 // row, run the GitHub effect only after admission, and dedupe / replay /

@@ -15,9 +15,7 @@ import {
 import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 
-// ============================================================================
 // Status and Ownership Schemas
-// ============================================================================
 
 /**
  * Code review status enum
@@ -40,9 +38,7 @@ export const OwnerSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-// ============================================================================
 // GitHub Webhook Schemas
-// ============================================================================
 
 /**
  * GitHub user schema
@@ -97,9 +93,7 @@ export const CodeReviewWebhookPayloadSchema = z.object({
   sender: GitHubUserSchema,
 });
 
-// ============================================================================
 // Database Operation Schemas
-// ============================================================================
 
 /**
  * Platform type for code reviews
@@ -155,9 +149,7 @@ export const ListReviewsParamsSchema = z.object({
   platform: CodeReviewPlatformSchema.optional(),
 });
 
-// ============================================================================
 // tRPC Input Schemas
-// ============================================================================
 
 /**
  * List code reviews input (for organizations)
@@ -203,9 +195,7 @@ export const RetriggerCodeReviewInputSchema = z.object({
   reviewId: z.string().uuid(),
 });
 
-// ============================================================================
 // Trigger Schemas
-// ============================================================================
 
 /**
  * Trigger review params schema
@@ -220,9 +210,7 @@ export const TriggerReviewParamsSchema = z.object({
     .passthrough(), // Allow additional fields beyond config
 });
 
-// ============================================================================
 // Inferred TypeScript Types from Zod Schemas
-// ============================================================================
 
 /**
  * Infer TypeScript types from Zod schemas for use in function signatures.

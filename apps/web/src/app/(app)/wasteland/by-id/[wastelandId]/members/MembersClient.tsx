@@ -145,8 +145,6 @@ export function MembersClient({ wastelandId }: { wastelandId: string }) {
   );
 }
 
-// ── Member Row ───────────────────────────────────────────────────────────
-
 function MemberRow({
   member,
   wastelandId,
@@ -205,8 +203,6 @@ function MemberRow({
     </TableRow>
   );
 }
-
-// ── Add Member Dialog ────────────────────────────────────────────────────
 
 function AddMemberDialog({
   wastelandId,
@@ -339,8 +335,6 @@ function AddMemberDialog({
   );
 }
 
-// ── Edit Member Dialog ───────────────────────────────────────────────────
-
 function EditMemberDialog({
   member,
   wastelandId,
@@ -470,8 +464,6 @@ function EditMemberDialog({
   );
 }
 
-// ── Remove Member Dialog ─────────────────────────────────────────────────
-
 function RemoveMemberDialog({
   member,
   wastelandId,
@@ -533,8 +525,6 @@ function RemoveMemberDialog({
     </AlertDialog>
   );
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 function formatTimestamp(iso: string): string {
   try {

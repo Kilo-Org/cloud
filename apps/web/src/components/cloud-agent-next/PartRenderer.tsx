@@ -46,9 +46,7 @@ import {
   isPartStreaming,
 } from './types';
 
-// ============================================================================
 // Types
-// ============================================================================
 
 export type PartRendererProps = {
   part: Part;
@@ -60,9 +58,7 @@ export type PartRendererProps = {
   onOpenChildSession?: OpenChildSession;
 };
 
-// ============================================================================
 // Shared Components
-// ============================================================================
 
 function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
   const safeHref = toSafeHttpUrl(href);
@@ -79,9 +75,7 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
 const markdownComponents = { a: LinkRenderer };
 const remarkPlugins = [remarkGfm];
 
-// ============================================================================
 // Part Renderers
-// ============================================================================
 
 /**
  * Renders a TextPart as markdown
@@ -412,9 +406,7 @@ function UnknownPartRenderer({ part }: { part: Part }) {
   );
 }
 
-// ============================================================================
 // Main Component
-// ============================================================================
 
 /**
  * Error fallback for individual parts

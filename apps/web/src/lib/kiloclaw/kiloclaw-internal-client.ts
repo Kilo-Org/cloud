@@ -964,7 +964,6 @@ export class KiloClawInternalClient {
     );
   }
 
-  // ── Agent config CRUD (→ /api/platform/agents*) ─────────────────────
   // Write payloads are forwarded opaquely (like patchOpenclawConfig); the tRPC
   // layer validates input with Zod and the controller re-validates.
 

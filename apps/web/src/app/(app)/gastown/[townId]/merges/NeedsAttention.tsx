@@ -32,8 +32,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-// ── Types ────────────────────────────────────────────────────────────
-
 type MergeQueueData = GastownOutputs['gastown']['getMergeQueueData'];
 type MergeQueueItem = MergeQueueData['needsAttention']['openPRs'][number];
 
@@ -47,8 +45,6 @@ type ConfirmAction = {
   title: string;
   action: 'fail' | 'retry';
 };
-
-// ── Status badges ────────────────────────────────────────────────────
 
 const CATEGORY_STYLES = {
   openPR: {
@@ -72,8 +68,6 @@ const CATEGORY_STYLES = {
 } as const;
 
 type Category = keyof typeof CATEGORY_STYLES;
-
-// ── Convoy grouping ──────────────────────────────────────────────────
 
 function groupByConvoy(items: MergeQueueItem[]): {
   convoyGroups: ConvoyGroup[];
@@ -103,8 +97,6 @@ function groupByConvoy(items: MergeQueueItem[]): {
     standalone,
   };
 }
-
-// ── Main component ───────────────────────────────────────────────────
 
 export function NeedsAttention({
   data,
@@ -250,8 +242,6 @@ export function NeedsAttention({
   );
 }
 
-// ── Convoy group card ────────────────────────────────────────────────
-
 function ConvoyGroupCard({
   group,
   categoryByBeadId,
@@ -329,8 +319,6 @@ function ConvoyGroupCard({
   );
 }
 
-// ── Standalone attention item card ───────────────────────────────────
-
 function AttentionItemCard({
   item,
   category,
@@ -348,8 +336,6 @@ function AttentionItemCard({
     </div>
   );
 }
-
-// ── Shared row component (used inside convoy group and standalone) ───
 
 function AttentionItemRow({
   item,

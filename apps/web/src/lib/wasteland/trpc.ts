@@ -15,13 +15,11 @@ import type { inferRouterOutputs } from '@trpc/server';
 import type { WrappedWastelandRouter } from '@/lib/wasteland/types/router';
 import { WASTELAND_URL } from '@/lib/constants';
 
-// ── Type exports ──────────────────────────────────────────────────────────
 // Re-export the router type so frontend components can extract output types
 // without importing from the worker package directly.
 export type { WrappedWastelandRouter };
 export type WastelandOutputs = inferRouterOutputs<WrappedWastelandRouter>;
 
-// ── Token management ──────────────────────────────────────────────────────
 // Fetches a short-lived JWT from /api/wasteland/token (session-cookie-authed)
 // and caches it in memory. Refreshes automatically when near expiry.
 
@@ -56,8 +54,6 @@ export async function getToken(): Promise<string> {
   return inflightRequest;
 }
 
-// ── tRPC client ───────────────────────────────────────────────────────────
-
 const wastelandTrpcUrl = `${WASTELAND_URL}/trpc`;
 
 const headers = async () => {
@@ -77,7 +73,6 @@ export function createWastelandTRPCClient() {
   });
 }
 
-// ── React integration ─────────────────────────────────────────────────────
 // Creates the same shape as the main tRPC utils (TRPCProvider, useTRPC, etc.)
 // but typed against the Wasteland router served by the worker.
 

@@ -144,9 +144,7 @@ function installLinkedomDom(): { cleanup: () => void; container: HTMLElement } {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Fixtures
-// ---------------------------------------------------------------------------
 
 const entryReady: PoolEntry = { model: 'anthropic/claude-sonnet-4', variant: 'high' };
 const entryFailed: PoolEntry = { model: 'google/gemini-2.5-flash', variant: null };
@@ -245,9 +243,7 @@ function findSaveButton(container: HTMLElement): HTMLButtonElement {
   return save as HTMLButtonElement;
 }
 
-// ---------------------------------------------------------------------------
 // Endpoint / query key
-// ---------------------------------------------------------------------------
 
 describe('settings endpoint and query key', () => {
   it('uses the settings route for pool-aware reads/writes', () => {
@@ -264,9 +260,7 @@ describe('settings endpoint and query key', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Empty state copy (exact strings from the card module)
-// ---------------------------------------------------------------------------
 
 describe('empty / inherited pool copy', () => {
   it('uses the exact personal empty string', () => {
@@ -286,9 +280,7 @@ describe('empty / inherited pool copy', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Status mapping (real helper used by the card rows)
-// ---------------------------------------------------------------------------
 
 describe('mapPoolEntryDisplayStatus', () => {
   it('maps ready, pending/running, failed, and unavailable exactly', () => {
@@ -360,9 +352,7 @@ describe('mapPoolEntryDisplayStatus', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Polling stop condition
-// ---------------------------------------------------------------------------
 
 describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
   const configured: PoolEntryWithAvailability[] = [
@@ -420,9 +410,7 @@ describe('settingsRefetchInterval / hasBenchmarkingEntries', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Draft resolution the card executes on every render (poll-safe overrides)
-// ---------------------------------------------------------------------------
 
 describe('resolveEffectiveDraft (card-executed override-over-saved)', () => {
   it('keeps overrides when a poll updates the saved snapshot (dirty draft preserved)', () => {
@@ -532,9 +520,7 @@ describe('resolveEffectiveDraft (card-executed override-over-saved)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Save / retry mutation callbacks the card wires into useMutation
-// ---------------------------------------------------------------------------
 
 describe('applySaveMutationSuccess / applySaveMutationError', () => {
   it('on save success updates the query cache and clears the save-error panel', () => {
@@ -623,9 +609,7 @@ describe('applyRetryMutationSuccess', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Add flow
-// ---------------------------------------------------------------------------
 
 describe('tryAddPoolEntry', () => {
   it('requires a variant when the model exposes variants', () => {
@@ -703,9 +687,7 @@ describe('tryAddPoolEntry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Eligibility
-// ---------------------------------------------------------------------------
 
 describe('isDirectByokOnlyModel / isEligiblePoolModel', () => {
   it('excludes direct-BYOK-only entries via hasUserByokAvailable + provider prefix', () => {
@@ -792,9 +774,7 @@ describe('toEligibleModelOptions', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Save / retry bodies
-// ---------------------------------------------------------------------------
 
 describe('buildSaveBody / buildRetryBody / buildModeSaveBody', () => {
   it('PUTs { mode, pool } with nulls for inherit (happy save payload)', () => {
@@ -843,9 +823,7 @@ describe('removePoolEntry / clear', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Clear pool + editable chrome (card-executed visibility)
-// ---------------------------------------------------------------------------
 
 describe('shouldShowClearPoolControl / resolveEditableChrome', () => {
   it('shows Clear pool only when a saved configured pool exists', () => {
@@ -902,9 +880,7 @@ describe('shouldShowClearPoolControl / resolveEditableChrome', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Errors
-// ---------------------------------------------------------------------------
 
 describe('error messages', () => {
   it('load failure message surfaces the API error string', () => {
@@ -934,9 +910,7 @@ describe('error messages', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Readonly / permission isolation (org member) — call-site derivation
-// ---------------------------------------------------------------------------
 
 describe('readonly org member controls', () => {
   it('billing-manager edit permission is isolated from page-level canEdit', () => {
@@ -981,9 +955,7 @@ describe('readonly org member controls', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Variant labels used by real card rows
-// ---------------------------------------------------------------------------
 
 describe('variantLabel', () => {
   it('labels null as Default and known effort keys for display', () => {
@@ -992,9 +964,7 @@ describe('variantLabel', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Mounted card: poolSupported === false (legacy worker fallback)
-// ---------------------------------------------------------------------------
 
 describe('AutoRoutingModeCard poolSupported=false', () => {
   const originalFetch = global.fetch;

@@ -64,7 +64,6 @@ export async function PUT(
     // Create tRPC context for authentication
     const ctx = await createTRPCContext();
 
-    // Parse multipart form data
     let formData: FormData | undefined;
     try {
       formData = await request.formData();
@@ -76,7 +75,6 @@ export async function PUT(
       );
     }
 
-    // Extract form fields
     const rawData = {
       file: formData.get('file'),
       organizationId: formData.get('organizationId'),
@@ -87,7 +85,6 @@ export async function PUT(
       isBaseBranch: formData.get('isBaseBranch') || 'true',
     };
 
-    // Validate with Zod
     const validationResult = FormDataSchema.safeParse(rawData);
 
     if (!validationResult.success) {
@@ -146,7 +143,6 @@ export async function PUT(
         branch: isBaseBranch ? undefined : gitBranch,
       });
 
-      // Convert file to text stream
       const fileStream = file.stream();
       const textStream = fileStream.pipeThrough(new TextDecoderStream());
 
@@ -169,7 +165,6 @@ export async function PUT(
             continue;
           }
 
-          // Process AI attribution stats for this chunk
           aiAttributionTracker.processChunk(chunk);
 
           // Truncate chunk if it exceeds max length
@@ -188,7 +183,6 @@ export async function PUT(
             isBaseBranch,
           });
 
-          // Process batch when it reaches the batch size
           if (batch.length >= BATCH_SIZE) {
             chunksProcessed += batch.length;
             await processBatch(batch);
@@ -196,7 +190,6 @@ export async function PUT(
           }
         }
 
-        // Process any remaining chunks in the final batch
         if (batch.length > 0) {
           chunksProcessed += batch.length;
           await processBatch(batch);
@@ -206,7 +199,6 @@ export async function PUT(
         // No explicit cleanup needed as the generator's finally block handles reader.releaseLock()
       }
 
-      // Get final AI attribution stats
       const { totalLines, totalAiLines } = aiAttributionTracker.getStats();
 
       // Upsert manifest entry for this file

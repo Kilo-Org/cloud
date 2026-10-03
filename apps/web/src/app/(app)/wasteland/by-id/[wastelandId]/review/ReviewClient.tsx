@@ -118,7 +118,6 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     refetchInterval: 30_000,
   });
 
-  // ── Filter / sort state ──────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState<InboxKind | null>(null);
   const [sortField, setSortField] = useState<SortField>('activity');
@@ -146,7 +145,6 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     });
   }, [items, search, kindFilter, sortField]);
 
-  // ── Mutations ─────────────────────────────────────────────────────
   const refetch = () => {
     void queryClient.invalidateQueries({ queryKey: inboxQueryKey });
   };
@@ -215,7 +213,6 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
 
   const busy = mergeMutation.isPending || closeMutation.isPending || acceptMutation.isPending;
 
-  // ── Page header contribution ──────────────────────────────────────
   useSetWastelandPageHeader({
     title: 'Review',
     icon: <Inbox className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />,
@@ -228,7 +225,6 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
     ) : null,
   });
 
-  // ── Permission / loading states ───────────────────────────────────
   if (wastelandQuery.isLoading || credentialQuery.isLoading || membersQuery.isLoading) {
     return <ReviewShell>{<InboxListSkeleton />}</ReviewShell>;
   }
@@ -434,8 +430,6 @@ export function ReviewClient({ wastelandId }: { wastelandId: string }) {
   );
 }
 
-// ── Shell (used for loading / access-denied states) ─────────────────────
-
 function ReviewShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -484,8 +478,6 @@ function AccessDenied({ title, description }: { title: string; description: stri
   );
 }
 
-// ── Filter chip ──────────────────────────────────────────────────────────
-
 function FilterChip({
   label,
   count,
@@ -516,7 +508,6 @@ function FilterChip({
   );
 }
 
-// ── Row-title label maps ────────────────────────────────────────────────
 //
 // These two const maps are also defined inside ReviewItemPanel.tsx for use
 // by the drawer body. They're duplicated here intentionally because the
@@ -540,8 +531,6 @@ const ADMIN_SUBKIND_LABEL: Record<
   close: { label: 'Close (no stamp)', tone: 'white' },
   'close-upstream': { label: 'Close upstream (no stamp)', tone: 'white' },
 };
-
-// ── Comment dialog ──────────────────────────────────────────────────────
 
 function CommentDialog({
   wastelandId,
@@ -637,8 +626,6 @@ function CommentDialog({
     </Dialog>
   );
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 /**
  * Title shown as the bold first line of each list row. Different per

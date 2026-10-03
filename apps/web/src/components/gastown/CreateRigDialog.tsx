@@ -104,7 +104,6 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
 
   function handleRepoSelect(fullName: string) {
     setSelectedRepo(fullName);
-    // Determine platform from the selection
     const repo = unifiedRepositories.find(r => r.fullName === fullName);
     // TODO: Add Bitbucket support to Gastown.
     if (repo?.platform && repo.platform !== 'bitbucket') {

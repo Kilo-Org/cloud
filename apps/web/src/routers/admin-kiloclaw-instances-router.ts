@@ -3763,8 +3763,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       }
     }),
 
-  // ── Orphan detection ──────────────────────────────────────────────────
-
   detectOrphans: adminProcedure.input(DetectOrphansSchema).mutation(async ({ input }) => {
     // 1. Fetch all active (non-destroyed) instances created within the date range.
     //    Cap at 1000 to avoid excessively long fan-outs; the UI shows when capped.
@@ -3937,7 +3935,6 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // ── Orphan-volume reaper ──────────────────────────────────────────────
   //
   // Finds Fly volumes left behind by destroyed instances and lets an admin
   // reap them one row at a time. Detection is anchored on the (soft-deleted,

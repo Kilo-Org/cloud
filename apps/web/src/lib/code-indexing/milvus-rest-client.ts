@@ -6,9 +6,7 @@
  * API Reference: https://docs.zilliz.com/reference/restful/data-plane-v2
  */
 
-// ============================================================================
 // Types matching the MilvusClient interface
-// ============================================================================
 
 export type DataType =
   | 'None'
@@ -105,9 +103,7 @@ type MilvusRestClientConfig = {
   timeout?: number;
 };
 
-// ============================================================================
 // REST API Response Types
-// ============================================================================
 
 type MilvusApiResponse<T = unknown> = {
   code: number;
@@ -115,9 +111,7 @@ type MilvusApiResponse<T = unknown> = {
   data?: T;
 };
 
-// ============================================================================
 // MilvusRestClient Implementation
-// ============================================================================
 
 export class MilvusRestClient {
   private baseUrl: string;

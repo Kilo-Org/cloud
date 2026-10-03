@@ -55,9 +55,7 @@ import {
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
 
-// ---------------------------------------------------------------------------
 // Pure helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
 
 export function formatAccuracy(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
@@ -83,9 +81,7 @@ export function formatCostPerAccuracy(candidate: Pick<RankedCandidate, 'accuracy
   return Number.isFinite(value) ? formatUsd(value) : '—';
 }
 
-// ---------------------------------------------------------------------------
 // Model picker helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
 
 /** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
 export function pinnedModelFor(id: string): ModelOption {
@@ -108,9 +104,7 @@ export function variantOptionsForModel(
   return catalogKeys;
 }
 
-// ---------------------------------------------------------------------------
 // Fetch helpers
-// ---------------------------------------------------------------------------
 
 async function fetchBenchmarkConfig() {
   const response = await fetch('/admin/api/auto-routing/benchmark-config');
@@ -193,9 +187,7 @@ async function fetchBenchmarkRoutingTable() {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Local form state type for decider model rows
-// ---------------------------------------------------------------------------
 
 type DeciderModelRow = {
   id: string;
@@ -359,9 +351,7 @@ export function formStateToConfig(
   };
 }
 
-// ---------------------------------------------------------------------------
 // Config editor sub-component
-// ---------------------------------------------------------------------------
 
 function BenchmarkConfigEditor({
   config,
@@ -979,9 +969,7 @@ function BenchmarkConfigEditor({
   );
 }
 
-// ---------------------------------------------------------------------------
 // Run summaries expandable table
-// ---------------------------------------------------------------------------
 
 function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   const isDecider = run.kind === 'decider';
@@ -1058,9 +1046,7 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Runs table
-// ---------------------------------------------------------------------------
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1151,9 +1137,7 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
   );
 }
 
-// ---------------------------------------------------------------------------
 // Routing table view
-// ---------------------------------------------------------------------------
 
 export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse }) {
   if (!data.table) {
@@ -1227,9 +1211,7 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
   );
 }
 
-// ---------------------------------------------------------------------------
 // Registry summary
-// ---------------------------------------------------------------------------
 
 const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
 
@@ -1285,9 +1267,7 @@ function RegistrySummary({
   );
 }
 
-// ---------------------------------------------------------------------------
 // Main exported section component
-// ---------------------------------------------------------------------------
 
 export function BenchmarksSection() {
   const queryClient = useQueryClient();

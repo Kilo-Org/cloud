@@ -101,8 +101,6 @@ describe('verifyPlayIntegrity production bypass guard', () => {
   });
 });
 
-// ── Decode endpoint resource path ─────────────────────────────────────────
-
 describe('verifyPlayIntegrity decode endpoint', () => {
   const originalFetch = global.fetch;
   const mockFetch = jest.fn();

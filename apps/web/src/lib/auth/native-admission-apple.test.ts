@@ -64,8 +64,6 @@ const EVIL_LEAF_DER = Buffer.from(
   'base64'
 );
 
-// ── CBOR encoding helpers (the verifier decodes CBOR, so the tests encode) ──
-
 function cborHead(major: number, length: number): Buffer {
   if (length < 24) return Buffer.from([(major << 5) | length]);
   if (length < 0x100) return Buffer.from([(major << 5) | 24, length]);
@@ -132,8 +130,6 @@ function buildAttestation(x5c: Buffer[], authData: Buffer): string {
   return object.toString('base64');
 }
 
-// ── clientDataHash convention ──────────────────────────────────────────────
-
 describe('appAttestClientDataHash', () => {
   test('hashes the UTF-8 bytes of the challenge string', () => {
     // `@expo/app-integrity` computes SHA256(Data(challenge.utf8)) before calling
@@ -152,8 +148,6 @@ describe('appAttestClientDataHash', () => {
     );
   });
 });
-
-// ── Certificate chain verification ─────────────────────────────────────────
 
 describe('verifyAppleAttestation certificate chain', () => {
   const teamId = 'WRPHYY66V6';
@@ -269,8 +263,6 @@ describe('verifyAppleAttestation certificate chain', () => {
     expect(result).toEqual({ ok: false, error: 'CERT_CHAIN_INVALID' });
   });
 });
-
-// ── Nonce extension parsing ────────────────────────────────────────────────
 
 describe('extractAppleAttestNonce', () => {
   test('extracts the nested nonce from the real Apple credential certificate', () => {

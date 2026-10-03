@@ -214,8 +214,6 @@ function PullEmptyState({ hasBranch }: { hasBranch: boolean }) {
   );
 }
 
-// ── Loading skeleton for a tab body ────────────────────────────────────
-
 function TabSkeleton() {
   return (
     <div className="space-y-3">
@@ -226,8 +224,6 @@ function TabSkeleton() {
     </div>
   );
 }
-
-// ── Pending review overlay ─────────────────────────────────────────────
 
 /**
  * Banner shown when the viewer has an open upstream PR for this item.

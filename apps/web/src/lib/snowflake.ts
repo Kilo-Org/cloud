@@ -2,9 +2,7 @@ import jwt from 'jsonwebtoken';
 
 import { getEnvVariable } from '@/lib/dotenvx';
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 export type SnowflakeConfig = {
   accountHost: string;
@@ -32,9 +30,7 @@ export type SnowflakeBinding =
 /** A row returned by Snowflake — values are always strings in the SQL API. */
 export type SnowflakeRow = string[];
 
-// ---------------------------------------------------------------------------
 // Config resolution
-// ---------------------------------------------------------------------------
 
 const REQUIRED_ENV_KEYS = [
   'SNOWFLAKE_ACCOUNT_HOST',
@@ -80,9 +76,7 @@ export function resolveSnowflakeConfig(): SnowflakeConfig | null {
   };
 }
 
-// ---------------------------------------------------------------------------
 // JWT
-// ---------------------------------------------------------------------------
 
 const SNOWFLAKE_JWT_LIFETIME_SECONDS = 59 * 60;
 
@@ -124,9 +118,7 @@ function buildJwt(config: SnowflakeConfig): string {
   });
 }
 
-// ---------------------------------------------------------------------------
 // HTTP helpers
-// ---------------------------------------------------------------------------
 
 const SNOWFLAKE_USER_AGENT = 'kilo-web/1.0';
 const SNOWFLAKE_MAX_POLL_ATTEMPTS = (() => {
@@ -254,9 +246,7 @@ async function pollStatement(
   throw new Error('Snowflake query timed out after polling');
 }
 
-// ---------------------------------------------------------------------------
 // Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Execute a SQL statement against Snowflake via the SQL API v2.

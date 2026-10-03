@@ -102,7 +102,6 @@ export function SettingsClient() {
   const isOwner = currentUserMember?.role === 'owner' || currentUser?.is_admin === true;
   const isUpstreamAdmin = credential?.is_upstream_admin === true;
 
-  // ── Local form state ───────────────────────────────────────────────
   // Form values sync from the wasteland query once, on first arrival.
   // `initialized` is a ref rather than state because flipping it during
   // render (via setState) would cause an extra render and trip React's
@@ -118,7 +117,6 @@ export function SettingsClient() {
     initializedRef.current = true;
   }, [wasteland]);
 
-  // ── Mutations ──────────────────────────────────────────────────────
   const wastelandQueryKey = trpc.wasteland.getWasteland.queryKey({ wastelandId });
 
   const updateConfig = useMutation({
@@ -490,8 +488,6 @@ export function SettingsClient() {
   );
 }
 
-// ── Connect DoltHub Dialog ───────────────────────────────────────────────
-
 /**
  * Lets a user wire a DoltHub credential into a wasteland. Two paths:
  *
@@ -808,8 +804,6 @@ function ConnectDoltHubDialog({
   );
 }
 
-// ── Delete Wasteland Dialog ──────────────────────────────────────────────
-
 function DeleteWastelandDialog({
   wastelandName,
   isPending,
@@ -866,8 +860,6 @@ function DeleteWastelandDialog({
     </AlertDialog>
   );
 }
-
-// ── Connected Towns Section ──────────────────────────────────────────────
 
 type ConnectedTown = {
   town_id: string;
@@ -1021,8 +1013,6 @@ function ConnectedTownsSection({
   );
 }
 
-// ── Connect Town Dialog ─────────────────────────────────────────────────
-
 function ConnectTownDialog({
   wastelandId,
   connectedTownIds,
@@ -1133,8 +1123,6 @@ function ConnectTownDialog({
     </Dialog>
   );
 }
-
-// ── Admin: verify upstream write access ─────────────────────────────────
 
 function AdminVerifySection({
   id,

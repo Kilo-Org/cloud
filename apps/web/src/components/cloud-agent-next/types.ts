@@ -12,9 +12,7 @@ import * as z from 'zod';
 
 import type { AssociatedPr } from './utils/github-pr-link';
 
-// ============================================================================
 // OpenCode Types
-// ============================================================================
 
 import type {
   Message as OpenCodeMessage,
@@ -70,9 +68,7 @@ export type {
   SessionStatus,
 };
 
-// ============================================================================
 // Composite Types
-// ============================================================================
 
 /**
  * StoredMessage - The message format stored in IndexedDB.
@@ -89,9 +85,7 @@ export type StoredMessage = {
  */
 export type SubtaskPart = Extract<Part, { type: 'subtask' }>;
 
-// ============================================================================
 // Type Guards
-// ============================================================================
 
 /** Check if a part is a TextPart */
 export function isTextPart(part: Part): part is TextPart {
@@ -245,9 +239,7 @@ export function isMessageStreaming(message: StoredMessage): boolean {
   return message.parts.some(isPartStreaming);
 }
 
-// ============================================================================
 // Agent Mode Types
-// ============================================================================
 
 /**
  * Valid mode values for cloud agent sessions. Includes the cloud-agent-next
@@ -264,9 +256,7 @@ export type AgentMode =
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   | (string & {});
 
-// ============================================================================
 // Stream Event Types
-// ============================================================================
 
 /**
  * WebSocket event envelope from cloud-agent.
@@ -295,9 +285,7 @@ export type StreamEventType =
   | 'session.error'
   | 'session.idle';
 
-// ============================================================================
 // Resume Configuration Types
-// ============================================================================
 
 /**
  * Configuration collected when resuming a CLI session in cloud-agent.
@@ -310,9 +298,7 @@ export type ResumeConfig = {
   setupCommands?: string[];
 };
 
-// ============================================================================
 // Shared Types
-// ============================================================================
 
 /**
  * Tool execution
@@ -434,9 +420,7 @@ export type StoredSession = {
   associatedPr?: AssociatedPr | null;
 };
 
-// ============================================================================
 // Zod Schemas for Runtime Validation
-// ============================================================================
 
 /**
  * Zod schema for ToolExecution
@@ -449,9 +433,7 @@ export const ToolExecutionSchema = z.object({
   timestamp: z.string(),
 });
 
-// ============================================================================
 // Parsed Stream Event Union
-// ============================================================================
 
 /**
  * Discriminated union of stream events we handle.

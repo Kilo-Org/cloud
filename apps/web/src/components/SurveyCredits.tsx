@@ -15,7 +15,6 @@ export const SurveyCredits = async (customerInfo: CustomerInfo) => {
   if (!isFlagEnabled) return null;
   if (!has_used1usd_andHoldOrPayment(customerInfo).success) return null;
 
-  // Check if user has already completed the survey by checking credit_transactions
   const existingSurveyCredit = await db
     .select({ id: credit_transactions.id })
     .from(credit_transactions)

@@ -144,7 +144,6 @@ export function SignInForm({
   }
 
   // Landing state - render based on tier
-  // ────────────────────────────────────
 
   // A passkey sign-in lands where the other providers land.
   const passkeyCallbackUrl = getSignInCallbackUrl(searchParams);

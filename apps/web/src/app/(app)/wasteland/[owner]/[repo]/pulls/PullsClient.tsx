@@ -126,8 +126,6 @@ export function PullsClient() {
   );
 }
 
-// ── Header ──────────────────────────────────────────────────────────────
-
 function PullsHeader({ owner, repoName }: { owner: string; repoName: string }) {
   return (
     <div className="flex flex-col gap-1 border-b border-white/[0.06] bg-white/[0.015] px-6 py-3">
@@ -141,8 +139,6 @@ function PullsHeader({ owner, repoName }: { owner: string; repoName: string }) {
     </div>
   );
 }
-
-// ── Mine tab ────────────────────────────────────────────────────────────
 
 function MineTab({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
@@ -226,8 +222,6 @@ function MinePullRow({ pull }: { pull: MyPull }) {
     </div>
   );
 }
-
-// ── Incoming tab ────────────────────────────────────────────────────────
 
 function IncomingTab({ wastelandId }: { wastelandId: string }) {
   const trpc = useWastelandTRPC();
@@ -457,8 +451,6 @@ function IncomingPullRow({ item, onOpen }: { item: InboxItem; onOpen: () => void
   );
 }
 
-// ── Comment dialog ─────────────────────────────────────────────────────
-
 function CommentDialog({
   wastelandId,
   item,
@@ -544,8 +536,6 @@ function CommentDialog({
     </Dialog>
   );
 }
-
-// ── Skeleton + empty state ─────────────────────────────────────────────
 
 function ListSkeleton() {
   return (

@@ -83,7 +83,6 @@ export function TerminalBar({
   const drawerStack = useDrawerStack();
   const router = useRouter();
 
-  // ── Always-on WebSocket for alarm status + UI action dispatch ──────
   const handleAgentStatus = useCallback(
     (_event: AgentStatusEvent) => {
       void queryClient.invalidateQueries({
@@ -170,7 +169,6 @@ export function TerminalBar({
   const effectiveActiveId = activeTabId ?? 'mayor';
   const activeTab = allTabs.find(t => t.id === effectiveActiveId) ?? allTabs[0];
 
-  // ── Fullscreen state (purely local — toggled via double-click / Escape) ──
   const [isFullscreen, setLocalFullscreen] = useState(false);
   const previousSizeRef = useRef<number>(size);
 
@@ -204,7 +202,6 @@ export function TerminalBar({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen, exitFullscreen]);
 
-  // ── Resize drag logic ──────────────────────────────────────────────
   const isDragging = useRef(false);
   const startPos = useRef(0);
   const startSize = useRef(0);
@@ -265,7 +262,6 @@ export function TerminalBar({
     }
   }, [collapsed, toggleFullscreen]);
 
-  // ── Compute container styles ───────────────────────────────────────
   const totalSize = collapsed ? COLLAPSED_SIZE : COLLAPSED_SIZE + size;
 
   const containerStyle = (() => {
@@ -332,7 +328,6 @@ export function TerminalBar({
     ? 'h-8 w-0.5 rounded-full bg-white/0 group-hover/resize:bg-white/25 transition-colors'
     : 'w-8 h-0.5 rounded-full bg-white/0 group-hover/resize:bg-white/25 transition-colors';
 
-  // ── Collapse chevron direction ─────────────────────────────────────
   const CollapseIcon = (() => {
     if (collapsed) {
       // Show icon pointing toward expansion
@@ -346,7 +341,6 @@ export function TerminalBar({
     ];
   })();
 
-  // ── Layout direction ───────────────────────────────────────────────
   // Horizontal: tab bar is a row at top (bottom position) or bottom (top position),
   //             content fills remaining height.
   // Vertical:   tab bar is a column at top, content fills remaining width.
@@ -513,8 +507,6 @@ export function TerminalBar({
     </div>
   );
 }
-
-// ── Tab Bar ──────────────────────────────────────────────────────────────
 
 type TabDef = {
   id: string;
@@ -779,8 +771,6 @@ function TabBar({
   );
 }
 
-// ── Position Picker Popup ────────────────────────────────────────────────
-
 const POSITION_OPTIONS: { value: TerminalPosition; label: string; Icon: typeof PanelBottom }[] = [
   { value: 'bottom', label: 'Bottom', Icon: PanelBottom },
   { value: 'top', label: 'Top', Icon: PanelTop },
@@ -839,8 +829,6 @@ export function PositionPicker({
   );
 }
 
-// ── Terminal Content Area ─────────────────────────────────────────────────
-
 function TerminalContent({
   activeTab,
   collapsed,
@@ -884,8 +872,6 @@ function TerminalContent({
     </AnimatePresence>
   );
 }
-
-// ── Alarm Status Pane ────────────────────────────────────────────────────
 
 type AlarmStatus = {
   alarm: { nextFireAt: string | null; intervalMs: number; intervalLabel: string };
@@ -1302,8 +1288,6 @@ function eventTypeColor(type: string): string {
   }
 }
 
-// ── Terminal Status Badge ─────────────────────────────────────────────────
-
 function TerminalStatusBadge({
   connectionStatus,
   status,
@@ -1325,8 +1309,6 @@ function TerminalStatusBadge({
     </div>
   );
 }
-
-// ── Mayor Terminal Pane ──────────────────────────────────────────────────
 
 const FIRST_TASK_STORAGE_PREFIX = 'gastown_first_task_';
 
@@ -1527,8 +1509,6 @@ function MayorTerminalPane({
     </div>
   );
 }
-
-// ── Agent Terminal Pane ──────────────────────────────────────────────────
 
 function AgentTerminalPane({
   townId,

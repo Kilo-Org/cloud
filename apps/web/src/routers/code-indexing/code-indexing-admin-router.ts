@@ -139,7 +139,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       const orgNameColumn = organizations.name.name;
       const userIdColumn = code_indexing_manifest.kilo_user_id.name;
 
-      // Get total count
       const { rows: countRows } = await db.execute(sql`
       SELECT COUNT(DISTINCT ${sql.identifier(orgIdColumn)})::int as total
       FROM ${sql.identifier(manifestTableName)}
@@ -147,7 +146,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     `);
       const total = Number(countRows[0]?.total || 0);
 
-      // Get paginated data
       const { rows } = await db.execute(sql`
       WITH table_stats AS (
           SELECT
@@ -184,7 +182,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       OFFSET ${offset};
       `);
 
-      // Convert BigInt and numeric string values to numbers for JSON serialization
       const items = rows.map(row => ({
         ...row,
         chunk_count: Number(row.chunk_count),
@@ -227,7 +224,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       const userIdColumn = code_indexing_manifest.kilo_user_id.name;
       const userEmailColumn = kilocode_users.google_user_email.name;
 
-      // Get total count
       const { rows: countRows } = await db.execute(sql`
       SELECT COUNT(DISTINCT ${sql.identifier(userIdColumn)})::int as total
       FROM ${sql.identifier(manifestTableName)}
@@ -235,7 +231,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     `);
       const total = Number(countRows[0]?.total || 0);
 
-      // Get paginated data
       const { rows } = await db.execute(sql`
       WITH table_stats AS (
           SELECT
@@ -272,7 +267,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       OFFSET ${offset};
       `);
 
-      // Convert BigInt and numeric string values to numbers for JSON serialization
       const items = rows.map(row => ({
         ...row,
         chunk_count: Number(row.chunk_count),
@@ -307,7 +301,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
 
     const telemetryData = await telemetryResponse.json();
 
-    // Extract memory statistics
     const memory = telemetryData.result?.memory || {};
     const memoryActiveBytes = memory.active_bytes || 0;
     const memoryAllocatedBytes = memory.allocated_bytes || 0;
@@ -315,7 +308,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     const memoryResidentBytes = memory.resident_bytes || 0;
     const memoryRetainedBytes = memory.retained_bytes || 0;
 
-    // Extract system information
     const system = telemetryData.result?.app?.system || {};
     const distribution = system.distribution || 'unknown';
     const distributionVersion = system.distribution_version || 'unknown';
@@ -327,24 +319,20 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     const totalDiskBytes = system.disk_size || 0;
     const cpuFlags = system.cpu_flags || 'unknown';
 
-    // Extract app information
     const app = telemetryData.result?.app || {};
     const qdrantVersion = app.version || 'unknown';
     const startupTime = app.startup || '';
 
-    // Calculate uptime
     const uptime = startupTime
       ? `${Math.floor((Date.now() - new Date(startupTime).getTime()) / (1000 * 60 * 60 * 24))} days`
       : 'unknown';
 
-    // Extract cluster information
     const cluster = telemetryData.result?.cluster?.status || {};
     const clusterRole = cluster.role || 'unknown';
     const clusterPeers = cluster.number_of_peers || 0;
     const clusterPendingOperations = cluster.pending_operations || 0;
     const consensusStatus = cluster.consensus_thread_status?.consensus_thread_status || 'unknown';
 
-    // Get main collection stats (org-code-indexing)
     // Note: The telemetry response doesn't include collection names in the collections array
     // We need to get this info from the cluster info or use the total vectors count
     const collectionsData = telemetryData.result?.collections || {};
@@ -356,13 +344,11 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     let mainCollectionOptimizersStatus = 'unknown';
 
     if (collections.length > 0) {
-      // Use the first/main collection's data
       const firstCollection = collections[0];
       mainCollectionPoints = firstCollection?.vectors || 0;
       mainCollectionOptimizersStatus = firstCollection?.optimizers_status || 'unknown';
     }
 
-    // Get total PostgreSQL rows from manifest table
     const manifestTableName = getTableName(code_indexing_manifest);
     const { rows } = await db.execute(sql`
       SELECT SUM(chunk_count)::int as total_rows

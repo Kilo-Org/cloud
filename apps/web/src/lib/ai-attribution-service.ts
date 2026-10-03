@@ -8,8 +8,6 @@ import 'server-only';
 import { z } from 'zod';
 
 const AI_ATTRIBUTION_SERVICE_URL = 'https://ai-attribution.kiloapps.io';
-// If you want to target the local attribution service, you can use this:
-// const AI_ATTRIBUTION_SERVICE_URL = 'http://localhost:8787';
 
 // Schema for debug data response from the worker
 const LineRecord = z.object({

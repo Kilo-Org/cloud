@@ -343,7 +343,6 @@ export const organizationAdminRouter = createTRPCRouter({
   updateCreatedBy: adminProcedure.input(UpdateCreatedByInputSchema).mutation(async ({ input }) => {
     const { organizationId, userId } = input;
 
-    // Validate that the organization exists
     const organization = await db.query.organizations.findFirst({
       where: eq(organizations.id, organizationId),
     });
@@ -382,7 +381,6 @@ export const organizationAdminRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId, free_trial_end_at } = input;
 
-      // Validate that the organization exists
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
@@ -403,7 +401,6 @@ export const organizationAdminRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId, suppress_trial_messaging } = input;
 
-      // Validate that the organization exists
       const organization = await db.query.organizations.findFirst({
         where: eq(organizations.id, organizationId),
       });
@@ -411,7 +408,6 @@ export const organizationAdminRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
 
-      // Update the settings JSONB column
       const updatedSettings = {
         ...organization.settings,
         suppress_trial_messaging,
@@ -1319,7 +1315,6 @@ export const organizationAdminRouter = createTRPCRouter({
       }
       // mode === 'all': no subscription filter
 
-      // Filter by Stripe subscription status (latest subscription for this org)
       if (stripe_status) {
         // Old form required the latest subscription status to match; sales-demo
         // orgs have no seats purchase, so include them for admins.

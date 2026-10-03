@@ -64,9 +64,7 @@ export async function verifyUserOwnsSessionByCloudAgentId(
   return session ? { kiloSessionId: session.session_id } : null;
 }
 
-// ============================================================================
 // V2 helpers (cli_sessions_v2 table)
-// ============================================================================
 
 /**
  * Verifies that a user owns a V2 session by cloud_agent_session_id.

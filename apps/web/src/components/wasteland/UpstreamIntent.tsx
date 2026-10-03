@@ -236,8 +236,6 @@ export function resolveUpstreamFromIntent(intent: UpstreamIntent): string {
   return intent.upstream.trim();
 }
 
-// ── Verification hook ────────────────────────────────────────────────
-
 /**
  * Debounced verify-exists probe shared by Card 2 (connect) and Card 3
  * (create). For `connect` we want `exists=true`; for `create` we want
@@ -294,8 +292,6 @@ export function useUpstreamVerification({
   }
   return { status: 'idle' };
 }
-
-// ── Card components ──────────────────────────────────────────────────
 
 type CardProps<T extends UpstreamIntent['kind']> = {
   selected: boolean;
@@ -588,8 +584,6 @@ function CreateCard({
     </CardShell>
   );
 }
-
-// ── Atoms ────────────────────────────────────────────────────────────
 
 function VerificationLine({
   state,

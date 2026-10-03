@@ -222,9 +222,6 @@ describe('generateSecurityReport', () => {
     });
 
     it('uses severity-matching labels on recommendation badges', () => {
-      // Previously the badges said [IMMEDIATE] / [HIGH] which didn't match the
-      // "critical" / "warning" vocabulary in the rest of the report. Rendered
-      // labels now mirror severity so there's one vocabulary throughout.
       expect(report.markdown).toContain('[CRITICAL]');
       expect(report.markdown).toContain('[WARNING]');
       expect(report.markdown).not.toContain('[IMMEDIATE]');

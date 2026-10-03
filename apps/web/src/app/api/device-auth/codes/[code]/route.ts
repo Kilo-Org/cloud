@@ -12,7 +12,6 @@ type RouteContext = {
   params: Promise<{ code: string }>;
 };
 
-// ──────────────── legacy poll ────────────────
 // @ponytail: remove this GET after all shipped clients migrate to POST /api/device-auth/token
 
 export const GET = withRestTiming(
@@ -53,8 +52,6 @@ export const GET = withRestTiming(
     }
   }
 );
-
-// ──────────────── deny with viewer token ────────────────
 
 const DEVICE_AUTH_DENY_RATE_LIMIT_ID = 'device-auth-deny';
 

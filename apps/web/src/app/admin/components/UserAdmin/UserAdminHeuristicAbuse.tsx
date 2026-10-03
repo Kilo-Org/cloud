@@ -32,18 +32,7 @@ type TableColumn<T> = {
 };
 
 const getAbuseTooltipContent = (_item: UsageForTableDisplay) => {
-  // try {
-  //   const result = classifyRecord(item);
-  //   const activeChecks = Object.entries(result.checks)
-  //     .filter(([_, value]) => value)
-  //     .map(([key, _]) => key.replace(/_/g, ' '));
-
-  //   if (activeChecks.length === 0) return 'No abuse indicators detected';
-
-  //   return `Flagged as abuse because:\n${activeChecks.map(check => `• ${check}`).join('\n')}`;
-  // } catch (_error) {
   return 'Unable to determine abuse reasons';
-  // }
 };
 
 // Create column definitions for MicrodollarUsage
@@ -378,9 +367,6 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
   };
 
   const getAbuseStatusColor = (_o: UsageForTableDisplay) => {
-    // const result = isLikelyAbuse(o);
-    // if (result === true) return '';
-    // if (result === false) return 'text-gray-300';
     return '';
   };
 

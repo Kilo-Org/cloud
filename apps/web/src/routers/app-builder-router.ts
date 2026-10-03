@@ -166,9 +166,7 @@ export const appBuilderRouter = createTRPCRouter({
       });
     }),
 
-  // ============================================================================
   // WebSocket-based streaming mutations
-  // ============================================================================
 
   /**
    * Start a Cloud Agent session for an existing project using WebSocket API.
@@ -227,9 +225,7 @@ export const appBuilderRouter = createTRPCRouter({
     };
   }),
 
-  // ============================================================================
   // GitHub Migration
-  // ============================================================================
 
   /**
    * Pre-flight check for GitHub migration.

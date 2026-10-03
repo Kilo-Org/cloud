@@ -15,13 +15,11 @@ import type { inferRouterOutputs } from '@trpc/server';
 import type { WrappedGastownRouter } from '@/lib/gastown/types/router';
 import { GASTOWN_URL } from '@/lib/constants';
 
-// ── Type exports ──────────────────────────────────────────────────────────
 // Re-export the router type so frontend components can extract output types
 // without importing from the worker package directly.
 export type { WrappedGastownRouter };
 export type GastownOutputs = inferRouterOutputs<WrappedGastownRouter>;
 
-// ── Token management ──────────────────────────────────────────────────────
 // Fetches a short-lived JWT from /api/gastown/token (session-cookie-authed)
 // and caches it in memory. Refreshes automatically when near expiry.
 
@@ -56,7 +54,6 @@ export async function getToken(): Promise<string> {
   return inflightRequest;
 }
 
-// ── WebSocket URL helper ──────────────────────────────────────────────────
 // The worker returns relative paths for WebSocket endpoints (e.g. /api/towns/…/stream).
 // The browser constructs the full ws(s):// URL using the known GASTOWN_URL.
 
@@ -65,8 +62,6 @@ export function gastownWsUrl(relativePath: string): string {
   const protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${base.host}${relativePath}`;
 }
-
-// ── tRPC client ───────────────────────────────────────────────────────────
 
 const gastownTrpcUrl = `${GASTOWN_URL}/trpc`;
 
@@ -87,7 +82,6 @@ export function createGastownTRPCClient() {
   });
 }
 
-// ── React integration ─────────────────────────────────────────────────────
 // Creates the same shape as the main tRPC utils (TRPCProvider, useTRPC, etc.)
 // but typed against the Gastown router served by the worker.
 

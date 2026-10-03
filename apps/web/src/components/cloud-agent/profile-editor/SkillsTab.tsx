@@ -424,9 +424,7 @@ async function extractSkillZip(file: File): Promise<ExtractedSkill> {
   };
 }
 
-// -------------------------------------------------------------------
 // SkillForm — shared create/edit form
-// -------------------------------------------------------------------
 
 type SkillFormProps = {
   profileId: string;

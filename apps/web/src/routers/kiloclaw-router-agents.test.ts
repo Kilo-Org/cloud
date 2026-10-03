@@ -205,7 +205,6 @@ describe('kiloclaw agent procedures (personal namespace)', () => {
     expect(agentMocks.createAgent).not.toHaveBeenCalled();
   });
 
-  // ── error mapping ──────────────────────────────────────────────────
   it('maps 404 agent_not_found to NOT_FOUND', async () => {
     agentMocks.getAgent.mockRejectedValue(apiError(404, 'agent_not_found', 'Agent not found'));
     const caller = await createCallerForUser(personalUser.id);

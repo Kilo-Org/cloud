@@ -573,8 +573,6 @@ export const userRouter = createTRPCRouter({
     });
   }),
 
-  // ─── Passkeys ───────────────────────────────────────────────────────
-
   getPasskeys: baseProcedure.query(async ({ ctx }) => {
     const passkeys = await listPasskeysForUser(ctx.user.id);
 
@@ -691,8 +689,6 @@ export const userRouter = createTRPCRouter({
 
     return successResult();
   }),
-
-  // ─── Device Sessions ────────────────────────────────────────────────
 
   listDeviceSessions: baseProcedure.query(async ({ ctx }) => {
     const rows = await db
@@ -1319,8 +1315,6 @@ export const userRouter = createTRPCRouter({
       return { status: 'deleted' as const };
     }),
 
-  // ─── Push Notification Tokens ──────────────────────────────────────
-
   registerPushToken: baseProcedure
     .input(
       z.object({
@@ -1507,8 +1501,6 @@ export const userRouter = createTRPCRouter({
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, ctx.user.id));
   }),
-
-  // ─── Notification Preferences ──────────────────────────────────────
 
   getNotificationPreferences: baseProcedure.query(async ({ ctx }) => {
     const [row] = await db

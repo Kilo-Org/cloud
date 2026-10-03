@@ -449,9 +449,7 @@ export async function evaluateScope(
   return evaluateSnapshot(snapshot, now);
 }
 
-// ---------------------------------------------------------------------------
 // Rollup
-// ---------------------------------------------------------------------------
 
 /**
  * The instant the rollup's range scan starts from: the start of the hour that
@@ -573,9 +571,7 @@ export async function sweepHourlyBuckets(
   return { scopeKeys, changedScopeKeys };
 }
 
-// ---------------------------------------------------------------------------
 // Postgres reads
-// ---------------------------------------------------------------------------
 
 /** Window start a rolling threshold sums from; the boundary the spend view uses. */
 function windowStart(now: Date, windowHours: number): Date {
@@ -769,9 +765,7 @@ export function createSpendAlertSweepStore(database: Db): SpendAlertSweepStore {
   };
 }
 
-// ---------------------------------------------------------------------------
 // Run
-// ---------------------------------------------------------------------------
 
 export type SpendAlertSweepDeps = {
   /**

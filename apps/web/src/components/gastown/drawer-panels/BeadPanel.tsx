@@ -108,7 +108,6 @@ export function BeadPanel({
     return acc;
   }, {});
 
-  // ── Edit mode state ───────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState>({
@@ -178,7 +177,6 @@ export function BeadPanel({
   const handleSave = useCallback(() => {
     if (!bead) return;
 
-    // Build the diff — only send fields that changed
     const updates: Record<string, unknown> = {};
     if (editState.title !== bead.title) updates.title = editState.title;
     if (editState.body !== (bead.body ?? '')) {
@@ -644,8 +642,6 @@ export function BeadPanel({
   );
 }
 
-// ── Edit select component ───────────────────────────────────────────────
-
 function EditSelect({
   value,
   options,
@@ -696,8 +692,6 @@ function MetaCell({
     </div>
   );
 }
-
-// ── Related beads DAG ─────────────────────────────────────────────────
 
 type BeadLike = {
   bead_id: string;

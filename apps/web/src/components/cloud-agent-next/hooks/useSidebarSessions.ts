@@ -680,7 +680,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
 
   const isSearchActive = searchQuery.length > 0;
 
-  // --- List query (default, non-search) ---
   const updatedSince = useMemo(() => startOfDay(subDays(new Date(), 5)).toISOString(), []);
   const listInput = useMemo(
     () => ({
@@ -714,7 +713,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     },
   });
 
-  // --- Search query ---
   const searchInput = useMemo(
     () => ({ search_string: searchQuery, createdOnPlatform, organizationId, gitUrl }),
     [searchQuery, createdOnPlatform, organizationId, gitUrl]

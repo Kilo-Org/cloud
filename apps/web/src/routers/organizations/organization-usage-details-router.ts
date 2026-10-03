@@ -215,7 +215,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       extendedStartDate.setDate(extendedStartDate.getDate() - 14);
       const extendedStartDateStr = extendedStartDate.toISOString();
 
-      // Get user emails for PostHog query
       const userEmails = members.map(m => m.email);
 
       // Fetch all component data in parallel
@@ -248,7 +247,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         activityData
       );
 
-      // Calculate trends
       const weeklyTrends = calculateWeeklyTrends(data);
 
       // Calculate per-user scores (anonymized - no identifying information)

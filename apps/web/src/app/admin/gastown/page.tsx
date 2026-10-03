@@ -101,8 +101,6 @@ function formatCount(n: number): string {
   return String(Math.round(n));
 }
 
-// ── Pivot timeseries data for recharts ───────────────────────────────
-
 /** Pivot rows [{hour, event, count}] into [{hour, eventA: 5, eventB: 3}], keeping only the top N events by total volume */
 function pivotTimeseries(
   rows: EventTimeseriesRow[],
@@ -157,8 +155,6 @@ function pivotDeliveryBreakdown(rows: DeliveryBreakdownRow[]): {
   const data = [...byHour.values()].sort((a, b) => String(a.hour).localeCompare(String(b.hour)));
   return { data, deliveries };
 }
-
-// ── Components ───────────────────────────────────────────────────────
 
 function LoadingCard({ title }: { title: string }) {
   return (
@@ -497,8 +493,6 @@ function TopUsersTable({ hours }: { hours: number }) {
     </Card>
   );
 }
-
-// ── Main Page ────────────────────────────────────────────────────────
 
 export default function GastownAnalyticsPage() {
   const [hours, setHours] = useState(24);

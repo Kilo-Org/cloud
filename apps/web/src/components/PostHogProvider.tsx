@@ -119,7 +119,6 @@ function IdentifyUser() {
   const name = session?.user?.name;
 
   useEffect(() => {
-    // Check if posthog is loaded before using it
     if (!posthog || !posthog.__loaded) return;
 
     const previousStatus = previousStatusRef.current;
@@ -132,7 +131,6 @@ function IdentifyUser() {
       posthog.reset();
     }
 
-    // Update the previous status for the next render
     previousStatusRef.current = status;
   }, [email, name, status, posthog]);
 

@@ -27,22 +27,17 @@ export async function GET(
     return res.authFailedResponse;
   }
 
-  // Get organizationId from query params
   const { searchParams } = new URL(request.url);
   const organizationId = searchParams.get('organizationId');
 
-  // If no organizationId provided, return false
   if (!organizationId) {
     return NextResponse.json({ enabled: isEnabledForUser(res.user) });
   }
 
-  // Check if user has access to the organization and fetch it
   try {
-    // Create tRPC context for authentication
     const ctx = await createTRPCContext();
     const org = await ensureOrganizationAccessAndFetchOrg(ctx, organizationId);
 
-    // Check if code indexing is enabled in organization settings
     const enabled = org.settings?.code_indexing_enabled === true;
 
     return NextResponse.json({ enabled });

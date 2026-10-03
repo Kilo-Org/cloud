@@ -41,7 +41,6 @@ interface ClassifyConfigResponse {
 
 export async function POST(req: NextRequest) {
   try {
-    // Validate internal API secret
     const secret = req.headers.get('X-Internal-Secret');
     if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -50,14 +49,12 @@ export async function POST(req: NextRequest) {
     const body: ClassifyConfigRequest = await req.json();
     const { ticketId } = body;
 
-    // Validate payload
     if (!ticketId) {
       return NextResponse.json({ error: 'Missing required field: ticketId' }, { status: 400 });
     }
 
     logExceptInTest('[classify-config] Getting classification config for ticket', { ticketId });
 
-    // Get ticket from database
     const ticket = await getTriageTicketById(ticketId);
 
     if (!ticket) {
@@ -65,7 +62,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
-    // Get GitHub token from integration (if available)
     let githubToken: string | undefined;
 
     if (ticket.platform_integration_id) {
@@ -106,7 +102,6 @@ export async function POST(req: NextRequest) {
           userId: ticket.owned_by_user_id || '',
         };
 
-    // Get agent config
     const agentConfig = await getAgentConfigForOwner(owner, 'auto_triage', 'github');
 
     if (!agentConfig) {

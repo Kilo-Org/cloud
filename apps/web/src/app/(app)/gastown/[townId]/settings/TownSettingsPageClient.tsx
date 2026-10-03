@@ -1353,8 +1353,6 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
   );
 }
 
-// ── Local sub-components ─────────────────────────────────────────────────
-
 function MergeStrategyOption({
   selected,
   onSelect,

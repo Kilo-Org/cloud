@@ -189,8 +189,6 @@ function mockSignCountPredicateUpdate(keyRows: unknown[]): {
   return { getSet: () => setValues, getWhere: () => whereCond };
 }
 
-// ── Wire contract validation ───────────────────────────────────────────────
-
 describe('validateAdmissionPayload', () => {
   test('rejects null', () => {
     expect(validateAdmissionPayload(null)).toBeUndefined();
@@ -324,8 +322,6 @@ describe('validateAdmissionPayload', () => {
     expect(result?.keyId).toBeUndefined();
   });
 });
-
-// ── Mode behavior ──────────────────────────────────────────────────────────
 
 describe('checkNativeAdmission', () => {
   beforeEach(() => {
@@ -463,8 +459,6 @@ describe('checkNativeAdmission', () => {
   });
 });
 
-// ── Challenge issuance ─────────────────────────────────────────────────────
-
 describe('issueAdmissionChallenge', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -493,8 +487,6 @@ describe('issueAdmissionChallenge', () => {
     );
   });
 });
-
-// ── Async admission verification ───────────────────────────────────────────
 
 describe('verifyAdmissionAsync', () => {
   beforeEach(() => {
@@ -539,8 +531,6 @@ describe('verifyAdmissionAsync', () => {
     const result = await verifyAdmissionAsync(admission);
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
   });
-
-  // ── iOS attestation ────────────────────────────────────────────────────
 
   test('ios attestation succeeds and returns public key', async () => {
     // Simulate successful atomic consume
@@ -640,8 +630,6 @@ describe('verifyAdmissionAsync', () => {
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
     expect(mockCaptureMessage).toHaveBeenCalledWith('apple_attestation_failed: CERT_CHAIN_INVALID');
   });
-
-  // ── iOS assertion ──────────────────────────────────────────────────────
 
   test('ios assertion fails when key is unknown', async () => {
     const setMock = jest.fn().mockReturnValue({
@@ -752,8 +740,6 @@ describe('verifyAdmissionAsync', () => {
     expect(params[Number(signCountPredicate![1]) - 1]).toBe(11);
   });
 
-  // ── iOS assertion: concurrency and monotonicity ─────────────────────────
-
   test('two concurrent assertions for the same sign count cannot both be accepted', async () => {
     const { setMock, getStored } = mockAtomicSignCountGate(10);
 
@@ -827,8 +813,6 @@ describe('verifyAdmissionAsync', () => {
     expect(setMock).toHaveBeenCalledTimes(2);
   });
 
-  // ── Android ─────────────────────────────────────────────────────────────
-
   test('android assertion succeeds', async () => {
     const setMock = jest.fn().mockReturnValue({
       where: jest.fn().mockReturnValue({
@@ -897,8 +881,6 @@ describe('verifyAdmissionAsync', () => {
     expect(result).toEqual({ ok: false, errorCode: 'ADMISSION_REQUIRED' });
   });
 });
-
-// ── Key persistence ────────────────────────────────────────────────────────
 
 describe('persistAttestedKey', () => {
   beforeEach(() => {
@@ -992,8 +974,6 @@ describe('persistAttestedKey', () => {
   });
 });
 
-// ── Async refusal mode ─────────────────────────────────────────────────────
-
 describe('shouldRefuseAsyncFailure', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1019,8 +999,6 @@ describe('shouldRefuseAsyncFailure', () => {
     expect(shouldRefuseAsyncFailure()).toBe(false);
   });
 });
-
-// ── Cleanup ────────────────────────────────────────────────────────────────
 
 describe('cleanupExpiredAdmissionChallenges', () => {
   test('deletes expired challenges', async () => {

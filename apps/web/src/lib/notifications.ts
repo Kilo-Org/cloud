@@ -255,7 +255,6 @@ async function generateTeamsTrialNotification(
   _user: User,
   ctx: NotificationContext
 ): Promise<KiloNotification[]> {
-  // Only show teams notification if user is NOT already in a team
   if (ctx.isInTeam) return [];
 
   return [
@@ -300,7 +299,6 @@ async function generateKiloPassNotification(
   user: User,
   ctx: NotificationContext
 ): Promise<KiloNotification[]> {
-  // Check if user belongs to an organization with balance > $5
   const hasHighBalanceOrg = ctx.userOrganizations.some(org => fromMicrodollars(org.balance) > 5);
   if (hasHighBalanceOrg) {
     return [];

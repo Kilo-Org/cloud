@@ -93,8 +93,6 @@ function parseSortField(value: string | null | undefined): SortField {
   return value === 'priority' ? 'priority' : 'activity';
 }
 
-// ── Slow operation toast helper ──────────────────────────────────────────
-
 const COLD_START_DELAY_MS = 3000;
 
 /**
@@ -122,8 +120,6 @@ export function useSlowOperationToast(isPending: boolean) {
     };
   }, [isPending]);
 }
-
-// ── Main component ───────────────────────────────────────────────────────
 
 /**
  * Render mode for the board.
@@ -693,8 +689,6 @@ export function WantedBoardClient({
   );
 }
 
-// ── Mark done dialog ─────────────────────────────────────────────────────
-
 export function MarkDoneDialog({
   wastelandId,
   item,
@@ -812,8 +806,6 @@ export function MarkDoneDialog({
     </Dialog>
   );
 }
-
-// ── Accept dialog ────────────────────────────────────────────────────────
 
 export function AcceptDialog({
   wastelandId,
@@ -1017,8 +1009,6 @@ function splitSkillTags(value: string): string[] | undefined {
   return tags.length > 0 ? tags : undefined;
 }
 
-// ── Reject dialog ────────────────────────────────────────────────────────
-
 export function RejectDialog({
   wastelandId,
   item,
@@ -1130,8 +1120,6 @@ export function RejectDialog({
   );
 }
 
-// ── Close-item dialog ────────────────────────────────────────────────────
-
 export function CloseItemDialog({
   wastelandId,
   item,
@@ -1207,8 +1195,6 @@ export function CloseItemDialog({
     </Dialog>
   );
 }
-
-// ── Unclaim dialog ───────────────────────────────────────────────────────
 
 export function UnclaimDialog({
   wastelandId,
@@ -1291,8 +1277,6 @@ export function UnclaimDialog({
   );
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────
-
 function WantedListSkeleton() {
   return (
     <div className="space-y-0">
@@ -1312,8 +1296,6 @@ function WantedListSkeleton() {
     </div>
   );
 }
-
-// ── Filter chip ───────────────────────────────────────────────────────────
 
 function FilterChip({
   label,

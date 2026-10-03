@@ -71,8 +71,6 @@ import {
 import type { GitLabReviewOwner } from '@/lib/provider-review/gitlab-authorization';
 import type { BitbucketReviewOwner } from '@/lib/provider-review/bitbucket-authorization';
 
-// ----- input schemas ----------------------------------------------------------
-
 // GitLab project paths are full nested paths (`group/sub/repo`) — never just
 // the last segment. The authorization layer matches them against the
 // integration's repository cache; the regex only bounds the shape.
@@ -304,8 +302,6 @@ const DisableAutoMergeInput = providerRefInput({
   operationKey: operationKeySchema,
 });
 
-// ----- owner + identity helpers -----------------------------------------------
-
 /**
  * Resolve the review owner. An organizationId runs `ensureOrganizationAccess`
  * (the guard from organizations/utils.ts, unchanged) BEFORE any provider
@@ -400,8 +396,6 @@ async function providerCall<T>(work: () => Promise<T>): Promise<T> {
     throw toProviderTrpcError(error);
   }
 }
-
-// ----- PR operation ledger ------------------------------------------------------
 
 // Same shared ledger, domain, lease, and admission state machine as the
 // GitHub write path (github-pr-review-router.ts). The GitHub helpers are
@@ -887,8 +881,6 @@ async function reconcileMergeProviderRow<T extends Record<string, unknown>>(
       return failProviderRowAmbiguous(base, row);
   }
 }
-
-// ----- router ------------------------------------------------------------------
 
 export const providerReviewRouter = createTRPCRouter({
   getPullRequest: baseProcedure.input(GetPullRequestInput).query(async ({ ctx, input }) => {

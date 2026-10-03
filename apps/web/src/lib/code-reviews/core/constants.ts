@@ -4,9 +4,7 @@
  * Constants used throughout the code review system.
  */
 
-// ============================================================================
 // Review Configuration
-// ============================================================================
 
 /** Default model for code reviews */
 export const DEFAULT_CODE_REVIEW_MODEL = 'anthropic/claude-sonnet-4.6';
@@ -27,9 +25,7 @@ export const CODE_REVIEW_MD_CONVERSION_FLAG = 'code-review-md-conversion';
 export const REVIEW_MD_CONVERSION_RATE_LIMIT = 30;
 export const REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS = 60 * 60;
 
-// ============================================================================
 // Pagination
-// ============================================================================
 
 /**
  * Default limit for listing code reviews
@@ -46,9 +42,7 @@ export const MAX_LIST_LIMIT = 100;
  */
 export const DEFAULT_LIST_OFFSET = 0;
 
-// ============================================================================
 // GitHub Webhook Events
-// ============================================================================
 
 /**
  * GitHub pull request actions that trigger code reviews

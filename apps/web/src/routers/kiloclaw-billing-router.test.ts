@@ -51,8 +51,6 @@ type KiloclawInternalClientMockShape = {
 
 jest.setTimeout(15_000);
 
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
 jest.mock('@/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { errors } = require('stripe').default ?? require('stripe');
@@ -170,8 +168,6 @@ jest.mock('@/lib/posthog', () => ({
   }),
 }));
 
-// ── Dynamic imports (after mocks) ──────────────────────────────────────────
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let createCallerForUser: (userId: string) => Promise<any>;
 
@@ -214,8 +210,6 @@ beforeAll(async () => {
   const mod = await import('@/routers/test-utils');
   createCallerForUser = mod.createCallerForUser;
 });
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 let user: User;
 
@@ -579,8 +573,6 @@ async function createCanceledTrialAndPaidSubscriptions(params?: {
     paidSubscription,
   };
 }
-
-// ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('getBillingStatus', () => {
   it('returns trialEligible true when user has no instance rows and no subscription', async () => {
@@ -6379,8 +6371,6 @@ describe('createSubscriptionCheckout — concurrent checkout guard', () => {
   });
 });
 
-// ── org-subscription coexistence ──────────────────────────────────────────
-
 describe('personal billing mutations do not affect org subscriptions', () => {
   async function createPersonalAndOrgSubscriptions(overrides?: {
     personalCancelAtPeriodEnd?: boolean;
@@ -6563,8 +6553,6 @@ describe('personal billing mutations do not affect org subscriptions', () => {
     expect(unchangedOrg?.scheduled_plan).toBeNull();
   });
 });
-
-// ── switchPlan ─────────────────────────────────────────────────────────────
 
 describe('switchPlan', () => {
   const now = Math.floor(Date.now() / 1000);
@@ -6828,8 +6816,6 @@ describe('switchPlan', () => {
   });
 });
 
-// ── cancelPlanSwitch ───────────────────────────────────────────────────────
-
 describe('cancelPlanSwitch', () => {
   it('releases the schedule and clears DB fields on happy path', async () => {
     await insertPersonalSubscriptionFixture({
@@ -6978,8 +6964,6 @@ describe('cancelPlanSwitch', () => {
     expect(row.stripe_schedule_id).toBe('sub_sched_fail');
   });
 });
-
-// ── Stripe-Funded Credit Settlement ─────────────────────────────────────────
 
 describe('applyStripeFundedKiloClawPeriod', () => {
   async function giveUserCredits(userId: string, microdollars: number) {
@@ -7206,8 +7190,6 @@ describe('applyStripeFundedKiloClawPeriod', () => {
     expect(subscription.auto_resume_retry_after).toEqual(expect.any(String));
   });
 });
-
-// ── Credit Enrollment ──────────────────────────────────────────────────────
 
 describe('enrollWithCredits', () => {
   async function giveUserCredits(userId: string, microdollars: number) {
@@ -8211,8 +8193,6 @@ describe('enrollWithCredits', () => {
   });
 });
 
-// ── Billing Status with Credits ────────────────────────────────────────────
-
 describe('getBillingStatus with credits', () => {
   async function createKiloPassSubscription(params: {
     userId: string;
@@ -8764,8 +8744,6 @@ describe('getBillingStatus with credits', () => {
     expect(result.creditEnrollmentPreview.commit.effectiveBalanceMicrodollars).toBe(9_500_000);
   });
 });
-
-// ── Pure Credit Cancel/Reactivate/SwitchPlan/CancelPlanSwitch ──────────────
 
 describe('pure credit cancel/reactivate', () => {
   async function createPureCreditSubscription(

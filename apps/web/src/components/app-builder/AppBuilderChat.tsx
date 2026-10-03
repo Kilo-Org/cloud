@@ -506,7 +506,6 @@ function SessionMessages({
  * Main chat component
  */
 export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
-  // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
   const { isStreaming, isInterrupting, model: projectModel, sessions, pendingNewSession } = state;
 
@@ -603,7 +602,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     [availableModels]
   );
 
-  // Check if the selected model supports images (vision)
   const selectedModelData = useMemo(
     () => availableModels.find(m => m.id === selectedModel),
     [availableModels, selectedModel]
@@ -660,7 +658,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   }, [activeSessionMessages, shouldAutoScroll]);
 
-  // Handle scroll events
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
 
@@ -683,7 +680,6 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     }
   };
 
-  // Handle send message using ProjectManager
   const handleSendMessage = useCallback(
     async (value: string, images?: Images): Promise<void> => {
       if (pendingNewSession) {
@@ -708,17 +704,14 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
     setHasImages(hasUploadedImages);
   }, []);
 
-  // Handle interrupt using ProjectManager
   const handleInterrupt = useCallback(() => {
     manager.interrupt();
   }, [manager]);
 
-  // Handle loading more messages (for V1 pagination)
   const handleLoadMore = useCallback(() => {
     setVisibleSessionCount(prev => prev + 1);
   }, []);
 
-  // Check if input should be disabled (no messages in any session yet)
   const hasAnyMessages = activeSessionMessages.length > 0;
 
   const handleNewChatToggle = useCallback(() => {
@@ -862,9 +855,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
   );
 }
 
-// =============================================================================
 // Hooks
-// =============================================================================
 
 /** No-op subscribe for when there's no active session */
 function noopSubscribe() {

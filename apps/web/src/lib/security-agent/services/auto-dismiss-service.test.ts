@@ -14,8 +14,6 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import { SecurityAuditLogActorType } from '@kilocode/db/schema-types';
 import type { SecurityFindingAnalysis } from '../core/types';
 
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
 const mockGetSecurityFindingById = jest.fn() as jest.MockedFunction<
   typeof securityFindingsModule.getSecurityFindingById
 >;
@@ -109,8 +107,6 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-// ── Imports (after mocks) ──────────────────────────────────────────────────
-
 let writebackDependabotDismissal: typeof writebackDependabotDismissalType;
 let maybeAutoDismissAnalysis: typeof maybeAutoDismissAnalysisType;
 let autoDismissEligibleFindings: typeof autoDismissEligibleFindingsType;
@@ -124,8 +120,6 @@ beforeAll(async () => {
     countEligibleForAutoDismiss,
   } = await import('./auto-dismiss-service'));
 });
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function makeFinding(overrides: Partial<SecurityFinding> = {}): SecurityFinding {
   return {
@@ -178,8 +172,6 @@ function makeIntegration(installationId: string) {
 }
 
 const userOwner = { type: 'user' as const, id: 'user-1', userId: 'user-1' };
-
-// ── Tests ──────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   jest.clearAllMocks();

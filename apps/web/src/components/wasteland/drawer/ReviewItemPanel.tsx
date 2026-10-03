@@ -336,8 +336,6 @@ function SecondaryActions({
   );
 }
 
-// ── Per-kind body ────────────────────────────────────────────────────────
-
 type BodyProps = Pick<PanelProps, 'wastelandId' | 'push'>;
 
 function CardBody({ item, wastelandId, push }: { item: InboxItem } & BodyProps) {
@@ -676,8 +674,6 @@ function UnknownBody({ item }: { item: Extract<InboxItem, { kind: 'unknown' }> }
     </div>
   );
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 /**
  * Render a worker's submitted evidence. The wasteland protocol stores

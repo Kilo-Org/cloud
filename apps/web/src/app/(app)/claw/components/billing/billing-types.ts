@@ -5,8 +5,6 @@ import {
   getKiloClawPricingCatalogEntry,
 } from '@kilocode/db/kiloclaw-pricing-catalog';
 
-// ── Shared utilities ─────────────────────────────────────────────────
-
 export function formatBillingDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
     month: 'long',
@@ -442,8 +440,6 @@ export function planPriceLabel(plan: ClawPlan, priceVersion?: string): string {
   return formatKiloClawPlanPrice({ plan, priceVersion });
 }
 
-// ── Types ────────────────────────────────────────────────────────────
-
 export type ClawBillingStatus = {
   hasAccess: boolean;
   accessReason: 'trial' | 'subscription' | 'earlybird' | null;
@@ -544,8 +540,6 @@ export type ClawBillingStatus = {
     destroyed: boolean;
   } | null;
 };
-
-// ── Derived banner states ────────────────────────────────────────────
 
 export type ClawBannerState =
   | 'trial_active'

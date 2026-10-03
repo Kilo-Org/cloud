@@ -327,8 +327,6 @@ function coseKeyToPublicKey(coseKeyBuf: Buffer) {
   });
 }
 
-// ── Assertion verification ────────────────────────────────────────────────
-
 /**
  * Verify an Apple App Attest assertion using a previously stored public key.
  *

@@ -1108,8 +1108,9 @@ describe('prepareReviewPayload', () => {
       githubRepo: REPO,
       platform: 'github',
       upstreamBranch: 'refs/pull/1234/head',
-      envVars: { KILO_CODE_REVIEW_PUBLICATION_SELF_CHECK: '1' },
+      githubPullRequestNumber: 1234,
     });
+    expect(payload.sessionInput).not.toHaveProperty('envVars');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 

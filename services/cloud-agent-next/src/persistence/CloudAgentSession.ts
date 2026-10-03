@@ -290,7 +290,7 @@ function isSameAcceptedInitialTurn(
   );
 }
 
-function isSameRegistrationRepository(
+export function isSameRegistrationRepository(
   metadata: SessionMetadata,
   input: CreateSessionWithInitialAdmissionInput
 ): boolean {
@@ -307,6 +307,7 @@ function isSameRegistrationRepository(
         stored.githubIntegrationId === submitted.githubIntegrationId &&
         (stored.githubAccessPurpose ?? 'workflow') ===
           (submitted.githubAccessPurpose ?? 'workflow') &&
+        stored.pullRequestNumber === submitted.pullRequestNumber &&
         stored.upstreamBranch === submitted.branch
       );
     case 'gitlab':

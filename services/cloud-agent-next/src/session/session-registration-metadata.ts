@@ -38,6 +38,7 @@ export type GroupedRegisterSessionInput = {
         repo: string;
         githubIntegrationId?: string;
         githubAccessPurpose?: 'workflow' | 'agent';
+        pullRequestNumber?: number;
         branch?: string;
       }
     | {
@@ -91,6 +92,9 @@ function repositoryMetadataFromRegistrationInput(
         githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
+          : {}),
+        ...(repository.pullRequestNumber !== undefined
+          ? { pullRequestNumber: repository.pullRequestNumber }
           : {}),
         upstreamBranch: repository.branch,
       };

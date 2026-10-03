@@ -22,6 +22,7 @@ import {
   type PreparingStep,
 } from '../../src/shared/protocol.js';
 import { WRAPPER_VERSION } from '../../src/shared/wrapper-version.js';
+import { GITHUB_REVIEW_MCP_BINARY } from '../../src/shared/github-review-target.js';
 import { WrapperState } from './state.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
 import { createKiloRuntimeLifecycle, type KiloRuntimeLifecycle } from './kilo-runtime-lifecycle.js';
@@ -32,7 +33,6 @@ import { openKiloGlobalFeed } from './global-feed.js';
 import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
 import { startToolCgroup } from './tool-cgroup.js';
-import { CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV } from '../../src/shared/code-review-self-check.js';
 import { abortKiloSessionForShutdown } from './shutdown.js';
 import { kiloServerBootstrapError, WrapperBootstrapError } from './bootstrap-error.js';
 import type { WrapperCommand } from '../../src/shared/protocol.js';
@@ -255,7 +255,6 @@ async function main() {
     wrapperInstanceId,
     wrapperInstanceGeneration,
     platform: process.env.KILO_PLATFORM,
-    publicationSelfCheck: process.env[CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV] === '1',
   };
 
   // Assigned below, after the feed manager and server deps that its callbacks
@@ -275,6 +274,7 @@ async function main() {
     resetLifecycle: () => lifecycleManager?.reset(),
     onDeliveryAcknowledged: (kind: 'async-prompt' | 'sync-command' | 'failed') =>
       lifecycleManager?.onDeliveryAcknowledged(kind),
+    onMessageAccepted: () => lifecycleManager?.resetPublicationRecoveryBudget(),
     readySession: readySession,
     updateRuntimeEnvironment: (env: Record<string, string>) => runtime.updateEnvironment(env),
     materializePromptAttachments,
@@ -353,6 +353,7 @@ async function main() {
     bindClient: (result, workspacePath) =>
       createWrapperKiloClient(result.client as SDKClient, result.server.url, workspacePath),
     captureEnv: () => process.env,
+    resolveGitHubReviewPublishBinary: () => Bun.which(GITHUB_REVIEW_MCP_BINARY) ?? undefined,
     getPlatform: () => serverConfig.platform,
     log: logToFile,
     chdir: workspacePath => process.chdir(workspacePath),
@@ -486,6 +487,8 @@ async function main() {
           closeConnections: () => connectionManager?.close() ?? Promise.resolve(),
           isConnected: () => connectionManager?.isConnected() ?? false,
           reconnectEventSubscription: () => connectionManager?.reconnectEventSubscription(),
+          isGitHubReviewPublicationInstalled: () =>
+            runtime?.isGitHubReviewPublicationInstalled() ?? false,
         }
       );
       lifecycleManager.start();
@@ -561,9 +564,6 @@ async function main() {
       serverConfig.workspacePath = request.workspace.workspacePath;
       serverConfig.sessionId = request.kiloSessionId;
       serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
-      serverConfig.publicationSelfCheck =
-        (request.materialized.env[CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV] ??
-          process.env[CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV]) === '1';
 
       if (!state.isConnected) {
         progressChannel = await openIngestProgressChannel(state);

@@ -30,8 +30,12 @@ import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-m
 import { gateResultFromProperties } from '../../src/shared/kilo-event-properties.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
-import { isSuccessfulGitHubSummaryWrite } from './publication-self-check.js';
 import { slashCommandCatalogStatus } from '../../src/shared/slash-commands.js';
+import {
+  assistantReportsNoActionableOutput,
+  classifyPublicationToolPart,
+  messageInfoReportsOutputLimit,
+} from './publication-recovery.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -491,6 +495,7 @@ export function createConnectionManager(
   let reconnectStartedAt = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let generation = 0;
+  const assistantTextByMessage = new Map<string, string>();
 
   // Event buffer for disconnection periods. Byte budget is primary; the count
   // cap is secondary. Lifecycle/terminal frames are protected from eviction.
@@ -1142,14 +1147,6 @@ export function createConnectionManager(
           if (gateResult !== undefined) {
             state.observeGateResult(gateResult);
           }
-          if (
-            eventType === 'message.part.updated' &&
-            state.currentSession?.publicationSelfCheck === true &&
-            isSuccessfulGitHubSummaryWrite(properties.part)
-          ) {
-            state.observeSummaryPublication();
-          }
-
           state.updateActivity();
 
           if (eventType === 'server.connected') {
@@ -1247,12 +1244,41 @@ export function createConnectionManager(
               const msgSessionId =
                 typeof messageInfo.sessionID === 'string' ? messageInfo.sessionID : undefined;
               const currentSessionId = state.currentSession?.kiloSessionId;
-              if (!currentSessionId || msgSessionId === currentSessionId) {
+              if (currentSessionId !== undefined && msgSessionId === currentSessionId) {
                 state.setLastAssistantMessageId(messageInfo.id);
+                if (messageInfoReportsOutputLimit(messageInfo)) {
+                  state.observeAssistantOutputLimit();
+                }
               }
             }
             if (isAssistantCompletionSignal(messageInfo)) {
               callbacks.onCompletionSignal();
+            }
+          }
+
+          if (eventType === 'message.part.updated') {
+            const part = properties.part;
+            const currentSessionId = state.currentSession?.kiloSessionId;
+            const partSessionId =
+              isRecord(part) && typeof part.sessionID === 'string' ? part.sessionID : undefined;
+            if (
+              isRecord(part) &&
+              currentSessionId !== undefined &&
+              partSessionId === currentSessionId
+            ) {
+              const publicationSignal = classifyPublicationToolPart(part);
+              if (publicationSignal) state.observePublicationSignal(publicationSignal);
+              if (
+                part.type === 'text' &&
+                typeof part.text === 'string' &&
+                part.text.length > 0 &&
+                typeof part.messageID === 'string'
+              ) {
+                assistantTextByMessage.set(
+                  part.messageID,
+                  (assistantTextByMessage.get(part.messageID) ?? '') + part.text
+                );
+              }
             }
           }
 
@@ -1289,6 +1315,14 @@ export function createConnectionManager(
               continue;
             }
             logToFile('session.idle received');
+            const lastAssistantId = state.lastAssistantMessageId;
+            const assistantText = lastAssistantId
+              ? (assistantTextByMessage.get(lastAssistantId) ?? '')
+              : '';
+            if (assistantReportsNoActionableOutput([{ text: assistantText }])) {
+              state.observeAssistantOutputLimit();
+            }
+            assistantTextByMessage.clear();
             callbacks.onCompletionSignal();
             callbacks.onSessionIdle?.();
             // For new path, forward the idle event to DO (already done via normal ingest)

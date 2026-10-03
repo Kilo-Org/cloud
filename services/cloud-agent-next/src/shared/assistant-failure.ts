@@ -380,3 +380,22 @@ export function assistantErrorDetail(source: unknown): string | undefined {
   if (source === undefined || source === null) return undefined;
   return recognizedAssistantErrorMessage(source) ?? 'Assistant message failed';
 }
+
+/**
+ * The CLI ends a turn whose model hit its output limit mid-reasoning with a
+ * plain assistant text notice instead of a terminal error. Matched as two
+ * independent fragments so small copy drift in either half still detects, while
+ * a review that merely discusses output limits cannot false-positive without
+ * the "no actionable output" half. Shared by the wrapper lifecycle and the
+ * wrapper supervisor so the rule has one owner.
+ */
+export function assistantReportsNoActionableOutput(parts: readonly unknown[]): boolean {
+  const texts: string[] = [];
+  for (const part of parts) {
+    if (typeof part !== 'object' || part === null || !('text' in part)) continue;
+    const text = part.text;
+    if (typeof text === 'string') texts.push(text);
+  }
+  const text = texts.join('\n');
+  return /no actionable output/i.test(text) && /(?:output|token) limit/i.test(text);
+}

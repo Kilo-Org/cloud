@@ -405,7 +405,11 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         ownerId: USER_ID,
         organizationId: ORG_ID,
       })
-    ).resolves.toEqual({ location: { sandboxId, provider: 'cloudflare' }, children: [] });
+    ).resolves.toEqual({
+      location: { sandboxId, provider: 'cloudflare' },
+      children: [],
+      directory: '/workspace/app',
+    });
 
     await expect(
       runInDurableObject(stub, instance =>
@@ -424,7 +428,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         kiloSessionId: kilo,
         ownerId: USER_ID,
       })
-    ).resolves.toEqual({ location: null, children: [] });
+    ).resolves.toEqual({ location: null, children: [], directory: null });
   });
 
   it('reads child Kilo sessions from the stored event log', async () => {
@@ -457,7 +461,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
           execution_id: '',
           session_id: sessionId,
           stream_event_type: 'kilocode',
-          payload: created(firstChild, ownKilo, workspacePath),
+          payload: created(firstChild, ownKilo, '/workspace/app'),
           timestamp: 1,
         },
         // A repeat update of the same child must not duplicate the lineage.
@@ -465,7 +469,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
           execution_id: '',
           session_id: sessionId,
           stream_event_type: 'kilocode',
-          payload: created(firstChild, ownKilo, workspacePath),
+          payload: created(firstChild, ownKilo, '/workspace/app'),
           timestamp: 2,
         },
         // A child in another directory is not part of this worktree.
@@ -481,7 +485,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
           execution_id: '',
           session_id: sessionId,
           stream_event_type: 'kilocode',
-          payload: created(ownKilo, firstChild, workspacePath),
+          payload: created(ownKilo, firstChild, '/workspace/app'),
           timestamp: 4,
         },
       ]);

@@ -258,7 +258,7 @@ async function startSharedConnectedSandbox(): Promise<{
   kiloA: string;
   kiloB: string;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, newSessionId());
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const worktreeA = worktreeId();
@@ -551,8 +551,13 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     await expect(sandbox.status({ sessionId: sessionA })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });
-    await expect(sandbox.status({ sessionId: sessionB })).resolves.not.toMatchObject({
-      view: { state: 'unknown' },
+    // Worktree B really prepared on its own per-session directory: an isolated
+    // sandbox id would place both worktrees at /workspace/app and fail B's grant
+    // with a credential scope mismatch.
+    await waitFor(async () => {
+      await expect(sandbox.status({ sessionId: sessionB })).resolves.toMatchObject({
+        view: { state: 'preparing' },
+      });
     });
     wrapper.close();
   });

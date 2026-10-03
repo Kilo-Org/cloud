@@ -8,6 +8,7 @@ import type {
   RecordCloudAgentWorktreeCleanupParams,
 } from '@kilocode/session-ingest-contracts';
 import type { TRPCContext } from '../../types';
+import { getWorktreeWorkspacePath } from '../../workspace';
 import { router } from '../auth';
 import { deleteWorktree } from './worktree-deletion';
 
@@ -288,5 +289,81 @@ describe('deleteWorktree authorization and completion', () => {
     await expect(
       f.caller.deleteWorktree({ worktreeId, kilocodeOrganizationId: organizationId })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('records the stored checkout directory returned by the session DO', async () => {
+    const f = fixture();
+    const identity = getWorktreeWorkspacePath(organizationId, userId, worktreeId);
+    mocks.getSession.mockImplementation((_env, ownerId: string, id: string) => {
+      expect(ownerId).toBe(userId);
+      return {
+        beginWorktreeDeletion: async () => ({
+          location: await f.beginSession(id),
+          children: [],
+          directory: '/workspace/app',
+        }),
+        finishWorktreeDeletion: () => f.finishSession(id),
+      };
+    });
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
+      success: true,
+    });
+    expect(f.record.mock.calls.length).toBeGreaterThan(0);
+    for (const call of f.record.mock.calls) {
+      expect(call[0].directory).toBe('/workspace/app');
+      expect(call[0].directory).not.toBe(identity);
+    }
+  });
+
+  it('records every distinct stored checkout directory across sessions', async () => {
+    const f = fixture(2);
+    const identity = getWorktreeWorkspacePath(organizationId, userId, worktreeId);
+    const directories = new Map<string, string>([
+      [workspaceId(0), '/workspace/app'],
+      [workspaceId(1), identity],
+    ]);
+    mocks.getSession.mockImplementation((_env, ownerId: string, id: string) => {
+      expect(ownerId).toBe(userId);
+      return {
+        beginWorktreeDeletion: async () => ({
+          location: await f.beginSession(id),
+          children: [],
+          directory: directories.get(id) ?? null,
+        }),
+        finishWorktreeDeletion: () => f.finishSession(id),
+      };
+    });
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
+      success: true,
+    });
+    // Both call sites (record_manifest carrying runtimeLocations and
+    // record_cleanup carrying sessionIds) must cover both directories.
+    const manifestDirectories = new Set(
+      f.record.mock.calls
+        .filter(call => call[0].runtimeLocations !== undefined)
+        .map(call => call[0].directory)
+    );
+    const cleanupDirectories = new Set(
+      f.record.mock.calls
+        .filter(call => call[0].sessionIds !== undefined)
+        .map(call => call[0].directory)
+    );
+    expect(manifestDirectories).toEqual(new Set(['/workspace/app', identity]));
+    expect(cleanupDirectories).toEqual(new Set(['/workspace/app', identity]));
+  });
+
+  it('falls back to the identity workspace path when no session returns a directory', async () => {
+    const f = fixture();
+    const identity = getWorktreeWorkspacePath(undefined, userId, worktreeId);
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toMatchObject({
+      success: true,
+    });
+    expect(f.record.mock.calls.length).toBeGreaterThan(0);
+    for (const call of f.record.mock.calls) {
+      expect(call[0].directory).toBe(identity);
+    }
   });
 });

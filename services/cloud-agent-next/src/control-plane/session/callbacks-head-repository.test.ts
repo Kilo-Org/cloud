@@ -58,7 +58,11 @@ function message(
 ): SessionMessage {
   return {
     messageId: MESSAGE_ID,
-    intent: { type: 'prompt', messageId: MESSAGE_ID, text: 'hello' },
+    intent: {
+      messageId: MESSAGE_ID,
+      turn: { type: 'prompt', prompt: 'hello' },
+      agent: { mode: 'code', model: 'test-model' },
+    },
     state,
     createdAt: 1,
     acceptedAt: 1,

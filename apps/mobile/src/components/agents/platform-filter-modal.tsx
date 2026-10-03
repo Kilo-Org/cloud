@@ -1,6 +1,6 @@
 import { Check } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -179,7 +179,13 @@ export function SessionFilterModal({
       {/* The sheet fills the detent, so the row list takes the slack and
           scrolls: a long recent-repository list can never push Apply off the
           bottom of the sheet. */}
-      <View className="flex-1 gap-4 p-5" style={{ paddingBottom: insets.bottom + 20 }}>
+      <View
+        className="flex-1 gap-4 p-5"
+        style={{
+          paddingTop: Platform.OS === 'ios' ? undefined : insets.top + 20,
+          paddingBottom: insets.bottom + 20,
+        }}
+      >
         <Text accessibilityRole="header" className="text-center text-base font-semibold">
           {t('agentChat.sessionFilter.title')}
         </Text>

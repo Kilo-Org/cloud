@@ -49,6 +49,8 @@ export interface SessionInput {
   bitbucketPullRequestId?: number;
   /** Head commit SHA that publication must remain fenced to. */
   bitbucketExpectedHeadSha?: string;
+  /** GitHub pull request number the review must publish its summary to. */
+  githubPullRequestNumber?: number;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */

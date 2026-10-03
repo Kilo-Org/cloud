@@ -324,6 +324,32 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
   });
 
+  it('preserves the GitHub pull request number for a review session', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 17 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current).repository).toMatchObject({ pullRequestNumber: 17 });
+  });
+
+  it('rejects a non-positive GitHub pull request number', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 0 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(() => parseSessionMetadata(current)).toThrow();
+  });
+
   it('preserves a validated worktree ID and its canonical workspace path', () => {
     const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
     const current = {

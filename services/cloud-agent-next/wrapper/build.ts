@@ -28,6 +28,14 @@ await Bun.build({
 });
 
 await Bun.build({
+  entrypoints: ['./src/github-review-publish-mcp.ts'],
+  outdir: './dist',
+  naming: 'github-review-publish-mcp',
+  target: 'bun',
+  minify: true,
+});
+
+await Bun.build({
   entrypoints: ['./src/control-plane/main.ts'],
   outdir: './dist',
   naming: 'control-plane-wrapper.js',
@@ -36,7 +44,8 @@ await Bun.build({
 });
 
 await chmod('./dist/bb', 0o755);
+await chmod('./dist/github-review-publish-mcp', 0o755);
 
 console.log(
-  'Build complete: dist/wrapper.js, dist/restore-session.js, dist/bb, dist/control-plane-wrapper.js'
+  'Build complete: dist/wrapper.js, dist/restore-session.js, dist/bb, dist/github-review-publish-mcp, dist/control-plane-wrapper.js'
 );

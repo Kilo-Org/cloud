@@ -1,6 +1,27 @@
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
-import { retryFailedMessage } from './retry-failed-message';
+import { parseFailedCommandRow, retryFailedMessage } from './retry-failed-message';
+
+describe('parseFailedCommandRow', () => {
+  const commands = [{ trigger: 'review' }, { trigger: 'compact' }];
+
+  it('parses a known command with its arguments', () => {
+    expect(parseFailedCommandRow('/review scope=diff', commands)).toEqual({
+      command: 'review',
+      args: 'scope=diff',
+    });
+  });
+
+  it('parses a known command without arguments', () => {
+    expect(parseFailedCommandRow('  /compact  ', commands)).toEqual({ command: 'compact', args: '' });
+  });
+
+  it('leaves ordinary prompts and unknown slash text as plain text', () => {
+    expect(parseFailedCommandRow('Ship the release notes.', commands)).toBeNull();
+    expect(parseFailedCommandRow('/unknown args', commands)).toBeNull();
+    expect(parseFailedCommandRow('/review', [])).toBeNull();
+  });
+});
 
 const owner = 'ses-owner' as KiloSessionId;
 const other = 'ses-other' as KiloSessionId;

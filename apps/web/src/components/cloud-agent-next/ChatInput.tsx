@@ -88,13 +88,17 @@ type ChatInputProps = {
   /** Pre-populate the textarea (e.g. to restore text after a failed send) */
   initialValue?: string;
   /**
-   * A request to place exactly this text in the composer, applied whenever the
-   * object changes. Unlike `initialValue`, it replaces a draft already in the
-   * field: the user asked for this text (a failed row's copy action), so a
-   * stale draft must not leave the control doing nothing. The `token` changes
-   * per request so repeating the same text still applies.
+   * A request to place exactly this text in the composer, applied once per
+   * token. Unlike `initialValue`, it replaces a draft already in the field:
+   * the user asked for this text (a failed row's copy action), so a stale
+   * draft must not leave the control doing nothing. The parent clears the
+   * request after applying (see `onConsumeRequestedValue`), so a remount —
+   * for example into another session's composer — cannot replay stale text.
+   * The `token` changes per request so repeating the same text still applies.
    */
   requestedValue?: { text: string; token: number } | null;
+  /** Clears a consumed `requestedValue` so it applies exactly once. */
+  onConsumeRequestedValue?: (token: number) => void;
   /** Custom modes exposed by the session's profile stack (shown in picker) */
   customModeOptions?: ModeOption<AgentMode>[];
   /** When true, the model picker is rendered read-only (e.g. agent has a model override). */
@@ -131,6 +135,7 @@ export function ChatInput({
   showToolbar = false,
   initialValue,
   requestedValue,
+  onConsumeRequestedValue,
   attachmentUploadOptions,
   attachmentsEnabled = true,
   customModeOptions,
@@ -184,7 +189,8 @@ export function ChatInput({
 
     setInputValue(requestedValue.text);
     textareaRef.current?.focus();
-  }, [requestedValue?.token, requestedValue?.text, setInputValue]);
+    onConsumeRequestedValue?.(requestedValue.token);
+  }, [requestedValue, setInputValue, onConsumeRequestedValue]);
 
   // Resolve the pinned model's display name from the allowed models list, so the
   // locked-read-only toolbar shows the same label as the ModelCombobox. Falls

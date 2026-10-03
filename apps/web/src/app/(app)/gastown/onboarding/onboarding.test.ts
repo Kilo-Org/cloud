@@ -13,9 +13,7 @@ import {
 
 import type { ModelPreset, CreationPhase } from './onboarding.domain';
 
-// ---------------------------------------------------------------------------
 // validateTownName
-// ---------------------------------------------------------------------------
 describe('validateTownName', () => {
   test('returns error for empty string', () => {
     expect(validateTownName('')).toBe('Town name is required');
@@ -58,18 +56,14 @@ describe('validateTownName', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // TOWN_NAME_MAX_LENGTH
-// ---------------------------------------------------------------------------
 describe('TOWN_NAME_MAX_LENGTH', () => {
   test('is 48', () => {
     expect(TOWN_NAME_MAX_LENGTH).toBe(48);
   });
 });
 
-// ---------------------------------------------------------------------------
 // deriveDefaultTownName
-// ---------------------------------------------------------------------------
 describe('deriveDefaultTownName', () => {
   test('returns empty string for null', () => {
     expect(deriveDefaultTownName(null)).toBe('');
@@ -116,9 +110,7 @@ describe('deriveDefaultTownName', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // resolveGitUrlFromRepo
-// ---------------------------------------------------------------------------
 describe('resolveGitUrlFromRepo', () => {
   test('returns github URL for github platform', () => {
     expect(resolveGitUrlFromRepo('github', 'octocat/hello-world')).toBe(
@@ -163,9 +155,7 @@ describe('resolveGitUrlFromRepo', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // presetToConfig
-// ---------------------------------------------------------------------------
 describe('presetToConfig', () => {
   test('returns frontier config with all roles set to kilo-auto/frontier', () => {
     const config = presetToConfig('frontier', {});
@@ -254,9 +244,7 @@ describe('presetToConfig', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // PRESETS constant
-// ---------------------------------------------------------------------------
 describe('PRESETS', () => {
   test('contains exactly 4 presets', () => {
     expect(PRESETS).toHaveLength(4);
@@ -293,9 +281,7 @@ describe('PRESETS', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // FIRST_TASK_STORAGE_PREFIX
-// ---------------------------------------------------------------------------
 describe('FIRST_TASK_STORAGE_PREFIX', () => {
   test('has the expected value', () => {
     expect(FIRST_TASK_STORAGE_PREFIX).toBe('gastown_first_task_');
@@ -308,9 +294,7 @@ describe('FIRST_TASK_STORAGE_PREFIX', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // PHASE_LABELS
-// ---------------------------------------------------------------------------
 describe('PHASE_LABELS', () => {
   test('idle phase has empty label', () => {
     expect(PHASE_LABELS.idle).toBe('');

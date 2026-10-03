@@ -10,8 +10,6 @@ import type { createCallerForUser as createCallerForUserType } from '@/routers/t
 import type { KiloClawApiError as KiloClawApiErrorType } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { UpstreamApiError } from '@/lib/trpc/init';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 type StartKiloCliRunResult = { ok: true; startedAt: string };
 type CancelKiloCliRunResult = { ok: boolean };
 type KiloCliRunStatusResult = {
@@ -23,8 +21,6 @@ type KiloCliRunStatusResult = {
   completedAt: string | null;
   prompt: string | null;
 };
-
-// ── Mocks ──────────────────────────────────────────────────────────────────
 
 const mockStartKiloCliRun = jest.fn<() => Promise<StartKiloCliRunResult>>();
 const mockCancelKiloCliRun = jest.fn<() => Promise<CancelKiloCliRunResult>>();
@@ -51,8 +47,6 @@ jest.mock('next/headers', () => {
   };
 });
 
-// ── Dynamic imports (after mocks) ──────────────────────────────────────────
-
 let createCallerForUser: typeof createCallerForUserType;
 let KiloClawApiError: typeof KiloClawApiErrorType;
 
@@ -62,8 +56,6 @@ beforeAll(async () => {
   const clientMod = await import('@/lib/kiloclaw/kiloclaw-internal-client');
   KiloClawApiError = clientMod.KiloClawApiError;
 });
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 let user: User;
 let org: Organization;
@@ -147,8 +139,6 @@ function mockRunningCliStatus(params: { startedAt: string; prompt: string }): vo
   });
 }
 
-// ── Personal router: kiloclaw.startKiloCliRun ──────────────────────────────
-
 describe('kiloclaw.startKiloCliRun error translation', () => {
   beforeEach(async () => {
     const instanceId = await createPersonalInstance(user.id);
@@ -227,8 +217,6 @@ describe('kiloclaw.startKiloCliRun error translation', () => {
     expect(new Date(rows[0]!.started_at!).toISOString()).toBe(startedAt);
   });
 });
-
-// ── Org router: organizations.kiloclaw.startKiloCliRun ─────────────────────
 
 describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
   beforeEach(async () => {
@@ -330,8 +318,6 @@ describe('organizations.kiloclaw.startKiloCliRun error translation', () => {
   });
 });
 
-// ── Personal router: kiloclaw.cancelKiloCliRun ────────────────────────────
-
 describe('kiloclaw.cancelKiloCliRun error translation', () => {
   beforeEach(async () => {
     const instanceId = await createPersonalInstance(user.id);
@@ -369,8 +355,6 @@ describe('kiloclaw.cancelKiloCliRun error translation', () => {
     await expect(caller.kiloclaw.cancelKiloCliRun({ runId })).resolves.toEqual({ ok: false });
   });
 });
-
-// ── Org router: organizations.kiloclaw.cancelKiloCliRun ───────────────────
 
 describe('organizations.kiloclaw.cancelKiloCliRun error translation', () => {
   beforeEach(async () => {
@@ -419,8 +403,6 @@ describe('organizations.kiloclaw.cancelKiloCliRun error translation', () => {
   });
 });
 
-// ── Org router: organizations.kiloclaw.getKiloCliRunStatus ────────────────
-
 describe('organizations.kiloclaw.getKiloCliRunStatus', () => {
   beforeEach(async () => {
     org = await createOrganization('Test Org', user.id);
@@ -468,8 +450,6 @@ describe('organizations.kiloclaw.getKiloCliRunStatus', () => {
   });
 });
 
-// ── Org router: organizations.kiloclaw.listKiloCliRuns ────────────────────
-
 describe('organizations.kiloclaw.listKiloCliRuns', () => {
   it('returns runs scoped to the org instance', async () => {
     org = await createOrganization('Test Org', user.id);
@@ -511,8 +491,6 @@ describe('organizations.kiloclaw.listKiloCliRuns', () => {
     expect(result.runs).toEqual([]);
   });
 });
-
-// ── Cross-instance isolation ──────────────────────────────────────────────
 
 describe('CLI run cross-instance isolation', () => {
   it('org runs are not visible via personal listKiloCliRuns', async () => {

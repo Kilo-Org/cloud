@@ -12,9 +12,7 @@ import {
   type KiloSdkMessageHistory,
 } from '@kilocode/session-ingest-contracts';
 
-// ---------------------------------------------------------------------------
 // Zod schema (mirrors cloudflare-session-ingest SharedSessionSnapshotSchema)
-// ---------------------------------------------------------------------------
 
 // Mirrors SharedSessionSnapshotSchema from cloudflare-session-ingest/src/util/share-output.ts.
 // Kept in sync manually (same pattern as cloud-agent-client.ts).
@@ -46,9 +44,7 @@ const SessionSnapshotSchema = z.object({
   ),
 });
 
-// ---------------------------------------------------------------------------
 // Types
-// ---------------------------------------------------------------------------
 
 /**
  * Snapshot returned by the session-ingest export endpoint.
@@ -58,9 +54,7 @@ export type SessionSnapshot = z.infer<typeof SessionSnapshotSchema>;
 
 export type SessionMessage = SessionSnapshot['messages'][number];
 
-// ---------------------------------------------------------------------------
 // Bounded fetch
-// ---------------------------------------------------------------------------
 
 /**
  * Redact a request URL to an allow-listed route label for logging: the
@@ -135,9 +129,7 @@ async function fetchSessionIngest(requestUrl: string, init: RequestInit = {}): P
   }
 }
 
-// ---------------------------------------------------------------------------
 // Fetch
-// ---------------------------------------------------------------------------
 
 /**
  * Fetch the session snapshot from the session-ingest service.
@@ -195,9 +187,7 @@ export async function fetchSessionMessages(
   return snapshot?.messages ?? null;
 }
 
-// ---------------------------------------------------------------------------
 // Paginated authorized session-message history
-// ---------------------------------------------------------------------------
 
 const SessionMessagesPageResponseSchema = z.object({
   success: z.literal(true),
@@ -301,9 +291,7 @@ export async function fetchSessionMessagesPage(
   };
 }
 
-// ---------------------------------------------------------------------------
 // Share
-// ---------------------------------------------------------------------------
 
 const ShareResponseSchema = z
   .object({
@@ -510,9 +498,7 @@ export async function fetchSharedSessionSnapshot(
   return parsed.data;
 }
 
-// ---------------------------------------------------------------------------
 // Authorization cache invalidation
-// ---------------------------------------------------------------------------
 
 export async function invalidateOrganizationSessionAccess(
   kiloUserId: string,
@@ -554,9 +540,7 @@ export async function invalidateOrganizationSessionAccess(
   }
 }
 
-// ---------------------------------------------------------------------------
 // Delete
-// ---------------------------------------------------------------------------
 
 /**
  * Delete a session via the session-ingest worker.

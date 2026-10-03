@@ -344,9 +344,7 @@ export function ProfilesListDialog({
   );
 }
 
-// -------------------------------------------------------------------
 // ProfileListItem
-// -------------------------------------------------------------------
 
 type ProfileListItemProps = {
   profile: ProfileSummaryWithOwner;
@@ -395,9 +393,7 @@ function ProfileListItem({
   );
 }
 
-// -------------------------------------------------------------------
 // NewProfilePane
-// -------------------------------------------------------------------
 
 type NewProfilePaneProps = {
   organizationId?: string;
@@ -491,9 +487,7 @@ function NewProfilePane({
   );
 }
 
-// -------------------------------------------------------------------
 // ProfileDetailPane
-// -------------------------------------------------------------------
 
 type ProfileDetailPaneProps = {
   profileId: string;
@@ -665,7 +659,6 @@ function ProfileDetailPane({
   );
 }
 
-// -------------------------------------------------------------------
 // AutoSaveField — always-visible scalar field that commits on blur/Enter.
 //
 // Matches the industry pattern for inline-editable text in admin panels
@@ -674,7 +667,6 @@ function ProfileDetailPane({
 // "Saving…" label, and after success we briefly show "Saved". If `onSave`
 // throws, the draft is reverted to the last-saved value so the user doesn't
 // end up staring at a value that was silently rejected.
-// -------------------------------------------------------------------
 
 type AutoSaveFieldProps = {
   kind: 'input' | 'textarea';
@@ -755,9 +747,7 @@ function AutoSaveField({ kind, id, label, placeholder, initialValue, onSave }: A
   );
 }
 
-// -------------------------------------------------------------------
 // OverviewTab
-// -------------------------------------------------------------------
 
 type OverviewTabProps = {
   profile: NonNullable<ReturnType<typeof useProfile>['data']>;
@@ -892,9 +882,7 @@ function OverviewTab({
   );
 }
 
-// -------------------------------------------------------------------
 // RepoPinsSection — shows repos this profile is bound to, with add/remove
-// -------------------------------------------------------------------
 
 type RepoOption = { id: number; fullName: string; private: boolean; platform: 'github' | 'gitlab' };
 
@@ -1169,9 +1157,7 @@ function RepoPinCommandItem({
   );
 }
 
-// -------------------------------------------------------------------
 // VarsTab
-// -------------------------------------------------------------------
 
 type VarsTabProps = {
   profileId: string;
@@ -1547,9 +1533,7 @@ function VarsTab({ profileId, organizationId, vars, mutations }: VarsTabProps) {
   );
 }
 
-// -------------------------------------------------------------------
 // .env paste parsing
-// -------------------------------------------------------------------
 
 function stripEnvQuotes(value: string): string {
   if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
@@ -1590,9 +1574,7 @@ function parseEnvText(content: string): { key: string; value: string }[] {
   return out;
 }
 
-// -------------------------------------------------------------------
 // CommandsTab
-// -------------------------------------------------------------------
 
 type CommandsTabProps = {
   profileId: string;

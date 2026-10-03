@@ -9,7 +9,6 @@ import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // Check if we're in development mode
   if (process.env.NODE_ENV !== 'development') {
     return NextResponse.json(
       { error: 'This endpoint is only available in development mode' },
@@ -39,7 +38,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Convert dollars to microdollars
     const microdollarsToConsume = Math.ceil(dollarAmount * 1_000_000);
 
     // Create a mock response with usage data
@@ -97,7 +95,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ttfb_ms: null,
     };
 
-    // Use the existing countAndStoreUsage function
     await countAndStoreUsage(mockResponse, usageContext, undefined);
 
     // Reset the balance cache using the proper function

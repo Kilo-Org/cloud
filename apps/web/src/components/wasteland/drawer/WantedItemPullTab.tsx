@@ -193,8 +193,6 @@ export function WantedItemPullTab({ wastelandId, pull }: { wastelandId: string; 
   );
 }
 
-// ── Inline comment form ───────────────────────────────────────────────
-
 function CommentForm({
   wastelandId,
   pullId,
@@ -257,8 +255,6 @@ function CommentForm({
     </form>
   );
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────
 
 function formatRelative(iso: string | null): string {
   if (!iso) return '—';

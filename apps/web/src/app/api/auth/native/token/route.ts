@@ -157,20 +157,17 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   const data = validation.data;
 
-  // ── Step 1: Sync admission gate ──────────────────────────────────────────
   const admissionGate = checkNativeAdmission(body);
   if (!admissionGate.admission.ok) {
     return NextResponse.json({ error: admissionGate.admission.errorCode }, { status: 403 });
   }
 
-  // ── Step 2: Extract and validate admission payload ───────────────────────
   // Only extract when async verification is needed (enforce or report mode).
   let admissionPayload: AdmissionPayload | undefined;
   if (admissionGate.verifyAsync && body['admission'] && typeof body['admission'] === 'object') {
     admissionPayload = validateAdmissionPayload(body['admission']);
   }
 
-  // ── Step 3: Provider identity verification ───────────────────────────────
   let args: CreateOrUpdateUserArgs;
   let autoLinkToExistingUser: boolean;
 
@@ -334,7 +331,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       };
       autoLinkToExistingUser = true;
 
-      // ── Step 3b: Async admission verification BEFORE settlement ────────
       let admissionVerification: VerifyAdmissionOk | undefined;
       if (admissionPayload) {
         try {
@@ -355,7 +351,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         }
       }
 
-      // ── Step 4: User settlement ──────────────────────────────────────
       const result = await createOrUpdateUser(
         args,
         undefined,
@@ -381,7 +376,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         return eligibilityResponse(resolvedEligibility);
       }
 
-      // ── Step 4.5: Key ownership check BEFORE code commit ─────────────
       // For assertion (existing key) and attestation (keyId already bound to
       // another user): enforce → refuse without consuming the code so a
       // legitimate retry remains possible. Report → log, skip persistence,
@@ -401,7 +395,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         }
       }
 
-      // ── Step 5: Persist attested key after settlement ─────────────────
       // Must run BEFORE code commit so a key collision under enforce does
       // not burn the sign-in code without issuing a credential.
       let sessionId: string | undefined;
@@ -454,7 +447,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         }
       }
 
-      // ── Step 6: Consume the sign-in code AFTER key persistence ─────────
       // The code is only committed once all pre-credential gates pass, so
       // a refusal never burns a code without issuing a credential.
       const committed = await commitSignInCode(data.email, data.code, data.challengeId);
@@ -518,7 +510,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   // Apple/Google path.
 
-  // ── Step 3c: Async admission verification BEFORE settlement ──────────────
   let admissionVerification: VerifyAdmissionOk | undefined;
   if (admissionPayload) {
     try {
@@ -536,7 +527,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     }
   }
 
-  // ── Step 4: User settlement ──────────────────────────────────────────────
   const result = await createOrUpdateUser(
     args,
     undefined,
@@ -554,7 +544,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
   }
 
-  // ── Step 5: Final eligibility check BEFORE persisting credentials ────────
   // The resolved account email can differ from the ID-token email (provider
   // account linking). Refuse before a device session, refresh token, or
   // attested key is persisted so an ineligible account leaves no credentials.
@@ -563,7 +552,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     return eligibilityResponse(resolvedEligibility);
   }
 
-  // ── Step 6: Persist attested key after settlement ────────────────────────
   let sessionId: string | undefined;
   let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
 

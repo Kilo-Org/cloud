@@ -112,5 +112,4 @@ export const rootRouter = createTRPCRouter({
   quickChat: quickChatRouter,
   spendAlerts: spendAlertRouter,
 });
-// export type definition of API
 export type RootRouter = typeof rootRouter;

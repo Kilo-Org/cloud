@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// ── Types ────────────────────────────────────────────────────────────────
-
 export type OnboardingTooltipId = 'convoy' | 'agents' | 'merges' | 'mayor';
 
 /** Ordered list of tooltip definitions. Shown sequentially. */
@@ -40,8 +38,6 @@ export const ONBOARDING_TOOLTIPS: ReadonlyArray<{
       'You can also ask me to work on multiple things at once, check on progress, or coordinate across repos.',
   },
 ];
-
-// ── localStorage helpers ─────────────────────────────────────────────────
 
 function storageKey(townId: string) {
   return `gastown_onboarding_tooltips_shown_${townId}`;
@@ -80,8 +76,6 @@ function isAllDismissed(townId: string): boolean {
   const dismissed = readDismissedSet(townId);
   return ONBOARDING_TOOLTIPS.every(t => dismissed.has(t.id));
 }
-
-// ── Hook ─────────────────────────────────────────────────────────────────
 
 type UseOnboardingTooltipsResult = {
   /** The tooltip currently being shown, or null if none. */

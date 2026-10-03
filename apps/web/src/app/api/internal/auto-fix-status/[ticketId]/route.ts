@@ -38,7 +38,6 @@ export async function POST(
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
   try {
-    // Validate internal API secret
     const secret = req.headers.get('X-Internal-Secret');
     if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -48,7 +47,6 @@ export async function POST(
     const payload: StatusUpdatePayload = await req.json();
     const { sessionId, cliSessionId, status, errorMessage, ...updates } = payload;
 
-    // Validate payload
     if (!status) {
       return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
     }
@@ -62,7 +60,6 @@ export async function POST(
       errorMessage,
     });
 
-    // Get current ticket to check if update is needed
     const ticket = await getFixTicketById(ticketId);
 
     if (!ticket) {
@@ -70,7 +67,6 @@ export async function POST(
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
     }
 
-    // Determine valid transitions based on incoming status
     const isTerminalState =
       ticket.status === 'completed' || ticket.status === 'failed' || ticket.status === 'cancelled';
 

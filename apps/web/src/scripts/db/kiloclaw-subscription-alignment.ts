@@ -2781,7 +2781,6 @@ type MultiRowAllDestroyedOutcome =
   | 'skipped_race'
   | 'skipped_not_collapsible';
 
-// ---------------------------------------------------------------------------
 // Multi-row-all-destroyed collapse
 //
 // Scope: users whose `personalCurrentSubscriptionWhere` predicate returns >1 rows
@@ -2807,7 +2806,6 @@ type MultiRowAllDestroyedOutcome =
 // transferred_to_subscription_id IS NULL, we set it to the immediately-next
 // row's id. We skip any pair whose target already has a predecessor (to avoid
 // UQ violations from pre-existing partial chains), so re-runs are idempotent.
-// ---------------------------------------------------------------------------
 
 type MultiRowAllDestroyedSourceRow = {
   subscriptionId: string;

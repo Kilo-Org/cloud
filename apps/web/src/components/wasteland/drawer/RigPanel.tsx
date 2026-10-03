@@ -276,8 +276,6 @@ export function RigPanel({
   );
 }
 
-// ── Section ──────────────────────────────────────────────────────────────
-
 function ActivitySection({
   icon: Icon,
   title,
@@ -472,8 +470,6 @@ function StampList({
     </ActivitySection>
   );
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 function TrustBadge({ level }: { level: number }) {
   const color =

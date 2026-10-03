@@ -95,7 +95,6 @@ export function NewDeploymentDialog({
     error: integrationError,
   } = useQuery(trpc.githubApps.listIntegrations.queryOptions(ghInput));
 
-  // Get the selected integration
   const selectedIntegration = integrations?.find(i => i.id === selectedIntegrationId);
 
   // Query repositories for the selected integration
@@ -245,7 +244,6 @@ export function NewDeploymentDialog({
   };
 
   const validateEnvVars = () => {
-    // Validate all env var keys
     for (const envVar of envVars) {
       if (envVar.key || envVar.value) {
         // Only validate if either key or value is filled
@@ -279,7 +277,6 @@ export function NewDeploymentDialog({
     // Mark all fields as touched
     setTouched({ branch: true });
 
-    // Validate all fields
     const branchValid = validateField('branch', branch);
 
     if (!branchValid || !selectedRepository) {
@@ -291,17 +288,14 @@ export function NewDeploymentDialog({
       return;
     }
 
-    // Validate env vars
     if (!validateEnvVars()) {
       return;
     }
 
-    // Validate password if enabled
     if (!validatePassword()) {
       return;
     }
 
-    // Filter out empty env vars
     const validEnvVars = envVars.filter(ev => ev.key && ev.value);
 
     createDeploymentMutation.mutate(

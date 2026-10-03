@@ -121,8 +121,6 @@ export function WantedItemBranchTab({
   );
 }
 
-// ── Header summary ─────────────────────────────────────────────────────
-
 function BranchHeader({ branch }: { branch: ForkBranch }) {
   return (
     <div className="space-y-2">
@@ -159,8 +157,6 @@ function BranchHeader({ branch }: { branch: ForkBranch }) {
     </div>
   );
 }
-
-// ── Item-level actions (claim/done/accept/reject/close/unclaim) ────────
 
 function BranchActionButtons({
   wastelandId,
@@ -345,8 +341,6 @@ function MarkDoneInlineForm({ wastelandId, item }: { wastelandId: string; item: 
   );
 }
 
-// ── Publish / Update PR ────────────────────────────────────────────────
-
 function PublishOrUpdateRow({ wastelandId, branch }: { wastelandId: string; branch: ForkBranch }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
@@ -420,8 +414,6 @@ function PublishOrUpdateRow({ wastelandId, branch }: { wastelandId: string; bran
   );
 }
 
-// ── Discard ────────────────────────────────────────────────────────────
-
 function DiscardRow({ wastelandId, branch }: { wastelandId: string; branch: ForkBranch }) {
   const trpc = useWastelandTRPC();
   const queryClient = useQueryClient();
@@ -474,8 +466,6 @@ function DiscardRow({ wastelandId, branch }: { wastelandId: string; branch: Fork
   );
 }
 
-// ── Empty state (no branch yet) ───────────────────────────────────────
-
 function BranchEmptyState({
   wastelandId,
   item,
@@ -519,8 +509,6 @@ function BranchEmptyState({
     </div>
   );
 }
-
-// ── Inline claim action ───────────────────────────────────────────────
 
 /**
  * Mirrors the legacy single-pane drawer's claim flow: first click
@@ -614,8 +602,6 @@ export function ClaimAction({ wastelandId, item }: { wastelandId: string; item: 
     </div>
   );
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────
 
 function formatRelative(iso: string): string {
   try {

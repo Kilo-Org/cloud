@@ -321,7 +321,6 @@ async function handleCoreInstallFlow(params: {
 
   const credentials = getGitHubAppCredentials(githubAppType);
 
-  // Handle uninstall/suspend actions
   if (setupAction === 'delete' || setupAction === 'suspend') {
     console.log(`GitHub App ${setupAction} action detected, skipping installation fetch`);
 
@@ -330,7 +329,6 @@ async function handleCoreInstallFlow(params: {
     );
   }
 
-  // Handle pending approval - store requester info for webhook matching
   if (setupAction === 'request') {
     const code = searchParams.get('code');
 
@@ -462,7 +460,6 @@ async function handleCoreInstallFlow(params: {
     }
   }
 
-  // Validate installation_id is present for normal install action
   if (!installationId) {
     captureMessage('GitHub callback missing installation_id', {
       level: 'warning',
@@ -625,7 +622,6 @@ async function handleCoreInstallFlow(params: {
     throw error;
   }
 
-  // Get selected repositories
   let repositories: PlatformRepository[] | null = null;
   if (installation.repository_selection === 'selected') {
     console.log('Fetching repositories for installation:', installationId);

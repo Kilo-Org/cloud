@@ -11,9 +11,7 @@
 import * as z from 'zod';
 import type { Images } from '@/lib/images-schema';
 
-// ============================================================================
 // Agent Mode Types
-// ============================================================================
 
 /**
  * Valid mode values for cloud agent sessions.
@@ -21,9 +19,7 @@ import type { Images } from '@/lib/images-schema';
  */
 export type AgentMode = 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
 
-// ============================================================================
 // Resume Configuration Types
-// ============================================================================
 
 /**
  * Configuration collected when resuming a CLI session in cloud-agent.
@@ -48,9 +44,7 @@ export type StreamResumeConfig = {
   githubRepo: string;
 };
 
-// ============================================================================
 // Streaming Message Types (for Jotai state management)
-// ============================================================================
 
 /**
  * Cloud agent message
@@ -70,9 +64,7 @@ export interface CloudMessage {
   images?: Images; // Image attachments for the message
 }
 
-// ============================================================================
 // Stored Session Message Types (for localStorage)
-// ============================================================================
 
 /**
  * Message role type
@@ -117,9 +109,7 @@ export interface SystemMessage extends BaseMessage {
  */
 export type Message = UserMessage | AssistantMessage | SystemMessage;
 
-// ============================================================================
 // Shared Types
-// ============================================================================
 
 /**
  * Tool execution
@@ -181,9 +171,7 @@ export interface StoredSession {
   createdOnPlatform?: string | null;
 }
 
-// ============================================================================
 // Zod Schemas for Runtime Validation
-// ============================================================================
 
 /**
  * Zod schema for ToolExecution
@@ -241,9 +229,7 @@ export const StoredSessionSchema = z.object({
  */
 export const StoredSessionsArraySchema = z.array(StoredSessionSchema);
 
-// ============================================================================
 // Streaming Event Types (from cloud-agent)
-// ============================================================================
 
 /**
  * Raw Kilocode CLI event - preserved exactly as received from stdout JSON.

@@ -531,8 +531,6 @@ async function applyStoreUpgradeCreditAdjustments(
   }
 }
 
-// ----- purchase ledger (P1-A-08d) -------------------------------------------
-
 const PURCHASE_LEDGER_DOMAIN = 'purchase' as const;
 const PURCHASE_LEDGER_INTENT = 'complete_store_purchase' as const;
 const PURCHASE_LEDGER_LEASE_SECONDS = 120;

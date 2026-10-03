@@ -137,8 +137,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   const queryClient = useQueryClient();
   const mainTrpc = useTRPC();
 
-  // ── Form state ────────────────────────────────────────────────────
-
   const [name, setName] = useState('');
   const [ownership, setOwnership] = useState<OwnershipType>(
     lockedOrgId ? 'organization' : 'personal'
@@ -175,8 +173,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   // instead of creating a duplicate. Cleared if the user navigates
   // back to a step that could change the create payload.
   const [pendingWastelandId, setPendingWastelandId] = useState<string | null>(null);
-
-  // ── Queries ───────────────────────────────────────────────────────
 
   const orgsQuery = useQuery(mainTrpc.organizations.list.queryOptions());
   const existingWastelandsQuery = useQuery(
@@ -256,8 +252,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
     if (suggested && suggested !== rigHandle) setRigHandle(suggested);
   }, [cachedDolthubUsername, rigHandle, rigHandleTouched]);
 
-  // ── Validation ────────────────────────────────────────────────────
-
   const nameError = getNameError(name);
   const hasCommonsConnection =
     existingWastelandsQuery.data?.some(w => w.dolthub_upstream === KILO_COMMONS_UPSTREAM) ?? false;
@@ -309,15 +303,11 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
 
   const stepIndex = visibleSteps.findIndex(s => s.key === step);
 
-  // ── Mutations ─────────────────────────────────────────────────────
-
   const createMutation = useMutation(
     trpc.wasteland.createWasteland.mutationOptions({
       onError: err => toast.error(err.message),
     })
   );
-
-  // ── Handlers ──────────────────────────────────────────────────────
 
   /** Resolve the token used for storeCredential. Mirrors the gastown wizard. */
   const resolveDolthubToken = (): string | null => {
@@ -431,8 +421,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
     void runProvision();
   };
 
-  // ── Step transitions ──────────────────────────────────────────────
-
   const goToCredentials = () => {
     if (!intentStepValid) return;
     setStep('credentials');
@@ -447,8 +435,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
     if (!rigStepValid) return;
     setStep('preview');
   };
-
-  // ── Render ────────────────────────────────────────────────────────
 
   return (
     <div className="mx-auto w-full max-w-2xl py-12 px-4">
@@ -555,8 +541,6 @@ function NewWastelandWizardForm({ lockedOrgId }: NewWastelandWizardFormProps) {
   );
 }
 
-// ── Stepper ──────────────────────────────────────────────────────────
-
 function Stepper({
   steps,
   currentIndex,
@@ -605,8 +589,6 @@ function Stepper({
     </ol>
   );
 }
-
-// ── Step: Intent ─────────────────────────────────────────────────────
 
 function IntentStep({
   name,
@@ -770,8 +752,6 @@ function IntentStep({
   );
 }
 
-// ── Step: Credentials ────────────────────────────────────────────────
-
 function CredentialsStep({
   isDolthubInstalled,
   installationLoading,
@@ -926,8 +906,6 @@ function CredentialsStep({
   );
 }
 
-// ── Step: Rig handle ─────────────────────────────────────────────────
-
 function RigStep({
   rigHandle,
   setRigHandle,
@@ -1002,8 +980,6 @@ function RigStep({
     </div>
   );
 }
-
-// ── Step: Preview ────────────────────────────────────────────────────
 
 function PreviewStep({
   intent,
@@ -1156,8 +1132,6 @@ function PreviewStep({
   );
 }
 
-// ── Step: Work ──────────────────────────────────────────────────────
-
 function WorkStep({
   intent,
   rigHandle,
@@ -1194,8 +1168,6 @@ function WorkStep({
     </div>
   );
 }
-
-// ── Step: Success ───────────────────────────────────────────────────
 
 function SuccessStep({
   state,
@@ -1317,8 +1289,6 @@ function SuccessStep({
     </div>
   );
 }
-
-// ── Atoms ────────────────────────────────────────────────────────────
 
 function FieldGroup({
   label,

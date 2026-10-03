@@ -8,8 +8,6 @@ import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 
-// ── Stripe mock ───────────────────────────────────────────────────────────────
-
 jest.mock('@/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { errors } = require('stripe').default ?? require('stripe');
@@ -50,8 +48,6 @@ function getStripeMock(): StripeMock {
   const mod: { __stripeMock: StripeMock } = jest.requireMock('@/lib/stripe-client');
   return mod.__stripeMock;
 }
-
-// ── Fixture helpers ───────────────────────────────────────────────────────────
 
 async function insertActiveAppStoreSubscription(kiloUserId: string) {
   const providerSubscriptionId = `apple-orig-${crypto.randomUUID()}`;
@@ -96,8 +92,6 @@ async function insertActiveAppStoreSubscription(kiloUserId: string) {
 
   return { subscriptionId, providerSubscriptionId };
 }
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('cancelAndRefundKiloPassForUser', () => {
   beforeEach(async () => {

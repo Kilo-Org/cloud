@@ -19,7 +19,6 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 
 describe('referrals', () => {
   afterEach(async () => {
-    // Clean up test data
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(referral_code_usages);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -62,14 +61,12 @@ describe('referrals', () => {
       const referringUserId = 'referring-user-id-custom';
       const customCode = 'custom-referral-code';
 
-      // Insert a custom referral code with max_redemptions = 2
       await db.insert(referral_codes).values({
         kilo_user_id: referringUserId,
         code: customCode,
         max_redemptions: 2,
       });
 
-      // Create 2 usages that have been paid out
       await db.insert(referral_code_usages).values([
         {
           code: customCode,
@@ -83,7 +80,6 @@ describe('referrals', () => {
         },
       ]);
 
-      // Simulate that the first two referrals have already been paid out
       await db
         .update(referral_code_usages)
         .set({ paid_at: sql`NOW()` })
@@ -91,14 +87,12 @@ describe('referrals', () => {
 
       const newRedeemingUserId = 'user-3';
 
-      // Insert a new usage record directly (simulating what would have been done by redeemReferralCode)
       await db.insert(referral_code_usages).values({
         code: customCode,
         redeeming_kilo_user_id: newRedeemingUserId,
         referring_kilo_user_id: referringUserId,
       });
 
-      // Usage should be recorded for the new user
       const allUsages = await db
         .select()
         .from(referral_code_usages)
@@ -108,10 +102,8 @@ describe('referrals', () => {
       const newUsage = allUsages.find(u => u.redeeming_kilo_user_id === newRedeemingUserId);
       expect(newUsage).toBeTruthy();
 
-      // But top-up processing should NOT grant free credits beyond max_redemptions
       await processReferralTopUp(newRedeemingUserId);
 
-      // Verify no payout was made for the new user
       const [postProcessUsage] = await db
         .select()
         .from(referral_code_usages)
@@ -121,7 +113,6 @@ describe('referrals', () => {
       expect(postProcessUsage.paid_at).toBeNull();
       expect(postProcessUsage.amount_usd).toBeNull();
 
-      // And no credits were granted - check that no credit transactions exist for this user
       const creditTransactions = await db
         .select()
         .from(credit_transactions)
@@ -133,7 +124,6 @@ describe('referrals', () => {
       const referringUserId = 'referring-user-id';
       const { code } = await getReferralCodeForUser(referringUserId);
 
-      // Get the max_redemptions value from the database
       const referralCodeRows = await db
         .select()
         .from(referral_codes)
@@ -141,7 +131,6 @@ describe('referrals', () => {
 
       const maxRedemptions = referralCodeRows[0].max_redemptions;
 
-      // Create max_redemptions usages and mark them as paid (simulate successful top-ups)
       const priorUsers = Array.from({ length: maxRedemptions }, (_, i) => `user-${i}`);
       await db.insert(referral_code_usages).values(
         priorUsers.map(u => ({
@@ -157,21 +146,18 @@ describe('referrals', () => {
 
       const newRedeemingUserId = 'new-redeeming-user-id';
 
-      // Insert a new usage record directly
       await db.insert(referral_code_usages).values({
         code,
         redeeming_kilo_user_id: newRedeemingUserId,
         referring_kilo_user_id: referringUserId,
       });
 
-      // Verify the new usage was added
       const newUserUsages = await db
         .select()
         .from(referral_code_usages)
         .where(eq(referral_code_usages.redeeming_kilo_user_id, newRedeemingUserId));
       expect(newUserUsages).toHaveLength(1);
 
-      // But processing top-up should not grant credits or mark as paid
       await processReferralTopUp(newRedeemingUserId);
 
       const [finalUsage] = await db
@@ -184,7 +170,6 @@ describe('referrals', () => {
     });
 
     it('should update updated_at when processing referral top up', async () => {
-      // Create actual users in the database using insertTestUser
       const redeemingUser = await insertTestUser({
         google_user_email: 'redeeming@example.com',
         google_user_name: 'Redeeming User',
@@ -202,17 +187,14 @@ describe('referrals', () => {
       const referringUserId = referringUser.id;
       const redeemingUserId = redeemingUser.id;
 
-      // Create a referral code and usage
       const { code } = await getReferralCodeForUser(referringUserId);
 
-      // Insert usage record directly
       await db.insert(referral_code_usages).values({
         code,
         redeeming_kilo_user_id: redeemingUserId,
         referring_kilo_user_id: referringUserId,
       });
 
-      // Get the initial usage record
       const initialUsages = await db
         .select()
         .from(referral_code_usages)
@@ -226,10 +208,8 @@ describe('referrals', () => {
       // Wait a small amount to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      // Process the referral top up
       await processReferralTopUp(redeemingUserId);
 
-      // Verify the usage record was updated
       const updatedUsages = await db
         .select()
         .from(referral_code_usages)
@@ -238,20 +218,15 @@ describe('referrals', () => {
       expect(updatedUsages).toHaveLength(1);
       const updatedUsage = updatedUsages[0];
 
-      // Verify paid_at was set
       expect(updatedUsage.paid_at).not.toBeNull();
 
-      // Verify updated_at was updated
       expect(updatedUsage.updated_at).not.toEqual(initialUpdatedAt);
       expect(new Date(updatedUsage.updated_at).getTime()).toBeGreaterThan(
         new Date(initialUpdatedAt).getTime()
       );
 
-      // Verify amount_usd was set
       expect(updatedUsage.amount_usd).toBe(10);
 
-      // Verify credit transactions were created for both users
-      // Check for redeeming user's credit transaction
       const redeemingUserTransactions = await db
         .select()
         .from(credit_transactions)
@@ -267,7 +242,6 @@ describe('referrals', () => {
       expect(redeemingUserTransactions[0].is_free).toBe(true);
       expect(redeemingUserTransactions[0].amount_microdollars).toBe(10000000); // 10 USD in microdollars
 
-      // Check for referring user's credit transaction
       const referringUserTransactions = await db
         .select()
         .from(credit_transactions)
@@ -288,26 +262,21 @@ describe('referrals', () => {
       const referringUserId = 'referring-user-id-2';
       const redeemingUserId = 'redeeming-user-id-2';
 
-      // Create a referral code and usage
       const { code } = await getReferralCodeForUser(referringUserId);
 
-      // Insert usage record directly
       await db.insert(referral_code_usages).values({
         code,
         redeeming_kilo_user_id: redeemingUserId,
         referring_kilo_user_id: referringUserId,
       });
 
-      // Manually mark as already paid
       await db
         .update(referral_code_usages)
         .set({ paid_at: sql`NOW()`, amount_usd: REFERRAL_BONUS_AMOUNT })
         .where(eq(referral_code_usages.redeeming_kilo_user_id, redeemingUserId));
 
-      // Process the referral top up (should return early)
       await processReferralTopUp(redeemingUserId);
 
-      // Verify no credit transactions were created for this user
       const creditTransactionsAfter = await db
         .select()
         .from(credit_transactions)
@@ -320,7 +289,6 @@ describe('referrals', () => {
 
       await processReferralTopUp(nonExistentUserId);
 
-      // Verify no credit transactions were created for this non-existent user
       const creditTransactions = await db
         .select()
         .from(credit_transactions)

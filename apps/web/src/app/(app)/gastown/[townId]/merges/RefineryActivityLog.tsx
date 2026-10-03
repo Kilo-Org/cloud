@@ -170,8 +170,6 @@ function buildDescription(entry: ActivityLogEntry): {
   }
 }
 
-// ── Convoy grouping ──────────────────────────────────────────────────
-
 type ConvoyInfo = NonNullable<ActivityLogEntry['convoy']>;
 
 type ConvoyActivityGroup = {
@@ -214,8 +212,6 @@ function groupActivityByConvoy(entries: ActivityLogEntry[]): {
 
   return { convoyGroups, standalone };
 }
-
-// ── Main component ───────────────────────────────────────────────────
 
 const PAGE_SIZE = 20;
 
@@ -369,8 +365,6 @@ export function RefineryActivityLog({
   );
 }
 
-// ── Convoy activity group card ───────────────────────────────────────
-
 function ConvoyActivityGroupCard({
   convoy,
   entries,
@@ -444,8 +438,6 @@ function ConvoyActivityGroupCard({
     </motion.div>
   );
 }
-
-// ── Timeline entry ───────────────────────────────────────────────────
 
 function TimelineEntry({
   entry,

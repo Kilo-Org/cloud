@@ -129,7 +129,6 @@ export async function GET(request: Request) {
 
     try {
       await db.transaction(async (tx: DrizzleTransaction) => {
-        // Calculate how much to top up (only if below monthly allocation)
         const creditDeltaMicrodollars = monthlyAmountMicrodollars - org.currentBalance;
 
         // Always update the reset timestamp in settings
@@ -153,7 +152,6 @@ export async function GET(request: Request) {
           return;
         }
 
-        // Get the organization owner for the credit grant
         const owner = await getOrganizationOwner(tx, org.id);
 
         if (!owner) {
@@ -172,7 +170,6 @@ export async function GET(request: Request) {
           return;
         }
 
-        // Fetch the full organization record for the credit grant
         const [orgRecord] = await tx
           .select()
           .from(organizations)
@@ -200,7 +197,6 @@ export async function GET(request: Request) {
           throw new Error(`Failed to grant credits: ${creditResult.message}`);
         }
 
-        // Update the reset timestamp in settings
         await tx
           .update(organizations)
           .set({ settings: updatedSettings })

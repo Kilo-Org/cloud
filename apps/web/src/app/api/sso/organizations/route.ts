@@ -71,7 +71,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         });
       }
 
-      // Check if PRIMARY email domain has SSO configured → force WorkOS
       // This prevents SSO bypass via linked personal accounts (gmail, etc.)
       const primaryEmailDomain = getLowerDomainFromEmail(userProviderInfo.primaryEmail);
       if (primaryEmailDomain) {
@@ -86,7 +85,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       return discoveryResponse({ kind: 'existing', providers: userProviderInfo.providers });
     }
 
-    // ─── New User Flow ────────────────────────────────────────────────────
     // Check if their email domain has SSO configured
     const domain = getLowerDomainFromEmail(email);
     if (domain) {

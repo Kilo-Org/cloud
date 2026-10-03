@@ -766,7 +766,6 @@ function useSecurityAgentProviderValue(
     trpc,
   ]);
 
-  // ---- Mutations (org) ----
   const { mutate: orgTrackUiInteractionMutate } = useMutation(
     trpc.organizations.securityAgent.trackUiInteraction.mutationOptions()
   );
@@ -956,7 +955,6 @@ function useSecurityAgentProviderValue(
     })
   );
 
-  // ---- Mutations (personal) ----
   const { mutate: personalTrackUiInteractionMutate } = useMutation(
     trpc.securityAgent.trackUiInteraction.mutationOptions()
   );
@@ -1147,7 +1145,6 @@ function useSecurityAgentProviderValue(
       })
     );
 
-  // ---- Handlers ----
   const handleSync = useCallback(
     (repoFullName?: string) => {
       if (isOrg && organizationId) {

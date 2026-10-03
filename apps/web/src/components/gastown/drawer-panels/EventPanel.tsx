@@ -448,8 +448,6 @@ export function EventPanel({
   );
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────
-
 function ContextSection({
   icon: SectionIcon,
   title,

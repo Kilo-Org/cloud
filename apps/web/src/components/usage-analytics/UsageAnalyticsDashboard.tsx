@@ -229,7 +229,6 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     [setState]
   );
 
-  // ---- Effective query scope ----------------------------------------------
   // Personal context: the org (if any) chosen in the personal Scope dropdown.
   const personalEffectiveOrgId =
     personalView !== PERSONAL_VIEW_PERSONAL_ONLY && personalView !== PERSONAL_VIEW_ALL_USAGE

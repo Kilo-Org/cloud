@@ -118,9 +118,7 @@ export const AdvancedConfig = memo(function AdvancedConfig({
     enabled: !!organizationId,
   });
 
-  // ---------------------------------------------------------------------------
   // Internal sub-component for the configuration summary
-  // ---------------------------------------------------------------------------
 
   function ConfigSummary({
     repoBoundProfileName,

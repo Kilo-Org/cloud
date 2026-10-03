@@ -170,7 +170,6 @@ async function findSimilarTickets(
 
 export async function POST(req: NextRequest) {
   try {
-    // Validate internal API secret
     const secret = req.headers.get('X-Internal-Secret');
     if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -179,7 +178,6 @@ export async function POST(req: NextRequest) {
     const body: CheckDuplicatesRequest = await req.json();
     const { ticketId, threshold = SIMILARITY_THRESHOLD, limit = SEARCH_LIMIT } = body;
 
-    // Validate payload
     if (!ticketId) {
       return NextResponse.json({ error: 'Missing required field: ticketId' }, { status: 400 });
     }
@@ -190,7 +188,6 @@ export async function POST(req: NextRequest) {
       limit,
     });
 
-    // Get ticket from database
     const ticket = await getTriageTicketById(ticketId);
 
     if (!ticket) {
@@ -235,8 +232,6 @@ export async function POST(req: NextRequest) {
       topSimilarity: similarTickets[0]?.similarity || 0,
     });
 
-    // Determine if duplicate based on similarity threshold
-    // For now, we use a simple threshold approach
     // In the future, we could add LLM verification for high-similarity matches
     const isDuplicate = similarTickets.length > 0 && similarTickets[0].similarity >= 0.9;
 

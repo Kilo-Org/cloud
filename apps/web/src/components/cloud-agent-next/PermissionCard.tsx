@@ -6,9 +6,7 @@ import { Shield, Loader2 } from 'lucide-react';
 import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 
-// ---------------------------------------------------------------------------
 // PermissionContext — mirrors QuestionContext pattern
-// ---------------------------------------------------------------------------
 
 type PermissionContextValue = {
   cloudAgentSessionId: string | null;
@@ -46,9 +44,7 @@ export function PermissionContextProvider({
   return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
 
-// ---------------------------------------------------------------------------
 // PermissionCard
-// ---------------------------------------------------------------------------
 
 type PermissionCardProps = {
   requestId: string;

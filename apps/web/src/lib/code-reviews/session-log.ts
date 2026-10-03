@@ -4,9 +4,7 @@ import type { SessionSnapshot } from '@/lib/session-ingest-client';
 import type { CloudMessage } from '@/components/cloud-agent-next/legacy-session-types';
 import { convertToCloudMessages } from '@/components/cloud-agent-next/legacy-session-types';
 
-// ---------------------------------------------------------------------------
 // Shared log entry type (matches DisplayEvent in CodeReviewStreamView)
-// ---------------------------------------------------------------------------
 
 export type SessionLogEntry = {
   timestamp: string;
@@ -19,9 +17,7 @@ export type SessionLogConversionOptions = {
   includeFullAssistantText?: boolean;
 };
 
-// ---------------------------------------------------------------------------
 // V2 (cloud-agent-next / session-ingest) conversion
-// ---------------------------------------------------------------------------
 
 /**
  * Convert a v2 session snapshot into flat log entries for the terminal view.
@@ -131,9 +127,7 @@ export function v2SnapshotToLogEntries(
   return entries;
 }
 
-// ---------------------------------------------------------------------------
 // V1 (cloud-agent / R2 blob) conversion
-// ---------------------------------------------------------------------------
 
 /**
  * Convert v1 blob messages into flat log entries.

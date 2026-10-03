@@ -1436,8 +1436,6 @@ async function ensureProvisionAccess(
   });
 }
 
-// ── Personal subscription management schemas ──────────────────────────
-
 const KiloclawInstanceInputSchema = z.object({ instanceId: z.string().uuid() });
 const KiloclawOptionalInstanceInputSchema = z.object({
   instanceId: z.string().uuid().optional(),
@@ -1528,8 +1526,6 @@ type CreditReprovisionRecoveryEligibility = CreditReprovisionRecoveryPreview & {
   eligible: false;
   reason: 'no_current_subscription' | 'subscription_not_current';
 };
-
-// ── Personal subscription helpers ──────────────────────────────────────
 
 const COMMIT_ADMISSION_ERROR_MESSAGE =
   'Commit is no longer available. Choose Standard for month-to-month KiloClaw hosting.';
@@ -4004,8 +4000,6 @@ export const kiloclawRouter = createTRPCRouter({
     return client.runDoctor(ctx.user.id, workerInstanceId(instance));
   }),
 
-  // ── Kilo CLI Run ──────────────────────────────────────────────────
-
   startKiloCliRun: clawAccessProcedure
     .input(z.object({ prompt: z.string().min(1).max(10_000) }))
     .mutation(async ({ ctx, input }) => {
@@ -4550,7 +4544,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
-  // ── Agent config CRUD ─────────────────────────────────────────────────
   listAgents: clawAccessProcedure.query(async ({ ctx }) => {
     try {
       const instance = await getActiveInstance(ctx.user.id);
@@ -4643,8 +4636,6 @@ export const kiloclawRouter = createTRPCRouter({
       }
     }),
 
-  // ── Billing endpoints ────────────────────────────────────────────────
-
   getBillingStatus: baseProcedure.query(async ({ ctx }) => {
     return await getPersonalBillingStatus(ctx.user);
   }),
@@ -4657,8 +4648,6 @@ export const kiloclawRouter = createTRPCRouter({
     const billing = await getPersonalBillingStatus(ctx.user);
     return summarizePersonalBillingStatus(billing);
   }),
-
-  // ── Personal subscription management ─────────────────────────────────
 
   listPersonalSubscriptions: baseProcedure
     .output(KiloclawPersonalSubscriptionsOutputSchema)

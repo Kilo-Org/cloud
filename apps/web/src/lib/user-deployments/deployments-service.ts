@@ -296,11 +296,9 @@ export async function cancelBuild(buildId: string, deploymentId: string, owner: 
     });
   }
 
-  // Call the builder API to cancel the build
   try {
     const result = await deployApiClient.cancelBuild(buildId);
 
-    // Handle result from builder
     if (!result.cancelled) {
       // not_found or already_finished: Build gone or completed in builder, treat as success
       if (result.reason === 'not_found' || result.reason === 'already_finished') {
@@ -436,7 +434,6 @@ export async function redeploy(deployment: Deployment) {
       )
   ).map(build => build.id);
 
-  // Get stored env vars from database
   let envVars = await envVarsService.getEnvVarsForDeployment(deployment.id);
 
   // For app-builder deployments, fetch DB credentials dynamically and merge with stored env vars
@@ -481,7 +478,6 @@ const DEFAULT_DEPLOYMENT_DOMAIN = 'd.kiloapps.io';
  * Validates format, reserved words, and database uniqueness.
  */
 export async function checkSlugAvailability(slug: string): Promise<CheckSlugAvailabilityResult> {
-  // Validate format using zod schema (includes reserved word check)
   const parseResult = slugSchema.safeParse(slug);
   if (!parseResult.success) {
     return {
@@ -645,7 +641,6 @@ async function resolveAppBuilderSource(source: AppBuilderSource): Promise<Resolv
     });
   }
 
-  // Extract project ID from git URL and generate a fresh read-only token
   const appId = extractAppIdFromGitUrl(gitUrl);
   const { token } = await generateAppBuilderGitToken(appId, 'ro');
 
@@ -842,7 +837,6 @@ export async function renameDeployment(
       ? eq(deployments.owned_by_user_id, owner.id)
       : eq(deployments.owned_by_organization_id, owner.id);
 
-  // Get deployment and verify ownership
   const [deployment] = await db
     .select()
     .from(deployments)

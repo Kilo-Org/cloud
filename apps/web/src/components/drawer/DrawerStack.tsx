@@ -12,8 +12,6 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, X } from 'lucide-react';
 
-// ── Public types ─────────────────────────────────────────────────────────
-
 export type DrawerStackHelpers<T> = {
   push: (entry: T) => void;
   replace: (entry: T) => void;
@@ -55,8 +53,6 @@ export type DrawerStackApi<T> = {
   open: (entry: T) => void;
   closeAll: () => void;
 };
-
-// ── Default visual constants ─────────────────────────────────────────────
 
 const DEFAULT_WIDTH = 620;
 const DEFAULT_DEPTH_OFFSET = 40;
@@ -263,8 +259,6 @@ export function createDrawerStack<T>() {
 
   return { DrawerStackProvider, useDrawerStack };
 }
-
-// ── Layer ────────────────────────────────────────────────────────────────
 
 function DrawerLayer({
   depth,

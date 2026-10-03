@@ -406,9 +406,7 @@ export function ProfilesListDialog({
   );
 }
 
-// -------------------------------------------------------------------
 // ProfileRow - A single profile row that can be expanded/collapsed
-// -------------------------------------------------------------------
 
 type ProfileRowProps = {
   profile: ProfileSummaryWithOwner;
@@ -503,9 +501,7 @@ function ProfileRow({
   );
 }
 
-// -------------------------------------------------------------------
 // ProfileEditPanel - Inline editing UI for variables and commands
-// -------------------------------------------------------------------
 
 type ProfileEditPanelProps = {
   profileId: string;

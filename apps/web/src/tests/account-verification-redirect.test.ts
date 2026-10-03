@@ -16,13 +16,11 @@ import type { User } from '@kilocode/db/schema';
 // Make React available globally for JSX in the server component
 (globalThis as { React: typeof React }).React = React;
 
-// --- Capture redirect calls ---
 const mockRedirect = jest.fn<never, [string]>(() => {
   // next/navigation redirect() throws to halt execution
   throw new Error('NEXT_REDIRECT');
 });
 
-// --- Mock dependencies ---
 jest.mock('next/navigation', () => ({
   redirect: (...args: [string]) => mockRedirect(...args),
 }));
@@ -70,7 +68,6 @@ jest.mock('@/components/auth/AccountCreationScreen', () => ({
 // isValidCallbackPath is NOT mocked — we use the real implementation
 // so the tests also validate that paths like /get-started pass validation.
 
-// --- Helper to build a test user ---
 function makeUser(overrides: Partial<User> = {}): User {
   const id = `test-user-${Math.random()}`;
   const now = new Date().toISOString();
@@ -108,7 +105,6 @@ function makeUser(overrides: Partial<User> = {}): User {
   } as User;
 }
 
-// --- Helper to invoke the page component ---
 async function renderPage(searchParams: Record<string, string> = {}) {
   // Use isolateModulesAsync to guarantee a fresh module import each time,
   // preventing module caching from causing false positives across tests.
@@ -129,7 +125,6 @@ async function renderPage(searchParams: Record<string, string> = {}) {
   });
 }
 
-// --- Tests ---
 describe('account-verification redirect logic', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -137,9 +132,7 @@ describe('account-verification redirect logic', () => {
     jest.resetModules();
   });
 
-  // ---------------------------------------------------------------
   // Baseline: stytchStatus === null means no redirect (page renders)
-  // ---------------------------------------------------------------
   describe('when stytchStatus is null (not yet verified)', () => {
     it('should NOT redirect — renders the verification page', async () => {
       const user = makeUser({ customer_source: null });
@@ -152,9 +145,7 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
   // Case: verified user who has NOT completed the survey
-  // ---------------------------------------------------------------
   describe('when stytchStatus is non-null AND customer_source is null (survey not completed)', () => {
     it('should redirect to /get-started as the default destination', async () => {
       const user = makeUser({ customer_source: null });
@@ -190,10 +181,8 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
   // Case: verified user who HAS completed the survey
   // These tests expose the redundant-redirect bug.
-  // ---------------------------------------------------------------
   describe('when stytchStatus is non-null AND customer_source is set (survey already completed)', () => {
     it('should redirect directly to /get-started, NOT through /customer-source-survey', async () => {
       const user = makeUser({ customer_source: 'Twitter' });
@@ -251,10 +240,8 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
   // Edge: stytchStatus is false (non-null but falsy)
   // false !== null, so redirect logic should still fire
-  // ---------------------------------------------------------------
   describe('when stytchStatus is false (verified but not allowed free tier)', () => {
     it('should still redirect — false is non-null', async () => {
       const user = makeUser({ customer_source: null });
@@ -279,7 +266,6 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
   // Bonus attribution: signupSource passed to handleSignupPromotion
   // Regression coverage for kilobot findings on PR #2622:
   //   1. `startsWith('/openclaw-advisor')` matched sibling paths like
@@ -287,7 +273,6 @@ describe('account-verification redirect logic', () => {
   //   2. Already-validated users hitting /account-verification directly
   //      could self-award the bonus once — must gate on the transition
   //      from has_validation_stytch=null to non-null.
-  // ---------------------------------------------------------------
   describe('openclaw-security-advisor signupSource attribution', () => {
     it('attributes a new user with callbackPath=/openclaw-advisor', async () => {
       const user = makeUser({ has_validation_stytch: null });
@@ -378,13 +363,11 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
   // Bonus attribution for admin-managed URL campaigns (/c/<slug>).
   // Mirrors the openclaw-advisor attribution guards (exact-path match,
   // first-validation-only, sibling-path rejection) because the same
   // class of abuse applies: a manually-constructed callback must not
   // award a signup bonus without completing the real flow.
-  // ---------------------------------------------------------------
   describe('credit-campaign signupSource attribution', () => {
     beforeEach(() => {
       // Default: slug lookup succeeds with a minimal campaign stub. Tests
@@ -545,9 +528,7 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
   // Edge: invalid callbackPath should be ignored
-  // ---------------------------------------------------------------
   describe('when callbackPath is invalid', () => {
     it('should ignore invalid callbackPath for user without customer_source', async () => {
       const user = makeUser({ customer_source: null });
@@ -573,9 +554,7 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
   // App-link-safe-redirect interstitial: claimed callback paths
-  // ---------------------------------------------------------------
   describe('app-link-safe-redirect interstitial', () => {
     it('routes callbackPath=/claw through the interstitial', async () => {
       const user = makeUser({ customer_source: null });

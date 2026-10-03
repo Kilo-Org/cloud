@@ -66,9 +66,7 @@ export type {
   CanMigrateToGitHubResult,
 } from '@/lib/app-builder/types';
 
-// ============================================================================
 // Private Helper Functions
-// ============================================================================
 
 const REQUIRED_WORKER_VERSION = 'v2' satisfies WorkerVersion;
 
@@ -385,9 +383,7 @@ async function sendToExistingCloudAgentNextSession(
 export { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
 import { getProjectWithOwnershipCheck } from '@/lib/app-builder/project-ownership';
 
-// ============================================================================
 // Exported Functions
-// ============================================================================
 
 export async function createProject(input: CreateProjectInput): Promise<CreateProjectResult> {
   const { owner, prompt, model, title, createdByUserId, authToken, images, mode } = input;
@@ -807,9 +803,7 @@ export async function interruptSession(
   return client.interruptSession(project.session_id);
 }
 
-// ============================================================================
 // WebSocket-based streaming functions
-// ============================================================================
 
 /**
  * Start a Cloud Agent session for a project using the WebSocket-based API.

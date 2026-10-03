@@ -407,7 +407,6 @@ export function buildCatalogJson(rows: CatalogRow[]): string {
   return `${JSON.stringify(keyed, null, 2)}\n`;
 }
 
-// ── Static source extraction ────────────────────────────────────────────────
 //
 // The LLM summarizer needs the enclosing handler source for each procedure.
 // It is extracted statically: root-router.ts imports are mapped to router

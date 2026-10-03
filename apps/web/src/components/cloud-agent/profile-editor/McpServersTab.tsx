@@ -188,9 +188,7 @@ function McpServerRow({
   );
 }
 
-// -------------------------------------------------------------------
 // McpForm — shared create/edit form
-// -------------------------------------------------------------------
 
 type McpFormProps = {
   profileId: string;

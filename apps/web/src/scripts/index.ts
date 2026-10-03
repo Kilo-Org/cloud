@@ -40,8 +40,6 @@ async function closeAllDrizzleConnectionsIfConfigured(): Promise<void> {
   }
 }
 
-// if no arguments print out all available scripts by listing all folders
-// and each file in the folder
 if (args.length === 0) {
   console.log('Available scripts:');
   folders.forEach(folder => {
@@ -56,11 +54,9 @@ if (args.length === 0) {
   process.exit(0);
 }
 
-// first arg is script folder, second is file name
 const scriptFolder = args[0];
 const scriptFile = `${args[1]}.ts`;
 
-// if the file exports an async run function, call it
 if (folders.includes(scriptFolder)) {
   const scriptPath = join(scriptsDir, scriptFolder, scriptFile);
   import(scriptPath)

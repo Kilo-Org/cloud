@@ -40,7 +40,6 @@ export async function POST(request: NextRequest) {
       return new NextResponse('Unauthorized - Invalid token', { status: 401 });
     }
 
-    // Get the expected token from integration metadata
     const metadata = integration.metadata as { webhook_secret?: string } | null;
     const expectedToken = metadata?.webhook_secret;
 
@@ -85,7 +84,6 @@ export async function POST(request: NextRequest) {
     // 6. Helper function to log webhook events
     const logWebhook = async (action: string) => {
       try {
-        // Determine owner from integration
         const owner = integration.owned_by_organization_id
           ? { type: 'org' as const, id: integration.owned_by_organization_id }
           : ({ type: 'user' as const, id: integration.owned_by_user_id } as Owner);
@@ -117,7 +115,6 @@ export async function POST(request: NextRequest) {
 
     // 7. Route based on event type
 
-    // Handle Merge Request events
     if (eventType === GITLAB_EVENT.MERGE_REQUEST) {
       const parseResult = MergeRequestPayloadSchema.safeParse(payload);
       if (!parseResult.success) {

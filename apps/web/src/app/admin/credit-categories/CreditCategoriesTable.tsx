@@ -69,7 +69,6 @@ export function CreditCategoriesTable() {
     []
   );
 
-  // Filter and sort data client-side
   const filteredAndSortedData = useMemo(() => {
     if (!data) return data;
 
@@ -85,7 +84,6 @@ export function CreditCategoriesTable() {
       );
     }
 
-    // Filter by availability
     if (hideUnavailable) {
       filteredCategories = filteredCategories.filter(category => {
         const hasEnded =
@@ -97,12 +95,10 @@ export function CreditCategoriesTable() {
       });
     }
 
-    // Filter by obsolete status
     if (hideObsolete) {
       filteredCategories = filteredCategories.filter(category => !category.obsolete);
     }
 
-    // Filter by zero redemptions
     if (hideZeroRedemptions) {
       filteredCategories = filteredCategories.filter(category => category.credit_count > 0);
     }
@@ -124,17 +120,14 @@ export function CreditCategoriesTable() {
     sortCreditCategories,
   ]);
 
-  // Handle row click
   const handleRowClick = (idempotencyKey: string) => {
     router.push(`/admin/credit-categories/${encodeURIComponent(idempotencyKey)}`);
   };
 
-  // Handle search
   const handleSearchChange = useCallback((newSearchTerm: string) => {
     setSearchTerm(newSearchTerm);
   }, []);
 
-  // Handle sorting
   const handleSort = useCallback((field: CreditCategorySortableField) => {
     setSortConfig(prevConfig => {
       if (!prevConfig || prevConfig.field !== field) {
@@ -277,17 +270,14 @@ export function CreditCategoriesTable() {
               filteredAndSortedData?.creditCategories.map(creditCategory => {
                 const tooltipContent = creditCategory.adminUI_label || creditCategory.description;
 
-                // Check if category has ended
                 const hasEnded =
                   creditCategory.promotion_ends_at &&
                   new Date(creditCategory.promotion_ends_at) < new Date();
 
-                // Check if category has reached redemption limit
                 const hasReachedLimit =
                   creditCategory.total_redemptions_allowed &&
                   creditCategory.credit_count >= creditCategory.total_redemptions_allowed;
 
-                // Determine if category should be grayed out
                 const isUnavailable = hasEnded || hasReachedLimit;
                 const isObsolete = creditCategory.obsolete;
 

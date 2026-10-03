@@ -199,7 +199,6 @@ export async function verifyPlayIntegrity(
   const payload = result.tokenPayloadExternal;
   if (!payload) return { ok: false, error: 'INVALID_TOKEN' };
 
-  // ── Challenge binding ───────────────────────────────────────────────────
   // Standard requests bind through `requestHash`, returned verbatim; classic
   // requests use `nonce`. The client sends standard requests, so read
   // `requestHash` and fall back to `nonce` only so a device still running a
@@ -217,7 +216,6 @@ export async function verifyPlayIntegrity(
     return { ok: false, error: 'NONCE_MISMATCH' };
   }
 
-  // ── Package identity ────────────────────────────────────────────────────
   const actualPackageName =
     payload.requestDetails?.requestPackageName ?? payload.appIntegrity?.packageName;
   if (!actualPackageName || actualPackageName !== config.expectedPackageName) {
@@ -227,7 +225,6 @@ export async function verifyPlayIntegrity(
     return { ok: false, error: 'PACKAGE_MISMATCH' };
   }
 
-  // ── Signing certificate digest ──────────────────────────────────────────
   const certDigests = payload.appIntegrity?.certificateSha256Digest ?? [];
   const hasMatch = config.expectedCertDigests.some(expected =>
     certDigests.some(actual => actual.toLowerCase() === expected.toLowerCase())
@@ -239,7 +236,6 @@ export async function verifyPlayIntegrity(
     return { ok: false, error: 'CERT_DIGEST_MISMATCH' };
   }
 
-  // ── App recognition ─────────────────────────────────────────────────────
   const appVerdict = payload.appIntegrity?.appRecognitionVerdict;
   if (appVerdict !== 'PLAY_RECOGNIZED') {
     captureMessage(`play_integrity_app_unrecognized: ${appVerdict ?? 'null'}`);

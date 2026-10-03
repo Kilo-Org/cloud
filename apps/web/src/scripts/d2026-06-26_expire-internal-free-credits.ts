@@ -37,14 +37,10 @@ import {
   type ExpiringTransaction,
 } from '@/lib/creditExpiration';
 
-// ── Constants ────────────────────────────────────────────────────────────────
-
 /** Email suffixes that mark an internal team account. */
 const INTERNAL_DOMAINS = ['kilocode.ai', 'kilo.ai'];
 
 const EXPIRED_CATEGORIES = ['credits_expired', 'orb_credit_expired', 'orb_credit_voided'] as const;
-
-// ── Arg parsing ──────────────────────────────────────────────────────────────
 
 function parseArgs(): { execute: boolean; yes: boolean; batchSize: number; concurrency: number } {
   const args = process.argv.slice(2);
@@ -77,8 +73,6 @@ function parseArgs(): { execute: boolean; yes: boolean; batchSize: number; concu
 
   return { execute, yes, batchSize, concurrency };
 }
-
-// ── Process a single user ────────────────────────────────────────────────────
 
 type AffectedUser = {
   id: string;
@@ -301,8 +295,6 @@ async function processUser(
     finalBalanceMicrodollars: Math.max(0, realBalanceAfter),
   };
 }
-
-// ── Main ─────────────────────────────────────────────────────────────────────
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];

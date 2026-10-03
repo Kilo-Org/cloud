@@ -6,9 +6,7 @@ import { Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { SuggestionAction } from '@kilocode/cloud-agent-sdk';
 
-// ---------------------------------------------------------------------------
 // SuggestionContext — mirrors PermissionContext pattern
-// ---------------------------------------------------------------------------
 
 type SuggestionContextValue = {
   /** When set, SuggestionCard routes through the session manager. */
@@ -38,9 +36,7 @@ export function SuggestionContextProvider({
   return <SuggestionContext.Provider value={value}>{children}</SuggestionContext.Provider>;
 }
 
-// ---------------------------------------------------------------------------
 // SuggestionCard
-// ---------------------------------------------------------------------------
 
 type SuggestionCardProps = {
   requestId: string;

@@ -118,9 +118,7 @@ async function seedGitLabIntegration(): Promise<void> {
   });
 }
 
-// ---------------------------------------------------------------------------
 // Role matrix: every organization-security-agent-router procedure × five roles
-// ---------------------------------------------------------------------------
 
 const memberProcedures: Array<{ name: string; input: Record<string, unknown> }> = [
   { name: 'trackUiInteraction', input: { interaction: 'findings_filtered' } },
@@ -188,9 +186,7 @@ describe('organization security agent router role matrix', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // connectWithPAT: rejects roles outside ORGANIZATION_BILLING_ROLES
-// ---------------------------------------------------------------------------
 
 describe('gitlabRouter.connectWithPAT role gate', () => {
   beforeEach(() => {
@@ -229,9 +225,7 @@ describe('gitlabRouter.connectWithPAT role gate', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // GitLab OAuth replacement gate (start + callback)
-// ---------------------------------------------------------------------------
 
 describe('GitLab OAuth connect replacement gate', () => {
   beforeEach(async () => {

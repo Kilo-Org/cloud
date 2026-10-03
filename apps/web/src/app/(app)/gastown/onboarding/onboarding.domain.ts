@@ -3,9 +3,7 @@
  * No React imports, no 'use client' — safe to run in any environment.
  */
 
-// ---------------------------------------------------------------------------
 // Town name validation
-// ---------------------------------------------------------------------------
 export const TOWN_NAME_MAX_LENGTH = 48;
 
 export function deriveDefaultTownName(userName: string | null | undefined): string {
@@ -22,9 +20,7 @@ export function validateTownName(name: string): string | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
 // Git URL resolution
-// ---------------------------------------------------------------------------
 export function resolveGitUrlFromRepo(
   platform: 'github' | 'gitlab',
   fullName: string,
@@ -37,9 +33,7 @@ export function resolveGitUrlFromRepo(
   return `https://github.com/${fullName}.git`;
 }
 
-// ---------------------------------------------------------------------------
 // Model presets
-// ---------------------------------------------------------------------------
 export type ModelPreset = 'frontier' | 'balanced' | 'cost-effective' | 'free' | 'custom';
 
 export type CustomModels = {
@@ -154,9 +148,7 @@ export function presetToConfig(preset: ModelPreset, customModels: CustomModels) 
   return config;
 }
 
-// ---------------------------------------------------------------------------
 // Task submission
-// ---------------------------------------------------------------------------
 export const FIRST_TASK_STORAGE_PREFIX = 'gastown_first_task_';
 
 export type CreationPhase =

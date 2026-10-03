@@ -536,12 +536,10 @@ export type OpenclawConfigResponse = {
   etag: string;
 };
 
-// ──────────────────────────────────────────────────────────────────────
 // Agent config CRUD responses.
 // apps/web cannot import from services/kiloclaw, so these mirror the worker-side
 // Zod schemas in services/kiloclaw/src/durable-objects/gateway-controller-types.ts
 // (AgentSummary, AgentConfigListResponse, etc.). Keep in sync with that file.
-// ──────────────────────────────────────────────────────────────────────
 export type AgentModelSummary = {
   primary: string | null;
   fallbacks: string[];

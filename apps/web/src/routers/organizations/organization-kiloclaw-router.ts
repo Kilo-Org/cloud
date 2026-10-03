@@ -198,8 +198,6 @@ function throwKiloClawProvisioningUnavailable(): never {
   });
 }
 
-// ── Input schemas ──────────────────────────────────────────────────
-
 const kilocodeDefaultModelSchema = z
   .string()
   .regex(
@@ -273,8 +271,6 @@ const patchBotIdentitySchema = z.object({
   botEmoji: z.string().trim().min(1).max(16).nullable().optional(),
 });
 
-// ── Helpers ────────────────────────────────────────────────────────
-
 function buildWorkerChannels(channels: z.infer<typeof updateConfigSchema>['channels']) {
   if (!channels) return undefined;
   return {
@@ -327,11 +323,7 @@ function sanitizeKiloCodeConfigResponse(
 
 const logDiskUsageError = sentryLogger('organization-kiloclaw-disk-usage', 'error');
 
-// ── Router ─────────────────────────────────────────────────────────
-
 export const organizationKiloclawRouter = createTRPCRouter({
-  // ── Global data (no instance needed) ──────────────────────────
-
   getChangelog: organizationMemberProcedure.query(async () => {
     return CHANGELOG_ENTRIES;
   }),
@@ -366,8 +358,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
         currentImageTag: input.currentImageTag ?? null,
       });
     }),
-
-  // ── Instance status ───────────────────────────────────────────
 
   getStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
@@ -503,8 +493,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
       inboundEmailAddress: await cycleInboundEmailAddressForInstance(instance.id),
     };
   }),
-
-  // ── Lifecycle ─────────────────────────────────────────────────
 
   provision: organizationMemberProcedure
     .input(updateConfigSchema)
@@ -670,8 +658,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
     return result;
   }),
-
-  // ── Config ────────────────────────────────────────────────────
 
   patchConfig: organizationMemberMutationProcedure
     .input(updateKiloCodeConfigSchema)
@@ -905,8 +891,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
     }));
   }),
 
-  // ── Machine operations ────────────────────────────────────────
-
   restartMachine: organizationMemberProcedure
     .input(
       z.object({
@@ -1007,8 +991,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
     return client.restoreConfig(ctx.user.id, undefined, workerInstanceId(instance));
   }),
 
-  // ── Gateway ───────────────────────────────────────────────────
-
   gatewayStatus: organizationMemberProcedure.query(async ({ ctx, input }) => {
     try {
       const instance = await getActiveOrgInstance(ctx.user.id, input.organizationId);
@@ -1046,8 +1028,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
     const client = new KiloClawInternalClient();
     return client.getControllerVersion(ctx.user.id, workerInstanceId(instance));
   }),
-
-  // ── Pairing ───────────────────────────────────────────────────
 
   listPairingRequests: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid(), refresh: z.boolean().optional() }))
@@ -1099,8 +1079,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
         workerInstanceId(instance)
       );
     }),
-
-  // ── Versioning ────────────────────────────────────────────────
 
   listAvailableVersions: organizationMemberProcedure
     .input(
@@ -1366,8 +1344,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
       return client.readMorningBriefing(ctx.user.id, input.day, workerInstanceId(instance));
     }),
 
-  // ── Google integration ────────────────────────────────────────
-
   getGoogleSetupCommand: organizationMemberProcedure.query(async ({ ctx, input }) => {
     const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
     const token = generateApiToken(ctx.user, undefined, {
@@ -1417,8 +1393,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
         throw err;
       }
     }),
-
-  // ── Kilo CLI Run ──────────────────────────────────────────────
 
   startKiloCliRun: organizationMemberMutationProcedure
     .input(z.object({ organizationId: z.uuid(), prompt: z.string().min(1).max(10_000) }))
@@ -1523,8 +1497,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
 
       return { runs };
     }),
-
-  // ── File operations ───────────────────────────────────────────
 
   fileTree: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid(), path: kiloclawFilePathSchema.optional() }))
@@ -1661,7 +1633,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
       }
     }),
 
-  // ── Agent config CRUD ─────────────────────────────────────────────────
   listAgents: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -1767,8 +1738,6 @@ export const organizationKiloclawRouter = createTRPCRouter({
         handleFileOperationError(err, 'update agent bindings');
       }
     }),
-
-  // ── Org-wide instance list (owner / billing_manager only) ─────
 
   listActiveInstances: organizationBillingProcedure.query(async ({ input }) => {
     const rows = await db

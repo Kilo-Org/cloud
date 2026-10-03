@@ -120,8 +120,6 @@ export function WastelandSettingsSection({
   return <DisconnectedState townId={townId} readOnly={readOnly} queryClient={queryClient} />;
 }
 
-// ── Connected State ──────────────────────────────────────────────────────
-
 function ConnectedState({
   townId,
   connection,
@@ -190,8 +188,6 @@ function ConnectedState({
   );
 }
 
-// ── Disconnected State ───────────────────────────────────────────────────
-
 function DisconnectedState({
   townId,
   readOnly,
@@ -232,8 +228,6 @@ function DisconnectedState({
     </>
   );
 }
-
-// ── Connect Dialog ───────────────────────────────────────────────────────
 
 /**
  * The dialog used to be a four-step wizard (`intent` → `select`/`new-details`
@@ -968,8 +962,6 @@ function ConnectWastelandDialog({
     </Dialog>
   );
 }
-
-// ── Shared ────────────────────────────────────────────────────────────────
 
 function FieldGroup({
   label,

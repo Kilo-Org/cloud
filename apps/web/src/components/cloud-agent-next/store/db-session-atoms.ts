@@ -30,9 +30,7 @@ import { extractRepoFromGitUrl } from '../utils/git-utils';
 // Many files import it from here, so we keep the export to avoid breaking changes
 export { extractRepoFromGitUrl };
 
-// ============================================================================
 // IndexedDB Types
-// ============================================================================
 
 /**
  * Organization context for a session
@@ -109,9 +107,7 @@ export type IndexedDbSessionData = {
   lastModel: string | null;
 };
 
-// ============================================================================
 // IndexedDB Store (jotai-minidb)
-// ============================================================================
 
 /** Lazily initialized session store instance */
 let _sessionStore: MiniDb<IndexedDbSessionData> | null = null;
@@ -144,9 +140,7 @@ function getSessionStore(): MiniDb<IndexedDbSessionData> {
   return _sessionStore;
 }
 
-// ============================================================================
 // Database Session Types
-// ============================================================================
 
 /**
  * API session type - matches the shape returned by cli-sessions-router.list (V1)
@@ -266,9 +260,7 @@ export type DbSessionDetails = {
   last_model?: string | null;
 };
 
-// ============================================================================
 // State Atoms
-// ============================================================================
 
 /**
  * Recent sessions fetched from database
@@ -282,9 +274,7 @@ export const dbSessionsAtom = atom<(DbSession | DbSessionV2)[]>([]);
  */
 const sessionsLoadingAtom = atom(false);
 
-// ============================================================================
 // Derived Atoms
-// ============================================================================
 
 /**
  * Recent sessions for display - returns dbSessionsAtom data
@@ -296,9 +286,7 @@ export const recentSessionsAtom = atom(get => {
   return get(dbSessionsAtom);
 });
 
-// ============================================================================
 // IndexedDB State Atoms
-// ============================================================================
 
 /**
  * Current session's IndexedDB data (reactive)
@@ -306,9 +294,7 @@ export const recentSessionsAtom = atom(get => {
  */
 const currentIndexedDbSessionAtom = atom<IndexedDbSessionData | null>(null);
 
-// ============================================================================
 // Action Atoms
-// ============================================================================
 
 /**
  * Update org context in IndexedDB
@@ -386,9 +372,7 @@ export const deleteSessionFromStoreAtom = atom(
   }
 );
 
-// ============================================================================
 // Utility Functions
-// ============================================================================
 
 /**
  * Format a date for display in the session list

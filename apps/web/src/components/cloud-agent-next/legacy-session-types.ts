@@ -8,9 +8,7 @@
 import type { Images } from '@/lib/images-schema';
 import type { ToolExecution } from './types';
 
-// ============================================================================
 // Legacy Streaming Message Types
-// ============================================================================
 
 /**
  * Cloud agent message (V1 format)
@@ -30,9 +28,7 @@ export type CloudMessage = {
   images?: Images; // Image attachments for the message
 };
 
-// ============================================================================
 // Legacy Streaming Event Types (from cloud-agent)
-// ============================================================================
 
 /**
  * Raw Kilocode CLI event - preserved exactly as received from stdout JSON.
@@ -106,9 +102,7 @@ export type StreamEvent =
   | SystemCompleteEvent
   | SystemInterruptedEvent;
 
-// ============================================================================
 // Legacy Message Conversion
-// ============================================================================
 
 /**
  * Convert database message format to CloudMessage format.

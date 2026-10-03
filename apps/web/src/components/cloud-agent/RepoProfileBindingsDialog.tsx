@@ -405,9 +405,7 @@ export function RepoProfileBindingsDialog({
   );
 }
 
-// ---------------------------------------------------------------------------
 // Internal sub-component for repo items in the Command list
-// ---------------------------------------------------------------------------
 
 function RepoCommandItem({
   repo,

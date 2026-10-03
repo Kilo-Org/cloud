@@ -34,17 +34,14 @@ function formatZodErrors(zodError: FlattenedZodError | undefined): string[] {
 
   const errors: string[] = [];
 
-  // Add form-level errors
   if (zodError.formErrors && zodError.formErrors.length > 0) {
     errors.push(...zodError.formErrors);
   }
 
-  // Add field-level errors with friendly formatting
   if (zodError.fieldErrors) {
     Object.entries(zodError.fieldErrors).forEach(([field, fieldErrors]) => {
       if (Array.isArray(fieldErrors) && fieldErrors.length > 0) {
         fieldErrors.forEach((fieldError: string) => {
-          // Convert field names to more readable format
           const friendlyFieldName = field
             .replace(/([A-Z])/g, ' $1') // Add space before capital letters
             .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
@@ -64,7 +61,6 @@ export function ErrorCard({ title, description, error, onRetry }: ErrorCardProps
 
   if (isTRPCError(error)) {
     if (error.data?.zodError) {
-      // Handle flattened Zod errors from TRPC
       const zodErrors = formatZodErrors(error.data.zodError);
       if (zodErrors.length > 0) {
         errorMessages = zodErrors;
@@ -72,7 +68,6 @@ export function ErrorCard({ title, description, error, onRetry }: ErrorCardProps
         errorMessages = [error.message || 'Validation failed'];
       }
     } else {
-      // TRPC error without zodError
       errorMessages = [error.message];
     }
   } else if (error instanceof Error) {

@@ -15,8 +15,6 @@ import {
 } from './native-admission-apple';
 import { verifyPlayIntegrity } from './native-admission-google';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 export type NativeAdmissionMode = 'off' | 'report' | 'enforce';
 
 export type AdmissionPlatform = 'ios' | 'android';
@@ -24,8 +22,6 @@ export type AdmissionPlatform = 'ios' | 'android';
 export type AdmissionKind = 'attestation' | 'assertion';
 
 export type NativeAdmissionResult = { ok: true } | { ok: false; errorCode: 'ADMISSION_REQUIRED' };
-
-// ── Wire contract ──────────────────────────────────────────────────────────
 
 /**
  * Admission payload as received from the mobile client.
@@ -43,8 +39,6 @@ export type AdmissionPayload = {
   /** Required for iOS attestation and assertion */
   keyId?: string;
 };
-
-// ── Challenge lifecycle ────────────────────────────────────────────────────
 
 export const CHALLENGE_EXPIRY_MS = 2 * 60 * 1000; // 2 minutes
 const CHALLENGE_RATE_LIMIT_ID = 'native-admission-challenge';
@@ -86,8 +80,6 @@ export class ChallengeRateLimitError extends Error {
   }
 }
 
-// ── Admission payload validation ───────────────────────────────────────────
-
 /**
  * Validate the shape of the admission payload received from the client.
  * Returns a sanitized AdmissionPayload on success, undefined on failure.
@@ -126,8 +118,6 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
     keyId: typeof keyId === 'string' ? keyId : undefined,
   };
 }
-
-// ── Admission gate (sync) ──────────────────────────────────────────────────
 
 /**
  * Evaluate admission for a native auth request body.
@@ -184,8 +174,6 @@ export function shouldRefuseAsyncFailure(): boolean {
   const mode = getEnvVariable('NATIVE_ADMISSION_MODE') as NativeAdmissionMode;
   return mode === 'enforce';
 }
-
-// ── Async attestation / assertion verification ─────────────────────────────
 
 /**
  * Perform full async admission verification BEFORE user settlement.
@@ -246,8 +234,6 @@ export async function verifyAdmissionAsync(
 
   return { ok: false, errorCode: 'ADMISSION_REQUIRED' };
 }
-
-// ── Apple (iOS) admission ──────────────────────────────────────────────────
 
 async function verifyAppleAdmission(
   admission: AdmissionPayload
@@ -346,8 +332,6 @@ async function verifyAppleAdmission(
   };
 }
 
-// ── Android (Play Integrity) admission ─────────────────────────────────────
-
 async function verifyAndroidAdmission(
   admission: AdmissionPayload
 ): Promise<VerifyAdmissionOk | { ok: false; errorCode: string }> {
@@ -375,8 +359,6 @@ async function verifyAndroidAdmission(
     keyId: '',
   };
 }
-
-// ── Key persistence (after settlement) ─────────────────────────────────────
 
 /**
  * Persist an attested key after user settlement.
@@ -509,8 +491,6 @@ export async function persistAttestedKeyTx(
       );
   }
 }
-
-// ── Cleanup ────────────────────────────────────────────────────────────────
 
 /**
  * Delete expired admission challenges. Called by the cron job.

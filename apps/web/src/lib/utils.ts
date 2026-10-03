@@ -150,7 +150,6 @@ export async function parseResultJsonWithZodSchema<T>(
         errorMessage = errorData.error;
       }
     } catch (_jsonError) {
-      //console.log('Failed to parse error response as JSON:', jsonError);
       // Keep the default error message if JSON parsing fails
     }
 

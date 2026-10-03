@@ -8,7 +8,6 @@ import { X } from 'lucide-react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { useOnboardingTooltips, ONBOARDING_TOOLTIPS } from './useOnboardingTooltips';
 
-// ── localStorage key for tracking whether first-task completion was detected ──
 function firstTaskCompletedKey(townId: string) {
   return `gastown_onboarding_first_task_completed_${townId}`;
 }
@@ -29,8 +28,6 @@ function markFirstTaskCompleted(townId: string) {
   }
 }
 
-// ── Main component ───────────────────────────────────────────────────────
-
 type OnboardingTooltipsProps = {
   townId: string;
 };
@@ -43,14 +40,12 @@ export function OnboardingTooltips({ townId }: OnboardingTooltipsProps) {
   // Check if first task was already completed previously
   const [alreadyCompleted] = useState(() => wasFirstTaskCompleted(townId));
 
-  // Trigger tooltips immediately if first task was completed in a prior session
   useEffect(() => {
     if (alreadyCompleted) {
       triggerTooltips();
     }
   }, [alreadyCompleted, triggerTooltips]);
 
-  // ── Detect first bead closure ────────────────────────────────────────
   // Query rigs, then beads per rig, to detect when any non-agent bead
   // transitions to closed status.
   //
@@ -97,8 +92,6 @@ export function OnboardingTooltips({ townId }: OnboardingTooltipsProps) {
     />
   );
 }
-
-// ── Individual tooltip popover ───────────────────────────────────────────
 
 export function OnboardingTooltipPopover({
   tooltip,

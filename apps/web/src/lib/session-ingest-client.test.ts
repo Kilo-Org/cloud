@@ -20,9 +20,7 @@ import {
   invalidateOrganizationSessionAccess,
 } from './session-ingest-client';
 
-// ---------------------------------------------------------------------------
 // Mocks
-// ---------------------------------------------------------------------------
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
@@ -43,9 +41,7 @@ global.fetch = mockFetch;
 const mockCaptureException = jest.mocked(captureException);
 const mockGenerateBoundedInternalServiceToken = jest.mocked(generateBoundedInternalServiceToken);
 
-// ---------------------------------------------------------------------------
 // Helpers
-// ---------------------------------------------------------------------------
 
 function makeSnapshot(
   messages: Array<{
@@ -67,9 +63,7 @@ function makeSnapshot(
   };
 }
 
-// ---------------------------------------------------------------------------
 // fetchSessionSnapshot
-// ---------------------------------------------------------------------------
 
 describe('fetchSessionSnapshot', () => {
   beforeEach(() => {
@@ -217,9 +211,7 @@ describe('fetchSessionSnapshot', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // deleteSession
-// ---------------------------------------------------------------------------
 
 describe('deleteSession', () => {
   beforeEach(() => {
@@ -312,9 +304,7 @@ describe('deleteSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // shareSession
-// ---------------------------------------------------------------------------
 
 describe('shareSession', () => {
   beforeEach(() => {
@@ -428,9 +418,7 @@ describe('shareSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // unshareSession
-// ---------------------------------------------------------------------------
 
 describe('unshareSession', () => {
   beforeEach(() => {
@@ -499,9 +487,7 @@ describe('unshareSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // fetchSharedSessionMetadata
-// ---------------------------------------------------------------------------
 
 describe('fetchSharedSessionMetadata', () => {
   beforeEach(() => {
@@ -585,9 +571,7 @@ describe('fetchSharedSessionMetadata', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // fetchSharedSessionSnapshot
-// ---------------------------------------------------------------------------
 
 describe('fetchSharedSessionSnapshot', () => {
   beforeEach(() => {
@@ -653,9 +637,7 @@ describe('fetchSharedSessionSnapshot', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // fetchSessionMessages (thin wrapper)
-// ---------------------------------------------------------------------------
 
 describe('invalidateOrganizationSessionAccess', () => {
   beforeEach(() => {
@@ -768,9 +750,7 @@ describe('fetchSessionMessages', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // fetchSessionMessagesPage (paginated authorized history)
-// ---------------------------------------------------------------------------
 
 describe('fetchSessionMessagesPage', () => {
   beforeEach(() => {
@@ -943,9 +923,7 @@ describe('fetchSessionMessagesPage', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Bounded upstream budget
-// ---------------------------------------------------------------------------
 
 describe('bounded upstream budget', () => {
   beforeEach(() => {
@@ -1033,9 +1011,7 @@ describe('bounded upstream budget', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Redacted route label
-// ---------------------------------------------------------------------------
 
 // `SESSION_INGEST_WORKER_URL` is concatenated as-is at every call site
 // (`config.server.ts:479` returns the env value unchanged), so a configured

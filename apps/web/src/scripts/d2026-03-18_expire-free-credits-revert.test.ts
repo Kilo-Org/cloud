@@ -21,8 +21,6 @@ import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 
-// ── Test user IDs ────────────────────────────────────────────────────────────
-
 const TEST_PREFIX = `revert-test-${Date.now()}`;
 const USER_PARTIALLY_SPENT = `${TEST_PREFIX}-partially-spent`;
 const USER_UNSPENT = `${TEST_PREFIX}-unspent`;
@@ -30,8 +28,6 @@ const USER_FULLY_SPENT = `${TEST_PREFIX}-fully-spent`;
 const USER_EXISTING_EXPIRY = `${TEST_PREFIX}-existing-expiry`;
 
 const ALL_USER_IDS = [USER_PARTIALLY_SPENT, USER_UNSPENT, USER_FULLY_SPENT, USER_EXISTING_EXPIRY];
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 const MICRODOLLARS = 1_000_000;
 
@@ -198,8 +194,6 @@ function findLatestMutationsFile(): string {
 }
 
 type AssertionResult = { name: string; passed: boolean; detail?: string };
-
-// ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   try {

@@ -50,11 +50,9 @@ export function SeatChangeModal({
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  // Use the mutation hook for updating seat count
   const updateSeatCountMutation = useUpdateOrganizationSeatCount();
   const invalidateAllOrgData = useInvalidateAllOrganizationData();
 
-  // Get the current active seat usage (members + invites)
   const seatUsageQuery = useOrganizationSeatUsage(organizationId);
   const activeSeatCount = seatUsageQuery.data?.usedSeats ?? currentSeatCount;
 
@@ -78,7 +76,6 @@ export function SeatChangeModal({
 
     const count = parseInt(value, 10);
 
-    // Check if it's a valid integer
     if (isNaN(count) || !Number.isInteger(Number(value))) {
       return { isValid: false, error: 'Seat count must be a whole number', count: null };
     }
@@ -103,7 +100,6 @@ export function SeatChangeModal({
   const handleSeatCountChange = (value: string) => {
     setInputValue(value);
 
-    // Validate on input change and update newSeatCount immediately if valid
     const validation = validateInput(value);
     setValidationError(validation.error);
 
@@ -120,7 +116,6 @@ export function SeatChangeModal({
       const newValueString = newValue.toString();
       setInputValue(newValueString);
 
-      // Validate and update seat count immediately
       const validation = validateInput(newValueString);
       if (validation.isValid && validation.count !== null) {
         setNewSeatCount(validation.count);
@@ -138,7 +133,6 @@ export function SeatChangeModal({
       const newValueString = newValue.toString();
       setInputValue(newValueString);
 
-      // Validate and update seat count immediately
       const validation = validateInput(newValueString);
       if (validation.isValid && validation.count !== null) {
         setNewSeatCount(validation.count);
@@ -178,7 +172,6 @@ export function SeatChangeModal({
         newSeatCount,
       });
 
-      // Check if 3DS/SCA authentication is required
       if (result.requiresAction) {
         if (!result.paymentIntentClientSecret) {
           // Backend indicated authentication is required but didn't provide the client secret.

@@ -24,14 +24,6 @@ import {
   trackCodeIndexingProjectFiles,
   trackCodeIndexingDeleteBeforeDate,
 } from '@/lib/code-indexing/posthog-tracking';
-
-// we have a max context lenght of embeddings for 8192 tokens
-// if we receive a chunk longer than aproximately this, we just
-// truncate it to fit within the limit
-// this should only happen when weird minified files get indexed so they're not generally relavant in search results
-
-// const MAX_CHUNK_LENGTH = 8192 * 1.2;
-
 const errorLogger = sentryLogger('code-indexing', 'error');
 const storage = getIndexStorage();
 

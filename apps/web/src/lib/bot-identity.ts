@@ -127,7 +127,6 @@ export async function unlinkTeamKiloUsers(
   return deletedKeys;
 }
 
-// -- HMAC-signed link tokens --------------------------------------------------
 //
 // The link-account URL carries a single `token` query parameter rather than
 // plain-text platform/teamId/userId.  The token is HMAC-signed and time-limited

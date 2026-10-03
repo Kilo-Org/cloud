@@ -12,9 +12,7 @@ import {
   getSessionActivityIndicatorKind,
 } from '@/components/shared/SessionStatusIndicator';
 
-// ============================================================================
 // extractRepoFromGitUrl Tests
-// ============================================================================
 
 describe('apiSessionToDbSession', () => {
   test('preserves worktree identity while converting API timestamps', () => {
@@ -83,9 +81,7 @@ describe('extractRepoFromGitUrl', () => {
   });
 });
 
-// ============================================================================
 // convertToCloudMessages Tests
-// ============================================================================
 
 describe('convertToCloudMessages', () => {
   test('should convert user_feedback messages to user type', () => {
@@ -247,9 +243,7 @@ describe('convertToCloudMessages', () => {
   });
 });
 
-// ============================================================================
 // formatSessionDate Tests
-// ============================================================================
 
 describe('formatSessionDate', () => {
   test('should format recent time as "just now"', () => {
@@ -285,9 +279,7 @@ describe('formatSessionDate', () => {
   });
 });
 
-// ============================================================================
 // getSessionDisplayTitle Tests
-// ============================================================================
 
 describe('getSessionDisplayTitle', () => {
   const baseSession: DbSession = {

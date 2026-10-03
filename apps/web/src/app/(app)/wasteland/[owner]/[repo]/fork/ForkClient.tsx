@@ -300,8 +300,6 @@ export function ForkClient() {
   );
 }
 
-// ── Header ──────────────────────────────────────────────────────────────
-
 function ForkHeader({
   dolthubOrg,
   repoName,
@@ -342,8 +340,6 @@ function ForkHeader({
   );
 }
 
-// ── Empty state ─────────────────────────────────────────────────────────
-
 function ForkEmpty({ upstreamPath }: { upstreamPath: string }) {
   return (
     <div className="mx-auto mt-12 flex max-w-md flex-col items-center gap-3 text-center">
@@ -363,8 +359,6 @@ function ForkEmpty({ upstreamPath }: { upstreamPath: string }) {
   );
 }
 
-// ── Loading skeleton ────────────────────────────────────────────────────
-
 function ForkSkeleton() {
   return (
     <div className="flex flex-col gap-2">
@@ -380,8 +374,6 @@ function ForkSkeleton() {
     </div>
   );
 }
-
-// ── Branch card ─────────────────────────────────────────────────────────
 
 function BranchRow({
   branch,
@@ -495,8 +487,6 @@ function BranchRow({
   );
 }
 
-// ── Status pair (branch / main) ────────────────────────────────────────
-
 function StatusPair({ branch, main }: { branch: Status; main: Status }) {
   return (
     <div className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.02] px-1.5 py-0.5 text-[10px] font-medium">
@@ -520,8 +510,6 @@ function StatusPair({ branch, main }: { branch: Status; main: Status }) {
     </div>
   );
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────
 
 function formatRelative(iso: string): string {
   try {

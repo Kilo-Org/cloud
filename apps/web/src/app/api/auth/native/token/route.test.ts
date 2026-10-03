@@ -1065,8 +1065,6 @@ describe('POST /api/auth/native/token', () => {
       expect(mockVerifyNativeGoogleIdToken).toHaveBeenCalled();
     });
 
-    // ── Fix 3: ownership check before code commit (email path) ─────────
-
     it('refuses ownership mismatch WITHOUT consuming the sign-in code (enforce, email path)', async () => {
       mockShouldRefuseAsyncFailure.mockReturnValue(true);
       mockValidateAdmissionPayload.mockReturnValue({
@@ -1099,10 +1097,6 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
     });
-
-    // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
-
-    // ── C14 repair: report mode logs mismatch and issues credentials ─
 
     it('logs ownership mismatch and issues credentials in report mode (email path)', async () => {
       // shouldRefuseAsyncFailure defaults to false (report mode)
@@ -1173,8 +1167,6 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).toHaveBeenCalled();
     });
-
-    // ── Fix 3: KeyCollisionError during persistence does not burn the code ─
 
     it('refuses key collision during persistence without burning the sign-in code (enforce, email, supportsRefresh)', async () => {
       mockShouldRefuseAsyncFailure.mockReturnValue(true);
@@ -1319,8 +1311,6 @@ describe('POST /api/auth/native/token', () => {
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_attested_key_cross_user_collision');
     });
 
-    // ── Fix 1: KeyCollisionError is not swallowed ─────────────────────
-
     it('returns 403 ADMISSION_REQUIRED when persistAttestedKey throws KeyCollisionError (enforce, apple/google, no supportsRefresh)', async () => {
       mockShouldRefuseAsyncFailure.mockReturnValue(true);
       mockVerifyNativeAppleIdToken.mockResolvedValue({
@@ -1390,8 +1380,6 @@ describe('POST /api/auth/native/token', () => {
       expect(await response.json()).toEqual({ error: 'ADMISSION_REQUIRED' });
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
     });
-
-    // ── Fix 6: attestation key + session in one transaction ────────────
 
     it('uses createDeviceSessionWithAttestedKey when attestation and supportsRefresh', async () => {
       mockVerifyNativeAppleIdToken.mockResolvedValue({

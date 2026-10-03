@@ -13,9 +13,7 @@ import type {
   OmniboxContext,
 } from './types';
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Check if the current page is an organization page
@@ -24,9 +22,7 @@ const isOrganizationPage = (ctx: OmniboxContext): boolean => {
   return ctx.pathname.startsWith('/organizations/') && ctx.organizationId !== null;
 };
 
-// ============================================================================
 // Action Groups
-// ============================================================================
 
 /**
  * Role Testing action group
@@ -68,9 +64,7 @@ export const createRoleTestingGroup = (
   ],
 });
 
-// ============================================================================
 // Admin Links
-// ============================================================================
 
 /**
  * Generate admin links based on context
@@ -94,9 +88,7 @@ export const createAdminLinks = (): OmniboxAdminLink[] => [
   },
 ];
 
-// ============================================================================
 // Registry Factory
-// ============================================================================
 
 export type CreateRegistryOptions = {
   onRoleChange: (role: 'KILO ADMIN' | 'owner' | 'member') => void;

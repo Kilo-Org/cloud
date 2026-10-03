@@ -39,7 +39,6 @@ interface CreatePRPayload {
 
 export async function POST(req: NextRequest) {
   try {
-    // Validate internal API secret
     const secret = req.headers.get('X-Internal-Secret');
     if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -48,7 +47,6 @@ export async function POST(req: NextRequest) {
     const payload: CreatePRPayload = await req.json();
     const { ticketId, sessionId, branchName: providedBranchName, githubToken, config } = payload;
 
-    // Validate payload
     if (!ticketId || !sessionId || !githubToken || !config) {
       return NextResponse.json(
         { error: 'Missing required fields: ticketId, sessionId, githubToken, config' },
@@ -61,7 +59,6 @@ export async function POST(req: NextRequest) {
       sessionId,
     });
 
-    // Get ticket
     const ticket = await getFixTicketById(ticketId);
 
     if (!ticket) {
@@ -204,7 +201,6 @@ The changes implement the fix as described in the original issue.
 
       // Post comment on issue explaining failure
       try {
-        // Use the same branch name logic as above
         const branchName = providedBranchName || `session/${sessionId}`;
 
         await postIssueComment({

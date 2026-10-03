@@ -927,8 +927,6 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
   );
 }
 
-// ── Shared sub-components ────────────────────────────────────────────────
-
 function SettingsSection({
   id,
   title,

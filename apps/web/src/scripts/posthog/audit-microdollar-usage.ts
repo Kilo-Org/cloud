@@ -199,8 +199,6 @@ interface ErrorLog {
   timestamp: string;
 }
 
-// --- Main Logic ---
-
 export async function run(): Promise<void> {
   console.log('🔍 Auditing PostHog for whole-word references to "microdollar_usage"...\n');
 

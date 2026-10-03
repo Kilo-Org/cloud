@@ -672,7 +672,6 @@ describe('organizations members trpc router', () => {
         is_admin: false,
       });
 
-      // Add them to the organization
       await addUserToOrganization(testOrganization.id, testMemberUser.id, 'member');
     });
 
@@ -754,7 +753,6 @@ describe('organizations members trpc router', () => {
         is_admin: false,
       });
 
-      // Add them to the organization as a regular member (not admin/owner)
       await addUserToOrganization(testOrganization.id, freshMemberUser.id, 'member');
 
       const caller = await createCallerForUser(freshMemberUser.id);
@@ -1408,7 +1406,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Get the invitation ID from the database
       const { db } = await import('@/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
@@ -1482,7 +1479,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Get the invitation ID from the database
       const { db } = await import('@/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
@@ -1530,7 +1526,6 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      // Get the invitation ID from the database
       const { db } = await import('@/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');

@@ -85,7 +85,6 @@ async function run(): Promise<void> {
   // Then run every 30 seconds
   const intervalId = setInterval(monitorActivity, INTERVAL_MS);
 
-  // Handle graceful shutdown
   process.on('SIGINT', async () => {
     console.log('\n\n🛑 Received SIGINT, shutting down...');
     clearInterval(intervalId);

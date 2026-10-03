@@ -392,7 +392,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const statusTable =
@@ -512,7 +511,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get daily time series data
   getDailyStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const dayExpr = accountingDayExpr(input);
@@ -574,7 +572,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get cancellation reasons analysis
   getCancellationAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const createdAt = accountingCreatedAt(input);
     const statusTable =
@@ -1005,7 +1002,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get daily queue wait percentiles (wait time = started_at - created_at)
   getWaitTimeStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const waitCondition =
       input.retryAccountingMode === 'all_attempts'
@@ -1053,7 +1049,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get daily performance percentiles (execution time = completed_at - started_at)
   getPerformanceStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const statusTable =
       input.retryAccountingMode === 'all_attempts'
@@ -1112,7 +1107,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get CSV export data
   getExportData: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
 

@@ -1051,7 +1051,6 @@ export async function anonymizeCloudUserData(
     });
   }
 
-  // ── Gateway cleanup ───────────────────────────────────────────────────
   await revokeGatewayStateForUser(tx, userId);
 
   // Remove recipient-addressed Security Agent notifications before user
@@ -1060,7 +1059,6 @@ export async function anonymizeCloudUserData(
     .delete(security_finding_notifications)
     .where(eq(security_finding_notifications.recipient_user_id, userId));
 
-  // ── 0b. Operation ledger and analytics outbox ────────────────────────
   // Outbox rows are keyed by distinct_id: the user's email, or the user id
   // when the writer's email lookup failed. Delete both identities.
   await tx.delete(operation_ledgers).where(eq(operation_ledgers.kilo_user_id, userId));
@@ -1068,7 +1066,6 @@ export async function anonymizeCloudUserData(
     .delete(analytics_event_outbox)
     .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
 
-  // ── 1. Anonymize the user row ────────────────────────────────────────
   await tx
     .update(kilocode_users)
     .set({
@@ -1102,7 +1099,6 @@ export async function anonymizeCloudUserData(
     })
     .where(eq(kilocode_users.id, userId));
 
-  // ── 2. Hard-delete PII tables ────────────────────────────────────────
   await tx.delete(user_auth_provider).where(eq(user_auth_provider.kilo_user_id, userId));
   await tx.execute(sql`
     INSERT INTO user_data_export_object_deletions (object_key, multipart_upload_id, available_at)
@@ -1608,8 +1604,6 @@ export async function anonymizeCloudUserData(
   await tx.delete(code_indexing_search).where(eq(code_indexing_search.kilo_user_id, userId));
   await tx.delete(code_indexing_manifest).where(eq(code_indexing_manifest.kilo_user_id, userId));
 
-  // ── 3. Anonymize PII in retained tables ──────────────────────────────
-
   const storePurchases = await tx
     .select({
       id: kilo_pass_store_purchases.id,
@@ -1780,7 +1774,6 @@ export async function anonymizeCloudUserData(
       )
     );
 
-  // ── 4. Nullify FK references ─────────────────────────────────────────
   await tx
     .update(user_feedback)
     .set({ kilo_user_id: null })

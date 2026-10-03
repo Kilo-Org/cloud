@@ -32,7 +32,6 @@ export async function GET(
 
   const { organization, user } = data;
 
-  // Get organization's default model setting
   let defaultModel = organization.settings?.default_model;
 
   const policy = evaluateEffectiveModelAccessPolicy(

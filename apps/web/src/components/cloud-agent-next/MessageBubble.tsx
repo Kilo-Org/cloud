@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
+import { Scissors, Image, FileText, AlertCircle, Clock, RotateCcw } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
@@ -134,7 +134,7 @@ function InlineFileAttachment({ part }: { part: FilePart }) {
  * (optimistic placeholders) to avoid duplication when both coexist.
  * Only uses non-synthetic parts if they have non-empty text.
  */
-function getUserTextContent(parts: Part[]): string {
+export function getUserTextContent(parts: Part[]): string {
   const textParts = parts.filter(isTextPart);
   const nonSynthetic = textParts.filter(p => !p.synthetic && p.text.length > 0);
   const effective = nonSynthetic.length > 0 ? nonSynthetic : textParts;
@@ -212,6 +212,88 @@ function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
   );
 }
 
+/**
+ * Fixed, safe copy for a failed delivery, matching the delivery badge's
+ * wording. The untranslated transport text stays in the badge's tooltip and
+ * the copy action, never in the statement itself.
+ */
+type DeliveryFailure = {
+  title: string;
+  detail: string | null;
+};
+
+const DELIVERY_DETAIL_BY_REASON = {
+  interrupted: 'Pending queued message interrupted by user',
+  exhausted: 'Failed to deliver after retries',
+} as const;
+
+/**
+ * `execution` is the response failing, not the transport: the message reached
+ * the agent and the run could not complete it. It states the turn failed and
+ * leaves out a delivery-flavoured second line, because the delivery badge and
+ * the session status line already report the same failure.
+ */
+function selectDeliveryFailure(
+  deliveryState: MessageDeliveryState | undefined
+): DeliveryFailure | null {
+  if (deliveryState?.status !== 'failed') return null;
+  if (deliveryState.reason === 'execution') {
+    return { title: 'Response failed', detail: null };
+  }
+  return {
+    title: 'Failed to deliver',
+    detail: DELIVERY_DETAIL_BY_REASON[deliveryState.reason],
+  };
+}
+
+function DeliveryFailureFooter({
+  failure,
+  message,
+  onRetryMessage,
+  onCopyToComposer,
+}: {
+  failure: DeliveryFailure;
+  message: StoredMessage;
+  onRetryMessage?: (message: StoredMessage) => void;
+  onCopyToComposer?: (text: string) => void;
+}) {
+  if (onRetryMessage === undefined && onCopyToComposer === undefined) return null;
+  const copyText = getUserTextContent(message.parts);
+  return (
+    <div className="mt-1 flex flex-col items-end gap-1">
+      <div className="text-muted-foreground flex items-center gap-1 text-xs">
+        <AlertCircle className="h-3 w-3" />
+        <span>{failure.title}</span>
+        {failure.detail !== null ? <span>{failure.detail}</span> : null}
+      </div>
+      <div className="flex items-center gap-1">
+        {onRetryMessage ? (
+          <button
+            type="button"
+            onClick={() => onRetryMessage(message)}
+            aria-label="Retry"
+            title="Retry"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+        {onCopyToComposer && copyText !== '' ? (
+          <button
+            type="button"
+            onClick={() => onCopyToComposer(copyText)}
+            aria-label="Copy to composer"
+            title="Copy to composer"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            Copy
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 type MessageBubbleProps = {
   message: StoredMessage;
   isStreaming?: boolean;
@@ -220,6 +302,16 @@ type MessageBubbleProps = {
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  /**
+   * Re-send a failed user row's own prompt. The page resolves the owning
+   * session before awaiting, so the row never resolves to a different chat.
+   */
+  onRetryMessage?: (message: StoredMessage) => void;
+  /**
+   * Put a failed user row's text back into the composer, for a user who would
+   * rather edit and resend than repeat the send.
+   */
+  onCopyToComposer?: (text: string) => void;
 };
 
 /**
@@ -234,10 +326,13 @@ export function MessageBubble({
   deliveryState,
   getChildMessages,
   onOpenChildSession,
+  onRetryMessage,
+  onCopyToComposer,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
   const deliveryBadge = getDeliveryBadge(deliveryState);
+  const deliveryFailure = selectDeliveryFailure(deliveryState);
 
   const getTextForCopy = useCallback(
     () =>
@@ -299,6 +394,14 @@ export function MessageBubble({
           {userContent && <CopyMessageButton getText={getTextForCopy} />}
           <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
         </div>
+        {deliveryFailure && !isStreaming && (
+          <DeliveryFailureFooter
+            failure={deliveryFailure}
+            message={message}
+            onRetryMessage={onRetryMessage}
+            onCopyToComposer={onCopyToComposer}
+          />
+        )}
       </div>
     );
   }

@@ -24,6 +24,8 @@ type ConversationMessageGroupProps = {
   commits?: readonly SessionCommit[];
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  onRetryMessage?: (message: StoredMessage) => void;
+  onCopyToComposer?: (text: string) => void;
   onOpenPreparationDetails: (attemptId: string) => void;
 };
 
@@ -36,6 +38,8 @@ const ConversationMessageGroup = memo(
     commits,
     getChildMessages,
     onOpenChildSession,
+    onRetryMessage,
+    onCopyToComposer,
     onOpenPreparationDetails,
   }: ConversationMessageGroupProps) {
     const first = messages[0];
@@ -54,6 +58,8 @@ const ConversationMessageGroup = memo(
           deliveryState={deliveryState}
           getChildMessages={getChildMessages}
           onOpenChildSession={onOpenChildSession}
+          onRetryMessage={onRetryMessage}
+          onCopyToComposer={onCopyToComposer}
         />
         {preparations?.map(attempt => (
           <PreparationRow
@@ -74,6 +80,8 @@ const ConversationMessageGroup = memo(
     previous.preparations === next.preparations &&
     previous.commits === next.commits &&
     previous.onOpenChildSession === next.onOpenChildSession &&
+    previous.onRetryMessage === next.onRetryMessage &&
+    previous.onCopyToComposer === next.onCopyToComposer &&
     previous.onOpenPreparationDetails === next.onOpenPreparationDetails &&
     previous.messages.length === next.messages.length &&
     previous.messages.every((message, index) => message === next.messages[index])
@@ -89,6 +97,8 @@ type ConversationMessagesProps = {
   commitsAfterMessage?: ReadonlyMap<string, readonly SessionCommit[]>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  onRetryMessage?: (message: StoredMessage) => void;
+  onCopyToComposer?: (text: string) => void;
   onOpenPreparationDetails: (attemptId: string) => void;
 };
 
@@ -102,6 +112,8 @@ export const ConversationMessages = memo(
     commitsAfterMessage = emptyCommitAnchors,
     getChildMessages,
     onOpenChildSession,
+    onRetryMessage,
+    onCopyToComposer,
     onOpenPreparationDetails,
   }: ConversationMessagesProps) {
     const messages = [...staticMessages, ...dynamicMessages];
@@ -122,6 +134,8 @@ export const ConversationMessages = memo(
           commits={commitsAfterMessage.get(last.info.id)}
           getChildMessages={getChildMessages}
           onOpenChildSession={onOpenChildSession}
+          onRetryMessage={onRetryMessage}
+          onCopyToComposer={onCopyToComposer}
           onOpenPreparationDetails={onOpenPreparationDetails}
         />
       );

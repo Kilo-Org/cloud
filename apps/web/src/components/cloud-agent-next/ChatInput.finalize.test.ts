@@ -426,4 +426,106 @@ describe('ChatInput finalize failure', () => {
       dom.cleanup();
     }
   });
+
+  it('replaces a draft when a copy action requests composer text', () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    let root!: Root;
+    let lastConsumed: number | undefined;
+    const render = (requestedValue: { text: string; token: number } | null) =>
+      createElement(ChatInput, {
+        onSend: jest.fn(async () => true),
+        attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+        requestedValue,
+        onConsumeRequestedValue: (token: number) => {
+          lastConsumed = token;
+        },
+      });
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+        root.render(render(null));
+      });
+
+      act(() => {
+        setTextareaValue(dom.container, 'a half-written draft');
+      });
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        'a half-written draft'
+      );
+
+      act(() => {
+        root.render(render({ text: 'the failed prompt', token: 1 }));
+      });
+
+      // The copy control must not be a no-op just because a draft exists.
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        'the failed prompt'
+      );
+      expect(lastConsumed).toBe(1);
+
+      act(() => {
+        root.render(render({ text: 'the failed prompt', token: 2 }));
+      });
+
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        'the failed prompt'
+      );
+      expect(lastConsumed).toBe(2);
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
+
+  it('does not replay a consumed copy request on remount', () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    let root!: Root;
+    let consumedToken: number | undefined;
+    let requestedValue: { text: string; token: number } | null = {
+      text: 'the failed prompt',
+      token: 7,
+    };
+    const render = () =>
+      createElement(ChatInput, {
+        onSend: jest.fn(async () => true),
+        attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+        requestedValue,
+        onConsumeRequestedValue: (token: number) => {
+          consumedToken = token;
+          if (requestedValue?.token === token) requestedValue = null;
+        },
+      });
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+        root.render(render());
+      });
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        'the failed prompt'
+      );
+      expect(consumedToken).toBe(7);
+
+      act(() => {
+        setTextareaValue(dom.container, 'typed after consuming');
+      });
+
+      // A remount with the cleared request (e.g. a different session's
+      // composer) must not put the stale copy text back.
+      act(() => {
+        root.unmount();
+        root = createRoot(dom.container);
+        root.render(render());
+      });
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
 });

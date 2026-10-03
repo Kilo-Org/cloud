@@ -19,7 +19,6 @@ export const allocation = sqliteTable('allocation', {
   last_activity_at: integer('last_activity_at'),
   create_deadline_at: integer('create_deadline_at'),
   first_connect_deadline_at: integer('first_connect_deadline_at'),
-  create_failures: integer('create_failures').notNull().default(0),
   stop_attempt: integer('stop_attempt').notNull(),
   stop_pending: integer('stop_pending', { mode: 'boolean' }).notNull(),
   stop_at: integer('stop_at'),

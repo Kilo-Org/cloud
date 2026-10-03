@@ -193,7 +193,7 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 |---|---|---|---|
 | `stopped` | `creating` | `prepare` for a session | — |
 | `creating` | `starting` | Provider created the sandbox and launched the supervisor | Provider call 2 min |
-| `creating` | `creating` or `stopped` | Transient create error: retry after a pause while a route deadline remains, else stop | Pause 10 s, doubling per consecutive failure, at most 60 s |
+| `creating` | `creating` or `stopped` | Transient create error: retry after a 10 s pause while a route deadline remains, else stop | — |
 | `creating` | `stopping` or `stopped` | Classified permanent create/launch error: fail preparing routes immediately; an owned physical ref uses the existing stop ladder | Existing ladder when a ref exists |
 | `starting` | `connected` | Wrapper `hello` accepted | 5 min without `hello` → `stopping` |
 | `connected` | `disconnected` | Socket closed, or no heartbeat for 45 s | — |
@@ -227,7 +227,7 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   deadline the route fails.
 - Provider adapters preserve structured admission causes. Only actual `insufficient_credits` fails
   as `billing_blocked`; `stopping`, meter outages, network/5xx, throttling and recoverable conflicts
-  retain the retry pause and the original attempt deadline. Error text or an HTTP 4xx
+  retain the ten-second retry pause and the original attempt deadline. Error text or an HTTP 4xx
   alone never proves permanence. Proven local invalid/unsupported configuration fails as
   `invalid_configuration`; Vercel's local REST validation kinds, not remote status codes, establish it.
 - A permanent error applies only while its allocation is still current and `creating`. It fails
@@ -520,7 +520,7 @@ them through one development-only override.
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
-| Sandbox DO | Provider create retry pause | 10 s after a transient failed create, doubling per consecutive failure, at most 60 s | Create again within the unchanged route attempt; classified permanent errors fail promptly |
+| Sandbox DO | Provider create retry pause | 10 s after a transient failed create | Create again within the unchanged route attempt; classified permanent errors fail promptly |
 | Sandbox DO | Wrapper first connect | 5 min from launch | Stop the sandbox |
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
@@ -546,7 +546,7 @@ them through one development-only override.
 
 | Failure | Detected by | Recovery | Message effect |
 |---|---|---|---|
-| Transient provider create error | Sandbox DO | Retry on a new allocation after a 10–60 s pause, within the unchanged route deadline | Queued fail at the deadline |
+| Transient provider create error | Sandbox DO | Retry on a new allocation after a 10 s pause, within the unchanged route deadline | Queued fail at the deadline |
 | Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |
 | Proven invalid/unsupported provider configuration | Provider adapter | New message after correcting configuration | Queued fail promptly (`invalid_configuration`) |
 | Wrapper never connects | Sandbox DO, 5 min | Stop; new allocation within the route deadline | Queued fail at the deadline |
@@ -734,7 +734,7 @@ counts.
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,
     report stage/code and one report/callback per terminal batch stay consistent; no raw provider
     detail is forwarded. Stopping, meter outages, network/5xx, throttling and recoverable conflicts
-    keep the retry pause, immutable attempt and original deadline, then can succeed. Owned refs
+    keep the ten-second pause, immutable attempt and original deadline, then can succeed. Owned refs
     use the existing stop ladder and retain unconfirmed physical evidence. Late results after hello
     cannot fail a healthy sibling or clean up its allocation. After restoration, a new message in
     the same session succeeds without changing the earlier terminal message or duplicating effects.

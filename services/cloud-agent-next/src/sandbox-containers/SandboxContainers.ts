@@ -218,23 +218,10 @@ export class SandboxContainers extends DurableObject<Env> {
     if (stored.state === 'launching' && sameRef) {
       if (phase === 'not_started') {
         const record = await this.installLaunchInstance(stored, input.instance);
-        return this.resumePreExecLaunch(
-          record,
-          ref,
-          input.env,
-          input.instance,
-          input.containment === true,
-          input.outboundContainerId
-        );
+        return this.resumePreExecLaunch(record, input);
       }
       if (phase === 'exec_pending' || phase === 'missing') {
-        return this.adoptUncertainWrapper(
-          stored,
-          ref,
-          input.containment === true,
-          phase === 'missing',
-          input.outboundContainerId
-        );
+        return this.adoptUncertainWrapper(stored, input);
       }
       throw new Error('Container wrapper attempt phase is unknown');
     }
@@ -504,12 +491,10 @@ export class SandboxContainers extends DurableObject<Env> {
    */
   private async resumePreExecLaunch(
     record: ContainersRecord,
-    ref: string,
-    env: Record<string, string>,
-    instance: ContainerInstanceSize,
-    containment: boolean,
-    outboundContainerId: string | undefined
+    input: ContainersLaunchInput
   ): Promise<{ started: boolean }> {
+    const { allocationRef: ref, env, instance, outboundContainerId } = input;
+    const containment = input.containment === true;
     const container = this.requiredContainer();
     if (containment) await this.installContainmentProxy(container, outboundContainerId);
     // A stopped container is started and metered before the probe. An already
@@ -544,11 +529,10 @@ export class SandboxContainers extends DurableObject<Env> {
    */
   private async adoptUncertainWrapper(
     stored: ContainersRecord,
-    ref: string,
-    containment: boolean,
-    stampLegacy: boolean,
-    outboundContainerId: string | undefined
+    input: ContainersLaunchInput
   ): Promise<{ started: boolean }> {
+    const { allocationRef: ref, outboundContainerId } = input;
+    const containment = input.containment === true;
     const container = this.requiredContainer();
     if (container.running !== true) {
       throw new Error('Container wrapper start is pending and the container is not running');
@@ -561,7 +545,7 @@ export class SandboxContainers extends DurableObject<Env> {
       await this.writeRunning(ref, 'retain');
       return { started: true };
     }
-    if (stampLegacy) await this.markWrapperAttempt('exec_pending');
+    if (readWrapperAttempt(stored) === 'missing') await this.markWrapperAttempt('exec_pending');
     if (probe === 'ambiguous') throw new Error('Wrapper probe was ambiguous');
     throw new Error('Container wrapper start is pending and no wrapper was found');
   }

@@ -310,7 +310,6 @@ function stateToRow(state: AllocationState): typeof allocationTable.$inferInsert
     last_activity_at: state.lastActivityAt,
     create_deadline_at: state.createDeadlineAt,
     first_connect_deadline_at: state.firstConnectDeadlineAt,
-    create_failures: state.createFailures,
     stop_attempt: state.stopAttempt,
     stop_pending: state.stopPending,
     stop_at: state.stopAt,
@@ -329,7 +328,6 @@ function rowToState(row: AllocationRow): AllocationState {
     lastActivityAt: row.last_activity_at,
     createDeadlineAt: row.create_deadline_at,
     firstConnectDeadlineAt: row.first_connect_deadline_at,
-    createFailures: row.create_failures,
     stopAttempt: row.stop_attempt,
     stopPending: row.stop_pending,
     stopAt: row.stop_at,
@@ -2530,11 +2528,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.ctx.waitUntil(this.runLease());
         return;
       case 'cleanup':
-        // A whole-sandbox stop could land on the replacement this same tick
-        // creates, so only a stop that reaches that allocation alone runs.
-        if (this.provider.allocationScopedStop) {
-          await this.retireCreatedRef(effect.providerRef, effect.allocationId);
-        }
+        await this.retireCreatedRef(effect.providerRef, effect.allocationId);
         return;
       case 'close-socket':
         await this.runCloseSocket(state);
@@ -2660,17 +2654,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;
         }
-        // N5: never stop a ref whose allocation is still current but no longer
-        // creating: a `hello` accepted during a slow launch made it the live
-        // sandbox. A ref the allocation has moved past is abandoned; it is
-        // stopped only where stop reaches that allocation alone.
         if (createdRef !== null) {
-          const latest = await this.readAllocation();
-          const abandoned =
-            latest.allocationId === allocationId
-              ? latest.kind === 'creating'
-              : this.provider.allocationScopedStop;
-          if (abandoned) await this.retireCreatedRef(createdRef, allocationId);
+          await this.retireCreatedRef(createdRef, allocationId);
         }
         await this.dispatchCreateFailed(allocationId);
       }
@@ -2696,6 +2681,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * attempt's launch.
    */
   private async retireCreatedRef(ref: string, allocationId: string | null): Promise<void> {
+    const current = await this.readAllocation();
+    if (current.allocationId === allocationId) {
+      // N5: an accepted hello owns the ref even if launch later fails.
+      if (current.kind !== 'creating') return;
+    } else if (!this.provider.allocationScopedStop) {
+      // A whole-sandbox stop could reach the replacement allocation.
+      return;
+    }
     const vercel = this.currentProvider() === 'vercel';
     const retire = async (): Promise<void> => {
       const confirmed = await this.stopRef(ref, allocationId);

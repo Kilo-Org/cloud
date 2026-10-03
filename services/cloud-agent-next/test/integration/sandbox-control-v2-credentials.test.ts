@@ -36,7 +36,6 @@ import {
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
-import { insertPreBAllocation } from './helpers/pre-b-allocation.js';
 import { waitFor } from './wait-for.js';
 
 const SANDBOX_ID = 'sbx__control_v2_credentials';
@@ -379,7 +378,7 @@ async function reconstructPreB(
     });
     for (const [key, value] of retained) await state.storage.put(key, value);
     expect(await state.storage.get('control_plane_generation')).toBe(2);
-    insertPreBAllocation(db, allocation);
+    db.insert(allocationTable).values(allocation).run();
     db.insert(routesTable).values(snapshots).run();
     const updates: Array<{ sessionId: string; update: ControlPlaneRouteUpdate }> = [];
     const reconstructed = new SandboxControlV2(state, instance.env);

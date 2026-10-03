@@ -37,7 +37,6 @@ const EXPECTED_ALLOCATION_COLUMNS: ColumnSignature[] = [
   { name: 'allocation_id', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'connection_id', type: 'text', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'create_deadline_at', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
-  { name: 'create_failures', type: 'integer', notnull: 1, dflt_value: '0', pk: 0 },
   { name: 'first_connect_deadline_at', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
   { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
   { name: 'last_activity_at', type: 'integer', notnull: 0, dflt_value: null, pk: 0 },
@@ -175,7 +174,7 @@ describe('sandbox control V2 consolidated migrations', () => {
         { name: 'grant', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
         { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
       ]);
-      expect(appliedMigrations(db)).toHaveLength(3);
+      expect(appliedMigrations(db)).toHaveLength(2);
       const applied = appliedMigrations(db);
       await migrate(db, migrations);
       expect(appliedMigrations(db)).toEqual(applied);
@@ -194,11 +193,13 @@ describe('sandbox control V2 consolidated migrations', () => {
       const oldApplied = appliedMigrations(db);
       expect(oldApplied.at(-1)?.created_at).toBe(1790511032804);
 
-      // Plain SQL: a Drizzle insert names columns the old schema does not have yet.
-      db.run(
-        sql`INSERT INTO allocation (id, state, stop_attempt, stop_pending, unconfirmed_provider_ref)
-            VALUES ('current', 'stopped', 0, 0, '{"fixture":"old-provider-ref"}')`
-      );
+      await db.insert(allocationTable).values({
+        id: 'current',
+        state: 'stopped',
+        stop_attempt: 0,
+        stop_pending: false,
+        unconfirmed_provider_ref: '{"fixture":"old-provider-ref"}',
+      });
       await db.insert(routesTable).values({
         session_id: 'workspace_old',
         spec: '{"kind":"old"}',
@@ -212,19 +213,13 @@ describe('sandbox control V2 consolidated migrations', () => {
       await expect(migrate(db, migrations)).resolves.toBeUndefined();
 
       expect(appliedMigrations(db).slice(0, oldApplied.length)).toEqual(oldApplied);
-      expect(appliedMigrations(db)).toHaveLength(oldApplied.length + 2);
+      expect(appliedMigrations(db)).toHaveLength(oldApplied.length + 1);
       expect(db.select().from(scopeGrants).all()).toEqual([]);
-      expect(columnSignatures(db, 'allocation')).toEqual(
-        [
-          ...oldAllocationColumns,
-          { name: 'create_failures', type: 'integer', notnull: 1, dflt_value: '0', pk: 0 },
-        ].sort((a, b) => a.name.localeCompare(b.name))
-      );
+      expect(columnSignatures(db, 'allocation')).toEqual(oldAllocationColumns);
       expect(columnSignatures(db, 'routes')).toEqual(oldRoutesColumns);
       expect(db.select().from(allocationTable).get()).toMatchObject({
         id: 'current',
         state: 'stopped',
-        create_failures: 0,
         unconfirmed_provider_ref: '{"fixture":"old-provider-ref"}',
       });
       expect(db.select().from(routesTable).get()).toMatchObject({

@@ -276,53 +276,6 @@ describe('allocation socket close origin', () => {
   });
 });
 
-describe('allocation create retry backoff', () => {
-  function failAgain(state: AllocationState, at: number, next: string) {
-    return reduceAllocation(
-      state,
-      {
-        type: 'create-failed',
-        at,
-        allocationId: state.allocationId ?? '',
-        nextAllocationId: next,
-        retryAllowed: true,
-      },
-      TIMERS
-    ).state;
-  }
-
-  it('doubles the pause per consecutive failure up to the 60 s ceiling, and ensure resets it', () => {
-    let state: AllocationState = {
-      ...initialAllocationState(),
-      kind: 'creating',
-      allocationId: 'alloc-0',
-      createDeadlineAt: 0,
-    };
-    const pauses: number[] = [];
-    for (let attempt = 1; attempt <= 6; attempt += 1) {
-      const at = attempt * 1_000_000;
-      state = failAgain(state, at, `alloc-${attempt}`);
-      pauses.push((state.createDeadlineAt ?? 0) - at);
-    }
-    expect(pauses).toEqual([10_000, 20_000, 40_000, 60_000, 60_000, 60_000]);
-
-    const stopped = reduceAllocation(
-      state,
-      { type: 'tick', at: 10_000_000, nextAllocationId: 'alloc-x', retryAllowed: false },
-      TIMERS
-    ).state;
-    const ensured = reduceAllocation(
-      stopped,
-      { type: 'ensure', at: 20_000_000, allocationId: 'alloc-y' },
-      TIMERS
-    ).state;
-    expect(ensured.createFailures).toBe(0);
-    expect((failAgain(ensured, 30_000_000, 'alloc-z').createDeadlineAt ?? 0) - 30_000_000).toBe(
-      10_000
-    );
-  });
-});
-
 describe('allocation abandoned create attempt', () => {
   function abandoned(providerRef: string | null): AllocationState {
     return {

@@ -44,7 +44,6 @@ import {
 } from './helpers/fake-credentials.js';
 import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
-import { insertPreBAllocation } from './helpers/pre-b-allocation.js';
 import { waitFor } from './wait-for.js';
 
 const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
@@ -1284,7 +1283,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         });
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
-        insertPreBAllocation(db, allocation);
+        db.insert(allocationTable).values(allocation).run();
         db.insert(routesTable)
           .values({ ...route, grant: JSON.stringify(grant) })
           .run();

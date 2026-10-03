@@ -36,11 +36,6 @@ export type AllocationState = {
   lastActivityAt: number | null;
   createDeadlineAt: number | null;
   firstConnectDeadlineAt: number | null;
-  /**
-   * Consecutive transient create failures since `ensure`. It sizes the retry
-   * pause (10 s doubling to 60 s); it does not decide the state.
-   */
-  createFailures: number;
   /** Id of the current stop attempt; results for other ids are ignored (N1). */
   stopAttempt: number;
   /** True when the next attempt is scheduled but its stop call is not issued yet. */
@@ -69,7 +64,6 @@ export function initialAllocationState(): AllocationState {
     lastActivityAt: null,
     createDeadlineAt: null,
     firstConnectDeadlineAt: null,
-    createFailures: 0,
     stopAttempt: 0,
     stopPending: false,
     stopAt: null,
@@ -155,15 +149,6 @@ export type AllocationReduction = {
 };
 
 const NO_EFFECTS: AllocationEffect[] = [];
-
-/** Pause before the next create after `failures` consecutive transient failures. */
-export function createRetryPauseMs(timers: SandboxTimers, failures: number): number {
-  const doublings = Math.max(0, failures - 1);
-  return Math.min(
-    timers.providerCreateRetryMaxMs,
-    timers.providerCreateRetryMs * 2 ** Math.min(doublings, 16)
-  );
-}
 
 /** The effect that retires an abandoned attempt's known provider ref, if any. */
 function cleanupEffects(state: AllocationState): AllocationEffect[] {
@@ -312,14 +297,12 @@ export function reduceAllocation(
         // Nothing is in flight now, so the deadline is the retry pause; the tick
         // that reaches it starts the next attempt with a full create deadline.
         // The failed attempt cleaned up its own ref before reporting.
-        const createFailures = state.createFailures + 1;
         return {
           state: {
             ...state,
             allocationId: event.nextAllocationId,
             providerRef: null,
-            createFailures,
-            createDeadlineAt: event.at + createRetryPauseMs(timers, createFailures),
+            createDeadlineAt: event.at + timers.providerCreateRetryMs,
           },
           effects: NO_EFFECTS,
         };

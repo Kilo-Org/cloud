@@ -1677,8 +1677,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   function updateCapabilityAtoms(session: CloudAgentSession): void {
     const cloudStatus = store.get(cloudStatusAtom);
     const cloudReady =
-      cloudStatus === null || cloudStatus.type === 'ready' || cloudStatus.type === 'error';
-    const liveCanSend = session.canSend && cloudReady;
+      cloudStatus === null ||
+      cloudStatus.type === 'ready' ||
+      cloudStatus.type === 'error' ||
+      (activeSessionType === 'cloud-agent' &&
+        (cloudStatus.type === 'preparing' || cloudStatus.type === 'finalizing'));
+    const liveCanSend = activeSessionType !== 'read-only' && session.canSend && cloudReady;
     if (postInterruptUnlock) {
       if (liveCanSend) {
         postInterruptUnlock = false;
@@ -2957,7 +2961,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    */
   function restoreAfterInterrupt(session: CloudAgentSession): void {
     const cs = store.get(cloudStatusAtom);
-    const cloudReady = cs === null || cs.type === 'ready' || cs.type === 'error';
+    const cloudReady =
+      cs === null ||
+      cs.type === 'ready' ||
+      cs.type === 'error' ||
+      (activeSessionType === 'cloud-agent' &&
+        (cs.type === 'preparing' || cs.type === 'finalizing'));
     const readOnly = activeSessionType === 'read-only';
     postInterruptUnlock = !readOnly;
     store.set(isStreamingAtom, false);

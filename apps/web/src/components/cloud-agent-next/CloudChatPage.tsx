@@ -1760,7 +1760,17 @@ export default function CloudChatPage({
                                   canCreateWorktreeChat ? handleReplaceWorktreeChat : undefined
                                 }
                                 onStop={handleStopExecution}
-                                disabled={!canSend}
+                                disabled={
+                                  !canSend ||
+                                  isLoading ||
+                                  transcriptPhase === 'opening' ||
+                                  activeSessionType === null
+                                }
+                                textareaDisabled={
+                                  activeSessionType === 'cloud-agent'
+                                    ? isReadOnly || isLoading || transcriptPhase === 'opening'
+                                    : !canSend
+                                }
                                 isStreaming={isStreaming && !activeSuggestion}
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}

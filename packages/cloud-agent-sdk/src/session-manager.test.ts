@@ -1435,6 +1435,48 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
     });
 
+    it.each(['preparing', 'finalizing'] as const)(
+      'allows queue sends during %s only for a resolved writable cloud transport',
+      async phase => {
+        mockSession.state.getCloudStatus.mockReturnValue({ type: phase });
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(config.store.get(mgr.atoms.canSend)).toBe(true);
+        mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+
+        mockSessionCallbacks.onResolved?.({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: cloudAgentId('agent-1'),
+        });
+        expect(config.store.get(mgr.atoms.canSend)).toBe(true);
+        mockSession.send.mockResolvedValue(undefined);
+        expect(
+          await mgr.send({
+            payload: {
+              type: 'prompt',
+              prompt: 'Queued follow-up',
+              mode: 'code',
+              model: 'test-model',
+            },
+          })
+        ).toBe(true);
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
+
+        mockSession.canSend = false;
+        mockSessionCallbacks.onTransportCapabilityChange?.();
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        mockSession.canSend = true;
+        mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        mgr.destroy();
+      }
+    );
+
     it('restores sending after a settled preparation failure without clearing its error', async () => {
       let subscriptionCallback = (): void => {
         throw new Error('Expected service state subscription callback');
@@ -1464,11 +1506,11 @@ describe('createSessionManager', () => {
 
       cloudStatus = { type: 'preparing', message: 'Setting up environment...' };
       subscriptionCallback();
-      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
 
       cloudStatus = { type: 'finalizing', message: 'Wrapping up...' };
       subscriptionCallback();
-      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
 
       cloudStatus = { type: 'error', message: 'Clone failed' };
       subscriptionCallback();

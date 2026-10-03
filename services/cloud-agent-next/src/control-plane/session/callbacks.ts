@@ -4,6 +4,15 @@ import {
 } from '../../callbacks/queue-payload.js';
 import { callbackHeadRepoFullName } from '../../callbacks/head-repository.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
+import { logger } from '../../logger.js';
+import type { SessionMetadata } from '../../persistence/session-metadata.js';
+import { projectTerminalClientError } from '../../session/terminal-error-projector.js';
+import type { LatestAssistantMessage } from '../../session/types.js';
+import {
+  CONTROL_PLANE_FAILURE_REASON_VALUES,
+  type ControlPlaneFailureReason,
+} from '../../shared/control-plane-protocol.js';
+import type { SessionMessage } from './messages.js';
 
 export const CALLBACK_OUTBOX_PREFIX = 'callback_outbox:';
 export const CALLBACK_ENQUEUE_MAX_ATTEMPTS = 5;

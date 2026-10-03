@@ -16,10 +16,7 @@ import { ManualReviewScreen } from './manual-review-screen';
 const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
-const keyboard = vi.hoisted(() => ({
-  platform: 'android',
-  listeners: new Map<string, ((event: unknown) => void)[]>(),
-}));
+const platformState = vi.hoisted(() => ({ OS: 'android' }));
 const status = vi.hoisted(() => ({
   connected: true,
   loading: false,
@@ -28,25 +25,33 @@ const status = vi.hoisted(() => ({
   refetch: vi.fn(),
   push: vi.fn(),
 }));
-
-vi.mock('react-native', () => ({
-  AppState: { addEventListener: () => ({ remove: () => undefined }) },
-  Keyboard: {
-    addListener: (event: string, listener: (event: unknown) => void) => {
-      keyboard.listeners.set(event, [...(keyboard.listeners.get(event) ?? []), listener]);
-      return {
-        remove: () => {
-          keyboard.listeners.set(
-            event,
-            (keyboard.listeners.get(event) ?? []).filter(entry => entry !== listener)
-          );
-        },
+// The footer reads its keyboard lift from the root `KeyboardProvider` instead of
+// listening to React Native's keyboard events. The store below is driven per
+// test so the footer clearance can be asserted against a raised keyboard; the
+// app-level stub in `vitest.setup.ts` always reports a hidden one.
+const keyboardStore = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
       };
     },
-  },
+    setHeight: (height: number) => {
+      keyboardStore.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+
+vi.mock('react-native', () => ({
   Platform: {
     get OS() {
-      return keyboard.platform;
+      return platformState.OS;
     },
   },
   Dimensions: { get: () => ({ height: 900 }) },
@@ -59,16 +64,36 @@ vi.mock('react-native', () => ({
   View: 'View',
   useWindowDimensions: () => ({ fontScale: 1 }),
 }));
-// The screen's footer and its outer keyboard-lift view both read the real
-// `useAppAwareKeyboardPadding`, so the assertions below see the shared lift
-// rather than a stub. That module and the tab-screen clearance both read the
-// safe-area insets through `react-native-safe-area-context`, whose module
-// resolves to its untransformed `react-native` entry (`src/index.tsx`): the
-// CommonJS entry requires a Flow react-native subpath this node project cannot
-// load, and every mounted suite mocks it. So stub the module's only native
-// dependency instead of the module itself, and keep the real footer and lift:
-// a whole-module mock of `app-aware-keyboard-padding` strips the hook the
-// footer reads and the lift assertions below fail.
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardStore.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useKeyboardState: (selector?: (state: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardStore.subscribe, heightOf, heightOf);
+      const state = {
+        height,
+        isVisible: height > 0,
+        progress: height > 0 ? 1 : 0,
+        duration: 0,
+      };
+      return selector ? selector(state) : state;
+    },
+  };
+});
+// The real footer and the tab-screen clearance are used on purpose: the footer
+// measures its own clearance with the real `useTabBarBottomPadding` (this screen
+// no longer renders `TabScreenScrollView`, so the old tab-screen mock does not
+// apply). Both read the safe-area insets through
+// `react-native-safe-area-context`, whose module resolves to its untransformed
+// `react-native` entry (`src/index.tsx`): the CommonJS entry requires a Flow
+// react-native subpath this node project cannot load, and every mounted suite
+// mocks it. So stub the module's only native dependency instead of the module
+// itself, and keep the real footer and clearance.
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: BOTTOM_INSET, left: 0, right: 0 }),
 }));
@@ -176,7 +201,7 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
 }
 
 beforeEach(() => {
-  keyboard.listeners.clear();
+  keyboardStore.setHeight(0);
   status.connected = true;
   status.loading = false;
   status.errorCode = null;
@@ -187,7 +212,7 @@ beforeEach(() => {
 
 describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on %s', platform => {
   beforeEach(() => {
-    keyboard.platform = platform;
+    platformState.OS = platform;
   });
 
   it('pins the start action outside the scroll viewport, clear of the tab bar', async () => {
@@ -216,39 +241,27 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
   it('drops the tab bar clearance while the keyboard lifts the footer', async () => {
     const { renderer, unmount } = await renderScreen();
 
-    const event = platform === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
-    const keyboardShow = keyboard.listeners.get(event) ?? [];
-    expect(keyboardShow.length).toBeGreaterThan(0);
+    // A keyboard at least as tall as the tab bar. The footer hands the whole
+    // bottom space to the lift view (`KeyboardAvoidingView`), which owns it
+    // while the keyboard is open, so its own clearance collapses to 0.
+    const keyboardLift = platform === 'android' ? 300 : 324;
     act(() => {
-      for (const listener of keyboardShow) {
-        listener({
-          endCoordinates: {
-            // A docked keyboard: iOS's frame top (576) plus its height (324)
-            // reaches the screen bottom (900), so the footer lifts by the same
-            // 324 as Android's height plus inset.
-            height: platform === 'android' ? 300 : 324,
-            screenY: platform === 'android' ? 876 : 576,
-          },
-        });
-      }
+      keyboardStore.setHeight(keyboardLift);
     });
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
-    // Nearest first: the footer drops its tab-bar clearance. Android restores
-    // the system-bar inset excluded from height; iOS's frame reaches the screen
-    // bottom, so its height is the lift.
-    expect(paddingBottomsAbove(action)).toEqual([0, 324]);
+    expect(paddingBottomsAbove(action)).toEqual([0]);
+    // The lift view is the sole keyboard owner while the keyboard is up.
+    expect(findAllOfType(renderer.root, 'KeyboardAvoidingView')).toHaveLength(1);
 
-    const hide = platform === 'android' ? 'keyboardDidHide' : 'keyboardWillHide';
+    // The provider clears the height when the keyboard hides; the footer
+    // restores its tab-bar clearance.
     act(() => {
-      for (const listener of keyboard.listeners.get(hide) ?? []) {
-        listener({});
-      }
+      keyboardStore.setHeight(0);
     });
     expect(paddingBottomsAbove(action)).toEqual([
       getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
         TAB_SCREEN_BOTTOM_GAP,
-      0,
     ]);
 
     unmount();
@@ -257,21 +270,11 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
   it('keeps the tab bar clearance a short keyboard does not cover', async () => {
     const { renderer, unmount } = await renderScreen();
 
-    const event = platform === 'android' ? 'keyboardDidShow' : 'keyboardWillShow';
-    const keyboardShow = keyboard.listeners.get(event) ?? [];
-    // The hardware-keyboard IME bar is one navigation bar tall; dropping the
-    // whole clearance for it parked the action behind the tab bar (e1-fill).
+    // The hardware-keyboard IME bar is one navigation bar tall; the footer keeps
+    // the difference so the action never lands behind the tab bar (e1-fill).
+    const keyboardLift = BOTTOM_INSET + BOTTOM_INSET;
     act(() => {
-      for (const listener of keyboardShow) {
-        listener({
-          endCoordinates: {
-            // A docked short keyboard: iOS's top (852) plus its height (48)
-            // reaches the screen bottom (900), one nav bar tall.
-            height: platform === 'android' ? 24 : 48,
-            screenY: platform === 'android' ? 876 : 852,
-          },
-        });
-      }
+      keyboardStore.setHeight(keyboardLift);
     });
 
     const action = only(findAllOfType(renderer.root, 'Button'), 'primary action');
@@ -280,10 +283,8 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
       platform,
       fontScale: 1,
     });
-    const keyboardLift = BOTTOM_INSET + BOTTOM_INSET;
     expect(paddingBottomsAbove(action)).toEqual([
       footerClearance + TAB_SCREEN_BOTTOM_GAP - keyboardLift,
-      keyboardLift,
     ]);
 
     unmount();
@@ -296,7 +297,12 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     expect(findAllOfType(renderer.root, 'Skeleton')).toHaveLength(2);
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { disabled: boolean }).disabled).toBe(true);
-    expect(paddingBottomsAbove(button)).toHaveLength(2);
+    // The footer is the sole clearance source now (the deleted lift layer is
+    // gone); at rest it reserves the tab bar height plus its final gap.
+    expect(paddingBottomsAbove(button)).toEqual([
+      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
+        TAB_SCREEN_BOTTOM_GAP,
+    ]);
     unmount();
   });
 
@@ -305,7 +311,12 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     const { renderer, unmount } = await renderScreen();
     const button = only(findAllOfType(renderer.root, 'Button'), 'primary action');
     expect((button.props as { loading: boolean }).loading).toBe(true);
-    expect(paddingBottomsAbove(button)).toHaveLength(2);
+    // The footer is the sole clearance source now (the deleted lift layer is
+    // gone); at rest it reserves the tab bar height plus its final gap.
+    expect(paddingBottomsAbove(button)).toEqual([
+      getEffectiveTabBarHeight({ bottomInset: BOTTOM_INSET, platform, fontScale: 1 }) +
+        TAB_SCREEN_BOTTOM_GAP,
+    ]);
     unmount();
   });
 

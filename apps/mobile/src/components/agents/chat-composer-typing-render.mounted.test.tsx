@@ -135,9 +135,12 @@ vi.mock('@/components/agents/slash-command-suggestions', () => ({
   SlashCommandSuggestions: () => null,
 }));
 vi.mock('@/components/agents/suggestion-card', () => ({ SuggestionCard: () => null }));
-vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(async () => true),
-}));
+vi.mock('@/components/agents/remote-session-exit-alert', () => {
+  const confirmExit = vi.fn(async () => true);
+  return {
+    useRemoteSessionExitConfirmation: () => ({ confirmExit, exitDialog: null }),
+  };
+});
 vi.mock('@/components/agents/remote-session-exit-confirmation', () => ({
   confirmRemoteSessionExit: vi.fn(async (_confirm: unknown, run: () => Promise<void>) => run()),
 }));

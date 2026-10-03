@@ -220,12 +220,13 @@ export function ModelPickerContent() {
             <Search size={18} color={colors.mutedForeground} />
             <Input
               ref={searchInputRef}
+              accessibilityLabel={t('common.searchModels')}
               placeholder={t('common.searchModels')}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="search"
-              className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+              className="flex-1 p-0 text-base leading-[normal] text-foreground"
               onChangeText={setSearch}
             />
             {/* In-field clear, on every platform: `clearButtonMode` is iOS

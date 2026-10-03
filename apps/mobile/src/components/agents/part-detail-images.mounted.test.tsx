@@ -40,7 +40,7 @@ vi.mock('@/components/ui/icons', () => ({
   Eye: 'Eye',
   Plug: 'Plug',
 }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000', mutedForeground: '#666' }),
 }));

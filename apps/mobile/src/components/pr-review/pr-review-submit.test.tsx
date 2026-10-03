@@ -119,6 +119,13 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
+// The feedback prompt renders through `@/components/ui/dialog`, whose
+// `DialogCard` chain reaches `DestructiveConfirmDialog` and its bottom inset;
+// the native module cannot load under this partial `react-native` mock.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
+}));
+
 vi.mock('@/components/pr-review/pr-form-sheet-chrome', () => ({
   PrFormSheetFooter: 'PrFormSheetFooter',
   PrFormSheetHeader: 'PrFormSheetHeader',

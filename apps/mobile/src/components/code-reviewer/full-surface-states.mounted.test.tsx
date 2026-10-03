@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- cohesive mounted suite for the code-reviewer surface states */
 import { createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -62,7 +63,8 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ scope: 'personal', platform: state.platform }),
   useRouter: () => ({ push: state.push }),
 }));
-vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', FlatList: 'FlatList' }));
+vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeOut: { duration: vi.fn() },
@@ -124,7 +126,7 @@ beforeEach(() => {
 });
 
 function firstList(renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer']) {
-  return renderer.root.find(node => String(node.type) === 'FlatList');
+  return renderer.root.find(node => String(node.type) === 'FlashList');
 }
 
 describe('Reviewer repository bodies', () => {

@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -9,6 +9,7 @@ import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -41,8 +42,8 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * One skill row: the name in mono, its source type, the enabled status, the
- * toggle, and edit/delete controls. The row carries no container
+ * One skill row: the name in mono, its source type, the enabled switch,
+ * and edit/delete controls. The row carries no container
  * `accessibilityLabel`, so the switch's label stays the only element a screen
  * reader matches by the skill's name.
  */
@@ -59,9 +60,6 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           {skillRowSubtitle(skill)}
         </Text>
       </View>
-      <Text className="text-xs text-muted-foreground">
-        {skill.enabled ? t('common.enabled') : t('common.disabled')}
-      </Text>
       <Switch value={skill.enabled} accessibilityLabel={skill.name} onValueChange={onToggle} />
       <Pressable
         className="h-11 w-11 items-center justify-center active:opacity-70"
@@ -99,6 +97,7 @@ export function ProfileSkillsScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { createCustomSkill, updateSkill, deleteSkill, setSkillEnabled } =
     useAgentProfileMutations(organizationId);
@@ -145,16 +144,14 @@ export function ProfileSkillsScreen({
   };
 
   const confirmDelete = (skill: SkillTarget) => {
-    Alert.alert(t('common.delete'), skill.name, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void runDelete(skill.id);
-        },
+    confirm({
+      title: t('common.delete'),
+      message: skill.name,
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        void runDelete(skill.id);
       },
-    ]);
+    });
   };
 
   let content: ReactNode = null;
@@ -247,6 +244,8 @@ export function ProfileSkillsScreen({
           }}
         />
       ) : null}
+
+      {dialog}
     </View>
   );
 }

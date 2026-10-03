@@ -1,11 +1,11 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useState } from 'react';
 import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
-import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
-import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
 import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
@@ -15,8 +15,6 @@ import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
-import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal-scroll';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -24,11 +22,12 @@ import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 /**
  * The profile override the new-session screen adds to the shared contract: the
- * Environment row and the advanced-config selector drive one session-level pick.
+ * Environment row owns selection; advanced configuration edits manual drafts.
  * The base fields live in `new-session-configure-form-props`, extracted so this
  * file stays within the repo's line cap.
  */
@@ -38,11 +37,10 @@ type NewSessionProfileOverrideProps = {
   /** Opens the profile picker sheet. */
   onOpenProfilePicker: () => void;
   /**
-   * The session's profile override, shared by the Environment row and the
-   * advanced-config selector; null keeps the effective default.
+   * The session's profile override; null keeps the effective default.
    */
   selectedProfileId: string | null;
-  /** Reports a pick (or `No profile`) from the advanced-config selector. */
+  /** Selects a newly saved profile from advanced configuration. */
   onSelectProfile: (id: string | null) => void;
   /**
    * The session's manual environment variables and setup commands. Owned by the
@@ -133,46 +131,11 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
-  // The form is edge-to-edge and the window never resizes for the IME on
-  // either platform, so the screen needs two floors. The first is the
-  // navigation-bar inset, which the pinned footer reserves itself
-  // (`bottomClearance` below), so the footer can never render inside the bar:
-  // the Start action sits in a footer below the scroll body, and without the
-  // inset the footer would render in the navigation bar's region (a formSheet
-  // over this screen no longer leaves that region exposed below itself: the
-  // sheet is fixed at its shared options, `sheetShouldOverflowTopInset`). The
-  // second is the keyboard height, because the composer auto-focuses on open
-  // and with the keyboard up the scroll body is only ~1300 px tall while the
-  // form is ~2000 px, so a Start inside the scroll would sit below the fold —
-  // the user had to dismiss the keyboard (a scroll drag with
-  // `keyboardDismissMode="on-drag"` did that for them) to reach the primary
-  // action. Start therefore lives in a footer *outside* the ScrollView. The
-  // keyboard-lift view below adds the reported IME height above that inset; it
-  // is the app's cross-platform IME primitive (keyboardDidShow/DidHide on
-  // Android, keyboardWillShow/WillHide on iOS), one implementation for both
-  // platforms, and it wraps the footer alone, so the IME shrinks the scroll
-  // body and lifts the action, and no scroll position can carry the Start
-  // action under the bar or the keyboard.
-  //
-  // The composer reveal keeps the scroll CONTENT reachable; it does not keep
-  // the composer card's own bottom row (the mode/model pills) above the IME —
-  // the card is the first child, so it is drawn under the keyboard. This
-  // reveal scrolls the card's bottom edge to the viewport's bottom, changing
-  // only the content offset (never a size) so no surrounding layout moves.
-  // The hook feeds the live offset back with `onScroll`, so when the IME
-  // closes it can give the keyboard-down view its offset back: the form is far
-  // taller than the lifted viewport, and without the restore the card's top
-  // edge (rounded corner, top padding, the prompt's first line) comes back
-  // clipped under the header.
-  const composerReveal = useComposerRevealScroll();
-  // The pinned footer's single source of bottom clearance: it clears the system
-  // navigation bar under Start. Without it the primary action can sit in the
-  // bar's translucent region a formSheet leaves exposed below itself (the
-  // picker's bottom strip showed its sliver). It rides the footer itself (see
-  // pr-comment-cta.tsx for the same bar pattern) rather than a spacer inside
-  // the ScrollView, which the pinned Start no longer needs and which left dead
-  // space below the last field of a long form.
+  // The footer reserves the platform inset. KeyboardAvoidingView lifts the
+  // scroll body and footer together; the prompt yields height to the viewport.
+  // The scroll view retains focused-input keyboard inset adjustment.
   const bottomClearance = useDetailScreenBottomPadding();
+  const { bottom } = useSafeAreaInsets();
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the footer, so the two never stack into a double lift.
@@ -181,7 +144,7 @@ export function NewSessionConfigureForm({
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
   // The scroll frame's own height, reported by the ScrollView below. It already
-  // shrinks with the keyboard because `AppAwareKeyboardPaddingView` pads this
+  // shrinks with the keyboard because the `KeyboardAvoidingView` below lifts this
   // parent; the prompt yields its minimum height to it so the whole composer
   // card renders above the bottom system bar.
   const [frameHeight, setFrameHeight] = useState(0);
@@ -203,32 +166,15 @@ export function NewSessionConfigureForm({
 
   const body = (
     <ScrollView
-      ref={composerReveal.scrollRef}
       className="flex-1"
       contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
-      onLayout={event => {
-        // The one layout feeds both consumers: the form frame height sets the
-        // prompt's input floor, and the hook's viewport height drives the reveal.
-        handleScrollFrameLayout(event);
-        composerReveal.onViewportLayout(event.nativeEvent.layout.height);
-      }}
-      onScroll={event => {
-        composerReveal.onScroll(event.nativeEvent.contentOffset.y);
-      }}
-      scrollEventThrottle={16}
-      onScrollBeginDrag={() => {
-        composerReveal.onUserScroll();
-      }}
+      onLayout={handleScrollFrameLayout}
     >
       <View
         onLayout={event => {
-          composerReveal.onComposerLayout({
-            y: event.nativeEvent.layout.y,
-            height: event.nativeEvent.layout.height,
-          });
           const nextTop = Math.max(Math.round(event.nativeEvent.layout.y), 0);
           setComposerTop(current => (current === nextTop ? current : nextTop));
         }}
@@ -389,19 +335,17 @@ export function NewSessionConfigureForm({
     </View>
   );
 
-  // The primary action is pinned below the scroll body, never part of it: a
-  // Start inside the form scrolled below the fold on a short screen, so only
-  // the top of the control stayed visible above the navigation bar. The lift
-  // view wraps the footer alone, so the IME shrinks the body instead of
-  // covering the action, and Start stays on screen above the navigation bar.
-  // The footer's own padding already reserves the bottom inset
-  // (`bottomClearance`), so `contentReservesBottomInset` keeps the
-  // screen-bottom-anchored occlusion from counting that inset a second time.
+  // Shrink the scroll viewport with the keyboard; a footer-only lift grows
+  // below its full-height sibling and leaves Start behind the keyboard.
   return (
-    <View className="flex-1 bg-background">
+    <KeyboardAvoidingView
+      className="flex-1 bg-background"
+      behavior="padding"
+      keyboardVerticalOffset={keyboardInsetOffset(bottom)}
+    >
       {body}
-      <AppAwareKeyboardPaddingView contentReservesBottomInset>{footer}</AppAwareKeyboardPaddingView>
-    </View>
+      {footer}
+    </KeyboardAvoidingView>
   );
 }
 
@@ -417,14 +361,13 @@ type NewSessionProfileRowProps = {
 };
 
 /**
- * The new-session Environment row: a tappable summary of the effective profile
- * with the active-profile indicator beside its label. Loading and failure keep
- * the shared body's reserved lines, so the rows below never move when the query
- * settles and no default flashes before it does; the settled row is the entry
- * point that opens the profile picker.
+ * The new-session Environment row: a tappable summary of the effective profile.
+ * Loading and failure keep the shared body's reserved lines, so the rows below
+ * never move when the query settles and no default flashes before it does.
+ * The settled row is the entry point that opens the profile picker.
  *
  * It lives with this screen rather than in `new-session-profile-row` because
- * the indicator and the chevron reach the app's icon barrel, which the mounted
+ * the chevron reaches the app's icon barrel, which the mounted
  * suite that renders the read-only row cannot load.
  */
 export function NewSessionProfileRow({
@@ -438,24 +381,11 @@ export function NewSessionProfileRow({
   const { t } = useTranslation();
   const colors = useThemeColors();
 
-  const indicatorState = buildActiveProfileIndicatorState({
-    selectedProfileName: profile?.name ?? null,
-    repoBoundProfileName: null,
-    hasManualEnvVars: false,
-    hasManualSetupCommands: false,
-    hasSelectedProfileId: profile !== null || overrideNeedsAttention,
-    isProfilesLoading: isProfileLoading,
-    hasProfileError: isProfileError,
-  });
-
   return (
     <View className="mt-5">
-      <View className="mb-2 flex-row items-center justify-between gap-2">
-        <Text className="text-sm font-medium text-muted-foreground">
-          {t('agentChat.newSession.environment')}
-        </Text>
-        <ActiveProfileIndicator state={indicatorState} onPress={onOpenProfilePicker} />
-      </View>
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('agentChat.newSession.environment')}
+      </Text>
       {isProfileLoading || isProfileError ? (
         renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
       ) : (

@@ -25,6 +25,10 @@
     {
       "name": "no-literal-copy",
       "specifier": "../../tools/oxlint/no-literal-copy/index.ts"
+    },
+    {
+      "name": "no-destructive-alert",
+      "specifier": "../../tools/oxlint/no-destructive-alert.mjs"
     }
   ],
   "options": {
@@ -54,8 +58,15 @@
         "paths": [
           {
             "name": "react-native",
-            "importNames": ["Image"],
-            "message": "Import Image from @/components/ui/image instead."
+            "importNames": [
+              "Image",
+              "Modal",
+              "KeyboardAvoidingView",
+              "FlatList",
+              "VirtualizedList",
+              "SectionList"
+            ],
+            "message": "Image → @/components/ui/image. Modal → @/components/ui/sheet or a formSheet route. KeyboardAvoidingView → react-native-keyboard-controller. FlatList/VirtualizedList/SectionList → FlashList. See apps/mobile/AGENTS.md."
           },
           {
             "name": "expo-image",
@@ -68,6 +79,106 @@
           {
             "name": "expo-file-system/legacy",
             "message": "Use the modern expo-file-system API (File, Directory, Paths, UploadType). The legacy module is deprecated."
+          },
+          {
+            "name": "@legendapp/list",
+            "message": "FlashList is the app's list component."
+          },
+          {
+            "name": "@expo/ui/community/bottom-sheet",
+            "message": "Use Sheet from @/components/ui/sheet."
+          },
+          {
+            "name": "@gorhom/bottom-sheet",
+            "message": "Use Sheet from @/components/ui/sheet."
+          },
+          {
+            "name": "react-native-modal",
+            "message": "Use Sheet from @/components/ui/sheet."
+          },
+          {
+            "name": "react-native-modalize",
+            "message": "Use Sheet from @/components/ui/sheet."
+          },
+          {
+            "name": "@lodev09/react-native-true-sheet",
+            "message": "Use Sheet from @/components/ui/sheet."
+          },
+          {
+            "name": "@swmansion/react-native-bottom-sheet",
+            "message": "Use Sheet from @/components/ui/sheet."
+          },
+          {
+            "name": "@rn-primitives/dialog",
+            "message": "Use the dialog surfaces from @/components/ui/dialog."
+          },
+          {
+            "name": "react-native-keyboard-aware-scroll-view",
+            "message": "Use KeyboardAwareScrollView from react-native-keyboard-controller."
+          },
+          {
+            "name": "react-native-toast-message",
+            "message": "Use sonner-native."
+          },
+          {
+            "name": "burnt",
+            "message": "Use sonner-native."
+          },
+          {
+            "name": "moti",
+            "message": "Use @/components/ui/skeleton."
+          },
+          {
+            "name": "react-native-reanimated-skeleton",
+            "message": "Use @/components/ui/skeleton."
+          },
+          {
+            "name": "react-native-skeleton-placeholder",
+            "message": "Use @/components/ui/skeleton."
+          },
+          {
+            "name": "react-hook-form",
+            "message": "Use @/components/ui/form-field."
+          },
+          {
+            "name": "@tanstack/react-form",
+            "message": "Use @/components/ui/form-field."
+          },
+          {
+            "name": "react-native-awesome-gallery",
+            "message": "Use @/components/ui/image-viewer."
+          },
+          {
+            "name": "react-native-image-viewing",
+            "message": "Use @/components/ui/image-viewer."
+          },
+          {
+            "name": "react-native-image-zoom-viewer",
+            "message": "Use @/components/ui/image-viewer."
+          },
+          {
+            "name": "@likashefqet/react-native-image-zoom",
+            "message": "Use @/components/ui/image-viewer."
+          },
+          {
+            "name": "react-native-video",
+            "message": "Use expo-video."
+          },
+          {
+            "name": "expo-av",
+            "message": "Use expo-video and expo-audio."
+          },
+          {
+            "name": "@react-native-segmented-control/segmented-control",
+            "message": "Use @/components/ui/segmented-control."
+          },
+          {
+            "name": "react-native-markdown-display",
+            "message": "Use the app's markdown chain (@/components/markdown/markdown-text)."
+          },
+          {
+            "name": "@ronradtke/react-native-markdown-display",
+            "message": "Use the app's markdown chain (@/components/markdown/markdown-text)."
           }
         ]
       }
@@ -220,6 +331,7 @@
     "anti-slop/no-unknown-returns": "error",
     "zod-utils/no-inline-zod-schema": "error",
     "rn-modal-backdrop/require-backdrop": "error",
+    "no-destructive-alert/no-destructive-alert": "error",
     "no-literal-copy/no-literal-copy": "error"
   },
   "overrides": [
@@ -250,6 +362,25 @@
     },
     {
       "files": ["src/components/ui/image.tsx"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      // Sanctioned homes for a banned import. These are the only files that may
+      // import a unified element's underlying library directly.
+      //   sheet.tsx  — the single home of `@expo/ui` BottomSheet
+      //   dialog.tsx — the single home of `@rn-primitives/dialog`
+      // Test files mock `react-native` and the native libraries directly, so
+      // they are exempt permanently. No file imports `Modal` from
+      // `react-native` any more, and no exception exists for it: see
+      // apps/mobile/AGENTS.md.
+      "files": [
+        "src/components/ui/sheet.tsx",
+        "src/components/ui/dialog.tsx",
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ],
       "rules": {
         "no-restricted-imports": "off"
       }

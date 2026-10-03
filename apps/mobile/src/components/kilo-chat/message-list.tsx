@@ -4,7 +4,6 @@ import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/ki
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   AccessibilityInfo,
-  Keyboard,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   View,
@@ -16,10 +15,7 @@ import {
   getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
 } from '@/components/agents/older-messages-a11y';
-import {
-  createMessageListKeyboardScrollScheduler,
-  createMessageListNewestScrollScheduler,
-} from './message-list-keyboard-scroll';
+import { createMessageListNewestScrollScheduler } from './message-list-newest-scroll';
 import {
   isMessageListAtBottom,
   messageListNewestScrollKey,
@@ -68,16 +64,6 @@ export function MessageList({
   const isAtBottomRef = useRef(true);
   const isAutoFollowingNewestRef = useRef(true);
   const scrollToNewestRequestRef = useRef(scrollToNewestRequest);
-  const keyboardScrollScheduler = useMemo(
-    () =>
-      createMessageListKeyboardScrollScheduler({
-        getScrollOffset: () => scrollOffsetRef.current,
-        scrollToOffset: params => {
-          listRef.current?.scrollToOffset(params);
-        },
-      }),
-    []
-  );
   const newestScrollScheduler = useMemo(
     () =>
       createMessageListNewestScrollScheduler({
@@ -87,9 +73,8 @@ export function MessageList({
       }),
     []
   );
-  // useMessages returns messages oldest-to-newest.
-  // FlashList v2 does not support `inverted`; instead we use maintainVisibleContentPosition
-  // with startRenderingFromBottom, which expects chronological order.
+  // useMessages returns messages oldest-to-newest. The list renders chronological
+  // order with maintainVisibleContentPosition + startRenderingFromBottom.
   const chronological = messages;
   const newestMessage = chronological.at(-1);
   const messageMap = useMemo(
@@ -101,6 +86,11 @@ export function MessageList({
     isAtBottomRef.current = true;
     newestScrollScheduler.schedule();
   }, [newestScrollScheduler]);
+  const handleLayout = useCallback(() => {
+    if (isAutoFollowingNewestRef.current) {
+      scrollToNewest();
+    }
+  }, [scrollToNewest]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -132,17 +122,12 @@ export function MessageList({
     [scrollToNewest]
   );
 
-  useEffect(() => {
-    const subscription = Keyboard.addListener('keyboardDidShow', event => {
-      keyboardScrollScheduler.schedule(event.endCoordinates.height);
-    });
-
-    return () => {
-      subscription.remove();
-      keyboardScrollScheduler.cancel();
+  useEffect(
+    () => () => {
       newestScrollScheduler.cancel();
-    };
-  }, [keyboardScrollScheduler, newestScrollScheduler]);
+    },
+    [newestScrollScheduler]
+  );
 
   useEffect(() => {
     const newestMessageKey = messageListNewestScrollKey(newestMessage);
@@ -200,6 +185,7 @@ export function MessageList({
       <FlashList
         ref={listRef}
         style={listStyle}
+        onLayout={handleLayout}
         data={chronological}
         renderItem={({ item, index }) => {
           // In chronological order, the previous message in time is data[index - 1].

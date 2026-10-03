@@ -5,6 +5,7 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { type ChatComposer } from './chat-composer';
 
 // The attachment-only send contract: a ready (`uploaded`) attachment with an
@@ -37,6 +38,15 @@ const uploadState = vi.hoisted(() => ({
 
 const toastErrorMock = vi.hoisted(() => vi.fn());
 const toastWarningMock = vi.hoisted(() => vi.fn());
+
+// Spies for the unclaimed-attachment leave: the composer dispatches the
+// prevented navigation action and releases the uploads only after the in-app
+// confirm runs its `onConfirm`.
+const leaveMock = vi.hoisted(() => ({
+  dispatch: vi.fn(),
+  releaseUnclaimedUploads: vi.fn(),
+  confirm: vi.fn(),
+}));
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -95,7 +105,7 @@ vi.mock('react-native-gesture-handler', () => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useNavigation: () => ({ dispatch: vi.fn() }),
+  useNavigation: () => ({ dispatch: leaveMock.dispatch }),
 }));
 
 vi.mock('@/lib/navigation/prevent-remove', () => ({
@@ -168,8 +178,17 @@ vi.mock('@/components/agents/attachment-picker', () => ({
   pickAgentAttachments: vi.fn(),
 }));
 
-vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
+vi.mock('@/components/agents/remote-session-exit-alert', () => {
+  const confirmExit = vi.fn(async () => true);
+  return {
+    useRemoteSessionExitConfirmation: () => ({ confirmExit, exitDialog: null }),
+  };
+});
+
+// The composer reaches this hook; the suite calls the component as a plain
+// function, so every hook on its path is stubbed.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: leaveMock.confirm, dialog: null }),
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
@@ -221,7 +240,7 @@ vi.mock('@/lib/agent-attachments/use-agent-attachment-upload', () => ({
     removeAttachment: vi.fn(() => undefined),
     retryAttachment: vi.fn(() => undefined),
     reset: vi.fn(() => undefined),
-    releaseUnclaimedUploads: vi.fn(() => undefined),
+    releaseUnclaimedUploads: leaveMock.releaseUnclaimedUploads,
     commitSent: vi.fn(() => undefined),
     isUploading: uploadState.isUploading,
     hasFailedAttachments: uploadState.attachments.some(attachment => attachment.status === 'error'),
@@ -425,5 +444,41 @@ describe('ChatComposer attachment-only send', () => {
 
     expect(onSendMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledWith('Wait for attachments to finish uploading.');
+  });
+});
+
+describe('ChatComposer unclaimed-attachment leave', () => {
+  it('routes the leave through the in-app discard confirm', async () => {
+    uploadState.attachments = [{ status: 'uploaded', remoteFilename: 'file.png', remoteKey: 'k1' }];
+
+    await mount(makeProps({ draftKey: 'agent-composer:sess-1' }));
+
+    const guard = vi.mocked(usePreventRemove).mock.calls.at(-1);
+    expect(guard?.[0]).toBe(true);
+    const action = { type: 'GO_BACK' };
+    const runGuard = guard?.[1] as
+      | ((options: { data: { action: { type: string } } }) => void)
+      | undefined;
+    if (!runGuard) {
+      throw new Error('composer did not register its leave guard');
+    }
+    runGuard({ data: { action } });
+
+    expect(leaveMock.confirm).toHaveBeenCalledWith({
+      title: 'Discard attachments?',
+      message: 'Unclaimed uploads will be deleted.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      onConfirm: expect.any(Function),
+    });
+    // The leave stays prevented until the user discards.
+    expect(leaveMock.releaseUnclaimedUploads).not.toHaveBeenCalled();
+    expect(leaveMock.dispatch).not.toHaveBeenCalled();
+
+    const request = leaveMock.confirm.mock.calls.at(-1)?.[0] as { onConfirm: () => void };
+    request.onConfirm();
+
+    expect(leaveMock.releaseUnclaimedUploads).toHaveBeenCalledTimes(1);
+    expect(leaveMock.dispatch).toHaveBeenCalledWith(action);
   });
 });

@@ -2,7 +2,7 @@ import { type ReactElement, useState, useSyncExternalStore } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { AlertCircle, Download, RotateCcw } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -278,7 +278,7 @@ export function MarkdownImage({
         </Pressable>
       </FixedImageSlot>
       {viewerVisible && (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
           uri={resolveMarkdownImageSrc(uri)}
           filename={filename}

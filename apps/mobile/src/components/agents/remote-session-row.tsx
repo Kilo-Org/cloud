@@ -25,7 +25,7 @@ import {
 } from '@/lib/session-attention';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
-import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
+import { useRemoteSessionExitConfirmation } from './remote-session-exit-alert';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   activeSessionMetaTimestamp,
@@ -69,6 +69,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const connection = useUserWebConnection();
+  const { confirmExit, exitDialog } = useRemoteSessionExitConfirmation();
   const { organizationId, isLoaded } = useOrganization();
   const authEpoch = currentAuthEpoch();
   const refreshScope = useMemo(
@@ -230,7 +231,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const handleExit = () => {
     void exitRemoteSessionFromList({
-      confirm: showRemoteSessionExitConfirmation,
+      confirm: confirmExit,
       sendExit: async () => {
         await connection.sendCommand(
           session.id,
@@ -326,6 +327,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         last={variant === 'card' ? true : undefined}
         className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />
+      {exitDialog}
     </Pressable>
   );
 });

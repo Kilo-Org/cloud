@@ -320,6 +320,8 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    // Inline video file parts in the session transcript (file-part-renderer).
+    'expo-video',
     'expo-font',
     // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
     // writes the union of the SecureStore and AppsFlyer exclusions). Disable the

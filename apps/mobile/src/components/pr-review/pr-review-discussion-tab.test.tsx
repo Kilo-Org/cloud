@@ -3,9 +3,9 @@
 // pr-review-discussion-tab.test-helpers. That import MUST stay first: the
 // helpers register the module mocks while they are evaluated.
 import {
-  alertCalls,
   BASE_PROPS,
   bottomPaddedViews,
+  confirmRequests,
   connectivity,
   deleteMutate,
   discussionState,
@@ -429,7 +429,7 @@ describe('PrReviewDiscussionTab own-comment actions (s4)', () => {
   }
 
   beforeEach(() => {
-    alertCalls.length = 0;
+    confirmRequests.length = 0;
   });
 
   it('pushes the comment-edit route with the posted body and the kind', () => {
@@ -457,15 +457,16 @@ describe('PrReviewDiscussionTab own-comment actions (s4)', () => {
     const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
     (list.props.onDeleteComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
 
-    expect(alertCalls).toHaveLength(1);
-    expect(alertCalls[0]?.title).toBe('Delete comment?');
-    expect(alertCalls[0]?.message).toBe('This comment will be deleted from the pull request.');
-    expect(alertCalls[0]?.buttons.map(button => button.text)).toEqual(['Cancel', 'Delete']);
+    expect(confirmRequests).toHaveLength(1);
+    expect(confirmRequests[0]?.title).toBe('Delete comment?');
+    expect(confirmRequests[0]?.message).toBe('This comment will be deleted from the pull request.');
+    expect(confirmRequests[0]?.confirmLabel).toBe('Delete');
+    // The safe choice keeps the generic Cancel label.
+    expect(confirmRequests[0]?.cancelLabel).toBeUndefined();
     // The confirmation itself writes nothing.
     expect(deleteMutate).not.toHaveBeenCalled();
 
-    const deleteButton = alertCalls[0]?.buttons.find(button => button.text === 'Delete');
-    deleteButton?.onPress?.();
+    confirmRequests[0]?.onConfirm();
 
     expect(deleteMutate).toHaveBeenCalledTimes(1);
     expect(deleteMutate).toHaveBeenCalledWith({
@@ -491,9 +492,8 @@ describe('PrReviewDiscussionTab own-comment actions (s4)', () => {
     const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
     (list.props.onDeleteComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
 
-    expect(alertCalls).toHaveLength(1);
-    const deleteButton = alertCalls[0]?.buttons.find(button => button.text === 'Delete');
-    deleteButton?.onPress?.();
+    expect(confirmRequests).toHaveLength(1);
+    confirmRequests[0]?.onConfirm();
 
     expect(deleteMutate).not.toHaveBeenCalled();
     expect(toastError).toHaveBeenCalledWith(

@@ -73,6 +73,14 @@ function searchInput(renderer: TestRenderer.ReactTestRenderer) {
   return input;
 }
 
+/**
+ * The style RN flattens an input's array to, so a test asserts the property it
+ * is about rather than the box's whole enforced style.
+ */
+function flattenedStyle(style: unknown): Record<string, unknown> {
+  return Object.assign({}, ...([style] as Record<string, unknown>[]).flat());
+}
+
 describe('SessionListSearchHeader landscape sensor insets', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -150,7 +158,7 @@ describe('SessionListSearchHeader typed query alignment', () => {
   it('passes no alignment style in LTR so English is unchanged', async () => {
     i18nManager.isRTL = false;
     const renderer = await mount(<SessionListSearchHeader {...baseProps} />);
-    expect(searchInput(renderer).props.style).toBeUndefined();
+    expect(flattenedStyle(searchInput(renderer).props.style).textAlign).toBeUndefined();
   });
 
   it('aligns the typed query to the field start edge in RTL', async () => {
@@ -159,7 +167,7 @@ describe('SessionListSearchHeader typed query alignment', () => {
     // The shared box applies the RTL content alignment in front of the
     // caller's own style (this field passes none), so the field's query follows
     // the interface direction.
-    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
+    expect(flattenedStyle(searchInput(renderer).props.style).textAlign).toBe('right');
   });
 });
 

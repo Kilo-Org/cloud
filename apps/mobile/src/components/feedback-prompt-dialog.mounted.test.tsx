@@ -14,12 +14,16 @@ const feedback = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  Modal: 'Modal',
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// `@/components/ui/dialog` reaches `DestructiveConfirmDialog`, which reads the
+// bottom inset; the native module cannot load under this partial RN mock.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -168,14 +172,15 @@ describe('FeedbackPromptDialog', () => {
     expect(feedback.sendAppFeedback).not.toHaveBeenCalled();
   });
 
-  it('dismisses without recording on the Android back request', () => {
+  // The card draws its own backdrop pressable; a press outside the card is a
+  // dismissal that records nothing (Android Back routes through the same
+  // `onClose`, owned by the primitive's `Content`).
+  it('dismisses without recording when the backdrop is pressed', () => {
     const root = mount();
 
-    act(() => {
-      (
-        root.find(node => isType(node, 'Modal')).props as { onRequestClose?: () => void }
-      ).onRequestClose?.();
-    });
+    press(
+      root.find(node => isType(node, 'Pressable') && classNameOf(node).includes('absolute inset-0'))
+    );
 
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(feedback.requestAppRating).not.toHaveBeenCalled();

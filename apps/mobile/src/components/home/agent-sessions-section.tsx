@@ -2,12 +2,17 @@ import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 
-import { LiveNowCard } from '@/components/home/live-now-card';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
+import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import {
+  GlanceableActiveCard,
+  GlanceableActiveCardSkeleton,
+} from '@/components/home/glanceable-active-card';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -17,8 +22,8 @@ import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
@@ -281,14 +286,16 @@ export function LiveSessionFeedback({
 export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { reducedMotion } = useMotionPolicy();
+  const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
 
   return (
     <View>
       {/* An accepted empty live list renders only the `Nothing running right
           now` card, so the `Live now` / See-all header would advertise the
-          Agents live index for sessions that do not exist. The summary card and
-          the loading skeleton keep the header unchanged. */}
+          Agents live index for sessions that do not exist. Rows and the
+          loading skeletons keep the header unchanged. */}
       {content !== 'empty' && (
         <SectionHeader
           label={t('home.agentSessions')}
@@ -306,23 +313,30 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
           sessions={sessions}
           failureLabel={t('home.couldNotLoadActiveSessions')}
         />
-        {content === 'pending' && (
-          // The placeholder borrows the summary card's geometry: the same
-          // reserved min-height, border, and card padding, so swapping it for
-          // the arriving card cannot reflow the LIVE NOW block.
-          <View className="min-h-[72px] justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3">
-            <Skeleton className="h-3 w-2/3 rounded" />
-            <Skeleton className="h-3 w-1/3 rounded" />
-          </View>
-        )}
-        {content === 'empty' && (
-          <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
-            <Text variant="muted" className="text-sm">
-              {t('home.noLiveSessions')}
-            </Text>
-          </View>
-        )}
-        {content === 'rows' && <LiveNowCard sessions={sessions} />}
+        {/* One card, not a row per session: its frame and row heights are the
+            same in the pending and rows states (`GlanceableActiveCardSkeleton`
+            repeats `GlanceableActiveCard`'s box), so the swap cannot move the
+            header, feedback or the agent-create actions below. */}
+        <Animated.View layout={LinearTransition}>
+          {content === 'pending' && <GlanceableActiveCardSkeleton />}
+          {content === 'empty' && (
+            <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
+              <Text variant="muted" className="text-sm">
+                {t('home.noLiveSessions')}
+              </Text>
+            </View>
+          )}
+          {content === 'rows' && (
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+            >
+              <GlanceableActiveCard
+                sessions={sessions.activeSessions}
+                onPressSession={handleRowPress}
+              />
+            </Animated.View>
+          )}
+        </Animated.View>
       </View>
     </View>
   );

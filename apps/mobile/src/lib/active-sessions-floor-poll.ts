@@ -192,12 +192,16 @@ type UseActiveSessionsFloorPollOptions = {
  * before the first payload is in the cache (nothing to compare against, and an
  * empty cache belongs to the initial fetch, not this poll).
  *
- * Arming also reconciles once immediately, so a surface that just became
- * visible — or a read gate/connection that just re-armed — catches up without
- * waiting a full interval. That reconcile is skipped while a query fetch for
- * the same key is already in flight, because that fetch is about to deliver
- * the same payload and racing it would only duplicate the request. It is a
- * single call per arm, not a second loop, so it adds no idle traffic.
+ * On the false->true edge of the `enabled && visible` gate — a surface that
+ * shows live agents becoming visible, or the read gate re-arming — one leading
+ * tick runs before the interval is installed, so the rows reconcile as soon as
+ * the surface is on screen instead of up to a full floor interval later. The
+ * cold-start arm is not an edge: the surface's own query mount already fetches,
+ * so the poll never duplicates it. A `connected` flip only re-arms the
+ * interval: a reconnect already gets its freshness from the live-sync path, so
+ * it must not add a request. The leading tick is the ordinary `tick` and keeps
+ * every guard below, so it is a no-op while hidden, backgrounded, in flight, or
+ * before the cache holds a payload.
  */
 export function useActiveSessionsFloorPoll({
   enabled,
@@ -209,9 +213,14 @@ export function useActiveSessionsFloorPoll({
 }: UseActiveSessionsFloorPollOptions): void {
   const { authEpoch } = useAuth();
   const inFlight = useRef(false);
+  // True while an interval is armed. Starts armed so the cold-start mount is
+  // not treated as a visible edge, and is kept across the `connected` re-arm so
+  // only the gate's own false->true edge leads a tick, never a reconnect.
+  const armed = useRef(true);
 
   useEffect(() => {
     if (!enabled || !visible) {
+      armed.current = false;
       return undefined;
     }
     const controller = new AbortController();
@@ -272,19 +281,20 @@ export function useActiveSessionsFloorPoll({
         }
       }
     };
+    // One leading tick on the gate's false->true edge, then the unchanged
+    // interval. `tick` owns every guard, so a backgrounded, hidden-cache or
+    // already-in-flight arm leads to no request.
+    const shouldLeadTick = !armed.current;
+    armed.current = true;
+    if (shouldLeadTick) {
+      void tick();
+    }
     const interval = setInterval(
       () => {
         void tick();
       },
       connected ? CONNECTED_FLOOR_POLL_MS : DISCONNECTED_FLOOR_POLL_MS
     );
-    // Reconcile once as this arm takes over, instead of leaving a just-focused
-    // surface stale for a full interval. A query fetch already in flight for
-    // the key is about to land the same payload, so skip the redundant request
-    // rather than race it; the interval below still owns every later tick.
-    if (queryClient.isFetching({ queryKey }) === 0) {
-      void tick();
-    }
     return () => {
       clearInterval(interval);
       // Stop the in-flight request as well as future ticks: an aborted fetch

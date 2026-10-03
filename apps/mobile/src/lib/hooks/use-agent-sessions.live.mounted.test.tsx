@@ -113,20 +113,6 @@ function live() {
   }
   return latest;
 }
-/**
- * The mount arms the floor poll, which reconciles once on arm (see
- * `active-sessions-floor-poll`). These notification tests seed the raise into
- * the cache by hand and expect it to survive, so point the poll's query
- * function at the current cache: the arm reconcile then compares a payload
- * with itself, writes nothing, and never clobbers the seeded rows with the
- * default empty response.
- */
-function echoActiveSessions(): void {
-  state.request.mockImplementation(async () => {
-    await Promise.resolve();
-    return client.getQueryData<CachedActiveSessionsData>(QUERY_KEY) ?? { sessions: [] };
-  });
-}
 async function startRefresh(): Promise<{ pending: Promise<boolean> | undefined }> {
   let pending: Promise<boolean> | undefined = undefined;
   await act(async () => {
@@ -333,7 +319,6 @@ describe('live query presentation and refresh contracts', () => {
     client.setQueryData(QUERY_KEY, {
       sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
     });
-    echoActiveSessions();
     await render();
     expect(state.scheduleNotificationAsync).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -377,7 +362,6 @@ describe('live query presentation and refresh contracts', () => {
     client.setQueryData(QUERY_KEY, {
       sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
     });
-    echoActiveSessions();
     await render();
     expect(state.scheduleNotificationAsync).not.toHaveBeenCalled();
   });
@@ -391,7 +375,6 @@ describe('live query presentation and refresh contracts', () => {
     client.setQueryData(QUERY_KEY, {
       sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
     });
-    echoActiveSessions();
     await render();
     expect(state.scheduleNotificationAsync).not.toHaveBeenCalled();
 
@@ -409,7 +392,6 @@ describe('live query presentation and refresh contracts', () => {
     client.setQueryData(QUERY_KEY, {
       sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
     });
-    echoActiveSessions();
     await render();
     expect(state.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
 
@@ -425,7 +407,6 @@ describe('live query presentation and refresh contracts', () => {
     client.setQueryData(QUERY_KEY, {
       sessions: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'permission' })],
     });
-    echoActiveSessions();
     await render();
     expect(state.scheduleNotificationAsync.mock.calls.map(c => c[0].identifier)).toEqual([
       'needs-input:ses_1',

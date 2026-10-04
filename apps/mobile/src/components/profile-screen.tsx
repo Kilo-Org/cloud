@@ -208,6 +208,10 @@ export function ProfileScreen() {
             icon={SlidersHorizontal}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
+            // Agents step: the row lists the agent profiles, and its two
+            // siblings in this section already carry `honey`. The neutral tile
+            // made one row of three read as disabled.
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {

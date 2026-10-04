@@ -16,7 +16,7 @@ import { createTRPCRouter } from '@/lib/trpc/init';
 import { client as stripe } from '@/lib/stripe-client';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { getOrganizationById } from '@/lib/organizations/organizations';
-import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import { ipCountryFromHeaders, ja4FromHeaders } from '@/lib/bouncer/credit-events';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
@@ -247,6 +247,7 @@ export const organizationKiloPassRouter = createTRPCRouter({
                     accountCreatedAt: organization.created_at,
                     ip: ctx.ip,
                     ipCountry: ipCountryFromHeaders(ctx.headersList),
+                    ja4: ja4FromHeaders(ctx.headersList),
                   }
                 : undefined,
             })

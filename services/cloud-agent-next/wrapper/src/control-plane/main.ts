@@ -305,6 +305,7 @@ export async function runControlPlaneWrapper(
     emit: frame => connection.send(frame),
     runtimes: { get: key => runtimes.get(key) },
     log: logToFile,
+    onDiagnostic: diagnostics.onDiagnostic,
   });
   preparationRef.current = createPreparationManager({
     timers,

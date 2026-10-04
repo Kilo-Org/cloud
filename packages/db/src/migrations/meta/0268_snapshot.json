@@ -1,5 +1,5 @@
 {
-  "id": "d7076853-a00f-4c17-9f43-e44064681749",
+  "id": "bc50c3f8-060f-4283-aad6-17561669faa6",
   "prevId": "0c987829-fdfe-42ab-8df4-a16b6ce7ea18",
   "version": "7",
   "dialect": "postgresql",
@@ -3824,6 +3824,153 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.bouncer_credit_event_outbox": {
+      "name": "bouncer_credit_event_outbox",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "UQ_bouncer_credit_event_outbox_event_id_type": {
+          "name": "UQ_bouncer_credit_event_outbox_event_id_type",
+          "columns": [
+            {
+              "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bouncer_credit_event_outbox_status_next_attempt_at": {
+          "name": "IDX_bouncer_credit_event_outbox_status_next_attempt_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bouncer_credit_event_outbox_user_id": {
+          "name": "IDX_bouncer_credit_event_outbox_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.byok_api_keys": {
       "name": "byok_api_keys",
       "schema": "",
@@ -4375,24 +4522,6 @@
         "pr_number": {
           "name": "pr_number",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_head_ref": {
-          "name": "pr_head_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_head_sha": {
-          "name": "pr_head_sha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pr_link_verified_at": {
-          "name": "pr_link_verified_at",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -12839,7 +12968,7 @@
               "nulls": "last"
             },
             {
-              "expression": "pr_number",
+              "expression": "git_branch",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -12852,7 +12981,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
+          "where": "\"github_branch_pull_requests\".\"owned_by_organization_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -12867,7 +12996,7 @@
               "nulls": "last"
             },
             {
-              "expression": "pr_number",
+              "expression": "git_branch",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -12880,7 +13009,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
+          "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -12895,7 +13024,7 @@
               "nulls": "last"
             },
             {
-              "expression": "pr_number",
+              "expression": "git_branch",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

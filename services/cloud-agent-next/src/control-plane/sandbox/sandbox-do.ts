@@ -75,7 +75,11 @@ import {
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { resolveVercelSandboxRuntimeConfig } from '../../agent-sandbox/vercel/vercel-runtime-config.js';
 import type { VercelSandboxNetworkPolicy } from '../../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { getManagedOutboundContainerId, getSandboxNamespace } from '../../sandbox-id.js';
+import {
+  getManagedOutboundContainerId,
+  getOutboundContainerId,
+  getSandboxNamespace,
+} from '../../sandbox-id.js';
 import { sessionDoName } from '../../session-plane.js';
 import { logger } from '../../logger.js';
 import {
@@ -242,6 +246,7 @@ const wrapperSocketAttachmentSchema = z.object({
   allocationId: z.string().optional(),
   connectionId: z.string().optional(),
   wrapperId: z.string().optional(),
+  heartbeatAck: z.literal(true).optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
@@ -2610,6 +2615,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
         createdRef = created.providerRef;
+        if (pin.provider === 'cloudflare' || pin.provider === 'cloudflare-containers') {
+          try {
+            const containerInstanceId =
+              pin.provider === 'cloudflare-containers'
+                ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
+                : getOutboundContainerId(this.env, intent.allocationName ?? this.sandboxId, {
+                    managedScmContainment: this.credentialContainmentEnabled(),
+                  });
+            logControlDiagnostic('container_launch_identity', {
+              sandboxId: this.sandboxId,
+              allocationId,
+              allocationName: intent.allocationName,
+              provider: pin.provider,
+              containerInstanceId,
+            });
+          } catch {
+            // Observability cannot turn a successful provider create into a failed allocation.
+          }
+        }
         await this.dispatchResult({
           type: 'provider-ref',
           at: Date.now(),
@@ -2915,6 +2939,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const attachment = this.readAttachment(ws);
 
     if (frame.type === 'hello') {
+      if (attachment?.connectionId !== undefined) return;
       const credential = typeof attachment?.credential === 'string' ? attachment.credential : null;
       const accepted = await this.validateAllocationCredential(frame.allocationId, credential);
       if (!accepted) {
@@ -2929,10 +2954,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
         allocationId: frame.allocationId,
         connectionId,
         wrapperId: frame.wrapperId,
+        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.
-      this.sendFrame(ws, { type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      this.sendFrame(ws, {
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+      });
       await this.applyEvent({
         type: 'hello-accepted',
         at: Date.now(),
@@ -2955,6 +2985,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
 
     if (frame.type === 'heartbeat') {
+      if (
+        !connectionMatches(
+          await this.readAllocation(),
+          attachment.allocationId,
+          attachment.connectionId
+        )
+      )
+        return;
       await this.applyEvent({
         type: 'heartbeat',
         at: Date.now(),
@@ -2962,6 +3000,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId: attachment.connectionId,
         active: frame.active,
       });
+      if (
+        attachment.heartbeatAck &&
+        connectionMatches(
+          await this.readAllocation(),
+          attachment.allocationId,
+          attachment.connectionId
+        ) &&
+        ws.readyState === WebSocket.OPEN &&
+        this.readAttachment(ws)?.connectionId === attachment.connectionId
+      ) {
+        this.sendFrame(ws, { type: 'heartbeat_ack' });
+      }
       return;
     }
 

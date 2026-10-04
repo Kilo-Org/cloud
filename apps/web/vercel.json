@@ -97,6 +97,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/dispatch-bouncer-credit-event-outbox",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/process-user-deletions",
       "schedule": "* * * * *"
     },

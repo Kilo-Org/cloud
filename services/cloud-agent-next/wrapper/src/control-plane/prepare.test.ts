@@ -1169,7 +1169,40 @@ describe('createPreparationManager', () => {
     const output = events
       .flatMap(frame => (frame.type === 'session.events' ? frame.events : []))
       .find(event => event.type === 'session.setup.output');
-    expect(output?.properties.output).toContain('installing dependencies');
+    expect(output?.properties.output).toBe('installing dependencies\n');
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'setup' });
+  });
+
+  it('separates streamed setup output and normalizes terminal progress like the legacy path', async () => {
+    const harness = createHarness();
+    harness.setSetupOutput(onOutput => {
+      onOutput('stdout', '\u001b[32mProgress: resolved 10\u001b[0m\r\n');
+      onOutput('stdout', 'Progress: resolved 15\rProgress: resolved 20\n');
+      onOutput('stderr', 'warning: kilo-token-');
+      onOutput('stderr', '1\n');
+      onOutput('stdout', 'Done');
+    });
+
+    await harness.manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
+
+    const events = harness.frames.flatMap(frame =>
+      frame.type === 'session.events' ? frame.events : []
+    );
+    const output = events
+      .filter(event => event.type === 'session.setup.output')
+      .map(event => event.properties.output);
+    expect(output).toEqual([
+      'Progress: resolved 10\n',
+      'Progress: resolved 20\n',
+      'warning: [REDACTED]\n',
+      'Done\n',
+    ]);
+    expect(output.join('')).toBe(
+      'Progress: resolved 10\nProgress: resolved 20\nwarning: [REDACTED]\nDone\n'
+    );
+    expect(events.at(-1)).toMatchObject({
+      type: 'session.setup.finished',
+      properties: { command: 1, exitCode: 0 },
+    });
   });
 });

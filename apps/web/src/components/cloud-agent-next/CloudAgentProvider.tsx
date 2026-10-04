@@ -24,6 +24,7 @@ import { fetchWebSessionSnapshotPage } from './session-page-adapter';
 import type { CloudAgentApi } from '@kilocode/cloud-agent-sdk/transport';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createWorktreeReviewSend, type WorktreeReviewSendApi } from './worktree-review-send';
+import { MarkdownParseCacheProvider } from './markdown-parse-cache';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
@@ -391,7 +392,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       <UserWebConnectionContext.Provider value={sharedConnection}>
         <ManagerContext.Provider value={managerRef.current}>
           <CloudAgentContext.Provider value={reviewSendRef.current}>
-            {children}
+            <MarkdownParseCacheProvider>{children}</MarkdownParseCacheProvider>
           </CloudAgentContext.Provider>
         </ManagerContext.Provider>
       </UserWebConnectionContext.Provider>

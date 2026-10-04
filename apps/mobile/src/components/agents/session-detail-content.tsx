@@ -96,9 +96,11 @@ import { useUserWebConnection } from '@/components/agents/user-web-connection-pr
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
+  resolveSessionFooterRowItem,
+  SEND_REASON_MAX_FONT_SCALE,
+  SESSION_FOOTER_ROW_ITEM_PADDING,
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
-  shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
@@ -316,11 +318,11 @@ export function SessionDetailContent({
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   // The accessor handed to the transcript's rows must keep one identity across
-  // streaming publishes: the SDK re-emits `childMessages` on every
-  // `partsRevision` bump, and a changing prop would defeat `MessageBubble`'s
-  // shallow memo for every visible row. The in-transcript subagent card
-  // subscribes to the atom itself (`LiveChildSessionSection`), so it stays live
-  // without this identity changing.
+  // root streaming publishes: the SDK only re-emits `childMessages` when
+  // non-root rows change or the storage/root session changes, and a changing
+  // prop would defeat `MessageBubble`'s shallow memo for every visible row. The
+  // in-transcript subagent card subscribes to the atom itself
+  // (`LiveChildSessionSection`), so it stays live without this identity changing.
   const getChildMessagesRef = useRef(getChildMessages);
   getChildMessagesRef.current = getChildMessages;
   const getChildMessagesForRows = useCallback(
@@ -1741,11 +1743,42 @@ export function SessionDetailContent({
     () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
     [transcript]
   );
-  const showSessionFooterRow = shouldShowSessionFooterRow({
+  // Why the send control cannot send, stated by the fixed footer row above the
+  // composer and announced to screen readers. `isComposerDisabled` is a
+  // structural lock on the whole composer; this reason covers the live send
+  // gate, which keeps the input editable. `messageCount` lets a terminal error
+  // on an empty transcript — the load-error state behind the full-screen Retry
+  // — resolve to the load-failure line instead of a runtime failure class.
+  //
+  // The indicator is the deduped one the row's own status line uses: the
+  // transcript's last row owns the failure it states and carries its action, so
+  // the reason must not restate that sentence beside it. Dropping it here keeps
+  // the reason's lower branches alive — a read-only session then names read-only
+  // instead of repeating the failed row.
+  const sendDisabledReason = resolveComposerSendDisabledReason({
+    canSend,
+    isReadOnly,
+    error,
+    statusIndicator: footerStatusIndicator,
+    cloudStatus,
+    messageCount: messages.length,
+  });
+  // The tone rides the same inputs, so a progress phase ("Setting up
+  // environment…") never renders in the destructive error color.
+  const sendDisabledReasonTone = resolveComposerSendDisabledReasonTone({
+    canSend,
+    isReadOnly,
+    error,
+    statusIndicator: footerStatusIndicator,
+    cloudStatus,
+    messageCount: messages.length,
+  });
+  const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
     hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
+    hasSendReason: sendDisabledReason !== null,
     messageCount: messages.length,
   });
 
@@ -1863,30 +1896,6 @@ export function SessionDetailContent({
     // A pinned agent model satisfies the model requirement even before the
     // catalog selection resolves.
     hasModel: Boolean(pinned.model ?? currentModel),
-  });
-  // Why the send control cannot send, stated beside it and announced to screen
-  // readers. `isComposerDisabled` above is a structural lock on the whole
-  // composer; this line covers the live send gate, which keeps the input
-  // editable. `messageCount` lets a terminal error on an empty transcript —
-  // the load-error state behind the full-screen Retry — resolve to the
-  // load-failure line instead of a runtime failure class.
-  const sendDisabledReason = resolveComposerSendDisabledReason({
-    canSend,
-    isReadOnly,
-    error,
-    statusIndicator,
-    cloudStatus,
-    messageCount: messages.length,
-  });
-  // The tone rides the same inputs, so a progress phase ("Setting up
-  // environment…") never renders in the destructive error color.
-  const sendDisabledReasonTone = resolveComposerSendDisabledReasonTone({
-    canSend,
-    isReadOnly,
-    error,
-    statusIndicator,
-    cloudStatus,
-    messageCount: messages.length,
   });
   const composerPlaceholder = useMemo(() => {
     if (cloudStatus?.type === 'preparing') {
@@ -2415,24 +2424,38 @@ export function SessionDetailContent({
             transcript rows it passes (profile-screen.tsx:275-277). It snaps in
             the same frame and stays opaque via `bg-background`, so a future
             layout change covers a transcript row instead of overprinting it.
-            Gated on has-messages so the empty/connecting path (which renders
-            the centered status indicator inside `renderContent`) does not
-            double-render. While preparing, suppressed when the transcript
-            already shows PreparationGroup (no duplicate). */}
-        {showSessionFooterRow ? (
+            One item renders at a time (working, then status, then the send
+            reason) and every item carries the same padding and text style, so a
+            swap between the one-line items cannot resize the flex-1 transcript
+            above it. The reason keeps its full copy — it wraps instead of
+            truncating — so a long translation can still add a line. The reason
+            outlives the has-messages and preparation gates: it states a send
+            gate no transcript surface carries, including the failed load on an
+            empty transcript. */}
+        {sessionFooterItem !== null ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
             className="bg-background"
           >
-            {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
-                label from the last assistant part, and compute-status.ts:33-35
-                maps a reasoning part to agentChat.partDetail.thinking, so the
-                spinner reads Thinking during a reasoning stream in both modes.
-                Feeding it displayedMessages would drop that label. */}
-            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {footerStatusIndicator ? (
+            {sessionFooterItem === 'working' ? (
+              /* Raw list on purpose: working-indicator.tsx derives the label
+                 from the last assistant part, and compute-status.ts maps a
+                 reasoning part to agentChat.partDetail.thinking, so the spinner
+                 reads Thinking during a reasoning stream in both modes. Feeding
+                 it displayedMessages would drop that label. */
+              <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+            ) : null}
+            {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
               <SessionStatusIndicator indicator={footerStatusIndicator} />
+            ) : null}
+            {sessionFooterItem === 'reason' && sendDisabledReason !== null ? (
+              <AccessibleStatus
+                message={sendDisabledReason}
+                tone={sendDisabledReasonTone === 'neutral' ? 'status' : 'error'}
+                maxFontSizeMultiplier={SEND_REASON_MAX_FONT_SCALE}
+                className={cn(SESSION_FOOTER_ROW_ITEM_PADDING, 'text-right text-sm')}
+              />
             ) : null}
           </Animated.View>
         ) : null}
@@ -2521,7 +2544,6 @@ export function SessionDetailContent({
               disabled={isComposerDisabled}
               sendDisabled={!canSend}
               sendDisabledReason={sendDisabledReason}
-              sendDisabledReasonTone={sendDisabledReasonTone}
               isStreaming={isStreaming}
               placeholder={composerPlaceholder}
               mode={currentMode}

@@ -300,7 +300,7 @@ notification, so a lost notification never leaves it waiting.
 
 ### Activity, idle stop and provider lease
 
-The wrapper heartbeat (every 15 s) carries `active`. The sandbox is active while a route prepares,
+The wrapper heartbeat (every 5 s) carries `active`. The sandbox is active while a route prepares,
 a Kilo session is busy or finalizing and not waiting for the user, a terminal has input, or a message
 was delivered in the last minute. After 10 minutes without activity the Sandbox DO stops the
 sandbox. Waiting on a question or permission is not activity. While the sandbox is active, the
@@ -364,6 +364,20 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 ## 7. Wrapper
 
 ### Connection
+
+- A new wrapper advertises optional `heartbeatAck: true` in `hello`; the Sandbox DO echoes it
+  in `welcome` only when offered. It sends `{ type: 'heartbeat_ack' }` after applying each valid
+  heartbeat from the current bound allocation/connection. Invalid, unbound, stale and terminal
+  allocation frames are not acknowledged. Negotiation lives in the socket attachment across hibernation.
+- Only a negotiated welcome starts the wrapper's 15 s acknowledgement deadline. Each acknowledgement
+  resets it; other frames do not. Expiry detaches/fences the socket and schedules the existing
+  reconnect backoff independently of close delivery. Old socket messages and callbacks cannot affect
+  the replacement. Explicit recycle clears timers, detaches the old socket and reconnects immediately
+  without waiting for close. Shutdown cancels all timers permanently. This does not restart Kilo or change billing.
+- Older v2 DOs strictly reject the capability-bearing hello. If still awaiting welcome after 1 s,
+  the wrapper sends the original hello on the same socket. A legacy welcome enables periodic
+  heartbeats without an acknowledgement deadline; old wrappers receive neither the optional field
+  nor acknowledgement frames. Duplicate hello on a bound socket is ignored.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the
@@ -573,7 +587,7 @@ requires containment. Unsupported modes and invalid modern facade configuration 
 before queuing work. Contained SCM resolution and Vercel policy remain enforced, and MCP still
 requires independent per-session runtimes.
 
-Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`,
+Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `session.credentials`,
 `session.prompt`, `session.abort`, `session.answer`, `session.release`, `session.events`,
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,

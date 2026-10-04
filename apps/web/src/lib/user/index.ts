@@ -119,6 +119,7 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  bouncer_credit_event_outbox,
   external_side_effect_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -995,6 +996,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
+ * - bouncer_credit_event_outbox (every row for the user; its payload carries the
+ *   user id, client ip, and card fingerprint)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1067,6 +1070,13 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(analytics_event_outbox)
     .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
+  // Bouncer credit-event payloads carry the user id, client ip, and card
+  // fingerprint, so every row for the user is deleted rather than retained.
+  // `enqueueCreditEvent` also refuses to store new rows for a soft-deleted
+  // account, so a late webhook cannot reintroduce the PII.
+  await tx
+    .delete(bouncer_credit_event_outbox)
+    .where(eq(bouncer_credit_event_outbox.user_id, userId));
 
   // ── 1. Anonymize the user row ────────────────────────────────────────
   await tx

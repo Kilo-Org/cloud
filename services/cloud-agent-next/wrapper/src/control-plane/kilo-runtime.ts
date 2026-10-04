@@ -281,19 +281,91 @@ export type KiloRuntime = {
   shutdown(): Promise<void>;
 };
 
+type HealthProbeObservation = {
+  startedAt: number;
+  finishedAt?: number;
+  signal: AbortSignal;
+  outcome:
+    | 'pending'
+    | 'healthy'
+    | 'unhealthy'
+    | 'http_error'
+    | 'parse_error'
+    | 'invalid_payload'
+    | 'request_error'
+    | 'aborted'
+    | 'unknown';
+  httpStatus?: number;
+};
+
+type HealthRestartTrigger =
+  | 'health_probe_false'
+  | 'sse_reconnect_budget'
+  | 'process_exit'
+  | 'no_client_retry';
+type HealthDecisionResolution = 'fulfilled_false' | 'rejected' | 'not_applicable';
+
 function createHealthProbe(
   url: string,
   directory: string,
-  timeoutMs: number
+  timeoutMs: number,
+  observe: (observation: HealthProbeObservation) => void
 ): (signal: AbortSignal) => Promise<boolean> {
   const client = createKiloEventClient({ baseUrl: url, directory });
   return async (): Promise<boolean> => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const observation: HealthProbeObservation = {
+      startedAt: Date.now(),
+      signal: controller.signal,
+      outcome: 'pending',
+    };
+    observe(observation);
     try {
       const result = await client.global.health({ signal: controller.signal });
-      return result.data?.healthy === true;
-    } catch {
+      const answered = result.data?.healthy === true;
+      observation.finishedAt = Date.now();
+      try {
+        const status = result.response?.status;
+        if (
+          typeof status === 'number' &&
+          Number.isInteger(status) &&
+          status >= 100 &&
+          status <= 599
+        ) {
+          observation.httpStatus = status;
+        }
+        const healthy: unknown = result.data?.healthy;
+        observation.outcome = controller.signal.aborted
+          ? 'aborted'
+          : result.response && !result.response.ok
+            ? 'http_error'
+            : result.error instanceof SyntaxError
+              ? 'parse_error'
+              : answered
+                ? 'healthy'
+                : healthy === false
+                  ? 'unhealthy'
+                  : !result.response
+                    ? 'request_error'
+                    : result.error !== undefined
+                      ? 'unknown'
+                      : 'invalid_payload';
+      } catch {
+        observation.outcome = 'unknown';
+      }
+      return answered;
+    } catch (error) {
+      observation.finishedAt = Date.now();
+      try {
+        observation.outcome = controller.signal.aborted
+          ? 'aborted'
+          : error instanceof SyntaxError
+            ? 'parse_error'
+            : 'request_error';
+      } catch {
+        observation.outcome = 'unknown';
+      }
       return false;
     } finally {
       clearTimeout(timer);
@@ -384,6 +456,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   let client: WrapperKiloClient | undefined;
   let feed: KiloEventFeed | undefined;
   let probeHealth: ((signal: AbortSignal) => Promise<boolean>) | undefined;
+  let healthObservation: HealthProbeObservation | undefined;
   let starting: Promise<WrapperKiloClient> | undefined;
   let startAbort: AbortController | undefined;
   let phase: KiloRuntimePhase = 'running';
@@ -495,7 +568,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       if (reconnects.length >= timers.sseReconnectLimit) {
         // Spec §7: too many reconnects inside the window without a recovered
         // stream; restart Kilo.
-        await restart('hang');
+        await restart('hang', 'sse_reconnect_budget');
         return;
       }
       reconnects.push(now);
@@ -546,7 +619,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       // A failed restart left no live Kilo and no exit hook. Keep restarting so
       // the attempts count toward the 3-in-10-minutes budget, then fail routes
       // (`agent_unavailable`) instead of staying degraded with no Kilo forever.
-      if (!starting) void restart('exit');
+      if (!starting) void restart('exit', 'no_client_retry');
       return;
     }
     if (probedThisEpisode) {
@@ -565,6 +638,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const probe = probeHealth;
     if (!probe) return;
     await runSingleFlight(async () => {
+      let decisionResolution: HealthDecisionResolution = 'fulfilled_false';
       const answered = await withTimeoutAndAbort(
         probe(AbortSignal.timeout(timers.healthRequestMs)),
         {
@@ -572,11 +646,14 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
           timeoutMessage: 'Kilo health request timed out',
           abortMessage: 'Kilo health request aborted',
         }
-      ).catch(() => false);
+      ).catch(() => {
+        decisionResolution = 'rejected';
+        return false;
+      });
       if (phase !== 'running' && phase !== 'suspected') return;
       if (!answered) {
         // No HTTP answer: Kilo is hung; restart it at once.
-        await restart('hang');
+        await restart('hang', 'health_probe_false', decisionResolution);
         return;
       }
       // Kilo answered, so it is alive but its event stream stalled: recover the
@@ -671,14 +748,17 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     kiloProcess = spawned;
     pidfilePath = file;
     client = kilo;
+    healthObservation = undefined;
     probeHealth =
       options.probeHealth ??
-      createHealthProbe(spawned.url, options.directory, timers.healthRequestMs);
+      createHealthProbe(spawned.url, options.directory, timers.healthRequestMs, observation => {
+        healthObservation = observation;
+      });
     pendingCredentials = options.env !== env;
     void spawned.exited.then(() => {
       if (phase !== 'running' && phase !== 'suspected') return;
       // Spec §7 "Kilo supervision": a Kilo process exit restarts Kilo.
-      void restart('exit');
+      void restart('exit', 'process_exit');
     });
     lastActivityAt = scheduler.now();
     if (phase === 'suspected') phase = 'running';
@@ -700,7 +780,11 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     return starting;
   }
 
-  async function restart(reason: KiloRestartReason): Promise<boolean> {
+  async function restart(
+    reason: KiloRestartReason,
+    trigger: HealthRestartTrigger | undefined,
+    decisionResolution: HealthDecisionResolution = 'not_applicable'
+  ): Promise<boolean> {
     if (phase === 'stopped' || phase === 'unavailable') return false;
     if (phase === 'restarting') return false;
     const now = scheduler.now();
@@ -719,8 +803,31 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       restarts.push(now);
     }
     phase = 'restarting';
+    let diagnostic = '';
+    if (reason !== 'credentials') {
+      const observation = trigger === 'health_probe_false' ? healthObservation : undefined;
+      const duration = observation
+        ? (observation.finishedAt ?? Date.now()) - observation.startedAt
+        : 0;
+      const silence = now - lastActivityAt;
+      const bound = (value: number) =>
+        Number.isFinite(value) ? Math.min(600_000, Math.max(0, Math.floor(value))) : 0;
+      diagnostic = ` diagnostic=${JSON.stringify({
+        trigger,
+        probeOutcome:
+          observation?.outcome ?? (trigger === 'health_probe_false' ? 'unknown' : 'not_applicable'),
+        decisionResolution,
+        innerAbortObserved: observation?.signal.aborted ?? false,
+        ...(observation?.httpStatus !== undefined ? { httpStatus: observation.httpStatus } : {}),
+        probeDurationMs: bound(duration),
+        probeDurationClamped: bound(duration) !== duration,
+        sseSilenceMs: bound(silence),
+        sseSilenceClamped: bound(silence) !== silence,
+        reconnectCount: Math.min(6, reconnects.length),
+      })}`;
+    }
     log(
-      `control-plane kilo restarting directory=${options.directory} reason=${reason} pid=${kiloProcess?.pid ?? 'none'}`
+      `control-plane kilo restarting directory=${options.directory} reason=${reason} pid=${kiloProcess?.pid ?? 'none'}${diagnostic}`
     );
     try {
       // Share the start with `ensure` so a concurrent ensure cannot spawn a
@@ -796,7 +903,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     ) {
       return false;
     }
-    return restart('credentials');
+    return restart('credentials', undefined);
   }
 
   return {

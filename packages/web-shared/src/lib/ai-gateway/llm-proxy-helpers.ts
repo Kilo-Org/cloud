@@ -3,7 +3,7 @@ import * as z from 'zod';
 import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
 import {
   countAndStoreUsage,
-  logMicrodollarUsage,
+  logMicrodollarUsageAndReportToBouncer,
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
@@ -920,8 +920,8 @@ export function countAndStoreFimUsage(
         usageStats.cacheDiscount_mUsd = 0;
       }
 
-      // Use the same logMicrodollarUsage as OpenRouter!
-      return logMicrodollarUsage(usageStats, usageContext);
+      // Persist billing, then report the same request to bouncer's usage ledger.
+      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
     })
   );
 }
@@ -1057,7 +1057,7 @@ export function countAndStoreEditUsage(
         usageStats.cacheDiscount_mUsd = 0;
       }
 
-      return logMicrodollarUsage(usageStats, usageContext);
+      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
     })
   );
 }
@@ -1216,7 +1216,7 @@ export function countAndStoreEmbeddingUsage(
         usageStats.cost_mUsd = 0;
       }
 
-      return logMicrodollarUsage(usageStats, usageContext);
+      return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
     })
   );
 }

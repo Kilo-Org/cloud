@@ -793,6 +793,131 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.stopCalls).toEqual([]);
   });
 
+  it('acknowledges negotiated current heartbeats but not invalid or unbound frames', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    wrapper.heartbeat(true);
+    wrapper.send({
+      type: 'hello',
+      wrapperId: 'wr_ack',
+      allocationId,
+      protocolVersion: 2,
+      heartbeatAck: true,
+    });
+    expect(await wrapper.next()).toEqual({
+      type: 'welcome',
+      protocolVersion: 2,
+      heartbeatAck: true,
+    });
+    const before = await readState(stub);
+    wrapper.send({ type: 'hello', wrapperId: 'wr_ack', allocationId, protocolVersion: 2 });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.send({ type: 'heartbeat', active: 'invalid', degraded: false });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.heartbeat(false);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect((await readState(stub)).lastActivityAt).toBe(before.lastActivityAt);
+    wrapper.heartbeat(true);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect(provider.leaseCalls).toHaveLength(1);
+    const legacy = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await legacy.hello({ wrapperId: 'wr_legacy', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: 2,
+    });
+    legacy.heartbeat(false);
+    expect(await legacy.next(20)).toBeNull();
+    const current = await readState(stub);
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const stale = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: before.connectionId,
+          wrapperId: 'wr_ack',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        stale,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect(await readState(stub)).toEqual(current);
+    await stub.reportProviderGone();
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const terminal = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: current.connectionId,
+          wrapperId: 'wr_legacy',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        terminal,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect((await readState(stub)).kind).toBe('stopped');
+  });
+
+  it.each(['socket', 'allocation'] as const)(
+    'rechecks %s identity after applying a negotiated heartbeat',
+    async identity => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider);
+      await awaitStarting(provider, stub);
+      await connectAndHello(provider, stub);
+      const current = await readState(stub);
+      await runInDurableObject(stub, async instance => {
+        const attachment = {
+          credential: null,
+          allocationId: current.allocationId,
+          connectionId: current.connectionId,
+          wrapperId: current.wrapperId,
+          heartbeatAck: true,
+        };
+        const send = vi.fn();
+        const socket = {
+          readyState: WebSocket.OPEN,
+          deserializeAttachment: () => attachment,
+          send,
+        } as unknown as WebSocket;
+        const target = instance as unknown as { applyEvent(event: unknown): Promise<void> };
+        const apply = target.applyEvent.bind(instance);
+        const spy = vi.spyOn(target, 'applyEvent').mockImplementation(async event => {
+          await apply(event);
+          if (identity === 'socket') attachment.connectionId = 'superseded';
+          else await apply({ type: 'provider-gone', at: Date.now() });
+        });
+        try {
+          await instance.webSocketMessage(
+            socket,
+            JSON.stringify({ type: 'heartbeat', active: false, degraded: false })
+          );
+          expect(send).not.toHaveBeenCalled();
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    }
+  );
+
   it('creates, launches and accepts a hello as connected', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);

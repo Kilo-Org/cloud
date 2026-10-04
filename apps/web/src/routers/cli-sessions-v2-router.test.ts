@@ -95,6 +95,7 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => {
   return {
     ...actual,
     fetchPullRequestByNumber: jest.fn(),
+    fetchPullRequestReviewDecision: jest.fn(),
   };
 });
 
@@ -122,6 +123,10 @@ async function flushAfterCallbacks(): Promise<void> {
 const mockedFetchPullRequestByNumber =
   githubAdapter.fetchPullRequestByNumber as jest.MockedFunction<
     typeof githubAdapter.fetchPullRequestByNumber
+  >;
+const mockedFetchPullRequestReviewDecision =
+  githubAdapter.fetchPullRequestReviewDecision as jest.MockedFunction<
+    typeof githubAdapter.fetchPullRequestReviewDecision
   >;
 
 let regularUser: User;
@@ -1920,7 +1925,10 @@ describe('cli-sessions-v2-router', () => {
   describe('getWithRuntimeState associatedPr', () => {
     const sessionWithPr = 'ses_assoc_pr_present_1234';
     const sessionWithoutPr = 'ses_assoc_pr_absent_1234';
+    const sessionBranchOnly = 'ses_assoc_pr_branch_only_1234';
+    const sessionUnverified = 'ses_assoc_pr_unverified_1234';
     const CACHE_GIT_URL = 'https://github.com/kilo/repo';
+    const VERIFIED_AT = '2026-01-01T00:00:00.000Z';
 
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values([
@@ -1930,6 +1938,12 @@ describe('cli-sessions-v2-router', () => {
           created_on_platform: 'cloud-agent',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/42',
+          pr_number: 42,
+          pr_head_ref: 'feature/x',
+          pr_head_sha: 'deadbeefcafe',
+          pr_link_verified_at: VERIFIED_AT,
         },
         {
           session_id: sessionWithoutPr,
@@ -1937,6 +1951,25 @@ describe('cli-sessions-v2-router', () => {
           created_on_platform: 'cloud-agent',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/y',
+        },
+        // Same repo + branch as the cache row, but no verified link of its own.
+        {
+          session_id: sessionBranchOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/x',
+        },
+        // Stored link that has not passed GitHub verification: must not render.
+        {
+          session_id: sessionUnverified,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/42',
+          pr_number: 42,
         },
       ]);
       await db.insert(github_branch_pull_requests).values({
@@ -1962,9 +1995,11 @@ describe('cli-sessions-v2-router', () => {
         );
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithPr));
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithoutPr));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionBranchOnly));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionUnverified));
     });
 
-    it('returns associatedPr when the per-tenant cache has a row for (git_url, git_branch)', async () => {
+    it('returns associatedPr when the session has its own verified link', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
         session_id: sessionWithPr,
@@ -1980,11 +2015,29 @@ describe('cli-sessions-v2-router', () => {
       expect(typeof result.associatedPr?.lastSyncedAt).toBe('string');
     });
 
-    it('returns null associatedPr when the per-tenant cache has no row for (git_url, git_branch)', async () => {
+    it('returns null associatedPr when the session has no stored link', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
         session_id: sessionWithoutPr,
       });
+      expect(result.associatedPr).toBeNull();
+    });
+
+    it('shows no PR for a session with no link even when its branch has a cache row', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionBranchOnly,
+      });
+      expect(result.associatedPr).toBeNull();
+    });
+
+    it('shows no PR for a stored link that has not been verified', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.getWithRuntimeState({
+        session_id: sessionUnverified,
+      });
+      // An unverified link is a guess. It must never render a badge or an
+      // Open-on-GitHub link, even when the branch cache row exists.
       expect(result.associatedPr).toBeNull();
     });
 
@@ -2009,6 +2062,45 @@ describe('cli-sessions-v2-router', () => {
         await db
           .delete(cli_sessions_v2)
           .where(eq(cli_sessions_v2.session_id, crossTenantSessionId));
+      }
+    });
+
+    it('does not show another user’s PR to an older session on the reused branch', async () => {
+      // otherUser opened pull/700 on the same branch name. regularUser's old
+      // session has no verified link, so it must show nothing.
+      const otherPrSessionId = 'ses_assoc_pr_other_user_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: otherPrSessionId,
+        kilo_user_id: otherUser.id,
+        created_on_platform: 'cloud-agent',
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/x',
+        platform: 'github',
+        pr_url: 'https://github.com/kilo/repo/pull/700',
+        pr_number: 700,
+        pr_link_verified_at: VERIFIED_AT,
+      });
+      await db.insert(github_branch_pull_requests).values({
+        git_url: CACHE_GIT_URL,
+        git_branch: 'feature/x',
+        owned_by_user_id: otherUser.id,
+        pr_url: 'https://github.com/kilo/repo/pull/700',
+        pr_number: 700,
+        pr_state: 'open',
+        pr_title: 'Someone else',
+        pr_head_sha: 'other',
+      });
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.getWithRuntimeState({
+          session_id: sessionBranchOnly,
+        });
+        expect(result.associatedPr).toBeNull();
+      } finally {
+        await db
+          .delete(github_branch_pull_requests)
+          .where(eq(github_branch_pull_requests.owned_by_user_id, otherUser.id));
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, otherPrSessionId));
       }
     });
 
@@ -2160,29 +2252,28 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
-    it('uses the branch fallback when the session has no stored link', async () => {
-      // sessionWithPr has no pr_url; the branch cache row (pull/42) is used.
+    it('shows no PR for a session with no link even when its branch has a cache row', async () => {
+      // sessionBranchOnly sits on feature/x, which has a cache row (pull/42),
+      // but has no verified link of its own: no branch-name fallback.
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.getWithRuntimeState({
-        session_id: sessionWithPr,
+        session_id: sessionBranchOnly,
       });
 
-      expect(result.associatedPr).toMatchObject({
-        url: 'https://github.com/kilo/repo/pull/42',
-        number: 42,
-        state: 'open',
-        platform: 'github',
-      });
+      expect(result.associatedPr).toBeNull();
     });
   });
 
   describe('list / search associatedPr', () => {
-    // Same fixtures as the getWithRuntimeState block: one session with a
-    // matching cache row, one without. Both sessions are recent so they fall
-    // inside the default `updatedSince` window of `list`.
+    // Same fixtures as the getWithRuntimeState block: one session with its own
+    // verified link + matching cache row, one without. Both sessions are recent
+    // so they fall inside the default `updatedSince` window of `list`.
     const sessionWithPr = 'ses_list_pr_present_5678';
     const sessionWithoutPr = 'ses_list_pr_absent_5678';
+    const sessionBranchOnly = 'ses_list_pr_branch_only_5678';
+    const sessionUnverified = 'ses_list_pr_unverified_5678';
     const CACHE_GIT_URL = 'https://github.com/kilo/repo';
+    const VERIFIED_AT = '2026-01-01T00:00:00.000Z';
 
     beforeEach(async () => {
       await db.insert(cli_sessions_v2).values([
@@ -2193,6 +2284,12 @@ describe('cli-sessions-v2-router', () => {
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/list-x',
           title: 'session with PR',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77',
+          pr_number: 77,
+          pr_head_ref: 'feature/list-x',
+          pr_head_sha: 'cafef00d',
+          pr_link_verified_at: VERIFIED_AT,
         },
         {
           session_id: sessionWithoutPr,
@@ -2201,6 +2298,25 @@ describe('cli-sessions-v2-router', () => {
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/list-y',
           title: 'session without PR',
+        },
+        {
+          session_id: sessionBranchOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/list-x',
+          title: 'session branch only',
+        },
+        {
+          session_id: sessionUnverified,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cloud-agent',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/list-x',
+          title: 'session unverified link',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/repo/pull/77',
+          pr_number: 77,
         },
       ]);
       await db.insert(github_branch_pull_requests).values({
@@ -2226,14 +2342,18 @@ describe('cli-sessions-v2-router', () => {
         );
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithPr));
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionWithoutPr));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionBranchOnly));
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionUnverified));
     });
 
-    it('list returns associatedPr per row from the per-tenant cache', async () => {
+    it('list returns associatedPr per row: live for a verified link, nothing for an unverified one', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.list({});
 
       const withPr = result.cliSessions.find(s => s.session_id === sessionWithPr);
       const withoutPr = result.cliSessions.find(s => s.session_id === sessionWithoutPr);
+      const branchOnly = result.cliSessions.find(s => s.session_id === sessionBranchOnly);
+      const unverified = result.cliSessions.find(s => s.session_id === sessionUnverified);
 
       expect(withPr?.associatedPr).toMatchObject({
         url: 'https://github.com/kilo/repo/pull/77',
@@ -2245,6 +2365,11 @@ describe('cli-sessions-v2-router', () => {
       });
       expect(typeof withPr?.associatedPr?.lastSyncedAt).toBe('string');
       expect(withoutPr?.associatedPr).toBeNull();
+      // Branch name + repo + tenant is not evidence.
+      expect(branchOnly?.associatedPr).toBeNull();
+      // An unverified stored link must not render a badge or an Open-on-GitHub
+      // link, even when the branch cache row exists.
+      expect(unverified?.associatedPr).toBeNull();
     });
 
     it('list returns live cache fields when the stored link has a trailing subpath', async () => {
@@ -2471,31 +2596,32 @@ describe('cli-sessions-v2-router', () => {
       });
     });
 
-    it('list row count does not increase when two cache rows share a PR URL', async () => {
-      // Two sessions on different branches whose cache rows point at the same
-      // PR URL. The JOIN is on (git_url, git_branch, tenant), not pr_url, so
-      // each session must appear exactly once (no fan-out).
-      const sharedPrUrl = 'https://github.com/kilo/repo/pull/77';
-      const secondSessionId = 'ses_list_pr_shared_url_5678';
-      const secondBranch = 'feature/list-b';
-
+    it('list shows each of several sessions on one repo+branch only its own PR', async () => {
+      // Two sessions share one repo + branch name but each has its own verified
+      // link and its own cache row. The join is by PR identity, so neither
+      // session can pick up the other's PR.
+      const secondSessionId = 'ses_list_pr_same_branch_5678';
       await db.insert(cli_sessions_v2).values({
         session_id: secondSessionId,
         kilo_user_id: regularUser.id,
         created_on_platform: 'cloud-agent',
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
-        title: 'second session shared PR',
+        git_branch: 'feature/list-x',
+        title: 'second session same branch',
+        platform: 'github',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_link_verified_at: VERIFIED_AT,
       });
       await db.insert(github_branch_pull_requests).values({
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
+        git_branch: 'feature/list-x',
         owned_by_user_id: regularUser.id,
-        pr_url: sharedPrUrl,
-        pr_number: 77,
-        pr_state: 'open',
-        pr_title: 'List endpoint feature',
-        pr_head_sha: 'cafef00d',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_state: 'closed',
+        pr_title: 'Second session PR',
+        pr_head_sha: 'secondsha',
       });
 
       try {
@@ -2505,47 +2631,81 @@ describe('cli-sessions-v2-router', () => {
         const ids = result.cliSessions.map(s => s.session_id);
         expect(ids.filter(id => id === sessionWithPr)).toHaveLength(1);
         expect(ids.filter(id => id === secondSessionId)).toHaveLength(1);
+        expect(
+          result.cliSessions.find(s => s.session_id === sessionWithPr)?.associatedPr
+        ).toMatchObject({ number: 77 });
+        expect(
+          result.cliSessions.find(s => s.session_id === secondSessionId)?.associatedPr
+        ).toMatchObject({ number: 88, state: 'closed' });
       } finally {
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, secondSessionId));
+        await db
+          .delete(github_branch_pull_requests)
+          .where(eq(github_branch_pull_requests.pr_number, 88));
       }
     });
 
-    it('search row count does not increase when two cache rows share a PR URL', async () => {
-      // Same fan-out guard as the list case: the JOIN is on (git_url,
-      // git_branch, tenant), not pr_url, so each session must appear exactly
-      // once in search results even when both cache rows point at one PR URL.
-      const sharedPrUrl = 'https://github.com/kilo/repo/pull/77';
-      const secondSessionId = 'ses_search_pr_shared_url_5678';
-      const secondBranch = 'feature/list-c';
-
+    it('search shows each of several sessions on one repo+branch only its own PR', async () => {
+      const secondSessionId = 'ses_search_pr_same_branch_5678';
       await db.insert(cli_sessions_v2).values({
         session_id: secondSessionId,
         kilo_user_id: regularUser.id,
         created_on_platform: 'cloud-agent',
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
-        title: 'second session shared PR',
+        git_branch: 'feature/list-x',
+        title: 'second session same branch',
+        platform: 'github',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_link_verified_at: VERIFIED_AT,
       });
       await db.insert(github_branch_pull_requests).values({
         git_url: CACHE_GIT_URL,
-        git_branch: secondBranch,
+        git_branch: 'feature/list-x',
         owned_by_user_id: regularUser.id,
-        pr_url: sharedPrUrl,
-        pr_number: 77,
-        pr_state: 'open',
-        pr_title: 'List endpoint feature',
-        pr_head_sha: 'cafef00d',
+        pr_url: 'https://github.com/kilo/repo/pull/88',
+        pr_number: 88,
+        pr_state: 'closed',
+        pr_title: 'Second session PR',
+        pr_head_sha: 'secondsha',
       });
 
       try {
         const caller = await createCallerForUser(regularUser.id);
         const result = await caller.cliSessionsV2.search({ search_string: 'session' });
 
-        const ids = result.results.map(s => s.session_id);
-        expect(ids.filter(id => id === sessionWithPr)).toHaveLength(1);
-        expect(ids.filter(id => id === secondSessionId)).toHaveLength(1);
+        expect(
+          result.results.find(s => s.session_id === sessionWithPr)?.associatedPr
+        ).toMatchObject({ number: 77 });
+        expect(
+          result.results.find(s => s.session_id === secondSessionId)?.associatedPr
+        ).toMatchObject({ number: 88, state: 'closed' });
       } finally {
         await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, secondSessionId));
+        await db
+          .delete(github_branch_pull_requests)
+          .where(eq(github_branch_pull_requests.pr_number, 88));
+      }
+    });
+
+    it('list shows no PR for a session whose branch name is reused in another repo', async () => {
+      const otherRepoSessionId = 'ses_list_pr_other_repo_5678';
+      await db.insert(cli_sessions_v2).values({
+        session_id: otherRepoSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+        git_url: 'https://github.com/kilo/other-repo',
+        git_branch: 'feature/list-x',
+        title: 'other repo same branch',
+      });
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.list({});
+        expect(
+          result.cliSessions.find(s => s.session_id === otherRepoSessionId)?.associatedPr
+        ).toBeNull();
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, otherRepoSessionId));
       }
     });
   });
@@ -2583,6 +2743,10 @@ describe('cli-sessions-v2-router', () => {
           title: 'pr session',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/pr-x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/search-provenance-repo/pull/42',
+          pr_number: 42,
+          pr_link_verified_at: '2026-01-01T00:00:00.000Z',
         },
         {
           session_id: sessionTitleOnly,
@@ -2669,14 +2833,31 @@ describe('cli-sessions-v2-router', () => {
   describe('refreshAssociatedPullRequest', () => {
     const sessionId = 'ses_refresh_pr_1234';
     // Session git_url is stored in the canonical normalized shape that the
-    // queue-consumer would persist for a new session, so the tenant-scoped
-    // cache JOIN can match.
+    // queue-consumer would persist for a new session, so the identity-scoped
+    // cache upsert can match.
     const SESSION_GIT_URL = 'https://github.com/kilo/repo';
     const SESSION_BRANCH = 'feature/z';
     // The session's stored PR link, set by the CLI when it links a PR.
     const SESSION_PR_URL = 'https://github.com/kilo/repo/pull/7';
     const SESSION_PR_NUMBER = 7;
     let integrationId: string;
+
+    // The GitHub facts a correct fetch returns for the session's own PR.
+    type PrFacts = NonNullable<Awaited<ReturnType<typeof githubAdapter.fetchPullRequestByNumber>>>;
+    function ownPrFacts(overrides: Partial<PrFacts> = {}): PrFacts {
+      return {
+        number: SESSION_PR_NUMBER,
+        htmlUrl: SESSION_PR_URL,
+        state: 'open',
+        title: 'Feature Z',
+        headSha: 'abc123',
+        updatedAt: '2026-01-01T00:00:00Z',
+        baseRepoFullName: 'kilo/repo',
+        headRepoFullName: 'kilo/repo',
+        headRef: SESSION_BRANCH,
+        ...overrides,
+      };
+    }
 
     async function readCacheRows(opts: { orgId?: string | null } = {}) {
       const tenantClause = opts.orgId
@@ -2704,6 +2885,7 @@ describe('cli-sessions-v2-router', () => {
         platform: 'github',
         pr_url: SESSION_PR_URL,
         pr_number: SESSION_PR_NUMBER,
+        pr_head_ref: SESSION_BRANCH,
       });
 
       const [integration] = await db
@@ -2721,6 +2903,7 @@ describe('cli-sessions-v2-router', () => {
       integrationId = integration.id;
 
       mockedFetchPullRequestByNumber.mockReset();
+      mockedFetchPullRequestReviewDecision.mockReset().mockResolvedValue('approved');
     });
 
     afterEach(async () => {
@@ -2738,15 +2921,12 @@ describe('cli-sessions-v2-router', () => {
       await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
     });
 
-    it('upserts when GitHub returns the stored-link PR', async () => {
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'abc123',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+    it("verifies and shows the session's own PR with live state and review decision", async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: 'abc123' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts());
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
@@ -2760,6 +2940,8 @@ describe('cli-sessions-v2-router', () => {
         repo: 'repo',
         number: 7,
         appType: 'standard',
+        includeCommits: true,
+        expectedHeadSha: 'abc123',
       });
       expect(result.associatedPr).toMatchObject({
         url: SESSION_PR_URL,
@@ -2767,30 +2949,136 @@ describe('cli-sessions-v2-router', () => {
         state: 'open',
         title: 'Feature Z',
         headSha: 'abc123',
+        reviewDecision: 'approved',
+        reviewDecisionPending: false,
         platform: 'github',
       });
 
       const [persisted] = await readCacheRows();
       expect(persisted).toMatchObject({
         git_url: SESSION_GIT_URL,
-        git_branch: SESSION_BRANCH,
         owned_by_user_id: regularUser.id,
         owned_by_organization_id: null,
         pr_url: SESSION_PR_URL,
         pr_number: 7,
         pr_state: 'open',
       });
+
+      const [sessionRow] = await db
+        .select({ verifiedAt: cli_sessions_v2.pr_link_verified_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(sessionRow.verifiedAt).not.toBeNull();
     });
 
-    it('writes one cache row per (url, branch, tenant) across repeated refreshes', async () => {
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'x',
-        headSha: 's1',
-        updatedAt: '2026-01-01T00:00:00Z',
+    it('rejects a PR whose head repository is a fork', async () => {
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headRepoFullName: 'forkowner/repo' })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+      const [sessionRow] = await db
+        .select({ verifiedAt: cli_sessions_v2.pr_link_verified_at })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      expect(sessionRow.verifiedAt).toBeNull();
+    });
+
+    it('rejects a PR opened from a different head ref', async () => {
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headRef: 'someone-elses-branch' })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('rejects a stored link whose URL names another repository without calling GitHub', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_url: 'https://github.com/other/thing/pull/7' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('rejects when GitHub does not confirm the session head SHA', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: 'session-sha' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headSha: 'other-head', commitShas: ['a', 'b'] })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('accepts when the session head SHA is one of the PR commits', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_head_sha: 'session-sha' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+      mockedFetchPullRequestByNumber.mockResolvedValue(
+        ownPrFacts({ headSha: 'other-head', commitShas: ['a', 'session-sha'] })
+      );
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
+
+      expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
+      expect(await readCacheRows()).toHaveLength(1);
+    });
+
+    it('returns null for a non-GitHub session without calling GitHub', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ platform: 'gitlab' })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
       });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toBeNull();
+    });
+
+    it('shows nothing and does not call GitHub when the repo/branch identity is missing', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ git_url: null, git_branch: null })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
+        sessionId,
+      });
+
+      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
+      expect(result.associatedPr).toBeNull();
+      expect(await readCacheRows()).toHaveLength(0);
+    });
+
+    it('keeps one cache row per PR identity across repeated refreshes', async () => {
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: 's1' }));
 
       const caller = await createCallerForUser(regularUser.id);
       await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
@@ -2802,19 +3090,11 @@ describe('cli-sessions-v2-router', () => {
         .where(
           and(
             eq(github_branch_pull_requests.git_url, SESSION_GIT_URL),
-            eq(github_branch_pull_requests.git_branch, SESSION_BRANCH),
             eq(github_branch_pull_requests.owned_by_user_id, regularUser.id)
           )
         );
 
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'x',
-        headSha: 's2',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: 's2' }));
       await caller.cliSessionsV2.refreshAssociatedPullRequest({ sessionId });
 
       const rows = await readCacheRows();
@@ -2822,8 +3102,8 @@ describe('cli-sessions-v2-router', () => {
       expect(rows[0].pr_head_sha).toBe('s2');
     });
 
-    it('does not overwrite a different branch-cache PR when refreshing by number', async () => {
-      // Branch cache holds a DIFFERENT PR than the session's stored link.
+    it('keeps a different branch-cache PR and adds the session PR keyed by identity', async () => {
+      // The cache already holds a DIFFERENT PR (99) on the same branch.
       await db.insert(github_branch_pull_requests).values({
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
@@ -2836,104 +3116,33 @@ describe('cli-sessions-v2-router', () => {
         pr_last_synced_at: new Date(Date.now() - 90_000).toISOString(),
       });
 
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'abc123',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts());
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
         sessionId,
       });
 
-      // Fetched the session's own PR by number...
-      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledWith({
-        installationId: 12345,
-        owner: 'kilo',
-        repo: 'repo',
-        number: 7,
-        appType: 'standard',
-      });
-      // ...and returned it for this session only.
       expect(result.associatedPr).toMatchObject({
         url: SESSION_PR_URL,
         number: 7,
         state: 'open',
       });
 
-      // The branch cache row for the other PR is untouched.
+      // Both PRs coexist: the identity-keyed cache row for PR 7 is added and
+      // the unrelated PR 99 row is untouched.
       const rows = await readCacheRows();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        pr_url: 'https://github.com/kilo/repo/pull/99',
-        pr_number: 99,
-      });
+      expect(rows).toHaveLength(2);
+      const byNumber = new Map(rows.map(row => [row.pr_number, row]));
+      expect(byNumber.get(7)).toMatchObject({ pr_url: SESSION_PR_URL, pr_number: 7 });
+      expect(byNumber.get(99)).toMatchObject({ pr_url: 'https://github.com/kilo/repo/pull/99' });
     });
 
-    it('returns the pending partial for a non-GitHub session without calling GitHub', async () => {
+    it('short-circuits on the recent-sync throttle when the session link is verified and matches', async () => {
       await db
         .update(cli_sessions_v2)
-        .set({ platform: 'gitlab' })
+        .set({ pr_link_verified_at: new Date().toISOString() })
         .where(eq(cli_sessions_v2.session_id, sessionId));
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
-        sessionId,
-      });
-
-      expect(mockedFetchPullRequestByNumber).not.toHaveBeenCalled();
-      expect(result.associatedPr).toMatchObject({
-        state: 'unknown',
-        title: null,
-        headSha: null,
-        reviewDecision: null,
-        reviewDecisionPending: true,
-        platform: 'gitlab',
-      });
-    });
-
-    it('fetches by number but does not write the cache when git_url/git_branch are missing', async () => {
-      await db
-        .update(cli_sessions_v2)
-        .set({ git_url: null, git_branch: null })
-        .where(eq(cli_sessions_v2.session_id, sessionId));
-
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'abc123',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
-        sessionId,
-      });
-
-      // Fetch-by-number still runs (pr_url parses)...
-      expect(mockedFetchPullRequestByNumber).toHaveBeenCalledTimes(1);
-      // ...returns the fetched payload for this session only...
-      expect(result.associatedPr).toMatchObject({
-        url: SESSION_PR_URL,
-        number: 7,
-        state: 'open',
-        platform: 'github',
-      });
-      // ...with reviewDecisionPending false: no cache row is written on this
-      // path, so no batch worker can ever clear a pending flag.
-      expect(result.associatedPr?.reviewDecisionPending).toBe(false);
-      // ...and writes no cache row (no branch identity).
-      const rows = await readCacheRows();
-      expect(rows).toHaveLength(0);
-    });
-
-    it('short-circuits on the recent-sync throttle when the cache matches the stored link', async () => {
       await db.insert(github_branch_pull_requests).values({
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
@@ -2974,14 +3183,7 @@ describe('cli-sessions-v2-router', () => {
         .set({ pr_url: 'https://github.com/kilo/repo/pull/7/files' })
         .where(eq(cli_sessions_v2.session_id, sessionId));
 
-      mockedFetchPullRequestByNumber.mockResolvedValue({
-        number: 7,
-        htmlUrl: SESSION_PR_URL,
-        state: 'open',
-        title: 'Feature Z',
-        headSha: 'new-sha',
-        updatedAt: '2026-01-01T00:00:00Z',
-      });
+      mockedFetchPullRequestByNumber.mockResolvedValue(ownPrFacts({ headSha: 'new-sha' }));
 
       const caller = await createCallerForUser(regularUser.id);
       const result = await caller.cliSessionsV2.refreshAssociatedPullRequest({
@@ -2990,8 +3192,6 @@ describe('cli-sessions-v2-router', () => {
 
       expect(result.associatedPr).toMatchObject({ number: 7, state: 'open' });
 
-      // The write guard treated the subpath link as the same PR and updated the
-      // existing row in place — no duplicate row and no stale fields.
       const rows = await readCacheRows();
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({
@@ -3065,12 +3265,14 @@ describe('cli-sessions-v2-router', () => {
 
       await db
         .update(cli_sessions_v2)
-        .set({ organization_id: otherOrg.id })
+        .set({
+          organization_id: otherOrg.id,
+          pr_link_verified_at: new Date().toISOString(),
+        })
         .where(eq(cli_sessions_v2.session_id, sessionId));
 
-      // Fresh sentinel row owned by the *org* that would normally short-circuit
-      // via the throttle. Using owned_by_organization_id matches how the JOIN
-      // would attach the PR to the now-org-scoped session.
+      // Fresh cache row owned by the *org* that would normally short-circuit
+      // via the throttle.
       await db.insert(github_branch_pull_requests).values({
         git_url: SESSION_GIT_URL,
         git_branch: SESSION_BRANCH,
@@ -3093,7 +3295,7 @@ describe('cli-sessions-v2-router', () => {
       } finally {
         await db
           .update(cli_sessions_v2)
-          .set({ organization_id: null })
+          .set({ organization_id: null, pr_link_verified_at: null })
           .where(eq(cli_sessions_v2.session_id, sessionId));
         await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
       }

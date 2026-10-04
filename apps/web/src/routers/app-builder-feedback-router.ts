@@ -6,8 +6,17 @@ import { app_builder_feedback } from '@kilocode/db/schema';
 import { getProjectWithOwnershipCheck } from '@/lib/app-builder/app-builder-service';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import * as z from 'zod';
+import { desc, eq } from 'drizzle-orm';
 import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
+import { toIsoTimestamp } from '@/lib/feedback/feedback-history';
 import type { Owner } from '@/lib/integrations/core/types';
+
+const DEFAULT_FEEDBACK_HISTORY_LIMIT = 5;
+const MAX_FEEDBACK_HISTORY_LIMIT = 20;
+
+const ListAppBuilderFeedbackInputSchema = z.object({
+  limit: z.number().int().min(1).max(MAX_FEEDBACK_HISTORY_LIMIT).optional(),
+});
 
 const recentMessageSchema = z.object({
   role: z.string().max(50),
@@ -27,6 +36,33 @@ const CreateAppBuilderFeedbackInputSchema = z.object({
 });
 
 export const appBuilderFeedbackRouter = createTRPCRouter({
+  /**
+   * The caller's own recent App Builder feedback, newest first.
+   *
+   * Scoped to `kilo_user_id`, so a user can only read back what they submitted.
+   * Used by the feedback dialog to show prior submissions and answer "did I
+   * already report this?".
+   */
+  list: baseProcedure
+    .input(ListAppBuilderFeedbackInputSchema.optional())
+    .query(async ({ ctx, input }) => {
+      const rows = await db
+        .select({
+          id: app_builder_feedback.id,
+          feedback_text: app_builder_feedback.feedback_text,
+          created_at: app_builder_feedback.created_at,
+        })
+        .from(app_builder_feedback)
+        .where(eq(app_builder_feedback.kilo_user_id, ctx.user.id))
+        .orderBy(desc(app_builder_feedback.created_at), desc(app_builder_feedback.id))
+        .limit(input?.limit ?? DEFAULT_FEEDBACK_HISTORY_LIMIT);
+
+      return rows.map(row => ({
+        ...row,
+        created_at: toIsoTimestamp(row.created_at),
+      }));
+    }),
+
   create: baseProcedure
     .input(CreateAppBuilderFeedbackInputSchema)
     .mutation(async ({ ctx, input }) => {

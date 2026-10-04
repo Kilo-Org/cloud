@@ -416,7 +416,7 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 }));
 
 vi.mock('@/lib/home-live-shape', () => ({
-  clearLiveShapeHint: vi.fn().mockResolvedValue(undefined),
+  clearLiveShapeHint: vi.fn(),
 }));
 
 vi.mock('@/lib/storage-keys', () => ({

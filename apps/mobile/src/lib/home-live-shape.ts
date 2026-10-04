@@ -36,8 +36,18 @@ export function persistLiveShapeHint(shape: LiveShape): void {
   }
 }
 
-/** Sign-out: the next account starts from the default card placeholder. */
-export async function clearLiveShapeHint(): Promise<void> {
+/**
+ * Account boundary (sign-out or a direct account switch): the next account
+ * starts from the default card placeholder. Best effort and synchronous for
+ * the session-scoped reset; a failed delete only costs one first frame.
+ */
+export function clearLiveShapeHint(): void {
   cached = 'rows';
-  await SecureStore.deleteItemAsync(HOME_LIVE_SHAPE_KEY);
+  void (async () => {
+    try {
+      await SecureStore.deleteItemAsync(HOME_LIVE_SHAPE_KEY);
+    } catch {
+      // The secure-store wrapper already reported the failure.
+    }
+  })();
 }

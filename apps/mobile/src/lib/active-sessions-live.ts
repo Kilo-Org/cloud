@@ -142,26 +142,48 @@ export function parseCliConnectionPayload(value: unknown): CliConnectionData | n
   return parsed.data;
 }
 
+type SessionStatusUpdate = {
+  sessionId: string;
+  status: string;
+  scheduledAt?: string | null;
+  /** ISO 8601 status-change time; absent when the payload's value is null or unparseable. */
+  statusUpdatedAt?: string;
+};
+
+/** Hermes only parses ISO 8601, so a status time enters the cache normalized. */
+function toIsoStatusTime(value: string | null): string | undefined {
+  if (value === null) {
+    return undefined;
+  }
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? undefined : new Date(at).toISOString();
+}
+
 /**
  * Dual-shaped `session.status.updated` (full session row vs lightweight
  * sessionId). Null payload status becomes `''` for the cache string field.
  */
-export function parseSessionStatusUpdatedPayload(
-  value: unknown
-): { sessionId: string; status: string; scheduledAt?: string | null } | null {
+export function parseSessionStatusUpdatedPayload(value: unknown): SessionStatusUpdate | null {
   const parsed = sessionStatusUpdatedPayloadSchema.safeParse(value);
   if (!parsed.success) {
     return null;
   }
   const data: SessionStatusUpdatedPayload = parsed.data;
+  const statusUpdatedAt = toIsoStatusTime(data.statusUpdatedAt);
   if ('session' in data) {
     return {
       sessionId: data.session.sessionId,
       status: data.status ?? data.session.status ?? '',
       scheduledAt: data.scheduledAt ?? data.session.scheduledAt,
+      statusUpdatedAt,
     };
   }
-  return { sessionId: data.sessionId, status: data.status ?? '', scheduledAt: data.scheduledAt };
+  return {
+    sessionId: data.sessionId,
+    status: data.status ?? '',
+    scheduledAt: data.scheduledAt,
+    statusUpdatedAt,
+  };
 }
 
 // ── Enrichment-preserving merge helpers ──────────────────────────────
@@ -319,18 +341,25 @@ export function mergeHeartbeatForActiveSessions(
 
 /**
  * Apply an explicit status transition (including leaving attention).
- * Unknown session ids are ignored — live cache only holds active rows.
+ * Unknown session ids are ignored — live cache only holds active rows. The
+ * transition's own time replaces the row's `statusUpdatedAt`, so the newest
+ * session and its age do not wait for the next tRPC poll.
  */
 export function applySessionStatusUpdated(
   current: readonly CachedActiveSession[],
-  update: { sessionId: string; status: string; scheduledAt?: string | null }
+  update: SessionStatusUpdate
 ): CachedActiveSession[] {
   const scheduledAt = update.status === 'scheduled' ? (update.scheduledAt ?? undefined) : undefined;
+  const statusUpdatedAt = update.statusUpdatedAt;
   return current.map(row => {
     if (row.id !== update.sessionId) {
       return row;
     }
-    if (row.status === update.status && row.scheduledAt === scheduledAt) {
+    if (
+      row.status === update.status &&
+      row.scheduledAt === scheduledAt &&
+      (statusUpdatedAt === undefined || row.statusUpdatedAt === statusUpdatedAt)
+    ) {
       return row;
     }
     const next: CachedActiveSession = { ...row, status: update.status };
@@ -338,6 +367,9 @@ export function applySessionStatusUpdated(
       delete next.scheduledAt;
     } else {
       next.scheduledAt = scheduledAt;
+    }
+    if (statusUpdatedAt !== undefined) {
+      next.statusUpdatedAt = statusUpdatedAt;
     }
     return next;
   });

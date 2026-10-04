@@ -223,8 +223,10 @@ export function ModelPickerContent() {
                 with no line cap, so copy wider than a narrow field wraps onto a
                 second line. A tail-ellipsized Text truncates the copy at any width
                 instead. The shared box draws the value on one line box and centres
-                it, and both texts share `px-0` so the overlay sits exactly where
-                the typed text will. */}
+                it, and both texts start at the field's left edge so the overlay
+                sits exactly where the typed text will. The input also needs the
+                physical `pl-0 pr-0`: Android's TextInput ignores the logical
+                padding `px-0` compiles to and keeps its default inset. */}
             <View className="relative flex-1">
               <Input
                 ref={searchInputRef}
@@ -232,7 +234,7 @@ export function ModelPickerContent() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="search"
-                className="flex-1 px-0 text-base text-foreground"
+                className="flex-1 px-0 pl-0 pr-0 text-base text-foreground"
                 onChangeText={setSearch}
               />
               {search.length === 0 ? (

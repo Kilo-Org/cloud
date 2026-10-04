@@ -503,6 +503,7 @@ describe('active-sessions-router', () => {
   describe('list enrichment associatedPr', () => {
     const sessionWithPr = 'ses_active_pr_present_0001';
     const sessionWithoutPr = 'ses_active_pr_absent_0001';
+    const sessionBranchOnly = 'ses_active_pr_branch_only_0001';
     const CACHE_GIT_URL = 'https://github.com/kilo/active-provenance-repo';
 
     beforeEach(async () => {
@@ -514,6 +515,11 @@ describe('active-sessions-router', () => {
           title: 'active with PR',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/active-x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/active-provenance-repo/pull/42',
+          pr_number: 42,
+          pr_head_ref: 'feature/active-x',
+          pr_link_verified_at: '2026-01-01T00:00:00.000Z',
         },
         {
           session_id: sessionWithoutPr,
@@ -522,6 +528,15 @@ describe('active-sessions-router', () => {
           title: 'active without PR',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/active-y',
+        },
+        {
+          // Same repo + branch as the cache row but no verified link of its own.
+          session_id: sessionBranchOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'active branch only',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/active-x',
         },
       ]);
       await db.insert(github_branch_pull_requests).values({
@@ -590,6 +605,17 @@ describe('active-sessions-router', () => {
       const withoutPr = result.sessions.find(s => s.id === sessionWithoutPr);
       expect(withoutPr).toBeDefined();
       expect(withoutPr).not.toHaveProperty('associatedPr');
+    });
+
+    it('omits associatedPr for a session with no verified link even on a branch with a cache row', async () => {
+      await mockHeartbeats([sessionBranchOnly]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      const branchOnly = result.sessions.find(s => s.id === sessionBranchOnly);
+      expect(branchOnly).toBeDefined();
+      expect(branchOnly).not.toHaveProperty('associatedPr');
     });
   });
 });

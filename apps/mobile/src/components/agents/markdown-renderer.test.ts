@@ -2,6 +2,7 @@
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
 import { createElement, type ReactElement, type ReactNode } from 'react';
+import { type GestureResponderEvent } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -477,6 +478,29 @@ describe('MarkdownRenderer link interaction', () => {
     expect(onLongPressLink).toHaveBeenCalledWith('https://example.com');
     expect(confirmAndOpenMarkdownLink).not.toHaveBeenCalled();
   });
+
+  it('a nested-table chip forwards the link long-press event to the host', async () => {
+    // Regression: the table() fallback passed a one-arg dispatcher, so a link
+    // long-press inside an opened nested table dropped the gesture event and
+    // the host could not stopPropagation.
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onLongPressLink = vi.fn<(href: string, event?: GestureResponderEvent) => void>();
+    const renderer = new RendererClass(palette, true, { onLongPressLink });
+    const element = renderer.table(
+      [['H']],
+      [[['r1']]],
+      undefined,
+      undefined,
+      undefined
+    ) as ReactElement<{
+      onLongPressLink?: (href: string, event?: GestureResponderEvent) => void;
+    }>;
+    const event = { stopPropagation: vi.fn() } as unknown as GestureResponderEvent;
+
+    element.props.onLongPressLink?.('https://example.com', event);
+
+    expect(onLongPressLink).toHaveBeenCalledWith('https://example.com', event);
+  });
 });
 
 describe('MarkdownRenderer code override', () => {
@@ -575,7 +599,10 @@ describe('MarkdownRenderer code override', () => {
     const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
       Record<string, unknown>
     >;
-    expect((inner(element).props as { onCopyCode?: unknown }).onCopyCode).toBe(onCopyCode);
+    const handler = (inner(element).props as { onCopyCode?: (code: string) => void }).onCopyCode;
+    expect(handler).toBeTypeOf('function');
+    handler?.('const x = 1;');
+    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
 
     const plain = new RendererClass(palette, true, {});
     const plainElement = plain.code(
@@ -594,9 +621,10 @@ describe('MarkdownRenderer code override', () => {
     const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
       Record<string, unknown>
     >;
-    expect((inner(element).props as { onLongPressCode?: unknown }).onLongPressCode).toBe(
-      onLongPressCode
-    );
+    const handler = (inner(element).props as { onLongPressCode?: () => void }).onLongPressCode;
+    expect(handler).toBeTypeOf('function');
+    handler?.();
+    expect(onLongPressCode).toHaveBeenCalledTimes(1);
 
     const plain = new RendererClass(palette, true, {});
     const plainElement = plain.code(
@@ -608,6 +636,27 @@ describe('MarkdownRenderer code override', () => {
     expect(
       (inner(plainElement).props as { onLongPressCode?: unknown }).onLongPressCode
     ).toBeUndefined();
+  });
+
+  it('dispatches a cached code element through the handler bound after setHandlers', async () => {
+    // The render cache reuses elements across a remount while the host may have
+    // recomputed its message-bound closures (a reaction or delivery failure).
+    // The element's long-press must reach the current handler, not the one the
+    // renderer captured when it built the element.
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+    const renderer = new RendererClass(palette, true, { onLongPressCode: first });
+    const element = renderer.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    const longPress = (inner(element).props as { onLongPressCode?: () => void }).onLongPressCode;
+
+    renderer.setHandlers({ onLongPressCode: second });
+    longPress?.();
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });
 

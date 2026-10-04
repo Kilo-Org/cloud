@@ -2,14 +2,12 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { z } from 'zod';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import {
-  responseFrameSchema,
   sessionTerminalConnectPayloadSchema,
   sessionTerminalConnectResultSchema,
   terminalPtyIdSchema,
-  wrapperInstanceIdSchema,
-  type ResponseFrame,
   type SessionTerminalConnectPayload,
 } from '../shared/sandbox-control-protocol.js';
+import type { ControlPlaneControlResult } from '../shared/control-plane-protocol.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -27,6 +25,13 @@ const SOCKET_CLOSING = 2;
 const TERMINAL_ENDED_REASON = 'PTY session ended';
 const encoder = new TextEncoder();
 
+/**
+ * The wrapper identity a terminal record is keyed by. Legacy records carry a
+ * UUID; the V2 plane carries the `hello.wrapperId` string, so the bridge
+ * validates any bounded identity string.
+ */
+export const terminalWrapperIdSchema = z.string().min(1).max(128);
+
 export type SandboxTerminalRecord = {
   ptyId: string;
   ownerId: string;
@@ -34,7 +39,7 @@ export type SandboxTerminalRecord = {
   kiloSessionId: string;
   directory: string;
   sandboxId: string;
-  wrapperInstanceId: string;
+  wrapperId: string;
   organizationId?: string;
   state: 'running' | 'ended';
 };
@@ -46,9 +51,19 @@ type SandboxTerminalBridgeOptions = {
   requestConnect: (
     record: SandboxTerminalRecord,
     payload: SessionTerminalConnectPayload
-  ) => Promise<ResponseFrame>;
+  ) => Promise<ControlPlaneControlResult>;
   reportActivity: (record: SandboxTerminalRecord) => Promise<void>;
   markEnded: (record: SandboxTerminalRecord) => Promise<void>;
+  /**
+   * Resolves the route directory for a metadata snapshot. Defaults to the legacy
+   * workspace path; the V2 Session DO passes its registered spec directory.
+   */
+  resolveDirectory?: (metadata: SessionMetadata) => string | undefined;
+  /**
+   * Whether this DO's name is the owner/session pair. Both planes name the
+   * Session DO `<ownerId>:<sessionId>`; the default compares the full name.
+   */
+  matchesDurableObjectName?: (record: SandboxTerminalRecord, durableObjectName: string) => boolean;
 };
 
 const terminalSocketAttachmentSchema = z
@@ -56,7 +71,8 @@ const terminalSocketAttachmentSchema = z
     role: z.enum(['browser', 'wrapper']),
     ptyId: terminalPtyIdSchema,
     bridgeGeneration: z.string().uuid(),
-    wrapperInstanceId: wrapperInstanceIdSchema,
+    // Persisted key stays `wrapperInstanceId`; deployed sockets carry it.
+    wrapperInstanceId: terminalWrapperIdSchema,
     capabilityHash: z
       .string()
       .regex(/^[a-f0-9]{64}$/)
@@ -141,8 +157,37 @@ function sameGeneration(
   );
 }
 
+/** Legacy route directory: the stored workspace path, else the derived path. */
+function defaultResolveDirectory(metadata: SessionMetadata): string | undefined {
+  return (
+    metadata.workspace?.workspacePath ??
+    getSessionWorkspacePath(
+      metadata.identity.orgId,
+      metadata.identity.userId,
+      metadata.identity.sessionId
+    )
+  );
+}
+
+/** Legacy Session DO is named `<ownerId>:<sessionId>`. */
+function defaultMatchesDurableObjectName(
+  record: SandboxTerminalRecord,
+  durableObjectName: string
+): boolean {
+  return durableObjectName === `${record.ownerId}:${record.sessionId}`;
+}
+
 export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOptions) {
-  const { state, getMetadata, getTerminal, requestConnect, reportActivity, markEnded } = options;
+  const {
+    state,
+    getMetadata,
+    getTerminal,
+    requestConnect,
+    reportActivity,
+    markEnded,
+    resolveDirectory = defaultResolveDirectory,
+    matchesDurableObjectName = defaultMatchesDurableObjectName,
+  } = options;
 
   function currentSocket(
     role: TerminalSocketAttachment['role'],
@@ -173,24 +218,18 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
       record.kiloSessionId !== metadata.auth.kiloSessionId ||
       record.sandboxId !== metadata.workspace?.sandboxId ||
       (record.organizationId ?? null) !== (metadata.identity.orgId ?? null) ||
-      !wrapperInstanceIdSchema.safeParse(record.wrapperInstanceId).success
+      !terminalWrapperIdSchema.safeParse(record.wrapperId).success
     ) {
       return false;
     }
 
     const durableObjectName = state.id.name;
-    if (durableObjectName && durableObjectName !== `${record.ownerId}:${record.sessionId}`) {
+    if (durableObjectName && !matchesDurableObjectName(record, durableObjectName)) {
       return false;
     }
 
     try {
-      const directory =
-        metadata.workspace?.workspacePath ??
-        getSessionWorkspacePath(
-          metadata.identity.orgId,
-          metadata.identity.userId,
-          metadata.identity.sessionId
-        );
+      const directory = resolveDirectory(metadata);
       return record.directory === directory;
     } catch {
       return false;
@@ -229,14 +268,10 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
     closeSockets(state.getWebSockets(TERMINAL_TAG), code, reason);
   }
 
-  function closeRuntime(
-    wrapperInstanceId: string,
-    code = 1000,
-    reason = TERMINAL_ENDED_REASON
-  ): void {
+  function closeRuntime(wrapperId: string, code = 1000, reason = TERMINAL_ENDED_REASON): void {
     const sockets = state
       .getWebSockets(TERMINAL_TAG)
-      .filter(socket => readAttachment(socket)?.wrapperInstanceId === wrapperInstanceId);
+      .filter(socket => readAttachment(socket)?.wrapperInstanceId === wrapperId);
     closeSockets(sockets, code, reason);
   }
 
@@ -260,7 +295,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
         if (
           !recordMatchesMetadata(record, metadata, attachment.ptyId) ||
           record.state !== 'running' ||
-          record.wrapperInstanceId !== attachment.wrapperInstanceId ||
+          record.wrapperId !== attachment.wrapperInstanceId ||
           current?.socket !== socket ||
           !sameGeneration(current.attachment, attachment)
         ) {
@@ -290,7 +325,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
         role: 'browser',
         ptyId,
         bridgeGeneration: crypto.randomUUID(),
-        wrapperInstanceId: record.wrapperInstanceId,
+        wrapperInstanceId: record.wrapperId,
       };
       state.acceptWebSocket(pair[1], [TERMINAL_TAG, socketTag('browser', ptyId)]);
       pair[1].serializeAttachment(attachment);
@@ -304,7 +339,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
     if (
       !recordMatchesMetadata(latestRecord, latestMetadata, ptyId) ||
       latestRecord.state !== 'running' ||
-      latestRecord.wrapperInstanceId !== record.wrapperInstanceId
+      latestRecord.wrapperId !== record.wrapperId
     ) {
       return new Response('Terminal unavailable', { status: 409 });
     }
@@ -314,7 +349,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
       role: 'browser',
       ptyId,
       bridgeGeneration,
-      wrapperInstanceId: latestRecord.wrapperInstanceId,
+      wrapperInstanceId: latestRecord.wrapperId,
       capabilityHash,
       capabilityExpiresAt: Date.now() + TERMINAL_CAPABILITY_LIFETIME_MS,
     };
@@ -330,12 +365,8 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
         bridgeGeneration,
         capability,
       });
-      const response = responseFrameSchema.safeParse(await requestConnect(latestRecord, payload));
-      if (
-        !response.success ||
-        !response.data.ok ||
-        !sessionTerminalConnectResultSchema.safeParse(response.data.result).success
-      ) {
+      const response = await requestConnect(latestRecord, payload);
+      if (!response.ok || !sessionTerminalConnectResultSchema.safeParse(response.result).success) {
         closeGeneration(attachment, 1011, 'Terminal connection failed');
         return new Response('Terminal connection failed', { status: 502 });
       }
@@ -349,7 +380,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
       if (
         !recordMatchesMetadata(currentRecord, currentMetadata, ptyId) ||
         currentRecord.state !== 'running' ||
-        currentRecord.wrapperInstanceId !== attachment.wrapperInstanceId ||
+        currentRecord.wrapperId !== attachment.wrapperInstanceId ||
         browser?.socket !== pair[1] ||
         !wrapper ||
         !sameGeneration(browser.attachment, attachment) ||
@@ -385,7 +416,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
     const browser = currentSocket('browser', ptyId);
     if (
       !browser ||
-      browser.attachment.wrapperInstanceId !== record.wrapperInstanceId ||
+      browser.attachment.wrapperInstanceId !== record.wrapperId ||
       browser.attachment.capabilityHash === undefined ||
       browser.attachment.capabilityExpiresAt === undefined ||
       browser.attachment.capabilityExpiresAt <= Date.now() ||
@@ -490,7 +521,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
       if (
         !recordMatchesMetadata(record, metadata, attachment.ptyId) ||
         record.state !== 'running' ||
-        record.wrapperInstanceId !== attachment.wrapperInstanceId ||
+        record.wrapperId !== attachment.wrapperInstanceId ||
         !latestBrowser ||
         !sameGeneration(latestBrowser.attachment, attachment)
       ) {

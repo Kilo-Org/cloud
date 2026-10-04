@@ -1,7 +1,7 @@
 import type { SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './CloudAgentSession.js';
-import type { SandboxSession } from '../sandbox-session/SandboxSession.js';
+import type { SandboxSessionV2 as SandboxSession } from '../control-plane/session/session-do.js';
 import type { MCPSecretValue } from '../router/schemas.js';
 import type { SessionMetadata } from './session-metadata.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
@@ -147,6 +147,8 @@ export type PersistenceEnv = {
   KILO_OPENROUTER_BASE?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
+  /** Shell-tool default timeout override (ms) forwarded to the Kilo server - defaults to 4 minutes */
+  KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS?: string;
   /** GitHub App slug for git commit attribution (e.g., 'kiloconnect') */
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */

@@ -18,12 +18,13 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import type { SendMessagePayload } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { CLOUD_AGENT_NEXT_WS_URL, SESSION_INGEST_WS_URL } from '@/lib/constants';
-import { normalizeAlias } from './session-config';
+import { normalizeAlias, selectAssignedSessionBranch } from './session-config';
 import { usePostHog } from 'posthog-js/react';
 import { fetchWebSessionSnapshotPage } from './session-page-adapter';
 import type { CloudAgentApi } from '@kilocode/cloud-agent-sdk/transport';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { createWorktreeReviewSend, type WorktreeReviewSendApi } from './worktree-review-send';
+import { MarkdownParseCacheProvider } from './markdown-parse-cache';
 
 const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
@@ -337,7 +338,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           title: sessionResult.title,
           organizationId: sessionResult.organization_id,
           gitUrl: sessionResult.git_url,
-          gitBranch: rs?.upstreamBranch ?? sessionResult.git_branch,
+          gitBranch: selectAssignedSessionBranch(rs?.upstreamBranch, sessionResult.git_branch),
           worktreeId: sessionResult.cloud_agent_worktree_id ?? null,
           mode: normalizeAlias(rs?.mode),
           model: rs?.model ?? null,
@@ -391,7 +392,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       <UserWebConnectionContext.Provider value={sharedConnection}>
         <ManagerContext.Provider value={managerRef.current}>
           <CloudAgentContext.Provider value={reviewSendRef.current}>
-            {children}
+            <MarkdownParseCacheProvider>{children}</MarkdownParseCacheProvider>
           </CloudAgentContext.Provider>
         </ManagerContext.Provider>
       </UserWebConnectionContext.Provider>

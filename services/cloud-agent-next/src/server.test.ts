@@ -8,6 +8,7 @@ import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/verce
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
+import { mintSandboxLaunchCredential } from './sandbox-control/credential.js';
 import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
@@ -26,6 +27,7 @@ const {
   requireCurrentSessionAccessMock,
   getPgDbMock,
   loggerWarnMock,
+  loggerWithFieldsMock,
 } = vi.hoisted(() => ({
   getRunningTerminalClientMock: vi.fn(),
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
@@ -35,6 +37,7 @@ const {
   requireCurrentSessionAccessMock: vi.fn(),
   getPgDbMock: vi.fn(),
   loggerWarnMock: vi.fn(),
+  loggerWithFieldsMock: vi.fn(),
 }));
 
 vi.mock('./logger.js', () => {
@@ -43,9 +46,9 @@ vi.mock('./logger.js', () => {
     info: vi.fn(),
     warn: loggerWarnMock,
     error: vi.fn(),
-    withFields: vi.fn(),
+    withFields: loggerWithFieldsMock,
   };
-  logger.withFields.mockReturnValue(logger);
+  loggerWithFieldsMock.mockReturnValue(logger);
 
   return {
     logger,
@@ -123,14 +126,6 @@ vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
 }));
 
-vi.mock('./persistence/SandboxControl.js', () => ({
-  SandboxControl: class SandboxControl {},
-}));
-
-vi.mock('./sandbox-session/SandboxSession.js', () => ({
-  SandboxSession: class SandboxSession {},
-}));
-
 vi.mock('./db/pg.js', () => ({
   getPgDb: getPgDbMock,
 }));
@@ -151,6 +146,7 @@ const {
   default: worker,
   REPORT_RETENTION_CRON,
   OUTCOME_AGGREGATE_CRON,
+  OUTCOME_AGGREGATE_CRONS,
 } = await import('./server.js');
 
 const secret = 'test-secret';
@@ -290,6 +286,7 @@ beforeEach(() => {
   runCloudAgentOutcomeCollectionMock.mockClear();
   runCloudAgentOpenStockCollectionMock.mockClear();
   loggerWarnMock.mockClear();
+  loggerWithFieldsMock.mockClear();
   getPgDbMock.mockReset();
   requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
     kiloSessionId: 'ses_12345678901234567890123456',
@@ -404,19 +401,44 @@ describe('server background reporting', () => {
     expect(runCloudAgentOpenStockCollectionMock).not.toHaveBeenCalled();
   });
 
-  it('runs the outcome and open-stock collections on the 3-minute cron', async () => {
+  it('runs the outcome and open-stock collections on the 5-minute cron', async () => {
     const env = createEnv();
+    const scheduledTime = Date.parse('2026-02-01T00:10:42.000Z');
 
     await worker.scheduled(
-      { cron: OUTCOME_AGGREGATE_CRON } as ScheduledController,
+      { cron: OUTCOME_AGGREGATE_CRON, scheduledTime } as ScheduledController,
       env as unknown as Env
     );
 
     expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
-    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(env);
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(
+      env,
+      expect.any(Date),
+      scheduledTime
+    );
     expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
     expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
     expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
+  });
+
+  it('runs the collections on the tolerated legacy 3-minute cron', async () => {
+    const env = createEnv();
+    const scheduledTime = Date.parse('2026-02-01T00:10:42.000Z');
+
+    await worker.scheduled(
+      { cron: '*/3 * * * *', scheduledTime } as ScheduledController,
+      env as unknown as Env
+    );
+
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(
+      env,
+      expect.any(Date),
+      scheduledTime
+    );
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 
   it('still runs the open-stock collection and preserves the outcome error when outcome collection rejects', async () => {
@@ -458,6 +480,8 @@ describe('server background reporting', () => {
 
     expect((config.triggers?.crons ?? []).slice().sort()).toEqual(expected);
     expect((config.env?.dev?.triggers?.crons ?? []).slice().sort()).toEqual(expected);
+    expect(OUTCOME_AGGREGATE_CRON).toBe('*/5 * * * *');
+    expect([...OUTCOME_AGGREGATE_CRONS]).toEqual([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
   });
 });
 
@@ -549,31 +573,6 @@ describe('server /terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
-  });
-
-  it('rejects a control-plane browser upgrade during runtime authorization recovery', async () => {
-    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-    const env = createEnv();
-    const consume = installTerminalNonceConsumer(env);
-    const sessionFetch = vi.fn();
-    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      fetch: sessionFetch,
-      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
-    });
-
-    const response = await fetchWorker(
-      new Request(
-        `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(signTerminalTicket(sessionId))}`,
-        { headers: { Upgrade: 'websocket' } }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(503);
-    await expect(response.text()).resolves.toBe('Runtime authorization recovery is in progress');
-    expect(consume).toHaveBeenCalledOnce();
-    expect(sessionFetch).not.toHaveBeenCalled();
   });
 
   it('rejects revoked control-plane access before consuming the browser ticket nonce', async () => {
@@ -918,6 +917,7 @@ describe('server runtime credential proxy', () => {
         ['GET', '/api/session/kilo_proxy/export', undefined],
         ['POST', '/api/session/kilo_proxy/ingest', '{}'],
         ['POST', '/api/session/kilo_proxy/title', '{}'],
+        ['POST', '/api/exa/search', '{}'],
       ] as const;
       for (const [method, path, body] of requests) {
         const response = await fetchWorker(
@@ -947,6 +947,7 @@ describe('server runtime credential proxy', () => {
         '/api/session/kilo_proxy/export',
         '/api/session/kilo_proxy/ingest',
         '/api/session/kilo_proxy/title',
+        '/api/exa/search',
       ]);
       const createRequest = upstream.mock.calls[7]?.[0] as Request;
       expect(await createRequest.text()).toBe('{"sessionId":"kilo_proxy"}');
@@ -1216,7 +1217,7 @@ describe('server runtime credential proxy', () => {
     }
   });
 
-  it('forwards the caller feature header while still replacing the organization header', async () => {
+  it('forwards gateway attribution headers while still replacing the organization header', async () => {
     const env = createEnv();
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
@@ -1229,6 +1230,17 @@ describe('server runtime credential proxy', () => {
         },
       }),
     });
+    const attributionHeaders = {
+      'X-Kilocode-Feature': 'code-review',
+      'X-KILOCODE-EDITORNAME': 'Kilo Cloud Agent',
+      'x-kilocode-mode': 'code',
+      'X-KILOCODE-MACHINEID': 'machine_proxy',
+      'X-KILOCODE-TASKID': 'task_proxy',
+      'X-KILOCODE-PROJECTID': 'project_proxy',
+      'X-KiloCode-Version': '7.8.1',
+      'x-kilo-session': 'session_proxy',
+      'x-kilo-request': 'request_proxy',
+    };
     const upstream = vi.fn().mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', upstream);
     try {
@@ -1239,7 +1251,7 @@ describe('server runtime credential proxy', () => {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${await handle()}`,
-              'X-Kilocode-Feature': 'code-review',
+              ...attributionHeaders,
               'X-Kilocode-OrganizationId': 'attacker-org',
               'Content-Type': 'application/json',
             },
@@ -1251,7 +1263,9 @@ describe('server runtime credential proxy', () => {
       expect(response.status).toBe(200);
       expect(upstream).toHaveBeenCalledOnce();
       const forwarded = upstream.mock.calls[0][0] as Request;
-      expect(forwarded.headers.get('x-kilocode-feature')).toBe('code-review');
+      for (const [name, value] of Object.entries(attributionHeaders)) {
+        expect(forwarded.headers.get(name)).toBe(value);
+      }
       expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
     } finally {
       vi.unstubAllGlobals();
@@ -1394,6 +1408,58 @@ describe('server runtime credential proxy', () => {
     vi.unstubAllGlobals();
   });
 
+  it('forwards allowlisted Exa requests with a kilo-gateway attestation', async () => {
+    const env = createEnv();
+    const backingToken = jwt.sign({ exp: 4_000_000_000 }, secret);
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: backingToken,
+        organizationId: 'org_proxy',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn(async (request: Request) => {
+      expect(request.method).toBe('POST');
+      expect(request.url).toBe('https://api.kilo.ai/api/exa/search');
+      expect(request.headers.get('authorization')).toBe(`Bearer ${backingToken}`);
+      expect(request.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
+      await expect(
+        verifyRuntimeProxyAttestation({
+          value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+          secret,
+          audience: 'kilo-gateway',
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+          bearer: backingToken,
+        })
+      ).resolves.toBe(true);
+      return new Response('ok');
+    });
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request('https://worker.test/api/runtime-credential-proxy/exa/api/exa/search', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${await handle()}`,
+            'Content-Type': 'application/json',
+          },
+          body: '{}',
+        }),
+        env
+      );
+      expect(response.status).toBe(200);
+      expect(upstream).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('validates the body-bound ingest identity before fetching upstream', async () => {
     const env = createEnv();
     const resolve = vi.fn().mockResolvedValue({
@@ -1418,6 +1484,117 @@ describe('server runtime credential proxy', () => {
     expect(response.status).toBe(404);
     expect(upstream).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it('emits the upstream status for a failed model-proxy request', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const resolve = vi.fn().mockResolvedValue({
+      token: 'https://api.kilo.ai:backing-token',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn().mockResolvedValue(new Response('Unauthorized', { status: 401 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle()}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(401);
+      await expect(response.text()).resolves.toBe('Unauthorized');
+      expect(upstream).toHaveBeenCalledOnce();
+      expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+      expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+        logTag: 'runtime_proxy_request_failed',
+        upstreamAttempted: true,
+        upstreamStatus: 401,
+        sessionId: 'agent_proxy',
+        kiloSessionId: 'kilo_proxy',
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('emits no diagnostic for a successful model-proxy request', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle()}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      expect(loggerWithFieldsMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('attempts no upstream and emits no upstream diagnostic when credential resolution rejects', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue(null),
+    });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle()}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(401);
+      await expect(response.text()).resolves.toBe('Unauthorized');
+      expect(upstream).not.toHaveBeenCalled();
+      expect(loggerWithFieldsMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -2355,46 +2532,6 @@ describe('server /internal/streams/close', () => {
   });
 });
 
-describe('server /internal/sandbox-control/seed', () => {
-  it('rejects without the internal API key', async () => {
-    const env = createEnv();
-    const response = await fetchWorker(
-      new Request('http://worker.test/internal/sandbox-control/seed', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sandboxId: 'sbx_test' }),
-      }),
-      env
-    );
-    expect(response.status).toBe(401);
-    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
-  });
-
-  it('stores the credential hash on the sandbox Durable Object', async () => {
-    const env = createEnv();
-    const setWrapperCredentialHash = vi.fn().mockResolvedValue(undefined);
-    env.SANDBOX_CONTROL.getByName.mockReturnValue({ setWrapperCredentialHash });
-    const response = await fetchWorker(
-      new Request('http://worker.test/internal/sandbox-control/seed', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': 'test-internal-secret',
-        },
-        body: JSON.stringify({ sandboxId: 'sbx_test' }),
-      }),
-      env
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { sandboxId: string; credential: string };
-    expect(body.sandboxId).toBe('sbx_test');
-    expect(body.credential).toMatch(/^[0-9a-f]{64}$/);
-    expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sbx_test');
-    expect(setWrapperCredentialHash).toHaveBeenCalledOnce();
-    expect(setWrapperCredentialHash.mock.calls[0]?.[0]).toMatch(/^[0-9a-f]{64}$/);
-  });
-});
-
 describe('server /sandbox-terminal', () => {
   const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -2532,27 +2669,6 @@ describe('server /sandbox-terminal', () => {
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
   });
-
-  it('rejects a valid producer WebSocket before forwarding during runtime authorization recovery', async () => {
-    const env = createEnv();
-    const sessionFetch = vi.fn();
-    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      fetch: sessionFetch,
-      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
-    });
-
-    const response = await fetchWorker(
-      new Request(`http://worker.test/sandbox-terminal/user-1/${sessionId}/pty_123`, {
-        headers: { Upgrade: 'websocket', Authorization: 'Bearer producer-capability' },
-      }),
-      env
-    );
-
-    expect(response.status).toBe(503);
-    await expect(response.text()).resolves.toBe('Runtime authorization recovery in progress');
-    expect(sessionFetch).not.toHaveBeenCalled();
-  });
 });
 
 describe('server control log routes', () => {
@@ -2609,6 +2725,31 @@ describe('server control log routes', () => {
 });
 
 describe('server /sandbox-control', () => {
+  it.each([
+    undefined,
+    '',
+    'Basic secret',
+    'Bearer',
+    'Bearer one two',
+    `Bearer ${'x'.repeat(4097)}`,
+  ])(
+    'rejects missing or malformed authorization before resolving a stub (case %#)',
+    async authorization => {
+      const env = createEnv();
+      const headers = new Headers({ Upgrade: 'websocket' });
+      if (authorization !== undefined) headers.set('Authorization', authorization);
+      env.SANDBOX_CONTROL.getByName.mockReturnValue({
+        fetch: vi.fn().mockResolvedValue(new Response()),
+      });
+      const response = await fetchWorker(
+        new Request('http://worker.test/sandbox-control/sbx_test', { headers }),
+        env
+      );
+      expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+      expect(response.status).toBe(401);
+    }
+  );
+
   it('rejects non-websocket requests', async () => {
     const env = createEnv();
     const response = await fetchWorker(
@@ -2638,7 +2779,17 @@ describe('server /sandbox-control', () => {
     env.SANDBOX_CONTROL.getByName.mockReturnValue({ fetch });
 
     const request = new Request('http://worker.test/sandbox-control/sbx_test', {
-      headers: { Upgrade: 'websocket', Authorization: 'Bearer secret' },
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${mintSandboxLaunchCredential(
+          {
+            sandboxId: 'sbx_test',
+            allocationId: crypto.randomUUID(),
+            credential: 'a'.repeat(64),
+          },
+          secret
+        )}`,
+      },
     });
     const response = await fetchWorker(request, env);
 

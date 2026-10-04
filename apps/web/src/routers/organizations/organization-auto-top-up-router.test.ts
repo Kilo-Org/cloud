@@ -2,12 +2,13 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import {
   auto_top_up_configs,
+  bouncer_credit_event_outbox,
   organization_service_fee_exemptions,
   organizations,
   stripe_service_fee_assessments,
 } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS } from '@/lib/autoTopUpConstants';
@@ -89,6 +90,17 @@ describe('organization auto-top-up router', () => {
     await db
       .delete(auto_top_up_configs)
       .where(eq(auto_top_up_configs.owned_by_organization_id, testOrg.id));
+    // The durable bouncer outbox persists charge attempts across tests; clear only this suite's
+    // fixture owners so concurrent suites' rows are untouched.
+    await db
+      .delete(bouncer_credit_event_outbox)
+      .where(
+        inArray(bouncer_credit_event_outbox.user_id, [
+          ownerUser.id,
+          memberUser.id,
+          nonMemberUser.id,
+        ])
+      );
   });
 
   describe('getConfig', () => {
@@ -205,6 +217,26 @@ describe('organization auto-top-up router', () => {
       expect(result.enabled).toBe(false);
       expect(result.redirectUrl).toBeDefined();
       expect(typeof result.redirectUrl).toBe('string');
+
+      // `reportChargeAttempted` is awaited by the mutation, so the durable outbox row is
+      // already committed when the mutation resolves.
+      const rows = await db
+        .select()
+        .from(bouncer_credit_event_outbox)
+        .where(eq(bouncer_credit_event_outbox.user_id, ownerUser.id));
+      expect(rows).toHaveLength(1);
+      expect(rows[0].event_type).toBe('charge.attempted');
+      expect(rows[0].user_id).toBe(ownerUser.id);
+      expect(rows[0].payload).toEqual(
+        expect.objectContaining({
+          type: 'charge.attempted',
+          flow: 'auto_topup',
+          userId: ownerUser.id,
+          orgId: testOrg.id,
+          amountCents: 50000,
+          accountCreatedAt: new Date(testOrg.created_at).toISOString(),
+        })
+      );
     });
 
     it('throws UNAUTHORIZED for non-owner members', async () => {

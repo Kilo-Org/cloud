@@ -5,10 +5,15 @@ import { FormField } from './form-field';
 import { AccessibleStatus } from './accessible-status';
 import { act, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
+import { compiledLengthDp } from '@/test/native-dimensions';
+import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 import ar from '@/i18n/locales/ar.json';
 import en from '@/i18n/locales/en.json';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
+// Mutable so a suite can prove the placeholder follows the active palette. The
+// inset is palette-independent; every suite resets the mock to the light tokens.
+const appearance = vi.hoisted((): { colors: Record<string, string> } => ({ colors: {} }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
@@ -21,14 +26,17 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888' }),
+  useThemeColors: () => appearance.colors,
 }));
 vi.mock('@/lib/a11y/status-announcement', () => ({ useStatusAnnouncement: vi.fn() }));
+
+appearance.colors = lightColors;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 afterEach(() => {
   rtl.isRTL = false;
+  appearance.colors = lightColors;
   act(() => {
     renderer?.unmount();
   });
@@ -194,6 +202,79 @@ describe('FormField shared single-line box', () => {
     expect(status.findByType('Text').props.children).toBe(i18n.t('login.pleaseEnterEmail'));
     expect(input.findAllByType(AccessibleStatus)).toHaveLength(0);
   });
+});
+
+describe('FormField multiline inset', () => {
+  it('insets the profile description content while keeping the caller box and top alignment', () => {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label: i18n.t('profiles.descriptionLabel'),
+          placeholder: i18n.t('profiles.descriptionPlaceholder'),
+          multiline: true,
+          textAlignVertical: 'top',
+          className: 'min-h-20 leading-5',
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const input = renderer.root.findByType('TextInput');
+    // The field's chrome still comes from FormField; the shared inset supplies
+    // the padding the profile description's value and placeholder need, and the
+    // caller's own box (`min-h-20 leading-5`) survives the merge. The single
+    // line floor and line height never leak into a multiline field.
+    expect(input.props.className).toContain('px-3');
+    expect(input.props.className).toContain('py-2.5');
+    expect(input.props.className).toContain('min-h-20');
+    expect(input.props.className).toContain('leading-5');
+    expect(input.props.className).not.toContain('min-h-[44px]');
+    expect(input.props.className).not.toContain('leading-[normal]');
+    expect(input.props.textAlignVertical).toBe('top');
+    expect(input.props.placeholder).toBe(i18n.t('profiles.descriptionPlaceholder'));
+  });
+
+  // The profile description is rendered through FormField, so the merged field
+  // chrome and the caller's `min-h-20 leading-5` are part of the native box the
+  // value and placeholder are drawn in. Compile the exact className the field
+  // renders through the app's NativeWind compiler — the rules Metro emits and
+  // RN's Fabric text input turns into its text-container inset — and assert the
+  // inset in both palettes, while the placeholder colour follows the palette.
+  it.each([
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const)(
+    'compiles the profile description field to a native box that insets its content in %s mode',
+    async (_mode, colors) => {
+      appearance.colors = colors;
+      act(() => {
+        renderer = TestRenderer.create(
+          createElement(FormField, {
+            label: i18n.t('profiles.descriptionLabel'),
+            placeholder: i18n.t('profiles.descriptionPlaceholder'),
+            multiline: true,
+            textAlignVertical: 'top',
+            className: 'min-h-20 leading-5',
+          })
+        );
+      });
+      if (!renderer) {
+        throw new Error('renderer was not created');
+      }
+      const input = renderer.root.findByType('TextInput');
+      const className = input.props.className as string;
+
+      // `px-3` is 10.5pt and `py-2.5` is 8.75pt at the app's 14pt rem; padding
+      // is static, so focus, theme, and an open keyboard leave it unchanged.
+      expect(await compiledLengthDp(className, 'paddingInline')).toBe(10.5);
+      expect(await compiledLengthDp(className, 'paddingBlock')).toBe(8.75);
+      // The caller's `min-h-20` survives the inset merge as the field's native floor.
+      expect(await compiledLengthDp(className, 'minHeight')).toBe(70);
+      expect(input.props.textAlignVertical).toBe('top');
+      expect(input.props.placeholderTextColor).toBe(colors.mutedForeground);
+    }
+  );
 });
 
 describe('FormField direction-aware content alignment', () => {

@@ -14,6 +14,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
+import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
 import {
   validateCronExpression,
@@ -802,10 +803,29 @@ export const webhookTriggersRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * List captured requests for a trigger.
-   * Proxies to worker and enriches with kiloSessionId from PostgreSQL.
-   */
+  getRequestLogs: baseProcedure
+    .input(
+      z
+        .object({
+          triggerId: triggerIdSchema,
+          requestId: z.string().uuid(),
+          organizationId: z.string().uuid().optional(),
+        })
+        .strict()
+    )
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      await assertTriggerOwnership(ctx.user.id, input.triggerId, input.organizationId);
+      return getWebhookRequestLogs(
+        input.organizationId ? undefined : ctx.user.id,
+        input.organizationId,
+        input.triggerId,
+        input.requestId
+      );
+    }),
+
   listRequests: baseProcedure
     .input(
       z.object({

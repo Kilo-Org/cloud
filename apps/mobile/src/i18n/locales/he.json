@@ -215,7 +215,6 @@
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
     "bonusCreditsExpiring": "תוקפם של קרדיטי בונוס בסך {{amount}} יפוג ב-{{date}}.",
-    "creditBalanceEmpty": "יתרת הקרדיטים שלך היא אפס. בחשבון הזה, הקרדיטים מנוהלים מחוץ לאפליקציית iOS.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "deleteAccountTitle": "למחוק את החשבון?",
@@ -241,6 +240,7 @@
     "addPasskey": "הוספת מפתח גישה",
     "passkeyDefaultName": "מפתח גישה",
     "passkeyAddedOn": "נוסף ב-{{date}}",
+    "passkeyLastUsedOn": "שימוש אחרון {{date}}",
     "passkeyAdded": "מפתח הגישה נוסף.",
     "passkeyAddFailed": "לא ניתן היה להוסיף מפתח גישה. נסו שוב.",
     "passkeyAddUnsupported": "המכשיר הזה אינו יכול ליצור מפתחות גישה.",
@@ -1543,6 +1543,7 @@
       "idCopied": "מזהה השיחה הועתק",
       "couldNotCopyId": "לא ניתן היה להעתיק את מזהה השיחה.",
       "untitled": "שיחה ללא כותרת",
+      "actions": "פעולות בשיחה",
       "sessionDeleted": "השיחה נמחקה",
       "needsInput": "נדרש קלט",
       "fromPlatform": "מ-{{platform}}",
@@ -1596,7 +1597,9 @@
       "renamePlaceholder": "שם הסשן",
       "transcriptAccessibility": "תמליל הסשן",
       "readOnly": "הסשן הזה מיועד לקריאה בלבד.",
+      "continueInNewSession": "המשך בסשן חדש",
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
+      "emptyTranscriptDescription": "בסשן הזה אין עדיין הודעות.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
@@ -1686,6 +1689,8 @@
       "leaveChanges": "השארת השינויים",
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
+      "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
+      "connectProviderToStart": "חבר ספק כדי להתחיל.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",
@@ -2070,6 +2075,7 @@
       "selectModelBeforeSending": "בחר מודל לפני השליחה.",
       "preparingPlaceholder": "מכין את הסביבה...",
       "finalizingPlaceholder": "מסיים...",
+      "sessionLoadFailed": "לא ניתן היה לטעון את ההפעלה. נסו שוב תחילה.",
       "cannotReceiveFiles": "הסשן הזה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה שלך.",
       "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
@@ -2140,6 +2146,7 @@
       "provider": "ספק",
       "totalCost": "עלות כוללת",
       "usageReflectsLatest": "נתוני השימוש משקפים את תשובת העוזר האחרונה שהושלמה.",
+      "usageUnavailable": "ניצול ההקשר אינו זמין",
       "tokenUsage": "שימוש בטוקנים",
       "cacheRate": "שיעור השימוש במטמון",
       "modelsCount": "מודלים ({{displayCount}})",
@@ -2176,7 +2183,10 @@
     "markdownImage": {
       "load": "טעינה",
       "loadWithHost": "טעינה מ-{{host}}",
-      "httpsOnly": "אפשר לטעון תמונות רק דרך HTTPS."
+      "httpsOnly": "אפשר לטעון תמונות רק דרך HTTPS.",
+      "trustTitle": "לטעון תמונה מ-{{host}}?",
+      "trustMessage": "מתן אמון ב-{{host}} טוען את התמונות שלו בלי לשאול בכל פעם. אפשר לבטל זאת מאוחר יותר תחת אתרים מהימנים.",
+      "loadOnce": "טעינה פעם אחת"
     },
     "markdownLink": {
       "invalidLink": "לא ניתן לפתוח קישור זה.",
@@ -3221,8 +3231,12 @@
     "subtitle": "אתרים שאישרת לפתוח ללא בקשת אישור נוספת",
     "emptyTitle": "אין אתרים מהימנים",
     "emptyDescription": "לאחר מתן אמון באתר, קישורים אליו ייפתחו ללא בקשת אישור נוספת.",
+    "imagesSectionTitle": "אתרי תמונות מהימנים",
+    "imagesSectionDescription": "תמונות מאתרים אלה נטענות בלי לשאול שוב.",
+    "imagesSectionEmpty": "אין אתרי תמונות מהימנים",
     "revoke": "ביטול האמון באתר {{host}}",
     "revokeMessage": "קישורים לאתר זה יבקשו אישור שוב.",
+    "revokeImageMessage": "תמונות מאתר זה יבקשו אישור שוב.",
     "backToPreferences": "חזרה להעדפות"
   },
   "quickChat": {
@@ -3487,5 +3501,17 @@
       "unboundToast": "ריפו לא כבול",
       "unbindFailed": "לא ניתן היה לבטל את קשירת המאגר"
     }
+  },
+  "credits": {
+    "title": "קניית קרדיטים",
+    "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
+    "packLabel": "הוספת {{amount}} בקרדיטים",
+    "priceUnavailable": "המחיר אינו זמין",
+    "purchased": "הקרדיטים נוספו ליתרה שלך.",
+    "empty": "חבילות קרדיטים אינן זמינות כעת.",
+    "noMatchingProducts": "App Store לא החזיר חבילות קרדיטים תואמות.",
+    "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
+    "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
+    "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   }
 }

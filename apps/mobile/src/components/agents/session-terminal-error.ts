@@ -374,6 +374,22 @@ export function describeTerminalFailure(message: string): SessionTerminalError {
   };
 }
 
+/**
+ * Whether a terminal failure can recover by retrying. A coded failure names
+ * its class directly; an uncoded one is classified from its message. The
+ * composer's reason line uses this so a non-retryable failure on an empty
+ * transcript (not authorized, insufficient credits, selected model
+ * unavailable, session gone) states its own reason instead of telling the
+ * reader to Retry an action the full-screen error does not offer.
+ */
+export function isRetryableTerminalFailure(input: {
+  message: string;
+  code?: SdkStatusMessageCode;
+}): boolean {
+  const codedClass = input.code === undefined ? undefined : errorClassForCode(input.code);
+  return retryableClass(codedClass ?? classifyTerminalError(input.message));
+}
+
 /** The reader's copy and the untranslated original for a runtime failure. */
 type SessionRuntimeFailure = {
   message: string;

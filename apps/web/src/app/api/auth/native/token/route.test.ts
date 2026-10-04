@@ -12,9 +12,9 @@ import {
   consumeSignInCode,
 } from '@/lib/auth/magic-link-tokens';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
-  findUserById,
   findUserByNormalizedEmail,
   findUserIdByAuthProvider,
 } from '@/lib/user';
@@ -35,9 +35,9 @@ jest.mock('@/lib/auth/passkey', () => ({
   consumeSignInTicket: jest.fn(),
 }));
 jest.mock('@/lib/user');
+jest.mock('@/lib/user/find-user-by-id');
 jest.mock('@/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
-jest.mock('@/lib/organizations/verified-domain-membership');
 jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
   checkNativeAdmission: jest.fn(),
@@ -56,9 +56,11 @@ jest.mock('@sentry/nextjs', () => ({
 
 // eslint-disable-next-line no-var
 var mockPosthogCapture: jest.Mock;
+// Jest also runs this factory while it generates the automatic `@/lib/user`
+// mock, so reuse one capture mock across calls.
 jest.mock('@/lib/posthog', () => {
-  const capture = jest.fn();
-  mockPosthogCapture = capture;
+  mockPosthogCapture ??= jest.fn();
+  const capture = mockPosthogCapture;
   return {
     __esModule: true,
     default: jest.fn(() => ({
@@ -86,7 +88,6 @@ import {
   createDeviceSessionWithAttestedKey,
 } from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
-import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
@@ -111,9 +112,6 @@ const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
 const mockCaptureMessage = jest.mocked(captureMessage);
-const mockEnsureVerifiedDomainOrganizationMembership = jest.mocked(
-  ensureVerifiedDomainOrganizationMembership
-);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
@@ -159,99 +157,7 @@ describe('POST /api/auth/native/token', () => {
     mockCommitSignInCode.mockResolvedValue(true);
     mockReleaseSignInCode.mockResolvedValue(undefined);
     mockConsumeSignInCode.mockResolvedValue(true);
-    mockEnsureVerifiedDomainOrganizationMembership.mockResolvedValue(null);
   });
-
-  it.each([
-    ['apple', 'legacy', { provider: 'apple', idToken: 'apple-id-token', admission: {} }],
-    ['apple', 'refresh', { provider: 'apple', idToken: 'apple-id-token', supportsRefresh: true }],
-    [
-      'apple',
-      'attested refresh',
-      { provider: 'apple', idToken: 'apple-id-token', supportsRefresh: true, admission: {} },
-    ],
-    ['google', 'legacy', { provider: 'google', idToken: 'google-id-token', admission: {} }],
-    [
-      'google',
-      'refresh',
-      { provider: 'google', idToken: 'google-id-token', supportsRefresh: true },
-    ],
-    [
-      'google',
-      'attested refresh',
-      { provider: 'google', idToken: 'google-id-token', supportsRefresh: true, admission: {} },
-    ],
-    [
-      'email',
-      'legacy',
-      { provider: 'email', email: 'emailuser@example.com', code: '123456', admission: {} },
-    ],
-    [
-      'email',
-      'refresh',
-      {
-        provider: 'email',
-        email: 'emailuser@example.com',
-        code: '123456',
-        supportsRefresh: true,
-      },
-    ],
-    [
-      'email',
-      'attested refresh',
-      {
-        provider: 'email',
-        email: 'emailuser@example.com',
-        code: '123456',
-        supportsRefresh: true,
-        admission: {},
-      },
-    ],
-  ] as const)(
-    'fails %s %s authentication before credentials when verified-domain admission fails',
-    async (provider, _credentialMode, body) => {
-      if (provider === 'apple') {
-        mockVerifyNativeAppleIdToken.mockResolvedValue({
-          sub: 'apple-sub-1',
-          email: 'appleuser@example.com',
-        });
-      } else if (provider === 'google') {
-        mockVerifyNativeGoogleIdToken.mockResolvedValue({
-          sub: 'google-sub-1',
-          email: 'googleuser@example.com',
-        });
-      }
-      mockValidateAdmissionPayload.mockReturnValue({
-        platform: 'ios',
-        kind: 'attestation',
-        challenge: 'challenge',
-        payload: 'payload',
-        keyId: 'key1',
-      });
-      mockEnsureVerifiedDomainOrganizationMembership.mockRejectedValueOnce(
-        new Error('verified-domain admission failed')
-      );
-
-      await expect(POST(createRequest(body))).rejects.toThrow('verified-domain admission failed');
-
-      expect(mockEnsureVerifiedDomainOrganizationMembership).toHaveBeenCalledWith(fakeUser.id);
-      expect(mockCreateOrUpdateUser.mock.invocationCallOrder[0]).toBeLessThan(
-        mockEnsureVerifiedDomainOrganizationMembership.mock.invocationCallOrder[0]
-      );
-      expect(mockCheckDomainSignInEligibility.mock.invocationCallOrder.at(-1)).toBeLessThan(
-        mockEnsureVerifiedDomainOrganizationMembership.mock.invocationCallOrder[0]
-      );
-      expect(mockPersistAttestedKey).not.toHaveBeenCalled();
-      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
-      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
-      expect(mockGenerateApiToken).not.toHaveBeenCalled();
-      if (provider === 'email') {
-        expect(mockCommitSignInCode).not.toHaveBeenCalled();
-        expect(mockReleaseSignInCode).toHaveBeenCalled();
-      }
-    }
-  );
 
   describe('apple', () => {
     it('builds args mirroring createAppleAccountInfo, autoLink=true, and mints a token', async () => {

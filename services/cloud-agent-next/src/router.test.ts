@@ -113,6 +113,9 @@ type MockSessionStub = {
   createTerminal?: ReturnType<typeof vi.fn>;
   resizeTerminal?: ReturnType<typeof vi.fn>;
   closeTerminal?: ReturnType<typeof vi.fn>;
+  terminalCreate?: ReturnType<typeof vi.fn>;
+  terminalResize?: ReturnType<typeof vi.fn>;
+  terminalClose?: ReturnType<typeof vi.fn>;
   isSandboxCleanupScheduled?: ReturnType<typeof vi.fn>;
 };
 
@@ -912,9 +915,10 @@ describe('router sessionId validation', () => {
 
       it('routes workspace_ interrupts to SANDBOX_SESSION', async () => {
         const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+        const stop = vi.fn().mockResolvedValue({ interrupted: true });
         const controlStub = {
           ...mockSessionStub,
-          interruptExecution: vi.fn().mockResolvedValue({ success: true }),
+          stop,
         };
         const sandboxSession = {
           idFromName: vi.fn((id: string) => ({ id })),
@@ -936,46 +940,7 @@ describe('router sessionId validation', () => {
         expect(result.success).toBe(true);
         expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
-        expect(controlStub.interruptExecution).toHaveBeenCalled();
-      });
-
-      it('keeps the interrupt failure reason out of the log message field', async () => {
-        const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abd';
-        const controlStub = {
-          ...mockSessionStub,
-          interruptExecution: vi.fn().mockResolvedValue({
-            success: false,
-            message: 'Stop cleanup deadline is invalid',
-          }),
-        };
-        const sandboxSession = {
-          idFromName: vi.fn((id: string) => ({ id })),
-          get: vi.fn(() => controlStub),
-        };
-        mockContext.env.SANDBOX_SESSION =
-          sandboxSession as unknown as TRPCContext['env']['SANDBOX_SESSION'];
-        vi.mocked(fetchSessionMetadata).mockResolvedValue(
-          legacySessionMetadata({
-            version: 123456789,
-            sessionId,
-            orgId: 'org-123',
-            userId: 'test-user-123',
-            timestamp: 123456789,
-          })
-        );
-        const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-        const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
-        try {
-          await caller.interruptSession({ sessionId });
-
-          expect(fields).toHaveBeenCalledWith({ reason: 'Stop cleanup deadline is invalid' });
-          expect(info).toHaveBeenCalledWith(
-            'No accepted current messages or pending queued messages to interrupt'
-          );
-        } finally {
-          fields.mockRestore();
-          info.mockRestore();
-        }
+        expect(stop).toHaveBeenCalledOnce();
       });
     });
 
@@ -1149,25 +1114,75 @@ describe('router sessionId validation', () => {
           expect(result.execution).toBeNull();
         });
 
-        it('projects current accepted message work into the existing execution-shaped field', async () => {
-          const sessionId: SessionId = 'agent_20202020-2020-2020-2020-202020202020';
-          mockGetMetadata.mockResolvedValue(
-            legacySessionMetadata({ version: 1, sessionId, userId: 'test-user-123', timestamp: 1 })
-          );
-          mockGetCurrentMessageWork.mockResolvedValue({
-            messageId: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
-            status: 'running',
-            health: 'healthy',
-          });
+        it.each(['healthy', 'stale'] as const)(
+          'preserves %s health for current legacy message work',
+          async health => {
+            const sessionId: SessionId = 'agent_20202020-2020-2020-2020-202020202020';
+            mockGetMetadata.mockResolvedValue(
+              legacySessionMetadata({
+                version: 1,
+                sessionId,
+                userId: 'test-user-123',
+                timestamp: 1,
+              })
+            );
+            mockGetCurrentMessageWork.mockResolvedValue({
+              messageId: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+              status: 'running',
+              health,
+            });
 
-          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+            const result = await caller.getSession({ cloudAgentSessionId: sessionId });
 
-          expect(result.execution).toMatchObject({
-            id: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
-            status: 'running',
-            health: 'healthy',
-          });
-        });
+            expect(result.execution).toMatchObject({
+              id: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+              status: 'running',
+              health,
+            });
+          }
+        );
+
+        it.each(['accepted', 'queued', null] as const)(
+          'projects control-plane %s work without legacy health lookup',
+          async state => {
+            const sessionId: SessionId = 'workspace_20202020-2020-2020-2020-202020202020';
+            mockGetMetadata.mockResolvedValue(
+              legacySessionMetadata({
+                version: 1,
+                sessionId,
+                userId: 'test-user-123',
+                timestamp: 1,
+              })
+            );
+            const controlStub = {
+              getMetadata: mockGetMetadata,
+              getSession: vi.fn().mockResolvedValue({
+                type: 'found',
+                messages:
+                  state === null ? [] : [{ messageId: 'msg_018f1e2d3c4bHydrateMsgAbCdE', state }],
+                latestEventId: 7,
+              }),
+            };
+            mockContext.env.SANDBOX_SESSION = {
+              idFromName: vi.fn((id: string) => ({ id })),
+              get: vi.fn(() => controlStub),
+            } as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+
+            const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+            expect(result.execution).toEqual(
+              state === null
+                ? null
+                : expect.objectContaining({
+                    id: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+                    status: state === 'accepted' ? 'running' : 'pending',
+                    health: 'healthy',
+                  })
+            );
+            expect(result.latestEventId).toBe(7);
+            expect(mockGetCurrentMessageWork).not.toHaveBeenCalled();
+          }
+        );
 
         it('should work for personal account sessions (no orgId)', async () => {
           const sessionId: SessionId = 'agent_abcdef01-2345-6789-abcd-ef0123456789';
@@ -1287,6 +1302,26 @@ describe('router sessionId validation', () => {
           await expect(caller.getSession({ cloudAgentSessionId: sessionId })).rejects.toThrow(
             'Session not found'
           );
+        });
+
+        it('returns NOT_FOUND for a pre-cutover workspace session with no stored metadata', async () => {
+          // The flipped handler path reads the control-plane Session DO, which
+          // reports no metadata for session storage wiped on first access.
+          const sessionId: SessionId = 'workspace_00000000-0000-0000-0000-000000000000';
+          const controlStub = { getMetadata: vi.fn().mockResolvedValue(null) };
+          mockContext.env.SANDBOX_SESSION = {
+            idFromName: vi.fn((id: string) => ({ id })),
+            get: vi.fn(() => controlStub),
+          } as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+
+          await expect(caller.getSession({ cloudAgentSessionId: sessionId })).rejects.toMatchObject(
+            {
+              code: 'NOT_FOUND',
+              message: 'Session not found',
+            }
+          );
+          expect(controlStub.getMetadata).toHaveBeenCalled();
+          expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
         });
       });
 
@@ -2245,6 +2280,23 @@ describe('getMessageResult procedure', () => {
     expect(mockGetMessageResult).toHaveBeenCalledWith(messageId);
   });
 
+  it('resolves a fresh session stub for every retry attempt', async () => {
+    const retryable = Object.assign(new Error('Transient DO error'), { retryable: true });
+    const firstStub = { getMessageResult: vi.fn().mockRejectedValue(retryable) };
+    const secondStub = { getMessageResult: mockGetMessageResult };
+    const get = vi.fn().mockReturnValueOnce(firstStub).mockReturnValueOnce(secondStub);
+    (mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS).get = get as never;
+    caller = appRouter.createCaller(mockContext);
+
+    await expect(
+      caller.getMessageResult({ cloudAgentSessionId: sessionId, messageId })
+    ).resolves.toMatchObject({ cloudAgentSessionId: sessionId, messageId, status: 'completed' });
+
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(firstStub.getMessageResult).toHaveBeenCalledTimes(1);
+    expect(secondStub.getMessageResult).toHaveBeenCalledTimes(1);
+  });
+
   it('returns Session not found when the Durable Object has no metadata', async () => {
     mockGetMessageResult.mockResolvedValue({ type: 'session-not-found' });
     await expect(
@@ -2422,12 +2474,10 @@ describe('router question and permission controls', () => {
       lifecycle: { version: 1, timestamp: 1 },
     });
     vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
-    const answerQuestion = vi.fn().mockResolvedValue({ success: true });
-    const rejectQuestion = vi.fn().mockResolvedValue({ success: true });
-    const answerPermission = vi.fn().mockResolvedValue({ success: true });
+    const answer = vi.fn().mockResolvedValue('sent');
     const sandboxSession = {
       idFromName: vi.fn((id: string) => ({ id })),
-      get: vi.fn(() => ({ answerQuestion, rejectQuestion, answerPermission })),
+      get: vi.fn(() => ({ answer })),
     };
     const context = {
       userId: 'test-user-123',
@@ -2453,9 +2503,18 @@ describe('router question and permission controls', () => {
       caller.answerPermission({ sessionId, permissionId: 'p_1', response: 'once' })
     ).resolves.toEqual({ success: true });
 
-    expect(answerQuestion).toHaveBeenCalledWith({ questionId: 'q_1', answers: [['yes']] });
-    expect(rejectQuestion).toHaveBeenCalledWith({ questionId: 'q_2' });
-    expect(answerPermission).toHaveBeenCalledWith({ permissionId: 'p_1', response: 'once' });
+    expect(answer).toHaveBeenCalledWith({
+      sessionId,
+      reply: { action: 'answer', questionId: 'q_1', answers: [['yes']] },
+    });
+    expect(answer).toHaveBeenCalledWith({
+      sessionId,
+      reply: { action: 'reject', questionId: 'q_2' },
+    });
+    expect(answer).toHaveBeenCalledWith({
+      sessionId,
+      reply: { action: 'permission', permissionId: 'p_1', response: 'once' },
+    });
     expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
     expect(getSandbox).not.toHaveBeenCalled();
   });
@@ -2558,12 +2617,12 @@ describe('router terminal procedures', () => {
   });
 
   it('creates control-plane terminals with a dedicated creation operation identity', async () => {
-    const createTerminal = vi.fn().mockResolvedValue({
+    const terminalCreate = vi.fn().mockResolvedValue({
       success: true,
       data: { pty: controlPty },
     });
     const { caller, sandboxSession, cloudAgentSession, context } = createControlTerminalCaller({
-      createTerminal,
+      terminalCreate,
     });
 
     await expect(
@@ -2577,7 +2636,7 @@ describe('router terminal procedures', () => {
     });
     expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${controlSessionId}`);
     expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
-    expect(createTerminal).toHaveBeenCalledWith({
+    expect(terminalCreate).toHaveBeenCalledWith({
       cols: 120,
       rows: 32,
       operationId: expect.stringMatching(
@@ -2587,22 +2646,22 @@ describe('router terminal procedures', () => {
   });
 
   it('reuses the same control-plane creation operation identity after a retryable Durable Object failure', async () => {
-    const createTerminal = vi
+    const terminalCreate = vi
       .fn()
       .mockRejectedValueOnce(
         Object.assign(new Error('Durable Object disconnected'), { retryable: true })
       )
       .mockResolvedValueOnce({ success: true, data: { pty: controlPty } });
-    const { caller, sandboxSession } = createControlTerminalCaller({ createTerminal });
+    const { caller, sandboxSession } = createControlTerminalCaller({ terminalCreate });
 
     await expect(
       caller.createTerminal({ cloudAgentSessionId: controlSessionId, cols: 80, rows: 24 })
     ).resolves.toEqual({ pty: controlPty });
 
     expect(sandboxSession.idFromName).toHaveBeenCalledTimes(2);
-    expect(createTerminal).toHaveBeenCalledTimes(2);
-    expect(createTerminal.mock.calls[0]?.[0]).toEqual(createTerminal.mock.calls[1]?.[0]);
-    expect(createTerminal.mock.calls[0]?.[0]).toMatchObject({
+    expect(terminalCreate).toHaveBeenCalledTimes(2);
+    expect(terminalCreate.mock.calls[0]?.[0]).toEqual(terminalCreate.mock.calls[1]?.[0]);
+    expect(terminalCreate.mock.calls[0]?.[0]).toMatchObject({
       cols: 80,
       rows: 24,
       operationId: expect.any(String),
@@ -2616,9 +2675,9 @@ describe('router terminal procedures', () => {
         new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
       );
       const { caller, sandboxSession } = createControlTerminalCaller({
-        createTerminal: vi.fn(),
-        resizeTerminal: vi.fn(),
-        closeTerminal: vi.fn(),
+        terminalCreate: vi.fn(),
+        terminalResize: vi.fn(),
+        terminalClose: vi.fn(),
       });
 
       const result =
@@ -2659,8 +2718,8 @@ describe('router terminal procedures', () => {
     },
     { error: 'Session not found', code: 'NOT_FOUND' },
   ])('projects control-plane terminal failure "$error" as $code', async ({ error, code }) => {
-    const createTerminal = vi.fn().mockResolvedValue({ success: false, error });
-    const { caller } = createControlTerminalCaller({ createTerminal });
+    const terminalCreate = vi.fn().mockResolvedValue({ success: false, error });
+    const { caller } = createControlTerminalCaller({ terminalCreate });
 
     await expect(
       caller.createTerminal({ cloudAgentSessionId: controlSessionId, cols: 80, rows: 24 })
@@ -2738,11 +2797,11 @@ describe('router terminal procedures', () => {
   });
 
   it('resizes and closes control-plane terminals through the owner-scoped session Durable Object', async () => {
-    const resizeTerminal = vi.fn().mockResolvedValue({ success: true, data: { pty: controlPty } });
-    const closeTerminal = vi.fn().mockResolvedValue({ success: true, data: { success: true } });
+    const terminalResize = vi.fn().mockResolvedValue({ success: true, data: { pty: controlPty } });
+    const terminalClose = vi.fn().mockResolvedValue({ success: true, data: { success: true } });
     const { caller, sandboxSession, cloudAgentSession } = createControlTerminalCaller({
-      resizeTerminal,
-      closeTerminal,
+      terminalResize,
+      terminalClose,
     });
 
     await expect(
@@ -2760,16 +2819,16 @@ describe('router terminal procedures', () => {
     expect(sandboxSession.idFromName).toHaveBeenCalledTimes(2);
     expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${controlSessionId}`);
     expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
-    expect(resizeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123', cols: 80, rows: 24 });
-    expect(closeTerminal).toHaveBeenCalledWith({ ptyId: 'pty_123' });
+    expect(terminalResize).toHaveBeenCalledWith({ ptyId: 'pty_123', cols: 80, rows: 24 });
+    expect(terminalClose).toHaveBeenCalledWith({ ptyId: 'pty_123' });
   });
 
   it('returns a retryable error when control-plane terminal closure fails', async () => {
-    const closeTerminal = vi
+    const terminalClose = vi
       .fn()
       .mockResolvedValueOnce({ success: false, error: 'Terminal closure failed; please retry' })
       .mockResolvedValueOnce({ success: true, data: { success: true } });
-    const { caller } = createControlTerminalCaller({ closeTerminal });
+    const { caller } = createControlTerminalCaller({ terminalClose });
     const input = { cloudAgentSessionId: controlSessionId, ptyId: 'pty_123' };
 
     await expect(caller.closeTerminal(input)).rejects.toMatchObject({

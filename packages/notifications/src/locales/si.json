@@ -45,7 +45,7 @@
     },
     "spendAlert": {
       "title": "වියදම් අනතුරු ඇඟවීම",
-      "body": "{{scopeName}} හි වියදම ${{amountUsd}} ඉක්මවා ගියේය"
+      "body": "{{scopeName}} වියදම ${{amountUsd}} ඉක්මවා ගියේය"
     },
     "securityFindingNew": {
       "title": "නව ආරක්ෂක සොයා ගැනීම ({{severity}})",

@@ -1,7 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './enums';
-import { mapAppleKiloPassTransaction } from './apple-store-verifier';
+import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from '@/lib/kilo-pass/enums';
+import {
+  mapActiveAppleKiloPassTransaction,
+  mapAppleKiloPassTransaction,
+} from './apple-store-verifier';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 
 function transaction(
@@ -55,10 +58,10 @@ describe('mapAppleKiloPassTransaction', () => {
     );
   });
 
-  it('rejects expired transactions', () => {
-    expect(() =>
+  it('maps an ended renewal period, which a late notification can carry', () => {
+    expect(
       mapAppleKiloPassTransaction(transaction({ expiresDate: Date.now() - 1_000 }))
-    ).toThrow('Apple subscription transaction has expired');
+    ).toMatchObject({ providerTransactionId: 'tx-1' });
   });
 
   it('rejects unknown products', () => {
@@ -71,5 +74,19 @@ describe('mapAppleKiloPassTransaction', () => {
     expect(() => mapAppleKiloPassTransaction(transaction({ originalTransactionId: '' }))).toThrow(
       'Apple transaction payload missing required identifiers'
     );
+  });
+});
+
+describe('mapActiveAppleKiloPassTransaction', () => {
+  it('rejects an ended period on the app-completion path', () => {
+    expect(() =>
+      mapActiveAppleKiloPassTransaction(transaction({ expiresDate: Date.now() - 1_000 }))
+    ).toThrow('Apple subscription transaction has expired');
+  });
+
+  it('maps a transaction whose period is still active', () => {
+    expect(mapActiveAppleKiloPassTransaction(transaction())).toMatchObject({
+      providerTransactionId: 'tx-1',
+    });
   });
 });

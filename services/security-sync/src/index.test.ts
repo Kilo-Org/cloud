@@ -12,7 +12,7 @@ import { settleOperation } from '@kilocode/db/operation-ledger';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import { runSecurityNotificationSweep } from './notifications/sweep.js';
-import { syncOwner } from './sync.js';
+import { syncOwner, releaseOwnerSyncLease } from './sync.js';
 import type * as SyncModule from './sync.js';
 
 vi.mock('@kilocode/db', async importOriginal => {
@@ -36,7 +36,7 @@ vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
 vi.mock('./notifications/sweep.js', () => ({ runSecurityNotificationSweep: vi.fn() }));
 vi.mock('./sync.js', async importOriginal => {
   const actual = await importOriginal<typeof SyncModule>();
-  return { ...actual, syncOwner: vi.fn() };
+  return { ...actual, syncOwner: vi.fn(), releaseOwnerSyncLease: vi.fn() };
 });
 
 beforeEach(() => {
@@ -55,6 +55,7 @@ beforeEach(() => {
   } as never);
   vi.mocked(runSecurityNotificationSweep).mockResolvedValue({} as never);
   vi.mocked(settleOperation).mockResolvedValue({ settled: true, row: {} } as never);
+  vi.mocked(releaseOwnerSyncLease).mockResolvedValue({ released: true });
 });
 
 /** Worker database stub; every repository call it would serve is mocked. */
@@ -644,6 +645,338 @@ describe('manual sync dispatch', () => {
   });
 });
 
+describe('manual sync lease dispositions', () => {
+  function manualSyncBody() {
+    return {
+      schemaVersion: 1,
+      commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      messageId: 'manual-sync-message',
+      trigger: 'manual',
+      owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      ownerKey: 'org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      chunkIndex: 1,
+      chunkCount: 2,
+      dispatchedAt: '2026-05-18T08:30:00.000Z',
+      actor: { id: 'user-123', email: 'owner@example.com' },
+    };
+  }
+
+  function leaseEnv(sendBatch: ReturnType<typeof vi.fn>) {
+    return {
+      HYPERDRIVE: { connectionString: 'postgres://worker' },
+      GIT_TOKEN_SERVICE: {},
+      SYNC_QUEUE: { sendBatch },
+    } as unknown as CloudflareEnv;
+  }
+
+  it('acks a stale chunk delivery without failing, settling, or enqueueing', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+    vi.mocked(syncOwner).mockResolvedValue({
+      synced: 0,
+      errors: 0,
+      staleRepos: [],
+      staleChunk: true,
+      exhaustedBudget: false,
+    } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const sendBatch = vi.fn();
+
+    await worker.queue(
+      { messages: [{ attempts: 1, body: manualSyncBody(), ack, retry }] } as never,
+      leaseEnv(sendBatch)
+    );
+
+    expect(syncOwner).toHaveBeenCalledWith(expect.objectContaining({ chunkIndex: 1 }));
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(sendBatch).not.toHaveBeenCalled();
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenCalledTimes(1);
+    expect(settleOperation).not.toHaveBeenCalled();
+    expect(
+      info.mock.calls.some(([message]) => message === 'Security sync completed for owner')
+    ).toBe(false);
+    info.mockRestore();
+  });
+
+  it.each([
+    { disposition: { staleChunk: true }, expectedLog: 'Security sync stale chunk acknowledged' },
+    {
+      disposition: { claimDenied: true, holderRunId: 'other-run' },
+      expectedLog: 'Security sync command terminated without continuation',
+    },
+  ])(
+    'acks a scheduled delivery with $expectedLog and no command transition',
+    async ({ disposition, expectedLog }) => {
+      const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+      vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+      vi.mocked(syncOwner).mockResolvedValue({
+        synced: 0,
+        errors: 0,
+        staleRepos: [],
+        exhaustedBudget: false,
+        ...disposition,
+      } as never);
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const sendBatch = vi.fn();
+
+      await worker.queue(
+        {
+          messages: [
+            {
+              attempts: 1,
+              body: {
+                schemaVersion: 1,
+                runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                messageId: 'scheduled-sync-message',
+                trigger: 'scheduled',
+                owner: { userId: 'user-123' },
+                ownerKey: 'user:user-123',
+                chunkIndex: 0,
+                chunkCount: 1,
+                dispatchedAt: '2026-05-18T08:30:00.000Z',
+              },
+              ack,
+              retry,
+            },
+          ],
+        } as never,
+        leaseEnv(sendBatch)
+      );
+
+      expect(info.mock.calls.some(([message]) => message === expectedLog)).toBe(true);
+      expect(
+        info.mock.calls.some(([message]) => message === 'Security sync completed for owner')
+      ).toBe(false);
+      expect(transitionSecurityAgentCommandWithCurrentState).not.toHaveBeenCalled();
+      expect(settleOperation).not.toHaveBeenCalled();
+      expect(sendBatch).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+      info.mockRestore();
+    }
+  );
+
+  it.each([
+    {
+      disposition: { claimDenied: true, holderRunId: 'other-run' },
+      resultCode: 'SYNC_ALREADY_RUNNING',
+      message: 'A sync is already in progress for this account. Wait for it to finish, then retry.',
+    },
+    {
+      disposition: { checkpointRejected: true },
+      resultCode: 'SYNC_SUPERSEDED',
+      message: 'This sync lost its place and cannot continue. Retry.',
+    },
+    {
+      disposition: { noProgress: true },
+      resultCode: 'SYNC_NO_PROGRESS',
+      message: 'Sync stopped because two consecutive passes made no progress. Retry.',
+    },
+  ])(
+    'fails the manual command with $resultCode without enqueueing',
+    async ({ disposition, resultCode, message }) => {
+      vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+      vi.mocked(syncOwner).mockResolvedValue({
+        synced: 0,
+        errors: 0,
+        staleRepos: [],
+        exhaustedBudget: false,
+        ...disposition,
+      } as never);
+      const ack = vi.fn();
+      const retry = vi.fn();
+      const sendBatch = vi.fn();
+
+      await worker.queue(
+        { messages: [{ attempts: 1, body: manualSyncBody(), ack, retry }] } as never,
+        leaseEnv(sendBatch)
+      );
+
+      expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+        2,
+        expect.anything(),
+        expect.objectContaining({
+          status: 'failed',
+          resultCode,
+          lastErrorRedacted: message,
+        })
+      );
+      expect(sendBatch).not.toHaveBeenCalled();
+      expect(ack).toHaveBeenCalledTimes(1);
+      expect(retry).not.toHaveBeenCalled();
+    }
+  );
+
+  it('settles the ledger when a lease disposition fails a manual command', async () => {
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState)
+      .mockResolvedValueOnce({ transitioned: true, command: {} } as never)
+      .mockResolvedValueOnce({
+        transitioned: true,
+        command: {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          operation_key: 'retry-safe-key-123',
+          status: 'failed',
+          result_code: 'SYNC_ALREADY_RUNNING',
+        },
+      } as never);
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerDb([{ id: 'ledger-row-id' }]));
+    vi.mocked(syncOwner).mockResolvedValue({
+      synced: 0,
+      errors: 0,
+      staleRepos: [],
+      claimDenied: true,
+      holderRunId: 'other-run',
+      exhaustedBudget: false,
+    } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      { messages: [{ attempts: 1, body: manualSyncBody(), ack, retry }] } as never,
+      leaseEnv(vi.fn())
+    );
+
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'failed',
+        outcomeCode: 'SYNC_ALREADY_RUNNING',
+      })
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('releases the owner lease on the final delivery attempt before retrying', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+    vi.mocked(syncOwner).mockRejectedValue(new Error('sync failed'));
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      { messages: [{ attempts: 4, body: manualSyncBody(), ack, retry }] } as never,
+      leaseEnv(vi.fn())
+    );
+
+    expect(releaseOwnerSyncLease).toHaveBeenCalledWith(
+      expect.anything(),
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      1
+    );
+    expect(vi.mocked(releaseOwnerSyncLease).mock.invocationCallOrder[0]).toBeLessThan(
+      retry.mock.invocationCallOrder[0] ?? Infinity
+    );
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(
+      info.mock.calls.some(
+        ([message, meta]) =>
+          message === 'Security sync lease released' &&
+          (meta as { reason?: string } | undefined)?.reason === 'retries_exhausted'
+      )
+    ).toBe(true);
+    info.mockRestore();
+  });
+
+  it('records exhaustion and still retries when the final-attempt lease release throws', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const workerDb = workerDbStub();
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
+    vi.mocked(syncOwner).mockRejectedValue(new Error('sync failed'));
+    vi.mocked(releaseOwnerSyncLease).mockRejectedValue(new Error('release unavailable'));
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      { messages: [{ attempts: 4, body: manualSyncBody(), ack, retry }] } as never,
+      leaseEnv(vi.fn())
+    );
+
+    expect(releaseOwnerSyncLease).toHaveBeenCalledWith(
+      expect.anything(),
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      1
+    );
+    expect(
+      errorLog.mock.calls.some(
+        ([message, meta]) =>
+          message === 'Security sync lease release rejected' &&
+          (meta as { reason?: string; error_type?: string } | undefined)?.reason ===
+            'retries_exhausted' &&
+          (meta as { error_type?: string } | undefined)?.error_type === 'Error'
+      )
+    ).toBe(true);
+    expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
+      workerDb,
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+    );
+    expect(
+      vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
+    ).toBeLessThan(retry.mock.invocationCallOrder[0] ?? Infinity);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(ack).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it('does not release the lease below the final delivery attempt', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+    vi.mocked(syncOwner).mockRejectedValue(new Error('sync failed'));
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      { messages: [{ attempts: 1, body: manualSyncBody(), ack, retry }] } as never,
+      leaseEnv(vi.fn())
+    );
+
+    expect(releaseOwnerSyncLease).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the owner lease before settling an already-terminal delivery', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: { status: 'succeeded', result_code: 'SYNC_COMPLETED' },
+    } as never);
+    vi.mocked(getWorkerDb).mockReturnValue(ledgerDb([{ id: 'ledger-row-id' }]));
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      { messages: [{ attempts: 2, body: manualSyncBody(), ack, retry }] } as never,
+      leaseEnv(vi.fn())
+    );
+
+    expect(releaseOwnerSyncLease).toHaveBeenCalledWith(
+      expect.anything(),
+      { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      1
+    );
+    expect(vi.mocked(releaseOwnerSyncLease).mock.invocationCallOrder[0]).toBeLessThan(
+      ack.mock.invocationCallOrder[0] ?? Infinity
+    );
+    expect(
+      info.mock.calls.some(
+        ([message, meta]) =>
+          message === 'Security sync lease released' &&
+          (meta as { reason?: string } | undefined)?.reason === 'command_terminal'
+      )
+    ).toBe(true);
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
+});
+
 describe('manual dismissal dispatch', () => {
   it('accepts an authenticated dismissal command and enqueues actor-aware Worker processing', async () => {
     const queuedBatches: MessageSendRequest<unknown>[][] = [];
@@ -901,6 +1234,7 @@ describe('manual dismissal dispatch', () => {
     expect(vi.mocked(settleOperation).mock.invocationCallOrder[0]).toBeLessThan(
       retry.mock.invocationCallOrder[0] ?? Infinity
     );
+    expect(releaseOwnerSyncLease).not.toHaveBeenCalled();
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
   });

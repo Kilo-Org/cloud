@@ -3,7 +3,7 @@ import type { WrapperKiloClient } from './kilo-api.js';
 import { logToFile } from './utils.js';
 
 /** Default timeout for condense operation (3 minutes) */
-const DEFAULT_CONDENSE_TIMEOUT_MS = 3 * 60 * 1000;
+export const DEFAULT_CONDENSE_TIMEOUT_MS = 3 * 60 * 1000;
 
 export type CondenseResult = {
   /** Whether the operation was aborted (kill signal or fatal error during execution) */
@@ -117,5 +117,58 @@ export async function runCondenseOnComplete(
       timestamp: new Date().toISOString(),
     });
     return { wasAborted: false, success: false, error: errorMsg };
+  }
+}
+
+export type SummarizeWithTimeoutOptions = {
+  kiloClient: WrapperKiloClient;
+  kiloSessionId: string;
+  directory?: string;
+  model: string;
+  /** Timeout for the whole summarize call (default: 3 minutes). */
+  timeoutMs?: number;
+  /** External cancellation (Stop or the finalization step timeout). */
+  signal?: AbortSignal;
+};
+
+/**
+ * Summarize one Kilo session with a single timeout around the whole call.
+ * The control-plane finalization uses this instead of `runCondenseOnComplete`:
+ * a timeout or a failure never aborts the Kilo session, so it cannot cancel a
+ * newer prompt that arrived after the idle.
+ */
+export async function summarizeWithTimeout(
+  opts: SummarizeWithTimeoutOptions
+): Promise<CondenseResult> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_CONDENSE_TIMEOUT_MS;
+  const controller = new AbortController();
+  const abortFromCaller = (): void => controller.abort(new Error('Condense aborted'));
+  if (opts.signal?.aborted) abortFromCaller();
+  else opts.signal?.addEventListener('abort', abortFromCaller, { once: true });
+  const timer = setTimeout(() => {
+    controller.abort(new Error('Condense timed out'));
+  }, timeoutMs);
+  try {
+    logToFile(`condense: summarizing session ${opts.kiloSessionId}`);
+    const summarized = await opts.kiloClient.summarizeSession({
+      sessionId: opts.kiloSessionId,
+      ...(opts.directory === undefined ? {} : { directory: opts.directory }),
+      model: { modelID: opts.model },
+      auto: true,
+      signal: controller.signal,
+    });
+    if (!summarized) {
+      logToFile('condense: session summarization reported failure');
+      return { wasAborted: false, success: false, error: 'Session summarization failed' };
+    }
+    logToFile('condense: completed');
+    return { wasAborted: false, success: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logToFile(`condense: error - ${errorMsg}`);
+    return { wasAborted: false, success: false, error: errorMsg };
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', abortFromCaller);
   }
 }

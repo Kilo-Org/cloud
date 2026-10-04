@@ -14,6 +14,7 @@ import {
   MessageSquare,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
@@ -36,6 +37,7 @@ import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
+import { openExternalUrl } from '@/lib/external-link';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganization } from '@/lib/organization-context';
@@ -61,6 +63,10 @@ const PROVIDER_LABEL_KEYS = {
   linkedin: 'profile.providerLinkedin',
   workos: 'profile.providerEnterpriseSso',
 } as const;
+
+// The app changelog lives on `main` and is written per store build by the
+// kilo-app Release workflow; never pin it to a version or a per-build copy.
+const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
@@ -202,6 +208,10 @@ export function ProfileScreen() {
             icon={SlidersHorizontal}
             title={t('profiles.title')}
             subtitle={t('profiles.entrySubtitle')}
+            // Agents step: the row lists the agent profiles, and its two
+            // siblings in this section already carry `honey`. The neutral tile
+            // made one row of three read as disabled.
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
@@ -289,9 +299,20 @@ export function ProfileScreen() {
             title={t('tour.tutorialLabel')}
             hue="sage"
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push('/(app)/tour' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Sparkles}
+            title={t('kiloclaw.changelog.title')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              void openExternalUrl(CHANGELOG_URL, {
+                label: t('kiloclaw.changelog.title'),
+              });
             }}
           />
         </View>

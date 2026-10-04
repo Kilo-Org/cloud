@@ -668,8 +668,10 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     const terminal = openTerminal();
     receiveCommit();
     mockSessionId = 'ses_historical';
+    mockAtomValues.dynamicMessages = [];
+    mockAtomValues.commits = [];
     render();
-    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+    expect(dom.container.querySelector('[data-conversation]')).toBeNull();
     expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
   });
 

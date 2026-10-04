@@ -1,6 +1,10 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { extname, join, relative } from 'path';
 
+const REPOSITORY_ROOT = join(process.cwd(), '../..');
+// packages/web-shared holds server code moved out of apps/web; scan both.
+const SOURCE_ROOTS = [join(process.cwd(), 'src'), join(REPOSITORY_ROOT, 'packages/web-shared/src')];
+
 const EMAIL_REGEX = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.mdx']);
 const ALLOWED_EMAILS = new Set([
@@ -79,27 +83,25 @@ function isAllowedEmail(email: string): boolean {
 
 describe('email literal guardrail', () => {
   it('keeps production source email literals limited to placeholders and approved aliases', () => {
-    const srcRoot = join(process.cwd(), 'src');
-    const findings = listProductionSourceFiles(srcRoot).flatMap(file => {
+    const findings = SOURCE_ROOTS.flatMap(listProductionSourceFiles).flatMap(file => {
       const content = readFileSync(file, 'utf8');
       return Array.from(content.matchAll(EMAIL_REGEX))
         .map(match => match[0])
         .filter(email => !isAllowedEmail(email))
-        .map(email => `${relative(process.cwd(), file)}: ${email}`);
+        .map(email => `${relative(REPOSITORY_ROOT, file)}: ${email}`);
     });
 
     expect(findings).toEqual([]);
   });
 
   it('keeps Mailgun provider access behind the environment-aware transport', () => {
-    const srcRoot = join(process.cwd(), 'src');
-    const providerFiles = listNonTestSourceFiles(srcRoot)
+    const providerFiles = SOURCE_ROOTS.flatMap(listNonTestSourceFiles)
       .filter(file => {
         const content = readFileSync(file, 'utf8');
         return MAILGUN_ACCESS_PATTERNS.some(pattern => pattern.test(content));
       })
-      .map(file => relative(process.cwd(), file));
+      .map(file => relative(REPOSITORY_ROOT, file));
 
-    expect(providerFiles).toEqual(['src/lib/email-mailgun.ts']);
+    expect(providerFiles).toEqual(['packages/web-shared/src/lib/email-mailgun.ts']);
   });
 });

@@ -52,6 +52,11 @@ import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@/lib/bouncer/credit-events';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
 import {
@@ -959,6 +964,15 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
+          await reportChargeAttempted({
+            flow: 'auto_topup',
+            userId: ctx.user.id,
+            amountCents,
+            accountCreatedAt: ctx.user.created_at,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
           const redirectUrl = await createAutoTopUpSetupCheckoutSession(
             ctx.user.id,
             ctx.user.stripe_customer_id,
@@ -981,6 +995,15 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
+      await reportChargeAttempted({
+        flow: 'auto_topup',
+        userId: ctx.user.id,
+        amountCents,
+        accountCreatedAt: ctx.user.created_at,
+        ip: ctx.ip,
+        ipCountry: ipCountryFromHeaders(ctx.headersList),
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
       const redirectUrl = await createAutoTopUpSetupCheckoutSession(
         ctx.user.id,
         ctx.user.stripe_customer_id,

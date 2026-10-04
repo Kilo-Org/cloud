@@ -1,5 +1,8 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createRequire } from 'node:module';
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { atom } from 'jotai';
 import type {
   PreparationAttempt,
@@ -33,19 +36,71 @@ jest.mock('@/components/shared/TimeAgo', () => ({
 jest.mock('@/components/shared/CopyMessageButton', () => ({ CopyMessageButton: () => null }));
 jest.mock('react-markdown', () => ({
   __esModule: true,
-  default: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('p', null, children),
+  default: ({ children }: { children?: React.ReactNode }) => {
+    recordMarkdownRender(typeof children === 'string' ? children : '');
+    return React.createElement('p', null, children);
+  },
 }));
 jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));
 jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
   iterateOverDiff: () => [],
 }));
+jest.mock('./MessageBubble', () => {
+  const actual = jest.requireActual<typeof MessageBubbleModule>('./MessageBubble');
+  return { ...actual, MessageBubble: jest.fn(actual.MessageBubble) };
+});
 
 import { ConversationMessages } from './ConversationMessages';
 import { commitsByMessageAnchor } from './message-presentation';
+import { MessageBubble } from './MessageBubble';
+import type * as MessageBubbleModule from './MessageBubble';
 import { PartRenderer } from './PartRenderer';
 
 Object.assign(globalThis, { React });
+
+function markdownRenders(): string[] {
+  const globals = globalThis as { __markdownRenders?: string[] };
+  return (globals.__markdownRenders ??= []);
+}
+
+function recordMarkdownRender(text: string): void {
+  markdownRenders().push(text);
+}
+
+function installDom() {
+  const requireFromHere = createRequire(__filename);
+  const requireFromNext = createRequire(requireFromHere.resolve('next/package.json'));
+  const { window, document } = (
+    requireFromNext('linkedom') as {
+      parseHTML: (html: string) => { window: Record<string, unknown>; document: Document };
+    }
+  ).parseHTML('<!doctype html><html><body><div id="root"></div></body></html>');
+  const globals = globalThis as typeof globalThis & Record<string, unknown>;
+  const values = {
+    React,
+    window,
+    document,
+    HTMLElement: window.HTMLElement,
+    Element: window.Element,
+    Node: window.Node,
+    Event: window.Event,
+    getComputedStyle: () => ({ animationName: 'none', display: 'block' }),
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    },
+    cancelAnimationFrame: () => undefined,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  };
+  const previous = new Map(Object.keys(values).map(name => [name, globals[name]]));
+  Object.assign(globals, values);
+  const container = document.getElementById('root');
+  if (!container) throw new Error('ConversationMessages test root missing');
+  return {
+    container,
+    cleanup: () => previous.forEach((value, name) => (globals[name] = value)),
+  };
+}
 
 function assistantMessage(
   id: string,
@@ -1102,6 +1157,7 @@ describe('PartRenderer tool lifecycle', () => {
     { tool: 'codesearch', title: 'CodeSearch' },
     { tool: 'webfetch', title: 'WebFetch' },
     { tool: 'background_process', title: 'Check background process' },
+    { tool: 'schedule_wakeup', title: 'Schedule wakeup' },
     { tool: 'apply_patch', title: 'Apply patch' },
     { tool: 'mcp', title: 'mcp' },
     { tool: 'custom-tool', title: 'custom-tool' },
@@ -1136,6 +1192,8 @@ describe('PartRenderer tool lifecycle', () => {
     'write',
     'bash',
     'background_process',
+    'schedule_wakeup',
+    'cron_list',
     'apply_patch',
     'webfetch',
     'codesearch',
@@ -1155,6 +1213,18 @@ describe('PartRenderer tool lifecycle', () => {
     expect(html).toContain(errorState.error);
     expect(buttons(html)).toHaveLength(0);
     expect(html).not.toContain('animate-spin');
+  });
+
+  it('renders a completed native scheduler tool with no input', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PartRenderer, {
+        part: toolPart('schedule_wakeup', 'Schedule wakeup', completedState),
+      })
+    );
+
+    expect(html).toContain('Schedule wakeup');
+    expect(html).toContain('data-tool-card');
+    expect(html).not.toContain('Failed to render');
   });
 
   it.each([
@@ -1210,5 +1280,144 @@ describe('PartRenderer tool lifecycle', () => {
     expect(buttons(html)).toEqual([expect.stringContaining('Todos')]);
     expect(buttons(html)[0]).toContain('aria-expanded="false"');
     expect(html).not.toContain('role="alert"');
+  });
+});
+
+describe('ConversationMessages memoization', () => {
+  let root: Root | undefined;
+  let container: HTMLElement;
+  let cleanup: () => void;
+  const messageBubbleMock = jest.mocked(MessageBubble);
+
+  beforeAll(() => {
+    const dom = installDom();
+    container = dom.container;
+    cleanup = dom.cleanup;
+  });
+
+  afterAll(() => cleanup());
+
+  beforeEach(() => {
+    markdownRenders().length = 0;
+    messageBubbleMock.mockClear();
+    jest.mocked(useOptionalManager).mockReturnValue(null);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root?.unmount());
+    root = undefined;
+  });
+
+  function renderConversationMessages(
+    props: React.ComponentProps<typeof ConversationMessages>
+  ): void {
+    act(() => {
+      root?.render(createElement(ConversationMessages, props));
+    });
+  }
+
+  function baseProps(
+    overrides: Partial<React.ComponentProps<typeof ConversationMessages>> = {}
+  ): React.ComponentProps<typeof ConversationMessages> {
+    return {
+      active: true,
+      isStreaming: false,
+      staticMessages: [],
+      dynamicMessages: [],
+      pendingMessages: new Map(),
+      preparationByMessageId: new Map(),
+      onOpenPreparationDetails: jest.fn(),
+      ...overrides,
+    };
+  }
+
+  function parsesOf(text: string): number {
+    return markdownRenders().filter(rendered => rendered === text).length;
+  }
+
+  it('does not re-render the active list when only getChildMessages changes', () => {
+    const message = assistantMessage('assistant-1', [textPart('text-1', 'Answer one')]);
+    const props = baseProps({
+      staticMessages: [message],
+      getChildMessages: () => [],
+    });
+
+    renderConversationMessages(props);
+    expect(messageBubbleMock).toHaveBeenCalledTimes(1);
+    expect(parsesOf('Answer one')).toBe(1);
+
+    messageBubbleMock.mockClear();
+    renderConversationMessages({ ...props, getChildMessages: () => [] });
+    expect(messageBubbleMock).not.toHaveBeenCalled();
+    expect(parsesOf('Answer one')).toBe(1);
+  });
+
+  it('does not re-parse a completed earlier group when the streaming text changes', () => {
+    const completed = assistantMessage(
+      'assistant-completed',
+      [textPart('completed-text', 'Completed text')],
+      { parentID: 'user-1' }
+    );
+    const props = baseProps({
+      isStreaming: true,
+      staticMessages: [completed],
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one')], {
+          parentID: 'user-2',
+          time: { created: 3 },
+        }),
+      ],
+    });
+
+    renderConversationMessages(props);
+    expect(messageBubbleMock).toHaveBeenCalledTimes(2);
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one')).toBe(1);
+
+    messageBubbleMock.mockClear();
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one more')], {
+          parentID: 'user-2',
+          time: { created: 3 },
+        }),
+      ],
+    });
+    expect(messageBubbleMock).toHaveBeenCalledTimes(1);
+    expect(messageBubbleMock.mock.calls[0]?.[0].message.info.id).toBe('assistant-streaming');
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one more')).toBe(1);
+  });
+
+  it('re-parses only the streaming text when a completed message is merged into the active group', () => {
+    const completed = assistantMessage('assistant-completed', [
+      textPart('completed-text', 'Completed text'),
+    ]);
+    const props = baseProps({
+      isStreaming: true,
+      staticMessages: [completed],
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one')], {
+          time: { created: 3 },
+        }),
+      ],
+    });
+
+    renderConversationMessages(props);
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one')).toBe(1);
+
+    renderConversationMessages({
+      ...props,
+      dynamicMessages: [
+        assistantMessage('assistant-streaming', [textPart('stream-text', 'Stream one more')], {
+          time: { created: 3 },
+        }),
+      ],
+    });
+    expect(parsesOf('Completed text')).toBe(1);
+    expect(parsesOf('Stream one more')).toBe(1);
   });
 });

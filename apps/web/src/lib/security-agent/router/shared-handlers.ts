@@ -140,10 +140,6 @@ import {
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
 
-// ---------------------------------------------------------------------------
-// Strategy types
-// ---------------------------------------------------------------------------
-
 type Owner = { type: 'user' | 'org'; id: string; userId: string };
 
 type Integration = Awaited<ReturnType<typeof getIntegrationForOwner>> | null;
@@ -282,10 +278,6 @@ async function assembleAuditReportResponse<TExtra>(params: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Security operation ledger (P1-A-08e)
-// ---------------------------------------------------------------------------
-//
 // The manual sync and finding dismissal procedures accept an optional
 // `operationKey`. When present, the handler admits a `security`-domain ledger
 // row BEFORE submitting to the security-sync Worker, and only then runs the
@@ -626,10 +618,6 @@ async function settleSecurityLedgerForTerminalCommand(params: {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Findings list DTO
-// ---------------------------------------------------------------------------
-//
 // The list response nulls `raw_data`, the raw Dependabot alert JSON. It is the
 // only heavy field no list UI reads. The detail procedure `getFinding` still
 // returns it. The web detail dialog is fed from the list
@@ -643,10 +631,6 @@ function toFindingListItem(
   return { ...finding, raw_data: null };
 }
 
-// ---------------------------------------------------------------------------
-// Remediation progress timeline (detail-only)
-// ---------------------------------------------------------------------------
-//
 // The remediation panel renders the ordered remediation audit events for one
 // finding. The list decorator stays lean (P2-GH-45a); this detail-only query
 // reads the audit log directly. Only the remediation members of
@@ -688,10 +672,6 @@ async function getRemediationTimeline(findingId: string): Promise<RemediationTim
   }));
 }
 
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
-
 export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps<TExtra>) {
   // tRPC passes `undefined` for no-input procedures.  For the personal router
   // TExtra = {}, so the fallback `{}` is structurally correct.  For the org
@@ -722,9 +702,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 1. getPermissionStatus
-    // -----------------------------------------------------------------------
     getPermissionStatus: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const integration = await (deps.getStatusIntegration ?? deps.getIntegration)(ctx, extra);
@@ -759,9 +736,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 2. getConfig
-    // -----------------------------------------------------------------------
     getConfig: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const owner = deps.resolveOwner(ctx, extra);
@@ -856,9 +830,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 3. saveConfig
-    // -----------------------------------------------------------------------
     saveConfig: {
       inputSchema: SaveSecurityConfigInputSchema,
       handler: async ({
@@ -1126,9 +1097,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 4. setEnabled
-    // -----------------------------------------------------------------------
     setEnabled: {
       inputSchema: SetEnabledInputSchema,
       handler: async ({
@@ -1143,10 +1111,8 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const resourceId = deps.resolveResourceId(ctx, input);
 
-        // Get integration (needed for both permission check and sync)
         const integration = await deps.getIntegration(ctx, input);
 
-        // Check permissions before enabling
         if (input.isEnabled) {
           if (!integration || !hasSecurityReviewPermissions(integration)) {
             throw new TRPCError({
@@ -1156,7 +1122,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           }
         }
 
-        // Determine repository selection
         const existingConfig = await getSecurityAgentConfigWithStatus(owner);
         const selectionMode =
           input.repositorySelectionMode ??
@@ -1180,7 +1145,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           }
         }
 
-        // Always upsert the config when enabling to ensure it exists with the correct selection
         if (input.isEnabled) {
           await upsertSecurityAgentConfig(
             owner,
@@ -1194,7 +1158,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         await setSecurityAgentEnabled(owner, input.isEnabled);
 
-        // When enabling, trigger an initial sync of repositories
         if (input.isEnabled && integration) {
           const installationId = integration.platform_installation_id;
           if (installationId) {
@@ -1291,9 +1254,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 5. getRepositories
-    // -----------------------------------------------------------------------
     getRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const integration = await deps.getIntegration(ctx, extra);
@@ -1302,7 +1262,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         return [];
       }
 
-      // Auto-fetch repositories from GitHub if not cached
       let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
       if (repos.length === 0 && integration.platform_installation_id) {
         const appType = integration.github_app_type || 'standard';
@@ -1355,9 +1314,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       }));
     },
 
-    // -----------------------------------------------------------------------
-    // 6. listFindings
-    // -----------------------------------------------------------------------
     listFindings: {
       inputSchema: ListFindingsInputSchema,
       handler: async ({
@@ -1405,9 +1361,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 7. getFinding
-    // -----------------------------------------------------------------------
     getFinding: {
       inputSchema: GetFindingInputSchema,
       handler: async ({
@@ -1449,18 +1402,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 8. getStats
-    // -----------------------------------------------------------------------
     getStats: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
       return await getSecurityFindingsSummary({ owner: securityOwner });
     },
 
-    // -----------------------------------------------------------------------
-    // 9. getLastSyncTime
-    // -----------------------------------------------------------------------
     getLastSyncTime: {
       inputSchema: ListFindingsInputSchema.pick({ repoFullName: true }),
       handler: async ({
@@ -1480,9 +1427,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 10. triggerSync
-    // -----------------------------------------------------------------------
     triggerSync: {
       inputSchema: TriggerSyncInputSchema,
       handler: async ({
@@ -1497,7 +1441,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const resourceId = deps.resolveResourceId(ctx, input);
 
-        // Get integration
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
           throw new TRPCError({
@@ -1506,7 +1449,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Check permissions
         if (!hasSecurityReviewPermissions(integration)) {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
@@ -1524,7 +1466,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
 
-        // Resolve the sync scope (a specific repo, or every enabled repo).
         let syncScope:
           | { syncType: 'single_repo'; repoCount: number; repoFullName: string }
           | { syncType: 'all_repos'; repoCount: number };
@@ -1628,9 +1569,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 11. dismissFinding
-    // -----------------------------------------------------------------------
     dismissFinding: {
       inputSchema: DismissFindingInputSchema,
       handler: async ({
@@ -1643,7 +1581,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const input = rawInput;
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
 
-        // Get the finding
         const finding = await getSecurityFindingById(input.findingId);
         if (!finding) {
           throw new TRPCError({
@@ -1652,7 +1589,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Verify ownership
         if (!deps.verifyFindingOwnership(finding, ctx, input)) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -1660,7 +1596,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Get integration for GitHub API call
         const integration = await deps.getIntegration(ctx, input);
         if (!integration || integration.integration_status !== 'active') {
           throw new TRPCError({
@@ -1724,9 +1659,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 12. startAnalysis
-    // -----------------------------------------------------------------------
     startAnalysis: {
       inputSchema: StartAnalysisInputSchema,
       handler: async ({
@@ -1748,7 +1680,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Verify ownership
         if (!deps.verifyFindingOwnership(finding, ctx, input)) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -1812,9 +1743,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 13. startRemediation
-    // -----------------------------------------------------------------------
     startRemediation: {
       inputSchema: StartRemediationInputSchema,
       handler: async ({
@@ -1863,9 +1791,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 14. retryRemediation
-    // -----------------------------------------------------------------------
     retryRemediation: {
       inputSchema: RetryRemediationInputSchema,
       handler: async ({
@@ -1915,9 +1840,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 15. cancelRemediation
-    // -----------------------------------------------------------------------
     cancelRemediation: {
       inputSchema: CancelRemediationInputSchema,
       handler: async ({
@@ -1946,9 +1868,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 16. getAnalysis
-    // -----------------------------------------------------------------------
     getAnalysis: {
       inputSchema: GetAnalysisInputSchema,
       handler: async ({
@@ -1968,7 +1887,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Verify ownership
         if (!deps.verifyFindingOwnership(finding, ctx, input)) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -2015,9 +1933,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 17. getCommandStatus
-    // -----------------------------------------------------------------------
     getCommandStatus: {
       inputSchema: GetCommandStatusInputSchema,
       handler: async ({
@@ -2038,9 +1953,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // getCommandStatuses (batch)
-    // -----------------------------------------------------------------------
     // Compatibility: getCommandStatus (single) kept for older mobile clients; remove when all shipped clients call getCommandStatuses.
     getCommandStatuses: {
       inputSchema: GetCommandStatusesInputSchema,
@@ -2061,25 +1973,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 18. listActiveCommands
-    // -----------------------------------------------------------------------
     listActiveCommands: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       return listActiveSecurityAgentCommands(deps.resolveSecurityOwner(ctx, extra));
     },
 
-    // -----------------------------------------------------------------------
-    // 19. getOrphanedRepositories
-    // -----------------------------------------------------------------------
     getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
 
-      // Get the current GitHub integration
       const integration = await deps.getIntegration(ctx, extra);
 
-      // Get list of accessible repository full names
       const accessibleRepoFullNames: string[] = [];
       if (integration && integration.integration_status === 'active') {
         const repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
@@ -2090,7 +1994,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         }
       }
 
-      // Get orphaned repositories with finding counts
       const orphanedRepos = await getOrphanedRepositoriesWithFindingCounts({
         owner: securityOwner,
         accessibleRepoFullNames,
@@ -2099,9 +2002,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       return orphanedRepos;
     },
 
-    // -----------------------------------------------------------------------
-    // 15. deleteFindingsByRepository
-    // -----------------------------------------------------------------------
     deleteFindingsByRepository: {
       inputSchema: DeleteFindingsByRepoInputSchema,
       handler: async ({
@@ -2132,9 +2032,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 16. getAutoDismissEligible
-    // -----------------------------------------------------------------------
     getAutoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
@@ -2146,9 +2043,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 17. autoDismissEligible
-    // -----------------------------------------------------------------------
     autoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
@@ -2169,9 +2063,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       };
     },
 
-    // -----------------------------------------------------------------------
-    // 18. getAuditReport
-    // -----------------------------------------------------------------------
     getAuditReport: {
       inputSchema: SecurityAgentAuditReportInputSchema,
       handler: async ({
@@ -2189,9 +2080,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       },
     },
 
-    // -----------------------------------------------------------------------
-    // 19. getDashboardStats
-    // -----------------------------------------------------------------------
     getDashboardStats: {
       inputSchema: GetDashboardStatsInputSchema,
       handler: async ({
@@ -2205,7 +2093,6 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const securityOwner = deps.resolveSecurityOwner(ctx, input);
         const owner = deps.resolveOwner(ctx, input);
 
-        // Get config for SLA targets
         const config = await getSecurityAgentConfigWithStatus(owner);
         const slaConfig = {
           slaCriticalDays: config?.config.sla_critical_days ?? 15,

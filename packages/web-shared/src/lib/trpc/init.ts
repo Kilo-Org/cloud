@@ -1,0 +1,243 @@
+import 'server-only';
+import { headers } from 'next/headers';
+import { getUserFromAuth } from '@/lib/user/server';
+import { initTRPC, TRPCError } from '@trpc/server';
+import type { ProcedureType } from '@trpc/server';
+import type { User } from '@kilocode/db/schema';
+import {
+  authViaTokenFromHeaders,
+  clientIpFromHeaders,
+  emitAdminAccessEvent,
+} from '@/lib/admin/admin-access-log';
+import { setTag, trpcMiddleware } from '@sentry/nextjs';
+import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
+import {
+  appUpdateRequiredError,
+  enforceMinimumVersion,
+  getMinimumVersions,
+  isMobileClient,
+} from '@/lib/trpc/min-version';
+import {
+  buildTimingLine,
+  readClientDimensions,
+  shouldLogTiming,
+} from '@/lib/observability/request-timing';
+import {
+  controlPlanePathFromInfo,
+  controlPlaneTypeFromInfo,
+  withControlPlaneBudget,
+  type ControlPlaneRequestInfo,
+} from '@/lib/trpc/control-plane-budget';
+
+export { UpstreamApiError } from '@/lib/trpc/transport';
+// Define the context type
+export type TRPCContext = {
+  user: User;
+  deviceSessionId?: string;
+  // Admin audit signals threaded from the auth layer so `adminProcedure` can
+  // emit IP-independent, identity-attributed access telemetry. Optional so the
+  // many existing `{ user }` context constructors (tests, scripts) keep working;
+  // production `createTRPCContext` always populates them.
+  authViaToken?: boolean;
+  tokenSource?: string | null;
+  ip?: string | null;
+  // Procedure path and type, injected into the context by `baseProcedure` so
+  // that `is_admin` elevation sites *inside* a resolver (which only receive
+  // `ctx`, not the middleware's `path`/`type`) can attribute their audit event
+  // to the exact procedure. Optional for the same reason as the fields above.
+  trpcPath?: string;
+  trpcType?: string;
+  // Populated by `createTRPCContext` and read by the min-version middleware.
+  headersList?: Headers;
+  // `performance.now()` when the mobile control-plane budget started, set by
+  // `createTRPCContext` so the procedure middleware shares the same 10s window
+  // as the shared auth read. Absent for web/CLI callers and test constructors.
+  controlPlaneStartedAt?: number;
+};
+
+/**
+ * Optional fetch-adapter argument. tRPC's `createContext` passes `{ req, info }`;
+ * callers that invoke this with no args (SSR prefetch, REST wrappers) fall
+ * back to `next/headers()` and a generic path.
+ */
+export type CreateTRPCContextOpts = {
+  req?: Request;
+  info?: ControlPlaneRequestInfo;
+};
+
+/**
+ * @see: https://trpc.io/docs/server/context
+ *
+ * The shared auth read (`getUserFromAuth` -> `findUserById(..., readDb)`) is
+ * the only upstream `user.getMe` awaits, and tRPC runs it *before* procedure
+ * middleware. Wrapping it here is what keeps a hanging replica read from
+ * becoming a gateway 504; the procedure middleware then consumes whatever
+ * budget remains.
+ */
+export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<TRPCContext> => {
+  const headersList = opts?.req?.headers ?? (await headers());
+  const startedAt = performance.now();
+  const { user, deviceSessionId, tokenSource } = await withControlPlaneBudget({
+    path: controlPlanePathFromInfo(opts?.info),
+    type: controlPlaneTypeFromInfo(opts?.info),
+    headersList,
+    next: () => getUserFromAuth({ adminOnly: false }),
+    startedAt,
+    surface: 'context',
+  });
+  if (!user) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'User not authenticated - no user to set on context',
+      // Marks this as a genuine session failure (vs a procedure-level
+      // UNAUTHORIZED like org-access denial) so the mobile client signs out
+      // only here — see AuthContextError / data.authRequired.
+      cause: new AuthContextError(),
+    });
+  }
+  setTag('userId', user.id);
+  return {
+    user,
+    deviceSessionId,
+    authViaToken: authViaTokenFromHeaders(headersList),
+    tokenSource: tokenSource ?? null,
+    ip: clientIpFromHeaders(headersList),
+    headersList,
+    controlPlaneStartedAt: isMobileClient(headersList) ? startedAt : undefined,
+  };
+};
+
+// Avoid exporting the entire t-object
+// since it's not very descriptive.
+// For instance, the use of a t variable
+// is common in i18n libraries.
+/**
+ * Marker class used to attach an upstream API error code to a TRPCError so the
+ * error-formatter can surface it to the client in `err.data.upstreamCode`.
+ *
+ * Usage:
+ *   throw new TRPCError({
+ *     code: 'CONFLICT',
+ *     message: 'Config was modified',
+ *     cause: new UpstreamApiError('etag_mismatch'),
+ *   });
+ *
+ * The client then sees `err.data.upstreamCode === 'etag_mismatch'`.
+ */
+const t = initTRPC.context<TRPCContext>().create({
+  errorFormatter: trpcErrorFormatter,
+});
+
+const sentryMiddleware = t.middleware(
+  trpcMiddleware({
+    attachRpcInput: false,
+  })
+);
+
+/**
+ * Options this middleware reads. Kept narrow so the timing behaviour can be
+ * driven directly in `init-timing.test.ts`; `baseProcedure.use` accepts it as a
+ * regular middleware function.
+ */
+export type TimingMiddlewareOptions<TResult extends { ok: boolean }> = {
+  path: string;
+  type: ProcedureType;
+  ctx: TRPCContext;
+  next: () => Promise<TResult>;
+};
+
+export const timingMiddleware = async <TResult extends { ok: boolean }>({
+  path,
+  type,
+  ctx,
+  next,
+}: TimingMiddlewareOptions<TResult>): Promise<TResult> => {
+  if (process.env.TRPC_TIMING_LOGGING !== '1') return next();
+
+  const start = performance.now();
+  const result = await next();
+  const durationMs = performance.now() - start;
+  const dimensions = readClientDimensions(ctx.headersList);
+  if (!shouldLogTiming({ client: dimensions.client })) return result;
+  console.log(
+    JSON.stringify(
+      buildTimingLine({
+        surface: 'trpc',
+        path,
+        procedureType: type, // 'query' | 'mutation' | 'subscription'
+        durationMs: Math.round(durationMs),
+        ok: result.ok,
+        userId: ctx.user?.id ?? null,
+        dimensions,
+      })
+    )
+  );
+  return result;
+};
+
+// Bounds a mobile query's procedure pipeline to whatever remains of the
+// control-plane budget started in `createTRPCContext`. Web/CLI callers and
+// mutations pass through untouched; see `control-plane-budget.ts`.
+const controlPlaneBudgetMiddleware = t.middleware(({ path, type, ctx, next }) =>
+  withControlPlaneBudget({
+    path,
+    type,
+    headersList: ctx.headersList,
+    next,
+    startedAt: ctx.controlPlaneStartedAt,
+  })
+);
+
+// Publishes the procedure path/type onto the context so audit emitters reachable
+// only from a resolver (see `recordKiloAdminElevation`) can name the procedure.
+// `next({ ctx })` merges into the existing context, so nothing is dropped.
+const auditContextMiddleware = t.middleware(({ path, type, next }) =>
+  next({ ctx: { trpcPath: path, trpcType: type } })
+);
+
+// Refuses a mobile client whose app version is below the configured minimum.
+// Web/CLI callers (and any caller without a `headersList`) short-circuit on
+// `isMobileClient` and pass without a DB read.
+const minimumVersionMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!isMobileClient(ctx.headersList)) return next();
+  const minimums = await getMinimumVersions();
+  if (!minimums || !enforceMinimumVersion(ctx.headersList, minimums).pass) {
+    throw appUpdateRequiredError();
+  }
+  return next();
+});
+
+// Base router and procedure helpers
+export const createTRPCRouter = t.router;
+export const createCallerFactory = t.createCallerFactory;
+export const baseProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(controlPlaneBudgetMiddleware)
+  .use(sentryMiddleware)
+  .use(auditContextMiddleware)
+  .use(minimumVersionMiddleware);
+
+// Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
+// lib/trpc/admin-procedures chain on this, so emitting here covers the whole
+// admin.* tRPC surface with a single event.
+export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }) => {
+  if (!ctx.user.is_admin) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Admin access required',
+    });
+  }
+  // Emit before next() so the access attempt is recorded even if the handler
+  // (or a chained sub-check) later throws.
+  emitAdminAccessEvent({
+    surface: 'trpc',
+    kind: 'admin_guard',
+    user: ctx.user,
+    authViaToken: ctx.authViaToken ?? false,
+    tokenSource: ctx.tokenSource ?? null,
+    route: path,
+    method: type,
+    ip: ctx.ip ?? null,
+  });
+  return next();
+});

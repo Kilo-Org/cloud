@@ -215,7 +215,6 @@
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
     "bonusCreditsExpiring": "Platnost bonusových kreditů v hodnotě {{amount}} vyprší {{date}}.",
-    "creditBalanceEmpty": "Nemáte žádné kredity. U tohoto účtu se kredity spravují mimo aplikaci pro iOS.",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -241,6 +240,7 @@
     "addPasskey": "Přidat přístupový klíč",
     "passkeyDefaultName": "Přístupový klíč",
     "passkeyAddedOn": "Přidán {{date}}",
+    "passkeyLastUsedOn": "Naposledy použito {{date}}",
     "passkeyAdded": "Přístupový klíč přidán.",
     "passkeyAddFailed": "Přístupový klíč se nepodařilo přidat. Zkuste to znovu.",
     "passkeyAddUnsupported": "Toto zařízení nemůže vytvářet přístupové klíče.",
@@ -2097,6 +2097,7 @@
       "idCopied": "ID relace zkopírováno",
       "couldNotCopyId": "ID relace se nepodařilo zkopírovat.",
       "untitled": "Nepojmenovaná relace",
+      "actions": "Akce s relací",
       "sessionDeleted": "Relace smazána",
       "needsInput": "čeká na reakci",
       "fromPlatform": "z {{platform}}",
@@ -2153,7 +2154,9 @@
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",
       "readOnly": "Tato relace je pouze pro čtení.",
+      "continueInNewSession": "Pokračovat v nové relaci",
       "emptyDescription": "Začněte odesláním zprávy v poli níže.",
+      "emptyTranscriptDescription": "Tato relace zatím neobsahuje žádné zprávy.",
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
@@ -2243,6 +2246,8 @@
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
+      "selectRepositoryToStart": "Vyberte repozitář, abyste mohli začít.",
+      "connectProviderToStart": "Připojte poskytovatele, abyste mohli začít.",
       "promptPlaceholder": "Na čem chcete pracovat?",
       "couldNotLoadModels": "Modely se nepodařilo načíst.",
       "prefillRepoAndModelUnavailable": "Repozitář a model původní relace už nejsou dostupné. Níže vyberte jiný repozitář a model.",
@@ -2636,6 +2641,7 @@
       "selectModelBeforeSending": "Před odesláním vyberte model.",
       "preparingPlaceholder": "Příprava prostředí…",
       "finalizingPlaceholder": "Dokončování…",
+      "sessionLoadFailed": "Relaci se nepodařilo načíst. Nejprve to zkuste znovu.",
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
       "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na tlačítko pro odeslání to zkuste znovu.",
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
@@ -2707,6 +2713,7 @@
       "provider": "Poskytovatel",
       "totalCost": "Celkové náklady",
       "usageReflectsLatest": "Údaje o využití odpovídají poslední dokončené odpovědi asistenta.",
+      "usageUnavailable": "Využití kontextu není k dispozici",
       "tokenUsage": "Využití tokenů",
       "cacheRate": "Podíl využití mezipaměti",
       "modelsCount": "Modely ({{displayCount}})",
@@ -2745,7 +2752,10 @@
     "markdownImage": {
       "load": "Načíst",
       "loadWithHost": "Načíst {{host}}",
-      "httpsOnly": "Lze načíst pouze obrázky přes HTTPS."
+      "httpsOnly": "Lze načíst pouze obrázky přes HTTPS.",
+      "trustTitle": "Načíst obrázek z {{host}}?",
+      "trustMessage": "Pokud doméně {{host}} důvěřuješ, její obrázky se načtou bez pokaždé se ptát. Později to můžeš odebrat v Důvěryhodné domény.",
+      "loadOnce": "Načíst jednou"
     },
     "markdownLink": {
       "invalidLink": "Tento odkaz nelze otevřít.",
@@ -3264,8 +3274,12 @@
     "subtitle": "Domény, jejichž odkazy se otevírají bez potvrzení",
     "emptyTitle": "Žádné důvěryhodné domény",
     "emptyDescription": "Odkazy na důvěryhodné domény se otevírají bez dalšího potvrzení.",
+    "imagesSectionTitle": "Důvěryhodné domény obrázků",
+    "imagesSectionDescription": "Obrázky z těchto domén se načítají bez dalšího dotazu.",
+    "imagesSectionEmpty": "Žádné důvěryhodné domény obrázků",
     "revoke": "Odebrat důvěru doméně {{host}}",
     "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
+    "revokeImageMessage": "Obrázky z této domény budou znovu vyžadovat potvrzení.",
     "backToPreferences": "Zpět na předvolby"
   },
   "quickChat": {
@@ -3530,5 +3544,17 @@
       "unboundToast": "Repo odpojeno",
       "unbindFailed": "Repo se nepodařilo zrušit"
     }
+  },
+  "credits": {
+    "title": "Koupit kredity",
+    "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
+    "packLabel": "Přidat {{amount}} v kreditech",
+    "priceUnavailable": "Cena není k dispozici",
+    "purchased": "Kredity byly přidány do vašeho zůstatku.",
+    "empty": "Balíčky kreditů teď nejsou k dispozici.",
+    "noMatchingProducts": "App Store nevrátil žádné odpovídající balíčky kreditů.",
+    "noMatchingProductsPlay": "Google Play nevrátil žádné odpovídající balíčky kreditů.",
+    "purchaseOwnedByAnotherAccount": "Kredity na tomto účtu Apple Account patří k jinému účtu Kilo. Chcete-li je použít, přihlaste se k příslušnému účtu Kilo.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účtu Google Play patří jinému účtu Kilo. Přihlaste se k tomuto účtu Kilo pro jejich použití."
   }
 }

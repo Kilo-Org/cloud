@@ -10,32 +10,49 @@ import { sessionIdSchema } from '../schemas.js';
 import type { WrapperClient } from '../../kilo/wrapper-client.js';
 import { WrapperError } from '../../kilo/wrapper-client.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
-import { sessionPlaneFromId } from '../../session-plane.js';
+import { sessionFor } from '../../session-plane.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
+import type { ControlPlaneAnswerReply } from '../../shared/control-plane-protocol.js';
 import { withDORetry } from '../../utils/do-retry.js';
 
-type InteractiveSessionTarget =
-  | { kind: 'control'; stub: ReturnType<typeof getSandboxSessionStub> }
-  | { kind: 'legacy'; wrapper: WrapperClient };
-
-async function resolveInteractiveSession(opts: {
-  sessionId: SessionId;
-  userId: string;
-  env: Env;
-}): Promise<InteractiveSessionTarget> {
-  const { sessionId, userId, env } = opts;
-  await requireCurrentSessionAccess({
-    env,
-    kiloUserId: userId,
-    cloudAgentSessionId: sessionId,
-  });
+/**
+ * Forwards one question/permission reply to the control-plane Session DO and
+ * projects its dispatch result onto the public `{success}` contract. The DO
+ * reports `sent` only when the reply reached the live turn or was admitted as a
+ * continuation, so `not_connected` is the public `success: false`.
+ */
+async function answerControlPlane(
+  env: Env,
+  userId: string,
+  sessionId: SessionId,
+  reply: ControlPlaneAnswerReply
+): Promise<{ success: boolean }> {
   const metadata = await fetchSessionMetadata(env, userId, sessionId);
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
+  const dispatch = await withDORetry(
+    () => getSandboxSessionStub(env, userId, sessionId),
+    current => current.answer({ sessionId, reply }),
+    'answer'
+  );
+  return { success: dispatch === 'sent' };
+}
 
-  if (sessionPlaneFromId(sessionId) === 'control') {
-    return { kind: 'control', stub: getSandboxSessionStub(env, userId, sessionId) };
+/**
+ * Resolves the live wrapper a legacy (`agent_*`) session's questions flow
+ * through: that plane keeps no pending set in a Durable Object, so the
+ * wrapper's live Kilo state is the only read there is.
+ */
+async function resolveLegacyWrapper(opts: {
+  sessionId: SessionId;
+  userId: string;
+  env: Env;
+}): Promise<WrapperClient> {
+  const { sessionId, userId, env } = opts;
+  const metadata = await fetchSessionMetadata(env, userId, sessionId);
+  if (!metadata) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
 
   let wrapperClient: WrapperClient | null;
@@ -50,17 +67,16 @@ async function resolveInteractiveSession(opts: {
   if (!wrapperClient) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'No wrapper found for session' });
   }
-  return { kind: 'legacy', wrapper: wrapperClient };
+  return wrapperClient;
 }
 
 /**
- * A legacy (`agent_*`) session's pending set, read from its wrapper: that plane
- * keeps none in a Durable Object, so the wrapper's live Kilo state is the only
- * read there is. Returns null when the wrapper cannot answer — it is not
- * running, it has no session bound yet, or it predates the read route — which
- * the caller reports as nothing pending: the answer this query gave for a
- * legacy session before the wrapper could be read at all, so the press still
- * hands the user to the app instead of dead-ending on an error.
+ * A legacy (`agent_*`) session's pending set, read from its wrapper. Returns
+ * null when the wrapper cannot answer — it is not running, it has no session
+ * bound yet, or it predates the read route — which the caller reports as
+ * nothing pending: the answer this query gave for a legacy session before the
+ * wrapper could be read at all, so the press still hands the user to the app
+ * instead of dead-ending on an error.
  */
 async function readLegacyPendingInteractions(opts: {
   sessionId: SessionId;
@@ -68,8 +84,8 @@ async function readLegacyPendingInteractions(opts: {
   env: Env;
 }): Promise<{ questions: unknown[]; permissions: unknown[] } | null> {
   try {
-    const target = await resolveInteractiveSession(opts);
-    return target.kind === 'legacy' ? await target.wrapper.getPendingInteractions() : null;
+    const wrapper = await resolveLegacyWrapper(opts);
+    return await wrapper.getPendingInteractions();
   } catch (error) {
     // Ownership still fails the read. An absent or unreachable wrapper, and a
     // wrapper too old to have the read route, have nothing to report: the
@@ -110,14 +126,24 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const target = await resolveInteractiveSession({ sessionId, userId, env });
-            const result =
-              target.kind === 'control'
-                ? await target.stub.answerQuestion({
-                    questionId: input.questionId,
-                    answers: input.answers,
-                  })
-                : await target.wrapper.answerQuestion(input.questionId, input.answers);
+            await requireCurrentSessionAccess({
+              env,
+              kiloUserId: userId,
+              cloudAgentSessionId: sessionId,
+            });
+            const result = await sessionFor(
+              sessionId,
+              () =>
+                answerControlPlane(env, userId, sessionId, {
+                  action: 'answer',
+                  questionId: input.questionId,
+                  answers: input.answers,
+                }),
+              async () => {
+                const wrapper = await resolveLegacyWrapper({ sessionId, userId, env });
+                return wrapper.answerQuestion(input.questionId, input.answers);
+              }
+            );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question answer forwarded to wrapper');
@@ -148,11 +174,23 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const target = await resolveInteractiveSession({ sessionId, userId, env });
-            const result =
-              target.kind === 'control'
-                ? await target.stub.rejectQuestion({ questionId: input.questionId })
-                : await target.wrapper.rejectQuestion(input.questionId);
+            await requireCurrentSessionAccess({
+              env,
+              kiloUserId: userId,
+              cloudAgentSessionId: sessionId,
+            });
+            const result = await sessionFor(
+              sessionId,
+              () =>
+                answerControlPlane(env, userId, sessionId, {
+                  action: 'reject',
+                  questionId: input.questionId,
+                }),
+              async () => {
+                const wrapper = await resolveLegacyWrapper({ sessionId, userId, env });
+                return wrapper.rejectQuestion(input.questionId);
+              }
+            );
             logger
               .withFields({ questionId: input.questionId, success: result.success })
               .info('Question rejection forwarded to wrapper');
@@ -185,14 +223,24 @@ export function createSessionQuestionHandlers() {
 
           logger.setTags({ userId, sessionId });
           try {
-            const target = await resolveInteractiveSession({ sessionId, userId, env });
-            const result =
-              target.kind === 'control'
-                ? await target.stub.answerPermission({
-                    permissionId: input.permissionId,
-                    response: input.response,
-                  })
-                : await target.wrapper.answerPermission(input.permissionId, input.response);
+            await requireCurrentSessionAccess({
+              env,
+              kiloUserId: userId,
+              cloudAgentSessionId: sessionId,
+            });
+            const result = await sessionFor(
+              sessionId,
+              () =>
+                answerControlPlane(env, userId, sessionId, {
+                  action: 'permission',
+                  permissionId: input.permissionId,
+                  response: input.response,
+                }),
+              async () => {
+                const wrapper = await resolveLegacyWrapper({ sessionId, userId, env });
+                return wrapper.answerPermission(input.permissionId, input.response);
+              }
+            );
             logger
               .withFields({ permissionId: input.permissionId, success: result.success })
               .info('Permission answer forwarded to wrapper');
@@ -226,20 +274,24 @@ export function createSessionQuestionHandlers() {
       .query(async ({ input, ctx }) => {
         const { userId, env } = ctx;
         const sessionId = input.cloudAgentSessionId as SessionId;
-        if (sessionPlaneFromId(sessionId) === 'control') {
-          await requireCurrentSessionAccess({
-            env,
-            kiloUserId: userId,
-            cloudAgentSessionId: sessionId,
-          });
-          return await withDORetry(
-            () => getSandboxSessionStub(env, userId, sessionId),
-            stub => stub.getPendingInteractions(),
-            'getPendingInteractions'
-          );
-        }
-        const pending = await readLegacyPendingInteractions({ sessionId, userId, env });
-        return pending ?? { questions: [], permissions: [] };
+        await requireCurrentSessionAccess({
+          env,
+          kiloUserId: userId,
+          cloudAgentSessionId: sessionId,
+        });
+        return await sessionFor(
+          sessionId,
+          () =>
+            withDORetry(
+              () => getSandboxSessionStub(env, userId, sessionId),
+              session => session.getPendingInteractions(),
+              'getPendingInteractions'
+            ),
+          async () => {
+            const pending = await readLegacyPendingInteractions({ sessionId, userId, env });
+            return pending ?? { questions: [], permissions: [] };
+          }
+        );
       }),
   };
 }

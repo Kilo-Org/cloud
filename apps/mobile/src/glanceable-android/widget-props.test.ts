@@ -12,6 +12,7 @@ import {
   buildAndroidWidgetProps,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
+  buildGenericWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
 import widgetConfig from './widget-config.json';
@@ -476,6 +477,24 @@ describe('widget config', () => {
     const widget = widgetConfig.widgets.find(entry => entry.name === 'ActiveAgentsWidget');
 
     expect(widget?.updatePeriodMillis).toBeLessThanOrEqual(GLANCEABLE_STALE_MS);
+  });
+});
+
+describe('buildGenericWidgetProps', () => {
+  // A placed widget with no snapshot has no account behind it — a fresh install
+  // or a signed-out one — so it must not claim "No work in progress", which
+  // asserts a signed-in empty tray. It reads the sign-in copy instead.
+  it('reads the sign-in copy with no counts and no actions', () => {
+    const props = buildGenericWidgetProps(translate);
+
+    expect(props.statusLine).toBe('Sign in to see agents');
+    expect(props.accessibilityLabel).toBe('Sign in to see agents');
+    expect(props.countLines).toEqual([]);
+    expect(props.primaryLabel).toBeNull();
+    expect(props.newestResultTitle).toBeNull();
+    expect(props.newestLine).toBeNull();
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
   });
 });
 

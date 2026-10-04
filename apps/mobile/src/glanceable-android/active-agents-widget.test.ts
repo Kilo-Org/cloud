@@ -415,12 +415,14 @@ describe('renderActiveAgentsWidget', () => {
     ]);
   });
 
-  // One cell tall: the counts run in a row instead of stacking. A short row
-  // keeps the word only on the ranked state, a wide one labels all three.
+  // One cell tall: the counts run in a row instead of stacking. A phone-wide
+  // row (four cells, about 360 dp) clipped the fourth label, so only a row
+  // wider than a phone labels all four; a shorter row keeps the ranked word.
   it.each([
     { width: 250, visibleText: ['1', 'Needs input', '1', '0', '0', 'Approve'] },
+    { width: 360, visibleText: ['1', 'Needs input', '1', '0', '0', 'Approve'] },
     {
-      width: 340,
+      width: 440,
       visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'],
     },
   ])(

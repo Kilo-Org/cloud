@@ -31,8 +31,14 @@ export const WIDGET_NAME = 'ActiveAgentsWidget';
  * row of three states and clip the last one.
  */
 const COMPACT_MAX_WIDTH_DP = 210;
-/** At or above this width (dp) every state in the row can carry its label. */
-export const ROW_LABEL_MIN_WIDTH_DP = 300;
+/**
+ * At or above this width (dp) every state in the row can carry its label.
+ *
+ * The row draws four states. With their labels they need about 410 dp beside
+ * the mark, so a four-cell phone row (about 360 dp) clipped the last state,
+ * which hid the only count when every agent was idle.
+ */
+export const ROW_LABEL_MIN_WIDTH_DP = 440;
 /**
  * At or above this height (dp) the mark sits above the rows and they own the
  * full width; below it the mark sits beside them.
@@ -125,8 +131,8 @@ function shapeOf(info: WidgetInfo, rtl: boolean): Shape {
   if (info.width < COMPACT_MAX_WIDTH_DP) {
     return { size: 'compact', rowLabels: true, rtl, height: info.height };
   }
-  // Three cells wide fit three counts but not three labels, so the ranked
-  // state keeps its word and the other two show as a marker and a number.
+  // A phone-wide row fits the four counts but not four labels, so the ranked
+  // state keeps its word and the other three show as a marker and a number.
   return {
     size: 'row',
     rowLabels: info.width >= ROW_LABEL_MIN_WIDTH_DP,

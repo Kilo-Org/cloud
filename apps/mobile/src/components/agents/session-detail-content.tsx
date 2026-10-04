@@ -25,11 +25,9 @@ import {
 } from '@/components/agents/chat-composer';
 import {
   type AgentMode,
-  customModeOptionsFromRuntimeAgents,
-  dedupeCustomModeOptions,
-  ensureSelectedCustomOption,
   lockedModelOption,
   resolvePinnedAgentModel,
+  resolveSessionRoleView,
 } from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import {
@@ -124,6 +122,7 @@ import { useSessionConfigSync } from '@/components/agents/use-session-config-syn
 import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
 import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -200,6 +199,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
 import {
   buildContinueHref,
   buildContinuePrefillParams,
@@ -576,6 +576,10 @@ export function SessionDetailContent({
     gatewayModelsLoading,
     organizationId,
   });
+  // A remote session's catalog can arrive empty or fail before the CLI is
+  // ready. Re-ask on attach, focus, and app-foreground while it is missing,
+  // empty, or errored; the hook bounds itself to those events.
+  useRemoteModelCatalogRetry({ activeSessionType, manager, remoteModelState });
   const modelOptions = sessionModels.options;
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
@@ -647,24 +651,33 @@ export function SessionDetailContent({
     spawnedMode,
   });
 
-  // Custom modes come from the session's `runtimeAgents` (slug + name). The
-  // selected slug is appended once when it is neither a built-in nor already
-  // listed, so an inherited custom slug stays visible in the picker.
+  // Custom modes: a remote session merges the session profile's visible custom
+  // agents (loaded for the session's own recorded/bound profile, not the
+  // context's effective default) with the session's runtime-reported agents, so
+  // the user's roles show even when the CLI has not reported them. Cloud-agent
+  // and read-only sessions use only `runtimeAgents`. The selected slug is
+  // appended once when it is neither a built-in nor already listed, so an
+  // inherited custom slug stays visible in the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
-  const customOptions = useMemo(
+  const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
+    organizationId,
+    activeSessionProfileId
+  );
+  const roleView = useMemo(
     () =>
-      ensureSelectedCustomOption(
-        dedupeCustomModeOptions(customModeOptionsFromRuntimeAgents(runtimeAgents)),
-        currentMode
-      ),
-    [runtimeAgents, currentMode]
+      resolveSessionRoleView({
+        sessionType: activeSessionType,
+        runtimeAgents,
+        profileAgents: effectiveProfileAgents,
+        selectedMode: currentMode,
+      }),
+    [activeSessionType, runtimeAgents, effectiveProfileAgents, currentMode]
   );
-  // A custom agent can pin a model (+ optional variant). Only Cloud Agent
-  // locks from `runtimeAgents`; remote sessions stay unlocked, as web does.
-  const pinned = useMemo(
-    () => resolvePinnedAgentModel({ slug: currentMode, runtimeAgents }),
-    [currentMode, runtimeAgents]
-  );
+  const customOptions = roleView.customOptions;
+  // A custom agent can pin a model (+ optional variant). The pin always comes
+  // from `runtimeAgents`, so a profile agent's pin never locks a cloud-agent
+  // toolbar or the send model, matching web's runtime-only lock.
+  const pinned = roleView.pinned;
   const modelLocked = activeSessionType === 'cloud-agent' && Boolean(pinned.model);
   const displayModel = modelLocked && pinned.model ? pinned.model : currentModel;
   const displayVariant = modelLocked && pinned.model ? (pinned.variant ?? '') : currentVariant;

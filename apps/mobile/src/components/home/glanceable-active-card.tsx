@@ -8,7 +8,10 @@ import {
   soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
-import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
+import {
+  namedSessionTitle,
+  useUserSessionTitlesRevision,
+} from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -69,6 +72,9 @@ export function GlanceableActiveCard({
   // A minute-bucketed clock keeps the relative age fresh without reading
   // `Date.now()` behind a memoized render (see `useNowTicker`).
   const now = useNowTicker(10_000);
+  // `namedSessionTitle` reads the user-title store, which hydrates after a
+  // cold start; subscribing re-renders the block once it lands.
+  useUserSessionTitlesRevision();
   const counts = countGlanceableSessions(sessions);
   const primaryKind = COUNT_LINES.find(line => counts[line.kind] > 0)?.kind ?? null;
   const scheduledAt = soonestScheduledAt(sessions);

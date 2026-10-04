@@ -91,6 +91,13 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       platform: z.string().min(1).max(32).nullable(),
       prUrl: z.string().min(1).max(2048).nullable(),
       prNumber: z.number().int().positive().max(2_147_483_647).nullable(),
+      // The branch the session pushed and the commit it pushed to that branch.
+      // Optional so CLIs that predate the fields still parse. When `headSha` is
+      // present the link is later shown only if GitHub reports that SHA as the
+      // PR's head or as one of its commits; when it is absent the repo, head
+      // repo, and head ref checks stand in — never a branch-name match alone.
+      headRef: z.string().min(1).max(256).nullable().optional(),
+      headSha: z.string().min(1).max(64).nullable().optional(),
     }),
   }),
 ]);

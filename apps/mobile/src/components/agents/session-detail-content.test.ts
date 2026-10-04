@@ -3709,9 +3709,9 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 
   it('states the cannot-send reason in the row with the row item typography', async () => {
-    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
-    // Read-only is a permanent fact and no status indicator competes with it,
-    // so the reason is the row's item.
+    // An empty read-only transcript keeps the composer, so its reason is the
+    // row's item.
+    const view = await mountDetails([]);
     const items = footerRowItems(view);
     expect(items).toHaveLength(1);
     const reason = items[0];
@@ -3754,23 +3754,23 @@ describe('SessionDetailContent fixed indicator row', () => {
 });
 
 describe('session detail read-only composer', () => {
-  // A read-only session keeps the composer on screen but disabled, with the
-  // reason stated above it, so the reader has an input slot instead of a
-  // transcript with nowhere to write. The continue affordance names the
-  // destination it opens rather than a bare "Continue" that reads as an
-  // in-place action.
-  it('keeps the composer mounted and disabled with the destination-named continue control', async () => {
+  // A read-only transcript has nowhere to write, so the continue section
+  // replaces the composer and states read-only once. The continue affordance
+  // names the destination it opens rather than a bare "Continue" that reads as
+  // an in-place action.
+  it('replaces the composer and send reason with the destination-named continue section', async () => {
     // The default fixture resolves `read-only` (cloud_agent_session_id NULL and
     // no live CLI presence) and this mount carries messages.
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
-    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
-    expect(composer.props.disabled).toBe(true);
-    // The reason beside send names the permanent read-only fact, not the
-    // generic "will become ready" line the resolver used to fall through to.
-    expect(composerProps(view).sendDisabledReason).toBe(i18n.t('agentChat.session.readOnly'));
-    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
-      i18n.t('agentChat.session.readOnly')
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
     );
+    // The continue section states read-only once; the footer reason row must
+    // not repeat it.
+    const readOnlyCopy = renderedTextOutsideSheet(view.renderer.root)
+      .split('\n')
+      .filter(text => text === i18n.t('agentChat.session.readOnly'));
+    expect(readOnlyCopy).toHaveLength(1);
     const continueControl = view.renderer.root.find(
       node =>
         Object.is(node.type, 'Button') &&

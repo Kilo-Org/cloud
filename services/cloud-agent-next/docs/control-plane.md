@@ -407,6 +407,15 @@ text, not route state. A route already prepared in this process (checkout presen
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
 including a new Kilo restart budget.
 
+Eligible managed GitHub HTTPS preparation clone and fetch, and only those invocations, pass two
+invocation-scoped options together: `proactiveAuth=basic` so the first request carries the existing
+URL-bound control alias, and `followRedirects=false` so every redirect fails instead of letting Git
+reattach the alias to a redirected request. The credential remains the existing control alias; the
+only credential flow is contained resolution, repository-authorized redemption, and the bounded
+Retry-After handler. Every redirect fails the operation, including a same-origin redirect from a
+renamed or transferred repository, so the caller must use the current direct repository URL. The
+options are command arguments, not Git config.
+
 ### Prompts and turn outcome
 
 - `session.prompt` is submitted to Kilo with `messageID` = `messageId`, in arrival order, also while
@@ -674,7 +683,10 @@ counts.
     lookup, not only with direct credentials. Compatible legacy siblings can both publish/export
     native history through the installed shared alias. Busy renewal and a new preparation attempt
     leave that alias usable with fresh backing material. Policy failure never publishes rejected
-    credentials; physical replacement rejects old aliases and preserves attempt deadlines.
+    credentials; physical replacement rejects old aliases and preserves attempt deadlines. Eligible
+    managed GitHub HTTPS clone and fetch carry the control alias on the first request and reject
+    every redirect, while the credential flow stays contained resolution, repository-authorized
+    redemption, and the bounded Retry-After handler.
 8. **Stop during a turn.** Messages `cancelled` at once; Kilo aborted; the sandbox and the other
    routes keep running; the next message works on the warm route.
 9. **Setup command fails.** Queued message fails with a visible reason; after fixing the setup the

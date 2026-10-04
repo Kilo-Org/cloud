@@ -12,6 +12,7 @@ import {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
+import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import {
@@ -53,6 +54,47 @@ const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
 const STEP_RETRY_ATTEMPTS = 2;
 /** Upper bound on one setup-output event so a chatty command cannot flood the wire. */
 const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
+
+/**
+ * Spec §7: eligible managed GitHub HTTPS preparation clone/fetch opts into the
+ * two invocation-scoped native Git options together. `proactiveAuth=basic`
+ * makes the first request carry the existing URL-bound control alias so
+ * contained resolution, repository-authorized redemption and the bounded
+ * Retry-After handler run instead of an anonymous first request;
+ * `followRedirects=false` fails every redirect (including a same-origin one)
+ * rather than letting Git reattach the alias to a redirected request. Never one
+ * option without the other, and never on an ineligible command.
+ */
+const MANAGED_GITHUB_PREPARATION_GIT_CONFIG = [
+  '-c',
+  'http.https://github.com/.proactiveAuth=basic',
+  '-c',
+  'http.https://github.com/.followRedirects=false',
+] as const;
+
+/**
+ * The single eligibility decision for the two invocation-scoped options. Both
+ * options or neither: the command must be preparation clone/fetch, the platform
+ * must be managed GitHub, the token must parse as a `github` control alias, and
+ * the URL must be the direct HTTPS default-port github.com URL. Callers judge
+ * `spec.git.url`, never the password parsed back out of the authenticated URL.
+ */
+function managedGitHubPreparationGitArgs(spec: ControlPlaneRouteSpec, command: string): string[] {
+  if (command !== 'clone' && command !== 'fetch') return [];
+  const git = spec.git;
+  if (!git || git.platform !== 'github') return [];
+  if (!git.token || parseControlPlaneCredential(git.token)?.purpose !== 'github') return [];
+  let url: URL;
+  try {
+    url = new URL(git.url);
+  } catch {
+    return [];
+  }
+  // WHATWG `URL.port` is '' for both `https://github.com/...` and an explicit
+  // `:443`, so explicit 443 is eligible and only a non-empty port is excluded.
+  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.port !== '') return [];
+  return [...MANAGED_GITHUB_PREPARATION_GIT_CONFIG];
+}
 
 export type PrepareRuntimePort = {
   ensure(input: {
@@ -368,6 +410,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
     if (!(await hasGit(directory))) {
       const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
+      const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
       let lastError: WrapperBootstrapError | undefined;
       for (let attempt = 1; attempt <= CLONE_RETRY_ATTEMPTS; attempt += 1) {
         signal.throwIfAborted();
@@ -378,14 +421,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             `Retrying clone (attempt ${attempt} of ${CLONE_RETRY_ATTEMPTS})`
           );
         }
-        const cloned = await runGit(['clone', '--progress', cloneUrl, directory], {
-          env,
-          inheritEnv: false,
-          signal,
-          onOutput: createGitProgressReporter(progressText =>
-            emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
-          ),
-        });
+        const cloned = await runGit(
+          [...gitConfigArgs, 'clone', '--progress', cloneUrl, directory],
+          {
+            env,
+            inheritEnv: false,
+            signal,
+            onOutput: createGitProgressReporter(progressText =>
+              emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
+            ),
+          }
+        );
         if (cloned.exitCode === 0) {
           lastError = undefined;
           break;
@@ -406,8 +452,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const branch = spec.branch ?? `session/${spec.kilo?.scopeId ?? spec.sessionId}`;
     if (isSyntheticReviewRef(branch) && spec.branchMode !== 'working') {
       await checkoutSyntheticReviewRef({
-        runGit: (args, options) =>
-          runGit(args, { ...options, cwd: directory, env, inheritEnv: false, signal }),
+        runGit: (args, options) => {
+          const gitConfigArgs =
+            args[0] === 'fetch' ? managedGitHubPreparationGitArgs(spec, 'fetch') : [];
+          return runGit([...gitConfigArgs, ...args], {
+            ...options,
+            cwd: directory,
+            env,
+            inheritEnv: false,
+            signal,
+          });
+        },
         workspacePath: directory,
         branchName: branch,
         signal,

@@ -10,6 +10,7 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
+import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
 import * as processUtils from '../utils.js';
@@ -51,6 +52,37 @@ function routeSpec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlane
 }
 
 type EnsureInput = { key: string; directory: string; env: Record<string, string> };
+
+const MANAGED_GITHUB_PROACTIVE_AUTH_ARG = 'http.https://github.com/.proactiveAuth=basic';
+const MANAGED_GITHUB_FOLLOW_REDIRECTS_ARG = 'http.https://github.com/.followRedirects=false';
+
+function managedGitHubAlias(purpose: 'github' | 'kilo' = 'github'): string {
+  const token = `kcp1.${Buffer.from('synthetic-sandbox').toString('base64url')}.${purpose}.${'ab12'.repeat(16)}`;
+  expect(parseControlPlaneCredential(token)?.purpose).toBe(purpose);
+  return token;
+}
+
+function gitSubcommand(args: string[]): string {
+  let index = 0;
+  while (index < args.length && args[index] === '-c') index += 2;
+  return args[index] ?? '';
+}
+
+function optionsOnlyOnCloneAndFetch(gitCalls: string[][]): boolean {
+  return gitCalls
+    .filter(args => args.includes(MANAGED_GITHUB_PROACTIVE_AUTH_ARG))
+    .every(args => {
+      const subcommand = gitSubcommand(args);
+      return subcommand === 'clone' || subcommand === 'fetch';
+    });
+}
+
+function hasManagedGithubOptions(args: string[]): boolean {
+  return (
+    args.includes(MANAGED_GITHUB_PROACTIVE_AUTH_ARG) ||
+    args.includes(MANAGED_GITHUB_FOLLOW_REDIRECTS_ARG)
+  );
+}
 
 type Harness = {
   manager: ReturnType<typeof createPreparationManager>;
@@ -1280,6 +1312,229 @@ describe('createPreparationManager', () => {
     expect(events.at(-1)).toMatchObject({
       type: 'session.setup.finished',
       properties: { command: 1, exitCode: 0 },
+    });
+  });
+
+  describe('managed GitHub invocation options', () => {
+    const clonePrefix = [
+      '-c',
+      MANAGED_GITHUB_PROACTIVE_AUTH_ARG,
+      '-c',
+      MANAGED_GITHUB_FOLLOW_REDIRECTS_ARG,
+      'clone',
+    ];
+
+    it('prepends both options to clone for an omitted port and an explicit :443', async () => {
+      for (const url of [
+        'https://github.com/acme/repo.git',
+        'https://github.com:443/acme/repo.git',
+      ]) {
+        const harness = createHarness();
+        const spec = routeSpec({
+          git: { url, token: managedGitHubAlias(), platform: 'github' },
+        });
+        await harness.manager.prepare(spec);
+        const clone = harness.gitCalls.find(args => gitSubcommand(args) === 'clone');
+        expect(clone?.slice(0, 5)).toEqual(clonePrefix);
+        expect(optionsOnlyOnCloneAndFetch(harness.gitCalls)).toBe(true);
+      }
+    });
+
+    it('prepends both options on every clone retry attempt', async () => {
+      const harness = createHarness();
+      harness.setGit(async args =>
+        gitSubcommand(args) === 'clone'
+          ? result(128, 'fatal: unable to access: Connection reset by peer')
+          : result(0)
+      );
+      const spec = routeSpec({
+        git: {
+          url: 'https://github.com/acme/repo.git',
+          token: managedGitHubAlias(),
+          platform: 'github',
+        },
+      });
+      await harness.manager.prepare(spec);
+      const clones = harness.gitCalls.filter(args => gitSubcommand(args) === 'clone');
+      expect(clones).toHaveLength(3);
+      expect(
+        clones.every(args => JSON.stringify(args.slice(0, 5)) === JSON.stringify(clonePrefix))
+      ).toBe(true);
+      expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'clone' });
+    });
+
+    it('prepends both options to a synthetic review-ref fetch but not to checkout or show-ref', async () => {
+      const harness = createHarness();
+      const spec = routeSpec({
+        git: {
+          url: 'https://github.com/acme/repo.git',
+          token: managedGitHubAlias(),
+          platform: 'github',
+        },
+        branch: 'refs/pull/12/head',
+      });
+      await harness.manager.prepare(spec);
+      const fetch = harness.gitCalls.find(args => gitSubcommand(args) === 'fetch');
+      expect(fetch?.slice(0, 5)).toEqual([
+        '-c',
+        MANAGED_GITHUB_PROACTIVE_AUTH_ARG,
+        '-c',
+        MANAGED_GITHUB_FOLLOW_REDIRECTS_ARG,
+        'fetch',
+      ]);
+      expect(
+        harness.gitCalls
+          .filter(args => ['checkout', 'show-ref'].includes(gitSubcommand(args)))
+          .every(args => args[0] !== '-c')
+      ).toBe(true);
+      expect(optionsOnlyOnCloneAndFetch(harness.gitCalls)).toBe(true);
+    });
+
+    it('prepends both options when a cached route fetches a synthetic review ref', async () => {
+      const harness = createHarness(FAST_TIMERS, { hasGit: true });
+      const spec = routeSpec({
+        git: {
+          url: 'https://github.com/acme/repo.git',
+          token: managedGitHubAlias(),
+          platform: 'github',
+        },
+        branch: 'refs/pull/12/head',
+      });
+      await harness.manager.prepare(spec);
+      expect(harness.gitCalls.some(args => gitSubcommand(args) === 'clone')).toBe(false);
+      const fetch = harness.gitCalls.find(args => gitSubcommand(args) === 'fetch');
+      expect(fetch?.slice(0, 5)).toEqual([
+        '-c',
+        MANAGED_GITHUB_PROACTIVE_AUTH_ARG,
+        '-c',
+        MANAGED_GITHUB_FOLLOW_REDIRECTS_ARG,
+        'fetch',
+      ]);
+      expect(optionsOnlyOnCloneAndFetch(harness.gitCalls)).toBe(true);
+    });
+
+    it('does not prepend options to a cached normal-branch checkout', async () => {
+      const harness = createHarness(FAST_TIMERS, { hasGit: true });
+      const spec = routeSpec({
+        git: {
+          url: 'https://github.com/acme/repo.git',
+          token: managedGitHubAlias(),
+          platform: 'github',
+        },
+        branch: 'main',
+      });
+      await harness.manager.prepare(spec);
+      expect(harness.gitCalls.some(args => gitSubcommand(args) === 'clone')).toBe(false);
+      expect(harness.gitCalls.some(args => gitSubcommand(args) === 'fetch')).toBe(false);
+      expect(harness.gitCalls.every(args => !hasManagedGithubOptions(args))).toBe(true);
+    });
+
+    it('does not prepend either option for any ineligible route on clone or fetch', async () => {
+      const ineligible: Array<Partial<ControlPlaneRouteSpec>> = [
+        {
+          git: { url: 'https://github.com/acme/repo.git', token: 'ghp-direct', platform: 'github' },
+        },
+        { git: { url: 'https://github.com/acme/repo.git', platform: 'github' } },
+        { git: { url: 'https://github.com/acme/repo.git', token: managedGitHubAlias() } },
+        {
+          git: {
+            url: 'https://github.com/acme/repo.git',
+            token: `kcp1.abcd.github.${'z'.repeat(64)}`,
+            platform: 'github',
+          },
+        },
+        {
+          git: {
+            url: 'https://github.com/acme/repo.git',
+            token: managedGitHubAlias('kilo'),
+            platform: 'github',
+          },
+        },
+        {
+          git: {
+            url: 'https://github.com/acme/repo.git',
+            token: 'kgh2.capability',
+            platform: 'github',
+          },
+        },
+        {
+          git: {
+            url: 'https://github.com/acme/repo.git',
+            token: managedGitHubAlias(),
+            platform: 'gitlab',
+          },
+        },
+        {
+          git: {
+            url: 'https://gitlab.com/acme/repo.git',
+            token: managedGitHubAlias(),
+            platform: 'gitlab',
+          },
+        },
+        {
+          git: {
+            url: 'https://github.com/acme/repo.git',
+            token: managedGitHubAlias(),
+            platform: 'bitbucket',
+          },
+        },
+        {
+          git: {
+            url: 'http://github.com/acme/repo.git',
+            token: managedGitHubAlias(),
+            platform: 'github',
+          },
+        },
+        {
+          git: {
+            url: 'https://github.com:8443/acme/repo.git',
+            token: managedGitHubAlias(),
+            platform: 'github',
+          },
+        },
+        {
+          git: {
+            url: 'https://gist.github.com/acme/repo.git',
+            token: managedGitHubAlias(),
+            platform: 'github',
+          },
+        },
+        {
+          git: {
+            url: 'https://github.com.evil.test/acme/repo.git',
+            token: managedGitHubAlias(),
+            platform: 'github',
+          },
+        },
+      ];
+      for (const overrides of ineligible) {
+        for (const branch of [undefined, 'refs/pull/12/head'] as const) {
+          const harness = createHarness();
+          await harness.manager.prepare(routeSpec({ ...overrides, ...(branch ? { branch } : {}) }));
+          expect(harness.gitCalls.every(args => !hasManagedGithubOptions(args))).toBe(true);
+        }
+      }
+    });
+
+    it('does not prepend options to credential refresh remote set-url', async () => {
+      const harness = createHarness();
+      const spec = routeSpec({
+        git: {
+          url: 'https://github.com/acme/repo.git',
+          token: managedGitHubAlias(),
+          platform: 'github',
+        },
+      });
+      await harness.manager.prepare(spec);
+      harness.gitCalls.length = 0;
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: managedGitHubAlias(), platform: 'github' },
+        kilo: { token: 'kilo-token-2' },
+      });
+      const remote = harness.gitCalls.find(args => args[0] === 'remote');
+      expect(remote?.slice(0, 2)).toEqual(['remote', 'set-url']);
+      expect(harness.gitCalls.every(args => !hasManagedGithubOptions(args))).toBe(true);
     });
   });
 });

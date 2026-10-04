@@ -28,7 +28,9 @@ export function SectionHeader({
 }: Readonly<SectionHeaderProps>) {
   return (
     <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
-      <Text variant="eyebrow" className="max-w-full grow">
+      {/* With a notice the label keeps its own width, so the notice takes all
+          the free space on the line instead of an equal share of it. */}
+      <Text variant="eyebrow" className={cn('max-w-full', !notice && 'grow')}>
         {label}
       </Text>
       {notice ? (

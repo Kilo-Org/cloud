@@ -137,7 +137,11 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   // the ranked primary does, because it is null only when every count is zero.
   const hasCounts = primaryKind !== null;
   const primaryCount = props.primaryCount ?? 0;
-  const statusLine = props.statusLine ?? (hasCounts ? null : COPY.empty);
+  // A real frame always carries its status line. An entry with no status line
+  // and no counts is the native fallback: no app has written a timeline yet
+  // (never signed in) or the gallery placeholder. The Android widget shows
+  // the same sign-in copy for a widget with no snapshot.
+  const statusLine = props.statusLine ?? (hasCounts ? null : COPY.signed_out);
 
   // Circle-based glyphs whose shapes differ as well as their colors, because
   // the Lock Screen families render in an accented mode that flattens tint.

@@ -1,6 +1,6 @@
 {
-  "id": "83e5890f-31eb-45aa-9d2e-72b3bb9b531c",
-  "prevId": "bc50c3f8-060f-4283-aad6-17561669faa6",
+  "id": "825ff314-d8fd-4f02-b275-7123c4831b2a",
+  "prevId": "4ad648c6-d9a9-4726-9904-bca757b7dfc3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4754,6 +4754,27 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_git_url_pr_number": {
+          "name": "IDX_cli_sessions_v2_git_url_pr_number",
+          "columns": [
+            {
+              "expression": "git_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pr_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }
@@ -12976,8 +12997,8 @@
         }
       },
       "indexes": {
-        "UQ_github_branch_prs_org": {
-          "name": "UQ_github_branch_prs_org",
+        "UQ_github_branch_prs_repo_pr_org": {
+          "name": "UQ_github_branch_prs_repo_pr_org",
           "columns": [
             {
               "expression": "git_url",
@@ -12986,7 +13007,7 @@
               "nulls": "last"
             },
             {
-              "expression": "git_branch",
+              "expression": "pr_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -12999,13 +13020,13 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"owned_by_organization_id\" is not null",
-          "concurrently": false,
+          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
-        "UQ_github_branch_prs_user": {
-          "name": "UQ_github_branch_prs_user",
+        "UQ_github_branch_prs_repo_pr_user": {
+          "name": "UQ_github_branch_prs_repo_pr_user",
           "columns": [
             {
               "expression": "git_url",
@@ -13014,7 +13035,7 @@
               "nulls": "last"
             },
             {
-              "expression": "git_branch",
+              "expression": "pr_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -13027,13 +13048,13 @@
             }
           ],
           "isUnique": true,
-          "where": "\"github_branch_pull_requests\".\"owned_by_user_id\" is not null",
-          "concurrently": false,
+          "where": "\"github_branch_pull_requests\".\"pr_number\" is not null",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
-        "IDX_github_branch_prs_url_branch": {
-          "name": "IDX_github_branch_prs_url_branch",
+        "IDX_github_branch_prs_url_pr_number": {
+          "name": "IDX_github_branch_prs_url_pr_number",
           "columns": [
             {
               "expression": "git_url",
@@ -13042,7 +13063,7 @@
               "nulls": "last"
             },
             {
-              "expression": "git_branch",
+              "expression": "pr_number",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

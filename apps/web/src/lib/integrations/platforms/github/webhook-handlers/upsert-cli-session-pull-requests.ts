@@ -4,7 +4,11 @@ import { db } from '@/lib/drizzle';
 import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
-import { parseRepoReference } from '@/lib/integrations/platforms/github/pr-link-identity';
+import {
+  parsePullRequestUrl,
+  parseRepoReference,
+  pullRequestUrlMatchesRepo,
+} from '@/lib/integrations/platforms/github/pr-link-identity';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 
 /**
@@ -75,8 +79,9 @@ function tenantPredicateForOwner(owner: WebhookInstallationOwner) {
  * matched.
  *
  * A session verifiably links the PR only when it stored a link to the same PR
- * number on the same repository and the evidence the session itself reported
- * agrees with the payload:
+ * number on the same repository — its `git_url` and the stored `pr_url` itself
+ * both name the webhook's repository and PR number — and the evidence the
+ * session itself reported agrees with the payload:
  *
  *   - the stored `pr_head_sha` equals the payload head SHA, or
  *   - the session stored no head SHA (older CLI) and its `pr_head_ref` equals
@@ -123,18 +128,41 @@ export async function markSessionsVerifyingPullRequest(
       : sql`false`
   );
 
+  const candidatePredicate = and(
+    eq(cli_sessions_v2.git_url, evidence.gitUrl),
+    eq(cli_sessions_v2.pr_number, evidence.prNumber),
+    isNotNull(cli_sessions_v2.pr_url),
+    tenantPredicateForOwner(owner),
+    headEvidence
+  );
+
+  // The stored link itself must name this PR: a `pr_url` on another repository
+  // (or another PR number) is no evidence even when the session's repo, PR
+  // number, and head fields agree with the payload.
+  const candidates = await db
+    .select({ session_id: cli_sessions_v2.session_id, pr_url: cli_sessions_v2.pr_url })
+    .from(cli_sessions_v2)
+    .where(candidatePredicate);
+  const linking = candidates.flatMap(candidate =>
+    candidate.pr_url !== null &&
+    parsePullRequestUrl(candidate.pr_url)?.number === evidence.prNumber &&
+    pullRequestUrlMatchesRepo(candidate.pr_url, evidence.gitUrl)
+      ? [
+          and(
+            eq(cli_sessions_v2.session_id, candidate.session_id),
+            eq(cli_sessions_v2.pr_url, candidate.pr_url)
+          ),
+        ]
+      : []
+  );
+  if (linking.length === 0) return { kind: 'no_session' };
+
+  // Re-apply the gate and pin each checked `pr_url` so a link changed after the
+  // read is never marked verified.
   const marked = await db
     .update(cli_sessions_v2)
     .set({ pr_link_verified_at: sql`now()` })
-    .where(
-      and(
-        eq(cli_sessions_v2.git_url, evidence.gitUrl),
-        eq(cli_sessions_v2.pr_number, evidence.prNumber),
-        isNotNull(cli_sessions_v2.pr_url),
-        tenantPredicateForOwner(owner),
-        headEvidence
-      )
-    )
+    .where(and(candidatePredicate, or(...linking)))
     .returning({ session_id: cli_sessions_v2.session_id });
 
   return marked.length > 0 ? { kind: 'session' } : { kind: 'no_session' };

@@ -6502,7 +6502,7 @@ export const cli_sessions_v2 = pgTable(
       .on(table.kilo_user_id, table.cloud_agent_worktree_id, table.updated_at)
       .concurrently()
       .where(isNotNull(table.cloud_agent_worktree_id)),
-    // Supports joins from github_branch_pull_requests on (git_url, git_branch).
+    // Supports session lookups by repository and branch.
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
     // Supports the webhook verified-link gate, which updates sessions by
     // `(git_url, pr_number)`. Without this index that UPDATE can only use the
@@ -6792,15 +6792,15 @@ export type CloudAgentSessionRun = typeof cloud_agent_session_runs.$inferSelect;
 export type NewCloudAgentSessionRun = typeof cloud_agent_session_runs.$inferInsert;
 
 /**
- * Per-tenant cache of the latest GitHub pull request observed for a
- * `(repo, branch)` pair. Written by the `pull_request` webhook handler
+ * Per-tenant cache of the latest GitHub state observed for a `(repo, PR number)`
+ * identity. Written by the `pull_request` webhook handler
  * and the manual `refreshAssociatedPullRequest` mutation; read by the
  * cli-sessions-v2 router to attach `associatedPr` to a session.
  *
  * Tenancy: XOR ownership columns mirror `platform_integrations`. A webhook
  * delivery from an org installation writes a row under that org; a user
  * installation writes under the user. Different tenants caching the same
- * `(git_url, git_branch)` produce separate rows and never contaminate
+ * `(git_url, pr_number)` produce separate rows and never contaminate
  * each other's reads.
  *
  * `git_url` is always stored in normalized form (see `normalizeGitUrl` in
@@ -6839,15 +6839,17 @@ export const github_branch_pull_requests = pgTable(
     // reused and shared across sessions, so (git_url, git_branch) can never
     // identify which PR belongs to which session. These partial unique indexes
     // serve as ON CONFLICT targets for the webhook upsert, keyed by PR number.
-    uniqueIndex('UQ_github_branch_prs_org')
+    uniqueIndex('UQ_github_branch_prs_repo_pr_org')
       .on(table.git_url, table.pr_number, table.owned_by_organization_id)
-      .where(isNotNull(table.pr_number)),
-    uniqueIndex('UQ_github_branch_prs_user')
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
+    uniqueIndex('UQ_github_branch_prs_repo_pr_user')
       .on(table.git_url, table.pr_number, table.owned_by_user_id)
-      .where(isNotNull(table.pr_number)),
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
     // Reads resolve a PR by identity (git_url, pr_number); branch columns are
     // no longer part of the join key.
-    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.pr_number).concurrently(),
+    index('IDX_github_branch_prs_url_pr_number').on(table.git_url, table.pr_number).concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(

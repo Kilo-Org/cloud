@@ -78,6 +78,94 @@ describe('CLIOutboundMessageSchema', () => {
     }
   });
 
+  it.each([
+    {},
+    { headRef: null, headSha: null },
+    { headRef: 'feature/fix', headSha: null },
+    { headRef: null, headSha: 'abc123' },
+    { headRef: 'feature/fix', headSha: 'abc123' },
+  ])('keeps all heartbeat sessions with nullable or omitted PR evidence: %j', evidence => {
+    const prLink = {
+      platform: 'github',
+      prUrl: 'https://github.com/kilo/repo/pull/7',
+      prNumber: 7,
+      ...evidence,
+    };
+    const result = CLIOutboundMessageSchema.parse({
+      type: 'heartbeat',
+      sessions: [
+        { id: validSessionId, status: 'busy', title: 'Linked session', prLink },
+        { id: 'ses_other', status: 'idle', title: 'Other session' },
+      ],
+    });
+    expect(result.type).toBe('heartbeat');
+    if (result.type === 'heartbeat') {
+      expect(result.sessions.map(session => session.id)).toEqual([validSessionId, 'ses_other']);
+      expect(JSON.parse(JSON.stringify(result.sessions[0].prLink))).toEqual({
+        platform: 'github',
+        prUrl: 'https://github.com/kilo/repo/pull/7',
+        prNumber: 7,
+        ...(evidence.headRef ? { headRef: evidence.headRef } : {}),
+        ...(evidence.headSha ? { headSha: evidence.headSha } : {}),
+      });
+    }
+  });
+
+  it.each([
+    { headRef: '' },
+    { headRef: 42 },
+    { headRef: 'x'.repeat(257) },
+    { headSha: '' },
+    { headSha: false },
+    { headSha: 'x'.repeat(65) },
+    { platform: '' },
+    { prNumber: -1 },
+    { prUrl: 'x'.repeat(2049) },
+  ])('rejects malformed PR input rather than treating it as absent: %j', invalid => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [
+          {
+            id: validSessionId,
+            status: 'busy',
+            title: 'Linked session',
+            prLink: {
+              platform: 'github',
+              prUrl: 'https://github.com/kilo/repo/pull/7',
+              prNumber: 7,
+              headRef: null,
+              headSha: null,
+              ...invalid,
+            },
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
+  it('does not let nullable PR evidence hide unrelated heartbeat errors', () => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [
+          {
+            id: validSessionId,
+            status: 'busy',
+            title: null,
+            prLink: {
+              platform: 'github',
+              prUrl: 'https://github.com/kilo/repo/pull/7',
+              prNumber: 7,
+              headRef: null,
+              headSha: null,
+            },
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
   it('parses heartbeat with instance and per-session platform (kilo remote CLI)', () => {
     const msg = {
       type: 'heartbeat',

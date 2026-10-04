@@ -63,7 +63,7 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
   // it, or a missed webhook leaves the session's own PR stuck without live
   // state. (An unverified link never reaches this component: the server shows
   // no PR for it.)
-  const awaitingVerification = pr.state === 'unknown';
+  const awaitingSync = pr.state === 'unknown';
   const headShaShort = pr.headSha?.slice(0, 7) ?? null;
   const truncatedTitle = truncatePrTitle(pr.title, 80);
 
@@ -91,10 +91,9 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
         <span className="text-muted-foreground text-xs leading-5">PR #{pr.number}</span>
       </div>
 
-      {awaitingVerification && (
+      {awaitingSync && (
         <p className="text-muted-foreground text-xs leading-snug">
-          Not verified against GitHub yet. Refresh to confirm this is the session&apos;s own pull
-          request.
+          Pull request status has not synced yet. Refresh to fetch the latest status from GitHub.
         </p>
       )}
 
@@ -128,7 +127,7 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
       </div>
 
       <div className="border-border/60 flex items-center gap-2 border-t pt-3">
-        {(awaitingVerification || !isWithinRefreshThrottle(pr.lastSyncedAt)) && (
+        {(awaitingSync || !isWithinRefreshThrottle(pr.lastSyncedAt)) && (
           <Button
             variant="ghost"
             size="sm"

@@ -52,7 +52,7 @@ export type ParsedPullRequestUrl = {
   repoUrl: string;
 };
 
-const PULL_URL_RE = /^(.+?)\/pull\/(\d+)(?:[/?#].*)?$/i;
+const PULL_PATH_RE = /^\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:\/.*)?$/i;
 
 function buildRepo(host: string, rawPath: string): NormalizedRepo | null {
   const path = rawPath
@@ -152,7 +152,8 @@ export function pullRequestUrlMatchesRepo(
   prUrl: string | null | undefined,
   repoUrl: string | null | undefined
 ): boolean {
-  return parsePullRequestUrl(prUrl) !== null && repoReferencesMatch(prUrl, repoUrl);
+  const parsed = parsePullRequestUrl(prUrl);
+  return parsed !== null && repoReferencesMatch(parsed.repoUrl, repoUrl);
 }
 
 /**
@@ -165,13 +166,25 @@ export function parsePullRequestUrl(value: string | null | undefined): ParsedPul
   const raw = value.trim();
   if (!raw) return null;
 
-  const match = raw.match(PULL_URL_RE);
+  let parsed: URL;
+  try {
+    // Preserve both `host/owner/repo/pull/123` and `owner/repo/pull/123`.
+    const url = raw.includes('://')
+      ? raw
+      : /^[^/?#]+\/[^/?#]+\/pull\//i.test(raw)
+        ? `https://${FALLBACK_HOST}/${raw}`
+        : `https://${raw}`;
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const match = parsed.pathname.match(PULL_PATH_RE);
   if (!match) return null;
 
-  const repoRef = parseRepoReference(match[1]);
+  const repoRef = buildRepo(parsed.hostname, `${match[1]}/${match[2]}`);
   if (!repoRef) return null;
 
-  const number = Number(match[2]);
+  const number = Number(match[3]);
   if (!Number.isSafeInteger(number) || number <= 0) return null;
 
   return {

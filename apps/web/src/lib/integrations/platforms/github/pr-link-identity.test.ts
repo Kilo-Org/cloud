@@ -97,6 +97,36 @@ describe('parsePullRequestUrl / pullRequestUrlMatchesRepo', () => {
     expect(parsePullRequestUrl('https://GitHub.com/Kilo/Repo/pull/42/files')?.number).toBe(42);
   });
 
+  it.each([
+    'https://github.com/kilo/repo/pull/7?diff=split#discussion',
+    'github.com/kilo/repo/pull/7?diff=split#discussion',
+    'kilo/repo/pull/7?diff=split#discussion',
+    'https://github.com/kilo/repo/pull/7/files?diff=split#discussion',
+  ])('preserves PR identity and repo matching for %s', value => {
+    expect(parsePullRequestUrl(value)).toEqual({
+      host: 'github.com',
+      owner: 'kilo',
+      repo: 'repo',
+      number: 7,
+      repoUrl: 'https://github.com/kilo/repo',
+    });
+    expect(pullRequestUrlMatchesRepo(value, 'git@github.com:kilo/repo.git')).toBe(true);
+  });
+
+  it.each([
+    'https://github.com/kilo/repo?next=/pull/7',
+    'https://github.com/kilo/repo#/pull/7',
+    'github.com/kilo/repo?next=/pull/7',
+    'github.com/kilo/repo#/pull/7',
+    'https://github.com/prefix/kilo/repo/pull/7',
+    'https://github.com/kilo/repo/issues/7?next=/pull/7',
+    'https://github.com/kilo/repo/pull/7oops',
+    'https://github.com/kilo/repo/pull/9007199254740992',
+  ])('rejects a link without an actual owner/repo/PR-number path: %s', value => {
+    expect(parsePullRequestUrl(value)).toBeNull();
+    expect(pullRequestUrlMatchesRepo(value, 'https://github.com/kilo/repo')).toBe(false);
+  });
+
   it('rejects non-PR URLs and non-positive numbers', () => {
     for (const value of [
       'https://github.com/kilo/repo',

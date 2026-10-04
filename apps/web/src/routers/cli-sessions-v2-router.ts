@@ -517,7 +517,7 @@ const commonSessionFieldsWithPr = {
  *
  * The tenant `or(...)` stops the planner using either partial unique index on
  * `github_branch_pull_requests`: it cannot prove `owned_by_*_id IS NOT NULL`
- * per row. `IDX_github_branch_prs_url_branch` covers `(git_url, pr_number)` and
+ * per row. `IDX_github_branch_prs_url_pr_number` covers `(git_url, pr_number)` and
  * carries this join instead. Do not drop that index — without it every list and
  * search hash-joins against a sequential scan of the whole cache table.
  */

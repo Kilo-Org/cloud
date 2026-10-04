@@ -1169,6 +1169,36 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       expect(await readUserRow({ userId: testUserId, prNumber: 705 })).toHaveLength(0);
     });
 
+    it.each([
+      ['another repository', 'https://github.com/foreign/widgets/pull/709'],
+      ['another PR number', `${NORMALIZED_GIT_URL}/pull/7090`],
+    ])('does not verify a session whose stored pr_url names %s', async (_label, foreignPrUrl) => {
+      const branch = 'feature/foreign-stored-pr-url';
+      const headSha = 'sha-709';
+      // Session repo, PR number, and head SHA all agree with the payload; only
+      // the stored link names a different pull request.
+      const sessionId = await seedSession({
+        branch,
+        owner: testOwner,
+        prNumber: 709,
+        prHeadSha: headSha,
+      });
+      await db
+        .update(cli_sessions_v2)
+        .set({ pr_url: foreignPrUrl })
+        .where(eq(cli_sessions_v2.session_id, sessionId));
+
+      const written = await upsertCliSessionPullRequestsFromWebhook(
+        makePayload({ action: 'opened', prNumber: 709, state: 'open', headRef: branch, headSha }),
+        testOwner
+      );
+
+      expect(written).toBe(0);
+      expect(await sessionVerifiedAt(sessionId)).toBeNull();
+      expect(await readUserRow({ userId: testUserId, prNumber: 709 })).toHaveLength(0);
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
     it('verifies a session on a platform outside the old review-decision set', async () => {
       const branch = 'feature/platform-agnostic-gate';
       // `cli`, `vscode` and `agent-manager` sessions surface the PR badge but

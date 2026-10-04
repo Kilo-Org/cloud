@@ -230,7 +230,7 @@ Worker `worktree_ownership` records distinguish `exclusive`, `shared`, and `unre
   - inspect callback enqueue, queue consumer, delivery classification, and retry logs.
 - Container disappears with little Worker noise:
   - inspect Docker container lifecycle and the final wrapper/Kilo logs copied from the sandbox while still available.
-  - A killed container is not a separate control-plane case. The wrapper socket closes, or the 45-second heartbeat deadline closes it. The allocation stays `disconnected` until the earlier of the reconnect window (5 minutes) and the idle deadline. It then stops: `connection_lost` when the reconnect window expires first, `sandbox_stopped` when the idle deadline expires first. The next message prepares a new sandbox. There is no provider poll. Local `docker kill` may not deliver `webSocketClose` promptly; the heartbeat alarm is the backstop, and a late Wrangler alarm makes that backstop late.
+  - A killed container is not a separate control-plane case. The wrapper socket closes, or the 45-second heartbeat deadline closes it. The allocation stays `disconnected` until the earlier of the reconnect window (90 seconds) and the idle deadline. It then stops: `connection_lost` when the reconnect window expires first, `sandbox_stopped` when the idle deadline expires first. The next message prepares a new sandbox. There is no provider poll. Local `docker kill` may not deliver `webSocketClose` promptly; the heartbeat alarm is the backstop, and a late Wrangler alarm makes that backstop late.
 
 ## Local Smoke Harness
 

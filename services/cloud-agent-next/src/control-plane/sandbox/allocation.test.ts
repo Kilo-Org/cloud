@@ -111,7 +111,7 @@ describe('allocation idle deadline while disconnected', () => {
   });
 
   it('waits for the reconnect deadline when it is the earlier deadline', () => {
-    // Activity at 0, socket closed at 0, reconnect at 5 min, idle at 10 min.
+    // Activity at 0, socket closed at 0, reconnect at 90 s, idle at 10 min.
     const state = disconnectedState(0, 0);
     const early = reduceAllocation(
       state,
@@ -139,11 +139,11 @@ describe('allocation idle deadline while disconnected', () => {
   });
 
   it('arms the alarm at the earlier of the idle and reconnect deadlines', () => {
-    // Socket closed at 9 min: idle (10 min) is earlier than reconnect (14 min).
+    // Socket closed at 9 min: idle (10 min) is earlier than reconnect (10.5 min).
     expect(nextAllocationAlarmAt(disconnectedState(0, TIMERS.idleMs - 60_000), TIMERS)).toBe(
       TIMERS.idleMs
     );
-    // Socket closed at 0: reconnect (5 min) is earlier than idle (10 min).
+    // Socket closed at 0: reconnect (90 s) is earlier than idle (10 min).
     expect(nextAllocationAlarmAt(disconnectedState(0, 0), TIMERS)).toBe(TIMERS.reconnectMs);
   });
 });

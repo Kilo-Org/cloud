@@ -1853,7 +1853,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
         // No usable grant: fail the route as the prepare path does, so the
         // Session DO starts a fresh attempt or releases the queued messages with
-        // the real reason, instead of leaving them for the 20-minute backstop.
+        // the real reason, instead of leaving them for the queued backstop.
         // If the route stayed `ready`, `prepare` would return the same ready
         // view and deliver would keep returning `not_ready`.
         await onRouteFailed(

@@ -198,6 +198,12 @@ type PreservedFields = {
    * but `lastActivityAt` may be legitimately absent (NULL in DB).
    */
   lastActivityAt: string | undefined;
+  /**
+   * Sticky: heartbeat and `sessions.list` rows never carry the status-change
+   * time. Only a tRPC fetch or a `session.status.updated` event writes it, so
+   * a merge must keep it or the newest session and its age go blank.
+   */
+  statusUpdatedAt: string | undefined;
   /** Sticky like the three above: WS payloads never carry an org id. */
   organizationId: string | null | undefined;
   /**
@@ -225,6 +231,7 @@ function readEnrichment(current: CachedActiveSession | undefined): PreservedFiel
     createdAt: current?.createdAt,
     updatedAt: current?.updatedAt,
     lastActivityAt: current?.lastActivityAt,
+    statusUpdatedAt: current?.statusUpdatedAt,
     organizationId: current?.organizationId,
     totalCostMicrodollars: current?.totalCostMicrodollars,
     associatedPr: current?.associatedPr,

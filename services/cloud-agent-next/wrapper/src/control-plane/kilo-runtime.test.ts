@@ -634,6 +634,41 @@ describe('createKiloRuntime', () => {
     await runtime.shutdown();
   });
 
+  it('does not emit a restart outcome when shutdown interrupts replacement preparation', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const gate = Promise.withResolvers<void>();
+    let preparations = 0;
+    const { runtime, nativeDiagnostics, logs } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      prepareFilesystem: async () => {
+        preparations += 1;
+        if (preparations === 2) await gate.promise;
+      },
+    });
+    await runtime.ensure();
+
+    spawner.processes[0]!.exit();
+    await waitFor(() => preparations === 2);
+    await runtime.shutdown();
+    gate.resolve();
+    await waitFor(() => logs.some(message => message.includes('kilo restart failed')));
+
+    expect(runtime.phase()).toBe('stopped');
+    expect(spawner.spawnCount()).toBe(1);
+    expect(nativeDiagnostics).toEqual([
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'kilo_restarting', kiloRestartReason: 'exit' },
+      },
+    ]);
+  });
+
   it('runs onRestart only after the runtime reports it is no longer restarting', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();

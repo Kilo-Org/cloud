@@ -863,7 +863,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         }`
       );
       if (currentPhase() !== 'stopped') phase = 'suspected';
-      if (reason !== 'credentials') {
+      if (currentPhase() !== 'stopped' && reason !== 'credentials') {
         options.onNativeDiagnostic?.('wrapper.lifecycle', {
           phase: 'kilo_restart_failed',
           kiloRestartReason: reason,

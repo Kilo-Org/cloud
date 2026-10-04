@@ -137,7 +137,7 @@ while true; do
     exit "$code"
   fi
   restarts="$restarts $(date +%s)"
-  native_log "{\"source\":\"control-plane-supervisor\",\"event\":\"wrapper_restart\",\"exitCode\":$code,\"restartCount\":$restart_count}"
+  native_log "{\"source\":\"control-plane-supervisor\",\"event\":\"wrapper_restart\",\"exitCode\":$code,\"restartCount\":$((restart_count + 1))}"
 
   # Reset the backoff ladder with the window: a crash after the pruned
   # restarts wait one minimum interval, not the capped maximum.

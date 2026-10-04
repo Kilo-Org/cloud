@@ -279,6 +279,14 @@ describe('control-plane-supervisor.sh', () => {
       // Exact counts: five retried failures then one exhausted budget.
       expect(gatedStderr.match(/"event":"wrapper_restart"/g)).toHaveLength(5);
       expect(gatedStderr.match(/"event":"restart_budget_exhausted"/g)).toHaveLength(1);
+      expect(
+        [
+          ...gatedStderr.matchAll(/"event":"wrapper_restart","exitCode":1,"restartCount":(\d+)/g),
+        ].map(match => Number(match[1]))
+      ).toEqual([1, 2, 3, 4, 5]);
+      expect(gatedStderr).toContain(
+        '"event":"restart_budget_exhausted","exitCode":1,"restartCount":5'
+      );
       // The line carries closed numeric fields and never an environment dump.
       expect(gatedStderr).not.toContain(SUPERVISOR_PATH);
       expect(gatedStderr).not.toContain('CONTROL_PLANE_WRAPPER_COMMAND');

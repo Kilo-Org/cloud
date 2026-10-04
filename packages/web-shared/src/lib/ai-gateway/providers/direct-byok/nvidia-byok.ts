@@ -15,7 +15,6 @@ export default {
 
     request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
 
-    delete request.body.provider;
     delete request.body.transforms;
     delete request.body.reasoning;
     delete request.body.safety_identifier;

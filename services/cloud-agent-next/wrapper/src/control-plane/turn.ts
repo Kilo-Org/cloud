@@ -1014,6 +1014,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       const turn = turns.get(sessionId);
       if (turn === undefined) return;
+      if (
+        event.type === 'session.deleted' &&
+        eventSessionId !== undefined &&
+        eventSessionId !== root
+      ) {
+        for (const partKey of turn.runningParts) {
+          if (partKey.startsWith(`${eventSessionId}\0`)) turn.runningParts.delete(partKey);
+        }
+      }
       // A subagent's question still pauses the root turn (spec §6).
       applyInteraction(turn, event.type);
       const realProgress = isRealProgress(turn, event.type, event.properties);

@@ -1685,6 +1685,53 @@ describe('running tool parts hold the no-progress clock', () => {
     expect(outcomeFrames(h.frames)).toHaveLength(0);
   });
 
+  it.each([false, true])(
+    'prunes deleted descendant parts without clearing other sessions (other running tools: %s)',
+    async otherRunningTools => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+      const siblingId = `${childId}_sibling`;
+      for (const id of [childId, siblingId]) {
+        h.manager.observeKiloEvent(
+          kiloEvent('session.created', { info: { id, parentID: KILO_SESSION } })
+        );
+      }
+      h.manager.observeKiloEvent(toolPartEvent(childId, 'shared_part', 'running'));
+      h.manager.observeKiloEvent(toolPartEvent(childId, 'another_part', 'running'));
+      if (otherRunningTools) {
+        h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'shared_part', 'running'));
+        h.manager.observeKiloEvent(toolPartEvent(siblingId, 'shared_part', 'running'));
+      }
+      h.advance(8 * 60_000);
+      h.manager.tick();
+      await settle();
+      expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+      h.manager.observeKiloEvent(kiloEvent('session.deleted', { info: { id: childId } }));
+      h.manager.tick();
+      await settle();
+      if (otherRunningTools) {
+        expect(outcomeFrames(h.frames)).toHaveLength(0);
+        h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'shared_part', 'completed'));
+        h.advance(8 * 60_000);
+        h.manager.tick();
+        await settle();
+        expect(outcomeFrames(h.frames)).toHaveLength(0);
+        h.manager.observeKiloEvent(toolPartEvent(siblingId, 'shared_part', 'completed'));
+        h.advance(SESSION_TIMERS.noProgressMs);
+        h.manager.tick();
+        await settle();
+      }
+      expect(outcomeFrames(h.frames)[0]).toMatchObject({
+        status: 'failed',
+        reason: 'no_progress',
+      });
+    }
+  );
+
   it('holds a root running task part with a silent child', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());

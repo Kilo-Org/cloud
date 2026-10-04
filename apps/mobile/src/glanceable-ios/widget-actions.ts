@@ -9,6 +9,7 @@ import {
   runWidgetAction,
   type WidgetAction,
 } from '@/lib/glanceable/widget-actions';
+import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
 
 import { ActiveAgentsWidget, WIDGET_NAME, type WidgetProps } from './active-agents-widget';
 import {
@@ -54,6 +55,21 @@ function stripPendingAction(props: WidgetProps | null | undefined): WidgetProps 
     ...rest
   } = props ?? {};
   return rest;
+}
+
+/**
+ * Whether an entry carries any press marker, including the visible flag alone.
+ *
+ * The App Intent writes `pendingAction` and `pendingActionVisible` together, but
+ * the stored timeline is long-lived: a partial write, or a marker whose action a
+ * later app version no longer knows, can leave the visible flag behind with no
+ * action this build can run. The layout already refuses to draw that orphan (it
+ * only shows the press line while the flag names a known action); this predicate
+ * is what lets the sweep strip the orphan, so a "Starting…" line cannot outlive
+ * the press that wrote it.
+ */
+function hasPressMarker(props: WidgetProps | null | undefined): boolean {
+  return props?.pendingActionVisible === true || pendingActionOf(props) !== null;
 }
 
 /**
@@ -123,8 +139,17 @@ function republishWidgetProps(): void {
 
 /** Where an unfinished action lands: the same agents list the body tap opens. */
 const OPEN_AGENTS_URI = 'kiloapp:///cloud/sessions';
-/** Where a create with nothing to start from lands: the new-session screen. */
-const OPEN_NEW_AGENT_URI = 'kiloapp://agent-chat/new';
+/**
+ * Where a create with nothing to start from lands: the new-session screen.
+ *
+ * `LAUNCHER_NEW_AGENT_URL` is the canonical `kiloapp:///cloud/sessions/new` the
+ * launcher shortcuts already use; `resolveIncomingUrl` maps it to
+ * `/(app)/agent-chat/new`. The old widget-local `kiloapp://agent-chat/new`
+ * matched no universal-link row, so the deep link resolved to null and the tap
+ * dead-ended. Sharing the constant with the Android twin keeps both platforms
+ * on the canonical row.
+ */
+const OPEN_NEW_AGENT_URI = LAUNCHER_NEW_AGENT_URL;
 
 /**
  * Run one press. `runWidgetAction` republishes the tray through every sink on
@@ -269,21 +294,28 @@ function takeResweepRequest(): boolean {
 async function sweepPendingActions(): Promise<void> {
   const timeline = await ActiveAgentsWidget.getTimeline();
   const pending = new Map<number, WidgetAction>();
+  // Every entry with a marker, including a visible flag no action names: the
+  // orphan is not run, but it is still stripped so it cannot keep the press
+  // line on a settled widget. `pending` is the subset that names an action.
+  const marked = new Set<number>();
   const pressed: PressedEntry[] = [];
   for (const [index, entry] of timeline.entries()) {
-    const action = pendingActionOf(entry.props);
-    if (action !== null) {
-      pending.set(index, action);
-      pressed.push({ date: entry.date.getTime(), action });
+    if (hasPressMarker(entry.props)) {
+      marked.add(index);
+      const action = pendingActionOf(entry.props);
+      if (action !== null) {
+        pending.set(index, action);
+        pressed.push({ date: entry.date.getTime(), action });
+      }
     }
   }
   const carried = takeCarriedPresses().filter(
     press => !pressed.some(read => read.date === press.date && read.action === press.action)
   );
-  if (pending.size > 0) {
+  if (marked.size > 0) {
     ActiveAgentsWidget.updateTimeline(
       timeline.map((entry, index) =>
-        pending.has(index) ? { date: entry.date, props: stripPendingAction(entry.props) } : entry
+        marked.has(index) ? { date: entry.date, props: stripPendingAction(entry.props) } : entry
       )
     );
   }

@@ -703,6 +703,9 @@ describe('createPreparationManager', () => {
     );
     expect(checkoutLine).toBeDefined();
     expect(checkoutLine?.fields).not.toHaveProperty('detail');
+    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'session_ready')).toBe(
+      false
+    );
   });
 
   it('reports a Kilo session timeout with the kilo_import_timeout subtype', async () => {
@@ -746,22 +749,6 @@ describe('createPreparationManager', () => {
     expect(ready).toHaveLength(2);
     expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'prepare_failed')).toBe(
       false
-    );
-  });
-
-  it('does not emit session_ready when prepare fails', async () => {
-    const harness = createHarness();
-    harness.setGit(args =>
-      args[0] === 'checkout' ? result(128, 'fatal: checkout failed') : result(0)
-    );
-    await harness.manager.prepare(
-      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, branch: 'main' })
-    );
-    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'session_ready')).toBe(
-      false
-    );
-    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'prepare_failed')).toBe(
-      true
     );
   });
 

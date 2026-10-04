@@ -564,28 +564,6 @@ describe('createKiloRuntime', () => {
     expect(scheduler.intervalCount()).toBe(0);
   });
 
-  it('projects kilo_restarting and kilo_restarted with the fault reason', async () => {
-    const spawner = createSpawner();
-    const scheduler = createScheduler();
-    const feed = createFeedFactory();
-    const probe = createProbe(false);
-    const { runtime, nativeDiagnostics } = createRuntime({ spawner, feed, probe, scheduler });
-    await runtime.ensure();
-
-    spawner.processes[0]!.exit();
-    await waitFor(() => spawner.spawnCount() === 2);
-
-    expect(nativeDiagnostics).toContainEqual({
-      event: 'wrapper.lifecycle',
-      fields: { phase: 'kilo_restarting', kiloRestartReason: 'exit' },
-    });
-    expect(nativeDiagnostics).toContainEqual({
-      event: 'wrapper.lifecycle',
-      fields: { phase: 'kilo_restarted', kiloRestartReason: 'exit' },
-    });
-    await runtime.shutdown();
-  });
-
   it('emits kilo_restarting before the replacement spawn and kilo_restarted only after it', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
@@ -616,6 +594,16 @@ describe('createKiloRuntime', () => {
 
     releaseSpawn();
     await waitFor(() => nativeDiagnostics.some(entry => entry.fields.phase === 'kilo_restarted'));
+    expect(nativeDiagnostics).toEqual([
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'kilo_restarting', kiloRestartReason: 'exit' },
+      },
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'kilo_restarted', kiloRestartReason: 'exit' },
+      },
+    ]);
     await runtime.shutdown();
   });
 

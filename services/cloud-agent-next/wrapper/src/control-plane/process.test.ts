@@ -219,7 +219,7 @@ describe('control-plane wrapper process', () => {
     }
   }, 20_000);
 
-  it('writes one production-interval wrapper.status line when the native gate is set', async () => {
+  it('writes a production-interval status line, then exits cleanly on SIGTERM without later status', async () => {
     const controlPort = await closedPort();
     const uploadPort = await closedPort();
     const handle = spawnWrapper(
@@ -256,6 +256,12 @@ describe('control-plane wrapper process', () => {
       expect(text).not.toContain('"phase":"retry_scheduled"');
       // The process is still alive when the line appears.
       expect(handle.child.exitCode).toBeNull();
+      process.kill(handle.child.pid, 'SIGTERM');
+      expect(await waitForExit(handle.child, 8_000)).toBe(0);
+      const stoppedText = handle.stderr();
+      const stoppingIndex = stoppedText.indexOf('"phase":"stopping"');
+      expect(stoppingIndex).toBeGreaterThanOrEqual(0);
+      expect(stoppedText.slice(stoppingIndex)).not.toContain('"event":"wrapper.status"');
     } finally {
       if (handle.child.exitCode === null) handle.child.kill();
       await handle.child.exited;
@@ -276,31 +282,6 @@ describe('control-plane wrapper process', () => {
       await Bun.sleep(70_000);
       expect(handle.child.exitCode).toBeNull();
       expect(statusLine(handle.stderr())).toBeUndefined();
-    } finally {
-      if (handle.child.exitCode === null) handle.child.kill();
-      await handle.child.exited;
-    }
-  }, 90_000);
-
-  it('exits 0 on SIGTERM after the status line and writes nothing after stopping', async () => {
-    const controlPort = await closedPort();
-    const uploadPort = await closedPort();
-    const handle = spawnWrapper(
-      nativeLogsEnv(`ws://127.0.0.1:${controlPort}/sandbox-control-v2/fake`, uploadPort)
-    );
-    try {
-      const deadline = Date.now() + 75_000;
-      while (Date.now() < deadline && statusLine(handle.stderr()) === undefined) {
-        await Bun.sleep(500);
-      }
-      expect(statusLine(handle.stderr())).toBeDefined();
-      process.kill(handle.child.pid, 'SIGTERM');
-      expect(await waitForExit(handle.child, 8_000)).toBe(0);
-
-      const text = handle.stderr();
-      const stoppingIndex = text.indexOf('"phase":"stopping"');
-      expect(stoppingIndex).toBeGreaterThanOrEqual(0);
-      expect(text.slice(stoppingIndex)).not.toContain('"event":"wrapper.status"');
     } finally {
       if (handle.child.exitCode === null) handle.child.kill();
       await handle.child.exited;

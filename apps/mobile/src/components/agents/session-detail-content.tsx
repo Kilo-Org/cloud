@@ -25,11 +25,9 @@ import {
 } from '@/components/agents/chat-composer';
 import {
   type AgentMode,
-  customModeOptionsFromRuntimeAgents,
-  dedupeCustomModeOptions,
-  ensureSelectedCustomOption,
   lockedModelOption,
   resolvePinnedAgentModel,
+  resolveSessionRoleView,
 } from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import {
@@ -124,6 +122,7 @@ import { useSessionConfigSync } from '@/components/agents/use-session-config-syn
 import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
 import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -200,6 +199,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
 import {
   buildContinueHref,
   buildContinuePrefillParams,
@@ -576,6 +576,10 @@ export function SessionDetailContent({
     gatewayModelsLoading,
     organizationId,
   });
+  // A remote session's catalog can arrive empty or fail before the CLI is
+  // ready. Re-ask on attach, focus, and app-foreground while it is missing,
+  // empty, or errored; the hook bounds itself to those events.
+  useRemoteModelCatalogRetry({ activeSessionType, manager, remoteModelState });
   const modelOptions = sessionModels.options;
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
@@ -647,24 +651,33 @@ export function SessionDetailContent({
     spawnedMode,
   });
 
-  // Custom modes come from the session's `runtimeAgents` (slug + name). The
-  // selected slug is appended once when it is neither a built-in nor already
-  // listed, so an inherited custom slug stays visible in the picker.
+  // Custom modes: a remote session merges the session profile's visible custom
+  // agents (loaded for the session's own recorded/bound profile, not the
+  // context's effective default) with the session's runtime-reported agents, so
+  // the user's roles show even when the CLI has not reported them. Cloud-agent
+  // and read-only sessions use only `runtimeAgents`. The selected slug is
+  // appended once when it is neither a built-in nor already listed, so an
+  // inherited custom slug stays visible in the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
-  const customOptions = useMemo(
+  const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
+    organizationId,
+    activeSessionProfileId
+  );
+  const roleView = useMemo(
     () =>
-      ensureSelectedCustomOption(
-        dedupeCustomModeOptions(customModeOptionsFromRuntimeAgents(runtimeAgents)),
-        currentMode
-      ),
-    [runtimeAgents, currentMode]
+      resolveSessionRoleView({
+        sessionType: activeSessionType,
+        runtimeAgents,
+        profileAgents: effectiveProfileAgents,
+        selectedMode: currentMode,
+      }),
+    [activeSessionType, runtimeAgents, effectiveProfileAgents, currentMode]
   );
-  // A custom agent can pin a model (+ optional variant). Only Cloud Agent
-  // locks from `runtimeAgents`; remote sessions stay unlocked, as web does.
-  const pinned = useMemo(
-    () => resolvePinnedAgentModel({ slug: currentMode, runtimeAgents }),
-    [currentMode, runtimeAgents]
-  );
+  const customOptions = roleView.customOptions;
+  // A custom agent can pin a model (+ optional variant). The pin always comes
+  // from `runtimeAgents`, so a profile agent's pin never locks a cloud-agent
+  // toolbar or the send model, matching web's runtime-only lock.
+  const pinned = roleView.pinned;
   const modelLocked = activeSessionType === 'cloud-agent' && Boolean(pinned.model);
   const displayModel = modelLocked && pinned.model ? pinned.model : currentModel;
   const displayVariant = modelLocked && pinned.model ? (pinned.variant ?? '') : currentVariant;
@@ -1773,12 +1786,15 @@ export function SessionDetailContent({
     cloudStatus,
     messageCount: messages.length,
   });
+  // A read-only transcript ends in the continue section, which states the
+  // read-only fact once and replaces the composer and its send reason.
+  const isReadOnlyTranscript = isReadOnly && messages.length > 0;
   const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
     hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
-    hasSendReason: sendDisabledReason !== null,
+    hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
     messageCount: messages.length,
   });
 
@@ -1875,16 +1891,17 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
-  // The composer stays mounted for every session. A read-only session keeps it
-  // on screen but disabled, with the reason stated above it, so the reader has
-  // a stable input slot and the continue affordance names its destination.
+  // The composer stays mounted for every writable session. A read-only
+  // transcript replaces it with the continue section, which names the
+  // destination it opens.
   // The bottom BlurBar reserves the composer's space and shares its visibility
-  // condition, so a blocking card that hides the composer never leaves the bar
+  // condition, so a blocking card or the continue section never leaves the bar
   // claiming space the composer does not fill. The strip is a pure full-bleed
   // background/spacer: it hosts no controls, so it deliberately carries no
   // horizontal safe-area padding — the composer's own content clears the
   // landscape sensor insets.
-  const isComposerVisible = !hasBlockingInteraction;
+  const isComposerVisible = !hasBlockingInteraction && !isReadOnlyTranscript;
+  const isReadOnlyContinueVisible = isReadOnlyTranscript && !hasBlockingInteraction;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2272,7 +2289,10 @@ export function SessionDetailContent({
               <View style={{ height: bottom }} />
             </BlurBar>
           ) : (
-            <View style={{ height: bottom }} className="bg-background" />
+            <View
+              style={{ height: bottom }}
+              className={isReadOnlyContinueVisible ? 'bg-secondary' : 'bg-background'}
+            />
           )}
 
           {sheetMountState.mounted ? (
@@ -2495,7 +2515,7 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
+        {isReadOnlyContinueVisible ? (
           <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
               {t('agentChat.session.readOnly')}
@@ -2511,72 +2531,74 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        <View
-          className={cn(hasBlockingInteraction && 'hidden')}
-          accessibilityElementsHidden={hasBlockingInteraction}
-          importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
-        >
-          {exitFailure ? (
-            <Animated.View
-              entering={FadeIn.duration(200)}
-              exiting={FadeOut.duration(150)}
-              layout={LinearTransition.duration(150)}
-            >
-              <RemoteSessionExitFailure
-                message={exitFailure.message}
-                onRetry={handleRetryExit}
-                isRetrying={isRetryingExit}
-              />
-            </Animated.View>
-          ) : null}
-          <ModelPickerSelectionScopeProvider
-            selectionScope={modelPickerSelectionScope}
-            isSelectionCurrent={isModelPickerSelectionCurrent}
+        {isReadOnlyTranscript ? null : (
+          <View
+            className={cn(hasBlockingInteraction && 'hidden')}
+            accessibilityElementsHidden={hasBlockingInteraction}
+            importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
           >
-            <ChatComposer
-              key={`${composerAccount.epoch}:${sessionId}`}
-              onSend={handleSend}
-              onSendCommand={handleSendCommand}
-              onCreateSession={handleCreateSession}
-              onRestartSession={handleRestartSession}
-              onExitSession={handleExitSession}
-              onStop={handleStop}
-              disabled={isComposerDisabled}
-              sendDisabled={!canSend}
-              sendDisabledReason={sendDisabledReason}
-              isStreaming={isStreaming}
-              placeholder={composerPlaceholder}
-              mode={currentMode}
-              onModeChange={handleModeChange}
-              model={displayModel}
-              variant={displayVariant}
-              modelOptions={modelOptionsForToolbar}
-              customOptions={customOptions}
-              modelLocked={modelLocked}
-              modelLockLabel={pinned.agentName}
-              onModelSelect={handleModelSelect}
-              organizationId={organizationId}
-              attachmentsEnabled={supportsAttachments}
-              activeSessionType={activeSessionType}
-              commands={availableCommands}
-              commandCatalogStatus={availableCommandsCatalogStatus}
-              commandState={remoteCommandState}
-              shareId={shareId}
-              autoSend={autoSend}
-              draftKey={userId ? sessionComposerDraftKey : undefined}
-              initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
-              sessionId={sessionId}
-              suggestion={activeSuggestion}
-              onAcceptSuggestion={async (requestId, index) => {
-                await manager.acceptSuggestion(requestId, index);
-              }}
-              onDismissSuggestion={async requestId => {
-                await manager.dismissSuggestion(requestId);
-              }}
-              controlRef={composerControlRef}
-            />
-          </ModelPickerSelectionScopeProvider>
-        </View>
+            {exitFailure ? (
+              <Animated.View
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(150)}
+                layout={LinearTransition.duration(150)}
+              >
+                <RemoteSessionExitFailure
+                  message={exitFailure.message}
+                  onRetry={handleRetryExit}
+                  isRetrying={isRetryingExit}
+                />
+              </Animated.View>
+            ) : null}
+            <ModelPickerSelectionScopeProvider
+              selectionScope={modelPickerSelectionScope}
+              isSelectionCurrent={isModelPickerSelectionCurrent}
+            >
+              <ChatComposer
+                key={`${composerAccount.epoch}:${sessionId}`}
+                onSend={handleSend}
+                onSendCommand={handleSendCommand}
+                onCreateSession={handleCreateSession}
+                onRestartSession={handleRestartSession}
+                onExitSession={handleExitSession}
+                onStop={handleStop}
+                disabled={isComposerDisabled}
+                sendDisabled={!canSend}
+                sendDisabledReason={sendDisabledReason}
+                isStreaming={isStreaming}
+                placeholder={composerPlaceholder}
+                mode={currentMode}
+                onModeChange={handleModeChange}
+                model={displayModel}
+                variant={displayVariant}
+                modelOptions={modelOptionsForToolbar}
+                customOptions={customOptions}
+                modelLocked={modelLocked}
+                modelLockLabel={pinned.agentName}
+                onModelSelect={handleModelSelect}
+                organizationId={organizationId}
+                attachmentsEnabled={supportsAttachments}
+                activeSessionType={activeSessionType}
+                commands={availableCommands}
+                commandCatalogStatus={availableCommandsCatalogStatus}
+                commandState={remoteCommandState}
+                shareId={shareId}
+                autoSend={autoSend}
+                draftKey={userId ? sessionComposerDraftKey : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                sessionId={sessionId}
+                suggestion={activeSuggestion}
+                onAcceptSuggestion={async (requestId, index) => {
+                  await manager.acceptSuggestion(requestId, index);
+                }}
+                onDismissSuggestion={async requestId => {
+                  await manager.dismissSuggestion(requestId);
+                }}
+                controlRef={composerControlRef}
+              />
+            </ModelPickerSelectionScopeProvider>
+          </View>
+        )}
       </>
     );
   }

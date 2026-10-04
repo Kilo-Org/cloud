@@ -998,7 +998,40 @@ export type AssociatedPullRequest = {
   title: string;
   headSha: string;
   updatedAt: string; // ISO
+  /**
+   * `owner/name` of the PR's base repository, as reported by GitHub. Used to
+   * verify that a session's stored link actually names this repository rather
+   * than trusting the branch name alone. `fetchPullRequestByNumber` always
+   * populates it; it is optional so callers that only need the previous fields
+   * keep compiling, and the identity helper treats its absence as no evidence.
+   */
+  baseRepoFullName?: string;
+  /**
+   * `owner/name` of the PR's head repository, as reported by GitHub. Empty when
+   * the head repository is gone (for example a deleted fork); a fork or another
+   * repository never satisfies the session-repo check.
+   */
+  headRepoFullName?: string;
+  /** Branch the PR was opened from, as reported by GitHub. */
+  headRef?: string;
+  /**
+   * SHAs of the PR's commits. Populated only when the caller passes
+   * `includeCommits` and the session SHA is not already the PR head. `undefined`
+   * means "not fetched", not "no commits". The walk is capped at
+   * `MAX_COMMIT_PAGES` pages so a very large PR cannot turn one refresh into
+   * hundreds of sequential GitHub calls.
+   */
+  commitShas?: string[];
 };
+
+/**
+ * Bound on the commit pages walked when a session head SHA is not the PR head.
+ * 100 commits per page, so at most 1 + `MAX_COMMIT_PAGES` GitHub calls. A
+ * session SHA beyond this window is treated as unverified (no PR shown) rather
+ * than paging through thousands of commits.
+ */
+const MAX_COMMIT_PAGES = 10;
+const COMMITS_PER_PAGE = 100;
 
 /**
  * Thrown when GitHub returns a rate-limit response. The caller can surface
@@ -1078,8 +1111,30 @@ export async function fetchPullRequestByNumber(params: {
   repo: string;
   number: number;
   appType: GitHubAppType;
+  /**
+   * When set, also fetch the PR's commit SHAs so a caller can verify a session
+   * head SHA that is not the PR's current head (for example the session pushed
+   * an earlier commit and later commits landed on the same branch).
+   * Defaults to false to keep the common case to a single API call.
+   */
+  includeCommits?: boolean;
+  /**
+   * The session's reported head SHA. When it equals the PR's current head the
+   * caller can accept the link from the head alone, so the commit walk is
+   * skipped entirely. Without it (or when it differs) the walk runs, capped at
+   * `MAX_COMMIT_PAGES`.
+   */
+  expectedHeadSha?: string | null;
 }): Promise<AssociatedPullRequest | null> {
-  const { installationId, owner, repo, number, appType } = params;
+  const {
+    installationId,
+    owner,
+    repo,
+    number,
+    appType,
+    includeCommits = false,
+    expectedHeadSha = null,
+  } = params;
 
   const tokenData = await generateGitHubInstallationToken(String(installationId), appType);
   const octokit = new Octokit({ auth: tokenData.token });
@@ -1100,6 +1155,32 @@ export async function fetchPullRequestByNumber(params: {
             ? 'open'
             : 'closed';
 
+    let commitShas: string[] | undefined;
+    if (includeCommits) {
+      const expected = expectedHeadSha?.trim().toLowerCase();
+      const prHeadSha = pr.head.sha.trim().toLowerCase();
+      // The session's SHA already is the PR head: `verifySessionPullRequestLink`
+      // accepts it from the head alone, so no commit walk is needed. This keeps
+      // the normal new-CLI refresh to a single GitHub call regardless of how
+      // many commits the PR has grown to.
+      if (!expected || expected !== prHeadSha) {
+        commitShas = [];
+        for (let page = 1; page <= MAX_COMMIT_PAGES; page += 1) {
+          const { data } = await octokit.pulls.listCommits({
+            owner,
+            repo,
+            pull_number: number,
+            per_page: COMMITS_PER_PAGE,
+            page,
+          });
+          for (const commit of data) {
+            if (typeof commit.sha === 'string') commitShas.push(commit.sha);
+          }
+          if (data.length < COMMITS_PER_PAGE) break;
+        }
+      }
+    }
+
     return {
       number: pr.number,
       htmlUrl: pr.html_url,
@@ -1107,6 +1188,10 @@ export async function fetchPullRequestByNumber(params: {
       title: pr.title,
       headSha: pr.head.sha,
       updatedAt: pr.updated_at,
+      baseRepoFullName: pr.base.repo?.full_name ?? `${owner}/${repo}`,
+      headRepoFullName: pr.head.repo?.full_name ?? '',
+      headRef: pr.head.ref,
+      ...(commitShas ? { commitShas } : {}),
     };
   } catch (error) {
     if (isRateLimitError(error)) {

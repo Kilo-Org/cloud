@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
+import pLimit from 'p-limit';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
@@ -669,8 +670,6 @@ type UseSidebarSessionsReturn = {
   cachedSessions: StoredSession[];
   worktreeDetails: Record<string, SidebarWorktreeDetails>;
   isLoading: boolean;
-  isFolderSessionsLoading: boolean;
-  isFolderSessionsError: boolean;
   refetchSessions: () => void;
   renameSessionLocally: (sessionId: string, newTitle: string) => void;
 };
@@ -809,38 +808,49 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     verifyPrLink({ sessionId: session.session_id });
   }, [verificationSessions, isVerifyingPrLink, verifyPrLink]);
 
+  const limitFolderQueries = useMemo(() => pLimit(4), []);
   const folderQueries = useQueries({
     queries: [...new Set(folderWorktreeIds ?? [])].flatMap(id => {
       const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
       if (!parsed.success) return [];
+      const queryOptions = trpc.cliSessionsV2.list.queryOptions(
+        {
+          worktreeId: parsed.data,
+          limit: 1,
+          orderBy: 'updated_at',
+          organizationId,
+          createdOnPlatform,
+          gitUrl,
+          fetchReviewDecision: true,
+        },
+        {
+          enabled: !isSearchActive,
+          staleTime: 5000,
+          refetchInterval: query =>
+            query.state.data?.cliSessions.some(
+              session => session.associatedPr?.reviewDecisionPending === true
+            )
+              ? REVIEW_DECISION_POLL_INTERVAL_MS
+              : false,
+        }
+      );
+      const queryFn = queryOptions.queryFn;
       return [
-        trpc.cliSessionsV2.list.queryOptions(
-          {
-            worktreeId: parsed.data,
-            limit: 1,
-            orderBy: 'updated_at',
-            organizationId,
-            createdOnPlatform,
-            gitUrl,
-            fetchReviewDecision: true,
-          },
-          {
-            enabled: !isSearchActive,
-            staleTime: 5000,
-            refetchInterval: query =>
-              query.state.data?.cliSessions.some(
-                session => session.associatedPr?.reviewDecisionPending === true
-              )
-                ? REVIEW_DECISION_POLL_INTERVAL_MS
-                : false,
-          }
-        ),
+        {
+          ...queryOptions,
+          queryFn:
+            typeof queryFn === 'function'
+              ? context =>
+                  limitFolderQueries(() => {
+                    context.signal.throwIfAborted();
+                    return queryFn(context);
+                  })
+              : queryFn,
+        },
       ];
     }),
     combine: queries => ({
       sessions: queries.flatMap(query => query.data?.cliSessions ?? []),
-      isLoading: queries.some(query => query.isLoading),
-      isError: queries.some(query => query.isError),
     }),
   });
 
@@ -1183,8 +1193,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     cachedSessions,
     worktreeDetails,
     isLoading,
-    isFolderSessionsLoading: !isSearchActive && folderQueries.isLoading,
-    isFolderSessionsError: !isSearchActive && folderQueries.isError,
     refetchSessions,
     renameSessionLocally,
   };

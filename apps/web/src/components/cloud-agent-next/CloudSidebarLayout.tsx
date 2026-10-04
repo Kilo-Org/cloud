@@ -233,25 +233,16 @@ export function CloudSidebarLayout({
     () => workspaceFolders.folders.flatMap(folder => folder.worktreeIds),
     [workspaceFolders.folders]
   );
-  const {
-    sessions,
-    cachedSessions,
-    worktreeDetails,
-    refetchSessions,
-    renameSessionLocally,
-    isFolderSessionsLoading,
-    isFolderSessionsError,
-  } = useSidebarSessions({
-    organizationId: organizationId ?? null,
-    searchQuery,
-    createdOnPlatform,
-    gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
-    folderWorktreeIds,
-  });
+  const { sessions, cachedSessions, worktreeDetails, refetchSessions, renameSessionLocally } =
+    useSidebarSessions({
+      organizationId: organizationId ?? null,
+      searchQuery,
+      createdOnPlatform,
+      gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
+      folderWorktreeIds,
+    });
   const sidebarWorkspaceFolders = {
     ...workspaceFolders,
-    isLoading: workspaceFolders.isLoading || isFolderSessionsLoading,
-    isError: workspaceFolders.isError || isFolderSessionsError,
     refresh: async () => {
       refetchSessions();
       await workspaceFolders.refresh();

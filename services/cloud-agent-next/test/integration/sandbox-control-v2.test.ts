@@ -36,6 +36,7 @@ import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
+import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
 
 const SANDBOX_ID = 'sbx__control_v2_smoke';
 const CUTOVER_SANDBOX_ID = 'sbx__control_v2_cutover';
@@ -370,6 +371,87 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 allocation lifecycle', () => {
+  it('streams the initial allocation, activity, and stopped state without changing idle timing', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const before = await readState(stub);
+    const alarm = await readAlarm(stub);
+    const url = 'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status';
+    const response = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+    expect(response.status).toBe(101);
+    const socket = response.webSocket;
+    if (!socket) throw new Error('Missing status socket');
+    const frames: Array<{ sessionId: string; streamEventType: string; data: unknown }> = [];
+    socket.addEventListener('message', event => {
+      frames.push(JSON.parse(String(event.data)));
+    });
+    socket.accept();
+    await waitFor(() => expect(frames).toHaveLength(1));
+    expect(frames[0]).toMatchObject({
+      sessionId: 'workspace_status',
+      streamEventType: 'cloud.sandbox.status',
+      data: { status: 'starting' },
+    });
+    expect(SandboxStatusSnapshotSchema.safeParse(frames[0]?.data).success).toBe(true);
+    expect(await readState(stub)).toEqual(before);
+    expect(await readAlarm(stub)).toEqual(alarm);
+    socket.send('not-wrapper-activity');
+    const { wrapper } = await connectAndHello(provider, stub);
+    await waitFor(() => expect(frames.at(-1)?.data).toMatchObject({ status: 'active' }));
+    const active = SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data);
+    expect(active.estimatedSleepAt).toBe((await readState(stub)).lastActivityAt! + TIMERS.idleMs);
+    wrapper.heartbeat(true);
+    await waitFor(() =>
+      expect(
+        SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data).estimatedSleepAt
+      ).toBeGreaterThan(active.estimatedSleepAt!)
+    );
+    await evictAllDurableObjects();
+    await stub.reportProviderGone();
+    await waitFor(() =>
+      expect(frames.at(-1)?.data).toMatchObject({ status: 'sleeping', estimatedSleepAt: null })
+    );
+    socket.close();
+    const reconnect = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+    const reconnected = reconnect.webSocket;
+    if (!reconnected) throw new Error('Missing reconnected socket');
+    const snapshot = new Promise<unknown>(resolve =>
+      reconnected.addEventListener(
+        'message',
+        event => resolve(JSON.parse(String(event.data)).data),
+        { once: true }
+      )
+    );
+    reconnected.accept();
+    expect(await snapshot).toMatchObject({ status: 'sleeping' });
+    reconnected.close();
+    wrapper.close();
+  });
+
+  it('rejects a status subscription without the registered sandbox owner', async () => {
+    const stub = sandboxNamespace.getByName('sbx__status_authorization');
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const request = (ownerId: string) =>
+      new Request(
+        `https://sandbox.internal/status-stream?ownerId=${ownerId}&sessionId=workspace_status`,
+        { headers: { Upgrade: 'websocket' } }
+      );
+    expect((await stub.fetch(request('other-owner'))).status).toBe(403);
+    expect((await stub.fetch(request(''))).status).toBe(403);
+    expect(
+      await runInDurableObject(
+        stub,
+        (_instance, state) => state.getWebSockets('sandbox-status').length
+      )
+    ).toBe(0);
+  });
+
   it('fails permanent launch configuration promptly while cleanup retains the existing stop ladder and uncertainty', async () => {
     const provider = createFakeProvider({ gateLaunch: true });
     provider.stopResults = Array.from(

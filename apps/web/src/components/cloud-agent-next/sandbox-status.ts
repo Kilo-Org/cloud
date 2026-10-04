@@ -129,6 +129,7 @@ export function sandboxStatusPresentation({
   estimateAfter,
   sessionActive,
   now,
+  live = false,
 }: {
   data: unknown;
   observation: 'checking' | 'paused' | 'unavailable' | 'observing';
@@ -138,6 +139,7 @@ export function sandboxStatusPresentation({
   estimateAfter: number;
   sessionActive: boolean;
   now: number;
+  live?: boolean;
 }): SandboxStatusPresentation {
   const unavailable: SandboxStatusPresentation = {
     status: 'unknown',
@@ -174,7 +176,7 @@ export function sandboxStatusPresentation({
     requestedAt < freshAfter ||
     receivedAt < requestedAt ||
     receivedAt > now ||
-    now >= freshUntil
+    (!live && now >= freshUntil)
   ) {
     return { ...unavailable, detail: 'Sandbox status is out of date. Waiting for a fresh update.' };
   }
@@ -188,7 +190,7 @@ export function sandboxStatusPresentation({
     snapshot.status === 'active' &&
     snapshot.provider !== 'Unknown' &&
     snapshot.inactivityTimeoutMs !== null &&
-    requestedAt >= estimateAfter &&
+    (live || requestedAt >= estimateAfter) &&
     localSleepDeadline !== null &&
     localSleepDeadline > now
       ? localSleepDeadline
@@ -207,7 +209,7 @@ export function sandboxStatusPresentation({
       ? Math.ceil((sleepDeadline - now) / 60_000)
       : null;
   const sleepingSoon = sleepDeadline !== null && sleepDeadline - now <= SANDBOX_SLEEP_SOON_MS;
-  const deadlines = [freshUntil];
+  const deadlines = live ? [] : [freshUntil];
   if (sleepDeadline !== null) {
     deadlines.push(sleepDeadline);
     const sleepingSoonAt = sleepDeadline - SANDBOX_SLEEP_SOON_MS;
@@ -237,6 +239,6 @@ export function sandboxStatusPresentation({
     stoppedAt: runtime?.stoppedAt ?? null,
     estimatedSleepAt,
     sleepMinutesRemaining,
-    nextChangeAt: Math.min(...deadlines),
+    nextChangeAt: deadlines.length > 0 ? Math.min(...deadlines) : null,
   };
 }

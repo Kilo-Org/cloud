@@ -1216,6 +1216,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
+    const url = new URL(request.url);
+    // Only the authorized Session DO forwards this internal path, using stored ownership.
+    if (url.pathname === '/status-stream') {
+      return this.enqueue(async () => {
+        const owner = await this.requireOwner();
+        const sessionId = url.searchParams.get('sessionId');
+        if (owner === null || owner !== url.searchParams.get('ownerId') || !sessionId)
+          return new Response('Sandbox owner mismatch', { status: 403 });
+        const pair = new WebSocketPair();
+        this.ctx.acceptWebSocket(pair[1], ['sandbox-status']);
+        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId });
+        this.sendStatusSnapshot(pair[1], sessionId, await this.readAllocation());
+        return new Response(null, { status: 101, webSocket: pair[0] });
+      });
+    }
     const token = parseSandboxLaunchBearer(request.headers.get('Authorization'));
     if (token === null)
       return new Response('Invalid or missing Authorization header', { status: 401 });
@@ -1259,6 +1274,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     await this.initialized;
+    if (this.isStatusSocket(ws)) return;
     // Resolve an outstanding control request before the serial queue so the
     // queued request that awaits it cannot block its own reply.
     this.resolvePendingControlResult(ws, message);
@@ -1267,6 +1283,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async webSocketClose(ws: WebSocket): Promise<void> {
     await this.initialized;
+    if (this.isStatusSocket(ws)) {
+      ws.close();
+      return;
+    }
     // Fail every request bound to this socket at once; do not wait the timeout.
     this.settlePendingForSocket(
       ws,
@@ -1528,7 +1548,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async applyEvent(event: AllocationEvent): Promise<void> {
     const previous = await this.readAllocation();
     const { state, effects, stopReason } = reduceAllocation(previous, event, this.sandboxTimers());
-    await this.writeAllocation(state);
+    await this.writeAllocation(state, previous);
     if (
       previous.kind !== state.kind ||
       previous.stopAttempt !== state.stopAttempt ||
@@ -2078,7 +2098,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     if (state.kind !== 'connected') return;
     const next: AllocationState = { ...state, lastActivityAt: at };
-    await this.writeAllocation(next);
+    await this.writeAllocation(next, state);
     await this.armAlarm(next);
   }
 
@@ -3749,12 +3769,60 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return rows[0] ?? null;
   }
 
-  private async writeAllocation(state: AllocationState): Promise<void> {
+  private async writeAllocation(state: AllocationState, previous?: AllocationState): Promise<void> {
     const row = stateToRow(state);
     await this.db
       .insert(allocationTable)
       .values(row)
       .onConflictDoUpdate({ target: allocationTable.id, set: row });
+    if (
+      previous?.kind === state.kind &&
+      previous.lastActivityAt === state.lastActivityAt &&
+      previous.unconfirmedProviderRef === state.unconfirmedProviderRef
+    )
+      return;
+    for (const socket of this.ctx.getWebSockets('sandbox-status')) {
+      const attachment: unknown = socket.deserializeAttachment();
+      if (
+        typeof attachment === 'object' &&
+        attachment !== null &&
+        'sessionId' in attachment &&
+        typeof attachment.sessionId === 'string'
+      )
+        this.sendStatusSnapshot(socket, attachment.sessionId, state);
+    }
+  }
+
+  private sendStatusSnapshot(socket: WebSocket, sessionId: string, state: AllocationState): void {
+    const snapshot = projectAllocationStatusSnapshot({
+      allocation: { ...state, provider: this.currentProvider() },
+      observedAt: Date.now(),
+      inactivityTimeoutMs: this.sandboxTimers().idleMs,
+    });
+    try {
+      socket.send(
+        JSON.stringify({
+          eventId: 0,
+          executionId: '',
+          sessionId,
+          streamEventType: 'cloud.sandbox.status',
+          timestamp: new Date(snapshot.observedAt).toISOString(),
+          data: snapshot,
+        })
+      );
+    } catch {
+      socket.close(1011, 'Status delivery failed');
+    }
+  }
+
+  private isStatusSocket(socket: WebSocket): boolean {
+    const attachment: unknown = socket.deserializeAttachment();
+    return (
+      typeof attachment === 'object' &&
+      attachment !== null &&
+      'kind' in attachment &&
+      attachment.kind === 'sandbox-status'
+    );
   }
 
   private async readProviderPin(): Promise<StoredProviderPin | null> {

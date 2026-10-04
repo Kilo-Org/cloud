@@ -212,6 +212,7 @@ export function createWebSocketManager(config: WebSocketManagerConfig): {
     ws = newWs;
 
     newWs.onmessage = (messageEvent: MessageEvent) => {
+      if (ws !== newWs) return;
       const parsed = parseMessage(messageEvent.data);
       if (parsed === null) {
         return;

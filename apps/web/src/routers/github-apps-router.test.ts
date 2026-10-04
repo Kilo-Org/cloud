@@ -55,6 +55,16 @@ const mockSeedUserGithubToken =
     (input: Record<string, unknown>) => Promise<{ upserted: boolean; githubLogin: string }>
   >();
 const mockListIntegrations = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
+const mockUpdateModel =
+  jest.fn<
+    (
+      owner: Owner,
+      modelSlug: string,
+      integrationId?: string,
+      thinkingEffort?: string | null
+    ) => Promise<{ success: boolean; error?: string }>
+  >();
+const mockCreateAuditLog = jest.fn<(input: Record<string, unknown>) => Promise<void>>();
 const mockUninstallApp = jest.fn<() => Promise<{ success: boolean; message: string }>>();
 const mockEnsureOrganizationAccess =
   jest.fn<
@@ -82,6 +92,16 @@ const mockBindGitHubIntegrationToCanonicalInstallation = jest.fn();
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
   uninstallApp: () => mockUninstallApp(),
+  updateModel: (
+    owner: Owner,
+    modelSlug: string,
+    integrationId?: string,
+    thinkingEffort?: string | null
+  ) => mockUpdateModel(owner, modelSlug, integrationId, thinkingEffort),
+}));
+
+jest.mock('@/lib/organizations/organization-audit-logs', () => ({
+  createAuditLog: (input: Record<string, unknown>) => mockCreateAuditLog(input),
 }));
 
 jest.mock('@/routers/organizations/utils', () => ({
@@ -179,6 +199,12 @@ let createCaller: (ctx: { user: User }) => {
     organizationId?: string;
     integrationId?: string;
   }) => Promise<{ success: boolean }>;
+  updateModel: (input: {
+    organizationId?: string;
+    integrationId?: string;
+    modelSlug: string;
+    thinkingEffort?: string | null;
+  }) => Promise<{ success: boolean; error?: string }>;
   beginConnection: (input: { organizationId: string }) => Promise<{ authorizationUrl: string }>;
   getConnectionAttempt: (input: { organizationId: string; attemptId: string }) => Promise<unknown>;
   selectConnectionInstallation: (input: {
@@ -715,5 +741,88 @@ describe('githubAppsRouter.devAddInstallation', () => {
     const [, details] = mockUpsertPlatformIntegrationForOwner.mock.calls[0] ?? [];
     expect(details).not.toHaveProperty('kiloUserId');
     expect(details).not.toHaveProperty('githubUserId');
+  });
+});
+
+describe('githubAppsRouter.updateModel audit trail', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockUpdateModel.mockResolvedValue({ success: true });
+  });
+
+  function auditMessage(): string {
+    const call = mockCreateAuditLog.mock.calls[0]?.[0];
+    if (!call) throw new Error('createAuditLog was not called');
+    return String(call.message);
+  }
+
+  it('keeps the installation id and records the thinking effort for a targeted update', async () => {
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await caller.updateModel({
+      organizationId,
+      integrationId,
+      modelSlug: 'anthropic/claude-sonnet-4',
+      thinkingEffort: 'high',
+    });
+
+    expect(auditMessage()).toBe(
+      `Updated GitHub App installation ${integrationId} model to anthropic/claude-sonnet-4 with thinking effort high`
+    );
+  });
+
+  it('records the thinking effort even when the update falls back to the primary installation', async () => {
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await caller.updateModel({
+      organizationId,
+      modelSlug: 'anthropic/claude-sonnet-4',
+      thinkingEffort: 'low',
+    });
+
+    expect(auditMessage()).toBe(
+      'Updated GitHub App integration model to anthropic/claude-sonnet-4 with thinking effort low'
+    );
+  });
+
+  it('records a cleared thinking effort as the default', async () => {
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await caller.updateModel({
+      organizationId,
+      integrationId,
+      modelSlug: 'anthropic/claude-sonnet-4',
+      thinkingEffort: null,
+    });
+
+    expect(auditMessage()).toBe(
+      `Updated GitHub App installation ${integrationId} model to anthropic/claude-sonnet-4 with thinking effort default`
+    );
+  });
+
+  it('omits the thinking effort when the caller does not supply one', async () => {
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await caller.updateModel({
+      organizationId,
+      integrationId,
+      modelSlug: 'anthropic/claude-sonnet-4',
+    });
+
+    expect(auditMessage()).toBe(
+      `Updated GitHub App installation ${integrationId} model to anthropic/claude-sonnet-4`
+    );
+  });
+
+  it('does not write an audit entry when the model update fails', async () => {
+    mockUpdateModel.mockResolvedValue({ success: false, error: 'Model is not allowed' });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+
+    await expect(
+      caller.updateModel({ organizationId, integrationId, modelSlug: 'blocked/model' })
+    ).resolves.toEqual({ success: false, error: 'Model is not allowed' });
+
+    expect(mockCreateAuditLog).not.toHaveBeenCalled();
   });
 });

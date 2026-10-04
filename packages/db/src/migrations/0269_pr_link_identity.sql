@@ -26,4 +26,13 @@ WHERE ranked.observation_rank > 1
   AND cache.git_url = ranked.git_url
   AND cache.git_branch = ranked.git_branch
   AND cache.owned_by_organization_id IS NOT DISTINCT FROM ranked.owned_by_organization_id
-  AND cache.owned_by_user_id IS NOT DISTINCT FROM ranked.owned_by_user_id;
+  AND cache.owned_by_user_id IS NOT DISTINCT FROM ranked.owned_by_user_id;--> statement-breakpoint
+COMMIT;--> statement-breakpoint
+CREATE INDEX CONCURRENTLY "IDX_cli_sessions_v2_git_url_pr_number" ON "cli_sessions_v2" USING btree ("git_url","pr_number");--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_github_branch_prs_repo_pr_org" ON "github_branch_pull_requests" USING btree ("git_url","pr_number","owned_by_organization_id") WHERE "github_branch_pull_requests"."pr_number" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_github_branch_prs_repo_pr_user" ON "github_branch_pull_requests" USING btree ("git_url","pr_number","owned_by_user_id") WHERE "github_branch_pull_requests"."pr_number" is not null;--> statement-breakpoint
+CREATE INDEX CONCURRENTLY "IDX_github_branch_prs_url_pr_number" ON "github_branch_pull_requests" USING btree ("git_url","pr_number");--> statement-breakpoint
+BEGIN;--> statement-breakpoint
+DROP INDEX "UQ_github_branch_prs_org";--> statement-breakpoint
+DROP INDEX "UQ_github_branch_prs_user";--> statement-breakpoint
+DROP INDEX "IDX_github_branch_prs_url_branch";

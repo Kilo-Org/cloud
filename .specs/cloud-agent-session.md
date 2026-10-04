@@ -106,10 +106,17 @@ repository.
 9. A turn that makes no real agent progress for seven minutes MUST fail, MUST
    tell the user the turn did not complete, MUST re-enable the composer, and
    MUST leave the session usable for a later message. Retry and offline status
-   are not real progress. A stop during a retry MUST still end the turn
-   immediately (rule 6).
+   are not real progress. A tool or subagent that is still running within its
+   own timeout MUST hold the inactivity check so the turn is not failed while it
+   runs; the seven-minute check restarts when the tool completes or errors.
+   Tool-part updates remain real progress; silent running time adds no new
+   progress events. A stop during a retry MUST still end the turn immediately
+   (rule 6).
    For `workspace_*` sessions, the wrapper owns the seven-minute Kilo-progress
-   check and the 60-minute hard execution cap. If the control plane cannot
+   check and the 120-minute hard execution cap. A tool part that is `running`
+   in the routed root session or a resolved descendant tree (including a
+   subagent `task`) holds the seven-minute check until it ends, and the
+   120-minute cap still fails the turn. If the control plane cannot
    reach the wrapper, missing updates MUST NOT be treated as Kilo inactivity.
    The user MUST still be able to Stop or queue another message while the
    wrapper reconnects. If the connection returns, accepted work MUST
@@ -117,7 +124,7 @@ repository.
    five minutes, the environment MUST stop and every accepted message on it
    MUST fail with a specific connection reason; queued messages MUST wait for a
    new environment in the same chat. Each affected composer MUST become usable;
-   already-terminal messages MUST stay unchanged. Do not wait for the 60-minute
+   already-terminal messages MUST stay unchanged. Do not wait for the 120-minute
    execution cap or physical stop confirmation, and do not claim that Kilo
    stalled or returned an error.
 

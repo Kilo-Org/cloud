@@ -97,7 +97,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     kiloRestartLimit: 3,
     kiloRestartWindowMs: ms(10 * MINUTE_MS),
     noProgressMs: ms(7 * MINUTE_MS),
-    turnHardCapMs: ms(60 * MINUTE_MS),
+    turnHardCapMs: ms(120 * MINUTE_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
   };

@@ -4,6 +4,7 @@ import type {
   ControlPlaneRouteSpec,
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
+import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
@@ -36,7 +37,7 @@ const SESSION_TIMERS = {
   kiloRestartLimit: 3,
   kiloRestartWindowMs: 1000,
   noProgressMs: 7 * 60_000,
-  turnHardCapMs: 60 * 60_000,
+  turnHardCapMs: CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs,
   reconnectBackoffMinMs: 10,
   reconnectBackoffMaxMs: 100,
 };
@@ -181,6 +182,24 @@ function commandPayload(
 
 function kiloEvent(type: string, properties: Record<string, unknown>): KiloFeedEvent {
   return { type, properties, nativeRuntimeId: 'rt' };
+}
+
+function toolPartEvent(
+  sessionId: string,
+  partId: string,
+  status: string,
+  messageId?: string
+): KiloFeedEvent {
+  return kiloEvent('message.part.updated', {
+    part: {
+      id: partId,
+      sessionID: sessionId,
+      ...(messageId === undefined ? {} : { messageID: messageId }),
+      type: 'tool',
+      tool: 'bash',
+      state: { status, input: {}, time: { start: 0 } },
+    },
+  });
 }
 
 function completedKiloTurn(): KiloFeedEvent {
@@ -872,6 +891,18 @@ describe('turn outcome rules', () => {
         },
       })
     );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: {
+          id: 'part_1',
+          sessionID: KILO_SESSION,
+          messageID: 'assistant_1',
+          type: 'tool',
+          tool: 'bash',
+          state: { status: 'completed', input: { command: 'sensitive command' } },
+        },
+      })
+    );
     h.advance(SESSION_TIMERS.noProgressMs - 60_000);
     h.manager.tick();
     await settle();
@@ -900,7 +931,7 @@ describe('turn outcome rules', () => {
           eventType: 'message.part.updated',
           messageId: 'assistant_1',
           partId: 'part_1',
-          toolStatus: 'running',
+          toolStatus: 'completed',
           elapsedMs: SESSION_TIMERS.noProgressMs,
         }),
       },
@@ -933,7 +964,7 @@ describe('turn outcome rules', () => {
           sessionID: KILO_SESSION,
           messageID: 'assistant_1',
           type: 'tool',
-          state: { status: 'running' },
+          state: { status: 'completed' },
         },
       })
     );
@@ -943,6 +974,29 @@ describe('turn outcome rules', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'no_progress' });
     expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
     expect(h.diagnostics.at(-1)?.fields).toMatchObject({ probeStatus: 'unavailable' });
+  });
+
+  it('does not fail no_progress at eight minutes while a root bash part is running', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: {
+          id: 'part_running',
+          sessionID: KILO_SESSION,
+          messageID: 'assistant_running',
+          type: 'tool',
+          tool: 'bash',
+          state: { status: 'running', input: {}, time: { start: 0 } },
+        },
+      })
+    );
+    h.advance(8 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
   });
 
   it('pauses the no-progress clock while waiting on the user', async () => {
@@ -1290,7 +1344,7 @@ describe('turn outcome rules', () => {
     ]);
   });
 
-  it('caps the turn at 60 minutes even after progress', async () => {
+  it('caps the turn at 120 minutes even after progress', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
     h.manager.submit(SESSION_ID, promptPayload('m1'));
@@ -1306,7 +1360,7 @@ describe('turn outcome rules', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'execution_limit' });
   });
 
-  it('caps the turn at 60 minutes even with continuous descendant progress', async () => {
+  it('caps the turn at 120 minutes even with continuous descendant progress', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
     h.manager.submit(SESSION_ID, promptPayload('m1'));
@@ -1316,7 +1370,7 @@ describe('turn outcome rules', () => {
       kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
     );
     // Continuous descendant progress resets the no-progress clock, but it must
-    // not buy the turn past the 60-minute hard cap.
+    // not buy the turn past the 120-minute hard cap.
     const stepMs = SESSION_TIMERS.noProgressMs - 60_000;
     let elapsed = 0;
     while (elapsed + stepMs < SESSION_TIMERS.turnHardCapMs) {
@@ -1587,6 +1641,325 @@ describe('turn outcome rules', () => {
       status: 'failed',
       reason: 'prompt_failed',
       lastMessageId: 'm2',
+    });
+  });
+});
+
+describe('running tool parts hold the no-progress clock', () => {
+  it('holds a root running bash part at eight and eleven minutes without a probe', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      toolPartEvent(KILO_SESSION, 'part_root', 'running', 'assistant_root')
+    );
+    h.advance(8 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    expect(h.diagnostics).toEqual([]);
+    expect(h.manager.isActive()).toBe(true);
+
+    h.advance(3 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    expect(h.diagnostics).toEqual([]);
+    expect(h.manager.isActive()).toBe(true);
+  });
+
+  it('holds a registered descendant running bash part while the root is silent', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(toolPartEvent(childId, 'part_child', 'running', 'child_assistant'));
+    h.advance(8 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+  });
+
+  it('holds a root running task part with a silent child', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: {
+          id: 'part_task',
+          sessionID: KILO_SESSION,
+          messageID: 'assistant_task',
+          type: 'tool',
+          tool: 'task',
+          state: { status: 'running', input: {} },
+        },
+      })
+    );
+    h.advance(8 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+  });
+
+  it('tracks a running part without a messageID', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_no_message', 'running'));
+    h.advance(8 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+  });
+
+  it('keeps root and descendant running parts isolated when they share a part id', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(
+      toolPartEvent(KILO_SESSION, 'shared_part', 'running', 'assistant_root')
+    );
+    h.manager.observeKiloEvent(toolPartEvent(childId, 'shared_part', 'running', 'assistant_child'));
+    h.manager.observeKiloEvent(
+      toolPartEvent(KILO_SESSION, 'shared_part', 'completed', 'assistant_root')
+    );
+    h.advance(8 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+  });
+
+  it.each(['completed', 'error'] as const)(
+    'restarts the clock from a %s tool part at T and fails no_progress at T+7',
+    async terminalStatus => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'running', 'assistant_1'));
+      h.advance(30 * 60_000);
+      h.manager.tick();
+      await settle();
+      expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+      h.manager.observeKiloEvent(
+        toolPartEvent(KILO_SESSION, 'part_1', terminalStatus, 'assistant_1')
+      );
+      h.advance(SESSION_TIMERS.noProgressMs - 1);
+      h.manager.tick();
+      await settle();
+      expect(outcomeFrames(h.frames)).toHaveLength(0);
+      h.advance(1);
+      h.manager.tick();
+      await settle();
+      expect(outcomeFrames(h.frames)[0]).toMatchObject({
+        status: 'failed',
+        reason: 'no_progress',
+      });
+    }
+  );
+
+  it('holds until the last of two running parts completes, then restarts the clock', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'running', 'assistant_1'));
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_2', 'running', 'assistant_1'));
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_2', 'running', 'assistant_1'));
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'completed', 'assistant_1'));
+    h.advance(8 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_2', 'completed', 'assistant_1'));
+    h.advance(SESSION_TIMERS.noProgressMs - 1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'no_progress',
+    });
+  });
+
+  it('holds a running tool through 60 minutes and caps at the shared 120 minutes', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'running', 'assistant_1'));
+    h.advance(60 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    h.advance(60 * 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'execution_limit',
+    });
+  });
+
+  it('does not hold the clock for a pending-only part', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_pending', 'pending'));
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'no_progress',
+    });
+  });
+
+  it('does not hold the clock for an unresolved descendant running part', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      toolPartEvent('ses_ffffffffffffffffffffffffff', 'part_unresolved', 'running', 'assistant_x')
+    );
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'no_progress',
+    });
+  });
+
+  it('lets a restart replace running state and fails a later silent turn normally', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'running', 'assistant_1'));
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'agent_restarted',
+    });
+
+    h.frames.length = 0;
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'no_progress',
+    });
+  });
+
+  it('clears running state on a restart that keeps a finalizing turn alive', async () => {
+    let release: ((value: { wasAborted: boolean; success: boolean }) => void) | undefined;
+    const h = createHarness({
+      runCondense: () => new Promise(resolve => (release = resolve)),
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(
+      SESSION_ID,
+      promptPayload('m1', { finalization: { condenseOnComplete: true } })
+    );
+    await settle();
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'running', 'assistant_1'));
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    release?.({ wasAborted: false, success: true });
+    await settle();
+    h.frames.length = 0;
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'no_progress',
+    });
+  });
+
+  it.each(['abort', 'release'] as const)(
+    'does not let a previous turn running state hold a later silent turn after %s',
+    async action => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'running', 'assistant_1'));
+      h.manager[action](SESSION_ID);
+      await settle();
+      if (action === 'release') h.registerRoute(routeSpec());
+      h.frames.length = 0;
+
+      h.manager.submit(SESSION_ID, promptPayload('m2'));
+      await settle();
+      h.advance(SESSION_TIMERS.noProgressMs);
+      h.manager.tick();
+      await settle();
+      expect(outcomeFrames(h.frames)[0]).toMatchObject({
+        status: 'failed',
+        reason: 'no_progress',
+      });
+    }
+  );
+
+  it('keeps a turn with a question and a running part inactive, paused and capped', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(kiloEvent('question.asked', { sessionID: KILO_SESSION, id: 'q1' }));
+    h.manager.observeKiloEvent(toolPartEvent(KILO_SESSION, 'part_1', 'running', 'assistant_1'));
+    expect(h.manager.isActive()).toBe(false);
+
+    h.advance(SESSION_TIMERS.noProgressMs * 2);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    h.advance(SESSION_TIMERS.turnHardCapMs);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'execution_limit',
     });
   });
 });
@@ -2063,6 +2436,7 @@ describe('turn clock helpers', () => {
       lastProgressAt: 100,
       pausedMs: 50,
       waitingSince: null as number | null,
+      runningParts: new Set<string>(),
     };
     expect(turnPausedMs(base, 1000)).toBe(50);
     expect(noProgressElapsedMs(base, 1000)).toBe(850);
@@ -2071,6 +2445,27 @@ describe('turn clock helpers', () => {
     expect(turnDeadlineAction(base, SESSION_TIMERS.turnHardCapMs, SESSION_TIMERS)).toBe(
       'execution_limit'
     );
+  });
+
+  it('holds no_progress on a nonempty running set but keeps cap precedence', () => {
+    const base = {
+      startedAt: 0,
+      lastProgressAt: 0,
+      pausedMs: 0,
+      waitingSince: null as number | null,
+      runningParts: new Set<string>(['ses\0part']),
+    };
+    expect(turnDeadlineAction(base, SESSION_TIMERS.noProgressMs, SESSION_TIMERS)).toBeNull();
+    expect(turnDeadlineAction(base, SESSION_TIMERS.turnHardCapMs, SESSION_TIMERS)).toBe(
+      'execution_limit'
+    );
+    expect(
+      turnDeadlineAction(
+        { ...base, runningParts: new Set<string>() },
+        SESSION_TIMERS.noProgressMs,
+        SESSION_TIMERS
+      )
+    ).toBe('no_progress');
   });
 
   it('derives the runtime key from the isolation mode', () => {

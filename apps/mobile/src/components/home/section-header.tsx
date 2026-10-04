@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { I18nManager, Pressable, View } from 'react-native';
 
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
@@ -11,14 +12,30 @@ type SectionHeaderProps = {
    */
   actionLabel?: string;
   onActionPress?: () => void;
+  /**
+   * Optional one-line status between the label and the action. It takes only
+   * the free space on the label's line (zero basis), so it can never wrap the
+   * row or change the header's height when it appears.
+   */
+  notice?: ReactNode;
 };
 
-export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<SectionHeaderProps>) {
+export function SectionHeader({
+  label,
+  actionLabel,
+  onActionPress,
+  notice,
+}: Readonly<SectionHeaderProps>) {
   return (
     <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
       <Text variant="eyebrow" className="max-w-full grow">
         {label}
       </Text>
+      {notice ? (
+        <View className="min-w-0 shrink grow basis-0 flex-row items-center justify-end gap-2">
+          {notice}
+        </View>
+      ) : null}
       {actionLabel && onActionPress ? (
         <Pressable
           onPress={onActionPress}

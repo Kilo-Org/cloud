@@ -62,6 +62,7 @@ import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from '@/lib/auth/session-scoped-state';
+import { clearLiveShapeHint } from '@/lib/home-live-shape';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
@@ -548,6 +549,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             clearCacheScopeForSignOut(readCachedUserId(queryClient)),
             clearLastActiveInstance(),
             clearKiloClawOwned(),
+            clearLiveShapeHint(),
             clearRecentPrs(),
             clearViewedFiles(),
             clearSessionAttentionForSignOut(),

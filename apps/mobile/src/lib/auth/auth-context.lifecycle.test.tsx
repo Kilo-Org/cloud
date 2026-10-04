@@ -415,6 +415,10 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/home-live-shape', () => ({
+  clearLiveShapeHint: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/storage-keys', () => ({
   ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',

@@ -623,12 +623,19 @@ function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape
   // empty and idle-only states. The counts are never dropped: when a stacked
   // column cannot fit, a short narrow cell runs them in one row instead.
   const available = height - 2 * PAD_DP[size];
-  const statusLines = available >= 2 * textLineHeight(STATUS_FONT_DP) ? 2 : 1;
+  const wantsActions = props.actions.approve || props.actions.newAgent;
+  // The locked copy takes a second line only when the wanted chip still fits
+  // under it. A one-row cell (about 104 dp) fits one line and the 48 dp chip
+  // but not two lines and the chip, and the chip is the copy's only action.
+  const statusLine = textLineHeight(STATUS_FONT_DP);
+  const chipFitsUnderOneLine =
+    wantsActions && statusLine + BODY_GAP_DP + ACTION_TARGET_DP <= available;
+  const chipReserve = chipFitsUnderOneLine ? BODY_GAP_DP + ACTION_TARGET_DP : 0;
+  const statusLines = available >= 2 * statusLine + chipReserve ? 2 : 1;
   const stacked = countsHeight(props, shape, { layRows: false, statusLines });
   const layRows = size === 'row' || (size === 'compact' && stacked > available);
   const chrome: Chrome = { layRows, statusLines };
   const base = countsHeight(props, shape, chrome);
-  const wantsActions = props.actions.approve || props.actions.newAgent;
   const showActions = wantsActions && base + BODY_GAP_DP + ACTION_TARGET_DP <= available;
   const slotFits = base + BODY_GAP_DP + NEWEST_LINE_DP[size] <= available;
   const slotWithActionsFits =

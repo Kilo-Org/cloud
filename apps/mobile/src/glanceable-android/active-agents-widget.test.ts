@@ -38,6 +38,7 @@ type MockElement = {
     clickActionData?: { uri?: string };
     accessibilityLabel?: string;
     allowFontScaling?: boolean;
+    maxLines?: number;
     style?: { backgroundColor?: string; justifyContent?: string; height?: number };
     children?: unknown;
   };
@@ -327,25 +328,42 @@ describe('renderActiveAgentsWidget', () => {
   });
 
   // The empty and idle-only states were the ones whose New agent chip was cut
-  // at the cell edge: the chip plus the reserved line and the body needed more
-  // than the one-cell height. The short bucket drops the chrome instead, and
-  // the deep link still opens Kilo.
-  it('drops the New agent chip rather than clipping it in a short empty cell', () => {
+  // at the cell edge. A one-row cell (a Pixel launcher reports 104 dp) fits the
+  // chip under one line of copy, so the copy gives up its second line before
+  // the cell gives up its only action. A cell too short even for that drops
+  // the chip, and the deep link still opens Kilo.
+  it.each([
+    { width: 150, height: 100 },
+    { width: 360, height: 104 },
+  ])('keeps the New agent chip under one line of copy in a $width x $height empty cell', cell => {
+    const props = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
+    const light = render(props, cell).light;
+
+    expect(collectText(light)).toEqual(['No agents waiting', 'New agent']);
+    expect(
+      findElement(light, element => element.props.text === 'No agents waiting')?.props.maxLines
+    ).toBe(1);
+    expect(
+      findElement(light, element => element.props.clickAction === 'new-agent')?.props.style?.height
+    ).toBe(48);
+  });
+
+  it('drops the New agent chip rather than clipping it in a cell too short for it', () => {
     const props = buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate);
 
-    const short = render(props, { width: 150, height: 100 }).light;
+    const short = render(props, { width: 150, height: 70 }).light;
     expect(collectText(short)).toEqual(['No agents waiting']);
     expect(
       findElement(short, element => element.props.clickAction === 'new-agent')
     ).toBeUndefined();
     expect(short.props.clickAction).toBe('OPEN_URI');
 
-    // The tall cell draws the chip, centred in its full 48 dp target.
+    // A cell with room for both keeps the second line of copy and the chip.
     const tall = render(props, { width: 250, height: 200 }).light;
     expect(collectText(tall)).toEqual(['No agents waiting', 'New agent']);
     expect(
-      findElement(tall, element => element.props.clickAction === 'new-agent')?.props.style?.height
-    ).toBe(48);
+      findElement(tall, element => element.props.text === 'No agents waiting')?.props.maxLines
+    ).toBe(2);
   });
 
   it('draws every state at a small width too, zeros included', () => {

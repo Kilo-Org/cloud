@@ -99,6 +99,38 @@ describe('SessionItemSchema session_pr_link validation', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses optional headRef and headSha evidence', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_pr_link',
+      data: {
+        platform: 'github',
+        prUrl: 'https://github.com/acme/widgets/pull/42',
+        prNumber: 42,
+        headRef: 'fix/typo',
+        headSha: 'abc123',
+      },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_pr_link',
+      data: {
+        platform: 'github',
+        prUrl: 'https://github.com/acme/widgets/pull/42',
+        prNumber: 42,
+        headRef: 'fix/typo',
+        headSha: 'abc123',
+      },
+    });
+  });
+
+  it('parses a set without head evidence for older CLIs', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_pr_link',
+      data: { platform: 'github', prUrl: 'https://github.com/acme/widgets/pull/42', prNumber: 42 },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects an empty platform', () => {
     expect(
       SessionItemSchema.safeParse({

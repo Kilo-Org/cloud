@@ -273,11 +273,20 @@ function buildExpiredWidgetProps(
   );
 }
 
-/** Gallery placeholder: empty copy and no counts, with no snapshot behind it. */
+/**
+ * Gallery placeholder and no-snapshot fallback: the sign-in copy and no counts.
+ *
+ * A placed widget with no snapshot has no account behind it — a fresh install or
+ * a signed-out one — so the honest claim is "Sign in to see agents", not the
+ * generic "No work in progress", which asserts the user is signed in with an
+ * empty tray. Drawing the sign-in copy here also keeps the terminal signed-out
+ * frame (which writes the same key) and this fallback from ever disagreeing. No
+ * snapshot means no state to act on, so the placeholder offers nothing.
+ */
 export function buildGenericWidgetProps(translate: (key: string) => string): AndroidWidgetProps {
-  const empty = translate('glanceable.empty');
+  const signedOut = translate('glanceable.signedOut');
   return {
-    statusLine: empty,
+    statusLine: signedOut,
     countLines: [],
     primaryLabel: null,
     newestResultKind: null,
@@ -286,14 +295,13 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
     newestResultAgo: null,
     scheduledAgo: null,
     newestLine: null,
-    // No snapshot means no state to act on: the placeholder offers nothing.
     actions: {
       approve: false,
       newAgent: false,
       approveLabel: translate('common.approve'),
       newAgentLabel: translate('glanceable.newAgent'),
     },
-    accessibilityLabel: empty,
+    accessibilityLabel: signedOut,
   };
 }
 

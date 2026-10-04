@@ -276,6 +276,11 @@ function readSchedules(storage: FakeStorage): Record<string, StoredSchedule> | u
   return storage.map.get(SCHEDULES_KEY) as Record<string, StoredSchedule> | undefined;
 }
 
+/** Billing callbacks only: a fresh launch also schedules the orphan lease check. */
+function billingScheduleNames(storage: FakeStorage): string[] {
+  return Object.keys(readSchedules(storage) ?? {}).filter(name => name !== 'leaseExpired');
+}
+
 function readGeneration(storage: FakeStorage): string | undefined {
   const context = storage.map.get(BILLING_CONTEXT_KEY) as { generation?: string } | undefined;
   return context?.generation;
@@ -651,6 +656,54 @@ describe('ContainersBilling force destroy', () => {
   });
 });
 
+describe('ContainersBilling for an allocation that never launched', () => {
+  it('settles the admitted generation when the abandoned allocation is stopped', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await expect(admit(instance, 'standard-4')).resolves.toEqual({ success: true });
+    expect(meter.recordStartInputs).toHaveLength(1);
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+  });
+
+  it('settles the admitted generation from its lease check when no stop arrives', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-4');
+    const check = readSchedules(storage)?.leaseExpired;
+    expect(check?.payload).toEqual({});
+
+    vi.setSystemTime(check?.dueAtMs ?? 0);
+    await instance.alarm();
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+  });
+
+  it('bounds a generation kept after an uncertain admission answer', async () => {
+    const { instance, storage, meter, pendingTasks } = setup();
+    meter.startBehavior = 'reject';
+    const admission = admit(instance, 'standard-4');
+    await vi.runAllTimersAsync();
+    await expect(admission).resolves.toMatchObject({ success: false });
+    expect(readGeneration(storage)).toBeDefined();
+    const check = readSchedules(storage)?.leaseExpired;
+    expect(check).toBeDefined();
+
+    meter.startBehavior = 'ok';
+    vi.setSystemTime(check?.dueAtMs ?? 0);
+    await instance.alarm();
+    await vi.runAllTimersAsync();
+    await flushPending(pendingTasks);
+
+    expect(meter.recordStopInputs).toHaveLength(1);
+    expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
+  });
+});
+
 describe('ContainersBilling inert without persisted attribution', () => {
   it('keeps launch, same-ref reuse, stop, and pre-change records unchanged for standard-2 and lite', async () => {
     for (const instanceSize of ['standard-2', 'lite'] as const) {
@@ -661,7 +714,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
       ).resolves.toEqual({ started: true });
       expect(readRecord(storage).instance).toBe(instanceSize);
       expect(readRecord(storage).billingConfigured).toBeUndefined();
-      expect(storage.map.get(SCHEDULES_KEY)).toBeUndefined();
+      expect(billingScheduleNames(storage)).toEqual([]);
       expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
       expect(meter.recordStartInputs).toHaveLength(0);
 
@@ -693,7 +746,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
     expect(container.startCalls[0]).toMatchObject({ instance: 'standard-4' });
     expect(readRecord(storage).billingConfigured).toBeUndefined();
-    expect(storage.map.get(SCHEDULES_KEY)).toBeUndefined();
+    expect(billingScheduleNames(storage)).toEqual([]);
     expect(storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
     expect(meter.recordStartInputs).toHaveLength(0);
     await expect(instance.getBillingRuntimeStatus()).resolves.toBeUndefined();
@@ -965,7 +1018,7 @@ describe('ContainersBilling resumed launch activation', () => {
     await flushPending(resumed.pendingTasks);
 
     expect(readMeasurementStarted(first.storage)).toBe(false);
-    expect(readSchedules(first.storage)).toBeUndefined();
+    expect(billingScheduleNames(first.storage)).toEqual([]);
     expect(readRecord(first.storage).allocationRef).toBe(REF_A);
   });
 });

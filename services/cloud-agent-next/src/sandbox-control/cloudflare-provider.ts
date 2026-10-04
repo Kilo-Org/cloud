@@ -45,6 +45,11 @@ const providerRefSchema = z
     sandboxId: z.string().min(1).max(256),
     containment: z.boolean(),
     instanceId: z.string().min(1).max(128),
+    /**
+     * Cloudflare Containers only: the allocation has its own container Durable
+     * Object. Refs without it address the logical sandbox's shared one.
+     */
+    container: z.literal('allocation').optional(),
   })
   .strict();
 
@@ -123,6 +128,8 @@ export function createCloudflareProviderAdapter(deps: {
     resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
+    // `stop` destroys the logical sandbox whatever the ref's instance.
+    allocationScopedStop: false,
     ensureBillingAdmission,
     async probeWrapperProcesses(ref) {
       const parsed = decodeOwnedProviderRef(ref);

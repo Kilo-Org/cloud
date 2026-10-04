@@ -61,8 +61,11 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
   eligible root Kilo session; it does not merge modern per-session runtime authorization.
 - `messageId` is the permanent message identity. The wrapper passes it to Kilo as the user message
   ID.
-- `allocationId` identifies one physical allocation. `wrapperId` is random per wrapper process. A new
-  `wrapperId` on the same allocation means the wrapper restarted and its Kilo state is gone.
+- `allocationId` identifies one physical allocation. Every create attempt, including a retry, mints
+  a new one. On Cloudflare Containers it also names the container Durable Object, so each allocation
+  gets a fresh container and a wedged or stale one never blocks its replacement. `wrapperId` is
+  random per wrapper process. A new `wrapperId` on the same allocation means the wrapper restarted
+  and its Kilo state is gone.
 
 ## 4. Normal flow
 
@@ -233,6 +236,19 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   ladder, retaining unconfirmed evidence; no ref follows the existing failed-create transition.
   Late-create/hello fences and Vercel billing admission remain unchanged. A new message starts a fresh
   attempt when the condition clears; failed routes never automatically retry permanent errors.
+- A create attempt is abandoned when its create deadline passes without a result (for example after
+  an eviction), or when its launch fails after the allocation has moved on. A known ref of an
+  abandoned attempt gets one best-effort stop where the provider's stop reaches only that allocation
+  (Cloudflare Containers); the replacement does not wait for it. Cloudflare Sandbox stops by sandbox
+  name, and Vercel settles billing through a binding shared across allocations, so both stop only a
+  ref the allocation still owns, before the next attempt. A ref whose allocation is current but no
+  longer `creating` (a `hello` was accepted) is never stopped.
+- A Cloudflare Containers container destroys itself when its lease lapses unrenewed for the lease
+  plus one minute. The owner renews the lease while the allocation is active and stops it otherwise,
+  so this only bounds an abandoned or forgotten container, including one whose stop failed.
+  Enforced billing admission opens a generation before the launch. A stop of an allocation that
+  never launched settles that generation at once, and the same lease check settles it when no stop
+  arrives, so a fresh container per allocation leaves no open interval.
 - `stopped` is a routing state. When the stop ladder ends without provider confirmation, the stop is
   logged as unconfirmed and a later `prepare` may create again. Billing and worktree deletion do not
   read `stopped` as proof of physical stop (see below).
@@ -515,6 +531,7 @@ them through one development-only override.
 | Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
 | Sandbox DO | Credential grant | 4 h; re-issued on `deliver` below 1 h | — |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
+| Container DO (Cloudflare Containers) | Lease check | Lease plus 1 min after the last renewal | Destroy the container |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
 | Wrapper | SSE silence | 30 s | Health request |
 | Wrapper | Kilo health request | 5 s | Restart Kilo |
@@ -529,7 +546,7 @@ them through one development-only override.
 
 | Failure | Detected by | Recovery | Message effect |
 |---|---|---|---|
-| Transient provider create error | Sandbox DO | Retry after a 10 s pause, within the unchanged route deadline | Queued fail at the deadline |
+| Transient provider create error | Sandbox DO | Retry on a new allocation after a 10 s pause, within the unchanged route deadline | Queued fail at the deadline |
 | Actual compute credit denial | Provider adapter / existing Vercel billing admission | New message after adding credits | Queued fail promptly (`billing_blocked`) |
 | Proven invalid/unsupported provider configuration | Provider adapter | New message after correcting configuration | Queued fail promptly (`invalid_configuration`) |
 | Wrapper never connects | Sandbox DO, 5 min | Stop; new allocation within the route deadline | Queued fail at the deadline |
@@ -734,7 +751,11 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
 - The cause of the Kilo hang is inside Kilo and is not fixed here; the restart only recovers it.
 - A prompt frame lost when the socket breaks stays `accepted` until the next outcome or the backstop.
 - Notifications are best effort; the Session DO backstop bounds a lost one.
-- An unconfirmed provider stop is logged; the container may run until the provider stops it.
+- An unconfirmed provider stop is logged; the container may run until the provider stops it. On
+  Cloudflare Containers the lease check destroys it once its lease lapses.
+- Contained credentials are bound to the logical sandbox, not to one container. Until it is
+  destroyed, an orphaned Cloudflare Containers container can resolve the sandbox's credentials while
+  the current allocation is live.
 - A killed container is not found by polling the provider. It is a wrapper connection that does not
   return. The user waits at most the reconnect window, then the message fails `connection_lost`.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,

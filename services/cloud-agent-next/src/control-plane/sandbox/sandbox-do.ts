@@ -2531,6 +2531,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'lease':
         this.ctx.waitUntil(this.runLease());
         return;
+      case 'cleanup':
+        await this.retireCreatedRef(effect.providerRef, effect.allocationId);
+        return;
       case 'close-socket':
         await this.runCloseSocket(state);
         return;
@@ -2642,9 +2645,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         const current = await this.readAllocation();
         if (current.kind !== 'creating' || current.allocationId !== allocationId) {
-          const confirmed = await this.stopRef(createdRef, allocationId);
-          if (pin.provider === 'vercel')
-            await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
+          await this.retireCreatedRef(createdRef, allocationId);
           return;
         }
         const launchDeadline = current.createDeadlineAt ?? createDeadline;
@@ -2676,16 +2677,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;
         }
-        // N5: only clean up a container the reducer still owns. If a `hello`
-        // was accepted during a slow launch, the sandbox has an owner and must
-        // not be destroyed here.
         if (createdRef !== null) {
-          const latest = await this.readAllocation();
-          if (latest.kind === 'creating' && latest.allocationId === allocationId) {
-            const confirmed = await this.stopRef(createdRef, allocationId);
-            if (this.currentProvider() === 'vercel')
-              await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
-          }
+          await this.retireCreatedRef(createdRef, allocationId);
         }
         await this.dispatchCreateFailed(allocationId);
       }
@@ -2702,6 +2695,34 @@ export class SandboxControlV2 extends DurableObject<Env> {
       nextAllocationId: crypto.randomUUID(),
       retryAllowed: await this.retryAllowed(),
     });
+  }
+
+  /**
+   * Stop a create attempt's ref that no allocation will own. Where stop reaches
+   * only that allocation, the replacement does not wait for it. A stop that
+   * reaches the whole sandbox is awaited, so it cannot land after the next
+   * attempt's launch.
+   */
+  private async retireCreatedRef(ref: string, allocationId: string | null): Promise<void> {
+    const current = await this.readAllocation();
+    if (current.allocationId === allocationId) {
+      // N5: an accepted hello owns the ref even if launch later fails.
+      if (current.kind !== 'creating') return;
+    } else if (!this.provider.allocationScopedStop) {
+      // A whole-sandbox stop could reach the replacement allocation.
+      return;
+    }
+    const vercel = this.currentProvider() === 'vercel';
+    const retire = async (): Promise<void> => {
+      const confirmed = await this.stopRef(ref, allocationId);
+      if (vercel) await this.settleStoppedCreatedVercelRef(ref, confirmed);
+    };
+    if (!this.provider.allocationScopedStop) return retire();
+    this.ctx.waitUntil(
+      retire().catch(() => {
+        logger.withFields({ sandboxId: this.sandboxId }).warn('Abandoned sandbox cleanup failed');
+      })
+    );
   }
 
   private async stopRef(ref: string, allocationId: string | null): Promise<boolean> {
@@ -3667,10 +3688,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
         pin.configuration?.provider === 'cloudflare-containers'
           ? pin.configuration.instance
           : undefined;
+      const outboundContainerId = getManagedOutboundContainerId(pin.provider, this.env, {
+        logicalSandboxId: this.sandboxId,
+        physicalSandboxId: this.sandboxId,
+      });
       return createCloudflareContainersProviderAdapter({
         logicalSandboxId: this.sandboxId,
         allocationName,
         ...(instance === undefined ? {} : { instance }),
+        ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
         getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
       });
     }

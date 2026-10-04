@@ -129,6 +129,11 @@ export type AllocationEvent =
 
 export type AllocationEffect =
   | { type: 'create'; allocationId: string }
+  /**
+   * A create attempt was abandoned after its provider ref was known. The owner
+   * stops that ref best effort; the replacement does not wait for it.
+   */
+  | { type: 'cleanup'; allocationId: string | null; providerRef: string }
   | { type: 'stop'; stopAttempt: number }
   | { type: 'close-socket' }
   | { type: 'lease' };
@@ -144,6 +149,13 @@ export type AllocationReduction = {
 };
 
 const NO_EFFECTS: AllocationEffect[] = [];
+
+/** The effect that retires an abandoned attempt's known provider ref, if any. */
+function cleanupEffects(state: AllocationState): AllocationEffect[] {
+  return state.providerRef === null
+    ? NO_EFFECTS
+    : [{ type: 'cleanup', allocationId: state.allocationId, providerRef: state.providerRef }];
+}
 
 function maxStopAttempts(timers: SandboxTimers): number {
   return timers.providerStopLadderMs.length + 1;
@@ -284,6 +296,7 @@ export function reduceAllocation(
       if (event.retryAllowed) {
         // Nothing is in flight now, so the deadline is the retry pause; the tick
         // that reaches it starts the next attempt with a full create deadline.
+        // The failed attempt cleaned up its own ref before reporting.
         return {
           state: {
             ...state,
@@ -381,6 +394,8 @@ function reduceTick(
       if (state.createDeadlineAt === null || event.at < state.createDeadlineAt) {
         return { state, effects: NO_EFFECTS };
       }
+      // No create is in flight here (the in-flight attempt owns its deadline),
+      // so a known ref belongs to an attempt that will never report: retire it.
       if (event.retryAllowed) {
         return {
           state: {
@@ -389,10 +404,13 @@ function reduceTick(
             providerRef: null,
             createDeadlineAt: event.at + timers.providerCreateMs,
           },
-          effects: [{ type: 'create', allocationId: event.nextAllocationId }],
+          effects: [
+            ...cleanupEffects(state),
+            { type: 'create', allocationId: event.nextAllocationId },
+          ],
         };
       }
-      return { state: initialAllocationState(), effects: NO_EFFECTS };
+      return { state: initialAllocationState(), effects: cleanupEffects(state) };
     }
 
     case 'starting': {

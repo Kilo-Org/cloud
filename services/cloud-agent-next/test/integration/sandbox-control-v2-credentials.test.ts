@@ -92,6 +92,7 @@ function createFakeProvider(): FakeProvider {
     resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
+    allocationScopedStop: false,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.intents.push(intent);

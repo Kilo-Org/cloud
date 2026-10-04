@@ -275,3 +275,46 @@ describe('allocation socket close origin', () => {
     expect(effects).toEqual([]);
   });
 });
+
+describe('allocation abandoned create attempt', () => {
+  function abandoned(providerRef: string | null): AllocationState {
+    return {
+      ...initialAllocationState(),
+      kind: 'creating',
+      allocationId: 'alloc-1',
+      providerRef,
+      createDeadlineAt: 0,
+    };
+  }
+
+  it('retires the known ref when the create deadline passes and a new attempt starts', () => {
+    const { effects } = reduceAllocation(
+      abandoned('ref-1'),
+      { type: 'tick', at: 1, nextAllocationId: 'alloc-2', retryAllowed: true },
+      TIMERS
+    );
+    expect(effects).toEqual([
+      { type: 'cleanup', allocationId: 'alloc-1', providerRef: 'ref-1' },
+      { type: 'create', allocationId: 'alloc-2' },
+    ]);
+  });
+
+  it('retires the known ref when the create deadline passes with no attempt time left', () => {
+    const { state, effects } = reduceAllocation(
+      abandoned('ref-1'),
+      { type: 'tick', at: 1, nextAllocationId: 'alloc-2', retryAllowed: false },
+      TIMERS
+    );
+    expect(state).toEqual(initialAllocationState());
+    expect(effects).toEqual([{ type: 'cleanup', allocationId: 'alloc-1', providerRef: 'ref-1' }]);
+  });
+
+  it('has nothing to retire when the attempt never learned a ref', () => {
+    const { effects } = reduceAllocation(
+      abandoned(null),
+      { type: 'tick', at: 1, nextAllocationId: 'alloc-2', retryAllowed: true },
+      TIMERS
+    );
+    expect(effects).toEqual([{ type: 'create', allocationId: 'alloc-2' }]);
+  });
+});

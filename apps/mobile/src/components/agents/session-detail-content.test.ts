@@ -113,14 +113,20 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
 // The personal `agentProfiles.list` rows the header's active-profile chip
 // reads; tests set it before mounting to drive the chip's presence.
-const profileRowsState = vi.hoisted(() => ({
-  personal: [] as unknown[],
-  combined: {
-    orgProfiles: [] as unknown[],
-    personalProfiles: [] as unknown[],
-    effectiveDefaultId: null as string | null,
-  },
-}));
+const profileRowsState = vi.hoisted(() => {
+  // profileId -> `agentProfiles.get` agents, so a test can prove the session's
+  // own profile agents are the ones offered by the in-session role picker.
+  const agentsById: Record<string, unknown[]> = {};
+  return {
+    personal: [] as unknown[],
+    combined: {
+      orgProfiles: [] as unknown[],
+      personalProfiles: [] as unknown[],
+      effectiveDefaultId: null as string | null,
+    },
+    agentsById,
+  };
+});
 const routerSetParams = vi.hoisted(() => vi.fn());
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
@@ -489,6 +495,12 @@ vi.mock('@/lib/hooks/use-session-model-options', () => {
     useSessionModelOptions: () => ({ options, selectedValue: '', selectedVariant: '' }),
   };
 });
+// The retry hook owns the app-foreground/focus subscriptions and the SDK
+// transport call; its mounted suite covers that wiring, so this screen test
+// stands it in as a no-op.
+vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
+  useRemoteModelCatalogRetry: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
@@ -526,6 +538,16 @@ vi.mock('@/lib/trpc', () => ({
           queryFn: () => profileRowsState.combined,
           initialData: profileRowsState.combined,
         }),
+      },
+      get: {
+        queryOptions: (input: { profileId?: string } = {}) => {
+          const agents = profileRowsState.agentsById[input.profileId ?? ''] ?? [];
+          return {
+            queryKey: ['agentProfiles', 'get', input.profileId ?? ''],
+            queryFn: () => ({ agents }),
+            initialData: { agents },
+          };
+        },
       },
     },
     // The real context sheet resolves the "running on" row from the connected
@@ -734,6 +756,7 @@ beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   profileRowsState.personal = [];
   profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
+  profileRowsState.agentsById = {};
   openRenameModal.mockClear();
   renameModalState.isOpen = false;
   renameModalState.initialValue = '';
@@ -1210,6 +1233,71 @@ describe('session detail active-profile indicator', () => {
     // pre-load window; a fallback to the context default would surface here.
     await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
     expect(findChip(view.renderer)).toHaveLength(0);
+  });
+});
+
+function roleProfileRow(id: string, name: string, isDefault: boolean) {
+  return {
+    id,
+    name,
+    description: null,
+    isDefault,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 0,
+    commandCount: 0,
+    mcpServerCount: 0,
+    skillCount: 0,
+    agentCount: 1,
+    kiloCommandCount: 0,
+  };
+}
+
+function roleAgent(slug: string, name: string) {
+  return {
+    slug,
+    name,
+    config: { description: null, mode: 'primary' },
+  };
+}
+
+function composerCustomValues(renderer: ReactTestRenderer): string[] {
+  const composer = renderer.root.findByType('ChatComposer');
+  return (composer.props as { customOptions: { value: string }[] }).customOptions.map(
+    option => option.value
+  );
+}
+
+describe('session detail role picker profile source', () => {
+  it("offers the session profile's own custom agents, not the context default's", async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    profileRowsState.personal = [
+      roleProfileRow('p-default', 'Default', true),
+      roleProfileRow('p-recorded', 'Recorded', false),
+    ];
+    profileRowsState.agentsById = {
+      'p-default': [roleAgent('default-role', 'Default role')],
+      'p-recorded': [roleAgent('session-role', 'Session role')],
+    };
+
+    const view = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => composerCustomValues(view.renderer).includes('session-role'));
+    const values = composerCustomValues(view.renderer);
+    expect(values).toContain('session-role');
+    expect(values).not.toContain('default-role');
+  });
+
+  it("falls back to the effective default profile's agents when the session recorded none", async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    profileRowsState.personal = [roleProfileRow('p-default', 'Default', true)];
+    profileRowsState.agentsById = {
+      'p-default': [roleAgent('default-role', 'Default role')],
+    };
+
+    const view = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => composerCustomValues(view.renderer).includes('default-role'));
   });
 });
 
@@ -3709,9 +3797,9 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 
   it('states the cannot-send reason in the row with the row item typography', async () => {
-    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
-    // Read-only is a permanent fact and no status indicator competes with it,
-    // so the reason is the row's item.
+    // An empty read-only transcript keeps the composer, so its reason is the
+    // row's item.
+    const view = await mountDetails([]);
     const items = footerRowItems(view);
     expect(items).toHaveLength(1);
     const reason = items[0];
@@ -3754,23 +3842,23 @@ describe('SessionDetailContent fixed indicator row', () => {
 });
 
 describe('session detail read-only composer', () => {
-  // A read-only session keeps the composer on screen but disabled, with the
-  // reason stated above it, so the reader has an input slot instead of a
-  // transcript with nowhere to write. The continue affordance names the
-  // destination it opens rather than a bare "Continue" that reads as an
-  // in-place action.
-  it('keeps the composer mounted and disabled with the destination-named continue control', async () => {
+  // A read-only transcript has nowhere to write, so the continue section
+  // replaces the composer and states read-only once. The continue affordance
+  // names the destination it opens rather than a bare "Continue" that reads as
+  // an in-place action.
+  it('replaces the composer and send reason with the destination-named continue section', async () => {
     // The default fixture resolves `read-only` (cloud_agent_session_id NULL and
     // no live CLI presence) and this mount carries messages.
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
-    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
-    expect(composer.props.disabled).toBe(true);
-    // The reason beside send names the permanent read-only fact, not the
-    // generic "will become ready" line the resolver used to fall through to.
-    expect(composerProps(view).sendDisabledReason).toBe(i18n.t('agentChat.session.readOnly'));
-    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
-      i18n.t('agentChat.session.readOnly')
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
     );
+    // The continue section states read-only once; the footer reason row must
+    // not repeat it.
+    const readOnlyCopy = renderedTextOutsideSheet(view.renderer.root)
+      .split('\n')
+      .filter(text => text === i18n.t('agentChat.session.readOnly'));
+    expect(readOnlyCopy).toHaveLength(1);
     const continueControl = view.renderer.root.find(
       node =>
         Object.is(node.type, 'Button') &&

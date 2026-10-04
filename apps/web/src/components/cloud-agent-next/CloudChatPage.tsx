@@ -910,6 +910,15 @@ export default function CloudChatPage({
     setRequestedComposerText(current => (current?.token === token ? null : current));
   }, []);
 
+  // A read-only session mounts no ChatInput, so nothing would consume a pending
+  // request. This page outlives a `?sessionId=` change, so dropping it here
+  // stops a copy from one session replaying into the next writable composer.
+  useEffect(() => {
+    if (isReadOnly) {
+      setRequestedComposerText(null);
+    }
+  }, [isReadOnly]);
+
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
   }, [manager]);
@@ -1749,7 +1758,9 @@ export default function CloudChatPage({
                                     onRetryMessage={
                                       isCurrentSession ? handleRetryFailedMessage : undefined
                                     }
-                                    onCopyToComposer={handleCopyFailedToComposer}
+                                    onCopyToComposer={
+                                      isReadOnly ? undefined : handleCopyFailedToComposer
+                                    }
                                     onOpenPreparationDetails={handleOpenPreparationDetails}
                                   />
 

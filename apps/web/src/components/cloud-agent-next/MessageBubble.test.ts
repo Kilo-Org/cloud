@@ -302,5 +302,12 @@ describe('MessageBubble', () => {
       expect(html).toContain('aria-label="Copy to composer"');
       expect(html).not.toContain('aria-label="Retry"');
     });
+
+    it('offers retry without copy when only the retry handler is wired', () => {
+      const html = renderFailed(failed, { onCopyToComposer: undefined });
+
+      expect(html).toContain('aria-label="Retry"');
+      expect(html).not.toContain('aria-label="Copy to composer"');
+    });
   });
 });

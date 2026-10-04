@@ -86,6 +86,8 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
   const handleDownload = async (format: 'json' | 'csv') => {
     setIsDownloading(true);
     setDownloadError(null);
+    let url: string | undefined;
+    let anchor: HTMLAnchorElement | undefined;
     try {
       const file = await queryClient.fetchQuery(
         trpc.cloudAgentNextFailures.exportSessionDiagnostics.queryOptions({
@@ -94,17 +96,17 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
         })
       );
       const blob = new Blob([file.content], { type: file.contentType });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
+      url = URL.createObjectURL(blob);
+      anchor = document.createElement('a');
       anchor.href = url;
       anchor.download = file.fileName;
       document.body.appendChild(anchor);
       anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
     } catch {
       setDownloadError('Could not prepare the diagnostics file. Try again.');
     } finally {
+      anchor?.remove();
+      if (url) URL.revokeObjectURL(url);
       setIsDownloading(false);
     }
   };

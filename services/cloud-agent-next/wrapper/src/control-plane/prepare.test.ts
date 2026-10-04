@@ -9,6 +9,7 @@ import type {
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
+import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
 import * as processUtils from '../utils.js';
@@ -55,6 +56,7 @@ type Harness = {
   manager: ReturnType<typeof createPreparationManager>;
   frames: ControlPlaneWrapperFrame[];
   logs: string[];
+  nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }>;
   gitCalls: string[][];
   authorCalls: Array<{ name: string; email: string } | undefined>;
   ensureCalls: () => number;
@@ -94,6 +96,7 @@ function createHarness(
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
   const logs: string[] = [];
+  const nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }> = [];
   const gitCalls: string[][] = [];
   const authorCalls: Array<{ name: string; email: string } | undefined> = [];
   const ensureInputs: EnsureInput[] = [];
@@ -159,6 +162,7 @@ function createHarness(
     timers: activeTimers,
     emit: frame => frames.push(frame),
     log: message => logs.push(message),
+    onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     runtimes,
     inheritedEnv: {},
     homeRoot: '/tmp/prepare-test-homes',
@@ -205,6 +209,7 @@ function createHarness(
     manager,
     frames,
     logs,
+    nativeDiagnostics,
     gitCalls,
     authorCalls,
     ensureCalls: () => ensureCalls,
@@ -690,6 +695,14 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec);
 
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'checkout' });
+    const checkoutLine = harness.nativeDiagnostics.find(
+      entry =>
+        entry.event === 'wrapper.lifecycle' &&
+        entry.fields.phase === 'prepare_failed' &&
+        entry.fields.preparationStep === 'checkout'
+    );
+    expect(checkoutLine).toBeDefined();
+    expect(checkoutLine?.fields).not.toHaveProperty('detail');
   });
 
   it('reports a Kilo session timeout with the kilo_import_timeout subtype', async () => {
@@ -704,6 +717,83 @@ describe('createPreparationManager', () => {
       step: 'kilo_session',
       subtype: 'kilo_import_timeout',
     });
+    // The native owner line carries the closed step and subtype, never the error text.
+    expect(harness.nativeDiagnostics).toContainEqual({
+      event: 'wrapper.lifecycle',
+      fields: {
+        phase: 'prepare_failed',
+        preparationStep: 'kilo_session',
+        subtype: 'kilo_import_timeout',
+      },
+    });
+  });
+
+  it('projects one session_ready line per ready emit, with the session id and no directory', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    const first = harness.nativeDiagnostics.filter(
+      entry => entry.event === 'wrapper.lifecycle' && entry.fields.phase === 'session_ready'
+    );
+    expect(first).toEqual([
+      { event: 'wrapper.lifecycle', fields: { phase: 'session_ready', sessionId: spec.sessionId } },
+    ]);
+    expect(JSON.stringify(first[0]?.fields)).not.toContain(spec.directory);
+
+    // A re-prepare ready is a new line, not a latched one.
+    await harness.manager.prepare({ ...spec, attemptId: 'attempt-2' });
+    const ready = harness.nativeDiagnostics.filter(entry => entry.fields.phase === 'session_ready');
+    expect(ready).toHaveLength(2);
+    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'prepare_failed')).toBe(
+      false
+    );
+  });
+
+  it('does not emit session_ready when prepare fails', async () => {
+    const harness = createHarness();
+    harness.setGit(args =>
+      args[0] === 'checkout' ? result(128, 'fatal: checkout failed') : result(0)
+    );
+    await harness.manager.prepare(
+      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, branch: 'main' })
+    );
+    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'session_ready')).toBe(
+      false
+    );
+    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'prepare_failed')).toBe(
+      true
+    );
+  });
+
+  it('reports preparingCount and sessionCount from the owner maps', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec();
+    expect(harness.manager.preparingCount()).toBe(0);
+    expect(harness.manager.sessionCount()).toBe(0);
+
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    expect(harness.manager.isPreparing()).toBe(true);
+    expect(harness.manager.preparingCount()).toBe(1);
+    expect(harness.manager.sessionCount()).toBe(0);
+
+    resume.resolve();
+    await running;
+    expect(harness.manager.isPreparing()).toBe(false);
+    expect(harness.manager.preparingCount()).toBe(0);
+    // An idle prepared session still counts.
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
+    expect(harness.manager.sessionCount()).toBe(1);
+
+    harness.manager.release(spec.sessionId);
+    expect(harness.manager.sessionCount()).toBe(0);
   });
 
   it('does not publish silent setup command bodies containing inline credentials', async () => {

@@ -492,6 +492,21 @@ exit it restarts the wrapper with 1 s to 30 s backoff, at most 5 times in 10 min
 ends the loop. If the loop gives up, the Sandbox DO `starting` or `disconnected` timer stops the
 sandbox.
 
+The provider launch command is not the only starter. On the native Cloudflare Containers runtime the
+container main process is the supervisor: `start()` is issued with `['/bin/sh', supervisor-path]` as
+its entrypoint, and PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation, bounded by the
+wrapper readiness deadline. PID 1 identity is not wrapper readiness: the wrapper socket and the
+Sandbox DO `starting` timer stay the readiness owner, and no provider poll or wrapper-child probe is
+added for that path. Sandbox SDK and Vercel still exec the supervisor against a living PID 1.
+
+A native attempt that already issued the main process does not start another supervisor when that
+process is gone; the persisted `exec_pending` fence is not reset, and the next allocation may start a
+new one. Native supervisor exit stops the container, and the Sandbox DO timer still owns stop.
+Operational stderr (including the supervisor script's native-gated JSON lines) is native-only and is
+not a substitute for the R2 file archive or the diagnostic upload. It also carries the wrapper's
+periodic 60 s status line and its normal prepare/outcome/start/exit transitions; those are
+native-only and are not an upload substitute either.
+
 ## 8. Timers
 
 Each timer has one owner. All values live in one constants module per side. Local E2E may shorten

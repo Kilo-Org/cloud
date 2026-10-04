@@ -2,11 +2,14 @@ import {
   CONTROL_LOG_MAX_BATCH_BYTES,
   CONTROL_LOG_MAX_BATCH_RECORDS,
   CONTROL_LOG_MAX_BUFFER_RECORDS,
+  controlUploadFailureStartsEpisode,
   createControlDiagnosticRecord,
   type ControlDiagnosticReporter,
+  type ControlDiagnosticProjector,
   type ControlDiagnosticRecord,
   type ControlLogBatch,
   type ControlLogUploadResult,
+  type ControlUploadFailureSample,
 } from '../../../src/shared/control-diagnostics.js';
 
 export type ControlDiagnostics = {
@@ -24,6 +27,7 @@ type Options = {
   now?: () => number;
   intervalMs?: number;
   uploadTimeoutMs?: number;
+  projector?: ControlDiagnosticProjector;
 };
 
 type PendingBatch = { id: string; body: string; sequence: number; attempts: number };
@@ -79,6 +83,7 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
   let droppedTerminalRecords = 0;
   let uploadFailures = 0;
   let lastUploadFailure: ControlDiagnosticRecord | undefined;
+  let lastUploadFailureSample: ControlUploadFailureSample | undefined;
   let sequence = 0;
   let pending: PendingBatch | undefined;
   let active: Promise<void> | undefined;
@@ -126,6 +131,12 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
 
   const onDiagnostic: ControlDiagnosticReporter = (event, fields) => {
     try {
+      // Native stderr is projected before the upload gate closes, so a lifecycle
+      // line after a 401/403 still appears. `control.upload` is exempt: the
+      // archive owner projects it under its own latch, and the diagnostic
+      // uploader does so in `reportUploadResult`, so projecting it here would
+      // duplicate the line.
+      if (event !== 'control.upload') options.projector?.(event, fields);
       if (!accepting) return;
       const record = createControlDiagnosticRecord(event, fields, now());
       if (!record) {
@@ -147,15 +158,14 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
     try {
       const accepted = category === 'accepted';
       if (!accepted) uploadFailures = Math.min(Number.MAX_SAFE_INTEGER, uploadFailures + 1);
+      const safeStatusCode =
+        statusCode !== undefined && statusCode >= 100 && statusCode <= 599 ? statusCode : undefined;
       const record = createControlDiagnosticRecord(
         'control.upload',
         {
           phase: accepted ? 'completed' : 'failed',
           category,
-          statusCode:
-            statusCode !== undefined && statusCode >= 100 && statusCode <= 599
-              ? statusCode
-              : undefined,
+          statusCode: safeStatusCode,
           sequence: batch.sequence,
           attempt: batch.attempts,
           failureCount: uploadFailures,
@@ -165,12 +175,34 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
       if (!record) return;
       if (!accepted) {
         lastUploadFailure = record;
+        const sample: ControlUploadFailureSample = {
+          category,
+          ...(safeStatusCode === undefined ? {} : { statusCode: safeStatusCode }),
+        };
+        if (
+          options.projector?.enabled &&
+          controlUploadFailureStartsEpisode(lastUploadFailureSample, sample)
+        ) {
+          options.projector('control.upload', {
+            phase: 'failed',
+            category,
+            statusCode: safeStatusCode,
+            sequence: batch.sequence,
+            attempt: batch.attempts,
+            failureCount: uploadFailures,
+          });
+        }
+        lastUploadFailureSample = sample;
       } else {
         if (lastUploadFailure) bufferRecord(lastUploadFailure);
         lastUploadFailure = undefined;
+        lastUploadFailureSample = undefined;
         uploadFailures = 0;
       }
-      console.error(JSON.stringify(record));
+      // The Sandbox SDK and Vercel control-plane wrapper share this module and
+      // keep the per-attempt console line; only the native gate switches it to
+      // the projector.
+      if (!options.projector?.enabled) console.error(JSON.stringify(record));
     } catch {
       return;
     }

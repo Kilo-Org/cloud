@@ -31,6 +31,8 @@ export type ControlPlaneTerminalRuntime = {
    * abandoned terminal does not pin the sandbox awake.
    */
   hasRecentInput(): boolean;
+  /** Attached sessions with input inside that same window, for the status line. */
+  recentInputCount(): number;
   handle(frame: ControlPlaneTerminalRequestFrame): Promise<ControlPlaneWrapperFrame>;
   shutdown(): void;
 };
@@ -148,12 +150,17 @@ export function createControlPlaneTerminals(options: {
     await runtime.detachDirectory(directory);
   }
 
-  function hasRecentInput(): boolean {
+  function recentInputCount(): number {
     const now = Date.now();
+    let count = 0;
     for (const at of inputAt.values()) {
-      if (now - at < TERMINAL_INPUT_WINDOW_MS) return true;
+      if (now - at < TERMINAL_INPUT_WINDOW_MS) count += 1;
     }
-    return false;
+    return count;
+  }
+
+  function hasRecentInput(): boolean {
+    return recentInputCount() > 0;
   }
 
   async function handle(
@@ -205,6 +212,7 @@ export function createControlPlaneTerminals(options: {
     forgetSession,
     detachDirectory,
     hasRecentInput,
+    recentInputCount,
     handle,
     shutdown: () => runtime.shutdown(),
   };

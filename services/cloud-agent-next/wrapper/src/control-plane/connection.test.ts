@@ -347,6 +347,33 @@ describe('createControlPlaneConnection', () => {
     }
   });
 
+  it('snapshots the live phase, attempt and outbox bytes without a url or credential', async () => {
+    const sandbox = createFakeSandbox();
+    sandbox.setMode('reject');
+    const connection = await connect(sandbox, {
+      timers: timerOverrides({ reconnectBackoffMinMs: 5, reconnectBackoffMaxMs: 15 }),
+    });
+    try {
+      connection.send({
+        type: 'session.outcome',
+        sessionId: 'session-1',
+        status: 'completed',
+        lastMessageId: 'message-1',
+      });
+      await waitFor(() => sandbox.attempts() >= 1);
+      const snapshot = connection.snapshot();
+      expect(snapshot.phase).not.toBe('connected');
+      expect(snapshot.attempt).toBeGreaterThanOrEqual(1);
+      expect(snapshot.outboxBytes).toBeGreaterThan(0);
+      expect(snapshot).not.toHaveProperty('url');
+      expect(snapshot).not.toHaveProperty('credential');
+      expect(JSON.stringify(snapshot)).not.toContain('secret-credential');
+    } finally {
+      connection.close();
+      sandbox.stop();
+    }
+  });
+
   it('sends hello, accepts welcome and handles shutdown', async () => {
     const sandbox = createFakeSandbox();
     const shutdowns: Array<string | undefined> = [];

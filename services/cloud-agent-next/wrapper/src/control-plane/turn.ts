@@ -1,14 +1,15 @@
 import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
 import {
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
+  controlPlaneFailureReasonSchema,
   type ControlPlaneAnswerReply,
   type ControlPlaneOutcome,
   type ControlPlanePromptPayload,
   type ControlPlaneRouteSpec,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
+import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
 import {
@@ -57,6 +58,8 @@ export type TurnManagerDeps = {
   runtimes: { get(key: string): TurnKiloRuntime | undefined };
   log?: (message: string) => void;
   onDiagnostic?: ControlDiagnosticReporter;
+  /** The one native projector, for the normal `session_outcome` transition. */
+  onNativeDiagnostic?: ControlDiagnosticReporter;
   now?: () => number;
   scheduler?: TurnScheduler;
   materializeAttachments?: typeof materializeMessageAttachments;
@@ -284,6 +287,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
         ? {}
         : { providerOwnership: facts.providerOwnership }),
       lastMessageId,
+    });
+    // Closed native record for every status. `outcomeReason` is the parsed
+    // failure enum only; an assistant `safeMessage` does not parse and is never
+    // copied. `assistantReason` stays on the socket frame.
+    const outcomeReason = controlPlaneFailureReasonSchema.safeParse(reason);
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'session_outcome',
+      status,
+      sessionId: turn.route.sessionId,
+      ...(outcomeReason.success ? { outcomeReason: outcomeReason.data } : {}),
     });
     resetTurn(turn.route.sessionId);
     maybeApplyPendingCredentials(turn.route.runtimeKey);
@@ -910,6 +923,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return matched;
   }
 
+  /** Turns not waiting on the user; the heartbeat and the status line share it. */
+  function activeTurnCount(): number {
+    let count = 0;
+    for (const turn of turns.values()) {
+      if (turn.waitingSince !== null) continue;
+      count += 1;
+    }
+    return count;
+  }
+
   return {
     canRestartRuntime,
 
@@ -1075,12 +1098,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     isActive(): boolean {
-      for (const turn of turns.values()) {
-        if (turn.waitingSince !== null) continue;
-        return true;
-      }
-      return false;
+      return activeTurnCount() > 0;
     },
+
+    activeTurnCount,
 
     tick,
 

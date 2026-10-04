@@ -82,6 +82,7 @@ async function checkDirectBYOK(
       responseTransforms: null,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
+        delete context.request.body.provider;
         directByok.transformRequest(context);
       },
     } satisfies Provider,

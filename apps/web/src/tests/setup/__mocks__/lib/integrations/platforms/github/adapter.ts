@@ -85,6 +85,10 @@ export type AssociatedPullRequest = {
   title: string;
   headSha: string;
   updatedAt: string;
+  baseRepoFullName?: string;
+  headRepoFullName?: string;
+  headRef?: string;
+  commitShas?: string[];
 };
 
 export class GitHubRateLimitError extends Error {
@@ -94,6 +98,40 @@ export class GitHubRateLimitError extends Error {
     this.name = 'GitHubRateLimitError';
     this.resetAt = resetAt;
   }
+}
+
+export async function fetchPullRequestByNumber(_params: {
+  installationId: number;
+  owner: string;
+  repo: string;
+  number: number;
+  appType: GitHubAppType;
+  includeCommits?: boolean;
+  expectedHeadSha?: string | null;
+}): Promise<AssociatedPullRequest | null> {
+  return null;
+}
+
+/**
+ * Representative PR payload shape including the identity fields added for
+ * session-to-PR link verification. Tests that need `fetchPullRequestByNumber`
+ * to return a PR can spread this instead of re-declaring every field.
+ */
+export function mockAssociatedPullRequest(
+  overrides: Partial<AssociatedPullRequest> = {}
+): AssociatedPullRequest {
+  return {
+    number: 1,
+    htmlUrl: 'https://github.com/mock-owner/mock-repo/pull/1',
+    state: 'open',
+    title: 'Mock PR',
+    headSha: 'mock-head-sha',
+    updatedAt: '2099-01-01T00:00:00.000Z',
+    baseRepoFullName: 'mock-owner/mock-repo',
+    headRepoFullName: 'mock-owner/mock-repo',
+    headRef: 'mock-branch',
+    ...overrides,
+  };
 }
 
 export type ReviewDecision = 'approved' | 'changes_requested' | 'review_required';

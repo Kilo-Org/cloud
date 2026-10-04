@@ -430,6 +430,26 @@ index 55fb9b3..e13e8ea 100644
      ) {
        if let label = props.label {
          if let systemImage = props.systemImage {
+diff --git a/ios/Widgets/TimelineProvider.swift b/ios/Widgets/TimelineProvider.swift
+--- a/ios/Widgets/TimelineProvider.swift
++++ b/ios/Widgets/TimelineProvider.swift
+@@ -30,6 +30,16 @@ public struct WidgetsTimelineProvider: TimelineProvider {
+     }
+ 
+     let entries = parseTimeline(identifier: groupIdentifier, name: name, family: context.family)
++    // WidgetKit rejects an empty timeline ("Returned view collection was
++    // either nil or empty"), and a placed widget then shows an error. Until the
++    // app writes a timeline, render the layout once with no props, the same
++    // entry `placeholder` and `getSnapshot` use.
++    // The app reloads the widget when it writes a timeline.
++    if entries.isEmpty {
++      let fallback = WidgetsTimelineEntry(date: Date(), name: name, props: nil, entryIndex: nil)
++      completion(Timeline<WidgetsTimelineEntry>(entries: [fallback], policy: .never))
++      return
++    }
+ 
+     let timeline = Timeline<WidgetsTimelineEntry>(entries: entries, policy: .atEnd)
+     completion(timeline)
 diff --git a/ios/Widgets/Utils.swift b/ios/Widgets/Utils.swift
 index 2b4c044..e5a0b1e 100644
 --- a/ios/Widgets/Utils.swift

@@ -1199,6 +1199,38 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
     });
 
+    it.each([
+      ['stored head ref', { pr_head_ref: 'feature/other-branch' }],
+      ['session branch', { git_branch: 'feature/other-branch' }],
+    ])(
+      'does not verify a matching head SHA when the %s names another branch',
+      async (_label, contradiction) => {
+        const branch = 'feature/contradicting-ref';
+        const headSha = 'sha-711';
+        // The head SHA matches, but refresh would reject this link because a
+        // stored ref names another branch, so the webhook must not verify it.
+        const sessionId = await seedSession({
+          branch,
+          owner: testOwner,
+          prNumber: 711,
+          prHeadSha: headSha,
+        });
+        await db
+          .update(cli_sessions_v2)
+          .set(contradiction)
+          .where(eq(cli_sessions_v2.session_id, sessionId));
+
+        const written = await upsertCliSessionPullRequestsFromWebhook(
+          makePayload({ action: 'opened', prNumber: 711, state: 'open', headRef: branch, headSha }),
+          testOwner
+        );
+
+        expect(written).toBe(0);
+        expect(await sessionVerifiedAt(sessionId)).toBeNull();
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+      }
+    );
+
     it('verifies a session on a platform outside the old review-decision set', async () => {
       const branch = 'feature/platform-agnostic-gate';
       // `cli`, `vscode` and `agent-manager` sessions surface the PR badge but

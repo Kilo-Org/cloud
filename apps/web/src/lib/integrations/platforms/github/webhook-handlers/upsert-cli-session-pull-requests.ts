@@ -89,6 +89,11 @@ function tenantPredicateForOwner(owner: WebhookInstallationOwner) {
  *   - the session stored neither head field (pre-headRef CLI) and its
  *     `git_branch` equals the payload head ref.
  *
+ * In every case a stored `pr_head_ref` or `git_branch` that names another
+ * branch than the payload head ref blocks the match. This is the same rule as
+ * `verifySessionPullRequestLink`, so a link the webhook verifies is never
+ * revoked by the next refresh.
+ *
  * A branch name (with repo and tenant) is never on its own enough: a PR opened
  * by someone else on a reused branch name does not carry this session's PR
  * number and does not match.
@@ -128,12 +133,25 @@ export async function markSessionsVerifyingPullRequest(
       : sql`false`
   );
 
+  // A stored head ref or session branch that contradicts the payload head ref
+  // rejects the session, and at least one of them must name the payload head
+  // ref, as `verifySessionPullRequestLink` requires on refresh.
+  const noContradictingRef =
+    payloadHeadRef !== null
+      ? and(
+          or(isNull(cli_sessions_v2.pr_head_ref), eq(cli_sessions_v2.pr_head_ref, payloadHeadRef)),
+          or(isNull(cli_sessions_v2.git_branch), eq(cli_sessions_v2.git_branch, payloadHeadRef)),
+          or(isNotNull(cli_sessions_v2.pr_head_ref), isNotNull(cli_sessions_v2.git_branch))
+        )
+      : sql`false`;
+
   const candidatePredicate = and(
     eq(cli_sessions_v2.git_url, evidence.gitUrl),
     eq(cli_sessions_v2.pr_number, evidence.prNumber),
     isNotNull(cli_sessions_v2.pr_url),
     tenantPredicateForOwner(owner),
-    headEvidence
+    headEvidence,
+    noContradictingRef
   );
 
   // The stored link itself must name this PR: a `pr_url` on another repository

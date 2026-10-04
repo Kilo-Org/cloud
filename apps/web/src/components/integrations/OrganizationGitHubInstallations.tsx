@@ -583,7 +583,7 @@ function InstallationModelSettings({
         placeholder="Select a model"
         triggerAriaLabel={`AI model for ${accountName}`}
       />
-      {availableVariants.length > 0 && (
+      {availableVariants.length > 0 || selectedEffort ? (
         <div className="space-y-2">
           <Label>Thinking Effort</Label>
           <Select
@@ -601,13 +601,18 @@ function InstallationModelSettings({
                   {thinkingEffortLabel(variant)}
                 </SelectItem>
               ))}
+              {selectedEffort && !availableVariants.includes(selectedEffort) && (
+                <SelectItem value={selectedEffort}>
+                  {thinkingEffortLabel(selectedEffort)} (unavailable for this model)
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
           <p className="text-muted-foreground text-sm">
             Configure the model&apos;s reasoning intensity
           </p>
         </div>
-      )}
+      ) : null}
       <div className="flex justify-end">
         <Button
           size="sm"

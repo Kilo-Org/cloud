@@ -440,12 +440,11 @@ export const githubAppsRouter = createTRPCRouter({
           actor_id: ctx.user.id,
           actor_email: ctx.user.google_user_email,
           actor_name: ctx.user.google_user_name,
-          message: input.integrationId
-            ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}` +
-              (input.thinkingEffort === undefined
-                ? ''
-                : ` with thinking effort ${input.thinkingEffort ?? 'default'}`)
-            : `Updated GitHub App integration model to ${input.modelSlug}`,
+          message:
+            `Updated GitHub App integration model to ${input.modelSlug}` +
+            (input.thinkingEffort === undefined
+              ? ''
+              : ` with thinking effort ${input.thinkingEffort ?? 'default'}`),
         });
       }
 

@@ -3,18 +3,19 @@ import { Pressable, View } from 'react-native';
 
 import {
   countGlanceableSessions,
+  glanceableStatusKind,
   type GlanceableStatusKind,
-  newestGlanceableResult,
   soonestScheduledAt,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { pickNewestSession } from '@/lib/glanceable/newest-session';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -35,13 +36,13 @@ const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] =
  * occupies the exact box the card will. Every row is a fixed height rather than
  * sized to its text, so a longer count label or a scheduled wake cannot move a
  * row: 4 heights of 6 + 3 gaps of 2 + 3 padding = 144, a 1px divider, then a
- * 68px newest block.
+ * 68px newest block whose two 20px lines sit vertically centered.
  */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'gap-2 px-4 py-3';
 const COUNT_ROW_CLASS = 'h-6 flex-row items-center gap-2';
 const DIVIDER_CLASS = 'h-px bg-border';
-const NEWEST_BLOCK_CLASS = 'h-[68px] gap-1 px-4 py-3';
+const NEWEST_BLOCK_CLASS = 'h-[68px] justify-center gap-1 px-4';
 const NEWEST_ROW_CLASS = 'h-5 flex-row items-center gap-2';
 
 function labelKeyFor(kind: GlanceableStatusKind): string {
@@ -72,15 +73,20 @@ export function GlanceableActiveCard({
   const primaryKind = COUNT_LINES.find(line => counts[line.kind] > 0)?.kind ?? null;
   const scheduledAt = soonestScheduledAt(sessions);
   const scheduledWake = scheduledAt === null ? null : formatScheduledWake(scheduledAt);
-  const newest = newestGlanceableResult(sessions);
-  const newestSession =
-    newest === null
-      ? null
-      : (sessions.find(session => session.statusUpdatedAt === newest.at) ?? null);
+  // The widgets name the same session (`pickNewestSession`), and any live
+  // session fills the block: an untitled one reads as the list rows'
+  // untitled label, and a row with no time drops only the age.
+  const newest = pickNewestSession(sessions);
+  const newestSession = newest?.row ?? null;
+  const newestKind = newestSession === null ? null : glanceableStatusKind(newestSession.status);
   const newestTitle =
-    newestSession === null ? null : (sessionDisplayTitle(newestSession.title) ?? null);
-  const newestAge = newest === null ? null : timeAgo(parseTimestamp(newest.at), undefined, now);
-  const stateLabel = newest === null ? null : t(labelKeyFor(newest.kind));
+    newestSession === null
+      ? null
+      : (namedSessionTitle(newestSession.title, newestSession.id) ??
+        t('agents.sessionRow.untitled'));
+  const stateLabel = newestKind === null ? null : t(labelKeyFor(newestKind));
+  const newestAt = newest?.at ?? null;
+  const newestAge = newestAt === null ? null : timeAgo(parseTimestamp(newestAt), undefined, now);
   const newestLabel = [newestTitle, stateLabel, newestAge].filter(Boolean).join(', ');
 
   return (
@@ -118,24 +124,23 @@ export function GlanceableActiveCard({
         className="active:opacity-70"
       >
         <View className={NEWEST_BLOCK_CLASS}>
-          {newestTitle !== null ? (
-            <View className="h-5 justify-center">
-              <Text className="text-sm text-foreground" numberOfLines={1}>
-                {t('glanceable.newestSession', { title: newestTitle })}
-              </Text>
-            </View>
-          ) : null}
-          {newest !== null && stateLabel !== null ? (
-            <View className={NEWEST_ROW_CLASS}>
-              <Text className="text-xs text-muted-foreground">{t('glanceable.newestResult')}</Text>
-              <SessionStatusIcon kind={newest.kind} />
-              <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                {stateLabel}
-              </Text>
-              {newestAge !== null ? (
-                <Text className="ml-auto text-xs text-muted-foreground">{newestAge}</Text>
-              ) : null}
-            </View>
+          {newestTitle !== null && newestKind !== null ? (
+            <>
+              <View className="h-5 justify-center">
+                <Text className="text-sm text-foreground" numberOfLines={1}>
+                  {newestTitle}
+                </Text>
+              </View>
+              <View className={NEWEST_ROW_CLASS}>
+                <SessionStatusIcon kind={newestKind} />
+                <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
+                  {stateLabel}
+                </Text>
+                {newestAge !== null ? (
+                  <Text className="ml-auto text-xs text-muted-foreground">{newestAge}</Text>
+                ) : null}
+              </View>
+            </>
           ) : null}
         </View>
       </Pressable>

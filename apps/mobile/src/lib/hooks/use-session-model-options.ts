@@ -93,6 +93,20 @@ export function buildSessionModelOptions(
 ): SessionModelOptions {
   if (input.activeSessionType === 'remote') {
     if (input.remoteModelState.protocol === 'v1' && input.remoteModelState.catalog) {
+      // A v1 catalog with zero models is an empty answer (the CLI replied
+      // before its model list was ready, or a late/absent response), and must
+      // not become an enabled, zero-option picker whose sheet shows "No models
+      // available". Count models, not providers: the wire schema allows a
+      // connected provider with an empty `models` record, which projects to
+      // zero options. Route either shape through the unavailable projection
+      // instead, so the chip stays loading/disabled for the whole retry window.
+      // A populated catalog is unchanged.
+      const hasModel = input.remoteModelState.catalog.providers.some(
+        provider => provider.models.length > 0
+      );
+      if (!hasModel) {
+        return buildUnavailableRemoteOptions(input);
+      }
       return buildCliCatalogOptions(input);
     }
     if (input.remoteModelState.protocol === 'legacy') {

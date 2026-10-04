@@ -62,13 +62,12 @@ export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT
  * caller's choice stays last and wins on both platforms and in both
  * directions.
  *
- * A `multiline` caller is a different control: it keeps only its own line
- * height/min-height (an explicit `leading-*` and `min-h-*`), while the shared
- * multiline inset (`px-3 py-2.5`) supplies its padding, and it keeps its own
- * `textAlignVertical`, so neither the shared single-line box nor the forced
- * vertical alignment applies. As with the single-line shape, the inset comes
- * before the caller's `className`, so a call site's own `px-*`/`py-*` still
- * wins through tailwind-merge.
+ * A `multiline` caller is a different control: it keeps its own box (an
+ * explicit `leading-*`) and its own `textAlignVertical`, and keeps its own
+ * `numberOfLines` (no default is applied), so neither the shared box nor the
+ * forced vertical alignment applies. A single-line caller is pinned to
+ * `numberOfLines={1}`, so the placeholder and the value cannot wrap to a second
+ * line and shift the text off the box's vertical centre.
  */
 function Input({
   className,
@@ -77,6 +76,7 @@ function Input({
   placeholderTextColor,
   multiline,
   textAlignVertical,
+  numberOfLines,
   ...props
 }: Readonly<TextInputProps & React.RefAttributes<TextInput>>) {
   const colors = useThemeColors();
@@ -89,6 +89,7 @@ function Input({
     <TextInput
       {...props}
       multiline={multiline}
+      numberOfLines={multiline ? numberOfLines : 1}
       className={cn(
         multiline ? INPUT_MULTILINE_INSET_CLASS : INPUT_BOX_SHAPE_CLASS,
         className,

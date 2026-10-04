@@ -198,6 +198,10 @@ class FakeContainer {
   startBehavior: StartBehavior = 'ok';
   execHandler: (cmd: string[]) => ExecProcess = () => execProcess(0);
 
+  setInactivityTimeout(_ms: number | bigint): Promise<void> {
+    return Promise.resolve();
+  }
+
   start(options?: ContainerStartupOptions): void {
     this.startCalls.push(options as ContainerStartupOptions);
     if (this.startBehavior === 'reject') throw new Error('container start failed');

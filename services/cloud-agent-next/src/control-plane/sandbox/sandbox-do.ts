@@ -2838,7 +2838,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.provider.ensureLeaseAtLeast(state.providerRef, this.sandboxTimers().providerLeaseMs),
       this.sandboxTimers().providerStopAttemptMs,
       'Sandbox lease renewal timed out'
-    ).catch(() => undefined);
+    ).catch(error => {
+      logControlDiagnostic(
+        'lease_renewal_failed',
+        {
+          allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+          allocationId: state.allocationId,
+          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+        },
+        'warn'
+      );
+    });
   }
 
   private async runCloseSocket(state: AllocationState): Promise<void> {

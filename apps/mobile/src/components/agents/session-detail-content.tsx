@@ -1773,12 +1773,15 @@ export function SessionDetailContent({
     cloudStatus,
     messageCount: messages.length,
   });
+  // A read-only transcript ends in the continue section, which states the
+  // read-only fact once and replaces the composer and its send reason.
+  const isReadOnlyTranscript = isReadOnly && messages.length > 0;
   const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
     hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
-    hasSendReason: sendDisabledReason !== null,
+    hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
     messageCount: messages.length,
   });
 
@@ -1875,16 +1878,17 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
-  // The composer stays mounted for every session. A read-only session keeps it
-  // on screen but disabled, with the reason stated above it, so the reader has
-  // a stable input slot and the continue affordance names its destination.
+  // The composer stays mounted for every writable session. A read-only
+  // transcript replaces it with the continue section, which names the
+  // destination it opens.
   // The bottom BlurBar reserves the composer's space and shares its visibility
-  // condition, so a blocking card that hides the composer never leaves the bar
+  // condition, so a blocking card or the continue section never leaves the bar
   // claiming space the composer does not fill. The strip is a pure full-bleed
   // background/spacer: it hosts no controls, so it deliberately carries no
   // horizontal safe-area padding — the composer's own content clears the
   // landscape sensor insets.
-  const isComposerVisible = !hasBlockingInteraction;
+  const isComposerVisible = !hasBlockingInteraction && !isReadOnlyTranscript;
+  const isReadOnlyContinueVisible = isReadOnlyTranscript && !hasBlockingInteraction;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2272,7 +2276,10 @@ export function SessionDetailContent({
               <View style={{ height: bottom }} />
             </BlurBar>
           ) : (
-            <View style={{ height: bottom }} className="bg-background" />
+            <View
+              style={{ height: bottom }}
+              className={isReadOnlyContinueVisible ? 'bg-secondary' : 'bg-background'}
+            />
           )}
 
           {sheetMountState.mounted ? (
@@ -2495,7 +2502,7 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
+        {isReadOnlyContinueVisible ? (
           <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
               {t('agentChat.session.readOnly')}
@@ -2511,72 +2518,74 @@ export function SessionDetailContent({
           </View>
         ) : null}
 
-        <View
-          className={cn(hasBlockingInteraction && 'hidden')}
-          accessibilityElementsHidden={hasBlockingInteraction}
-          importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
-        >
-          {exitFailure ? (
-            <Animated.View
-              entering={FadeIn.duration(200)}
-              exiting={FadeOut.duration(150)}
-              layout={LinearTransition.duration(150)}
-            >
-              <RemoteSessionExitFailure
-                message={exitFailure.message}
-                onRetry={handleRetryExit}
-                isRetrying={isRetryingExit}
-              />
-            </Animated.View>
-          ) : null}
-          <ModelPickerSelectionScopeProvider
-            selectionScope={modelPickerSelectionScope}
-            isSelectionCurrent={isModelPickerSelectionCurrent}
+        {isReadOnlyTranscript ? null : (
+          <View
+            className={cn(hasBlockingInteraction && 'hidden')}
+            accessibilityElementsHidden={hasBlockingInteraction}
+            importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
           >
-            <ChatComposer
-              key={`${composerAccount.epoch}:${sessionId}`}
-              onSend={handleSend}
-              onSendCommand={handleSendCommand}
-              onCreateSession={handleCreateSession}
-              onRestartSession={handleRestartSession}
-              onExitSession={handleExitSession}
-              onStop={handleStop}
-              disabled={isComposerDisabled}
-              sendDisabled={!canSend}
-              sendDisabledReason={sendDisabledReason}
-              isStreaming={isStreaming}
-              placeholder={composerPlaceholder}
-              mode={currentMode}
-              onModeChange={handleModeChange}
-              model={displayModel}
-              variant={displayVariant}
-              modelOptions={modelOptionsForToolbar}
-              customOptions={customOptions}
-              modelLocked={modelLocked}
-              modelLockLabel={pinned.agentName}
-              onModelSelect={handleModelSelect}
-              organizationId={organizationId}
-              attachmentsEnabled={supportsAttachments}
-              activeSessionType={activeSessionType}
-              commands={availableCommands}
-              commandCatalogStatus={availableCommandsCatalogStatus}
-              commandState={remoteCommandState}
-              shareId={shareId}
-              autoSend={autoSend}
-              draftKey={userId ? sessionComposerDraftKey : undefined}
-              initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
-              sessionId={sessionId}
-              suggestion={activeSuggestion}
-              onAcceptSuggestion={async (requestId, index) => {
-                await manager.acceptSuggestion(requestId, index);
-              }}
-              onDismissSuggestion={async requestId => {
-                await manager.dismissSuggestion(requestId);
-              }}
-              controlRef={composerControlRef}
-            />
-          </ModelPickerSelectionScopeProvider>
-        </View>
+            {exitFailure ? (
+              <Animated.View
+                entering={FadeIn.duration(200)}
+                exiting={FadeOut.duration(150)}
+                layout={LinearTransition.duration(150)}
+              >
+                <RemoteSessionExitFailure
+                  message={exitFailure.message}
+                  onRetry={handleRetryExit}
+                  isRetrying={isRetryingExit}
+                />
+              </Animated.View>
+            ) : null}
+            <ModelPickerSelectionScopeProvider
+              selectionScope={modelPickerSelectionScope}
+              isSelectionCurrent={isModelPickerSelectionCurrent}
+            >
+              <ChatComposer
+                key={`${composerAccount.epoch}:${sessionId}`}
+                onSend={handleSend}
+                onSendCommand={handleSendCommand}
+                onCreateSession={handleCreateSession}
+                onRestartSession={handleRestartSession}
+                onExitSession={handleExitSession}
+                onStop={handleStop}
+                disabled={isComposerDisabled}
+                sendDisabled={!canSend}
+                sendDisabledReason={sendDisabledReason}
+                isStreaming={isStreaming}
+                placeholder={composerPlaceholder}
+                mode={currentMode}
+                onModeChange={handleModeChange}
+                model={displayModel}
+                variant={displayVariant}
+                modelOptions={modelOptionsForToolbar}
+                customOptions={customOptions}
+                modelLocked={modelLocked}
+                modelLockLabel={pinned.agentName}
+                onModelSelect={handleModelSelect}
+                organizationId={organizationId}
+                attachmentsEnabled={supportsAttachments}
+                activeSessionType={activeSessionType}
+                commands={availableCommands}
+                commandCatalogStatus={availableCommandsCatalogStatus}
+                commandState={remoteCommandState}
+                shareId={shareId}
+                autoSend={autoSend}
+                draftKey={userId ? sessionComposerDraftKey : undefined}
+                initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+                sessionId={sessionId}
+                suggestion={activeSuggestion}
+                onAcceptSuggestion={async (requestId, index) => {
+                  await manager.acceptSuggestion(requestId, index);
+                }}
+                onDismissSuggestion={async requestId => {
+                  await manager.dismissSuggestion(requestId);
+                }}
+                controlRef={composerControlRef}
+              />
+            </ModelPickerSelectionScopeProvider>
+          </View>
+        )}
       </>
     );
   }

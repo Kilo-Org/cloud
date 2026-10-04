@@ -31,6 +31,7 @@ import {
   type SessionRuntimeLocator,
 } from '../sandbox-control/worktree-ownership.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
+import { callbackHeadRepoFullName } from '../callbacks/head-repository.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import { sql } from 'drizzle-orm';
@@ -431,6 +432,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         ? {}
         : { clientError: projectTerminalClientError({ status, error }) }),
       lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
+      headRepoFullName: callbackHeadRepoFullName(metadata),
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,

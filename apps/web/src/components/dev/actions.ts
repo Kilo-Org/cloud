@@ -2,7 +2,8 @@
 
 import { redirect } from 'next/navigation';
 import { IS_DEVELOPMENT } from '@/lib/constants';
-import { findUserById, softDeleteUser } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
+import { softDeleteUser } from '@/lib/user';
 import { getUserFromAuth } from '@/lib/user/server';
 import { captureException } from '@sentry/nextjs';
 

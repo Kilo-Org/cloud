@@ -12,8 +12,10 @@ import { i18n } from '@/i18n';
 import {
   createAppStoreKiloPassPurchaseActions,
   getKiloPassPurchaseErrorMessage,
+  isRecoverableKiloPassPurchase,
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
+  resetTerminalPurchaseRejections,
   useInlinePurchaseErrorOwnership,
 } from './use-store-kilo-pass-purchase';
 import { type AppStoreKiloPassProduct } from './store-products';
@@ -62,6 +64,8 @@ vi.mock('expo-iap', () => ({
   ErrorCode: {
     AlreadyOwned: 'already-owned',
     BillingUnavailable: 'billing-unavailable',
+    DeferredPayment: 'deferred-payment',
+    Pending: 'pending',
     UserCancelled: 'user-cancelled',
   },
   fetchProducts: mockedIap.fetchProducts,
@@ -85,6 +89,10 @@ vi.mock('expo-iap', () => ({
 
 vi.mock('react-native', () => ({
   Platform: mockedPlatform,
+}));
+
+vi.mock('@/lib/iap/pending-store-purchases', () => ({
+  fetchPendingStorePurchases: mockedIap.getAvailablePurchases,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -326,6 +334,7 @@ function createActions(
 ) {
   return createAppStoreKiloPassPurchaseActions({
     storefront: 'app_store',
+    appAccountToken: product.appAccountToken,
     completeAppStorePurchase: vi.fn(),
     completePlayPurchase: vi.fn(),
     enabledAppleProductIds: [product.appleProductId],
@@ -333,6 +342,7 @@ function createActions(
     finishTransaction: vi.fn(),
     getAvailablePurchases: vi.fn().mockResolvedValue([]),
     invalidateAfterCompletion: vi.fn(),
+    isAccountCurrent: () => true,
     requestPurchase: vi.fn(),
     restorePurchases: vi.fn(),
     showError: () => undefined,
@@ -376,6 +386,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetPurchaseErrorToastDedup();
   resetInlinePurchaseErrorOwnership();
+  resetTerminalPurchaseRejections();
   mockedPlatform.OS = 'ios';
   mockedAuth.authEpoch = 0;
   mockedCurrentUserId.userId = 'user-1';
@@ -383,7 +394,7 @@ beforeEach(() => {
   mockedIap.connected = false;
   mockedIap.fetchProducts.mockResolvedValue([]);
   mockedIap.finishTransaction.mockResolvedValue(undefined);
-  mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
+  mockedIap.getAvailablePurchases.mockResolvedValue([]);
   mockedIap.handlers = null;
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedIap.restorePurchases.mockResolvedValue(undefined);
@@ -509,6 +520,50 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     await actions.handlePurchaseSuccess(createPurchase());
 
     expect(finishTransaction).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending purchase queued and completes the later approval once', async () => {
+    // Play delivers a slow test card's purchase as `pending` immediately and
+    // again as `purchased` once it is approved. The first delivery must not
+    // reach the backend, finish the transaction, announce, or report a failure.
+    const pending = createPurchase({
+      store: 'google',
+      productId: 'kilopass_tier19',
+      purchaseState: 'pending',
+    });
+    const completePlayPurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const invalidateAfterCompletion = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      finishTransaction,
+      invalidateAfterCompletion,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+      showError: message => {
+        showError(message);
+      },
+      enabledGoogleProductIds: ['kilopass_tier19'],
+    });
+
+    expect(await actions.handlePurchaseSuccess(pending)).toBe(false);
+    expect(completePlayPurchase).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+    expect(onPurchaseCompleted).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+
+    // The store approves the same transaction and re-delivers it as purchased:
+    // exactly one grant, one finish and one announcement.
+    const approved = { ...pending, purchaseState: 'purchased' as const };
+    expect(await actions.handlePurchaseSuccess(approved)).toBe(true);
+    expect(completePlayPurchase).toHaveBeenCalledTimes(1);
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+    expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
   });
 
   it('finishes the transaction and invalidates Kilo Pass state after backend success', async () => {
@@ -651,6 +706,130 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
   });
 
+  it('skips an App Store transaction that the completion path rejects as expired', async () => {
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({ completeAppStorePurchase, finishTransaction });
+
+    const expired = createPurchase({
+      expirationDateIOS: Date.now() - 60_000,
+      transactionId: 'tx-expired',
+    });
+    expect(isRecoverableKiloPassPurchase(expired, [product.appleProductId])).toBe(false);
+    expect(await actions.recoverPurchases([expired])).toEqual([]);
+    expect(completeAppStorePurchase).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+
+    const live = createPurchase({
+      expirationDateIOS: Date.now() + 60_000,
+      transactionId: 'tx-live',
+    });
+    expect(await actions.recoverPurchases([live])).toEqual([live]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a purchase with no expiration date recoverable', async () => {
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({ completeAppStorePurchase });
+    const purchase = createPurchase();
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not post a purchase the backend terminally rejected a second time', async () => {
+    const completeAppStorePurchase = vi.fn().mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'We could not verify this App Store purchase. Please try again.',
+      },
+    });
+    const actions = createActions({ completeAppStorePurchase });
+    const purchase = createPurchase();
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not post a Play purchase the backend terminally rejected a second time', async () => {
+    const purchase = createPurchase({ store: 'google', productId: 'kilopass_tier19' });
+    const completePlayPurchase = vi.fn().mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'We could not verify this Google Play purchase. Please try again.',
+      },
+    });
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      enabledAppleProductIds: [],
+      enabledGoogleProductIds: ['kilopass_tier19'],
+    });
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completePlayPurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries after a session error, which is not about the payload', async () => {
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({ data: { code: 'UNAUTHORIZED', message: 'Not signed in' } })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({ completeAppStorePurchase, finishTransaction });
+    const purchase = createPurchase();
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('reposts a wrong-account refusal, so the owning account can complete it', async () => {
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'App Store purchase account token does not match the signed-in user.',
+        },
+      })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({ completeAppStorePurchase, finishTransaction });
+    const purchase = createPurchase();
+
+    // The account-token assertion keeps the shared assertion's default code, so
+    // the refusal is a `BAD_REQUEST` that names the account rather than the
+    // payload. Remembering it would freeze the transaction for the account that
+    // owns it, which is the account that signs in next.
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
+    expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+  });
+
+  it('reposts a refusal the account can outgrow', async () => {
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'This App Store purchase cannot be used for your account.',
+        },
+      })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({ completeAppStorePurchase });
+    const purchase = createPurchase();
+
+    // An account-domain refusal (an already-owned transaction, a subscription
+    // state) is not about the payload, so it must not be frozen for the process.
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
+  });
+
   it('invalidates Kilo Pass state once after recovering multiple purchases', async () => {
     const finishTransaction = vi.fn();
     const invalidateAfterCompletion = vi.fn();
@@ -707,6 +886,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const purchase = createPurchase();
     const recoveryActions = createAppStoreKiloPassPurchaseActions({
       storefront: 'app_store',
+      appAccountToken: product.appAccountToken,
       completeAppStorePurchase: completeFromRecovery,
       completePlayPurchase: vi.fn(),
       enabledAppleProductIds: [product.appleProductId],
@@ -714,12 +894,14 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       finishTransaction: finishFromRecovery,
       getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
+      isAccountCurrent: () => true,
       requestPurchase: vi.fn(),
       restorePurchases: vi.fn(),
       showError: () => undefined,
     });
     const sheetActions = createAppStoreKiloPassPurchaseActions({
       storefront: 'app_store',
+      appAccountToken: product.appAccountToken,
       completeAppStorePurchase: completeFromSheet,
       completePlayPurchase: vi.fn(),
       enabledAppleProductIds: [product.appleProductId],
@@ -727,6 +909,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       finishTransaction: finishFromSheet,
       getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
+      isAccountCurrent: () => true,
       onPurchaseCompleted: () => {
         onPurchaseCompleted();
       },
@@ -745,6 +928,152 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(finishFromRecovery).toHaveBeenCalledTimes(1);
     expect(finishFromSheet).not.toHaveBeenCalled();
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not post a receipt whose account is already gone', async () => {
+    const completeAppStorePurchase = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => false,
+      completeAppStorePurchase,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(false);
+    expect(completeAppStorePurchase).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('does not post a second pending Pass receipt after the account changed under the first', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = createDeferredPromise();
+    const completeAppStorePurchase = vi.fn().mockReturnValue(backendGate.promise);
+    const invalidateAfterCompletion = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      invalidateAfterCompletion,
+    });
+
+    const firstPass = actions.recoverPurchases([createPurchase({ transactionId: 'tx-1' })]);
+    // The account changes while the first receipt's backend call is in flight.
+    signedInAccount = 'account-b';
+
+    // The second receipt is recovered by the same, now old, session: it must not
+    // be posted under the new one.
+    await expect(
+      actions.recoverPurchases([createPurchase({ transactionId: 'tx-2' })])
+    ).resolves.toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+
+    // The first receipt's grant belongs to the old session: it is not reported
+    // as recovered and does not refresh the new account's balance.
+    backendGate.resolve({ alreadyProcessed: false });
+    await expect(firstPass).resolves.toEqual([]);
+    expect(invalidateAfterCompletion).not.toHaveBeenCalled();
+  });
+
+  it('does not announce or refresh when the account changes while the backend answers', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = createDeferredPromise();
+    const completeAppStorePurchase = vi.fn().mockReturnValue(backendGate.promise);
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const invalidateAfterCompletion = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      finishTransaction,
+      invalidateAfterCompletion,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    const completion = actions.handlePurchaseSuccess(createPurchase());
+    signedInAccount = 'account-b';
+    backendGate.resolve({ alreadyProcessed: false });
+
+    await expect(completion).resolves.toBe(true);
+    expect(onPurchaseCompleted).not.toHaveBeenCalled();
+    expect(invalidateAfterCompletion).not.toHaveBeenCalled();
+    // The store transaction is still finished for this device.
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report or clear the pending callback for a failure that outlived its account', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = createDeferredRejectablePromise();
+    const completeAppStorePurchase = vi.fn().mockReturnValue(backendGate.promise);
+    const setPendingPurchaseCompletedCallback = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      setPendingPurchaseCompletedCallback: onCompleted => {
+        setPendingPurchaseCompletedCallback(onCompleted);
+      },
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const completion = actions.handlePurchaseSuccess(createPurchase());
+    // The account changes while the backend call is in flight, then the backend
+    // refuses the receipt. The refusal belongs to the old session: the new
+    // account's UI must not be told about it, and clearing the pending sheet
+    // callback would drop the new session's own callback.
+    signedInAccount = 'account-b';
+    backendGate.reject(
+      new Error('App Store purchase account token does not match the signed-in user.')
+    );
+
+    await expect(completion).resolves.toBe(false);
+    expect(showError).not.toHaveBeenCalled();
+    expect(setPendingPurchaseCompletedCallback).not.toHaveBeenCalled();
+  });
+
+  it('does not let a new account join an unresolved completion the old account left behind', async () => {
+    const purchase = createPurchase();
+    const backendGate = createDeferredPromise();
+    const completeForAccountA = vi.fn().mockReturnValue(backendGate.promise);
+    // Account A is mid-completion when the account changes; the new account's
+    // recovery finds the same transaction. It must submit its own request under
+    // its own account token, not join A's and inherit its result.
+    const completeForAccountB = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('App Store purchase account token does not match the signed-in user.')
+      );
+    const showErrorForAccountB = vi.fn();
+    const actionsForAccountA = createActions({
+      appAccountToken: 'account-a-token',
+      completeAppStorePurchase: completeForAccountA,
+    });
+    const actionsForAccountB = createActions({
+      appAccountToken: 'account-b-token',
+      completeAppStorePurchase: completeForAccountB,
+      showError: message => {
+        showErrorForAccountB(message);
+      },
+    });
+
+    const accountACompletion = actionsForAccountA.handlePurchaseSuccess(purchase);
+    const accountBCompletion = actionsForAccountB.handlePurchaseSuccess(purchase);
+    backendGate.resolve({ alreadyProcessed: false });
+
+    await expect(accountBCompletion).resolves.toBe(false);
+    await expect(accountACompletion).resolves.toBe(true);
+
+    expect(completeForAccountA).toHaveBeenCalledTimes(1);
+    expect(completeForAccountB).toHaveBeenCalledTimes(1);
+    // B's own refusal is the explicit account-token refusal, so it is the one
+    // that earns the different-account copy on B's UI.
+    expect(showErrorForAccountB).toHaveBeenCalledWith(
+      i18n.t('kiloPass.purchaseOwnedByAnotherAccount')
+    );
   });
 
   it('explicitly restores active Kilo Pass purchases through StoreKit and backend completion', async () => {
@@ -775,6 +1104,37 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a remembered rejection when the user asks for a restore', async () => {
+    const purchase = createPurchase();
+    const restorePurchases = vi.fn().mockResolvedValue(undefined);
+    const getAvailablePurchases = vi.fn().mockResolvedValue([purchase]);
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'We could not verify this App Store purchase. Please try again.',
+        },
+      })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase,
+      finishTransaction,
+      getAvailablePurchases,
+      restorePurchases,
+    });
+
+    // The background pass remembers the refusal, and does not post again.
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+
+    // A restore is an explicit action, so it posts a second time.
+    expect(await actions.restorePurchases()).toBe('restored');
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
   });
 
   it('loads product IDs before deciding an explicit restore is empty', async () => {
@@ -1216,6 +1576,18 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(getKiloPassPurchaseErrorMessage(error, 'fallback', 'app_store')).toBe(error.message);
   });
 
+  it.each(['pending', 'deferred-payment'])(
+    'maps a store %s purchase state to no copy, not a failure',
+    code => {
+      expect(
+        getKiloPassPurchaseErrorMessage({ code, message: 'not finished' }, 'fallback', 'play')
+      ).toBeNull();
+      expect(
+        getKiloPassPurchaseErrorMessage({ code, message: 'not finished' }, 'fallback', 'app_store')
+      ).toBeNull();
+    }
+  );
+
   it('maps Google Play account mismatch strings to Play-specific copy', () => {
     expect(
       getKiloPassPurchaseErrorMessage(
@@ -1412,12 +1784,17 @@ describe('KiloPassNativeIapOwner', () => {
   });
 
   it('recovers purchases using server-backed product IDs when the store fetch is empty', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
+    // The store answer lands in the owner's own state; the recovery effect runs
+    // on the render that follows it.
     owner.render();
     await flushPromises();
 
@@ -1442,9 +1819,16 @@ describe('KiloPassNativeIapOwner', () => {
       purchaseToken: 'tier49-token',
       transactionId: 'tier49-order',
     });
-    mockedIap.availablePurchases = [unresolvedTierPurchase];
+    // Recovery reads the owner's own store lookup (`getAvailableIapPurchases`),
+    // not the hook's reactive list, so the store must be connected and answer
+    // with the charged purchase.
+    mockedIap.getAvailablePurchases.mockResolvedValue([unresolvedTierPurchase]);
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
+    // The store answer lands in the owner's own state; the recovery effect runs
+    // on the render that follows it.
     owner.render();
     await flushPromises();
 
@@ -1466,7 +1850,10 @@ describe('KiloPassNativeIapOwner', () => {
   // must stay silent rather than pop a bare toast behind a screen with no
   // purchase UI.
   it('keeps a recovery failure silent while no inline error surface is mounted', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    // Recovery reads the transactions the store still holds, so the store must be
+    // connected and answer with the charged purchase.
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
@@ -1514,12 +1901,15 @@ describe('KiloPassNativeIapOwner', () => {
   });
 
   it('invalidates the full Kilo Pass state set including getPurchasePresentation after completion', async () => {
-    mockedIap.availablePurchases = [createPurchase()];
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
       products: [{ appleProductId: product.appleProductId }],
     };
     const owner = renderKiloPassNativeIapOwner();
 
+    owner.render();
+    await flushPromises();
     owner.render();
     await flushPromises();
 

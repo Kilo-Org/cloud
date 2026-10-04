@@ -215,7 +215,6 @@
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
     "bonusCreditsExpiring": "Bonusa kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
-    "creditBalanceEmpty": "Tavi kredīti ir iztērēti. Šim kontam kredītus var pārvaldīt ārpus iOS lietotnes.",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -241,6 +240,7 @@
     "addPasskey": "Pievienot piekļuves atslēgu",
     "passkeyDefaultName": "Piekļuves atslēga",
     "passkeyAddedOn": "Pievienota {{date}}",
+    "passkeyLastUsedOn": "Pēdējo reizi izmantots {{date}}",
     "passkeyAdded": "Piekļuves atslēga pievienota.",
     "passkeyAddFailed": "Neizdevās pievienot piekļuves atslēgu. Mēģiniet vēlreiz.",
     "passkeyAddUnsupported": "Šī ierīce nevar izveidot piekļuves atslēgas.",
@@ -2072,6 +2072,7 @@
       "idCopied": "Sesijas ID nokopēts",
       "couldNotCopyId": "Neizdevās nokopēt sesijas ID.",
       "untitled": "Sesija bez nosaukuma",
+      "actions": "Darbības ar sesiju",
       "sessionDeleted": "Sesija dzēsta",
       "needsInput": "gaida ievadi",
       "fromPlatform": "no {{platform}}",
@@ -2125,7 +2126,9 @@
       "renamePlaceholder": "Sesijas nosaukums",
       "transcriptAccessibility": "Sesijas sarakste",
       "readOnly": "Šī sesija ir pieejama tikai lasīšanai.",
+      "continueInNewSession": "Turpināt jaunā sesijā",
       "emptyDescription": "Lai sāktu, nosūti ziņojumu zemāk esošajā laukā.",
+      "emptyTranscriptDescription": "Šajā sesijā vēl nav ziņojumu.",
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
@@ -2215,6 +2218,8 @@
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
+      "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
+      "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
       "prefillRepoAndModelUnavailable": "Sākotnējās sesijas repozitorijs un modelis vairs nav pieejami. Izvēlies tos zemāk.",
@@ -2599,6 +2604,7 @@
       "selectModelBeforeSending": "Pirms nosūtīšanas izvēlies modeli.",
       "preparingPlaceholder": "Sagatavo vidi…",
       "finalizingPlaceholder": "Pabeidz darbu…",
+      "sessionLoadFailed": "Sesiju nevarēja ielādēt. Vispirms mēģiniet vēlreiz.",
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
       "couldNotAttachFiles": "Neizdevās pievienot failus. Nospied nosūtīšanas pogu, lai mēģinātu vēlreiz.",
       "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
@@ -2669,6 +2675,7 @@
       "provider": "Pakalpojumu sniedzējs",
       "totalCost": "Kopējās izmaksas",
       "usageReflectsLatest": "Izmantojuma dati atbilst pēdējai pabeigtajai asistenta atbildei.",
+      "usageUnavailable": "Konteksta izmantošana nav pieejama",
       "tokenUsage": "Tokenu izmantojums",
       "cacheRate": "Kešatmiņas īpatsvars",
       "modelsCount": "Modeļi ({{displayCount}})",
@@ -2705,7 +2712,10 @@
     "markdownImage": {
       "load": "Ielādēt",
       "loadWithHost": "Ielādēt {{host}}",
-      "httpsOnly": "Atļauti tikai attēli no HTTPS adresēm."
+      "httpsOnly": "Atļauti tikai attēli no HTTPS adresēm.",
+      "trustTitle": "Ielādēt attēlu no {{host}}?",
+      "trustMessage": "Ja uzticies resursdatoram {{host}}, tā attēli tiks ielādēti, katru reizi neprasot. Vēlāk to vari atsaukt sadaļā Uzticamie resursdatori.",
+      "loadOnce": "Ielādēt vienreiz"
     },
     "markdownLink": {
       "invalidLink": "Šo saiti nevar atvērt.",
@@ -3221,8 +3231,12 @@
     "subtitle": "Resursdatori, kuru saites var atvērt bez apstiprinājuma",
     "emptyTitle": "Nav uzticamu resursdatoru",
     "emptyDescription": "Ja uzticies saites resursdatoram, tā saites turpmāk atveras bez atkārtota apstiprinājuma.",
+    "imagesSectionTitle": "Uzticamie attēlu resursdatori",
+    "imagesSectionDescription": "Attēli no šiem resursdatoriem tiek ielādēti bez atkārtota pieprasījuma.",
+    "imagesSectionEmpty": "Nav uzticamu attēlu resursdatoru",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
     "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
+    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu.",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
   },
   "quickChat": {
@@ -3487,5 +3501,17 @@
       "unboundToast": "Repo bez ierobežojumiem",
       "unbindFailed": "Nevarēja atsaistīt repo"
     }
+  },
+  "credits": {
+    "title": "Pirkt kredītus",
+    "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
+    "packLabel": "Pievienot {{amount}} kredītos",
+    "priceUnavailable": "Cena nav pieejama",
+    "purchased": "Kredīti ir pievienoti tavai bilancei.",
+    "empty": "Kredītu paketes šobrīd nav pieejamas.",
+    "noMatchingProducts": "App Store neatgrieza nevienu atbilstošu kredītu paketi.",
+    "noMatchingProductsPlay": "Google Play neatgrieza nevienu atbilstošu kredītu paketi.",
+    "purchaseOwnedByAnotherAccount": "Kredīti šajā Apple Account kontā pieder citam Kilo kontam. Lai tos izmantotu, pieraksties attiecīgajā Kilo kontā.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredīti šajā Google Play kontā pieder citam Kilo kontam. Lai tos izmantotu, piesakieties tajā Kilo kontā."
   }
 }

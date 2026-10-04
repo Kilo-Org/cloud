@@ -215,7 +215,6 @@
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
     "bonusCreditsExpiring": "{{amount}}のボーナスクレジットが{{date}}に失効します。",
-    "creditBalanceEmpty": "クレジット残高がありません。このアカウントのクレジットは、iOSアプリ外で管理します。",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",
@@ -241,6 +240,7 @@
     "addPasskey": "パスキーを追加",
     "passkeyDefaultName": "パスキー",
     "passkeyAddedOn": "{{date}} に追加",
+    "passkeyLastUsedOn": "{{date}} に最終使用",
     "passkeyAdded": "パスキーを追加しました。",
     "passkeyAddFailed": "パスキーを追加できませんでした。もう一度お試しください。",
     "passkeyAddUnsupported": "このデバイスではパスキーを作成できません。",
@@ -1534,6 +1534,7 @@
       "idCopied": "セッションIDをコピーしました",
       "couldNotCopyId": "セッションIDをコピーできませんでした。",
       "untitled": "無題のセッション",
+      "actions": "セッションの操作",
       "sessionDeleted": "セッションを削除しました",
       "needsInput": "入力が必要",
       "fromPlatform": "{{platform}}から",
@@ -1584,7 +1585,9 @@
       "renamePlaceholder": "セッション名",
       "transcriptAccessibility": "セッションの会話履歴",
       "readOnly": "このセッションは読み取り専用です。",
+      "continueInNewSession": "新しいセッションで続行",
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
+      "emptyTranscriptDescription": "このセッションにはまだメッセージがありません。",
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "renameAccessibility": "セッション「{{title}}」の名前を変更",
@@ -1674,6 +1677,8 @@
       "leaveChanges": "変更を残す",
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
+      "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
+      "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",
@@ -2049,6 +2054,7 @@
       "selectModelBeforeSending": "送信前にモデルを選択してください。",
       "preparingPlaceholder": "環境を準備中…",
       "finalizingPlaceholder": "終了処理中…",
+      "sessionLoadFailed": "セッションを読み込めませんでした。先に再試行してください。",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
       "couldNotAttachFiles": "ファイルを添付できませんでした。「送信」をタップして、もう一度お試しください。",
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
@@ -2118,6 +2124,7 @@
       "provider": "プロバイダー",
       "totalCost": "合計コスト",
       "usageReflectsLatest": "使用量は直近に完了したアシスタントの応答を反映しています。",
+      "usageUnavailable": "コンテキスト使用状況を利用できません",
       "tokenUsage": "トークン使用量",
       "cacheRate": "キャッシュ率",
       "modelsCount": "モデル（{{displayCount}}）",
@@ -2152,7 +2159,10 @@
     "markdownImage": {
       "load": "読み込む",
       "loadWithHost": "{{host}}から読み込む",
-      "httpsOnly": "HTTPSの画像のみ読み込めます。"
+      "httpsOnly": "HTTPSの画像のみ読み込めます。",
+      "trustTitle": "{{host}} から画像を読み込みますか？",
+      "trustMessage": "{{host}} を信頼すると、毎回確認せずにその画像が読み込まれます。後で信頼済みホストから取り消せます。",
+      "loadOnce": "1回だけ読み込む"
     },
     "markdownLink": {
       "invalidLink": "このリンクを開けません。",
@@ -3178,8 +3188,12 @@
     "subtitle": "確認せずに開くことを許可したホスト",
     "emptyTitle": "信頼済みホストはありません",
     "emptyDescription": "リンク先のホストを信頼済みにすると、次回から確認せずに開けます。",
+    "imagesSectionTitle": "信頼済み画像ホスト",
+    "imagesSectionDescription": "これらのホストの画像は確認なしで読み込まれます。",
+    "imagesSectionEmpty": "信頼済み画像ホストはありません",
     "revoke": "{{host}}を信頼済みホストから削除",
     "revokeMessage": "このホストへのリンクは再び確認を求めます。",
+    "revokeImageMessage": "このホストの画像は再び確認を求めます。",
     "backToPreferences": "設定に戻る"
   },
   "quickChat": {
@@ -3444,5 +3458,17 @@
       "unboundToast": "バインドされていないリポジトリ",
       "unbindFailed": "リポジトリのバインドを解除できませんでした"
     }
+  },
+  "credits": {
+    "title": "クレジットを購入",
+    "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
+    "packLabel": "{{amount}}分のクレジットを追加",
+    "priceUnavailable": "価格を取得できません",
+    "purchased": "クレジットを残高に追加しました。",
+    "empty": "現在、クレジットパックを利用できません。",
+    "noMatchingProducts": "App Storeから一致するクレジットパックが返されませんでした。",
+    "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
+    "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
+    "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   }
 }

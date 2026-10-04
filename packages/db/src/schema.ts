@@ -101,6 +101,7 @@ import {
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -132,6 +133,7 @@ import type {
   UserDeletionAuditDetails,
   UserDeletionActivityDetails,
   CustomLlmDefinition,
+  AutoFreeConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -303,6 +305,7 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -2829,12 +2832,18 @@ export const api_request_log = pgTable(
     provider: text(),
     model: text(),
     status_code: integer(),
+    /** Unused and always empty; the request body is stored in R2 under `request_r2_key`. */
     request: jsonb(),
+    /** Unused and always empty; the response body is stored in R2 under `response_r2_key`. */
     response: text(),
     error: jsonb(),
+    request_r2_key: text(),
+    response_r2_key: text(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
+
+export type ApiRequestLog = typeof api_request_log.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',
@@ -5806,6 +5815,7 @@ export const ai_gateway_config = pgTable(
   {
     id: integer().primaryKey().default(1),
     config: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    auto_free: jsonb().$type<AutoFreeConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -5905,6 +5915,7 @@ export const cloud_agent_code_reviews = pgTable(
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
     previous_summary_head_sha: text(),
+    previous_summary_observed: boolean(),
 
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
@@ -5946,6 +5957,24 @@ export const cloud_agent_code_reviews = pgTable(
     index('idx_cloud_agent_code_reviews_created_at').on(table.created_at),
     // Index for GitHub ID lookups
     index('idx_cloud_agent_code_reviews_pr_author_github_id').on(table.pr_author_github_id),
+    // Outcome-time windows and the start-latency sample each range-scan their own
+    // timestamp; the missing-outcome-time aggregate matches only null completed_at
+    // on terminal rows, which neither idx_cloud_agent_code_reviews_status nor the
+    // non-null completed_at index can serve.
+    index('idx_cloud_agent_code_reviews_completed_at')
+      .on(table.completed_at)
+      .concurrently()
+      .where(isNotNull(table.completed_at)),
+    index('idx_cloud_agent_code_reviews_started_at')
+      .on(table.started_at)
+      .concurrently()
+      .where(isNotNull(table.started_at)),
+    index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
+      .on(table.status)
+      .concurrently()
+      .where(
+        sql`${table.status} IN ('completed', 'failed', 'cancelled', 'interrupted') AND ${table.completed_at} IS NULL`
+      ),
     // Owner check constraint (exactly one must be set)
     check(
       'cloud_agent_code_reviews_owner_check',
@@ -6076,6 +6105,7 @@ export const cloud_agent_code_review_attempts = pgTable(
     terminal_reason: text(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    publication_status: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6098,6 +6128,11 @@ export const cloud_agent_code_review_attempts = pgTable(
     check(
       'cloud_agent_code_review_attempts_attempt_number_check',
       sql`${table.attempt_number} >= 1`
+    ),
+    enumCheck(
+      'cloud_agent_code_review_attempts_publication_status_check',
+      table.publication_status,
+      CodeReviewPublicationStatus
     ),
   ]
 );
@@ -6654,6 +6689,7 @@ export type CloudAgentSessionRunFailureStage =
   | 'unknown';
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
+  | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'
   | 'wrapper_start_failed'
@@ -7092,10 +7128,11 @@ export const openai_chatgpt_connections = pgTable(
     is_shared_services: boolean().default(false).notNull(),
     /**
      * The last time OpenAI answered a delegated request with a plan usage
-     * limit. The gateway writes it and a reconnect clears it. It is request
-     * state, not credential state, so it stays out of the encrypted payload. A
-     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
-     * hides it once the reset time OpenAI reported has passed.
+     * limit. The gateway writes it, a request through the same connection that
+     * succeeds clears it, and a reconnect clears it. It is request state, not
+     * credential state, so it stays out of the encrypted payload. It gates
+     * nothing: `readOpenAiChatGptUsageLimit` hides a record once the reset time
+     * OpenAI reported has passed, and routing never reads it.
      */
     usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
     /** The reset time OpenAI reported with the limit, when it reported one. */
@@ -11566,6 +11603,67 @@ export const external_side_effect_outbox = pgTable(
 
 export type ExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferSelect;
 export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferInsert;
+
+/**
+ * Durable outbox for Bouncer financial credit events (charge steps and store
+ * money events). Financial callers enqueue a row atomically with the primary
+ * write and before they acknowledge a payment or webhook; the cron drainer
+ * claims due `pending` rows, delivers them over HTTP, and marks `delivered`.
+ * On a transport failure it backs off and retries, failing a row after 8
+ * attempts; `sending` claims older than 5 minutes are reclaimed. A unique
+ * `(event_id, event_type)` — the same identity bouncer's credit ledger dedupes
+ * on, where `event_id` is the source event id (a Stripe event id or an Apple
+ * `notificationUUID`) — makes an enqueue idempotent within the retention
+ * window: a webhook replay in that window reports nothing new. Retention is
+ * bounded, so it is not a permanent dedupe; an event replayed after the window
+ * is recreated, but it keeps its original `occurredAt`, so bouncer's standing
+ * (current) computation still does not double-count it. `payload` holds the
+ * shaped wire body for the event and carries account PII (user id, client ip,
+ * card fingerprint, JA4 client-fingerprint digest); `user_id` is denormalized
+ * onto the row so user soft deletion can delete it.
+ */
+export type BouncerCreditEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_credit_event_outbox = pgTable(
+  'bouncer_credit_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The source event id; with `event_type`, the dedupe key that makes enqueue idempotent. */
+    event_id: text().notNull(),
+    /** The `CreditEvent` discriminant, for observability and metrics. */
+    event_type: text().notNull(),
+    /** The Kilo account the event is about; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerCreditEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_credit_event_outbox_event_id_type').on(
+      table.event_id,
+      table.event_type
+    ),
+    index('IDX_bouncer_credit_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_credit_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferSelect;
+export type NewBouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferInsert;
 
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 

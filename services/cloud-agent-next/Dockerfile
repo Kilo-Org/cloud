@@ -3,7 +3,7 @@ FROM docker.io/cloudflare/sandbox:0.12.9
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.6.2"
+ARG KILOCODE_CLI_VERSION="7.8.1"
 
 # Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, and supporting tools.
 # The default Ubuntu git (2.34.1 on 22.04) is outdated; the git-core PPA ships the latest
@@ -77,8 +77,10 @@ RUN cd /tmp/wrapper-build/wrapper && \
     bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
     bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
     bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
-    bun build src/control/main.ts --outfile=/usr/local/bin/kilocode-control-wrapper.js --target=bun --minify && \
+    bun build src/control-plane/main.ts --outfile=/usr/local/bin/kilocode-control-plane-wrapper.js --target=bun --minify && \
     chmod +x /usr/local/bin/bb && \
+    cp control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh && \
+    chmod +x /usr/local/bin/kilocode-control-plane-supervisor.sh && \
     rm -rf /tmp/wrapper-build
 
 # DO NOT override USER, WORKDIR, or ENTRYPOINT from the base image

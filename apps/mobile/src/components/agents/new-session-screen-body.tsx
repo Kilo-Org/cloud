@@ -53,6 +53,7 @@ import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import {
   resolveContinueStartDisabled,
+  resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
 } from '@/lib/new-session-submit';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
@@ -737,6 +738,62 @@ export function NewSessionScreenBody() {
 
   const isStartDisabled = resolveStartDisabled();
 
+  // The repository section's own settle state, separated from the repository
+  // count exactly as the extension separates provider connect from repo count.
+  const hasRepositories = repositories.length > 0;
+  const hasConnectableProvider = groups.some(group => group.status === 'connect');
+  const isLoadingRepositories = groups.some(group => group.status === 'loading');
+
+  const startBlockedReasonKey = resolveNewSessionStartBlockedReason(
+    isCloneEntry
+      ? {
+          entry: 'continue',
+          hasRepositories,
+          hasConnectableProvider,
+          isLoadingRepositories,
+          isRemoteTargetSelected,
+          selectedRepo,
+          gate: {
+            isCreating,
+            isSubmitting,
+            isSpawningRemote: remoteSpawn.isSpawningRemote,
+            model: isRemoteTargetSelected ? modelView.selectedValue : displayModel,
+            isRemoteTargetSelected,
+            instanceCatalogLoading: instanceCatalog.isLoading,
+            instanceHasSessionClone,
+            cloneImportFailureKey,
+            isModelUnavailable: modelView.isSelectionUnavailable,
+          },
+        }
+      : {
+          entry: 'new-session',
+          hasRepositories,
+          hasConnectableProvider,
+          isLoadingRepositories,
+          isRemoteTargetSelected,
+          selectedRepo,
+          gate: {
+            attachmentsHasFailed: attachments.hasFailedAttachments,
+            attachmentsIsUploading: attachments.isUploading,
+            hasPrompt,
+            isCreating,
+            isRemoteTargetSelected,
+            isSubmitting,
+            model: displayModel,
+            isProfileLoading,
+          },
+        }
+  );
+
+  let startBlockedReason: string | null = null;
+  if (startBlockedReasonKey === 'connect-provider') {
+    startBlockedReason = t('agentChat.newSession.connectProviderToStart');
+  } else if (startBlockedReasonKey === 'refresh-repositories') {
+    startBlockedReason = t('agentChat.newSession.refreshRepositories');
+  } else if (startBlockedReasonKey === 'select-repository') {
+    startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');
+  }
+
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
       if (runOnInstance !== null) {
@@ -871,6 +928,7 @@ export function NewSessionScreenBody() {
         onAutoCommitChange={setAutoCommit}
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
+        startBlockedReason={startBlockedReason}
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}

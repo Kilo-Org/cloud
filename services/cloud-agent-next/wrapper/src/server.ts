@@ -53,6 +53,8 @@ export type ServerConfig = {
   wrapperInstanceGeneration?: number;
   /** Product surface that created the session, e.g. code-review. */
   platform?: string;
+  /** Code review that must publish a summary: self-check once if none was written. */
+  publicationSelfCheck?: boolean;
 };
 
 export type ServerDependencies = {
@@ -355,6 +357,7 @@ export async function bindSessionContext(
       ingestToken: binding.ingestToken,
       workerAuthToken: binding.workerAuthToken,
       platform: config.platform,
+      publicationSelfCheck: config.publicationSelfCheck,
       wrapperRunId: binding.wrapperRunId,
       wrapperGeneration: binding.wrapperGeneration,
       wrapperConnectionId: binding.wrapperConnectionId,
@@ -373,6 +376,7 @@ export async function bindSessionContext(
     ingestToken: binding.ingestToken,
     workerAuthToken: binding.workerAuthToken,
     platform: config.platform,
+    publicationSelfCheck: config.publicationSelfCheck,
     wrapperRunId: binding.wrapperRunId,
     wrapperGeneration: binding.wrapperGeneration,
     wrapperConnectionId: binding.wrapperConnectionId,
@@ -528,6 +532,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
       autoCommit: prompt.finalization?.autoCommit ?? false,
       condenseOnComplete: prompt.finalization?.condenseOnComplete ?? false,
       model: prompt.agent?.model?.modelID,
+      agent: prompt.agent,
       upstreamBranch: binding?.upstreamBranch,
       ...(prompt.finalization?.commitCoAuthor
         ? { commitCoAuthor: prompt.finalization.commitCoAuthor }
@@ -615,6 +620,7 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
           autoCommit: body.autoCommit ?? false,
           condenseOnComplete: body.condenseOnComplete ?? false,
           model: body.agent?.model?.modelID,
+          agent: body.agent,
           upstreamBranch: binding?.upstreamBranch,
           ...(body.commitCoAuthor ? { commitCoAuthor: body.commitCoAuthor } : {}),
         })

@@ -117,7 +117,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 
 vi.mock('@/lib/kilo-pass/legal-links', () => ({
-  getKiloPassLegalLinks: () => [
+  getStoreLegalLinks: () => [
     { url: 'https://example.com/privacy', label: 'Privacy Policy' },
     { url: 'https://example.com/terms', label: 'Terms of Use' },
   ],

@@ -92,7 +92,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$base" HEAD \
-            | grep -Eq '^apps/web/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"
@@ -348,7 +348,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$before" HEAD \
-            | grep -Eq '^apps/web/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
+            | grep -Eq '^apps/web/src/|^packages/web-shared/src/|^services/kilo-mcp/|^\.kilo/skills/|^\.github/workflows/kilo-mcp-catalog\.yml$|^scripts/kilo-mcp-catalog\.test\.mjs$'; then
             echo "catalog=true" >> "$GITHUB_OUTPUT"
           else
             echo "catalog=false" >> "$GITHUB_OUTPUT"

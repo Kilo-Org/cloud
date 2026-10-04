@@ -61,6 +61,11 @@ import type * as SessionTranscript from '@/components/agents/session-transcript'
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
+  SEND_REASON_MAX_FONT_SCALE,
+  SESSION_FOOTER_ROW_ITEM_PADDING,
+} from '@/components/agents/session-working-state';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import {
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
@@ -700,6 +705,14 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
 
+/** The send-gate props the screen hands the mounted composer. */
+function composerProps(view: { renderer: ReactTestRenderer }) {
+  return view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer')).props as {
+    sendDisabled?: boolean;
+    sendDisabledReason?: string | null;
+  };
+}
+
 /**
  * The FlashList keys the first message list would mount rows under. The list is
  * stubbed, so read the props the stub was handed: the same `keyExtractor` the
@@ -1006,6 +1019,28 @@ function renderedTextOutsideSheet(root: ReactTestInstance): string {
 
 function reasoningRenderers(renderer: ReactTestRenderer) {
   return renderer.root.findAll(node => Object.is(node.type, 'ReasoningPartRenderer'));
+}
+
+/**
+ * The fixed footer row wrapper. The row renders one item at a time — the
+ * working spinner, then the status indicator, then the cannot-send reason — so
+ * the wrapper is what the row's own position and opacity contracts hold for,
+ * and its children are the ladder's observable result.
+ */
+function indicatorRowOf(view: { renderer: ReactTestRenderer }) {
+  const rows = view.renderer.root.findAll(
+    node =>
+      Object.is(node.type, 'AnimatedView') && String(node.props.className ?? '') === 'bg-background'
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new Error('Missing the fixed indicator row wrapper');
+  }
+  return row;
+}
+
+function footerRowItems(view: { renderer: ReactTestRenderer }) {
+  return indicatorRowOf(view).children.filter(child => typeof child !== 'string');
 }
 
 function pressHeaderBack(renderer: ReactTestRenderer) {
@@ -2830,7 +2865,7 @@ describe('hide thinking preference', () => {
     expect(renderedText(view.renderer.root)).toContain('Visible answer');
   });
 
-  it('drops a reasoning-only message from the transcript but keeps it in the working indicator', async () => {
+  it('drops a reasoning-only message from the transcript while a status line holds the row', async () => {
     hideThinking.current = true;
     const message = partMessage('msg-think-only', [
       reasoningPart('reasoning-only', 'msg-think-only'),
@@ -2849,7 +2884,26 @@ describe('hide thinking preference', () => {
       view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
     ).toHaveLength(0);
     expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+    // The dropped reasoning row still reaches the transcript's status surface,
+    // so the row is not empty; the ladder shows that status line, not a spinner.
+    expect(indicatorNodes(view).length).toBeGreaterThan(0);
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+  });
 
+  it('hands the raw message list to the working spinner, not the displayed list', async () => {
+    hideThinking.current = true;
+    const message = partMessage('msg-think-only', [
+      reasoningPart('reasoning-only', 'msg-think-only'),
+    ]);
+    const view = await mountDetails([message]);
+    // The spinner's label derives from the last assistant part, so a hidden
+    // reasoning row must still reach it. The ladder mounts the spinner only
+    // while no status line outranks it, so this mount streams with none.
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
     const indicator = view.renderer.root.findByType(WorkingIndicator);
     const indicatorMessages = indicator.props.messages as StoredMessage[];
     expect(indicatorMessages.some(candidate => candidate.info.id === 'msg-think-only')).toBe(true);
@@ -3097,6 +3151,74 @@ describe('session detail composer after a failed turn', () => {
     const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
     expect(node.props.disabled).toBe(false);
     expect(node.props.sendDisabled).toBe(false);
+  });
+});
+
+describe('session detail composer cannot-send reason', () => {
+  it('states the load-failure reason beside send in the load-error state', async () => {
+    // The audit's state (owner evidence A4/A12): the open fails, the transcript
+    // is empty and the manager cannot send, but the input stays editable. The
+    // reason beside send must name the load failure, not a runtime class.
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    const props = composerProps(view);
+    expect(props.sendDisabled).toBe(true);
+    expect(props.sendDisabledReason).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+    expect(props.sendDisabledReason).not.toBe(i18n.t('agentChat.session.connectionTrouble'));
+  });
+
+  it('states the class reason for a running session that cannot send', async () => {
+    // A non-empty transcript means a terminal failure is a runtime class, not
+    // the load failure behind the full-screen Retry, so its own copy is shown.
+    const view = await mountDetails([childMessage(ROOT_ID, 'hello')]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'cloud-agent');
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBe(
+      i18n.t('agentChat.session.notEnoughCredits')
+    );
+  });
+
+  it('passes no reason while the session can send', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        null
+      );
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBeNull();
   });
 });
 
@@ -3540,17 +3662,6 @@ describe('SessionDetailContent fixed indicator row', () => {
     goalMountOptions = {};
   });
 
-  function indicatorRowOf(view: Awaited<ReturnType<typeof mountDetails>>) {
-    let node: ReactTestInstance | null = view.renderer.root.findByType(WorkingIndicator);
-    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
-      node = node.parent;
-    }
-    if (node === null) {
-      throw new Error('Missing the fixed indicator row wrapper');
-    }
-    return node;
-  }
-
   it.each([
     { type: 'error', message: 'simulated error' },
     { type: 'warning', message: 'Retrying… simulated error' },
@@ -3574,15 +3685,100 @@ describe('SessionDetailContent fixed indicator row', () => {
     }
   );
 
-  it('renders no fixed indicator row for an empty transcript', async () => {
+  it('renders no progress item for an empty transcript, keeping only the send reason', async () => {
     const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+    // The empty/connecting body states progress itself, so the row drops it and
+    // keeps the one line only it can state: why send is unavailable. The
+    // has-messages gate must not take the load-failure line with it.
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.props.message).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+  });
+
+  it('states the cannot-send reason in the row with the row item typography', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    // Read-only is a permanent fact and no status indicator competes with it,
+    // so the reason is the row's item.
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    const reason = items[0];
+    expect(Object.is(reason?.type, AccessibleStatus)).toBe(true);
+    expect(reason?.props.message).toBe(i18n.t('agentChat.session.readOnly'));
+    expect(reason?.props.maxFontSizeMultiplier).toBe(SEND_REASON_MAX_FONT_SCALE);
+    const className = String(reason?.props.className ?? '');
+    // The row's own typography, not the composer's narrower one: a shorter item
+    // would shift the row every time the ladder swaps to or from it.
+    expect(className).toContain(SESSION_FOOTER_ROW_ITEM_PADDING);
+    expect(className).toContain('text-sm');
+    // The reason must not be clipped: a longer translation keeps its actionable
+    // tail ("Retry first.") on a phone width.
+    expect(reason?.props.numberOfLines).toBeUndefined();
+    expect(reason?.props.ellipsizeMode).toBeUndefined();
+  });
+
+  it('lets the status indicator outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     act(() => {
       view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
         view.manager.atoms.statusIndicator,
         { type: 'error', message: 'simulated error', timestamp: 0 }
       );
     });
-    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, 'SessionStatusIndicator')).toBe(true);
+  });
+
+  it('lets the working spinner outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, WorkingIndicator)).toBe(true);
+  });
+});
+
+describe('session detail read-only composer', () => {
+  // A read-only session keeps the composer on screen but disabled, with the
+  // reason stated above it, so the reader has an input slot instead of a
+  // transcript with nowhere to write. The continue affordance names the
+  // destination it opens rather than a bare "Continue" that reads as an
+  // in-place action.
+  it('keeps the composer mounted and disabled with the destination-named continue control', async () => {
+    // The default fixture resolves `read-only` (cloud_agent_session_id NULL and
+    // no live CLI presence) and this mount carries messages.
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.disabled).toBe(true);
+    // The reason beside send names the permanent read-only fact, not the
+    // generic "will become ready" line the resolver used to fall through to.
+    expect(composerProps(view).sendDisabledReason).toBe(i18n.t('agentChat.session.readOnly'));
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('agentChat.session.readOnly')
+    );
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(renderedText(continueControl)).toContain(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
   });
 });
 

@@ -137,9 +137,9 @@ export function ModelSelector({
         accessibilityRole="button"
         accessibilityState={{ busy: true, disabled: true }}
         accessibilityLabel={t('common.model')}
-        className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 opacity-50"
+        className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5"
       >
-        <Text className="shrink text-sm font-medium text-muted-foreground" numberOfLines={1}>
+        <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
           {t('common.model')}
         </Text>
         <ChevronDown size={14} color={colors.mutedForeground} />
@@ -202,10 +202,7 @@ export function ModelSelector({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled: effectivelyDisabled }}
-      className={cn(
-        'min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
-        effectivelyDisabled && 'opacity-50'
-      )}
+      className="min-w-0 shrink flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
         <Text className="shrink text-sm font-medium text-foreground" numberOfLines={1}>
@@ -222,13 +219,21 @@ export function ModelSelector({
         {showVariantBadge ? (
           <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">
             <Brain size={12} color={colors.mutedForeground} />
-            <Text className="text-xs font-medium text-muted-foreground" numberOfLines={1}>
+            {/* The label is text, not the chip's chevron/icon, so it keeps
+             * full theme contrast against the badge surface. The muted token
+             * falls below 4.5:1 on `neutral-200`/`neutral-800`, which the
+             * dim-only-chevron/icon rule does not cover (D2). */}
+            <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
               {variantLabel}
             </Text>
           </View>
         ) : null}
       </View>
-      <ChevronDown size={14} color={colors.mutedForeground} />
+      {/* The label stays at full theme contrast; a disabled chip dims only its
+       * chevron so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
+      <View className={cn(effectivelyDisabled && 'opacity-50')}>
+        <ChevronDown size={14} color={colors.mutedForeground} />
+      </View>
     </Pressable>
   );
 }

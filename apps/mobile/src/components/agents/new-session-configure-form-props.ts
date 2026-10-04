@@ -91,6 +91,11 @@ export type NewSessionConfigureFormProps = {
   // Start.
   isSpawningRemote: boolean;
   isStartDisabled: boolean;
+  /**
+   * One line naming why Start is unavailable when the missing repository blocks
+   * it (translated), or null when no such reason applies.
+   */
+  startBlockedReason?: string | null;
   onStartSession: () => void;
   /** The last cloud-create rejection, or null before one. */
   cloudCreateError?: CloudCreateFailure | null;

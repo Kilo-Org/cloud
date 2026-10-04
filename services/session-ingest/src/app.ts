@@ -1,6 +1,7 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { Env } from './env';
 import { z } from 'zod';
 
@@ -14,7 +15,6 @@ import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
 
-const sessionIdSchema = z.string().startsWith('ses_').length(30);
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.uuid(),

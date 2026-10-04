@@ -256,6 +256,27 @@ describe('organization Kilo Pass router', () => {
     expect(createCheckout).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['schedule_conflict', 'PRECONDITION_FAILED', 'another scheduled change'],
+    ['schedule_unavailable', 'CONFLICT', 'could not prepare'],
+  ] as const)(
+    'maps a checkout %s to tRPC %s with a specific message',
+    async (reason, code, message) => {
+      const { OrganizationKiloPassCheckoutScheduleError } =
+        await import('@/lib/kilo-pass-org/cancellation-schedule');
+      createCheckout.mockRejectedValue(new OrganizationKiloPassCheckoutScheduleError(reason));
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.kiloPass.createCheckout({
+          organizationId: parent.id,
+          tier: 'tier_19',
+          allocations: [],
+        })
+      ).rejects.toMatchObject({ code, message: expect.stringContaining(message) });
+    }
+  );
+
   it('maps a stale plan service conflict to tRPC CONFLICT', async () => {
     updateAllocation.mockRejectedValue(new Error('STALE_PLAN_VERSION'));
     const caller = await createCallerForUser(owner.id);

@@ -9115,6 +9115,71 @@
     ],
     "searchBlob": "codingPlans.subscribe Start a subscription to a Kilo coding plan. Pay the plan cost in credits and get the managed provider credential installed. codingplans subscribe planid idempotencykey planId idempotencyKey"
   },
+  "credits.completeAppStorePurchase": {
+    "path": "credits.completeAppStorePurchase",
+    "kind": "mutation",
+    "summary": "Finish an Apple App Store one-off credit-pack purchase by validating the receipt and granting the purchased credits to the user's account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "signedTransactionJws": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "signedTransactionJws"
+      ]
+    },
+    "tags": [
+      "credits",
+      "completeappstorepurchase",
+      "signedtransactionjws"
+    ],
+    "searchBlob": "credits.completeAppStorePurchase Finish an Apple App Store one-off credit-pack purchase by validating the receipt and granting the purchased credits to the user's account. credits completeappstorepurchase signedtransactionjws signedTransactionJws"
+  },
+  "credits.completePlayPurchase": {
+    "path": "credits.completePlayPurchase",
+    "kind": "mutation",
+    "summary": "Finish a Google Play one-off credit-pack purchase by validating the purchase token and granting the purchased credits to the user's account.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "productId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purchaseToken": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "productId",
+        "purchaseToken"
+      ]
+    },
+    "tags": [
+      "credits",
+      "completeplaypurchase",
+      "productid",
+      "purchasetoken"
+    ],
+    "searchBlob": "credits.completePlayPurchase Finish a Google Play one-off credit-pack purchase by validating the purchase token and granting the purchased credits to the user's account. credits completeplaypurchase productid purchasetoken productId purchaseToken"
+  },
+  "credits.getMobileStoreProducts": {
+    "path": "credits.getMobileStoreProducts",
+    "kind": "query",
+    "summary": "List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount.",
+    "inputSchema": {},
+    "tags": [
+      "credits",
+      "getmobilestoreproducts"
+    ],
+    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts"
+  },
   "debug.badInputError": {
     "path": "debug.badInputError",
     "kind": "query",
@@ -9893,6 +9958,53 @@
       "upstream"
     ],
     "searchBlob": "dolthub.verifyUpstream Verify that a DoltHub upstream repository (owner/repo) exists and is accessible. dolthub verifyupstream organizationid upstream organizationId upstream"
+  },
+  "feedback.submit": {
+    "path": "feedback.submit",
+    "kind": "mutation",
+    "summary": "Submit feedback, a bug report, or a feature request about the Kilo platform to the Kilo team. Batch everything into one submission; the endpoint accepts one submission per user per minute.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "feedback_text": {
+          "default": "",
+          "type": "string"
+        },
+        "feedback_for": {
+          "default": "unknown",
+          "type": "string",
+          "minLength": 1
+        },
+        "feedback_batch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "default": "web",
+          "type": "string",
+          "minLength": 1
+        },
+        "context_json": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    "tags": [
+      "feedback",
+      "submit",
+      "feedback_text",
+      "feedback_for",
+      "feedback_batch",
+      "source",
+      "context_json"
+    ],
+    "searchBlob": "feedback.submit Submit feedback, a bug report, or a feature request about the Kilo platform to the Kilo team. Batch everything into one submission; the endpoint accepts one submission per user per minute. feedback submit feedback_text feedback_for feedback_batch source context_json feedback_text feedback_for feedback_batch source context_json"
   },
   "githubApps.beginConnection": {
     "path": "githubApps.beginConnection",
@@ -15790,6 +15902,17 @@
     ],
     "searchBlob": "models.list List all available OpenRouter AI models with their ids, names, vision support, and which ones are marked as preferred. models list"
   },
+  "models.preferred": {
+    "path": "models.preferred",
+    "kind": "query",
+    "summary": "Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "preferred"
+    ],
+    "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
+  },
   "moderation.acceptTerms": {
     "path": "moderation.acceptTerms",
     "kind": "mutation",
@@ -16934,6 +17057,9 @@
               "organization.domain_claim.verify",
               "organization.domain_claim.lose_verification",
               "organization.domain_claim.remove",
+              "organization.domain_claim.cleanup_started",
+              "organization.domain_claim.cleanup_completed",
+              "organization.domain_claim.cleanup_failed",
               "organization.mode.create",
               "organization.mode.update",
               "organization.mode.delete",
@@ -30494,130 +30620,6 @@
     ],
     "searchBlob": "organizations.usageStats Get an organization's usage totals (cost, requests, tokens) over the last 30 days. organizations usagestats organizationid organizationId"
   },
-  "organizations.verifiedDomains.create": {
-    "path": "organizations.verifiedDomains.create",
-    "kind": "mutation",
-    "summary": "Start verifying a domain for an organization. Use to claim an email domain.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "domain": {
-          "type": "string",
-          "maxLength": 512
-        }
-      },
-      "required": [
-        "organizationId",
-        "domain"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "create",
-      "organizationid",
-      "domain"
-    ],
-    "searchBlob": "organizations.verifiedDomains.create Start verifying a domain for an organization. Use to claim an email domain. organizations verifieddomains create organizationid domain organizationId domain"
-  },
-  "organizations.verifiedDomains.list": {
-    "path": "organizations.verifiedDomains.list",
-    "kind": "query",
-    "summary": "List the verified domain claims for an organization.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "list",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.verifiedDomains.list List the verified domain claims for an organization. organizations verifieddomains list organizationid organizationId"
-  },
-  "organizations.verifiedDomains.refresh": {
-    "path": "organizations.verifiedDomains.refresh",
-    "kind": "mutation",
-    "summary": "Re-check the verification status of a claimed domain for an organization. Use to refresh domain verification.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "claimId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "claimId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "refresh",
-      "organizationid",
-      "claimid"
-    ],
-    "searchBlob": "organizations.verifiedDomains.refresh Re-check the verification status of a claimed domain for an organization. Use to refresh domain verification. organizations verifieddomains refresh organizationid claimid organizationId claimId"
-  },
-  "organizations.verifiedDomains.remove": {
-    "path": "organizations.verifiedDomains.remove",
-    "kind": "mutation",
-    "summary": "Remove a verified domain claim from an organization. Use to delete a domain claim.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "claimId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "claimId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "remove",
-      "organizationid",
-      "claimid"
-    ],
-    "searchBlob": "organizations.verifiedDomains.remove Remove a verified domain claim from an organization. Use to delete a domain claim. organizations verifieddomains remove organizationid claimid organizationId claimId"
-  },
   "organizations.withMembers": {
     "path": "organizations.withMembers",
     "kind": "query",
@@ -37792,6 +37794,46 @@
       "organizationid"
     ],
     "searchBlob": "webhookTriggers.get Get the full configuration and inbound webhook URL for a single webhook trigger by its trigger ID. webhooktriggers get triggerid organizationid triggerId organizationId"
+  },
+  "webhookTriggers.getRequestLogs": {
+    "path": "webhookTriggers.getRequestLogs",
+    "kind": "query",
+    "summary": "Retrieve the log details for a specific webhook request received by a trigger, including what happened during that delivery. Use to inspect or debug an individual incoming webhook call.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "triggerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "triggerId",
+        "requestId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "webhooktriggers",
+      "getrequestlogs",
+      "triggerid",
+      "requestid",
+      "organizationid"
+    ],
+    "searchBlob": "webhookTriggers.getRequestLogs Retrieve the log details for a specific webhook request received by a trigger, including what happened during that delivery. Use to inspect or debug an individual incoming webhook call. webhooktriggers getrequestlogs triggerid requestid organizationid triggerId requestId organizationId"
   },
   "webhookTriggers.invoke": {
     "path": "webhookTriggers.invoke",

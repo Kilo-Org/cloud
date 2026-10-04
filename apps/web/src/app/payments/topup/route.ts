@@ -8,6 +8,8 @@ import { captureException } from '@sentry/nextjs';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import { clientIpFromHeaders } from '@/lib/admin/admin-access-log';
+import { ipCountryFromHeaders, ja4FromHeaders } from '@/lib/bouncer/credit-events';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -66,11 +68,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
   }
 
   let stripeCustomerId: string | null | undefined;
+  let accountCreatedAt: Date | string = currentUser.created_at;
   if (organizationId) {
     const orgContext = await getAuthorizedOrgContext(organizationId, ORGANIZATION_BILLING_ROLES);
     if (!orgContext.success) {
       return orgContext.nextResponse;
     }
+    accountCreatedAt = orgContext.data.organization.created_at;
     stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
   } else {
     stripeCustomerId = currentUser.stripe_customer_id;
@@ -85,7 +89,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
     validationResult.amount as number,
     origin,
     organizationId,
-    cancelPath
+    cancelPath,
+    {
+      accountCreatedAt,
+      ip: clientIpFromHeaders(request.headers),
+      ipCountry: ipCountryFromHeaders(request.headers),
+      ja4: ja4FromHeaders(request.headers),
+    }
   );
 
   if (!url) {

@@ -18,8 +18,8 @@ vi.mock('cloudflare:workers', () => ({ DurableObject: DurableObjectMock }));
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 
 import {
+  CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
-  CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
 import {
   ContainersAllocationConflictError,
@@ -29,8 +29,8 @@ import {
 } from './SandboxContainers.js';
 import type { Env } from '../types.js';
 
-// The fake proves coordinator ordering only. It does not prove that the platform snapshot survives
-// destroy(), that a restored filesystem contains user files, or that exec behaves as assumed.
+// The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
+// fails any attempt to snapshot the container so a stop that snapshots cannot pass silently.
 const RECORD_KEY = 'containers:record:v1';
 const REF_A = 'ref-a';
 const REF_B = 'ref-b';
@@ -86,9 +86,6 @@ function makeExecProcess(behavior: ExecBehavior = {}): ExecProcess {
 
 type StartBehavior = 'ok' | 'reject' | 'effect-then-reject';
 type DestroyBehavior = 'ok' | 'reject' | 'deferred' | 'hang';
-type SnapshotBehavior = { kind: 'resolve'; id: string } | { kind: 'reject' } | { kind: 'deferred' };
-
-type DeferredSnapshot = { resolve: (id: string) => void; reject: (error: Error) => void };
 
 class FakeContainer {
   running = false;
@@ -106,8 +103,6 @@ class FakeContainer {
 
   startBehavior: StartBehavior = 'ok';
   destroyBehavior: DestroyBehavior = 'ok';
-  snapshotBehavior: SnapshotBehavior = { kind: 'resolve', id: 'snap-1' };
-  deferredSnapshots: DeferredSnapshot[] = [];
   deferredDestroy: { resolve: () => void; reject: (error: Error) => void } | null = null;
   execHandler: (cmd: string[]) => ExecProcess | Promise<ExecProcess> = () =>
     makeExecProcess({ exitCode: 0 });
@@ -130,16 +125,7 @@ class FakeContainer {
 
   async snapshotContainer(_options: ContainerSnapshotOptions): Promise<ContainerSnapshot> {
     this.snapshotCalls += 1;
-    if (this.snapshotBehavior.kind === 'reject') throw new Error('container snapshot failed');
-    if (this.snapshotBehavior.kind === 'deferred') {
-      return await new Promise<ContainerSnapshot>((resolve, reject) => {
-        this.deferredSnapshots.push({
-          resolve: id => resolve({ id, size: 1 }),
-          reject,
-        });
-      });
-    }
-    return { id: this.snapshotBehavior.id, size: 1 };
+    throw new Error('container snapshot is disabled');
   }
 
   async destroy(): Promise<void> {
@@ -272,7 +258,7 @@ describe('SandboxContainers launch', () => {
       { image: 'registry.example/kilo/app:test', instance: 'standard-2', enableInternet: true },
     ]);
     expect(container.execCalls).toEqual([
-      { cmd: ['bun', 'run', CONTROL_WRAPPER_PATH], options: { env: { FOO: 'bar' }, cwd: '/' } },
+      { cmd: ['/bin/sh', CONTROL_SUPERVISOR_PATH], options: { env: { FOO: 'bar' }, cwd: '/' } },
     ]);
     expect(container.monitorCalls).toBe(0);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
@@ -284,7 +270,7 @@ describe('SandboxContainers launch', () => {
     expect(container.execCalls).toHaveLength(1);
   });
 
-  it('restores a stored snapshot with containerSnapshot and never passes image', async () => {
+  it('starts from the image even when a stored snapshot exists', async () => {
     const { instance, container } = setup({
       record: {
         state: 'idle',
@@ -298,11 +284,11 @@ describe('SandboxContainers launch', () => {
 
     const options = container.startCalls[0] as Record<string, unknown>;
     expect(options).toEqual({
-      containerSnapshot: { id: 'snap-stored' },
+      image: 'registry.example/kilo/app:test',
       instance: 'lite',
       enableInternet: true,
     });
-    expect('image' in options).toBe(false);
+    expect('containerSnapshot' in options).toBe(false);
   });
 
   it('installs the Kilo and git outbound proxy before a contained start', async () => {
@@ -325,7 +311,7 @@ describe('SandboxContainers launch', () => {
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls).toEqual([
       {
-        cmd: ['bun', 'run', CONTROL_WRAPPER_PATH],
+        cmd: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
         options: {
           cwd: '/',
           env: {
@@ -361,7 +347,7 @@ describe('SandboxContainers launch', () => {
     });
 
     expect(resumed).toEqual({ started: true });
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
     expect(container.execCalls[1]?.options?.env).toEqual({
       FOO: 'bar',
       SANDBOX_INTERCEPT_HTTPS: '1',
@@ -401,7 +387,7 @@ describe('SandboxContainers launch', () => {
     const reexecuted = await launch(reexecs.instance, REF_A);
     expect(reexecuted).toEqual({ started: true });
     expect(reexecs.readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
-    expect(reexecs.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(reexecs.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
   });
 
   it('detects a wrapper that appears late while the pid-0 handle exitCode stays pending', async () => {
@@ -439,8 +425,8 @@ describe('SandboxContainers launch', () => {
     });
     await vi.advanceTimersByTimeAsync(65_000);
     expect(settled).toBe(false);
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun', 'pgrep']);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['/bin/sh', 'pgrep']);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -450,7 +436,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(pending).resolves.toEqual({ started: true });
     expect(maxActiveProbes).toBe(1);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(container.execCalls.at(-1)?.cmd[0]).toBe('pgrep');
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
@@ -474,7 +460,7 @@ describe('SandboxContainers launch', () => {
     const pending = launch(instance, REF_A);
     await vi.advanceTimersByTimeAsync(39_000);
     expect(buns).toBe(1);
-    expect(container.execCalls[0]?.cmd[0]).toBe('bun');
+    expect(container.execCalls[0]?.cmd[0]).toBe('/bin/sh');
 
     await vi.advanceTimersByTimeAsync(1_000);
     expect(buns).toBe(1);
@@ -483,7 +469,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(1);
     await expect(pending).resolves.toEqual({ started: true });
     expect(buns).toBe(2);
-    expect(container.execCalls.at(-1)?.cmd[0]).toBe('bun');
+    expect(container.execCalls.at(-1)?.cmd[0]).toBe('/bin/sh');
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
@@ -561,7 +547,7 @@ describe('SandboxContainers launch', () => {
     await expect(outcome).resolves.toBe('rejected');
     expect(absentProbes).toBeGreaterThanOrEqual(1);
     expect(ambiguousProbes).toBeGreaterThanOrEqual(1);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -632,7 +618,7 @@ describe('SandboxContainers launch', () => {
     expect(maxActiveProbes).toBe(1);
     expect(pgrepStarts[1] ?? -1).toBeGreaterThanOrEqual(pgrepSettles[0] ?? Number.MAX_SAFE_INTEGER);
     expect(pgrepStarts[0] ?? -1).toBe(0);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
@@ -647,11 +633,11 @@ describe('SandboxContainers launch', () => {
       () => 'rejected' as const
     );
     await vi.advanceTimersByTimeAsync(89_000);
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['/bin/sh']);
 
     await vi.advanceTimersByTimeAsync(1_000);
     await expect(outcome).resolves.toBe('rejected');
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['/bin/sh']);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -662,7 +648,7 @@ describe('SandboxContainers launch', () => {
     await expect(launch(instance, REF_A)).rejects.toThrow(
       'pending and the container is not running'
     );
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
   });
 
   it('does not start a second bun while a pid-0 handle exitCode is pending', async () => {
@@ -681,7 +667,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(90_000);
 
     await expect(outcome).resolves.toBe('rejected');
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       wrapperAttempt: 'exec_pending',
@@ -721,7 +707,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(40_000);
     await expect(outcome).resolves.toBe('rejected');
     expect(pgrepCalls).toBe(1);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       wrapperAttempt: 'exec_pending',
@@ -759,7 +745,7 @@ describe('SandboxContainers launch', () => {
 
     resolveProbe(makeExecProcess({ exitCode: 0 }));
     await expect(outcome).resolves.toBe('rejected');
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -806,7 +792,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(1_000);
     await expect(outcome).resolves.toBe('rejected');
     expect(pgrepCalls).toBe(probesAt89);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       wrapperAttempt: 'exec_pending',
@@ -845,7 +831,7 @@ describe('SandboxContainers launch', () => {
     expect(pgrepStarts.at(-1) ?? 0).toBeGreaterThanOrEqual(88_000);
     expect(execStarts.filter(start => start >= 90_000)).toEqual([]);
     expect(pgrepStarts.filter(start => start >= 90_000)).toEqual([]);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -873,12 +859,12 @@ describe('SandboxContainers launch', () => {
     await expect(launch(rejected.instance, REF_A)).rejects.toThrow(
       'pending and no wrapper was found'
     );
-    expect(rejected.container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(rejected.container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
 
     // An ambiguous probe never re-execs either.
     rejected.container.execHandler = () => makeExecProcess({ exitCode: 2 });
     await expect(launch(rejected.instance, REF_A)).rejects.toThrow('Wrapper probe was ambiguous');
-    expect(rejected.container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(rejected.container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
   });
 
   it('applies the requested instance when resuming a pre-exec launch whose start never took effect', async () => {
@@ -902,20 +888,23 @@ describe('SandboxContainers launch', () => {
     expect(container.startCalls).toEqual([
       { image: 'registry.example/kilo/app:test', instance: 'standard-3', enableInternet: true },
     ]);
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
-  it('repairs a stopping record that lacks a stop op id before snapshotting', async () => {
-    const { instance, readRecord } = setup({
+  it('repairs a stopping record that lacks a stop op id and destroys without snapshotting', async () => {
+    const { instance, container, readRecord } = setup({
       record: { ...idleRecord, state: 'stopping', allocationRef: REF_A, stopOpId: null },
     });
 
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
 
+    expect(container.snapshotCalls).toBe(0);
+    expect(container.destroyCalls).toBe(1);
     expect(readRecord()).toMatchObject({
       state: 'idle',
-      lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
+      allocationRef: null,
+      lastSnapshot: null,
     });
   });
 
@@ -1180,7 +1169,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       containment: true,
     });
 
-    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:bun']);
+    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:/bin/sh']);
   });
 
   it('orders containment before start, probe and bun on a stopped pre-exec resume', async () => {
@@ -1207,7 +1196,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       'http-intercept',
       'start',
       'exec:pgrep',
-      'exec:bun',
+      'exec:/bin/sh',
     ]);
   });
 });
@@ -1308,35 +1297,28 @@ describe('SandboxContainers observe', () => {
 });
 
 describe('SandboxContainers stop', () => {
-  it('serialises duplicate stops while the snapshot resolves, destroying once after confirmation', async () => {
+  it('destroys without snapshotting and keeps an already stored snapshot untouched', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        lastSnapshot: { id: 'old-snap', sourceAllocation: REF_A },
+      },
     });
     container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
 
-    let first: 'terminal' | 'retryable' | undefined;
-    let second: 'terminal' | 'retryable' | undefined;
-    const firstStop = instance.stop(REF_A).then(result => {
-      first = result;
-    });
-    const secondStop = instance.stop(REF_A).then(result => {
-      second = result;
-    });
+    const result = await instance.stop(REF_A);
 
-    await vi.waitFor(() => expect(container.snapshotCalls).toBe(1));
-    expect(first).toBeUndefined();
-    expect(second).toBeUndefined();
-    expect(container.destroyCalls).toBe(0);
-
-    container.deferredSnapshots[0]?.resolve('snap-1');
-    await Promise.all([firstStop, secondStop]);
-
-    expect(first).toBe('terminal');
-    expect(second).toBe('terminal');
-    expect(container.snapshotCalls).toBe(1);
+    expect(result).toBe('terminal');
+    expect(container.snapshotCalls).toBe(0);
     expect(container.destroyCalls).toBe(1);
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, stopOpId: null });
+    expect(readRecord()).toEqual({
+      state: 'idle',
+      allocationRef: null,
+      stopOpId: null,
+      lastSnapshot: { id: 'old-snap', sourceAllocation: REF_A },
+    });
   });
 
   it('retains ownership when destroy fails, then a retried stop resumes the persisted op and destroys', async () => {
@@ -1354,143 +1336,21 @@ describe('SandboxContainers stop', () => {
     expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
     expect(container.running).toBe(true);
 
-    container.snapshotBehavior = { kind: 'deferred' };
-    container.destroyBehavior = 'ok';
+    container.destroyBehavior = 'deferred';
     let second: 'terminal' | 'retryable' | undefined;
     const secondStop = instance.stop(REF_A).then(result => {
       second = result;
     });
 
-    await vi.waitFor(() => expect(container.snapshotCalls).toBe(2));
+    await vi.waitFor(() => expect(container.destroyCalls).toBe(2));
     expect(second).toBeUndefined();
     expect(readRecord().stopOpId).toBe(persistedOpId);
 
-    container.deferredSnapshots[0]?.resolve('snap-2');
+    container.deferredDestroy?.resolve();
     await secondStop;
 
     expect(second).toBe('terminal');
-    expect(readRecord()).toEqual({
-      state: 'idle',
-      allocationRef: null,
-      stopOpId: null,
-      lastSnapshot: { id: 'snap-2', sourceAllocation: REF_A },
-    });
-  });
-
-  it('does not publish a snapshot that resolves after the allocation was replaced', async () => {
-    vi.useFakeTimers();
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
-
-    const stopPromise = instance.stop(REF_A);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(1);
-
-    await vi.advanceTimersByTimeAsync(11_000);
-    await expect(stopPromise).resolves.toBe('terminal');
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
-
-    await launch(instance, REF_B);
-    expect(readRecord()).toMatchObject({
-      state: 'running',
-      allocationRef: REF_B,
-      lastSnapshot: null,
-    });
-
-    container.deferredSnapshots[0]?.resolve('late-snap');
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(readRecord().lastSnapshot).toBeNull();
-  });
-
-  it('does not let a timed-out stop publish after a later stop owns the record (no ABA)', async () => {
-    vi.useFakeTimers();
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
-
-    const firstStop = instance.stop(REF_A);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(1);
-    const firstOpId = readRecord().stopOpId;
-
-    await vi.advanceTimersByTimeAsync(10_000);
-    await expect(firstStop).resolves.toBe('terminal');
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
-    expect(container.deferredSnapshots).toHaveLength(1);
-
-    await launch(instance, REF_A);
-    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
-
-    const secondStop = instance.stop(REF_A);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(2);
-    const secondOpId = readRecord().stopOpId;
-    expect(secondOpId).toEqual(expect.any(String));
-    expect(secondOpId).not.toBe(firstOpId);
-
-    container.deferredSnapshots[0]?.resolve('late-op1');
-    await vi.advanceTimersByTimeAsync(0);
-    expect(readRecord()).toEqual({
-      state: 'stopping',
-      allocationRef: REF_A,
-      stopOpId: secondOpId,
-      lastSnapshot: null,
-      instance: 'standard-2',
-    });
-
-    container.deferredSnapshots[1]?.resolve('op2');
-    await secondStop;
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(readRecord().lastSnapshot).toEqual({ id: 'op2', sourceAllocation: REF_A });
-  });
-
-  it('defers a late snapshot behind a pending destroy so it cannot publish during cleanup', async () => {
-    vi.useFakeTimers();
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
-    container.destroyBehavior = 'deferred';
-
-    let settled: 'terminal' | 'retryable' | undefined;
-    const stopPromise = instance.stop(REF_A).then(result => {
-      settled = result;
-      return result;
-    });
-
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(1);
-    const opId = readRecord().stopOpId;
-
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(container.destroyCalls).toBe(1);
-    expect(container.deferredDestroy).not.toBeNull();
-    expect(settled).toBeUndefined();
-
-    container.deferredSnapshots[0]?.resolve('late-snap');
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(readRecord()).toEqual({
-      state: 'stopping',
-      allocationRef: REF_A,
-      stopOpId: opId,
-      lastSnapshot: null,
-    });
-
-    container.deferredDestroy?.resolve();
-    await stopPromise;
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(settled).toBe('terminal');
-    expect(container.destroyCalls).toBe(1);
+    expect(container.snapshotCalls).toBe(0);
     expect(readRecord()).toEqual({
       state: 'idle',
       allocationRef: null,
@@ -1527,7 +1387,7 @@ describe('SandboxContainers stop', () => {
       state: 'stopping',
       allocationRef: REF_A,
       stopOpId: opId,
-      lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
+      lastSnapshot: null,
     });
   });
 
@@ -1580,22 +1440,8 @@ describe('SandboxContainers stop', () => {
       state: 'idle',
       allocationRef: null,
       stopOpId: null,
-      lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
+      lastSnapshot: null,
     });
-  });
-
-  it('destroys even when the snapshot fails', async () => {
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'reject' };
-
-    const result = await instance.stop(REF_A);
-
-    expect(result).toBe('terminal');
-    expect(container.destroyCalls).toBe(1);
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
   });
 
   it('does not clear a pending phase when a timed-out destroy later resolves, but a confirmed stop does', async () => {

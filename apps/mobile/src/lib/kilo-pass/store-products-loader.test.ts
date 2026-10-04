@@ -135,6 +135,33 @@ describe('loadAppStoreKiloPassProducts', () => {
 
     expect(fetchStoreProducts).toHaveBeenCalledWith(['kilopass_tier19', 'kilopass_tier49']);
   });
+
+  it('does not probe the same hung store per product id when the combined call times out', async () => {
+    vi.useFakeTimers();
+    try {
+      const gate = Promise.withResolvers<never>();
+      const fetchStoreProducts = vi.fn().mockReturnValue(gate.promise);
+
+      const attempt = loadAppStoreKiloPassProducts({
+        storefront: 'app_store',
+        fetchStoreProducts,
+        loadBackendProducts: vi.fn().mockResolvedValue({
+          appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+          products: backendProducts,
+        }),
+      });
+      const rejection = expect(attempt).rejects.toBeInstanceOf(Error);
+
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      await rejection;
+      // One combined call and no per-id probes: a hung store would answer the
+      // probes no better, and each probe would spend another deadline.
+      expect(fetchStoreProducts).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('getAuthoredProductsErrorMessage', () => {

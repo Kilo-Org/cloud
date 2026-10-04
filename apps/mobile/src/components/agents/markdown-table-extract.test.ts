@@ -68,8 +68,12 @@ async function loadSplitter() {
 }
 
 describe('splitMarkdownTables', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // `splitMarkdownTables` lexes through the module-level cache, so a value a
+    // preceding test already lexed would make this test's own lex invisible.
+    const { clearMarkdownParseCachesForTests } = await import('./markdown-parse-cache');
+    clearMarkdownParseCachesForTests();
   });
 
   it('returns text and table segments in source order with ordinal keys', async () => {
@@ -131,6 +135,22 @@ describe('splitMarkdownTables', () => {
     const spy = vi.spyOn(markedModule, 'MarkedLexer');
 
     splitMarkdownTables(VALUE);
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('retains a value larger than the lex-cache budget across calls', async () => {
+    // Regression: the character-bounded cache evicted its sole just-inserted
+    // entry when the key alone exceeded the 2,000,000-char budget, so a value at
+    // 10x the audit's 256 KB message was never cached and every call re-lexed it.
+    const splitMarkdownTables = await loadSplitter();
+    const markedModule = await import('react-native-marked');
+    const spy = vi.spyOn(markedModule, 'MarkedLexer');
+    const huge = `| A |\n| --- |\n| ${'x'.repeat(2_100_000)} |`;
+
+    splitMarkdownTables(huge);
+    splitMarkdownTables(huge);
 
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();

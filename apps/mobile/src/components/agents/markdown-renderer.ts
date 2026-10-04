@@ -29,7 +29,6 @@ import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import {
   getLinkAccessibilityActions,
   getLinkAccessibilityHint,
-  getLinkLongPressHandler,
   resolveLinkAccessibilityLabel,
 } from './markdown-link';
 import { type MarkdownPalette } from './markdown-palette';
@@ -139,13 +138,41 @@ type MarkdownRendererHandlers = {
   onLongPressCode?: MarkdownCodeLongPressHandler;
 };
 
+export type { MarkdownRendererHandlers };
+
 export class MarkdownRenderer extends Renderer {
   private readonly palette: MarkdownPalette;
   private readonly selectable: boolean;
-  private readonly onLongPressLink?: MarkdownLinkLongPressHandler;
-  private readonly onPressLink?: MarkdownLinkPressHandler;
-  private readonly onCopyCode?: MarkdownCopyCodeHandler;
-  private readonly onLongPressCode?: MarkdownCodeLongPressHandler;
+  // The handlers are mutable because a render can be cached and reused by a
+  // later mount, after the host has recomputed its message-bound closures (a
+  // reaction or delivery failure updates the message without changing its
+  // markdown). The cached elements read these fields at call time and a reused
+  // mount refreshes them through `setHandlers`, so a fence long-press always
+  // dispatches through the current message.
+  private onLongPressLink?: MarkdownLinkLongPressHandler;
+  private onPressLink?: MarkdownLinkPressHandler;
+  private onCopyCode?: MarkdownCopyCodeHandler;
+  private onLongPressCode?: MarkdownCodeLongPressHandler;
+  // Stable dispatchers handed to cached child elements. They read the current
+  // handler fields, so an element built by an earlier render still reaches the
+  // handler `setHandlers` bound most recently.
+  private readonly copyCode = (code: string): void => {
+    this.onCopyCode?.(code);
+  };
+  private readonly longPressCode = (): void => {
+    this.onLongPressCode?.();
+  };
+  private readonly linkLongPress = (href: string, event?: GestureResponderEvent): void => {
+    // A table link forwards the press event so the host can stop its
+    // propagation; the image/accessibility call sites have no event and must
+    // keep invoking the host with one argument.
+    if (event === undefined) {
+      this.onLongPressLink?.(href);
+    } else {
+      this.onLongPressLink?.(href, event);
+    }
+  };
+  private readonly linkPress = (href: string): boolean => this.onPressLink?.(href) ?? false;
   // Ordinal host key: the parser builds every header/body cell (each consuming
   // getKey()) before table() returns, so a slugger-based host key would shift
   // as rows/cells grow. A fresh renderer per parse restarts this counter, so
@@ -157,6 +184,19 @@ export class MarkdownRenderer extends Renderer {
     super();
     this.palette = palette;
     this.selectable = selectable;
+    this.onLongPressLink = handlers.onLongPressLink;
+    this.onPressLink = handlers.onPressLink;
+    this.onCopyCode = handlers.onCopyCode;
+    this.onLongPressCode = handlers.onLongPressCode;
+  }
+
+  /**
+   * Point this renderer at the host's current interactive handlers. Called when
+   * a mount reuses this renderer's cached elements, so their callbacks dispatch
+   * through the current message-bound closures rather than the ones captured
+   * when the elements were first built.
+   */
+  setHandlers(handlers: MarkdownRendererHandlers): void {
     this.onLongPressLink = handlers.onLongPressLink;
     this.onPressLink = handlers.onPressLink;
     this.onCopyCode = handlers.onCopyCode;
@@ -216,9 +256,10 @@ export class MarkdownRenderer extends Renderer {
         language: normalizeFenceLanguage(language),
         selectable: this.selectable,
         baseColor: this.palette.textColor,
+        tokenScheme: this.palette.codeTokenScheme,
         maxLength: MARKDOWN_CODE_CHARACTER_CAP,
-        onCopyCode: this.onCopyCode,
-        onLongPressCode: this.onLongPressCode,
+        onCopyCode: this.onCopyCode === undefined ? undefined : this.copyCode,
+        onLongPressCode: this.onLongPressCode === undefined ? undefined : this.longPressCode,
       })
     );
   }
@@ -290,7 +331,7 @@ export class MarkdownRenderer extends Renderer {
                   /* eslint-disable typescript-eslint/no-confusing-void-expression -- the link action runs the host confirm or the chat sheet; its void result is discarded by design */
                   onShowLinkActions: () =>
                     this.onLongPressLink
-                      ? this.onLongPressLink(href)
+                      ? this.linkLongPress(href)
                       : confirmAndOpenMarkdownLink(href, {
                           label: interactionProps.accessibilityLabel,
                         }),
@@ -325,18 +366,19 @@ export class MarkdownRenderer extends Renderer {
       accessibilityActions: getLinkAccessibilityActions(this.onLongPressLink !== undefined),
       onAccessibilityAction: (event: AccessibilityActionEvent) => {
         if (event.nativeEvent.actionName === 'showLinkActions') {
-          this.onLongPressLink?.(href);
+          this.linkLongPress(href);
         }
       },
       onLongPress:
         this.onLongPressLink !== undefined
-          ? getLinkLongPressHandler(this.onLongPressLink, href)
+          ? (event: GestureResponderEvent) => {
+              this.onLongPressLink?.(href, event);
+            }
           : () => {
               confirmAndOpenMarkdownLink(href, { label: accessibilityLabel });
             },
       onPress: () => {
-        const handled = this.onPressLink?.(href);
-        if (handled) {
+        if (this.linkPress(href)) {
           return;
         }
         confirmAndOpenMarkdownLink(href, { label: accessibilityLabel });
@@ -437,8 +479,8 @@ export class MarkdownRenderer extends Renderer {
       rowCount,
       header,
       rows,
-      onLongPressLink: this.onLongPressLink,
-      onPressLink: this.onPressLink,
+      onLongPressLink: this.onLongPressLink === undefined ? undefined : this.linkLongPress,
+      onPressLink: this.onPressLink === undefined ? undefined : this.linkPress,
     });
   }
 }

@@ -26,6 +26,7 @@ import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
+import { estimateSessionListHeaderActionsWidth } from '@/components/agents/session-list-header-actions-width';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
@@ -214,21 +215,26 @@ export function AgentSessionListScreen() {
   // this is the only route to stored sessions there (UX repair, agents-empty).
   const viewHistoryLabel = t('agents.sessionList.viewHistory');
   // The list controls share the title's row through the header's `inlineActions`
-  // slot, trailing the eyebrow + title heading. The heading keeps
-  // `min-w-0 flex-1`, so the 30px title keeps its tail ellipsis while the
-  // controls keep their full width — sharing that row through the old
-  // `headerRight` half-row cap squeezed both columns on a narrow viewport until
-  // the title broke mid-word and this label stacked onto two lines (device
-  // capture at 480x1040: "Age / nts" beside "SEE / ALL"). On its own row the
-  // control keeps the header's full width at every display size, and the
-  // reserved row height keeps the header from moving when the filter button
-  // appears with the loaded sessions; the box can shrink so an extreme
-  // accessibility scale ellipsizes the label instead of wrapping it to a
-  // second line.
-  // The controls row is a section header, not a bare action: its label owns the
-  // row start and grows, so the controls keep the row end — the same shape the
-  // Home live-sessions header uses. A row holding only the trailing 'See all'
-  // read as a section header whose label was missing (e2, agents).
+  // slot while the row can still hold a readable 30px title: the heading keeps
+  // `min-w-0 flex-1`, so the title tail-ellipsizes and the controls keep their
+  // full width instead of the old `headerRight` half-row cap wrapping them. The
+  // row holds only the two trailing controls — the history link and the filter
+  // button — packed to the row end, so the live count beside the title is the
+  // row's only label and nothing sits between the title and the controls. It
+  // reflows onto its own full-width row when the controls cannot share the
+  // title's row: the Croatian catalog made the row as wide as the title's
+  // readable minimum on a narrow phone, so `Agenti` broke mid-word into
+  // "Age" / "nti" (owner capture, agents-header-hr-20260929). The estimate below
+  // reserves the row's laid-out width for that decision; on its own row the
+  // controls keep the header's full width at every display size, and the box can
+  // shrink so an extreme accessibility scale ellipsizes the link instead of
+  // wrapping it to a second line.
+  const inlineActionsWidth = estimateSessionListHeaderActionsWidth({
+    historyLabel,
+    showFilter: query.canFilter,
+    fontScale,
+    isRTL: I18nManager.isRTL,
+  });
   // The history route is the app's only route to the stored-session history,
   // which exists independently of the live list, so it outlives the live
   // section: the accepted-empty state carries the same control in the body,
@@ -265,7 +271,6 @@ export function AgentSessionListScreen() {
   const viewHistoryAction = historyControl(viewHistoryLabel);
   const headerActions = (
     <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
-      <Eyebrow className="min-w-0 grow">{t('home.agentSessions')}</Eyebrow>
       {historyControl(historyLabel)}
       {query.canFilter ? (
         <SessionFilterButton
@@ -484,10 +489,13 @@ export function AgentSessionListScreen() {
             // The count is an assertion about the current snapshot, so it is
             // withheld whenever that snapshot cannot be confirmed: while the
             // list is unresolved (loading or membership unknown) and while the
-            // live query is in an error state, exactly as the tab badge is.
-            // The cached rows themselves stay on screen, so a failed refresh
-            // never blanks the list it kept.
-            !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
+            // live query is in an error state, exactly as the tab badge is. An
+            // accepted-empty snapshot is confirmed but names no live sessions,
+            // so it withholds the count too, matching the badge's hide-at-zero,
+            // and the empty card below is the sole live-session content. The
+            // cached rows themselves stay on screen, so a failed refresh never
+            // blanks the list it kept.
+            !sessions.isLoading && !sessions.isError && hasLiveRows
               ? t('agents.liveCount', { count: activeSessions.length })
               : undefined
           }
@@ -495,15 +503,15 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          // An accepted empty live list must not advertise a live section: the
-          // `Live now` label names sessions that do not exist. The whole row is
-          // withheld, so the accepted-empty state renders no live-sessions row
-          // at all, and the body below carries the history route instead
-          // (`LiveSessionListEmptyState`'s `historyAction`). Rows, pending, and
+          // An accepted empty live list carries the history route in its body
+          // (`LiveSessionListEmptyState`'s `historyAction`), so the controls row
+          // is withheld there: the empty state renders exactly one history
+          // control instead of a duplicate in the header. Rows, pending, and
           // error keep the full row byte-identical, and the search/filter
           // no-match body is a `rows` state
           // (`hasLiveRows && visibleSessions.length === 0`), so its row stays.
           inlineActions={content === 'empty' ? undefined : headerActions}
+          inlineActionsWidth={inlineActionsWidth}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

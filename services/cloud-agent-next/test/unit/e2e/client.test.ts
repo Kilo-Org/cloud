@@ -902,7 +902,7 @@ describe('create helper session tracking', () => {
 
     expect(prepared.cloudAgentSessionId).toBe(SESSION_ID);
     expect(onSessionCreated).toHaveBeenCalledTimes(1);
-    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID);
+    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID, 'ses_1');
   });
 
   it('does not report an id when prepareBrowserSession rejects', async () => {
@@ -931,7 +931,7 @@ describe('create helper session tracking', () => {
 
     expect(created.cloudAgentSessionId).toBe(SESSION_ID);
     expect(onSessionCreated).toHaveBeenCalledTimes(1);
-    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID);
+    expect(onSessionCreated).toHaveBeenCalledWith(SESSION_ID, 'ses_2');
   });
 
   it('does not report an id when createWorktreeChat rejects', async () => {

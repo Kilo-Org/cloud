@@ -7,8 +7,8 @@ import type {
 } from '@kilocode/worker-utils/github-authorization';
 import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
-import type { SandboxControl } from './persistence/SandboxControl.js';
-import type { SandboxSession } from './sandbox-session/SandboxSession.js';
+import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
+import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // Type-only exception to "no reverse import from production code": erased at

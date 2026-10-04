@@ -1,10 +1,7 @@
 import * as z from 'zod';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
-
-// ---------------------------------------------------------------------------
-// Wire-level envelope
-// ---------------------------------------------------------------------------
 
 export const cloudAgentEventSchema = z.object({
   eventId: z.number(),
@@ -33,10 +30,6 @@ export const streamErrorSchema = z.object({
   message: z.string(),
 });
 export type StreamError = z.infer<typeof streamErrorSchema>;
-
-// ---------------------------------------------------------------------------
-// Session / cloud status discriminated unions
-// ---------------------------------------------------------------------------
 
 export const sessionStatusSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('busy') }),
@@ -72,10 +65,6 @@ export const cloudStatusSchema = z.discriminatedUnion('type', [
 ]);
 export type CloudStatus = z.infer<typeof cloudStatusSchema>;
 
-// ---------------------------------------------------------------------------
-// Question / permission payloads
-// ---------------------------------------------------------------------------
-
 export const questionPayloadSchema = z
   .object({
     requestId: z.string(),
@@ -96,10 +85,6 @@ export const permissionPayloadSchema = z
   })
   .passthrough();
 export type PermissionState = z.infer<typeof permissionPayloadSchema>;
-
-// ---------------------------------------------------------------------------
-// Remote CLI model catalog
-// ---------------------------------------------------------------------------
 
 export const REMOTE_MODEL_MAX_PROVIDERS = 64;
 export const REMOTE_MODEL_MAX_MODELS_PER_PROVIDER = 512;
@@ -341,10 +326,6 @@ export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transfo
 });
 export type RemoteModelCatalogV1 = z.output<typeof remoteModelCatalogV1Schema>;
 
-// ---------------------------------------------------------------------------
-// Remote CLI command catalog
-// ---------------------------------------------------------------------------
-
 export const REMOTE_COMMAND_MAX_COMMANDS = 256;
 export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
@@ -423,10 +404,6 @@ export const userWebCommandErrorDataSchema = z
   .strict();
 export type UserWebCommandErrorData = z.infer<typeof userWebCommandErrorDataSchema>;
 
-// ---------------------------------------------------------------------------
-// WebSocket inbound message (CLI live transport)
-// ---------------------------------------------------------------------------
-
 export const webInboundMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('event'),
@@ -445,10 +422,6 @@ export const webInboundMessageSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type WebInboundMessage = z.infer<typeof webInboundMessageSchema>;
-
-// ---------------------------------------------------------------------------
-// Active CLI sessions
-// ---------------------------------------------------------------------------
 
 export const activeSessionCapabilitiesSchema = z
   .object({
@@ -512,11 +485,7 @@ export const cliConnectionDataSchema = z.object({
 });
 export type CliConnectionData = z.infer<typeof cliConnectionDataSchema>;
 
-export const kiloSessionIdSchema = z
-  .string()
-  .startsWith('ses_')
-  .length(30)
-  .transform(id => id as KiloSessionId);
+export const kiloSessionIdSchema = sessionIdSchema.transform(id => id as KiloSessionId);
 export type KiloSessionIdInput = z.input<typeof kiloSessionIdSchema>;
 
 /**
@@ -537,10 +506,6 @@ export const createSessionResponseV1Schema = z
   })
   .strict();
 export type CreateSessionResponseV1 = z.infer<typeof createSessionResponseV1Schema>;
-
-// ---------------------------------------------------------------------------
-// Remote CLI directory listing (list_directories)
-// ---------------------------------------------------------------------------
 
 const REMOTE_DIRECTORY_MAX_ENTRIES = 256;
 const REMOTE_DIRECTORY_MAX_STRING_LENGTH = 2_000;
@@ -566,10 +531,6 @@ export const listDirectoriesV1Schema = z
   })
   .strict();
 export type ListDirectoriesV1 = z.infer<typeof listDirectoriesV1Schema>;
-
-// ---------------------------------------------------------------------------
-// V2 session system events
-// ---------------------------------------------------------------------------
 
 /**
  * Permissive status value for v2 session rows and status-updated payloads.
@@ -650,19 +611,11 @@ export const sessionEventPayloadSchema = z.discriminatedUnion('type', [
 ]);
 export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 
-// ---------------------------------------------------------------------------
-// Kilocode payload
-// ---------------------------------------------------------------------------
-
 export const kilocodePayloadSchema = z.object({
   type: z.string(),
   properties: z.unknown(),
 });
 export type KilocodePayload = z.infer<typeof kilocodePayloadSchema>;
-
-// ---------------------------------------------------------------------------
-// Per-event-type data schemas (normalizeInnerEvent)
-// ---------------------------------------------------------------------------
 
 export const messageUpdatedDataSchema = z.object({
   info: z.object({ id: z.string(), sessionID: z.string() }).passthrough(),
@@ -976,10 +929,6 @@ export const commandsAvailableDataSchema = z.object({
 });
 export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
 
-// ---------------------------------------------------------------------------
-// Per-message delivery lifecycle (cloud.message.*)
-// ---------------------------------------------------------------------------
-
 export const cloudMessageQueuedDataSchema = z.object({
   messageId: z.string(),
   executionId: z.string().optional(),
@@ -1018,10 +967,6 @@ export const cloudMessageFailedDataSchema = z
   .passthrough();
 export type CloudMessageFailedData = z.infer<typeof cloudMessageFailedDataSchema>;
 
-// ---------------------------------------------------------------------------
-// Session snapshot (historical transport / replay)
-// ---------------------------------------------------------------------------
-
 export const sessionSnapshotSchema = z.object({
   info: z.object({ id: z.unknown() }).passthrough(),
   messages: z.array(
@@ -1032,10 +977,6 @@ export const sessionSnapshotSchema = z.object({
   ),
 });
 export type SessionSnapshotData = z.infer<typeof sessionSnapshotSchema>;
-
-// ---------------------------------------------------------------------------
-// Error shape (session-manager tRPC error extraction)
-// ---------------------------------------------------------------------------
 
 export const errorShapeSchema = z
   .object({

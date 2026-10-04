@@ -22,6 +22,7 @@ import {
   type BoundedSlashCommandCatalog,
   type SlashCommandInfo,
 } from '../../src/shared/slash-commands.js';
+import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -248,6 +249,14 @@ export type WrapperKiloClient = {
     directory: string,
     signal?: AbortSignal
   ) => Promise<{ id: string; directory: string }>;
+  /** Metadata only; never return tool input or output to diagnostics. */
+  probeMessagePart?: (
+    sessionId: string,
+    directory: string,
+    messageId: string,
+    partId: string,
+    signal: AbortSignal
+  ) => Promise<{ status: string; outputBytes?: number } | null>;
   ensureSession: (sessionId: string, directory: string, signal?: AbortSignal) => Promise<void>;
   sendPrompt: (opts: PromptOptions) => Promise<SessionPromptResponse>;
   sendPromptAsync: (opts: PromptOptions) => Promise<void>;
@@ -403,6 +412,23 @@ export function createWrapperKiloClient(
       return { id: data.id, directory: data.directory };
     },
 
+    probeMessagePart: async (sessionId, directory, messageId, partId, signal) => {
+      const result = await v2Client.session.message(
+        { sessionID: sessionId, messageID: messageId, directory },
+        { signal }
+      );
+      if (result.response?.status === 404) return null;
+      const message = requireSdkData(result, 'Session message probe');
+      const part = message.parts.find(item => item.id === partId);
+      if (part?.type !== 'tool') return null;
+      return {
+        status: part.state.status,
+        ...(part.state.status === 'completed'
+          ? { outputBytes: Buffer.byteLength(part.state.output, 'utf8') }
+          : {}),
+      };
+    },
+
     ensureSession: async (sessionId, directory, signal) => {
       const lookupTimeout = AbortSignal.timeout(5_000);
       const lookupSignal = signal ? AbortSignal.any([signal, lookupTimeout]) : lookupTimeout;
@@ -435,7 +461,7 @@ export function createWrapperKiloClient(
           projectID: project.id,
           slug: sessionId.slice(0, 24),
           title: 'New session - ' + new Date(now).toISOString(),
-          version: '7.6.2',
+          version: KILO_CLI_VERSION,
           timeCreated: now,
           timeUpdated: now,
         },

@@ -8,10 +8,12 @@ import {
   SANDBOX_INTERCEPT_HTTPS_ENV,
 } from '../shared/container-intercept.js';
 import {
+  CONTROL_PROCESS_MATCH,
+  CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
-  CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import { diagnosticCause, logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import {
   ContainersBilling,
   ContainersBillingScheduler,
@@ -59,6 +61,8 @@ type ContainersRecord = {
   state: ContainersState;
   allocationRef: string | null;
   stopOpId: string | null;
+  // Retained so records persisted before snapshots were disabled still round-trip. Container
+  // snapshots are no longer created, restored or consumed.
   lastSnapshot: { id: string; sourceAllocation: string } | null;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
@@ -92,7 +96,6 @@ const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 /** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
 const WRAPPER_READINESS_POLL_MS = 1_000;
-const SNAPSHOT_TIMEOUT_MS = 10_000;
 const DESTROY_TIMEOUT_MS = 30_000;
 const MAX_LOG_BYTES = 1024 * 1024;
 
@@ -134,6 +137,20 @@ function readWrapperAttempt(record: ContainersRecord): WrapperAttemptRead {
   if (value === undefined) return 'missing';
   if (value === 'not_started' || value === 'exec_pending') return value;
   return 'unknown';
+}
+
+/** Name the branch that decided a stop: every 'retryable' used to look the same in the logs. */
+function stopPath(
+  path: string,
+  result: 'terminal' | 'retryable',
+  fields: Record<string, string | number | boolean | undefined> = {}
+): 'terminal' | 'retryable' {
+  logControlDiagnostic(
+    'container_stop',
+    { path, result, ...fields },
+    result === 'retryable' ? 'warn' : 'info'
+  );
+  return result;
 }
 
 export class SandboxContainers extends DurableObject<Env> {
@@ -231,7 +248,7 @@ export class SandboxContainers extends DurableObject<Env> {
     await this.startContainerAndActivateBilling(
       container,
       record,
-      this.startOptions(input.instance, record.lastSnapshot?.id)
+      this.startOptions(input.instance)
     );
     await this.startWrapper(container, input.env, input.containment === true);
     await this.writeRunning(ref, 'clear');
@@ -369,20 +386,22 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.runExclusive(async () => {
       const ref = allocationRef;
       const record = await this.readRecord();
-      if (record.allocationRef === null) return 'terminal';
-      if (record.allocationRef !== ref && record.state !== 'stopping') return 'terminal';
-      if (record.allocationRef !== ref) return 'retryable';
+      if (record.allocationRef === null) return stopPath('no_allocation', 'terminal');
+      if (record.allocationRef !== ref && record.state !== 'stopping') {
+        return stopPath('other_allocation', 'terminal');
+      }
+      if (record.allocationRef !== ref) return stopPath('other_allocation_stopping', 'retryable');
       if (record.state === 'stopping') {
         const stopOpId = record.stopOpId ?? crypto.randomUUID();
         if (record.stopOpId === null) {
           await this.writeRecord({ ...record, stopOpId });
         }
-        return this.finishStop(record, ref, stopOpId);
+        return this.finishStop(record);
       }
       const stopOpId = crypto.randomUUID();
       const stopping: ContainersRecord = { ...record, state: 'stopping', stopOpId };
       await this.writeRecord(stopping);
-      return this.finishStop(stopping, ref, stopOpId);
+      return this.finishStop(stopping);
     });
   }
 
@@ -442,11 +461,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // A stopped container is started and metered before the probe. An already
     // running container is probed first, and billing is activated by outcome.
     if (!container.running) {
-      await this.startContainerAndActivateBilling(
-        container,
-        record,
-        this.startOptions(instance, record.lastSnapshot?.id)
-      );
+      await this.startContainerAndActivateBilling(container, record, this.startOptions(instance));
     }
     const probe = await this.probeWrapper(container);
     if (probe === 'ambiguous') {
@@ -457,11 +472,7 @@ export class SandboxContainers extends DurableObject<Env> {
     }
     if (probe === 'absent') {
       // Skip physical start when already running, but still activate billing.
-      await this.startContainerAndActivateBilling(
-        container,
-        record,
-        this.startOptions(instance, record.lastSnapshot?.id)
-      );
+      await this.startContainerAndActivateBilling(container, record, this.startOptions(instance));
       await this.startWrapper(container, env, containment);
     } else {
       await this.activateBillingIfRunning(container, record);
@@ -518,7 +529,7 @@ export class SandboxContainers extends DurableObject<Env> {
         throw new WrapperExecTimeoutError();
       }
       const proc = await this.awaitProbeCall(
-        container.exec(['pgrep', '-f', CONTROL_WRAPPER_PATH]),
+        container.exec(['pgrep', '-f', CONTROL_PROCESS_MATCH]),
         deadlineAt
       );
       const exitCode = await this.awaitProbeCall(proc.exitCode, deadlineAt);
@@ -643,7 +654,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // after expiry.
     if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
     return this.awaitContainerCall(
-      container.exec(['bun', 'run', CONTROL_WRAPPER_PATH], {
+      container.exec(['/bin/sh', CONTROL_SUPERVISOR_PATH], {
         env: containment ? containedProcessEnv(env) : env,
         cwd: '/',
       }),
@@ -695,14 +706,7 @@ export class SandboxContainers extends DurableObject<Env> {
     return container;
   }
 
-  private startOptions(
-    instance: ContainerInstanceSize,
-    snapshotId?: string
-  ): ContainerStartupOptions {
-    // The runtime startup union requires image XOR containerSnapshot.
-    if (snapshotId !== undefined) {
-      return { containerSnapshot: { id: snapshotId }, instance, enableInternet: true };
-    }
+  private startOptions(instance: ContainerInstanceSize): ContainerStartupOptions {
     return { image: this.containerImage(), instance, enableInternet: true };
   }
 
@@ -725,62 +729,38 @@ export class SandboxContainers extends DurableObject<Env> {
     };
   }
 
-  private async finishStop(
-    record: ContainersRecord,
-    ref: string,
-    stopOpId: string
-  ): Promise<'terminal' | 'retryable'> {
+  private async finishStop(record: ContainersRecord): Promise<'terminal' | 'retryable'> {
     const container = this.ctx.container;
     if (!container) {
       // A missing container only proves cleanup for a record that never reached
       // a bun exec. Pending or unclassified phases stay stopping so a later stop
       // can observe the destroy resolve; destroying nothing must not clear them.
-      if (readWrapperAttempt(record) !== 'not_started') return 'retryable';
+      if (readWrapperAttempt(record) !== 'not_started') {
+        return stopPath('no_container_unfenced', 'retryable', {
+          wrapperAttempt: readWrapperAttempt(record),
+        });
+      }
       await this.writeRecord(this.terminalRecord(record));
       await this.settleBillingAtStop(record);
-      return 'terminal';
+      return stopPath('no_container_not_started', 'terminal');
     }
-    await this.snapshotBeforeDestroy(container, ref, stopOpId);
+    const destroyStartedAt = Date.now();
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
-    } catch {
+    } catch (error) {
       // A timed-out destroy has no late callback; the phase is cleared only by a
       // later stop that observes the destroy resolve.
-      return 'retryable';
+      return stopPath('destroy_failed', 'retryable', {
+        destroyMs: Date.now() - destroyStartedAt,
+        running: container.running,
+        errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+        cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+      });
     }
     const current = await this.readRecord();
     await this.writeRecord(this.terminalRecord(current));
     await this.settleBillingAtStop(current);
-    return 'terminal';
-  }
-
-  private async snapshotBeforeDestroy(
-    container: Container,
-    ref: string,
-    stopOpId: string
-  ): Promise<void> {
-    const attempt = container.snapshotContainer({});
-    try {
-      const snapshot = await withTimeout(
-        attempt,
-        SNAPSHOT_TIMEOUT_MS,
-        'container snapshot timed out'
-      );
-      await this.publishSnapshot(snapshot.id, ref, stopOpId);
-    } catch {
-      void attempt.then(
-        snapshot => this.runExclusive(() => this.publishSnapshot(snapshot.id, ref, stopOpId)),
-        () => undefined
-      );
-    }
-  }
-
-  private async publishSnapshot(id: string, ref: string, stopOpId: string): Promise<void> {
-    const record = await this.readRecord();
-    if (record.state !== 'stopping') return;
-    if (record.allocationRef !== ref) return;
-    if (record.stopOpId !== stopOpId) return;
-    await this.writeRecord({ ...record, lastSnapshot: { id, sourceAllocation: ref } });
+    return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
   }
 
   private billingScheduler(): ContainersBillingScheduler {

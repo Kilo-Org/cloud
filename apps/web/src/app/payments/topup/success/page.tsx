@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { useEffect } from 'react';
 import { fetchCreditTransactionIdForStripeSession, getPaymentReturnUrl } from './actions';
 import BigLoader from '@/components/BigLoader';
-import { fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import {
   TOPUP_AMOUNT_QUERY_STRING_KEY,
   TOPUP_STATUS_PENDING,

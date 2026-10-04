@@ -75,9 +75,7 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
   SessionPlatformIcon: () => null,
 }));
 vi.mock('@/components/agents/session-row-actions', () => ({
-  copySessionId: vi.fn(),
   showRenamePrompt: vi.fn(),
-  showSessionActionMenu: vi.fn(),
 }));
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
   showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),

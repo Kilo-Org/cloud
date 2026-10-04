@@ -715,6 +715,8 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         });
       }
       const stats = readWorkloadStats(group.reference);
+      const toolStats = readWorkloadStats(managed.toolsReference);
+      const serverStats = readWorkloadStats(managed.serverReference);
       if (stats.oomKills > lastOomKills || stats.oomGroupKills > lastOomGroupKills) {
         lastOomKills = Math.max(lastOomKills, stats.oomKills);
         lastOomGroupKills = Math.max(lastOomGroupKills, stats.oomGroupKills);
@@ -741,6 +743,27 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           : {}),
         ...(stats.pressureFullTotal !== undefined
           ? { pressureFullTotal: stats.pressureFullTotal }
+          : {}),
+        ...(stats.memoryMaxEvents !== undefined ? { memoryMaxEvents: stats.memoryMaxEvents } : {}),
+        ...(stats.memoryOomEvents !== undefined ? { memoryOomEvents: stats.memoryOomEvents } : {}),
+        ...(stats.cpuUsageUsec !== undefined ? { cpuUsageUsec: stats.cpuUsageUsec } : {}),
+        ...(stats.cpuThrottledUsec !== undefined
+          ? { cpuThrottledUsec: stats.cpuThrottledUsec }
+          : {}),
+        ...(stats.cpuThrottleCount !== undefined
+          ? { cpuThrottleCount: stats.cpuThrottleCount }
+          : {}),
+        ...(stats.ioReadBytes !== undefined ? { ioReadBytes: stats.ioReadBytes } : {}),
+        ...(stats.ioWriteBytes !== undefined ? { ioWriteBytes: stats.ioWriteBytes } : {}),
+        ...(toolStats.cpuUsageUsec !== undefined
+          ? { toolCpuUsageUsec: toolStats.cpuUsageUsec }
+          : {}),
+        ...(serverStats.cpuUsageUsec !== undefined
+          ? { serverCpuUsageUsec: serverStats.cpuUsageUsec }
+          : {}),
+        ...(toolStats.ioReadBytes !== undefined ? { toolIoReadBytes: toolStats.ioReadBytes } : {}),
+        ...(toolStats.ioWriteBytes !== undefined
+          ? { toolIoWriteBytes: toolStats.ioWriteBytes }
           : {}),
       });
     } catch {

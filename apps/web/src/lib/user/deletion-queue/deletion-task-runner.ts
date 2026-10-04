@@ -1,8 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
-import { UserDeletionStepKey, UserDeletionStepStatus } from '@kilocode/db/schema-types';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { type UserDeletionStepKey, UserDeletionStepStatus } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
 import { catalogEntryFor } from '@/lib/user/deletion-queue/deletion-catalog';
 import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcomes';
@@ -91,17 +90,6 @@ export async function runClaimedDeletionTask(params: {
     outcome,
     handlerDeadlineAt: params.deadlineAt,
   });
-
-  if (
-    persisted.kind === 'applied' &&
-    persisted.effectiveOutcome.kind === 'succeeded' &&
-    claimed.step_key === UserDeletionStepKey.Anonymize &&
-    persisted.anonymizedUserId
-  ) {
-    void reportEvents({
-      events: [{ type: 'user.deleted', data: { kilo_user_id: persisted.anonymizedUserId } }],
-    });
-  }
 
   return { ...persisted, stepKey: claimed.step_key };
 }

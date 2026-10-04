@@ -215,7 +215,6 @@
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
     "bonusCreditsExpiring": "Kiriiditiin badhaasaa {{amount}} gaafa {{date}} yeroon isaa darba.",
-    "creditBalanceEmpty": "Hafteen kiriiditii kee duwwaa dha. Kiriiditiin herrega kanaa appilikeeshinii iOS tiin alatti bulfama.",
     "signOutTitle": "Keessaa baataa?",
     "signOutMessage": "Iddoo hojii keetti deebi'uuf ammas seenuu qabda.",
     "deleteAccountTitle": "Herrega haqxaa?",
@@ -241,6 +240,7 @@
     "addPasskey": "Furtuu seenii dabali",
     "passkeyDefaultName": "Furtuu seenii",
     "passkeyAddedOn": "{{date}} dabalaman",
+    "passkeyLastUsedOn": "Yeroo dhumaa itti fayyadame {{date}}",
     "passkeyAdded": "Furtuu seenii dabalaman.",
     "passkeyAddFailed": "Furtuu seenii dabaluun hin danda'amne. Irra deebi'ii yaali.",
     "passkeyAddUnsupported": "Meeshaan kun furtuu seenii uumuu hin danda'u.",
@@ -2047,6 +2047,7 @@
       "idCopied": "ID turtii waraabameera",
       "couldNotCopyId": "ID turtii waraabuun hin danda'amne.",
       "untitled": "Turtii mataduree hin qabne",
+      "actions": "Gochaalee turtii",
       "sessionDeleted": "Turtiin haqameera",
       "needsInput": "deebii barbaada",
       "fromPlatform": "{{platform}} irraa",
@@ -2097,7 +2098,9 @@
       "renamePlaceholder": "Maqaa turtii",
       "transcriptAccessibility": "Galmee marii turtii",
       "readOnly": "Turtii kana dubbisuu qofa dandeessa.",
+      "continueInNewSession": "Turtii haaraa keessatti itti fufi",
       "emptyDescription": "Jalqabuuf gadiitti ergaa ergi.",
+      "emptyTranscriptDescription": "Turtii kana keessatti hanga ammaatti ergaan hin jiru.",
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
       "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",
@@ -2187,6 +2190,8 @@
       "leaveChanges": "Jijjiiramoota dhiisi",
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
+      "selectRepositoryToStart": "Jalqabuuf kuusaa koodii filadhu.",
+      "connectProviderToStart": "Jalqabuuf waltajjii walqabsiisi.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",
       "prefillRepoAndModelUnavailable": "Kuusaan koodii fi moodeli turtii jalqabaa kana booda hin argaman. Gadiitti isaan filadhu.",
@@ -2562,6 +2567,7 @@
       "selectModelBeforeSending": "Erguun dura moodela filadhu.",
       "preparingPlaceholder": "Naannoo qopheessaa jira...",
       "finalizingPlaceholder": "Xumuraa jira...",
+      "sessionLoadFailed": "Seshiniin hin fe'amne. Dura irra deebi'ii yaali.",
       "cannotReceiveFiles": "Turtiin kun faayiloota fudhachuu hin danda'u. Ergaa kee erguuf faayiloota qabachiifaman baasi.",
       "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'amne. Deebi'anii yaaluuf Ergi tuqi.",
       "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
@@ -2631,6 +2637,7 @@
       "provider": "Dhiyeessaa",
       "totalCost": "Baasii waliigalaa",
       "usageReflectsLatest": "Fayyadamni kun deebii gargaaraa isa dhuma xumurame irratti hundaa'a.",
+      "usageUnavailable": "Fayyadama context hin argamu",
       "tokenUsage": "Fayyadama tookanootaa",
       "cacheRate": "Dhibbeentaa kuusaa yeroo",
       "modelsCount": "Moodeloota ({{displayCount}})",
@@ -2665,7 +2672,10 @@
     "markdownImage": {
       "load": "Fe'i",
       "loadWithHost": "{{host}} fe'i",
-      "httpsOnly": "Suuraaleen HTTPS qofti hayyamamu."
+      "httpsOnly": "Suuraaleen HTTPS qofti hayyamamu.",
+      "trustTitle": "Suuraa {{host}} irraa fe'uu?",
+      "trustMessage": "{{host}} amanachuun suuraa isaa yeroo hunda gaafachuu malee fe'a. Booda Keessummeessitoota amanaman keessatti haquu dandeessa.",
+      "loadOnce": "Yeroo tokko fe'i"
     },
     "markdownLink": {
       "invalidLink": "Geessituun kun banamuu hin danda'u.",
@@ -3178,8 +3188,12 @@
     "subtitle": "Keessummeessitoota osoo hin gaafatin banuuf amantu",
     "emptyTitle": "Keessummeessitoonni amanaman hin jiran",
     "emptyDescription": "Keessummeessaa geessituu tokko yoo amante, deebi'ee osoo hin gaafatin bana.",
+    "imagesSectionTitle": "Keessummeessitoota suuraa amanaman",
+    "imagesSectionDescription": "Suuraan keessummeessitoota kanaa irraa deebi'ee gaafachuu malee fe'ama.",
+    "imagesSectionEmpty": "Keessummeessitoota suuraa amanaman hin jiran",
     "revoke": "Amanamummaa {{host}} haqi",
     "revokeMessage": "Geessituuwwan gara keessummeessaa kanaa ammas mirkaneessa gaafatu.",
+    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu.",
     "backToPreferences": "Gara filannoowwaniitti deebi'i"
   },
   "quickChat": {
@@ -3444,5 +3458,17 @@
       "unboundToast": "Repo hin hidhamne",
       "unbindFailed": "Repo hiikuu hin dandeenye"
     }
+  },
+  "credits": {
+    "title": "Kireedita bituu",
+    "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
+    "packLabel": "Kireedita {{amount}} dabali",
+    "priceUnavailable": "Gatii hin argamu",
+    "purchased": "Kireeditiin baalansii kee irratti dabalameera.",
+    "empty": "Paakeejii kireeditii yeroo ammaa hin argamu.",
+    "noMatchingProducts": "App Store paakeejii kireeditii walsimu hin deebisne.",
+    "noMatchingProductsPlay": "Google Play paakeejii kireeditii walsimu hin deebisne.",
+    "purchaseOwnedByAnotherAccount": "Kireeditiin Apple Account kana irratti jiru kan herrega Kilo biraati. Fayyadamuuf herrega Kilo sanatti seeni.",
+    "purchaseOwnedByAnotherAccountPlay": "Kireeditiin akaawuntii Google Play kana irratti jiru akaawuntii Kilo adda tokko kan ta'e dha. Fayyadamuuf akaawuntii Kilo sana seeni."
   }
 }

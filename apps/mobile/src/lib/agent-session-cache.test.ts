@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
+import {
+  invalidateAgentSessionQueries,
+  prefetchSessionTranscript,
+  SESSION_TRANSCRIPT_STALE_TIME_MS,
+} from '@/lib/agent-session-cache';
 
 const reconcileFirstPageMock =
   vi.fn<(queryClient: unknown, queryKeyPrefix: readonly unknown[]) => void>();
@@ -38,5 +42,32 @@ describe('invalidateAgentSessionQueries', () => {
     // The other two keys keep their plain invalidation.
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(recentRepositoriesFilter);
     expect(queryClient.invalidateQueries).toHaveBeenCalledWith(activeListFilter);
+  });
+});
+
+describe('prefetchSessionTranscript', () => {
+  it('issues one prefetchQuery with the passed options and the transcript stale time', async () => {
+    const prefetchQuery = vi.fn().mockResolvedValue(undefined);
+    const options = { queryKey: ['cliSessionsV2', 'transcript', 'ses-1'] };
+
+    await prefetchSessionTranscript({ prefetchQuery }, options);
+
+    expect(prefetchQuery).toHaveBeenCalledTimes(1);
+    expect(prefetchQuery).toHaveBeenCalledWith({
+      ...options,
+      staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
+    });
+  });
+
+  it('overrides a caller-supplied stale time with the transcript stale time', async () => {
+    const prefetchQuery = vi.fn().mockResolvedValue(undefined);
+    const options = { queryKey: ['cliSessionsV2', 'transcript', 'ses-2'], staleTime: 5 };
+
+    await prefetchSessionTranscript({ prefetchQuery }, options);
+
+    expect(prefetchQuery).toHaveBeenCalledWith({
+      queryKey: options.queryKey,
+      staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
+    });
   });
 });

@@ -46,8 +46,18 @@ let latest: HookValue | null = null;
 const fetchStoreProducts =
   vi.fn<(productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>>();
 
-function Probe({ connected }: { connected: boolean }) {
-  latest = useStoreKiloPassProducts({ connected, fetchStoreProducts });
+// The retry restores the store connection before asking for prices; the default
+// answers like a store that comes back.
+const noopReconnect = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
+
+function Probe({
+  connected,
+  reconnectStore = noopReconnect,
+}: {
+  connected: boolean;
+  reconnectStore?: () => Promise<boolean>;
+}) {
+  latest = useStoreKiloPassProducts({ connected, fetchStoreProducts, reconnectStore });
   return null;
 }
 
@@ -70,10 +80,13 @@ function createDeferred(): { promise: Promise<unknown>; resolve: (value: unknown
   return { promise, resolve: resolvePromise };
 }
 
-async function renderProbe(connected: boolean): Promise<TestRenderer.ReactTestRenderer> {
+async function renderProbe(
+  connected: boolean,
+  reconnectStore: () => Promise<boolean> = noopReconnect
+): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
-    renderer = TestRenderer.create(createElement(Probe, { connected }));
+    renderer = TestRenderer.create(createElement(Probe, { connected, reconnectStore }));
     await Promise.resolve();
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
@@ -283,6 +296,71 @@ describe('useStoreKiloPassProducts retry busy state', () => {
 
     expect(current().isLoading).toBe(false);
     expect(current().isRefetching).toBe(true);
+
+    renderer.unmount();
+  });
+});
+
+describe('useStoreKiloPassProducts retry connection', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mocks.query.data = undefined;
+    mocks.query.dataUpdatedAt = 0;
+    mocks.query.error = null;
+    mocks.query.isError = false;
+    mocks.query.isLoading = false;
+    mocks.query.isRefetching = false;
+    mocks.query.isSuccess = false;
+    mocks.query.refetch.mockReset();
+    noopReconnect.mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reconnects the store before it fetches prices again', async () => {
+    // A failed store initialization leaves the native store without a product
+    // query, so a retry that only re-runs the fetch issues no new ProductRequest
+    // and the "Could not connect" card can never clear. The reconnect must
+    // complete before the fetch starts.
+    const order: string[] = [];
+    const reconnectStore = vi.fn(async () => {
+      await Promise.resolve();
+      order.push('reconnect');
+      return true;
+    });
+    mocks.query.refetch.mockImplementation(async () => {
+      await Promise.resolve();
+      order.push('refetch');
+      return { status: 'success' };
+    });
+    const renderer = await renderProbe(false, reconnectStore);
+
+    await act(async () => {
+      await current().refetch();
+    });
+
+    expect(order).toEqual(['reconnect', 'refetch']);
+    expect(reconnectStore).toHaveBeenCalledTimes(1);
+    expect(mocks.query.refetch).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('still fetches prices when the reconnect fails', async () => {
+    // The reconnect may fail (still offline). The fetch is then the only thing
+    // that can answer, and the bounded wait keeps the card up either way.
+    const reconnectStore = vi.fn().mockRejectedValue(new Error('still offline'));
+    mocks.query.refetch.mockResolvedValue({ status: 'error' });
+    const renderer = await renderProbe(false, reconnectStore);
+
+    await act(async () => {
+      await current().refetch();
+    });
+
+    expect(reconnectStore).toHaveBeenCalledTimes(1);
+    expect(mocks.query.refetch).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

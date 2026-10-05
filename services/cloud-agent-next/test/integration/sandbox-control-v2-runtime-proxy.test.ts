@@ -345,6 +345,13 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(
       await sibling.resolveRuntimeCredentialProxyGrant(second.credentials.proxy.handle)
     ).toBeNull();
+    await waitFor(async () =>
+      expect(await sibling.getSession()).toMatchObject({ messages: [{ state: 'failed' }] })
+    );
+    wrapper.close();
+    await waitFor(async () =>
+      expect((await sandbox.getAllocationState()).kind).toBe('disconnected')
+    );
   });
 
   it.each([

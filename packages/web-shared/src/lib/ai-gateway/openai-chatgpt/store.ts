@@ -336,3 +336,23 @@ export async function markOpenAiChatGptError(
 
   await markOpenAiChatGptConnectionErrored(db, owner, connection, message);
 }
+
+/**
+ * Records OpenAI's refusal of the connected account. Only the connection whose
+ * access token served the refused request is marked: a reconnect that landed
+ * while the request was in flight can hold a different, eligible account, and
+ * must not be erased by a stale refusal. A missing row is a no-op.
+ */
+export async function markOpenAiChatGptNotEligible(
+  owner: OpenAiChatGptOwner,
+  refusedAccessToken: string,
+  message: string
+): Promise<void> {
+  await db.transaction(async tx => {
+    const row = await readOpenAiChatGptConnectionRow(tx, owner, { forUpdate: true });
+    if (!row) return;
+    const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
+    if (!connection || connection.access_token !== refusedAccessToken) return;
+    await markOpenAiChatGptConnectionErrored(tx, owner, connection, message);
+  });
+}

@@ -26,7 +26,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organization_audit_logs, organizations } from '@kilocode/db/schema';
 import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { computeSnapshotDiff } from '@/lib/ai-gateway/providers/openrouter/snapshot-diff';
+import { computeSnapshotDiff } from '@/lib/providers/openrouter/snapshot-diff';
 import {
   buildAutoChangeMessage,
   computeRelevantChangesForOrg,

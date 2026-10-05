@@ -15,7 +15,7 @@ import type {
   OpenRouterProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { OpenRouterProvidersResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { fetchModelsForProvider } from '@/lib/ai-gateway/providers/openrouter/fetch-provider-models';
+import { fetchModelsForProvider } from '@/lib/providers/openrouter/fetch-provider-models';
 import { ai_gateway_sync_providers_state, modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { desc, eq, lt, sql } from 'drizzle-orm';
@@ -26,13 +26,13 @@ import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-ch
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
-import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
+import { syncDirectByokModels } from '@/lib/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
-} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
-import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter/inject-extra-provider-models';
+} from '@/lib/providers/openrouter/free-endpoint-data-policy';
+import { injectExtraProviderModels } from '@/lib/providers/openrouter/inject-extra-provider-models';
 import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';

@@ -19,7 +19,7 @@ import {
   TestBYOKKeyInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
-} from '@/lib/ai-gateway/byok/types';
+} from '@/lib/byok/types';
 import {
   UserByokProviderIdSchema,
   UserByokTestModels,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import * as z from 'zod';
-import { getModelTraffic } from '@/lib/ai-gateway/model-traffic';
+import { getModelTraffic } from '@/lib/model-traffic';
 import type { RunAnalyticsEngineQuery } from '@/lib/cloudflare/analytics-engine';
 
 const NOW = new Date('2026-10-02T12:03:20Z');

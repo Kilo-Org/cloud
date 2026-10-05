@@ -5,7 +5,7 @@ import { modelsByProvider, organization_audit_logs, organizations } from '@kiloc
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
-import { applySnapshotChangesAndAudit } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
+import { applySnapshotChangesAndAudit } from '@/lib/providers/openrouter/sync-providers';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,

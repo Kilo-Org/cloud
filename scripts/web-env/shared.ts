@@ -354,6 +354,7 @@ export type EnvRecord = {
   target: string[];
   customEnvironmentIds: string[];
   gitBranch?: string;
+  configurationId?: string;
   value?: string;
 };
 
@@ -393,9 +394,33 @@ export function listEnvRecords(context: VercelContext): EnvRecord[] {
       target: stringArray(record.target),
       customEnvironmentIds: stringArray(record.customEnvironmentIds),
       gitBranch: stringValue(record, 'gitBranch'),
+      configurationId: stringValue(record, 'configurationId'),
       value: type === 'plain' ? stringValue(record, 'value') : undefined,
     };
   });
+}
+
+// Maps integration configuration IDs to integration slugs such as `sentry`.
+// A configuration that no longer exists keeps its ID as the name.
+export function integrationSlugs(
+  context: VercelContext,
+  configurationIds: readonly string[]
+): Map<string, string> {
+  const slugs = new Map<string, string>();
+  for (const id of new Set(configurationIds)) {
+    try {
+      const response = vercelApi(
+        context,
+        `/v1/integrations/configuration/${encodeURIComponent(id)}`,
+        'Read an integration configuration'
+      );
+      slugs.set(id, stringValue(response, 'slug') ?? id);
+    } catch (error) {
+      if (!(error instanceof VercelApiError && error.code === 'not_found')) throw error;
+      slugs.set(id, id);
+    }
+  }
+  return slugs;
 }
 
 export function customEnvironmentId(context: VercelContext, slug: string): string | undefined {

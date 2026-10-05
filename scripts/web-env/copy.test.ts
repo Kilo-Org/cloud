@@ -24,7 +24,8 @@ void test('planEnvironment selects production records by target and keeps their 
     ],
     'production',
     'staging-id',
-    new Set()
+    new Set(),
+    new Map()
   );
 
   assert.deepEqual(plan.variables, [
@@ -50,7 +51,8 @@ void test('planEnvironment matches staging through its custom environment ID', (
     ],
     'staging',
     'staging-id',
-    new Set()
+    new Set(),
+    new Map()
   );
 
   assert.deepEqual(
@@ -70,7 +72,8 @@ void test('planEnvironment reports branch, excluded and unsupported records as s
     ],
     'production',
     undefined,
-    new Set(['EXCLUDED_TOKEN', 'apiUrl'])
+    new Set(['EXCLUDED_TOKEN', 'apiUrl']),
+    new Map()
   );
 
   assert.deepEqual(
@@ -92,8 +95,38 @@ void test('planEnvironment rejects a variable defined twice for one environment'
         [record({ key: 'TWICE', id: 'first' }), record({ key: 'TWICE', id: 'second' })],
         'production',
         undefined,
-        new Set()
+        new Set(),
+        new Map()
       ),
     /TWICE is defined more than once for production/
   );
+});
+
+void test('planEnvironment leaves integration-owned variables to their integration', () => {
+  const plan = planEnvironment(
+    [
+      record({ key: 'SENTRY_AUTH_TOKEN', configurationId: 'icfg_sentry' }),
+      record({ key: 'LEGACY_TOKEN', configurationId: 'icfg_removed' }),
+      record({ key: 'OWN_TOKEN' }),
+    ],
+    'production',
+    undefined,
+    new Set(['SENTRY_AUTH_TOKEN']),
+    new Map([['icfg_sentry', 'sentry']])
+  );
+
+  assert.deepEqual(
+    plan.variables.map(variable => variable.name),
+    ['OWN_TOKEN']
+  );
+  assert.deepEqual(plan.skipped, [
+    {
+      name: 'LEGACY_TOKEN',
+      reason: 'managed by the icfg_removed integration; add the project to it instead',
+    },
+    {
+      name: 'SENTRY_AUTH_TOKEN',
+      reason: 'managed by the sentry integration; add the project to it instead',
+    },
+  ]);
 });

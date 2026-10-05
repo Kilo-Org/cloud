@@ -7,6 +7,7 @@ import {
   confirm,
   customEnvironmentId,
   decryptedEnvValues,
+  integrationSlugs,
   listEnvRecords,
   readVaultValues,
   resolveVault,
@@ -34,12 +35,14 @@ type EnvironmentPlan = {
 const COPYABLE_TYPES = new Set(['plain', 'encrypted', 'sensitive']);
 
 // `staging` is a Vercel custom environment, so its records are matched by ID
-// rather than by the standard `target` list.
+// rather than by the standard `target` list. Integration-owned records are left
+// to the integration, which manages them per project.
 export function planEnvironment(
   records: readonly EnvRecord[],
   environment: Environment,
   stagingId: string | undefined,
-  exclude: ReadonlySet<string>
+  exclude: ReadonlySet<string>,
+  integrations: ReadonlyMap<string, string>
 ): EnvironmentPlan {
   const variables: PlannedVariable[] = [];
   const skipped: SkippedVariable[] = [];
@@ -61,7 +64,13 @@ export function planEnvironment(
     }
     seen.add(record.key);
 
-    if (exclude.has(record.key)) {
+    if (record.configurationId) {
+      const integration = integrations.get(record.configurationId) ?? record.configurationId;
+      skipped.push({
+        name: record.key,
+        reason: `managed by the ${integration} integration; add the project to it instead`,
+      });
+    } else if (exclude.has(record.key)) {
       skipped.push({ name: record.key, reason: 'excluded with --exclude' });
     } else if (!COPYABLE_TYPES.has(record.type)) {
       skipped.push({ name: record.key, reason: `unsupported Vercel type ${record.type}` });
@@ -150,10 +159,14 @@ export async function runCopy(options: CopyOptions): Promise<void> {
 
     console.log(`Reading ${options.from} environment variables...`);
     const records = listEnvRecords(source);
+    const integrations = integrationSlugs(
+      source,
+      records.flatMap(record => (record.configurationId ? [record.configurationId] : []))
+    );
     const plans = new Map(
       environments.map(environment => [
         environment,
-        planEnvironment(records, environment, stagingIds?.source, exclude),
+        planEnvironment(records, environment, stagingIds?.source, exclude, integrations),
       ])
     );
 

@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   decryptedEnvValues,
+  integrationSlugs,
   listEnvRecords,
   readVaultValues,
   redeployLatest,
@@ -468,6 +469,13 @@ if (command === 'whoami') {
       { id: 'env-1', key: 'PLAIN_VALUE', type: 'plain', value: 'visible', target: ['production'] },
       { id: 'env-3', key: 'apiUrl', type: 'encrypted', target: 'development' },
       {
+        id: 'env-4',
+        key: 'SENTRY_ORG',
+        type: 'encrypted',
+        target: ['production'],
+        configurationId: 'icfg_sentry'
+      },
+      {
         id: 'env-2',
         key: 'SECRET_TOKEN',
         type: 'sensitive',
@@ -484,6 +492,11 @@ if (command === 'whoami') {
   respond({ id: 'env-2', type: 'sensitive', decrypted: false });
 } else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-global-app/env/env-3?')) {
   respond({ id: 'env-3', type: 'encrypted', decrypted: true, value: '' });
+} else if (command === 'api' && endpoint.startsWith('/v1/integrations/configuration/icfg_sentry?')) {
+  respond({ id: 'icfg_sentry', slug: 'sentry' });
+} else if (command === 'api' && endpoint.startsWith('/v1/integrations/configuration/icfg_removed?')) {
+  process.stderr.write('Error: Integration configuration not found. (404)\\n');
+  process.exitCode = 1;
 } else if (command === 'list') {
   respond({ deployments: [] });
 } else {
@@ -548,6 +561,7 @@ void test('listEnvRecords keeps only plain values and normalizes string and arra
           target: ['production'],
           customEnvironmentIds: [],
           gitBranch: undefined,
+          configurationId: undefined,
           value: 'visible',
         },
         {
@@ -557,6 +571,17 @@ void test('listEnvRecords keeps only plain values and normalizes string and arra
           target: ['development'],
           customEnvironmentIds: [],
           gitBranch: undefined,
+          configurationId: undefined,
+          value: undefined,
+        },
+        {
+          id: 'env-4',
+          key: 'SENTRY_ORG',
+          type: 'encrypted',
+          target: ['production'],
+          customEnvironmentIds: [],
+          gitBranch: undefined,
+          configurationId: 'icfg_sentry',
           value: undefined,
         },
         {
@@ -566,6 +591,7 @@ void test('listEnvRecords keeps only plain values and normalizes string and arra
           target: ['production'],
           customEnvironmentIds: ['staging-id'],
           gitBranch: undefined,
+          configurationId: undefined,
           value: undefined,
         },
       ]
@@ -583,6 +609,22 @@ void test('decryptedEnvValues returns only values Vercel decrypted', async () =>
       new Map([
         ['env-1', 'decrypted-value'],
         ['env-3', ''],
+      ])
+    );
+  });
+});
+
+void test('integrationSlugs names configurations and keeps the ID of a deleted one', async () => {
+  await withFakeVercel(directory => {
+    assert.deepEqual(
+      integrationSlugs({ project: 'kilocode-global-app', orgId: 'team-id', cwd: directory }, [
+        'icfg_sentry',
+        'icfg_removed',
+        'icfg_sentry',
+      ]),
+      new Map([
+        ['icfg_sentry', 'sentry'],
+        ['icfg_removed', 'icfg_removed'],
       ])
     );
   });

@@ -100,7 +100,7 @@ function git(args, options = {}) {
   return execFileSync('git', args, { encoding: 'utf8', ...options });
 }
 
-function reasonOf(error) {
+export function reasonOf(error) {
   const stderr = error && error.stderr ? String(error.stderr).trim() : '';
   const lines = stderr
     .split('\n')
@@ -190,7 +190,7 @@ export function splitSections(text) {
 }
 
 /** The heading line of a section, i.e. its first line. */
-function headingOf(section) {
+export function headingOf(section) {
   return section.split('\n')[0];
 }
 
@@ -490,7 +490,7 @@ function treeFile(parent, path) {
 }
 
 /** A commit on top of `parent` that replaces one file with `content`. */
-function commitOn(parent, path, content, message) {
+export function commitOn(parent, path, content, message) {
   const blob = git(['hash-object', '-w', '--stdin'], { input: content }).trim();
   const work = mkdtempSync(join(tmpdir(), 'kilo-notes-commit-'));
   try {

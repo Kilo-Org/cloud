@@ -1284,6 +1284,26 @@ describe('SandboxContainers readiness deadline', () => {
 });
 
 describe('SandboxContainers native start and main-process identity', () => {
+  it('consumes the PID probe output without waiting separately for exitCode', async () => {
+    const { instance, container, readRecord } = setup();
+    const exec = container.exec.bind(container);
+    vi.spyOn(container, 'exec').mockImplementation((cmd, options) => {
+      if (cmd[0] !== 'cat') return exec(cmd, options);
+      return Promise.resolve(
+        makeExecProcess({
+          exitCodePromise: new Promise<number>(() => {}),
+          stdout: `/bin/sh\0${CONTROL_SUPERVISOR_PATH}\0`,
+        })
+      );
+    });
+
+    await expect(launch(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
   it('treats a same-ref running record as a no-op and does not read identity', async () => {
     const { instance, container, readRecord } = setup({
       record: { ...idleRecord, state: 'running', allocationRef: REF_A, instance: 'standard-1' },
@@ -2180,7 +2200,7 @@ describe('SandboxContainers repository capture', () => {
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
     expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
 
-    await vi.advanceTimersByTimeAsync(3 * 60_000 + 1_000);
+    await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
     await expect(capture).resolves.toBe(false);
     container.deferredSnapshots[0]?.resolve('late');
     await vi.advanceTimersByTimeAsync(0);

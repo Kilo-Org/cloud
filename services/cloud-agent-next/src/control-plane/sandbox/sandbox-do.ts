@@ -227,7 +227,7 @@ const GENERATION = 2;
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const OWNER_KEY = 'control_plane_owner';
 /** Backstop over the container DO's own capture timeout; the wrapper waits slightly longer. */
-const REPOSITORY_CAPTURE_CALL_MS = 3 * 60_000 + 5_000;
+const REPOSITORY_CAPTURE_CALL_MS = 5 * 60_000 + 5_000;
 const ALLOCATION_ROW_ID = 'current';
 const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
 const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
@@ -439,8 +439,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
   private createInFlight = false;
-  /** Sessions with a repository capture running, so a replayed request does not repeat it. */
-  private readonly capturesInFlight = new Set<string>();
+  private readonly repositoryCaptures = new Map<
+    string,
+    { allocationId: string | null; ok?: boolean }
+  >();
   private readonly billingSchedule: BillingScheduleTable;
   private vercelBilling:
     | {
@@ -628,6 +630,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
     await this.enqueue(async () => {
       this.notifications.retire(parsed.sessionId);
+      this.repositoryCaptures.delete(parsed.sessionId);
       await deleteRoute(this.db, parsed.sessionId);
       // Rebuild the policy inside the queue; if it cannot apply, stop the
       // sandbox as a platform failure so the alias is not left injected.
@@ -1286,6 +1289,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
     await this.enqueue(async () => {
       const attachment = this.readAttachment(ws);
+      if (
+        attachment?.allocationId !== undefined &&
+        [...this.repositoryCaptures.values()].some(
+          capture => capture.allocationId === attachment.allocationId && capture.ok === undefined
+        )
+      )
+        return;
       if (attachment?.allocationId === undefined || attachment.connectionId === undefined) {
         ws.serializeAttachment({ credential: null });
         await this.armAlarm(await this.readAllocation());
@@ -1562,6 +1572,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.armAlarm(state);
     await this.afterVercelBillingTransition(event);
     await this.applyRouteEffects(previous, state, event, stopReason);
+    for (const [sessionId, capture] of this.repositoryCaptures) {
+      if (capture.allocationId !== state.allocationId || state.kind === 'stopping') {
+        this.repositoryCaptures.delete(sessionId);
+      } else if (
+        capture.ok !== undefined &&
+        (await readRoute(this.db, sessionId))?.state !== 'preparing'
+      ) {
+        this.repositoryCaptures.delete(sessionId);
+      }
+    }
     for (const effect of effects) {
       await this.runEffect(effect, state);
     }
@@ -2932,6 +2952,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async runCloseSocket(state: AllocationState): Promise<void> {
     if (state.allocationId === null || state.connectionId === null) return;
+    if (
+      [...this.repositoryCaptures.values()].some(
+        capture => capture.allocationId === state.allocationId && capture.ok === undefined
+      )
+    )
+      return;
     await this.applyEvent({
       type: 'socket-closed',
       at: Date.now(),
@@ -3060,6 +3086,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         wrapperId: frame.wrapperId,
       });
       await confirmRepositoryLaunch(this.ctx.storage, frame.allocationId);
+      for (const [sessionId, capture] of this.repositoryCaptures) {
+        if (capture.allocationId === frame.allocationId && capture.ok !== undefined) {
+          this.trySendFrame(ws, { type: 'workspace.captured', sessionId, ok: capture.ok });
+        }
+      }
       return;
     }
 
@@ -3130,6 +3161,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         return;
       case 'session.ready':
+        if (current) this.repositoryCaptures.delete(frame.sessionId);
         if (frame.workspace !== undefined) {
           logger
             .withFields({ sessionId: frame.sessionId, workspace: frame.workspace })
@@ -3176,11 +3208,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     state: AllocationState,
     current: boolean
   ): void {
-    if (!current || this.capturesInFlight.has(frame.sessionId)) return;
-    this.capturesInFlight.add(frame.sessionId);
+    if (!current || this.repositoryCaptures.has(frame.sessionId)) return;
+    this.repositoryCaptures.set(frame.sessionId, { allocationId: state.allocationId });
     this.ctx.waitUntil(
-      this.runRepositoryCapture(frame, state).finally(() => {
-        this.capturesInFlight.delete(frame.sessionId);
+      this.runRepositoryCapture(frame, state).finally(async () => {
+        await this.enqueue(async () => this.armAlarm(await this.readAllocation()));
       })
     );
   }
@@ -3211,6 +3243,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const latest = await this.readAllocation();
     if (latest.allocationId !== state.allocationId) return;
+    const capture = this.repositoryCaptures.get(frame.sessionId);
+    if (capture?.allocationId !== state.allocationId) return;
+    capture.ok = ok;
     const socket = this.boundWrapperSocket(latest);
     if (socket === null) return;
     this.trySendFrame(socket, { type: 'workspace.captured', sessionId: frame.sessionId, ok });
@@ -3908,7 +3943,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // The one alarm is the earliest of the allocation timers and the route
     // preparation deadlines, so a hung wrapper's route cannot outlive its
     // 12-minute attempt.
-    const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
+    const allocationAt = nextAllocationAlarmAt(
+      state.kind === 'connected' &&
+        [...this.repositoryCaptures.values()].some(
+          capture => capture.allocationId === state.allocationId && capture.ok === undefined
+        )
+        ? { ...state, lastFrameAt: Date.now() }
+        : state,
+      this.sandboxTimers()
+    );
     const routeAt = await earliestRouteDeadlineAt(this.db);
     if (this.billingSchedule.snapshotEarliestDue() === undefined) await this.billingSchedule.load();
     const billingAt = this.billingSchedule.snapshotEarliestDue() ?? null;

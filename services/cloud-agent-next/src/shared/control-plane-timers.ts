@@ -93,7 +93,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     heartbeatNegotiationMs: ms(1_000),
     cloneMs: 6 * MINUTE_MS,
     restoreMs: 2 * MINUTE_MS,
-    captureMs: 3 * MINUTE_MS + 10_000,
+    captureMs: 5 * MINUTE_MS + 10_000,
     kiloRuntimeStartMs: 2 * MINUTE_MS,
     kiloSessionMs: 2 * MINUTE_MS,
     sseSilenceMs: 30_000,

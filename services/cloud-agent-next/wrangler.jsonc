@@ -488,6 +488,7 @@
         "WORKTREE_CREATION_ENABLED_IDS": "*",
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
+        "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
         "VERCEL_SANDBOX_ORG_IDS": "",
         "VERCEL_PROJECT_ID": "",
         "VERCEL_TEAM_ID": "",

@@ -3,7 +3,10 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
-import { routes as routesTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import {
+  allocation as allocationTable,
+  routes as routesTable,
+} from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -448,6 +451,98 @@ describe('repository capture request', () => {
 
     await releaseCapture(stub, provider);
     expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
+  });
+
+  it('ignores socket close during capture and resumes disconnect handling afterwards', async () => {
+    const provider = createFakeProvider();
+    provider.captureResult = 'hang';
+    const { wrapper, stub } = await preparing(provider, 'sbx__repo_capture_close');
+    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
+    await waitFor(() => expect(provider.captures).toHaveLength(1));
+
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.webSocketClose(state.getWebSockets()[0]);
+      expect((await instance.getAllocationState()).kind).toBe('connected');
+    });
+    await releaseCapture(stub, provider);
+    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.webSocketClose(state.getWebSockets()[0]);
+      expect((await instance.getAllocationState()).kind).toBe('disconnected');
+    });
+  });
+
+  it('keeps an overdue heartbeat socket alive only while capture runs', async () => {
+    const provider = createFakeProvider();
+    provider.captureResult = 'hang';
+    const { wrapper, stub } = await preparing(provider, 'sbx__repo_capture_heartbeat');
+    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
+    await waitFor(() => expect(provider.captures).toHaveLength(1));
+
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db.update(allocationTable).set({ last_frame_at: Date.now() - 60_000 });
+      await instance.alarm();
+      expect((await instance.getAllocationState()).kind).toBe('connected');
+      expect(await state.storage.getAlarm()).toBeGreaterThan(Date.now());
+    });
+    await releaseCapture(stub, provider);
+    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
+    await runInDurableObject(stub, async instance => {
+      await instance.alarm();
+      expect((await instance.getAllocationState()).kind).toBe('disconnected');
+    });
+  });
+
+  it.each([true, false])(
+    'delivers capture across reconnect (completed first: %s)',
+    async completedFirst => {
+      const provider = createFakeProvider();
+      provider.captureResult = 'hang';
+      const sandboxId = `sbx__repo_capture_reply_reconnect_${completedFirst}`;
+      const { wrapper, stub } = await preparing(provider, sandboxId);
+      wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
+      await waitFor(() => expect(provider.captures).toHaveLength(1));
+      wrapper.close();
+      await wrapper.waitForClose();
+      if (completedFirst) await releaseCapture(stub, provider);
+
+      const { wrapper: reconnected } = await connect(sandboxId, provider);
+      if (!completedFirst) await releaseCapture(stub, provider);
+      expect(await reconnected.nextSkipping(['session.prepare'])).toEqual({
+        type: 'workspace.captured',
+        sessionId: SESSION,
+        ok: true,
+      });
+      expect(provider.captures).toHaveLength(1);
+
+      reconnected.send({ type: 'session.ready', sessionId: SESSION });
+      await waitFor(async () =>
+        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
+      );
+      const { wrapper: readyReconnect } = await connect(sandboxId, provider);
+      expect(await readyReconnect.next(50)).toBeNull();
+    }
+  );
+
+  it('does not replay a completed capture into a replacement allocation', async () => {
+    const provider = createFakeProvider();
+    provider.captureResult = 'hang';
+    const sandboxId = 'sbx__repo_capture_reply_replaced';
+    const { wrapper, stub } = await preparing(provider, sandboxId);
+    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
+    await waitFor(() => expect(provider.captures).toHaveLength(1));
+    await releaseCapture(stub, provider);
+    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
+
+    const replacement = crypto.randomUUID();
+    await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db.update(allocationTable).set({ allocation_id: replacement });
+    });
+    provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID = replacement;
+    const { wrapper: replaced } = await connect(sandboxId, provider);
+    expect(await replaced.nextSkipping(['session.prepare'], 50)).toBeNull();
   });
 
   it('does not block other frames while a capture runs', async () => {

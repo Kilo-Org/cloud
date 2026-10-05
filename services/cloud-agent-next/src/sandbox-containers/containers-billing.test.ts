@@ -251,7 +251,7 @@ function cmdlineProcess(text: string): ExecProcess {
   return {
     pid: 1,
     exitCode: Promise.resolve(0),
-    output: () => Promise.resolve({ stdout: buffer, stderr: new ArrayBuffer(0) }),
+    output: () => Promise.resolve({ stdout: buffer, stderr: new ArrayBuffer(0), exitCode: 0 }),
   } as unknown as ExecProcess;
 }
 

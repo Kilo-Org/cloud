@@ -156,7 +156,7 @@ const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 /** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
 const WRAPPER_READINESS_POLL_MS = 1_000;
 /** Bounds one repository capture. The wrapper's own wait is a backstop over this. */
-const REPO_CAPTURE_TIMEOUT_MS = 3 * 60_000;
+const REPO_CAPTURE_TIMEOUT_MS = 5 * 60_000;
 const DESTROY_TIMEOUT_MS = 30_000;
 
 type RepositoryCaptureOutcome = 'stored' | 'index_unavailable' | 'abandoned' | 'failed';
@@ -961,9 +961,8 @@ export class SandboxContainers extends DurableObject<Env> {
         container.exec(['cat', '/proc/1/cmdline']),
         deadlineAt
       );
-      const exitCode = await this.awaitContainerCall(proc.exitCode, deadlineAt);
-      if (exitCode !== 0) return 'ambiguous';
       const output = await this.awaitContainerCall(proc.output(), deadlineAt);
+      if (output.exitCode !== 0) return 'ambiguous';
       return classifyMainProcess(new Uint8Array(output.stdout));
     } catch {
       return 'ambiguous';

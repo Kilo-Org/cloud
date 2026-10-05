@@ -4,8 +4,6 @@ import {
 } from '../../src/shared/assistant-failure.js';
 import { GITHUB_REVIEW_TOOL_PERMISSION_KEY } from '../../src/shared/github-review-target.js';
 
-export const PUBLICATION_RECOVERY_DEADLINE_MS = 90_000;
-
 export const PUBLICATION_RECOVERY_PROMPT =
   'Publish the review summary by calling the code_review_publish_review_summary tool with the wording only; do not use gh for the summary.';
 

@@ -5,7 +5,6 @@ import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
 import {
   decidePublicationRecovery,
-  PUBLICATION_RECOVERY_DEADLINE_MS,
   PUBLICATION_RECOVERY_PROMPT,
 } from './publication-recovery.js';
 
@@ -61,21 +60,18 @@ export function createLifecycleManager(
   let publicationRecoveryBudgetUsed = false;
   let publicationRecoveryInFlight = false;
   let publicationRecoveryArmId = 0;
-  let publicationRecoveryDeadline: ReturnType<typeof setTimeout> | null = null;
   let publicationRecoverySubmitController: AbortController | null = null;
 
-  type PublicationRecoveryPromptOutcome = 'delivered' | 'failed' | 'superseded' | 'deadline';
+  type PublicationRecoveryPromptOutcome = 'delivered' | 'failed' | 'superseded';
 
   /**
    * Invalidates the current recovery arm before aborting its submit, so the
-   * arm's catch, deadline timer, and deadline `.finally` can no longer emit an
-   * error, abort a session, or finalize on behalf of a superseded recovery.
-   * It does not touch the per-batch budget: a new admitted batch resets that
-   * separately.
+   * arm's catch can no longer emit an error, abort a session, or finalize on
+   * behalf of a superseded recovery. It does not touch the per-batch budget:
+   * a new admitted batch resets that separately.
    */
   function supersedePublicationRecovery(): void {
     publicationRecoveryArmId += 1;
-    clearPublicationRecoveryDeadline();
     publicationRecoverySubmitController?.abort();
     publicationRecoverySubmitController = null;
   }
@@ -222,7 +218,6 @@ export function createLifecycleManager(
 
   function drainAndClose(): Promise<void> {
     state.blockAdmissions();
-    clearPublicationRecoveryDeadline();
     if (drainPromise) return drainPromise;
     const drainGeneration = lifecycleGeneration;
     clearStableIdleCandidate();
@@ -275,12 +270,6 @@ export function createLifecycleManager(
     void drainAndClose();
   }
 
-  function clearPublicationRecoveryDeadline(): void {
-    if (!publicationRecoveryDeadline) return;
-    clearTimeout(publicationRecoveryDeadline);
-    publicationRecoveryDeadline = null;
-  }
-
   async function abortSessionBounded(sessionId: string): Promise<void> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
@@ -315,17 +304,6 @@ export function createLifecycleManager(
     const armId = publicationRecoveryArmId + 1;
     publicationRecoveryArmId = armId;
     const isCurrentArm = () => publicationRecoveryArmId === armId;
-    publicationRecoveryDeadline = setTimeout(() => {
-      publicationRecoveryDeadline = null;
-      if (!isCurrentArm()) return;
-      publicationRecoverySubmitController?.abort();
-      logToFile('publication check: deadline');
-      emitPublicationRecoveryError('Publication recovery deadline reached');
-      void abortSessionBounded(session.kiloSessionId).finally(() => {
-        if (!isCurrentArm()) return;
-        if (state.beginFinalizing()) triggerDrainAndClose();
-      });
-    }, PUBLICATION_RECOVERY_DEADLINE_MS);
     try {
       await deps.kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
@@ -344,16 +322,10 @@ export function createLifecycleManager(
         // submit: never emit or abort a session on a stale arm's behalf.
         return 'superseded';
       }
-      if (publicationRecoveryDeadline === null) {
-        // The deadline already aborted the submit and owns finalization; do not
-        // abort or emit a second nonfatal error.
-        return 'deadline';
-      }
       logToFile(
         `publication check: send failed${error instanceof Error ? `: ${error.message}` : ''}`
       );
       emitPublicationRecoveryError('Failed to send publication recovery prompt');
-      clearPublicationRecoveryDeadline();
       await abortSessionBounded(session.kiloSessionId);
       // A reset or new admitted batch can supersede during the bounded abort;
       // never seal the new batch from a stale arm.
@@ -382,13 +354,10 @@ export function createLifecycleManager(
       } finally {
         publicationRecoveryInFlight = false;
       }
-      // A superseded arm or one whose deadline already owns finalization must
-      // not finalize here; the new batch or the deadline `.finally` owns it.
-      if (outcome === 'superseded' || outcome === 'deadline') return;
+      // A superseded arm must not finalize here; the new batch owns it.
+      if (outcome === 'superseded') return;
       if (outcome === 'delivered' && deps.isConnected()) return;
-      clearPublicationRecoveryDeadline();
     }
-    clearPublicationRecoveryDeadline();
     if (state.beginFinalizing()) {
       triggerDrainAndClose();
     }

@@ -307,9 +307,7 @@ function createRecoveryHarness(options: { abortDeferred?: boolean; submitFails?:
   state.setSendToIngestFn(event => events.push(event));
   state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false });
 
-  const sendSignals: AbortSignal[] = [];
   const messageIds: string[] = [];
-  const abortSignals: AbortSignal[] = [];
   let sendCalls = 0;
   let abortCalls = 0;
   let resolveDeferredAbort: (() => void) | null = null;
@@ -317,7 +315,6 @@ function createRecoveryHarness(options: { abortDeferred?: boolean; submitFails?:
     sendPromptAsync: (opts: { messageId?: string; signal?: AbortSignal }) => {
       sendCalls += 1;
       if (opts.messageId) messageIds.push(opts.messageId);
-      if (opts.signal) sendSignals.push(opts.signal);
       if (options.submitFails) return Promise.reject(new Error('submit failed'));
       if (options.abortDeferred) {
         return new Promise<void>((_resolve, reject) => {
@@ -328,9 +325,8 @@ function createRecoveryHarness(options: { abortDeferred?: boolean; submitFails?:
       }
       return Promise.resolve();
     },
-    abortSession: (opts?: { signal?: AbortSignal }) => {
+    abortSession: () => {
       abortCalls += 1;
-      if (opts?.signal) abortSignals.push(opts.signal);
       if (options.abortDeferred) {
         return new Promise<void>(resolve => {
           resolveDeferredAbort = resolve;
@@ -356,9 +352,7 @@ function createRecoveryHarness(options: { abortDeferred?: boolean; submitFails?:
     state,
     events,
     lifecycle,
-    sendSignals,
     messageIds,
-    abortSignals,
     get sendCalls() {
       return sendCalls;
     },
@@ -376,7 +370,7 @@ async function triggerRecovery(harness: ReturnType<typeof createRecoveryHarness>
 }
 
 describe('publication recovery lifecycle', () => {
-  it('a recovered seal clears the 90s deadline without a later abort or error', async () => {
+  it('a verified result seals without aborting the session or emitting an error', async () => {
     jest.useFakeTimers();
     try {
       const harness = createRecoveryHarness();
@@ -388,35 +382,8 @@ describe('publication recovery lifecycle', () => {
       jest.advanceTimersByTime(3_000);
       await flushMicrotasks();
 
-      jest.advanceTimersByTime(90_000);
-      await flushMicrotasks();
       expect(harness.abortCalls).toBe(0);
-      expect(
-        harness.events.some(
-          event =>
-            event.streamEventType === 'error' && JSON.stringify(event.data).includes('deadline')
-        )
-      ).toBe(false);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('keeps the deadline absolute while the recovered turn stays busy', async () => {
-    jest.useFakeTimers();
-    try {
-      const harness = createRecoveryHarness();
-      await triggerRecovery(harness);
-
-      jest.advanceTimersByTime(40_000);
-      harness.lifecycle.onRootSessionActivity();
-      jest.advanceTimersByTime(49_000);
-      await flushMicrotasks();
-      expect(harness.abortCalls).toBe(0);
-
-      jest.advanceTimersByTime(1_000);
-      await flushMicrotasks();
-      expect(harness.abortCalls).toBe(1);
+      expect(harness.events.some(event => event.streamEventType === 'error')).toBe(false);
     } finally {
       jest.useRealTimers();
     }
@@ -451,29 +418,6 @@ describe('publication recovery lifecycle', () => {
     }
   });
 
-  it('the deadline aborts the submit and aborts the session once on a fresh signal', async () => {
-    jest.useFakeTimers();
-    try {
-      const harness = createRecoveryHarness({ abortDeferred: true });
-      await triggerRecovery(harness);
-      expect(harness.sendCalls).toBe(1);
-
-      jest.advanceTimersByTime(90_000);
-      await flushMicrotasks();
-      expect(harness.sendSignals[0]?.aborted).toBe(true);
-      expect(harness.abortCalls).toBe(1);
-      expect(harness.abortSignals).toHaveLength(1);
-      expect(harness.abortSignals[0]).not.toBe(harness.sendSignals[0]);
-      expect(harness.abortSignals[0]?.aborted).toBe(false);
-
-      harness.resolveDeferredAbort();
-      await flushMicrotasks();
-      expect(harness.abortCalls).toBe(1);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
   it('superseding a deferred submit via a new message does not emit or abort the new turn', async () => {
     jest.useFakeTimers();
     try {
@@ -490,65 +434,6 @@ describe('publication recovery lifecycle', () => {
 
       expect(harness.abortCalls).toBe(0);
       expect(harness.events.some(event => event.streamEventType === 'error')).toBe(false);
-      expect(harness.events.map(event => event.streamEventType)).not.toContain(
-        'wrapper_finalizing'
-      );
-      expect(harness.events.map(event => event.streamEventType)).not.toContain('complete');
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('a message accepted during the deadline abort cannot finalize the new batch', async () => {
-    jest.useFakeTimers();
-    try {
-      const harness = createRecoveryHarness({ abortDeferred: true });
-      await triggerRecovery(harness);
-      jest.advanceTimersByTime(90_000);
-      await flushMicrotasks();
-      expect(harness.abortCalls).toBe(1);
-
-      harness.lifecycle.resetPublicationRecoveryBudget();
-      harness.state.acceptMessage('message-new', {
-        autoCommit: false,
-        condenseOnComplete: false,
-      });
-      harness.resolveDeferredAbort();
-      await flushMicrotasks();
-
-      expect(harness.abortCalls).toBe(1);
-      expect(harness.events.map(event => event.streamEventType)).not.toContain(
-        'wrapper_finalizing'
-      );
-      expect(harness.events.map(event => event.streamEventType)).not.toContain('complete');
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('a stale abort completion cannot finalize a newly bound batch', async () => {
-    jest.useFakeTimers();
-    try {
-      const harness = createRecoveryHarness({ abortDeferred: true });
-      await triggerRecovery(harness);
-      jest.advanceTimersByTime(90_000);
-      await flushMicrotasks();
-      expect(harness.abortCalls).toBe(1);
-
-      harness.lifecycle.reset();
-      harness.state.bindSession({
-        ...sessionContext,
-        kiloSessionId: 'kilo_sess_new',
-        wrapperGeneration: 2,
-        wrapperConnectionId: 'conn_2',
-      });
-      harness.state.acceptMessage('message-new', {
-        autoCommit: false,
-        condenseOnComplete: false,
-      });
-      harness.resolveDeferredAbort();
-      await flushMicrotasks();
-
       expect(harness.events.map(event => event.streamEventType)).not.toContain(
         'wrapper_finalizing'
       );

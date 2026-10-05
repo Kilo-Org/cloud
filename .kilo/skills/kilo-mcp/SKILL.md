@@ -11,10 +11,13 @@ Then regenerate:
   pnpm --filter web script src/scripts/mcp-catalog/skill.ts
 -->
 
-# Kilo MCP
+# Kilo MCP (beta)
 
 The Kilo MCP server exposes the Kilo API through two tools, `kilo_search` and
 `kilo_call`.
+
+Kilo MCP is in beta. Its tools, catalog paths, and behavior can change without
+notice. The changes are recorded in `services/kilo-mcp/CHANGELOG.md`.
 
 ## How to use it
 

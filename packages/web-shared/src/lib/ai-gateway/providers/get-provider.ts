@@ -75,6 +75,11 @@ async function checkOpenRouterBYOK(
 
   const openrouterByok = userByok[0];
 
+  if (openrouterByok.baseUrl && isPrivateUrl(openrouterByok.baseUrl)) {
+    console.warn(`SECURITY: OpenRouter BYOK for user ${user.id} points to a private URL: ${openrouterByok.baseUrl}`);
+    return null;
+  }
+
   return {
     kind: 'provider',
     provider: {

@@ -103,7 +103,7 @@ export function decryptByokRow({
   provider_api?: string | null;
 }): {
   decryptedAPIKey: string;
-  providerId: string;
+  providerId: UserByokProviderId;
   baseUrl: string | null;
   displayName: string | null;
   providerApi: string | null;
@@ -111,7 +111,7 @@ export function decryptByokRow({
   const parsedProviderId = UserByokProviderIdSchema.safeParse(provider_id);
   return {
     decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: parsedProviderId.success ? parsedProviderId.data : provider_id,
+    providerId: parsedProviderId.success ? parsedProviderId.data : (provider_id as UserByokProviderId),
     baseUrl: base_url ?? null,
     displayName: display_name ?? null,
     providerApi: provider_api ?? null,

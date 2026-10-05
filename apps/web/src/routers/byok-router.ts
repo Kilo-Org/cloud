@@ -184,14 +184,13 @@ async function testCustomOrOpenRouterByokKey(existingKey: typeof byok_api_keys.$
       model: createGateway({
         apiKey: VERCEL_AI_GATEWAY.apiKey,
       })(model),
-      providerOptions: {
-        gateway: {
-          only: [finalProvider],
-          byok: { [finalProvider]: byokList },
-        } satisfies GatewayProviderOptions,
-      },
-      },
-    };
+       providerOptions: {
+         gateway: {
+           only: [finalProvider],
+           byok: { [finalProvider]: byokList },
+         } satisfies GatewayProviderOptions
+       },
+     };
   }
 
   try {

@@ -25,7 +25,6 @@ export function isAutoFixBillingErrorMessage(message: string): boolean {
   return BILLING_ERROR_PATTERNS.some(pattern => normalized.includes(pattern));
 }
 
-/** Map raw auto-fix failure text to a concise user-facing message. */
 export function formatAutoFixErrorMessage(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) {

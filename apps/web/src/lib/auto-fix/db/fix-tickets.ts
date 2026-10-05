@@ -1,10 +1,3 @@
-/**
- * Auto Fix - Database Operations
- *
- * Database operations for auto fix tickets.
- * Follows Drizzle ORM patterns used throughout the codebase.
- */
-
 import { db } from '@/lib/drizzle';
 import { auto_fix_tickets } from '@kilocode/db/schema';
 import { eq, and, desc, count, or } from 'drizzle-orm';
@@ -20,10 +13,6 @@ import type {
 } from '../core/schemas';
 import type { AutoFixTicket } from '@kilocode/db/schema';
 
-/**
- * Creates a new fix ticket record
- * Returns the created ticket ID
- */
 export async function createFixTicket(params: CreateFixTicketParams): Promise<string> {
   try {
     const [ticket] = await db
@@ -65,10 +54,6 @@ export async function createFixTicket(params: CreateFixTicketParams): Promise<st
   }
 }
 
-/**
- * Gets a fix ticket by ID
- * Returns null if not found
- */
 export async function getFixTicketById(ticketId: string): Promise<AutoFixTicket | null> {
   try {
     const [ticket] = await db
@@ -87,10 +72,6 @@ export async function getFixTicketById(ticketId: string): Promise<AutoFixTicket 
   }
 }
 
-/**
- * Gets a fix ticket by session ID
- * Returns null if not found
- */
 export async function getFixTicketBySessionId(sessionId: string): Promise<AutoFixTicket | null> {
   try {
     const [ticket] = await db
@@ -109,10 +90,6 @@ export async function getFixTicketBySessionId(sessionId: string): Promise<AutoFi
   }
 }
 
-/**
- * Checks if a fix ticket already exists for a given repo and issue number
- * Returns the existing ticket if found, null otherwise
- */
 export async function findExistingFixTicket(
   repoFullName: string,
   issueNumber: number
@@ -171,9 +148,6 @@ export async function findExistingReviewCommentFixTicket(
   }
 }
 
-/**
- * Updates fix ticket status and optional fields
- */
 export async function updateFixTicketStatus(
   ticketId: string,
   status: FixStatus,
@@ -185,7 +159,6 @@ export async function updateFixTicketStatus(
       updated_at: new Date().toISOString(),
     };
 
-    // Add optional updates
     if (updates.sessionId !== undefined) {
       updateData.session_id = updates.sessionId;
     }
@@ -211,7 +184,6 @@ export async function updateFixTicketStatus(
       updateData.completed_at = updates.completedAt.toISOString();
     }
 
-    // Auto-set timestamps based on status
     if (status === 'running' && !updates.startedAt) {
       updateData.started_at = new Date().toISOString();
     }
@@ -232,11 +204,6 @@ export async function updateFixTicketStatus(
   }
 }
 
-/**
- * Lists fix tickets for an owner (org or user)
- * Supports filtering by status, classification, and repository
- * Returns tickets sorted by creation date (newest first)
- */
 export async function listFixTickets(params: ListFixTicketsParams): Promise<AutoFixTicket[]> {
   try {
     const {
@@ -248,17 +215,14 @@ export async function listFixTickets(params: ListFixTicketsParams): Promise<Auto
       repoFullName,
     } = params;
 
-    // Build WHERE conditions
     const conditions = [];
 
-    // Owner condition
     if (owner.type === 'org') {
       conditions.push(eq(auto_fix_tickets.owned_by_organization_id, owner.id));
     } else {
       conditions.push(eq(auto_fix_tickets.owned_by_user_id, owner.id));
     }
 
-    // Optional filters
     if (status) {
       conditions.push(eq(auto_fix_tickets.status, status));
     }
@@ -287,10 +251,6 @@ export async function listFixTickets(params: ListFixTicketsParams): Promise<Auto
   }
 }
 
-/**
- * Counts total fix tickets for an owner
- * Supports same filtering as listFixTickets
- */
 export async function countFixTickets(params: {
   owner: Owner;
   status?: FixStatus;
@@ -300,17 +260,14 @@ export async function countFixTickets(params: {
   try {
     const { owner, status, classification, repoFullName } = params;
 
-    // Build WHERE conditions
     const conditions = [];
 
-    // Owner condition
     if (owner.type === 'org') {
       conditions.push(eq(auto_fix_tickets.owned_by_organization_id, owner.id));
     } else {
       conditions.push(eq(auto_fix_tickets.owned_by_user_id, owner.id));
     }
 
-    // Optional filters
     if (status) {
       conditions.push(eq(auto_fix_tickets.status, status));
     }
@@ -336,10 +293,6 @@ export async function countFixTickets(params: {
   }
 }
 
-/**
- * Resets a failed fix ticket for retry
- * Clears status back to 'pending' and removes error/session data
- */
 export async function resetFixTicketForRetry(ticketId: string): Promise<void> {
   try {
     await db
@@ -363,10 +316,6 @@ export async function resetFixTicketForRetry(ticketId: string): Promise<void> {
   }
 }
 
-/**
- * Cancels a fix ticket
- * Sets status to 'cancelled' and sets completed_at
- */
 export async function cancelFixTicket(ticketId: string): Promise<void> {
   try {
     await db
@@ -386,10 +335,6 @@ export async function cancelFixTicket(ticketId: string): Promise<void> {
   }
 }
 
-/**
- * Gets count of active fix tickets for an owner (for concurrency control)
- * Active tickets are those with status 'running' or 'pending'
- */
 export async function getActiveFixTicketsCount(owner: Owner): Promise<number> {
   try {
     const conditions = [
@@ -414,10 +359,6 @@ export async function getActiveFixTicketsCount(owner: Owner): Promise<number> {
   }
 }
 
-/**
- * Gets pending fix tickets for an owner
- * Returns tickets sorted by creation date (oldest first for FIFO processing)
- */
 export async function getPendingFixTickets(owner: Owner, limit: number): Promise<AutoFixTicket[]> {
   try {
     const ownerCondition =
@@ -429,7 +370,7 @@ export async function getPendingFixTickets(owner: Owner, limit: number): Promise
       .select()
       .from(auto_fix_tickets)
       .where(and(ownerCondition, eq(auto_fix_tickets.status, 'pending')))
-      .orderBy(auto_fix_tickets.created_at) // Oldest first (FIFO)
+      .orderBy(auto_fix_tickets.created_at)
       .limit(limit);
 
     return tickets;

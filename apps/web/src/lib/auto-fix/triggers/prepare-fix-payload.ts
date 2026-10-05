@@ -55,7 +55,6 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
 
     const triggerSource = ticket.trigger_source || 'label';
 
-    // 6. Prepare session input
     const sessionInput: DispatchFixRequest['sessionInput'] = {
       repoFullName: ticket.repo_full_name,
       issueNumber: ticket.issue_number,

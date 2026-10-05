@@ -1,10 +1,3 @@
-/**
- * GitHub Pull Request Creation Helper (Auto Fix)
- *
- * Creates a pull request using the GitHub REST API.
- * Used by the auto-fix system to create PRs for bug fixes and features.
- */
-
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
@@ -23,13 +16,6 @@ export type CreatePullRequestResult = {
   url: string;
 };
 
-/**
- * Create a pull request on GitHub
- *
- * @param params - Pull request parameters
- * @returns PR number and URL
- * @throws Error if PR creation fails
- */
 export async function createPullRequest(
   params: CreatePullRequestParams
 ): Promise<CreatePullRequestResult> {
@@ -43,7 +29,6 @@ export async function createPullRequest(
     bodyLength: body.length,
   });
 
-  // Parse repo owner and name
   const [owner, repo] = repoFullName.split('/');
 
   if (!owner || !repo) {

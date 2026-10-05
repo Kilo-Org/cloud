@@ -55,13 +55,11 @@ const PUBLIC_ERROR_MAX_LENGTH = 500;
 
 /** Strip URLs, file paths, and stack traces that may leak infra details. */
 export function sanitizePublicErrorMessage(raw: string): string {
-  return (
-    raw
-      .replace(/(\n\s+at\s.+)+/g, '\n(stack trace omitted)')
-      .replace(/https?:\/\/(?!github\.com)[^\s)]+/g, '[internal-url]')
-      .replace(/\/(?:home|var|tmp|usr|opt|etc|root|srv)\/[^\s)]+/g, '[internal-path]')
-      .slice(0, PUBLIC_ERROR_MAX_LENGTH)
-  );
+  return raw
+    .replace(/(\n\s+at\s.+)+/g, '\n(stack trace omitted)')
+    .replace(/https?:\/\/(?!github\.com)[^\s)]+/g, '[internal-url]')
+    .replace(/\/(?:home|var|tmp|usr|opt|etc|root|srv)\/[^\s)]+/g, '[internal-path]')
+    .slice(0, PUBLIC_ERROR_MAX_LENGTH);
 }
 
 type FriendlyFailure = {
@@ -254,7 +252,7 @@ export async function handleCommentReply(
       return { ok: true, action: 'reaction_and_reply' };
     }
 
-  const failureReason = payload.errorMessage?.trim() || 'Unknown error';
+    const failureReason = payload.errorMessage?.trim() || 'Unknown error';
     const friendlyFailure = getFriendlyFailure(failureReason);
     const traceLine = sessionId ? `- Session ID: \`${sessionId}\`` : '- Session ID: unavailable';
     const sanitizedReason = sanitizePublicErrorMessage(failureReason);
@@ -317,8 +315,8 @@ export async function handleCommentReply(
       extra: { ticketId, sessionId, outcome },
     });
 
-    // Try to add failure reaction
     try {
+      await addReactionToPRReviewComment(
         installationId,
         repoOwner,
         repoName,

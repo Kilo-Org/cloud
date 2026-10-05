@@ -1,16 +1,5 @@
-/**
- * Auto Fix - Zod Validation Schemas
- *
- * Runtime validation schemas for auto fix inputs and outputs.
- * Follows validation patterns used throughout the codebase.
- */
-
 import * as z from 'zod';
 import type { AutoFixTicket } from '@kilocode/db/schema';
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 export const AUTO_FIX_CONSTANTS = {
   DEFAULT_PAGE_SIZE: 20,
@@ -20,10 +9,6 @@ export const AUTO_FIX_CONSTANTS = {
   MIN_PR_CREATION_TIME_MINUTES: 5,
   MAX_PR_CREATION_TIME_MINUTES: 30,
 } as const;
-
-// ============================================================================
-// Status and Ownership Schemas
-// ============================================================================
 
 /**
  * Auto fix ticket status enum
@@ -35,9 +20,6 @@ export const FixStatusSchema = z.enum(['pending', 'running', 'completed', 'faile
  */
 export const FixClassificationTypeSchema = z.enum(['bug', 'feature', 'question', 'unclear']);
 
-/**
- * Owner schema - discriminated union
- */
 export const OwnerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('org'),
@@ -51,19 +33,12 @@ export const OwnerSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-// ============================================================================
-// Configuration Schemas
-// ============================================================================
+export const TriggerSourceSchema = z.enum(['label', 'review_comment']);
 
 /**
  * Auto fix agent configuration schema
  * Used for storing configuration in agent_configs table
  */
-/**
- * Trigger source for fix tickets
- */
-export const TriggerSourceSchema = z.enum(['label', 'review_comment']);
-
 export const AutoFixAgentConfigSchema = z
   .object({
     enabled_for_issues: z.boolean().describe('Enable auto fix for GitHub issues'),
@@ -122,9 +97,6 @@ export const AutoFixAgentConfigSchema = z
   })
   .strict();
 
-/**
- * Schema for saving auto fix configuration via tRPC
- */
 export const SaveAutoFixConfigSchema = z
   .object({
     organizationId: z.string().uuid(),
@@ -150,10 +122,6 @@ export const SaveAutoFixConfigSchema = z
   })
   .strict();
 
-// ============================================================================
-// GitHub Label Event Schemas
-// ============================================================================
-
 /**
  * GitHub label schema
  */
@@ -162,9 +130,6 @@ export const GitHubLabelSchema = z.object({
   color: z.string().optional(),
 });
 
-/**
- * GitHub issue labeled webhook payload
- */
 export const IssueLabeledPayloadSchema = z.object({
   action: z.literal('labeled'),
   label: GitHubLabelSchema,
@@ -191,13 +156,6 @@ export const IssueLabeledPayloadSchema = z.object({
   }),
 });
 
-// ============================================================================
-// Database Operation Schemas
-// ============================================================================
-
-/**
- * Create fix ticket params schema
- */
 export const CreateFixTicketParamsSchema = z.object({
   owner: OwnerSchema,
   platformIntegrationId: z.string().uuid().optional(),
@@ -213,9 +171,7 @@ export const CreateFixTicketParamsSchema = z.object({
   confidence: z.number().min(0).max(1).optional(),
   intentSummary: z.string().optional(),
   relatedFiles: z.array(z.string()).optional(),
-  // Trigger source (defaults to 'label')
   triggerSource: TriggerSourceSchema.optional(),
-  // Review comment context (for review_comment trigger)
   reviewCommentId: z.number().int().positive().optional(),
   reviewCommentBody: z.string().optional(),
   filePath: z.string().optional(),
@@ -224,9 +180,6 @@ export const CreateFixTicketParamsSchema = z.object({
   prHeadRef: z.string().optional(),
 });
 
-/**
- * Update fix ticket status params schema
- */
 export const UpdateFixTicketStatusParamsSchema = z.object({
   ticketId: z.string().uuid(),
   status: FixStatusSchema,
@@ -240,9 +193,6 @@ export const UpdateFixTicketStatusParamsSchema = z.object({
   completedAt: z.date().optional(),
 });
 
-/**
- * List fix tickets params schema
- */
 export const ListFixTicketsParamsSchema = z.object({
   owner: OwnerSchema,
   limit: z
@@ -257,13 +207,6 @@ export const ListFixTicketsParamsSchema = z.object({
   repoFullName: z.string().optional(),
 });
 
-// ============================================================================
-// tRPC Input Schemas
-// ============================================================================
-
-/**
- * List fix tickets input (for organizations)
- */
 export const ListFixTicketsInputSchema = z.object({
   organizationId: z.string().uuid(),
   limit: z
@@ -279,9 +222,6 @@ export const ListFixTicketsInputSchema = z.object({
   repoFullName: z.string().optional(),
 });
 
-/**
- * List fix tickets input (for personal users)
- */
 export const ListFixTicketsForUserInputSchema = z.object({
   limit: z
     .number()
@@ -296,45 +236,26 @@ export const ListFixTicketsForUserInputSchema = z.object({
   repoFullName: z.string().optional(),
 });
 
-/**
- * Get fix ticket input
- */
 export const GetFixTicketInputSchema = z.object({
   ticketId: z.string().uuid(),
 });
 
-/**
- * Retrigger fix ticket input
- */
 export const RetriggerFixTicketInputSchema = z.object({
   ticketId: z.string().uuid(),
 });
 
-/**
- * Cancel fix ticket input
- */
 export const CancelFixTicketInputSchema = z.object({
   ticketId: z.string().uuid(),
 });
 
-/**
- * Get auto fix config input
- */
 export const GetAutoFixConfigInputSchema = z.object({
   organizationId: z.string().uuid(),
 });
 
-/**
- * Toggle auto fix agent input
- */
 export const ToggleAutoFixAgentInputSchema = z.object({
   organizationId: z.string().uuid().optional(),
   isEnabled: z.boolean(),
 });
-
-// ============================================================================
-// Worker Communication Schemas
-// ============================================================================
 
 /**
  * Fix status update from worker to backend
@@ -350,9 +271,6 @@ export const FixStatusUpdateSchema = z.object({
   errorMessage: z.string().optional(),
 });
 
-/**
- * Dispatch fix request to worker
- */
 export const DispatchFixRequestSchema = z.object({
   ticketId: z.string().uuid(),
   authToken: z.string(),
@@ -379,7 +297,6 @@ export const DispatchFixRequestSchema = z.object({
     prTitleTemplate: z.string(),
     prBodyTemplate: z.string().nullable().optional(),
     prBaseBranch: z.string(),
-    // Review comment context (for review_comment trigger)
     upstreamBranch: z.string().optional(),
     reviewCommentId: z.number().int().positive().optional(),
     reviewCommentBody: z.string().optional(),
@@ -389,14 +306,6 @@ export const DispatchFixRequestSchema = z.object({
   }),
 });
 
-// ============================================================================
-// Inferred TypeScript Types from Zod Schemas
-// ============================================================================
-
-/**
- * Infer TypeScript types from Zod schemas for use in function signatures.
- * These provide type safety while keeping schemas as the single source of truth.
- */
 export type FixStatus = z.infer<typeof FixStatusSchema>;
 export type FixClassificationType = z.infer<typeof FixClassificationTypeSchema>;
 export type Owner = z.infer<typeof OwnerSchema>;
@@ -410,9 +319,6 @@ export type DispatchFixRequest = z.infer<typeof DispatchFixRequestSchema>;
 export type IssueLabeledPayload = z.infer<typeof IssueLabeledPayloadSchema>;
 export type TriggerSource = z.infer<typeof TriggerSourceSchema>;
 
-/**
- * Response type for list fix tickets
- */
 export type ListFixTicketsResponse = {
   tickets: AutoFixTicket[];
   total: number;

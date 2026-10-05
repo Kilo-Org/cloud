@@ -1,16 +1,4 @@
-/**
- * Auto Fix - Default Configuration
- *
- * Centralized default configuration for auto-fix agent.
- * Used across all routers (personal, organization, and main auto-fix router).
- */
-
 import { AUTO_FIX_CONSTANTS, type AutoFixAgentConfig } from './schemas';
-
-/**
- * Default auto-fix configuration
- * Applied when no configuration exists for an owner
- */
 export const DEFAULT_AUTO_FIX_CONFIG: AutoFixAgentConfig = {
   enabled_for_issues: false,
   enabled_for_review_comments: false,

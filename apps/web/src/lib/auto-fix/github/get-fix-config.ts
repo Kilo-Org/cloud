@@ -1,10 +1,3 @@
-/**
- * Shared handler for loading auto-fix configuration for a ticket.
- *
- * Extracted so the `pr-callback` route can call it directly without a
- * self-referencing HTTP fetch to `/api/internal/auto-fix/config`.
- */
-
 import { getFixTicketById } from '@/lib/auto-fix/db/fix-tickets';
 import type { AutoFixTicket } from '@kilocode/db/schema';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';

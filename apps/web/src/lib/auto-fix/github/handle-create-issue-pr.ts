@@ -1,11 +1,3 @@
-/**
- * Shared handler for creating a GitHub PR from an issue-triggered fix ticket.
- *
- * Extracted so the `pr-callback` route can call it directly without
- * self-referencing HTTP fetches to `/api/internal/auto-fix/config`
- * and `/api/internal/auto-fix/create-pr`.
- */
-
 import { updateFixTicketStatus } from '@/lib/auto-fix/db/fix-tickets';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
@@ -29,7 +21,6 @@ export async function handleCreateIssuePR(
 ): Promise<HandleCreateIssuePRResult> {
   const { ticketId, sessionId, branchName: providedBranchName } = params;
 
-  // 1. Load config (token + PR settings)
   const configResult = await getFixConfig(ticketId);
 
   if (!configResult.ok) {
@@ -105,7 +96,6 @@ The changes implement the fix as described in the original issue.
       completedAt: new Date(),
     });
 
-    // Post comment on issue linking to PR (best-effort)
     try {
       await postIssueComment({
         repoFullName: ticket.repo_full_name,
@@ -135,7 +125,6 @@ The changes implement the fix as described in the original issue.
       completedAt: new Date(),
     });
 
-    // Post comment on issue explaining failure (best-effort)
     try {
       await postIssueComment({
         repoFullName: ticket.repo_full_name,

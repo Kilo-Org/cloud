@@ -575,6 +575,20 @@ export const controlPlaneSessionCredentialsPayloadSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * Endpoint and grant for the durable capture of this worktree's uncommitted
+     * changes, so a rebuilt sandbox restores them instead of discarding them.
+     * Delivered on `session.prepare` and refreshed on `session.credentials` so a
+     * long-lived wrapper's grant does not expire. Never persisted into the route
+     * spec, which keeps the stored route row readable by an older deploy.
+     */
+    worktreeState: z
+      .object({
+        url: z.string().min(1).max(4096),
+        grant: z.string().min(1).max(4096),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -585,6 +599,13 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    /**
+     * Negotiated like `heartbeatAck`: a new wrapper offers it in its first
+     * `hello`, and the Sandbox DO only delivers a `worktreeState` route field
+     * when it was offered. Older v2 DOs strictly reject this field, so the
+     * wrapper falls back to a hello without either capability.
+     */
+    worktreeState: z.literal(true).optional(),
   })
   .strict();
 

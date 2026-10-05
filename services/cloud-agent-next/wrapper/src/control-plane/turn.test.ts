@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type {
   ControlPlanePromptPayload,
   ControlPlaneRouteSpec,
@@ -9,6 +9,10 @@ import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { runtimeKey } from './prepare.js';
+import {
+  rememberWorktreeStateEndpoint,
+  resetWorktreeStateEndpoints,
+} from './worktree-state-endpoints.js';
 import {
   createTurnManager,
   noProgressElapsedMs,
@@ -223,6 +227,7 @@ function createHarness(
   options: {
     runCondense?: TurnManagerDeps['runCondense'];
     runAutoCommit?: TurnManagerDeps['runAutoCommit'];
+    captureWorktreeState?: TurnManagerDeps['captureWorktreeState'];
     materializeAttachments?: (message: {
       prompt?: string;
       parts?: unknown[];
@@ -273,6 +278,7 @@ function createHarness(
     runCondense:
       options.runCondense ?? (async () => ({ wasAborted: false, success: true }) as never),
     runAutoCommit: options.runAutoCommit ?? ((async () => ({ success: true })) as never),
+    ...(options.captureWorktreeState ? { captureWorktreeState: options.captureWorktreeState } : {}),
   });
 
   function ensureRuntime(spec: ControlPlaneRouteSpec): void {
@@ -2845,5 +2851,66 @@ describe('native session outcome transitions', () => {
       kiloEvent('question.replied', { sessionID: KILO_SESSION, requestID: 'q1' })
     );
     expect(h.manager.activeTurnCount()).toBe(1);
+  });
+});
+
+describe('turn worktree-state capture', () => {
+  afterEach(() => {
+    resetWorktreeStateEndpoints();
+  });
+
+  it('captures uncommitted state before reporting a completed turn', async () => {
+    const calls: Array<{ directory: string; grant: string }> = [];
+    const h = createHarness({
+      captureWorktreeState: (async (options: {
+        directory: string;
+        endpoint: { grant: string };
+      }) => {
+        calls.push({ directory: options.directory, grant: options.endpoint.grant });
+        return { status: 'captured', bytes: 10, files: 1 };
+      }) as never,
+    });
+    const endpoint = { url: 'https://worker.test/worktree-state/usr/w', grant: 'g1' };
+    rememberWorktreeStateEndpoint(DIRECTORY, endpoint);
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(calls).toHaveLength(0);
+
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: KILO_SESSION, messageID: 'assistant-1', type: 'text' },
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(calls).toEqual([{ directory: DIRECTORY, grant: 'g1' }]);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed' });
+  });
+
+  it('does not capture when the route has no worktree-state endpoint', async () => {
+    const calls: unknown[] = [];
+    const h = createHarness({
+      captureWorktreeState: (async () => {
+        calls.push(1);
+        return { status: 'skipped', reason: 'test' };
+      }) as never,
+    });
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: KILO_SESSION, messageID: 'assistant-1', type: 'text' },
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(calls).toHaveLength(0);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
   });
 });

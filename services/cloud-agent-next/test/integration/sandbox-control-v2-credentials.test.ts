@@ -267,7 +267,8 @@ async function setup(
 async function prepareWarmRoute(
   stub: DurableObjectStub<SandboxControlV2>,
   provider: FakeProvider,
-  input: ControlPlanePrepareInput = prepareInput(SESSION)
+  input: ControlPlanePrepareInput = prepareInput(SESSION),
+  hello: { worktreeState?: boolean } = {}
 ): Promise<{
   wrapper: FakeWrapper;
   prepareFrame: ControlPlaneWrapperFrame | null;
@@ -283,7 +284,13 @@ async function prepareWarmRoute(
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
   const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
-  expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+  expect(
+    await wrapper.hello({
+      wrapperId: 'wr_1',
+      allocationId,
+      ...(hello.worktreeState ? { worktreeState: true } : {}),
+    })
+  ).toEqual({
     type: 'welcome',
     protocolVersion: 2,
   });
@@ -1292,6 +1299,37 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(grant.kilo.alias).toBe(prepareFrame.credentials?.kilo.token);
     expect(broker.kiloIssued()).toBe(1);
     expect(broker.githubIssued()).toBe(1);
+  });
+
+  it('does not project worktree-state for a wrapper that did not offer the capability', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker, {
+      WORKER_URL: 'https://worker.test',
+      NEXTAUTH_SECRET: 'test-worktree-state-secret',
+    });
+
+    const { prepareFrame } = await prepareWarmRoute(stub, provider);
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.credentials?.worktreeState).toBeUndefined();
+  });
+
+  it('projects a per-worktree worktree-state grant when the wrapper offered it', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker, {
+      WORKER_URL: 'https://worker.test',
+      NEXTAUTH_SECRET: 'test-worktree-state-secret',
+    });
+
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, prepareInput(SESSION), {
+      worktreeState: true,
+    });
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.credentials?.worktreeState?.url).toBe(
+      `https://worker.test/worktree-state/${encodeURIComponent('user_123')}/${SESSION}`
+    );
+    expect(prepareFrame.credentials?.worktreeState?.grant).toEqual(expect.any(String));
   });
 
   it('re-issues below one hour with fresh tokens and sends session.credentials before prompts', async () => {

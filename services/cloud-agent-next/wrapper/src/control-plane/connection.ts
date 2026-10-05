@@ -334,6 +334,7 @@ export function createControlPlaneConnection(
         allocationId: options.allocationId,
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
+        worktreeState: true,
       });
       // Older v2 peers strictly reject the capability-bearing hello.
       negotiationTimer = setTimeout(() => {

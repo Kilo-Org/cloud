@@ -75,6 +75,7 @@ type Harness = {
   setRestore: (value: () => Promise<unknown>) => void;
   restoreCalls: () => number;
   restoreOptions: () => Array<Record<string, unknown> | undefined>;
+  worktreeRestoreCalls: Array<Record<string, unknown>>;
   setEnsureRejects: (value: boolean) => void;
   setEnsureError: (value: unknown) => void;
   setEnsureHung: (value: boolean) => void;
@@ -116,6 +117,7 @@ function createHarness(
     step: 'download',
   });
   const restoreArgs: Array<Record<string, unknown> | undefined> = [];
+  const worktreeRestoreCalls: Array<Record<string, unknown>> = [];
   let ensureRejects = false;
   let ensureError: unknown;
   let ensureHung = false;
@@ -198,6 +200,10 @@ function createHarness(
       return restore();
     }) as never,
     seedRegistration: async () => undefined,
+    restoreWorktreeState: (async (options: Record<string, unknown>) => {
+      worktreeRestoreCalls.push(options);
+      return { status: 'restored', files: 0 };
+    }) as never,
     sessionExists: async () => {
       if (sessionExistsHung) return new Promise<boolean>(() => undefined);
       return sessionExists;
@@ -237,6 +243,7 @@ function createHarness(
     },
     restoreCalls: () => restoreArgs.length,
     restoreOptions: () => restoreArgs,
+    worktreeRestoreCalls,
     setEnsureRejects: value => {
       ensureRejects = value;
     },
@@ -846,7 +853,6 @@ describe('createPreparationManager', () => {
         writeBootstrapMarker: async () => undefined,
         mkdir: async () => undefined,
         configureGitAuthor: async () => undefined,
-        seedRegistration: async () => undefined,
         sessionExists: async () => true,
       });
 
@@ -1364,5 +1370,35 @@ describe('createPreparationManager', () => {
         }
       }
     );
+  });
+});
+
+describe('preparation worktree-state restore', () => {
+  it('restores a captured worktree after setup when the credentials carry an endpoint', async () => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    const spec = routeSpec({ setupCommands: ['echo setup'] });
+    const worktreeState = {
+      url: 'https://worker.test/worktree-state/usr/w',
+      grant: 'grant-1',
+    };
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'kilo-token' },
+      worktreeState,
+    });
+    expect(harness.worktreeRestoreCalls).toHaveLength(1);
+    expect(harness.worktreeRestoreCalls[0]).toMatchObject({
+      directory: spec.directory,
+      endpoint: worktreeState,
+    });
+  });
+
+  it('does not restore when the credentials carry no worktree-state endpoint', async () => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    await harness.manager.prepare(routeSpec({ setupCommands: ['echo setup'] }), {
+      sessionId: 'workspace_11111111-1111-1111-1111-111111111111',
+      kilo: { token: 'kilo-token' },
+    });
+    expect(harness.worktreeRestoreCalls).toHaveLength(0);
   });
 });

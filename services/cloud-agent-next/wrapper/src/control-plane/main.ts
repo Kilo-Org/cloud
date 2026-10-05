@@ -33,6 +33,13 @@ import { createControlPlaneTerminals } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
+import { discardWorktreeState } from '../worktree-state.js';
+import {
+  beginWorktreeStateDeletion,
+  endWorktreeStateDeletion,
+  forgetWorktreeStateEndpoint,
+  worktreeStateEndpointFor,
+} from './worktree-state-endpoints.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
@@ -365,6 +372,14 @@ export async function runControlPlaneWrapper(
     retireDirectory: directory => runtimes.retireDirectory(directory),
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
+    onDeletionBegin: directory => beginWorktreeStateDeletion(directory),
+    onDeletionComplete: directory => {
+      endWorktreeStateDeletion(directory);
+      const endpoint = worktreeStateEndpointFor(directory);
+      forgetWorktreeStateEndpoint(directory);
+      if (endpoint) void discardWorktreeState(endpoint);
+    },
+    onDeletionFailed: directory => endWorktreeStateDeletion(directory),
     onDiagnostic: diagnostics.onDiagnostic,
     log: logToFile,
   });

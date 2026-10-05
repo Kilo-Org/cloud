@@ -98,6 +98,49 @@ describe('control-plane wrapper worktree deletion (R2)', () => {
     ]);
   });
 
+  test('suppresses capture around a destructive delete and completes after removal', async () => {
+    const events: string[] = [];
+    const { adapter, fixture: f } = harness({
+      onDeletionBegin: dir => events.push(`begin:${dir}`),
+      onDeletionComplete: dir => events.push(`complete:${dir}`),
+      onDeletionFailed: dir => events.push(`failed:${dir}`),
+    });
+    f.sessions.set(sessionId(0), { id: sessionId(0), directory });
+
+    await adapter.handle(deletionRequest('worktree.delete', 'req-hooks'));
+
+    expect(events).toEqual([`begin:${directory}`, `complete:${directory}`]);
+  });
+
+  test('does not suppress capture for a non-destructive prepareDeletion', async () => {
+    const events: string[] = [];
+    const { adapter } = harness({
+      onDeletionBegin: () => events.push('begin'),
+      onDeletionComplete: () => events.push('complete'),
+      onDeletionFailed: () => events.push('failed'),
+    });
+
+    await adapter.handle(deletionRequest('worktree.prepareDeletion', 'req-prep-hooks'));
+
+    expect(events).toEqual([]);
+  });
+
+  test('resumes capture when a destructive delete fails', async () => {
+    const events: string[] = [];
+    const { adapter } = harness({
+      clients: () => {
+        throw new Error('Kilo cleanup is unavailable');
+      },
+      onDeletionBegin: () => events.push('begin'),
+      onDeletionComplete: () => events.push('complete'),
+      onDeletionFailed: () => events.push('failed'),
+    });
+
+    await adapter.handle(deletionRequest('worktree.delete', 'req-fail-hooks'));
+
+    expect(events).toEqual(['begin', 'failed']);
+  });
+
   test('detaches directory terminals before deleting', async () => {
     const detached: string[] = [];
     const { adapter, fixture: f } = harness({

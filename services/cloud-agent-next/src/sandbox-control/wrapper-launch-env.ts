@@ -1,5 +1,6 @@
 import { sandboxControlWebSocketUrl } from './control-url.js';
 import { mintControlLogUploadGrant } from './log-upload-grant.js';
+import { normalizeWorkerOrigin } from './worker-origin.js';
 
 export type ControlWrapperLaunchEnvInput = {
   workerUrl?: string;
@@ -17,18 +18,9 @@ export function buildControlWrapperLaunchEnv(
 ): Record<string, string> {
   const workerUrl = input.workerUrl?.replace(/\/$/, '') ?? '';
   let diagnosticEnv: Record<string, string> = {};
-  if (input.diagnostics?.signingSecret && workerUrl) {
+  const diagnosticOrigin = normalizeWorkerOrigin(input.workerUrl);
+  if (input.diagnostics?.signingSecret && diagnosticOrigin) {
     try {
-      const base = new URL(workerUrl);
-      if (
-        !['http:', 'https:'].includes(base.protocol) ||
-        base.username ||
-        base.password ||
-        base.search ||
-        base.hash
-      ) {
-        throw new Error('Invalid diagnostic upload origin');
-      }
       const identity = {
         sandboxId: input.sandboxId,
         allocationId: input.diagnostics.allocationId,
@@ -39,7 +31,7 @@ export function buildControlWrapperLaunchEnv(
         .map(encodeURIComponent)
         .join('/');
       diagnosticEnv = {
-        CONTROL_LOG_UPLOAD_URL: `${workerUrl}/sandbox-logs/${path}`,
+        CONTROL_LOG_UPLOAD_URL: `${diagnosticOrigin}/sandbox-logs/${path}`,
         CONTROL_LOG_UPLOAD_GRANT: grant,
         CONTROL_WRAPPER_INSTANCE_ID: identity.wrapperInstanceId,
       };

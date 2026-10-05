@@ -21,6 +21,12 @@ import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js'
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
+import { captureWorktreeState, logWorktreeState } from '../worktree-state.js';
+import { WORKTREE_STATE_CAPTURE_BUDGET_MS } from '../../../src/shared/worktree-state.js';
+import {
+  isWorktreeStateDeletionInProgress,
+  worktreeStateEndpointFor,
+} from './worktree-state-endpoints.js';
 import type { KiloRestartReason } from './kilo-runtime.js';
 import { runtimeKey } from './prepare.js';
 
@@ -64,6 +70,7 @@ export type TurnManagerDeps = {
   scheduler?: TurnScheduler;
   materializeAttachments?: typeof materializeMessageAttachments;
   runAutoCommit?: typeof runAutoCommit;
+  captureWorktreeState?: typeof captureWorktreeState;
   runCondense?: (input: {
     kiloClient: WrapperKiloClient;
     kiloSessionId: string;
@@ -238,6 +245,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
   };
   const materialize = deps.materializeAttachments ?? materializeMessageAttachments;
   const autoCommit = deps.runAutoCommit ?? runAutoCommit;
+  const capture = deps.captureWorktreeState ?? captureWorktreeState;
   const condense =
     deps.runCondense ??
     ((input: {
@@ -276,7 +284,32 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return turn.prompts.at(-1)?.payload.messageId ?? '';
   }
 
+  /**
+   * Emits a terminal outcome and releases the turn. The `completed` path
+   * captures the worktree first (see `finalize`); every other path captures
+   * here, before the outcome, because the sandbox becomes idle-eligible as soon
+   * as the outcome is reported. A prompt that arrives while a terminal capture
+   * runs starts a fresh turn, so the reset happens before the capture.
+   */
   function sendOutcome(
+    turn: Turn,
+    status: 'completed' | 'failed' | 'cancelled',
+    reason?: string,
+    facts?: Pick<ControlPlaneOutcome, 'assistantReason' | 'providerOwnership'>
+  ): void {
+    if (
+      status === 'completed' ||
+      worktreeStateEndpointFor(turn.route.directory) === undefined ||
+      isWorktreeStateDeletionInProgress(turn.route.directory)
+    ) {
+      emitOutcome(turn, status, reason, facts);
+      return;
+    }
+    resetTurn(turn.route.sessionId);
+    void captureWorktreeStateForTurn(turn).finally(() => emitOutcome(turn, status, reason, facts));
+  }
+
+  function emitOutcome(
     turn: Turn,
     status: 'completed' | 'failed' | 'cancelled',
     reason?: string,
@@ -309,8 +342,31 @@ export function createTurnManager(deps: TurnManagerDeps) {
       sessionId: turn.route.sessionId,
       ...(outcomeReason.success ? { outcomeReason: outcomeReason.data } : {}),
     });
-    resetTurn(turn.route.sessionId);
+    if (turns.get(turn.route.sessionId) === turn) resetTurn(turn.route.sessionId);
     maybeApplyPendingCredentials(turn.route.runtimeKey);
+  }
+
+  /**
+   * Captures the worktree's uncommitted state so a rebuilt sandbox can restore
+   * it. Best-effort and bounded: the capture never throws, and no failure here
+   * can fail the turn.
+   */
+  async function captureWorktreeStateForTurn(turn: Turn): Promise<void> {
+    const endpoint = worktreeStateEndpointFor(turn.route.directory);
+    if (!endpoint || isWorktreeStateDeletionInProgress(turn.route.directory)) return;
+    const env = deps.runtimes.get(turn.route.runtimeKey)?.env;
+    try {
+      const captured = await capture({
+        directory: turn.route.directory,
+        endpoint,
+        ...(env ? { env } : {}),
+        signal: AbortSignal.timeout(WORKTREE_STATE_CAPTURE_BUDGET_MS),
+      });
+      logWorktreeState('capture', turn.route.directory, captured);
+    } catch {
+      // capture() already degrades to a skip; this only guards a throw from the
+      // diagnostic log itself.
+    }
   }
 
   function resetTurn(sessionId: string): void {
@@ -748,6 +804,25 @@ export function createTurnManager(deps: TurnManagerDeps) {
         // A newer prompt is running; wait for its idle.
         turn.phase = 'busy';
         return;
+      }
+      // Capture uncommitted work before the turn is reported done, so the idle
+      // stop cannot discard it. A prompt that arrives while the capture runs is
+      // handled by the same rechecks the pass already uses.
+      if (
+        worktreeStateEndpointFor(turn.route.directory) !== undefined &&
+        !isWorktreeStateDeletionInProgress(turn.route.directory)
+      ) {
+        await captureWorktreeStateForTurn(turn);
+        if (turns.get(sessionId) !== turn) return;
+        if (hasUndispatchedPrompt(turn)) {
+          turn.phase = 'busy';
+          return;
+        }
+        if (turn.submittedSinceIdle) {
+          if (turn.idleWhileFinalizing) continue;
+          turn.phase = 'busy';
+          return;
+        }
       }
       sendOutcome(turn, 'completed');
       return;

@@ -90,10 +90,17 @@ function isAskingRow(row: WaitingAskRow): row is WaitingAskRow & { id: string } 
 /**
  * The waiting ask the action buttons should name, or null when nothing waits.
  *
- * The oldest `statusUpdatedAt` wins; ties keep the first row in tray order,
- * which is the order the publisher already relies on. `isCloudAgent` marks the
- * row the cloud-agent control plane merged in (the sentinel connection id in
- * `active-sessions-live.ts`); a row with no `connectionId` is not cloud-agent.
+ * An approvable ask wins over any other: the oldest cloud-agent `permission`,
+ * the row the widget's own Approve answers (`pickFrontApprovableSession`). Only
+ * when none waits does the oldest ask of any kind win. Without the preference an
+ * older question hid Approve on the Live Activity and the ongoing card while
+ * the widget still offered it for the newer permission.
+ *
+ * Within a rank the oldest `statusUpdatedAt` wins; ties keep the first row in
+ * tray order, which is the order the publisher already relies on.
+ * `isCloudAgent` marks the row the cloud-agent control plane merged in (the
+ * sentinel connection id in `active-sessions-live.ts`); a row with no
+ * `connectionId` is not cloud-agent.
  */
 export function selectWaitingAsk(
   rows: readonly WaitingAskRow[],
@@ -101,12 +108,18 @@ export function selectWaitingAsk(
   now: number
 ): WaitingAsk | null {
   let chosen: (WaitingAskRow & { id: string }) | null = null;
+  let chosenApprovable = false;
   let chosenAt = Number.POSITIVE_INFINITY;
   for (const row of rows) {
     if (isAskingRow(row)) {
+      const approvable =
+        row.status === 'permission' && row.connectionId === CLOUD_AGENT_CONNECTION_ID;
       const at = readStatusTime(row.statusUpdatedAt);
-      if (chosen === null || at < chosenAt) {
+      const ranksHigher = approvable && !chosenApprovable;
+      const sameRankOlder = approvable === chosenApprovable && at < chosenAt;
+      if (chosen === null || ranksHigher || sameRankOlder) {
         chosen = row;
+        chosenApprovable = approvable;
         chosenAt = at;
       }
     }

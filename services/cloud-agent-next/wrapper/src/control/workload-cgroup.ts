@@ -29,8 +29,11 @@ export const WORKLOAD_SWEEP_INTERVAL_MS = 1000;
 export const WORKLOAD_PARENT_NAME = 'kilo-workloads';
 export const WORKLOAD_SERVER_NAME = 'server';
 export const WORKLOAD_TOOLS_NAME = 'tools';
+export const WORKLOAD_RUNTIME_NAME = 'kilo-runtime';
 export const WORKLOAD_DEFAULT_CPU_WEIGHT = 100;
 export const CGROUP_FS_MAGIC = 0x63677270;
+
+const MAX_EVACUATION_PASSES = 3;
 
 export type WorkloadFailure =
   | 'flag_off'
@@ -83,10 +86,17 @@ export type WorkloadProcessEntry = { pid: number; ppid: number; argv: string[] }
 export type WorkloadStats = {
   currentBytes?: number;
   peakBytes?: number;
+  memoryMaxEvents?: number;
+  memoryOomEvents?: number;
   oomKills: number;
   oomGroupKills: number;
   pressureSomeTotal?: number;
   pressureFullTotal?: number;
+  cpuUsageUsec?: number;
+  cpuThrottledUsec?: number;
+  cpuThrottleCount?: number;
+  ioReadBytes?: number;
+  ioWriteBytes?: number;
 };
 
 export class WorkloadUnavailableError extends Error {
@@ -136,6 +146,17 @@ export function createWorkloadReporter(report?: ControlDiagnosticReporter): Work
         fields.peakBytes ?? '',
         fields.pressureSomeTotal ?? '',
         fields.pressureFullTotal ?? '',
+        fields.memoryMaxEvents ?? '',
+        fields.memoryOomEvents ?? '',
+        fields.cpuUsageUsec ?? '',
+        fields.cpuThrottledUsec ?? '',
+        fields.cpuThrottleCount ?? '',
+        fields.ioReadBytes ?? '',
+        fields.ioWriteBytes ?? '',
+        fields.toolCpuUsageUsec ?? '',
+        fields.serverCpuUsageUsec ?? '',
+        fields.toolIoReadBytes ?? '',
+        fields.toolIoWriteBytes ?? '',
         fields.toolCount ?? '',
         fields.serverCount ?? '',
         fields.migratedCount ?? '',
@@ -256,6 +277,8 @@ export function readWorkloadStats(reference: string): WorkloadStats {
   const peak = readControl(path.join(reference, 'memory.peak'));
   const pressure = readControl(path.join(reference, 'memory.pressure'));
   const events = readControl(path.join(reference, 'memory.events'));
+  const cpu = readControl(path.join(reference, 'cpu.stat'));
+  const io = readControl(path.join(reference, 'io.stat'));
   if (current.ok) {
     const parsed = Number.parseInt(current.text.trim(), 10);
     if (Number.isSafeInteger(parsed) && parsed >= 0) stats.currentBytes = parsed;
@@ -275,7 +298,34 @@ export function readWorkloadStats(reference: string): WorkloadStats {
       if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
       if (key === 'oom_kill') stats.oomKills = parsed;
       if (key === 'oom_group_kill') stats.oomGroupKills = parsed;
+      if (key === 'max') stats.memoryMaxEvents = parsed;
+      if (key === 'oom') stats.memoryOomEvents = parsed;
     }
+  }
+  if (cpu.ok) {
+    for (const line of cpu.text.split('\n')) {
+      const [key, value] = line.trim().split(/\s+/);
+      const parsed = Number(value);
+      if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+      if (key === 'usage_usec') stats.cpuUsageUsec = parsed;
+      if (key === 'throttled_usec') stats.cpuThrottledUsec = parsed;
+      if (key === 'nr_throttled') stats.cpuThrottleCount = parsed;
+    }
+  }
+  if (io.ok) {
+    let readBytes = 0;
+    let writeBytes = 0;
+    for (const line of io.text.split('\n')) {
+      for (const token of line.trim().split(/\s+/).slice(1)) {
+        const [key, value] = token.split('=');
+        const parsed = Number(value);
+        if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+        if (key === 'rbytes') readBytes += parsed;
+        if (key === 'wbytes') writeBytes += parsed;
+      }
+    }
+    if (Number.isSafeInteger(readBytes)) stats.ioReadBytes = readBytes;
+    if (Number.isSafeInteger(writeBytes)) stats.ioWriteBytes = writeBytes;
   }
   return stats;
 }
@@ -429,11 +479,80 @@ function enableMountRootControllers(cgroupRoot: string): void {
   }
 }
 
+function readPids(pathname: string): number[] | undefined {
+  const read = readControl(pathname);
+  if (!read.ok) return undefined;
+  const pids: number[] = [];
+  for (const token of read.text.split(/\s+/)) {
+    if (!token) continue;
+    const pid = Number.parseInt(token, 10);
+    if (Number.isSafeInteger(pid) && pid > 0) pids.push(pid);
+  }
+  return pids;
+}
+
+type RuntimeDirectory = { ok: true; directory: string } | { ok: false };
+
+function prepareRuntimeDirectory(cgroupRoot: string): RuntimeDirectory {
+  const directory = path.join(cgroupRoot, WORKLOAD_RUNTIME_NAME);
+  let stat;
+  try {
+    stat = lstatSync(directory);
+  } catch {
+    try {
+      mkdirSync(directory);
+    } catch (error) {
+      if (!isErofs(error)) return { ok: false };
+      remountCgroupWritable(cgroupRoot);
+      try {
+        mkdirSync(directory);
+      } catch {
+        return { ok: false };
+      }
+    }
+    return { ok: true, directory };
+  }
+  if (stat.isSymbolicLink() || !stat.isDirectory()) return { ok: false };
+  const memory = readMemoryMax(path.join(directory, 'memory.max'));
+  if (memory.kind === 'limit' || memory.kind === 'unreadable') return { ok: false };
+  const procs = readControl(path.join(directory, 'cgroup.procs'));
+  if (!procs.ok || procs.text.trim() !== '') return { ok: false };
+  return { ok: true, directory };
+}
+
+function evacuateMountRoot(cgroupRoot: string): boolean {
+  let remaining = readPids(path.join(cgroupRoot, 'cgroup.procs'));
+  if (remaining === undefined || remaining.length === 0) return false;
+  const runtime = prepareRuntimeDirectory(cgroupRoot);
+  if (!runtime.ok) return false;
+  for (let pass = 0; pass < MAX_EVACUATION_PASSES && remaining.length > 0; pass += 1) {
+    for (const pid of remaining) {
+      try {
+        writeFileSync(path.join(runtime.directory, 'cgroup.procs'), String(pid));
+      } catch {
+        return false;
+      }
+    }
+    remaining = readPids(path.join(cgroupRoot, 'cgroup.procs'));
+    if (remaining === undefined) return false;
+  }
+  return remaining.length === 0;
+}
+
 function findUsableParent(cgroupRoot: string, membership: string): AncestorLookup {
   const delegatedAncestor = scanDelegatingCgroup(cgroupRoot, workloadAncestors(membership));
   if (delegatedAncestor.ok || delegatedAncestor.failure === 'unavailable') return delegatedAncestor;
+
   enableMountRootControllers(cgroupRoot);
-  return scanDelegatingCgroup(cgroupRoot, workloadCgroupCandidates(membership));
+
+  const selfEnabled = scanDelegatingCgroup(cgroupRoot, workloadCgroupCandidates(membership));
+  if (selfEnabled.ok || selfEnabled.failure === 'unavailable') return selfEnabled;
+  if (membership !== '/') return selfEnabled;
+
+  if (!evacuateMountRoot(cgroupRoot)) return selfEnabled;
+
+  enableMountRootControllers(cgroupRoot);
+  return scanDelegatingCgroup(cgroupRoot, ['/']);
 }
 
 function probeWorkloadParent(input: {

@@ -12,6 +12,7 @@ import {
   type QueueMessageInput,
 } from './queue-message.js';
 import { preflightExistingPromptModel } from './model-preflight.js';
+import { QUEUED_MESSAGE_LIMIT } from '../control-plane/session/messages.js';
 import type {
   CustomerBillingFailure,
   SessionMessageAdmissionResult,
@@ -151,21 +152,24 @@ describe('queueMessage', () => {
   });
 
   it.each(['prompt', 'command'] as const)(
-    'reuses an omitted %s ID after a committed response is lost',
+    'reuses an omitted %s ID across a lost control-plane send response',
     async type => {
-      const admissions = new Map<string, SubmittedSessionMessageRequest>();
+      const metadata = {
+        identity: { createdOnPlatform: 'cloud-agent-web' },
+        agent: { mode: 'code', model: 'test/model' },
+      } as unknown as SessionMetadata;
+      const fetchMetadata = vi
+        .spyOn(sessionService, 'fetchSessionMetadata')
+        .mockResolvedValue(metadata);
+      const sent: string[] = [];
       let attempts = 0;
-      const admitSubmittedMessage = vi.fn(
-        async (request: SubmittedSessionMessageRequest): Promise<SessionMessageAdmissionResult> => {
-          const messageId = request.turn.id;
-          if (!messageId) throw new Error('Missing durable message identity');
-          if (!admissions.has(messageId)) admissions.set(messageId, structuredClone(request));
-          attempts += 1;
-          if (attempts === 1)
-            throw Object.assign(new Error('Response lost after admission'), { retryable: true });
-          return { success: true, outcome: 'queued', compatibilityDelivery: 'queued', messageId };
-        }
-      );
+      const send = vi.fn(async (payload: { messageId: string }) => {
+        sent.push(payload.messageId);
+        attempts += 1;
+        if (attempts === 1)
+          throw Object.assign(new Error('Response lost after admission'), { retryable: true });
+        return { type: 'ok' as const };
+      });
       const response = await queueMessage(
         {
           cloudAgentSessionId: 'workspace_existing',
@@ -174,15 +178,13 @@ describe('queueMessage', () => {
               ? { type, prompt: 'hello' }
               : { type, command: 'review', arguments: '--all' },
         },
-        { env: makeEnv({ admitSubmittedMessage }) as Env, userId: 'user_abc' }
+        { env: makeEnv({ send }) as Env, userId: 'user_abc' }
       );
 
       expect(attempts).toBe(2);
-      expect(admissions.size).toBe(1);
-      expect(admissions.has(response.messageId)).toBe(true);
-      expect(admitSubmittedMessage.mock.calls[0]?.[0].turn.id).toBe(
-        admitSubmittedMessage.mock.calls[1]?.[0].turn.id
-      );
+      expect(new Set(sent).size).toBe(1);
+      expect(sent[0]).toBe(response.messageId);
+      fetchMetadata.mockRestore();
     }
   );
 
@@ -331,44 +333,6 @@ describe('queueMessage', () => {
   });
 
   it.each([
-    ['FORBIDDEN', 'FORBIDDEN', false, 'msg_018f1e2d3c4bAbCdEfGhIjKlMn'],
-    ['MODEL_VALIDATION_UNAVAILABLE', 'SERVICE_UNAVAILABLE', true, undefined],
-  ] as const)(
-    'preserves returned control %s as %s with retryable %s',
-    async (resultCode, trpcCode, retryable, messageId) => {
-      const message = 'Model validation rejected the prompt';
-      const { stub, admitSubmittedMessage, hasMessageAdmission } = makeDoStub({
-        success: false,
-        code: resultCode,
-        error: message,
-      });
-      const env = makeEnv(stub);
-      const idFromName = vi.spyOn(env.SANDBOX_SESSION, 'idFromName');
-      const getLegacySession = vi.spyOn(env.CLOUD_AGENT_SESSION, 'get');
-      const error: unknown = await preflightAndQueuePromptMessage(
-        {
-          cloudAgentSessionId: 'workspace_existing',
-          turn: { type: 'prompt', id: messageId, prompt: 'follow up' },
-        },
-        { env: env as Env, userId: 'user_abc' },
-        'send'
-      ).catch(error => error);
-
-      expect(error).toBeInstanceOf(TRPCError);
-      expect(error).toMatchObject({
-        code: trpcCode,
-        message,
-        cause: { error: resultCode, message, retryable },
-      });
-      expect(admitSubmittedMessage).toHaveBeenCalledOnce();
-      expect(idFromName).toHaveBeenCalledWith('user_abc:workspace_existing');
-      expect(getLegacySession).not.toHaveBeenCalled();
-      expect(hasMessageAdmission).not.toHaveBeenCalled();
-      expect(preflightExistingPromptModel).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each([
     ['PAYMENT_REQUIRED', 'PAYMENT_REQUIRED', 'INSUFFICIENT_CREDITS', false],
     ['COMPUTE_STOPPING', 'CONFLICT', 'COMPUTE_STOPPING', true],
     ['BILLING_UNAVAILABLE', 'SERVICE_UNAVAILABLE', 'BILLING_UNAVAILABLE', true],
@@ -417,6 +381,32 @@ describe('queueMessage', () => {
       message: 'full',
       cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
     });
+  });
+
+  it('projects a control queue-full send as the legacy 429 PENDING_QUEUE_FULL', async () => {
+    const metadata = {
+      identity: { createdOnPlatform: 'cloud-agent-web' },
+      agent: { mode: 'code', model: 'test/model' },
+    } as unknown as SessionMetadata;
+    const fetchMetadata = vi
+      .spyOn(sessionService, 'fetchSessionMetadata')
+      .mockResolvedValue(metadata);
+    const send = vi.fn(async () => ({ type: 'queue-full' as const }));
+
+    const error = await queueMessage(
+      {
+        cloudAgentSessionId: 'workspace_full',
+        turn: { type: 'prompt', prompt: 'x' },
+      },
+      { env: makeEnv({ send }) as Env, userId: 'user_abc' }
+    ).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      message: `Pending message queue is full (${QUEUED_MESSAGE_LIMIT})`,
+      cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
+    });
+    fetchMetadata.mockRestore();
   });
 
   it('maps INTERNAL to an explicitly retryable 500 error', async () => {

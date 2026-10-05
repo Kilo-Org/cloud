@@ -2,7 +2,7 @@ import { DirectUserByokInferenceProviderIdSchema } from '@/lib/ai-gateway/provid
 import { db } from '@/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import type { DirectByokModel } from './types';
+import type { DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
 import {
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,

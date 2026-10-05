@@ -1,7 +1,7 @@
 import type { RuntimeAuthorizationBindingRejectionReason } from '@kilocode/worker-utils/runtime-authorization';
 import { logger } from '../logger.js';
 
-type RecoveryDenialReason =
+export type RecoveryDenialReason =
   | 'metadata_unavailable'
   | 'owner_mismatch'
   | 'missing_secret'

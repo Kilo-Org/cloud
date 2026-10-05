@@ -61,6 +61,11 @@ import type * as SessionTranscript from '@/components/agents/session-transcript'
 import { type SessionTranscriptItem } from '@/components/agents/session-transcript';
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import {
+  SEND_REASON_MAX_FONT_SCALE,
+  SESSION_FOOTER_ROW_ITEM_PADDING,
+} from '@/components/agents/session-working-state';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
+import {
   resolveSendAttachmentKind,
   shouldRefuseSilentAttachmentDrop,
 } from '@/components/agents/session-detail-send-attachment';
@@ -108,14 +113,20 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
 // The personal `agentProfiles.list` rows the header's active-profile chip
 // reads; tests set it before mounting to drive the chip's presence.
-const profileRowsState = vi.hoisted(() => ({
-  personal: [] as unknown[],
-  combined: {
-    orgProfiles: [] as unknown[],
-    personalProfiles: [] as unknown[],
-    effectiveDefaultId: null as string | null,
-  },
-}));
+const profileRowsState = vi.hoisted(() => {
+  // profileId -> `agentProfiles.get` agents, so a test can prove the session's
+  // own profile agents are the ones offered by the in-session role picker.
+  const agentsById: Record<string, unknown[]> = {};
+  return {
+    personal: [] as unknown[],
+    combined: {
+      orgProfiles: [] as unknown[],
+      personalProfiles: [] as unknown[],
+      effectiveDefaultId: null as string | null,
+    },
+    agentsById,
+  };
+});
 const routerSetParams = vi.hoisted(() => vi.fn());
 const handoffAdvertiserCalls = vi.hoisted(() => ({
   props: [] as { anchorMessageId?: string | null }[],
@@ -484,6 +495,12 @@ vi.mock('@/lib/hooks/use-session-model-options', () => {
     useSessionModelOptions: () => ({ options, selectedValue: '', selectedVariant: '' }),
   };
 });
+// The retry hook owns the app-foreground/focus subscriptions and the SDK
+// transport call; its mounted suite covers that wiring, so this screen test
+// stands it in as a no-op.
+vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
+  useRemoteModelCatalogRetry: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
 vi.mock('@/lib/persist/use-draft-load', () => ({
@@ -521,6 +538,16 @@ vi.mock('@/lib/trpc', () => ({
           queryFn: () => profileRowsState.combined,
           initialData: profileRowsState.combined,
         }),
+      },
+      get: {
+        queryOptions: (input: { profileId?: string } = {}) => {
+          const agents = profileRowsState.agentsById[input.profileId ?? ''] ?? [];
+          return {
+            queryKey: ['agentProfiles', 'get', input.profileId ?? ''],
+            queryFn: () => ({ agents }),
+            initialData: { agents },
+          };
+        },
       },
     },
     // The real context sheet resolves the "running on" row from the connected
@@ -700,6 +727,14 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
 
+/** The send-gate props the screen hands the mounted composer. */
+function composerProps(view: { renderer: ReactTestRenderer }) {
+  return view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer')).props as {
+    sendDisabled?: boolean;
+    sendDisabledReason?: string | null;
+  };
+}
+
 /**
  * The FlashList keys the first message list would mount rows under. The list is
  * stubbed, so read the props the stub was handed: the same `keyExtractor` the
@@ -721,6 +756,7 @@ beforeEach(() => {
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   profileRowsState.personal = [];
   profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
+  profileRowsState.agentsById = {};
   openRenameModal.mockClear();
   renameModalState.isOpen = false;
   renameModalState.initialValue = '';
@@ -1008,6 +1044,28 @@ function reasoningRenderers(renderer: ReactTestRenderer) {
   return renderer.root.findAll(node => Object.is(node.type, 'ReasoningPartRenderer'));
 }
 
+/**
+ * The fixed footer row wrapper. The row renders one item at a time — the
+ * working spinner, then the status indicator, then the cannot-send reason — so
+ * the wrapper is what the row's own position and opacity contracts hold for,
+ * and its children are the ladder's observable result.
+ */
+function indicatorRowOf(view: { renderer: ReactTestRenderer }) {
+  const rows = view.renderer.root.findAll(
+    node =>
+      Object.is(node.type, 'AnimatedView') && String(node.props.className ?? '') === 'bg-background'
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new Error('Missing the fixed indicator row wrapper');
+  }
+  return row;
+}
+
+function footerRowItems(view: { renderer: ReactTestRenderer }) {
+  return indicatorRowOf(view).children.filter(child => typeof child !== 'string');
+}
+
 function pressHeaderBack(renderer: ReactTestRenderer) {
   const { onPress } = renderer.root.findByProps({ accessibilityLabel: 'Go back' }).props as {
     onPress: () => void;
@@ -1175,6 +1233,71 @@ describe('session detail active-profile indicator', () => {
     // pre-load window; a fallback to the context default would surface here.
     await waitFor(() => view.store.get(view.manager.atoms.fetchedSessionData) !== null);
     expect(findChip(view.renderer)).toHaveLength(0);
+  });
+});
+
+function roleProfileRow(id: string, name: string, isDefault: boolean) {
+  return {
+    id,
+    name,
+    description: null,
+    isDefault,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    varCount: 0,
+    commandCount: 0,
+    mcpServerCount: 0,
+    skillCount: 0,
+    agentCount: 1,
+    kiloCommandCount: 0,
+  };
+}
+
+function roleAgent(slug: string, name: string) {
+  return {
+    slug,
+    name,
+    config: { description: null, mode: 'primary' },
+  };
+}
+
+function composerCustomValues(renderer: ReactTestRenderer): string[] {
+  const composer = renderer.root.findByType('ChatComposer');
+  return (composer.props as { customOptions: { value: string }[] }).customOptions.map(
+    option => option.value
+  );
+}
+
+describe('session detail role picker profile source', () => {
+  it("offers the session profile's own custom agents, not the context default's", async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    profileRowsState.personal = [
+      roleProfileRow('p-default', 'Default', true),
+      roleProfileRow('p-recorded', 'Recorded', false),
+    ];
+    profileRowsState.agentsById = {
+      'p-default': [roleAgent('default-role', 'Default role')],
+      'p-recorded': [roleAgent('session-role', 'Session role')],
+    };
+
+    const view = await mountDetails([], { sessionProfileId: 'p-recorded' });
+
+    await waitFor(() => composerCustomValues(view.renderer).includes('session-role'));
+    const values = composerCustomValues(view.renderer);
+    expect(values).toContain('session-role');
+    expect(values).not.toContain('default-role');
+  });
+
+  it("falls back to the effective default profile's agents when the session recorded none", async () => {
+    goalMountOptions = { resolvedType: 'remote' };
+    profileRowsState.personal = [roleProfileRow('p-default', 'Default', true)];
+    profileRowsState.agentsById = {
+      'p-default': [roleAgent('default-role', 'Default role')],
+    };
+
+    const view = await mountDetails([], { sessionProfileId: null });
+
+    await waitFor(() => composerCustomValues(view.renderer).includes('default-role'));
   });
 });
 
@@ -2830,7 +2953,7 @@ describe('hide thinking preference', () => {
     expect(renderedText(view.renderer.root)).toContain('Visible answer');
   });
 
-  it('drops a reasoning-only message from the transcript but keeps it in the working indicator', async () => {
+  it('drops a reasoning-only message from the transcript while a status line holds the row', async () => {
     hideThinking.current = true;
     const message = partMessage('msg-think-only', [
       reasoningPart('reasoning-only', 'msg-think-only'),
@@ -2849,7 +2972,26 @@ describe('hide thinking preference', () => {
       view.renderer.root.findAll(node => Object.is(node.type, 'TranscriptTimeMarker'))
     ).toHaveLength(0);
     expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+    // The dropped reasoning row still reaches the transcript's status surface,
+    // so the row is not empty; the ladder shows that status line, not a spinner.
+    expect(indicatorNodes(view).length).toBeGreaterThan(0);
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+  });
 
+  it('hands the raw message list to the working spinner, not the displayed list', async () => {
+    hideThinking.current = true;
+    const message = partMessage('msg-think-only', [
+      reasoningPart('reasoning-only', 'msg-think-only'),
+    ]);
+    const view = await mountDetails([message]);
+    // The spinner's label derives from the last assistant part, so a hidden
+    // reasoning row must still reach it. The ladder mounts the spinner only
+    // while no status line outranks it, so this mount streams with none.
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+
+    expect(reasoningRenderers(view.renderer)).toHaveLength(0);
     const indicator = view.renderer.root.findByType(WorkingIndicator);
     const indicatorMessages = indicator.props.messages as StoredMessage[];
     expect(indicatorMessages.some(candidate => candidate.info.id === 'msg-think-only')).toBe(true);
@@ -3097,6 +3239,74 @@ describe('session detail composer after a failed turn', () => {
     const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
     expect(node.props.disabled).toBe(false);
     expect(node.props.sendDisabled).toBe(false);
+  });
+});
+
+describe('session detail composer cannot-send reason', () => {
+  it('states the load-failure reason beside send in the load-error state', async () => {
+    // The audit's state (owner evidence A4/A12): the open fails, the transcript
+    // is empty and the manager cannot send, but the input stays editable. The
+    // reason beside send must name the load failure, not a runtime class.
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    const props = composerProps(view);
+    expect(props.sendDisabled).toBe(true);
+    expect(props.sendDisabledReason).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+    expect(props.sendDisabledReason).not.toBe(i18n.t('agentChat.session.connectionTrouble'));
+  });
+
+  it('states the class reason for a running session that cannot send', async () => {
+    // A non-empty transcript means a terminal failure is a runtime class, not
+    // the load failure behind the full-screen Retry, so its own copy is shown.
+    const view = await mountDetails([childMessage(ROOT_ID, 'hello')]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'cloud-agent');
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBe(
+      i18n.t('agentChat.session.notEnoughCredits')
+    );
+  });
+
+  it('passes no reason while the session can send', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        null
+      );
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBeNull();
   });
 });
 
@@ -3540,17 +3750,6 @@ describe('SessionDetailContent fixed indicator row', () => {
     goalMountOptions = {};
   });
 
-  function indicatorRowOf(view: Awaited<ReturnType<typeof mountDetails>>) {
-    let node: ReactTestInstance | null = view.renderer.root.findByType(WorkingIndicator);
-    while (node != null && node.type !== ('AnimatedView' as ElementType)) {
-      node = node.parent;
-    }
-    if (node === null) {
-      throw new Error('Missing the fixed indicator row wrapper');
-    }
-    return node;
-  }
-
   it.each([
     { type: 'error', message: 'simulated error' },
     { type: 'warning', message: 'Retrying… simulated error' },
@@ -3574,15 +3773,100 @@ describe('SessionDetailContent fixed indicator row', () => {
     }
   );
 
-  it('renders no fixed indicator row for an empty transcript', async () => {
+  it('renders no progress item for an empty transcript, keeping only the send reason', async () => {
     const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+    // The empty/connecting body states progress itself, so the row drops it and
+    // keeps the one line only it can state: why send is unavailable. The
+    // has-messages gate must not take the load-failure line with it.
+    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(items[0]?.props.message).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+  });
+
+  it('states the cannot-send reason in the row with the row item typography', async () => {
+    // An empty read-only transcript keeps the composer, so its reason is the
+    // row's item.
+    const view = await mountDetails([]);
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    const reason = items[0];
+    expect(Object.is(reason?.type, AccessibleStatus)).toBe(true);
+    expect(reason?.props.message).toBe(i18n.t('agentChat.session.readOnly'));
+    expect(reason?.props.maxFontSizeMultiplier).toBe(SEND_REASON_MAX_FONT_SCALE);
+    const className = String(reason?.props.className ?? '');
+    // The row's own typography, not the composer's narrower one: a shorter item
+    // would shift the row every time the ladder swaps to or from it.
+    expect(className).toContain(SESSION_FOOTER_ROW_ITEM_PADDING);
+    expect(className).toContain('text-sm');
+    // The reason must not be clipped: a longer translation keeps its actionable
+    // tail ("Retry first.") on a phone width.
+    expect(reason?.props.numberOfLines).toBeUndefined();
+    expect(reason?.props.ellipsizeMode).toBeUndefined();
+  });
+
+  it('lets the status indicator outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     act(() => {
       view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
         view.manager.atoms.statusIndicator,
         { type: 'error', message: 'simulated error', timestamp: 0 }
       );
     });
-    expect(view.renderer.root.findAllByType(WorkingIndicator)).toHaveLength(0);
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, 'SessionStatusIndicator')).toBe(true);
+  });
+
+  it('lets the working spinner outrank a resolved cannot-send reason', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isStreaming, true);
+    });
+    const items = footerRowItems(view);
+    expect(items).toHaveLength(1);
+    expect(Object.is(items[0]?.type, WorkingIndicator)).toBe(true);
+  });
+});
+
+describe('session detail read-only composer', () => {
+  // A read-only transcript has nowhere to write, so the continue section
+  // replaces the composer and states read-only once. The continue affordance
+  // names the destination it opens rather than a bare "Continue" that reads as
+  // an in-place action.
+  it('replaces the composer and send reason with the destination-named continue section', async () => {
+    // The default fixture resolves `read-only` (cloud_agent_session_id NULL and
+    // no live CLI presence) and this mount carries messages.
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    expect(view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'))).toHaveLength(
+      0
+    );
+    // The continue section states read-only once; the footer reason row must
+    // not repeat it.
+    const readOnlyCopy = renderedTextOutsideSheet(view.renderer.root)
+      .split('\n')
+      .filter(text => text === i18n.t('agentChat.session.readOnly'));
+    expect(readOnlyCopy).toHaveLength(1);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(renderedText(continueControl)).toContain(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
   });
 });
 

@@ -401,8 +401,18 @@ function sendHeartbeat(
     id: string;
     status: string;
     title: string;
+    gitUrl?: string;
+    gitBranch?: string;
+    parentSessionId?: string;
     platform?: string;
-    prLink?: { platform: string; prUrl: string; prNumber: number };
+    scheduledAt?: string | null;
+    prLink?: {
+      platform: string;
+      prUrl: string;
+      prNumber: number;
+      headRef?: string;
+      headSha?: string;
+    };
   }>,
   options: {
     protocolVersion?: string;
@@ -1127,6 +1137,7 @@ describe('UserConnectionDO', () => {
           id: 's1',
           status: 'busy',
           title: 'PR session',
+          gitUrl: 'https://github.com/o/r',
           prLink: { platform: 'github', prUrl: 'https://github.com/o/r/pull/42', prNumber: 42 },
         },
       ]);
@@ -1148,6 +1159,49 @@ describe('UserConnectionDO', () => {
           ],
         },
       });
+    });
+
+    it('drops a heartbeat prLink whose URL names another repo', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          id: 's1',
+          status: 'busy',
+          title: 'Wrong PR session',
+          gitUrl: 'https://github.com/acme/widgets',
+          prLink: {
+            platform: 'github',
+            prUrl: 'https://github.com/someone-else/widgets/pull/7',
+            prNumber: 7,
+          },
+        },
+      ]);
+      await flushAsync();
+
+      const heartbeat = allSent(webWs).find(
+        (msg: { event?: string }) => msg.event === 'sessions.heartbeat'
+      ) as { data: { sessions: Array<Record<string, unknown>> } };
+      expect(heartbeat.data.sessions[0]).not.toHaveProperty('prLink');
+      expect(doInstance.getActiveSessions()[0]).not.toHaveProperty('prLink');
+    });
+
+    it('drops a heartbeat prLink when the session reports no repository', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          id: 's1',
+          status: 'busy',
+          title: 'Legacy PR session',
+          prLink: { platform: 'github', prUrl: 'https://github.com/o/r/pull/42', prNumber: 42 },
+        },
+      ]);
+
+      expect(doInstance.getActiveSessions()[0]).not.toHaveProperty('prLink');
     });
 
     it('projects capabilities.attachments=true on every aggregateSessions row when the owning CLI advertises it', async () => {
@@ -4328,6 +4382,77 @@ describe('UserConnectionDO', () => {
         { id: 's1', status: 'busy', title: 'Legacy', connectionId: 'cli-1' },
       ]);
       expect(result[0]).not.toHaveProperty('platform');
+    });
+
+    it('forwards a scheduled status and its wake time (scheduledAt)', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          id: 's1',
+          status: 'scheduled',
+          title: 'Wake later',
+          scheduledAt: '2026-09-24T09:00:00.000Z',
+        },
+      ]);
+
+      expect(doInstance.getActiveSessions()).toEqual([
+        {
+          id: 's1',
+          status: 'scheduled',
+          title: 'Wake later',
+          connectionId: 'cli-1',
+          scheduledAt: '2026-09-24T09:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('forwards scheduled without a wake time when the CLI omits scheduledAt', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [{ id: 's1', status: 'scheduled', title: 'Wake later' }]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'scheduled', title: 'Wake later', connectionId: 'cli-1' },
+      ]);
+      expect(result[0]).not.toHaveProperty('scheduledAt');
+    });
+
+    it('keeps the session when the CLI sends an explicit null scheduledAt', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        { id: 's1', status: 'scheduled', title: 'Wake later', scheduledAt: null },
+        { id: 's2', status: 'busy', title: 'Working', scheduledAt: null },
+      ]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'scheduled', title: 'Wake later', connectionId: 'cli-1' },
+        { id: 's2', status: 'busy', title: 'Working', connectionId: 'cli-1' },
+      ]);
+      // The explicit null reads as no wake time. `sessions.list` carries these
+      // rows as JSON, and JSON drops the undefined value, so the row the web
+      // `activeSessionsResponseSchema` strict-parses matches the omitted-field
+      // case instead of failing on a null.
+      expect(result[0].scheduledAt).toBeUndefined();
+      expect(result[1].scheduledAt).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(result[0]))).not.toHaveProperty('scheduledAt');
+    });
+
+    it('accepts an unrecognized status without dropping the session', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [{ id: 's1', status: 'brand-new-status', title: 'Future' }]);
+
+      expect(doInstance.getActiveSessions()).toEqual([
+        { id: 's1', status: 'brand-new-status', title: 'Future', connectionId: 'cli-1' },
+      ]);
     });
   });
 

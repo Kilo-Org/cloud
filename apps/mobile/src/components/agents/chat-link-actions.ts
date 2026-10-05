@@ -70,6 +70,30 @@ function showRetryableError(message: string, retry: () => Promise<void>) {
   });
 }
 
+/**
+ * Sheet-callback entry for chat link actions. The themed sheet renders in an
+ * RN Modal (`useModal: true`), and the sheet library runs the select callback
+ * before that Modal unmounts — so opening the browser or the share sheet from
+ * the callback presents Safari / the share sheet from the dying sheet Modal,
+ * and the page flashes then vanishes on iOS. Defer those presentations past
+ * the sheet's 195 ms dismiss animation plus the Modal teardown. Copy needs
+ * no presentation, so it runs at once.
+ */
+export const CHAT_LINK_SHEET_DISMISS_DELAY_MS = 400;
+
+export function performChatLinkActionAfterSheet(
+  action: Exclude<ChatLinkAction, 'review-pr'>,
+  href: string
+): void {
+  if (action === 'open' || action === 'share') {
+    setTimeout(() => {
+      void performChatLinkAction(action, href);
+    }, CHAT_LINK_SHEET_DISMISS_DELAY_MS);
+    return;
+  }
+  void performChatLinkAction(action, href);
+}
+
 export async function performChatLinkAction(action: ChatLinkAction, href: string): Promise<void> {
   if (action === 'open') {
     await openExternalUrl(href, { retryOnError: true });

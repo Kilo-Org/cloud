@@ -39,8 +39,48 @@ type SessionMetadataUpdates = Partial<
     | 'platform'
     | 'pr_url'
     | 'pr_number'
+    | 'pr_head_ref'
+    | 'pr_head_sha'
+    | 'pr_link_verified_at'
   >
 >;
+
+/**
+ * Reduce a pull/merge request URL to its repository URL by dropping the
+ * `/pull/<n>` (GitHub), `/-/merge_requests/<n>` (GitLab), or
+ * `/merge_requests/<n>` suffix. Returns null when the input is not an http(s)
+ * URL with a recognizable request path.
+ */
+export function repoUrlFromPrUrl(prUrl: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(prUrl.trim());
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+
+  const match = parsed.pathname.match(/^(.*?)\/(?:-\/)?(?:pull|merge_requests)\/\d+(?:\/.*)?$/i);
+  if (!match?.[1]) return null;
+
+  return `${parsed.protocol}//${parsed.host}${match[1]}`;
+}
+
+/**
+ * True only when a PR URL's host+owner+repo equals the session's repository,
+ * compared after normalization (case-insensitive host/owner/name; `.git` and
+ * SSH forms folded). A missing PR URL or git URL is never evidence, so both
+ * return false.
+ */
+export function prUrlMatchesGitUrl(
+  prUrl: string | null | undefined,
+  gitUrl: string | null | undefined
+): boolean {
+  if (!prUrl || !gitUrl) return false;
+  const repoUrl = repoUrlFromPrUrl(prUrl);
+  if (!repoUrl) return false;
+  return normalizeGitUrl(repoUrl) === normalizeGitUrl(gitUrl);
+}
 
 export function computeSessionMetadataUpdates(
   mergedChanges: Map<string, string | null>,
@@ -71,6 +111,24 @@ export function computeSessionMetadataUpdates(
     const raw = mergedChanges.get('prNumber');
     updates.pr_number = raw === null ? null : Number(raw);
   }
+  if (mergedChanges.has('prHeadRef')) {
+    updates.pr_head_ref = mergedChanges.get('prHeadRef') ?? null;
+  }
+  if (mergedChanges.has('prHeadSha')) {
+    updates.pr_head_sha = mergedChanges.get('prHeadSha') ?? null;
+  }
+  // Any link or head-field change invalidates a prior GitHub verification: the
+  // stored evidence no longer describes what the PR was checked against, so the
+  // link must be re-verified (and hidden in the meantime) before it is shown.
+  if (
+    mergedChanges.has('prPlatform') ||
+    mergedChanges.has('prUrl') ||
+    mergedChanges.has('prNumber') ||
+    mergedChanges.has('prHeadRef') ||
+    mergedChanges.has('prHeadSha')
+  ) {
+    updates.pr_link_verified_at = null;
+  }
 
   return updates;
 }
@@ -99,6 +157,9 @@ export async function applyMetadataChanges(
   /** True only when a git_url write was actually applied (non-Cloud-Agent write or Cloud Agent null-to-value heal). */
   let gitUrlWriteApplied = false;
 
+  /** True only when a PR link/head-field write was actually applied (not rejected as a repo mismatch). */
+  let prLinkWriteApplied = false;
+
   const notification = await db.transaction(async tx => {
     const selectCurrentRow = () =>
       tx
@@ -110,6 +171,7 @@ export async function applyMetadataChanges(
           cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
           worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
           gitUrl: cli_sessions_v2.git_url,
+          prUrl: cli_sessions_v2.pr_url,
         })
         .from(cli_sessions_v2)
         .where(
@@ -163,6 +225,10 @@ export async function applyMetadataChanges(
       status === undefined
         ? { changed: false, previousStatus: null }
         : (() => {
+            // `SessionStatusSchema` is a permissive `z.string()`: a stored status
+            // this worker does not know yet (`scheduled`, or any future value)
+            // must not throw here and must be reported faithfully as the
+            // previous status, never coerced to `idle`.
             const previousStatus = SessionStatusSchema.nullable().parse(currentRow.status);
             return { changed: status !== previousStatus, previousStatus };
           })();
@@ -231,6 +297,38 @@ export async function applyMetadataChanges(
         }
       } else {
         gitUrlWriteApplied = true;
+      }
+    }
+
+    // PR-link evidence gate (never fuzzy): a link whose URL names a repo other
+    // than the session's effective repo is a guess, not evidence. Drop the whole
+    // link and its head fields so nothing is stored; a mismatch must never be
+    // overwritten by a later branch-only cache row. The effective repo is the
+    // git_url this write will store, else the stored one; the effective PR URL
+    // is the one this write carries, else the stored one (so a head-only update
+    // is still checked against the existing link).
+    const hasPrLinkChange =
+      mergedChanges.has('prPlatform') ||
+      mergedChanges.has('prUrl') ||
+      mergedChanges.has('prNumber') ||
+      mergedChanges.has('prHeadRef') ||
+      mergedChanges.has('prHeadSha');
+    if (hasPrLinkChange) {
+      const effectiveGitUrl = updates.git_url !== undefined ? updates.git_url : currentRow.gitUrl;
+      const effectivePrUrl = updates.pr_url !== undefined ? updates.pr_url : currentRow.prUrl;
+      if (effectivePrUrl != null && !prUrlMatchesGitUrl(effectivePrUrl, effectiveGitUrl)) {
+        console.warn('Dropping session PR link whose repository does not match the session', {
+          kiloUserId,
+          sessionId,
+        });
+        delete updates.pr_url;
+        delete updates.pr_number;
+        delete updates.platform;
+        delete updates.pr_head_ref;
+        delete updates.pr_head_sha;
+        delete updates.pr_link_verified_at;
+      } else {
+        prLinkWriteApplied = true;
       }
     }
 
@@ -321,9 +419,7 @@ export async function applyMetadataChanges(
           .where(
             and(
               eq(cli_sessions_v2.session_id, parentSessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-              sql`${cli_sessions_v2.cloud_agent_session_scope_id} IS NULL`,
-              sql`${cli_sessions_v2.cloud_agent_worktree_id} IS NULL`
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
             )
           )
           .limit(1);
@@ -363,9 +459,7 @@ export async function applyMetadataChanges(
       organizationIdWriteApplied ||
       gitUrlWriteApplied ||
       mergedChanges.has('gitBranch') ||
-      mergedChanges.has('prPlatform') ||
-      mergedChanges.has('prUrl') ||
-      mergedChanges.has('prNumber') ||
+      prLinkWriteApplied ||
       parentSessionIdWriteApplied;
 
     if (!changedNonStatus && !statusChange.changed) return null;

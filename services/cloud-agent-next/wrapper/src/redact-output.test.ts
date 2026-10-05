@@ -167,6 +167,32 @@ describe('known setup secret redaction', () => {
     );
   });
 
+  it('redacts every MCP header and local environment value regardless of its name', () => {
+    const remoteValue = 'remote-arbitrary-header-secret';
+    const localValue = 'local-arbitrary-environment-secret';
+    const redact = createSecretRedactor({
+      KILO_CONFIG_CONTENT: JSON.stringify({
+        mcp: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test',
+            headers: { 'X-Service-Auth': remoteValue },
+          },
+          local: {
+            type: 'local',
+            command: ['local-mcp'],
+            environment: { VALUE: localValue },
+          },
+        },
+      }),
+    });
+
+    const output = redact(`${remoteValue} ${localValue}`);
+    expect(output).not.toContain(remoteValue);
+    expect(output).not.toContain(localValue);
+    expect(output).toBe('[REDACTED] [REDACTED]');
+  });
+
   it.each([1, 7, 2049])(
     'redacts split chunks of %i characters on interleaved output streams',
     chunkSize => {

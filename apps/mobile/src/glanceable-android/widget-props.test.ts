@@ -12,6 +12,7 @@ import {
   buildAndroidWidgetProps,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
+  buildGenericWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
 import widgetConfig from './widget-config.json';
@@ -25,6 +26,7 @@ const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
   'common.working': 'Working',
+  'common.scheduled': 'Scheduled',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',
@@ -41,6 +43,7 @@ const COPY: Record<string, string> = {
   'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
   'common.approve': 'Approve',
+  'glanceable.scheduledWakes': 'wakes {{time}}',
 };
 const translate = (key: string): string => COPY[key] ?? key;
 
@@ -62,7 +65,7 @@ afterEach(() => {
 });
 
 function snapshotFor(
-  sessions: { status: string; statusUpdatedAt?: string }[],
+  sessions: { status: string; statusUpdatedAt?: string; scheduledAt?: string }[],
   revision = 0,
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
@@ -93,6 +96,7 @@ describe('buildAndroidWidgetProps', () => {
     expect(props.countLines).toEqual([
       { label: 'Needs input', kind: 'needsInput', count: '2' },
       { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Scheduled', kind: 'scheduled', count: '0' },
       { label: 'Idle', kind: 'idle', count: '3' },
     ]);
   });
@@ -122,7 +126,7 @@ describe('buildAndroidWidgetProps', () => {
       ['empty', [], 'No agents waiting', 0, false],
       // Counts show for stale, and all three rows draw whenever they show, so
       // the widget's rows never reflow as work moves between states.
-      ['stale', [{ status: 'busy' }], 'Updates delayed', 3, true],
+      ['stale', [{ status: 'busy' }], 'Updates delayed', 4, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Open Kilo to see agents', 0, false],
@@ -161,6 +165,7 @@ describe('buildAndroidWidgetProps', () => {
       'newestResultLabel',
       'newestResultTitle',
       'primaryLabel',
+      'scheduledAgo',
       'statusLine',
     ]);
     expect(json).not.toContain('user-9f3a-leak');
@@ -233,7 +238,7 @@ describe('newest-result props', () => {
     );
 
     expect(props.statusLine).toBe('Updates delayed');
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
     expect(props.newestResultTitle).toBe('Newest result');
     expect(props.newestResultLabel).toBe('Needs input');
     expect(props.newestResultAgo).toBe(AGO);
@@ -248,6 +253,82 @@ describe('newest-result props', () => {
     expect(props.newestResultKind).toBeNull();
     expect(props.newestResultLabel).toBeNull();
     expect(props.newestResultAgo).toBeNull();
+  });
+});
+
+describe('scheduled wake props', () => {
+  /** Two hours ahead of the suite's clock, so the stub formatter echoes it. */
+  const WAKE = new Date(NOW + 7_200_000).toISOString();
+
+  it('carries the scheduled row and the injected wake beside it', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+
+    // The count line exists whether or not a wake is known, so the surface
+    // never reflows when the CLI reports a wake for a session it had none for;
+    // only the time beside the row is conditional.
+    expect(props.countLines.find(line => line.kind === 'scheduled')).toEqual({
+      label: 'Scheduled',
+      kind: 'scheduled',
+      count: '1',
+    });
+    expect(props.scheduledAgo).toBe(formatAgo(WAKE));
+    expect(props.primaryLabel).toBe('Scheduled');
+  });
+
+  it('keeps the scheduled row but no wake when the CLI reported none', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'scheduled' }], 0),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+
+    expect(props.countLines.find(line => line.kind === 'scheduled')?.count).toBe('1');
+    expect(props.scheduledAgo).toBeNull();
+  });
+
+  it('carries no wake when nothing is scheduled', () => {
+    expect(
+      buildAndroidWidgetProps(MIXED, {}, translate, String, formatAgo).scheduledAgo
+    ).toBeNull();
+  });
+
+  it.each(['waiting', 'empty', 'expired', 'signed_out', 'privacy'] as const)(
+    'drops the wake on the locked %s frame that keeps no counts',
+    status => {
+      const props = buildAndroidWidgetProps(
+        snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0, status),
+        {},
+        translate,
+        String,
+        formatAgo
+      );
+
+      expect(props.scheduledAgo).toBeNull();
+    }
+  );
+
+  it('drops the wake with the counts at the data deadline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 28_800_000);
+    const props = buildCurrentWidgetProps(
+      snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0),
+      translate,
+      String,
+      formatAgo
+    );
+    vi.useRealTimers();
+
+    expect(props.statusLine).toBe('Status expired');
+    expect(props.countLines).toEqual([]);
+    expect(props.scheduledAgo).toBeNull();
   });
 });
 
@@ -332,6 +413,7 @@ describe('current widget lapsed frame', () => {
     expect(props.countLines).toEqual([
       { label: 'Needs input', kind: 'needsInput', count: '2' },
       { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Scheduled', kind: 'scheduled', count: '0' },
       { label: 'Idle', kind: 'idle', count: '3' },
     ]);
     expect(props.primaryLabel).toBe('Needs input');
@@ -350,7 +432,7 @@ describe('current widget lapsed frame', () => {
 
     expect(props.statusLine).toBeNull();
     expect(props.newestResultAgo).toBe(AGO);
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   // The deadline keeps its precedence: a lapsed snapshot past `expiresAt` still
@@ -398,6 +480,24 @@ describe('widget config', () => {
   });
 });
 
+describe('buildGenericWidgetProps', () => {
+  // A placed widget with no snapshot has no account behind it — a fresh install
+  // or a signed-out one — so it must not claim "No work in progress", which
+  // asserts a signed-in empty tray. It reads the sign-in copy instead.
+  it('reads the sign-in copy with no counts and no actions', () => {
+    const props = buildGenericWidgetProps(translate);
+
+    expect(props.statusLine).toBe('Sign in to see agents');
+    expect(props.accessibilityLabel).toBe('Sign in to see agents');
+    expect(props.countLines).toEqual([]);
+    expect(props.primaryLabel).toBeNull();
+    expect(props.newestResultTitle).toBeNull();
+    expect(props.newestLine).toBeNull();
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
+  });
+});
+
 describe('buildOngoingNotificationText', () => {
   it('lists every ranked numeric count for happy work', () => {
     expect(buildOngoingNotificationText(MIXED, {}, translate)).toBe(
@@ -427,6 +527,30 @@ describe('buildOngoingNotificationText', () => {
     expect(buildOngoingNotificationText(MIXED, {}, translate, String, 'Approval failed')).toBe(
       'Approval failed 2 Needs input, 4 Working, 3 Idle'
     );
+  });
+
+  /** Two hours ahead of the suite's clock, so the stub formatter echoes it. */
+  const WAKE = new Date(NOW + 7_200_000).toISOString();
+
+  it('appends the wake time to a scheduled count', () => {
+    const snapshot = snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0);
+    expect(buildOngoingNotificationText(snapshot, {}, translate, String, null, formatAgo)).toBe(
+      `1 Scheduled wakes ${formatAgo(WAKE)}`
+    );
+  });
+
+  it('leaves the scheduled count bare when the CLI reported no wake', () => {
+    const snapshot = snapshotFor([{ status: 'scheduled' }], 0);
+    expect(buildOngoingNotificationText(snapshot, {}, translate, String, null, formatAgo)).toBe(
+      '1 Scheduled'
+    );
+  });
+
+  it('keeps the stale warning and the pending notice around the wake', () => {
+    const snapshot = snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0, 'stale');
+    expect(
+      buildOngoingNotificationText(snapshot, {}, translate, String, 'Approval failed', formatAgo)
+    ).toBe(`Approval failed Updates delayed, 1 Scheduled wakes ${formatAgo(WAKE)}`);
   });
 
   it('prefixes the notice to the stale warning and to the locked copy', () => {
@@ -526,6 +650,13 @@ describe('widget actions and the newest line', () => {
     expect(props.actions.approve).toBe(true);
   });
 
+  it('does not offer New agent when a session is scheduled', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
+    expect(props.primaryLabel).toBe('Scheduled');
+  });
+
   it('offers New agent when every connected agent is idle and nothing waits', () => {
     // The idle-only tray has status happy: it keeps a card alive, and nothing
     // waiting means the only action the surface can offer is a new agent. The
@@ -538,7 +669,7 @@ describe('widget actions and the newest line', () => {
       newAgentLabel: 'New agent',
     });
     expect(props.statusLine).toBeNull();
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   it('offers New agent when nothing is eligible, instead of Approve', () => {
@@ -655,7 +786,7 @@ describe('widget actions and the newest line', () => {
     );
     expect(props.newestLine).toBe('Could not approve');
     expect(props.actions.approve).toBe(true);
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   it('draws the reserved line only where an action is offered', () => {

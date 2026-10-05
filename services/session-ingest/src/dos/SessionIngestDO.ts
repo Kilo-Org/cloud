@@ -74,7 +74,9 @@ type ExtractableMetaKey =
   | 'status'
   | 'prPlatform'
   | 'prUrl'
-  | 'prNumber';
+  | 'prNumber'
+  | 'prHeadRef'
+  | 'prHeadSha';
 
 function writeIngestMetaIfChanged(
   db: DrizzleSqliteDODatabase,
@@ -425,6 +427,8 @@ export class SessionIngestDO extends DurableObject<Env> {
       prPlatform: undefined,
       prUrl: undefined,
       prNumber: undefined,
+      prHeadRef: undefined,
+      prHeadSha: undefined,
     };
 
     const lifecycleEvents: IngestLifecycleEvent[] = [];
@@ -537,13 +541,15 @@ export class SessionIngestDO extends DurableObject<Env> {
         }
       }
 
-      // session_pr_link emits the whole triple atomically (or nothing), so the change
-      // map always receives all three keys together.
+      // session_pr_link emits the whole tuple atomically (or nothing), so the change
+      // map always receives all five keys together.
       const prLink = extractSessionPrLink(item);
       if (prLink !== undefined) {
         incomingByKey.prPlatform = prLink.prPlatform;
         incomingByKey.prUrl = prLink.prUrl;
         incomingByKey.prNumber = prLink.prNumber;
+        incomingByKey.prHeadRef = prLink.prHeadRef;
+        incomingByKey.prHeadSha = prLink.prHeadSha;
       }
 
       if (ingestVersion >= 1) {
@@ -1176,8 +1182,11 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   async stageR2Object(
     params: { kiloUserId: string; sessionId: string; key: string },
-    body: ReadableStream<unknown>
+    body: ReadableStream<unknown> | Uint8Array
   ): Promise<boolean> {
+    const cancelBody = async (): Promise<void> => {
+      if (body instanceof ReadableStream) await body.cancel();
+    };
     sessionIdSchema.parse(params.sessionId);
     const doKey = `${params.kiloUserId}/${params.sessionId}`;
     if (
@@ -1187,7 +1196,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       throw new Error('Session R2 identity conflict');
     }
     if (this.isDeleted()) {
-      await body.cancel();
+      await cancelBody();
       return false;
     }
     writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: params.kiloUserId });
@@ -1204,7 +1213,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       });
       const etag = reservation?.etag ?? (await this.env.SESSION_INGEST_R2.head(params.key))?.etag;
       if (this.isDeleted()) {
-        await body.cancel();
+        await cancelBody();
         await this.env.SESSION_INGEST_R2.delete(params.key);
         this.db.delete(ingestMeta).where(eq(ingestMeta.key, key)).run();
         return false;

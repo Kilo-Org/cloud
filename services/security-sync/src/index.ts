@@ -23,7 +23,7 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { eq, and, isNotNull, or } from 'drizzle-orm';
-import { SECURITY_SYNC_OWNER_BUDGET_MS, syncOwner } from './sync';
+import { SECURITY_SYNC_OWNER_BUDGET_MS, releaseOwnerSyncLease, syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
 import { runSecurityNotificationSweep } from './notifications/sweep';
 
@@ -184,6 +184,14 @@ function getEnvironment(env: CloudflareEnv): string | undefined {
 
 const QUEUE_SEND_BATCH_LIMIT = 100;
 const SECURITY_SYNC_COMMAND_MAX_ATTEMPTS = 4;
+
+/** User-facing redacted messages for lease-driven sync failures; no repo names or tokens. */
+const SECURITY_SYNC_RESULT_MESSAGES: Record<string, string> = {
+  SYNC_ALREADY_RUNNING:
+    'A sync is already in progress for this account. Wait for it to finish, then retry.',
+  SYNC_SUPERSEDED: 'This sync lost its place and cannot continue. Retry.',
+  SYNC_NO_PROGRESS: 'Sync stopped because two consecutive passes made no progress. Retry.',
+};
 
 function createOwnerKey(owner: SecuritySyncMessage['owner']): string {
   if (owner.organizationId) return `org:${owner.organizationId}`;
@@ -620,6 +628,20 @@ async function processSecuritySyncMessage(
         result_code: running.command?.result_code,
         attempts: message.attempts,
       });
+      const released = await releaseOwnerSyncLease(db, owner, body.runId, body.chunkIndex);
+      if (released.released) {
+        console.info('Security sync lease released', {
+          runId: body.runId,
+          chunkIndex: body.chunkIndex,
+          reason: 'command_terminal',
+        });
+      } else {
+        console.info('Security sync lease release rejected', {
+          runId: body.runId,
+          holderRunId: null,
+          reason: 'command_terminal',
+        });
+      }
       if (!body.actor) throw new Error('Manual security sync command has no actor');
       await settleSecurityLedgerForTerminalCommand(db, running.command, {
         actor: body.actor,
@@ -639,12 +661,66 @@ async function processSecuritySyncMessage(
     trigger: body.trigger,
     actor: body.actor,
     repoFullName: body.repoFullName,
+    chunkIndex: body.chunkIndex,
     notificationMaterializationEnabled: isStrictTrueRolloutFlag(
       env.SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED,
       'SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED'
     ),
     budgetMs: body.repoFullName ? undefined : SECURITY_SYNC_OWNER_BUDGET_MS,
   });
+
+  if (result.staleChunk) {
+    console.info('Security sync stale chunk acknowledged', {
+      command_id: body.commandId,
+      command_type: body.commandId ? 'sync' : undefined,
+      owner_type: body.owner.organizationId ? 'org' : 'user',
+      runId: body.runId,
+      ownerKey: body.ownerKey,
+      chunkIndex: body.chunkIndex,
+      attempts: message.attempts,
+    });
+    message.ack();
+    return;
+  }
+
+  const leaseFailure = result.claimDenied
+    ? 'SYNC_ALREADY_RUNNING'
+    : result.checkpointRejected
+      ? 'SYNC_SUPERSEDED'
+      : result.noProgress
+        ? 'SYNC_NO_PROGRESS'
+        : null;
+  if (leaseFailure) {
+    if (body.commandId) {
+      const terminalTransition = await transitionSecurityAgentCommandWithCurrentState(db, {
+        commandId: body.commandId,
+        fromStatuses: ['running'],
+        status: 'failed',
+        resultCode: leaseFailure,
+        lastErrorRedacted: SECURITY_SYNC_RESULT_MESSAGES[leaseFailure],
+      });
+      requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
+      if (!body.actor) throw new Error('Manual security sync command has no actor');
+      await settleSecurityLedgerForTerminalCommand(db, terminalTransition.command, {
+        actor: body.actor,
+        intent: 'manual_sync',
+        dispatchedAt: body.dispatchedAt,
+        counts: { repo_count: result.synced, error_count: result.errors },
+      });
+    }
+    console.info('Security sync command terminated without continuation', {
+      command_id: body.commandId,
+      command_type: body.commandId ? 'sync' : undefined,
+      owner_type: body.owner.organizationId ? 'org' : 'user',
+      result_code: leaseFailure,
+      runId: body.runId,
+      ownerKey: body.ownerKey,
+      chunkIndex: body.chunkIndex,
+      attempts: message.attempts,
+    });
+    message.ack();
+    return;
+  }
 
   if (result.exhaustedBudget) {
     const nextChunkIndex = body.chunkIndex + 1;
@@ -922,6 +998,44 @@ export default {
         await processSecuritySyncMessage(message, env);
       } catch (error) {
         const correlation = commandCorrelation(message.body);
+        const syncBody = SecuritySyncMessageSchema.safeParse(message.body);
+        if (message.attempts >= SECURITY_SYNC_COMMAND_MAX_ATTEMPTS && syncBody.success) {
+          const syncLeaseOwner = resolveOwner(syncBody.data.owner);
+          if (syncLeaseOwner) {
+            try {
+              const db = getWorkerDb(env.HYPERDRIVE.connectionString, {
+                statement_timeout: 30_000,
+              });
+              const released = await releaseOwnerSyncLease(
+                db,
+                syncLeaseOwner,
+                syncBody.data.runId,
+                syncBody.data.chunkIndex
+              );
+              if (released.released) {
+                console.info('Security sync lease released', {
+                  runId: syncBody.data.runId,
+                  chunkIndex: syncBody.data.chunkIndex,
+                  reason: 'retries_exhausted',
+                });
+              } else {
+                console.info('Security sync lease release rejected', {
+                  runId: syncBody.data.runId,
+                  holderRunId: null,
+                  reason: 'retries_exhausted',
+                });
+              }
+            } catch (releaseError) {
+              console.error('Security sync lease release rejected', {
+                runId: syncBody.data.runId,
+                chunkIndex: syncBody.data.chunkIndex,
+                holderRunId: null,
+                reason: 'retries_exhausted',
+                error_type: releaseError instanceof Error ? releaseError.name : 'UnknownError',
+              });
+            }
+          }
+        }
         let exhaustionOutcome: SecurityAgentCommandTransitionOutcome | undefined;
         if (correlation.commandId && message.attempts >= SECURITY_SYNC_COMMAND_MAX_ATTEMPTS) {
           try {

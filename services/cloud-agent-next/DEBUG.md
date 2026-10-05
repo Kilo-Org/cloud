@@ -167,9 +167,9 @@ The internal `getWrapperLogs` path also discovers these sandbox-side files direc
 
 ## Control-plane Diagnostics
 
-Control-plane (`workspace_*`) sessions use verbose structured wrapper diagnostics plus a bounded wrapper/Kilo file archive. JSON records include heartbeat attempts, feed freshness, control socket and request outcomes, event-send metadata, task phases, and retirement causes. They exclude prompts, assistant/tool content, raw errors, credentials, and URLs. The file archive can contain prompts and code, same as legacy session tarballs.
+Control-plane (`workspace_*`) sessions upload a bounded wrapper/Kilo file archive plus JSON records from the current wrapper: `wrapper.lifecycle`, `session.execution`, `control.workload`, `control.upload`, and `control.request` for worktree deletion only (`worktree.prepareDeletion`, `worktree.delete`, with `stage`, `worktreeId`, and `sessionCount`). Those records exclude prompts, assistant/tool content, raw errors, credentials, and URLs. The file archive can contain prompts and code, same as legacy session tarballs. `session.sync` and `accepted_reconciliation` are from the replaced wrapper and are not emitted for `workspace_*` sessions.
 
-The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. It also uploads `/tmp/kilocode-control-wrapper.log` plus worktree Kilo log dirs (`/tmp/kilo-worktrees/<home>/.local/share/kilo/log`) as one gzip archive every 30 seconds, and again during shutdown after the JSON flush. R2 keys are:
+The process is `kilocode-control-plane-wrapper.js`, started by `kilocode-control-plane-supervisor.sh`. Its log file is still `/tmp/kilocode-control-wrapper.log` (`CONTROL_WRAPPER_LOG_PATH`). The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. It also uploads that log plus worktree Kilo log dirs (`/tmp/kilo-worktrees/<home>/.local/share/kilo/log`) as one gzip archive every 30 seconds, and again during shutdown after the JSON flush. R2 keys are:
 
 ```text
 logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>.json
@@ -178,9 +178,13 @@ logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/files.tar.gz
 
 `sandboxId` is the logical SandboxControl ID, not the `workspace_*` session ID or physical provider allocation name. Use Worker logs to correlate these IDs. Each allocation/wrapper has separate immutable batches; sort them by the batch `sequence` and record `timestamp`, not the random batch ID. Check `droppedRecords` and `droppedTerminalRecords` for buffer overflow or rejected diagnostic records.
 
+For a `no_progress` outcome, find the `session.execution` record with `phase=deadline_expired`. It records the root session, last qualifying event's Kilo session and type, last tool part ID/status/output byte count observed by the wrapper, and elapsed time. A `phase=freshness` record with `probeStage=pre_deadline` is a bounded native Kilo message-part read started in the final minute; `probeStage=deadline` is started just before cancellation. Compare its `toolStatus` and `outputBytes` with the wrapper's deadline record. `probeStatus=missing` means that part was absent; `unavailable` means the read failed or timed out. The probe never delays or resets the seven-minute clock. A completed native part after a wrapper-observed running part suggests a feed or lineage gap; equal running parts show only that no newer part state was observable, not whether a subprocess was making useful progress.
+
+`control.workload` records are per `scopeId`, so count distinct scopes to see whether the allocation was shared. `cpuUsageUsec`, `cpuThrottledUsec`, `cpuThrottleCount`, `ioReadBytes`, and `ioWriteBytes` are cumulative cgroup counters: compare consecutive samples from the same scope. `toolCpuUsageUsec`, `serverCpuUsageUsec`, `toolIoReadBytes`, and `toolIoWriteBytes` separate the tools subgroup from the Kilo server; they do not identify one command when several run together. `memoryMaxEvents` counts attempts to cross the memory limit and can rise without an OOM kill. The Worker `container_launch_identity` diagnostic joins the physical allocation reference and sandbox name to Cloudflare's 64-character `containerInstanceId`, which can be queried in Cloudflare's historical Containers metrics. These counters show resource activity or contention, not useful tool progress.
+
 List and download these JSON batches and the overwriteable `files.tar.gz` object from R2 using local tooling and the key prefix above. Each wrapper incarnation keeps one file archive; later uploads replace it. Uploaded objects remain available after the container disappears, subject to the bucket's retention policy. The legacy `getWrapperLogs` live-file reader and tarball retrieval do not read these control-plane archives.
 
-Worker/DO diagnostics remain in Cloudflare logs/Axiom, not these wrapper archives. Successful `message.part.delta` forwarding is summarized in heartbeat counters and peak queue/RPC/total forwarding times instead of per-frame Worker logs. These counters and peaks reset when the DO is reconstructed. Failure and lifecycle records remain verbose, and wrapper archive logging is unchanged. Upload result markers on wrapper stderr distinguish HTTP rejection, network failure, timeout, and acceptance. An upload-only grant expires four hours after allocation launch and is not renewed; runtime credential revocation does not revoke it. Grant expiry does not delete archives. R2 retention remains governed by external bucket policy, not the session/report cleanup jobs.
+Worker/DO diagnostics remain in Cloudflare logs/Axiom, not these wrapper archives. Upload result markers on wrapper stderr distinguish HTTP rejection, network failure, timeout, and acceptance. An upload-only grant expires four hours after allocation launch and is not renewed; runtime credential revocation does not revoke it. Grant expiry does not delete archives. R2 retention remains governed by external bucket policy, not the session/report cleanup jobs.
 
 Uploads are best effort: an abrupt kill or network failure can lose unuploaded records. The buffer holds 512 records and each batch holds up to 128 records or 256 KiB. A recorded WebSocket send is a local handoff, not proof that a session DO applied the event; correlate it with the Worker forwarding and durable message-transition logs.
 
@@ -188,17 +192,7 @@ Uploads are best effort: an abrupt kill or network failure can lose unuploaded r
 
 `worktreeId` identifies the shared checkout and chat group; `sessionId` is the Cloud Agent chat ID and `kiloSessionId` is the Kilo session ID. Worker `worktree_chat_*` events cover admission, progress, reconciliation, settlement, and the result, correlating the source and resulting chats with the existing worktree. Their durations are phase-local; a reconciliation-pending result describes required recovery, while the separate reconciliation and settlement records report persistence outcomes. Wrapper attachment does not receive an explicit worktree ID, so join its chat IDs with Worker records rather than treating a credential `scopeId` or directory as the worktree identity.
 
-Worker `worktree_ownership` records distinguish `exclusive`, `shared`, and `unresolved` decisions and identify the evidence used. Unresolved ownership is not proof of sharing or permission to destroy a sandbox. `worktree_runtime_cleanup` records the cleanup strategy, failure stage, and confirmed journal flags. `worktree_cleanup_location` confirms resources cleaned at one runtime location; it is not overall deletion completion. Only `worktree_deletion` with `result=completed` or `result=replayed` confirms the complete deletion request.
-
-Wrapper `control.request` attachment summaries separate `workspaceAction` (reuse or bootstrap) from `sessionResolution` (existing, restored, or created chat). Worktree deletion records include the first fence/drain, preparation/deletion outcome, stage, and session count. These records contain IDs and fixed outcomes, not repository paths, credentials, or session content.
-
-### Accepted-message Reconciliation
-
-For `runtime_unhealthy`, correlate Worker `accepted_reconciliation` and `session_sync` records by `messageId`, expected wrapper identity, and lifecycle epoch. Reconciliation records distinguish healthy, superseded, and unhealthy decisions. The unhealthy decision is logged before failure/cleanup starts; `session_message_committed` remains the durable message-state confirmation. `session_interrupt_failed` identifies the separate explicit-abort path that can produce the same public failure reason.
-
-`session_sync` identifies its trigger (`accepted_alarm` or `pending_interactions`), failed stage, timeout, observed physical/connection state, and expected versus observed wrapper identity. It records safe response codes and validation counts, never raw errors or response payloads. Compare `receivedQuestionCount`/`receivedPermissionCount` with `questionCount`/`permissionCount` to see root scoping, and check `interactionSnapshotApplied` for revision-fenced snapshots. A successful sync means the snapshot was fetched and processed, not necessarily that accepted work is still active; the reconciliation decision applies the activity rule afterward.
-
-Wrapper `control.request` records for `session.sync` separate status, question, and permission reads from the overall `sync_result`. `nativeStatus`, `syncStatus`, and `ownedTask` show the task-owned busy override. Pending-query flags are frozen when the shared request signal aborts, so a query that ignores cancellation is still visible. Missing counts mean no successful result was available; they are not zero counts. The three reads retain their original shared deadline and parallel execution.
+Worker `worktree_ownership` records distinguish `exclusive`, `shared`, and `unresolved` decisions and identify the evidence used. Unresolved ownership is not proof of sharing or permission to destroy a sandbox. `worktree_cleanup_location` confirms resources cleaned at one runtime location; it is not overall deletion completion. Only `worktree_deletion` with `result=completed` or `result=replayed` confirms the complete deletion request.
 
 ## Interpreting Common States
 
@@ -236,6 +230,7 @@ Wrapper `control.request` records for `session.sync` separate status, question, 
   - inspect callback enqueue, queue consumer, delivery classification, and retry logs.
 - Container disappears with little Worker noise:
   - inspect Docker container lifecycle and the final wrapper/Kilo logs copied from the sandbox while still available.
+  - A killed container is not a separate control-plane case. The wrapper socket closes, or the 45-second heartbeat deadline closes it. The allocation stays `disconnected` until the earlier of the reconnect window (5 minutes) and the idle deadline. It then stops: `connection_lost` when the reconnect window expires first, `sandbox_stopped` when the idle deadline expires first. The next message prepares a new sandbox. There is no provider poll. Local `docker kill` may not deliver `webSocketClose` promptly; the heartbeat alarm is the backstop, and a late Wrangler alarm makes that backstop late.
 
 ## Local Smoke Harness
 
@@ -243,9 +238,9 @@ For end-to-end fake-LLM coverage, use:
 
 - `services/cloud-agent-next/test/e2e/README.md`
 - `pnpm exec tsx services/cloud-agent-next/test/e2e/run.ts <lifecycle> <conversation>`
-- `pnpm exec tsx services/cloud-agent-next/test/e2e/smoke.ts`
+- `pnpm --filter cloud-agent-next run e2e:local`
 
-The smoke helpers in `services/cloud-agent-next/test/e2e/sandbox-control.ts` already encode the same Docker log-discovery patterns used in this document.
+The harness helpers in `services/cloud-agent-next/test/e2e/sandbox-control.ts` already encode the same Docker log-discovery patterns used in this document.
 
 ## Safety Notes
 

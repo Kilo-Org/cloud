@@ -3,6 +3,7 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { resolveIncomingUrl } from '@kilocode/app-shared/universal-links';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -120,7 +121,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     const rendered = await runWidgetTask(handler, width);
     // Two agents wait, so the widget offers the in-place approval under the
     // counts (and in its reserved newest line, which is empty here).
-    const expected = ['2', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve'];
+    const expected = ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -151,8 +152,10 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
 
     const rendered = await runWidgetTask(handler, width);
 
-    expect(collectText(rendered.light)).toEqual(['No work in progress']);
-    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+    // No snapshot means no account behind the widget: the sign-in copy, never
+    // the generic "No work in progress" that asserts a signed-in empty tray.
+    expect(collectText(rendered.light)).toEqual(['Sign in to see agents']);
+    expect(collectText(rendered.dark)).toEqual(['Sign in to see agents']);
   });
 
   it('renders the existing placeholder when native storage cannot be read', async () => {
@@ -161,8 +164,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
 
     const rendered = await runWidgetTask(handler, width);
 
-    expect(collectText(rendered.light)).toEqual(['No work in progress']);
-    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+    expect(collectText(rendered.light)).toEqual(['Sign in to see agents']);
+    expect(collectText(rendered.dark)).toEqual(['Sign in to see agents']);
   });
 
   it.each([
@@ -189,7 +192,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     });
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -211,7 +214,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     vi.setSystemTime(Date.parse(old.expiresAt));
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
   });
@@ -274,8 +277,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     mocks.native.setWidgetSnapshot(raw, 0);
 
     const rendered = await runWidgetTask(handler, width);
-    expect(collectText(rendered.light)).toEqual(['No work in progress']);
-    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+    expect(collectText(rendered.light)).toEqual(['Sign in to see agents']);
+    expect(collectText(rendered.dark)).toEqual(['Sign in to see agents']);
   });
 
   it('keeps live widget props published while restoration is pending', async () => {
@@ -292,7 +295,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     });
     read.resolve(JSON.stringify(stored));
     const rendered = await rendering;
-    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -312,7 +315,17 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     // ...and the redraw after it drops the line without moving the rows.
     const settled = collectText(settledRender?.light);
     expect(settled).not.toContain('Approving…');
-    expect(settled).toEqual(['2', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve']);
+    expect(settled).toEqual([
+      '2',
+      'Needs input',
+      '2',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+      'Approve',
+    ]);
     expect(settledRender?.light.props).toMatchObject({
       clickAction: 'OPEN_URI',
       clickActionData: { uri: 'kiloapp:///cloud/sessions' },
@@ -344,6 +357,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       'Needs input',
       '1',
       'Working',
+      '0',
+      'Scheduled',
       '0',
       'Idle',
     ]);
@@ -379,6 +394,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       '1',
       'Working',
       '0',
+      'Scheduled',
+      '0',
       'Idle',
     ]);
   });
@@ -413,6 +430,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       '2',
       'Working',
       '0',
+      'Scheduled',
+      '0',
       'Idle',
       'Could not approve',
       'Approve',
@@ -446,7 +465,10 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     // widget leaves no error copy behind while it hands the user to the app.
     expect(collectText(renders[0]?.light)).toContain('Starting…');
     expect(collectText(renders.at(-1)?.light)).toEqual(['No agents waiting', 'New agent']);
-    expect(mocks.linking.openURL).toHaveBeenCalledWith('kiloapp://agent-chat/new');
+    // The canonical universal-link row: `resolveIncomingUrl` maps it onto
+    // `/(app)/agent-chat/new`, the route the New agent FAB pushes.
+    expect(mocks.linking.openURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
+    expect(resolveIncomingUrl('kiloapp:///cloud/sessions/new')).toBe('/(app)/agent-chat/new');
   });
 
   it.each(['approved', 'created'] as const)(

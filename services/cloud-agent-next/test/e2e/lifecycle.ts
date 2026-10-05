@@ -209,11 +209,135 @@ export async function stopOwnedSandboxFamily(
   return killed;
 }
 
-/** Only tear down sandboxes whose exclusive session ownership can be proven. */
-export async function stopOwnedSessionSandboxes(sessionId: string): Promise<void> {
-  for (const sandbox of await findOwnedSandboxes(sessionId, undefined, new Set())) {
-    await stopOwnedSandboxFamily(sandbox, sessionId);
+/**
+ * A refused ownership proof is only re-checked this long for a sandbox that is
+ * winding down on its own; the fault scenarios' 30 s default would stall every
+ * scenario whose sandbox is not exclusive.
+ */
+const RECLAIM_FAMILY_GONE_TIMEOUT_MS = 5_000;
+const RECLAIM_DOCKER_ATTEMPTS = 3;
+const RECLAIM_DOCKER_RETRY_MS = 1_000;
+
+export type ReclaimSession = { sessionId: string; kiloSessionId?: string };
+
+export type SandboxReclaimReport = {
+  /** Sandbox containers this call stopped. */
+  stopped: string[];
+  /** Why a session's sandbox was left alone. */
+  failures: string[];
+};
+
+type LocatedSandbox = { container: SandboxContainer; directory: string | undefined };
+
+/** The one primary sandbox a session provably owns, or `null` when none is running. */
+async function locateOwnedSandbox(
+  session: ReclaimSession,
+  executeDocker: DockerCommandExecutor | undefined
+): Promise<LocatedSandbox | null> {
+  const { sessionId, kiloSessionId } = session;
+  if (sessionId.startsWith('workspace_')) {
+    if (kiloSessionId === undefined) {
+      throw new Error(`no Kilo session id was recorded for ${sessionId}; ownership is unprovable`);
+    }
+    const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
+    return runtime ? { container: runtime.container, directory: runtime.directory } : null;
   }
+  const matches = await listSandboxesForAgentSession(sessionId, executeDocker);
+  if (matches.length > 1) {
+    throw new Error(`multiple containers match ${sessionId}; refusing ambiguous ownership`);
+  }
+  return matches[0] ? { container: matches[0], directory: undefined } : null;
+}
+
+/**
+ * Run a docker-scanning step again when a raw `docker` command failed. The scans
+ * touch every sandbox, and a sibling scenario's reclaim can kill a container
+ * mid-scan; that fails without a "gone" marker, and the next attempt sees the
+ * container absent. Our own refusals (unprovable or shared ownership) are
+ * deterministic and are thrown at once.
+ */
+async function retryTransientDocker<T>(step: () => Promise<T>, retryMs: number): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await step();
+    } catch (error) {
+      const transient = error instanceof Error && error.message.includes('Command failed: docker');
+      if (!transient || attempt >= RECLAIM_DOCKER_ATTEMPTS) throw error;
+      await new Promise(resolve => setTimeout(resolve, retryMs));
+    }
+  }
+}
+
+/**
+ * Stop the sandbox families (primary and `-proxy`) that `sessions` provably own.
+ * Each local session has its own `ses-…` sandbox (`PER_SESSION_SANDBOX_ORG_IDS`
+ * is `*` in the dev config), and its proxy is named after it, so once the
+ * gate has deleted the sessions nothing can address that sandbox again. One
+ * sandbox is stopped once even when several sessions share it (a worktree's
+ * chats); the sessions' own worktrees are the only extra directories the
+ * exclusivity proof accepts. A sandbox whose ownership cannot be proven is left
+ * running and reported, never killed. Never throws.
+ */
+export async function reclaimOwnedSandboxes(
+  sessions: readonly ReclaimSession[],
+  deps: {
+    executeDocker?: DockerCommandExecutor;
+    familyGoneTimeoutMs?: number;
+    retryMs?: number;
+  } = {}
+): Promise<SandboxReclaimReport> {
+  const { executeDocker } = deps;
+  const retryMs = deps.retryMs ?? RECLAIM_DOCKER_RETRY_MS;
+  const failures: string[] = [];
+  const groups = new Map<
+    string,
+    { container: SandboxContainer; sessions: ReclaimSession[]; directories: string[] }
+  >();
+  for (const session of sessions) {
+    try {
+      const located = await retryTransientDocker(
+        () => locateOwnedSandbox(session, executeDocker),
+        retryMs
+      );
+      if (!located) continue;
+      const group = groups.get(located.container.id) ?? {
+        container: located.container,
+        sessions: [],
+        directories: [],
+      };
+      group.sessions.push(session);
+      if (located.directory !== undefined) group.directories.push(located.directory);
+      groups.set(located.container.id, group);
+    } catch (error) {
+      failures.push(`${session.sessionId}: ${errorText(error)}`);
+    }
+  }
+
+  const stopped: string[] = [];
+  for (const group of groups.values()) {
+    const [owner] = group.sessions;
+    if (!owner) continue;
+    try {
+      const killed = await retryTransientDocker(
+        () =>
+          stopOwnedSandboxFamily(group.container, owner.sessionId, owner.kiloSessionId, {
+            ...(executeDocker ? { executeDocker } : {}),
+            familyGoneTimeoutMs: deps.familyGoneTimeoutMs ?? RECLAIM_FAMILY_GONE_TIMEOUT_MS,
+            allowedDirectories: group.directories,
+          }),
+        retryMs
+      );
+      if (killed.length > 0) stopped.push(group.container.name);
+    } catch (error) {
+      failures.push(`${group.container.name}: ${errorText(error)}`);
+    }
+  }
+
+  return { stopped, failures };
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** Snapshot of live sandbox container ids, used to detect a new container. */

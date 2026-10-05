@@ -3,18 +3,19 @@ import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { github_branch_pull_requests } from '@kilocode/db/schema';
 import { logExceptInTest } from '@/lib/utils.server';
-import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
+import { parseRepoReference } from '@/lib/integrations/platforms/github/pr-link-identity';
 import type { PullRequestReviewPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import {
-  checkMatchingSession,
+  markSessionsVerifyingPullRequest,
   type WebhookInstallationOwner,
 } from './upsert-cli-session-pull-requests';
 
 /**
  * Side-effect: when a pull_request_review webhook arrives and at least one
- * cli_sessions_v2 row on a supported platform in this tenant references the
- * same `(git_url, git_branch)`, flip `review_decision_pending = true` on the
- * existing `github_branch_pull_requests` cache row.
+ * cli_sessions_v2 row verifiably links this PR (same repo, same PR number, plus
+ * the session's own head evidence), flip `review_decision_pending = true` on the
+ * existing `github_branch_pull_requests` cache row keyed by PR identity
+ * `(git_url, PR number, tenant)`.
  *
  * UPDATE-only (no INSERT): avoids writing a half-formed PR row from a review
  * event. The `pull_request` event is canonical for the other PR fields.
@@ -22,7 +23,7 @@ import {
  * The review decision is NOT fetched here. The background batch in
  * `batch-review-decisions.ts` picks it up on the next user-facing read.
  *
- * Returns 0 when no row is updated (no matching session or no cache row yet).
+ * Returns 0 when no row is updated (no verifying session or no cache row yet).
  */
 export async function upsertCliSessionPullRequestReviewFromWebhook(
   payload: PullRequestReviewPayload,
@@ -39,13 +40,29 @@ export async function upsertCliSessionPullRequestReviewFromWebhook(
     return 0;
   }
 
-  const gitUrl = normalizeGitUrl(headRepo.clone_url);
+  // Only a PR whose base and head repositories are the same repository can be
+  // a session's own PR.
+  const baseRepoRef = parseRepoReference(repository.full_name);
+  const headRepoRef = parseRepoReference(headRepo.clone_url);
+  if (!baseRepoRef || !headRepoRef || baseRepoRef.key !== headRepoRef.key) {
+    return 0;
+  }
+
+  const gitUrl = baseRepoRef.url;
 
   try {
-    const gateResult = await checkMatchingSession(gitUrl, branch, owner);
+    const gateResult = await markSessionsVerifyingPullRequest(
+      {
+        gitUrl,
+        prNumber: pull_request.number,
+        headRef: branch,
+        headSha: pull_request.head.sha ?? null,
+      },
+      owner
+    );
 
     if (gateResult.kind === 'no_session') {
-      logExceptInTest('pull_request_review upsert: no matching session, skipping', {
+      logExceptInTest('pull_request_review upsert: no verifying session, skipping', {
         pr_number: pull_request.number,
         repo: repository.full_name,
         branch,
@@ -75,7 +92,7 @@ export async function upsertCliSessionPullRequestReviewFromWebhook(
       .where(
         and(
           eq(github_branch_pull_requests.git_url, gitUrl),
-          eq(github_branch_pull_requests.git_branch, branch),
+          eq(github_branch_pull_requests.pr_number, pull_request.number),
           tenantPredicate
         )
       )

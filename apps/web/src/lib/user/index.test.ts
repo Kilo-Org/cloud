@@ -122,6 +122,7 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  bouncer_credit_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
   user_data_export_parts,
@@ -143,12 +144,12 @@ import {
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
   assertUserCanBeSoftDeleted,
   SoftDeletePreconditionError,
-  findUserById,
   findUsersByIds,
   createOrUpdateUser,
   getAllUserProviders,
@@ -3864,6 +3865,46 @@ describe('User', () => {
       const remainingOutbox = await db.select().from(external_side_effect_outbox);
       expect(remainingOutbox).toHaveLength(1);
       expect(remainingOutbox[0].invitation_id).toBe(forUser2.id);
+    });
+
+    it('deletes the bouncer credit-event outbox rows for the deleted user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(bouncer_credit_event_outbox).values([
+        {
+          event_id: 'evt-deleted-user-pii',
+          event_type: 'charge.attempted',
+          user_id: user1.id,
+          payload: {
+            type: 'charge.attempted',
+            eventId: 'evt-deleted-user-pii',
+            userId: user1.id,
+            ip: '203.0.113.9',
+            cardFingerprint: 'fp-deleted-user',
+          },
+        },
+        {
+          event_id: 'evt-retained-user',
+          event_type: 'charge.attempted',
+          user_id: user2.id,
+          payload: { type: 'charge.attempted', eventId: 'evt-retained-user', userId: user2.id },
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select()
+        .from(bouncer_credit_event_outbox)
+        .where(eq(bouncer_credit_event_outbox.user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+
+      const remainingForOtherUser = await db
+        .select()
+        .from(bouncer_credit_event_outbox)
+        .where(eq(bouncer_credit_event_outbox.user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
     });
 
     it('should anonymize organization audit logs', async () => {

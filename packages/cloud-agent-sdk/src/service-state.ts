@@ -214,7 +214,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         completed = false;
         terminated = false;
       }
-      // Child session busy → no activity change
     } else if (sessionStatus.type === 'retry') {
       activity = {
         type: 'retrying',
@@ -225,7 +224,20 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       if (isRootSession(sessionId) && activity.type !== 'idle') {
         activity = { type: 'idle' };
       }
+    } else if (sessionStatus.type === 'scheduled') {
+      // A scheduled session does nothing now, so the activity reads idle while
+      // the lifecycle status carries the wake time. Like `busy`, a child
+      // session's status must not repaint the root's status.
+      if (isRootSession(sessionId)) {
+        if (activity.type !== 'idle') activity = { type: 'idle' };
+        status = {
+          type: 'scheduled',
+          ...(sessionStatus.scheduledAt ? { scheduledAt: sessionStatus.scheduledAt } : {}),
+        };
+      }
     }
+    // Any other (unknown) status string leaves the previous status untouched —
+    // it is never coerced to idle.
 
     notify();
   }
@@ -238,7 +250,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     switch (event.reason) {
       case 'complete':
         completed = true;
-        // Status stays as-is (idle, or committed if was committing)
         if (event.branch) config.onBranchChanged?.(event.branch);
         break;
       case 'interrupted':
@@ -308,7 +319,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     if (event.info.parentID == null) {
       rootSessionId = event.info.id;
     }
-    // Only track root session info
     let info = event.info;
     if (isRootSession(event.info.id)) {
       info = preserveGoalReason(sessionInfo, event.info);
@@ -870,7 +880,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     // callbacks first so consumers (e.g. dock atoms) also clear.
     clearPendingInteractions();
 
-    // Clear terminated on connected
     terminated = false;
     if (
       status.type === 'disconnected' &&

@@ -111,10 +111,13 @@ export default function RepoPickerScreen() {
           {/* The placeholder is a single-line Text overlay, not the input's own
               placeholder: Android lays the native hint out at the field's width
               with no line cap, so copy wider than a narrow field wraps onto a
-              second line. A tail-ellipsized Text truncates the copy at any width
-              instead. The shared box draws the value on one line box and centres
-              it, and both texts share `px-0` so the overlay sits exactly where
-              the typed text will. */}
+              second line that the field's fixed height clips against its
+              border. A tail-ellipsized Text truncates the copy at any width
+              instead. Both texts share leading-[normal] and a centred text rect
+              so the overlay sits exactly where the typed text will. The
+              overlay box is a row, so the copy starts at the field's start
+              edge — the physical right in RTL — and the hugging Text cannot
+              drift to the other side of the field. */}
           <View className="relative flex-1">
             <Input
               accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
@@ -123,17 +126,20 @@ export default function RepoPickerScreen() {
               clearButtonMode="while-editing"
               returnKeyType="search"
               textAlignVertical="center"
-              className="px-0 text-base text-foreground"
+              className="h-8 p-0 text-base leading-[normal] text-foreground"
               style={{ color: colors.foreground }}
               onChangeText={setSearch}
             />
             {search.length === 0 ? (
-              <View className="absolute inset-0 justify-center" pointerEvents="none">
+              <View
+                className="absolute inset-0 flex-row items-center justify-start"
+                pointerEvents="none"
+              >
                 <Text
                   accessible={false}
                   numberOfLines={1}
                   ellipsizeMode="tail"
-                  className="text-base leading-[normal] font-normal text-muted-foreground"
+                  className="shrink max-w-full text-base leading-[normal] font-normal text-muted-foreground"
                 >
                   {t('agentChat.repoPicker.searchPlaceholder')}
                 </Text>
@@ -177,6 +183,7 @@ export default function RepoPickerScreen() {
             const repo = item.repo;
             const platformName = t(REPO_PLATFORM_LABEL_KEYS[repo.platform]);
             const rowLabel = `${platformName} ${repo.fullName}`;
+            const isSelected = bridge.currentValue === `${repo.platform}:${repo.fullName}`;
             return (
               <Pressable
                 key={item.key}
@@ -186,6 +193,7 @@ export default function RepoPickerScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel={rowLabel}
+                accessibilityState={{ selected: isSelected }}
               >
                 {repo.isPrivate ? (
                   <Lock size={14} color={colors.mutedForeground} />
@@ -201,9 +209,7 @@ export default function RepoPickerScreen() {
                 <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
                   {repo.fullName}
                 </Text>
-                {bridge.currentValue === `${repo.platform}:${repo.fullName}` ? (
-                  <Check size={18} color={colors.primary} />
-                ) : null}
+                {isSelected ? <Check size={18} color={colors.primary} /> : null}
               </Pressable>
             );
           })}

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Fara til baka",
     "idle": "Í bið",
+    "scheduled": "Áætlað",
     "keepEditing": "Halda áfram að breyta",
     "keepRunning": "Halda keyrslu áfram",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
     "bonusCreditsExpiring": "Bónusinneign að upphæð {{amount}} rennur út {{date}}.",
-    "creditBalanceEmpty": "Þú átt enga inneign. Inneign þessa reiknings er stjórnað utan iOS-forritsins.",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -240,6 +240,7 @@
     "addPasskey": "Bæta við aðgangslykli",
     "passkeyDefaultName": "Aðgangslykill",
     "passkeyAddedOn": "Bætt við {{date}}",
+    "passkeyLastUsedOn": "Síðast notað {{date}}",
     "passkeyAdded": "Aðgangslykli bætt við.",
     "passkeyAddFailed": "Tókst ekki að bæta við aðgangslykli. Reyndu aftur.",
     "passkeyAddUnsupported": "Þetta tæki getur ekki búið til aðgangslykla.",
@@ -566,7 +567,14 @@
       "deletedUser": "eyddur notandi",
       "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} lína til viðbótar fyrir ofan.",
-      "moreLinesAbove_other": "… {{displayCount}} línur til viðbótar fyrir ofan."
+      "moreLinesAbove_other": "… {{displayCount}} línur til viðbótar fyrir ofan.",
+      "deleteComment": "Eyða athugasemd",
+      "deleteCommentTitle": "Eyða athugasemd?",
+      "deleteCommentMessage": "Þessari athugasemd verður eytt úr sameiningarbeiðninni.",
+      "commentEditFailed": "Ekki tókst að vista athugasemdina þína. Athugaðu tenginguna og reyndu aftur.",
+      "commentEditUnavailable": "Ekki er hægt að breyta þessari athugasemd. Hún gæti hafa verið eydd.",
+      "commentDeleteFailed": "Ekki tókst að eyða athugasemdinni þinni. Athugaðu tenginguna og reyndu aftur.",
+      "commentDeleteUnavailable": "Ekki er hægt að eyða þessari athugasemd."
     },
     "couldNotOpenGitHubAppSettings": "Tókst ekki að opna stillingar GitHub-forritsins.",
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Þetta er ekki tengill á samrunabeiðni eða merge request",
     "announce": {
       "commentPosted": "Athugasemd birt",
+      "commentUpdated": "Athugasemd uppfærð",
+      "commentDeleted": "Athugasemd eydd",
       "reviewSubmitted": "Yfirferð send",
       "autoMergeEnabled": "Sjálfvirk sameining virkjuð"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Ekki tókst að hlaða virkum lotum.",
       "couldNotRefresh": "Ekki tókst að endurnýja",
       "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum. Loturnar þínar birtast hér.",
+      "viewHistory": "Lotuferill",
       "noMatches": "Engar lotur samsvara leitinni",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
       "tryAdjustFilters": "Reyndu að breyta eða hreinsa síurnar þínar.",
       "couldNotSearch": "Ekki tókst að leita í lotum.",
       "completedWillAppear": "Hér birtast lotur sem er lokið.",
       "noPastSessions": "Engar fyrri lotur",
+      "pastSessions": "Fyrri lotur",
       "live": "Í RAUNTÍMA",
       "updating": "Uppfæri"
     },
@@ -2035,6 +2047,7 @@
       "idCopied": "Lotukenni afritað",
       "couldNotCopyId": "Ekki tókst að afrita lotukennið.",
       "untitled": "Ónefnd lota",
+      "actions": "Aðgerðir fyrir lotu",
       "sessionDeleted": "Lotu eytt",
       "needsInput": "bíður eftir svari",
       "fromPlatform": "frá {{platform}}",
@@ -2085,7 +2098,9 @@
       "renamePlaceholder": "Lotunafn",
       "transcriptAccessibility": "Samtalsferill lotunnar",
       "readOnly": "Þessi lota er skrifvarin.",
+      "continueInNewSession": "Halda áfram í nýrri lotu",
       "emptyDescription": "Sendu skilaboð hér að neðan til að byrja.",
+      "emptyTranscriptDescription": "Þessi lota hefur engin skilaboð ennþá.",
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
       "renameAccessibility": "Endurnefna lotu: {{title}}",
@@ -2175,6 +2190,8 @@
       "leaveChanges": "Halda breytingum",
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",
+      "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
+      "connectProviderToStart": "Tengdu þjónustuveitanda til að byrja.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",
       "prefillRepoAndModelUnavailable": "Kóðasafn og líkan upprunalegu lotunnar eru ekki lengur tiltæk. Veldu ný hér að neðan.",
@@ -2550,6 +2567,7 @@
       "selectModelBeforeSending": "Veldu líkan áður en þú sendir.",
       "preparingPlaceholder": "Undirbýr umhverfi...",
       "finalizingPlaceholder": "Lýkur verkefninu...",
+      "sessionLoadFailed": "Ekki tókst að hlaða lotunni. Reyndu aftur fyrst.",
       "cannotReceiveFiles": "Þessi lota getur ekki tekið við skrám. Fjarlægðu viðhengin til að senda skilaboðin.",
       "couldNotAttachFiles": "Ekki tókst að hengja skrárnar við. Ýttu á sendihnappinn til að reyna aftur.",
       "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
@@ -2619,6 +2637,7 @@
       "provider": "Veitandi",
       "totalCost": "Heildarkostnaður",
       "usageReflectsLatest": "Notkunin miðast við síðasta fullgerða svar aðstoðarmannsins.",
+      "usageUnavailable": "Notkun samhengis er ekki tiltæk",
       "tokenUsage": "Tókanotkun",
       "cacheRate": "Skyndiminnishlutfall",
       "modelsCount": "Líkön ({{displayCount}})",
@@ -2653,7 +2672,10 @@
     "markdownImage": {
       "load": "Hlaða",
       "loadWithHost": "Hlaða mynd frá {{host}}",
-      "httpsOnly": "Aðeins er hægt að hlaða myndum með HTTPS."
+      "httpsOnly": "Aðeins er hægt að hlaða myndum með HTTPS.",
+      "trustTitle": "Hlaða mynd frá {{host}}?",
+      "trustMessage": "Að treysta {{host}} hleður myndum þess án þess að spyrja í hvert sinn. Þú getur afturkallað það síðar undir Traustir vefþjónar.",
+      "loadOnce": "Hlaða einu sinni"
     },
     "markdownLink": {
       "invalidLink": "Ekki er hægt að opna þennan tengil.",
@@ -2760,7 +2782,8 @@
     "optionsExpiredDescription": "Farðu til baka á fyrri skjá og opnaðu valgluggann aftur."
   },
   "sessionRow": {
-    "needsInput": "BÍÐUR EFTIR SVARI"
+    "needsInput": "BÍÐUR EFTIR SVARI",
+    "scheduled": "ÁÆTLAÐ"
   },
   "voiceInput": {
     "listening": "Hlusta…",
@@ -3165,7 +3188,12 @@
     "subtitle": "Vefþjónar sem tenglar mega opna án staðfestingar",
     "emptyTitle": "Engir traustir vefþjónar",
     "emptyDescription": "Þegar þú treystir vefþjóni opnast tenglar á hann án þess að beðið sé um staðfestingu aftur.",
+    "imagesSectionTitle": "Traustir myndavefþjónar",
+    "imagesSectionDescription": "Myndir frá þessum vefþjónum hlaðast án þess að spyrja aftur.",
+    "imagesSectionEmpty": "Engir traustir myndavefþjónar",
     "revoke": "Afturkalla traust á {{host}}",
+    "revokeMessage": "Tenglar á þennan vefþjón munu biðja um staðfestingu aftur.",
+    "revokeImageMessage": "Myndir frá þessum vefþjóni munu biðja um staðfestingu aftur.",
     "backToPreferences": "Til baka í stillingar"
   },
   "quickChat": {
@@ -3195,7 +3223,8 @@
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
     "openSession": "Opna",
     "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
-    "newestResult": "Nýjasta niðurstaðan"
+    "newestResult": "Nýjasta niðurstaðan",
+    "scheduledWakes": "vaknar {{time}}"
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
@@ -3429,5 +3458,17 @@
       "unboundToast": "Geymsla óbundin",
       "unbindFailed": "Ekki tókst að aftengja geymslu"
     }
+  },
+  "credits": {
+    "title": "Kaupa inneign",
+    "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
+    "packLabel": "Bæta við {{amount}} í inneign",
+    "priceUnavailable": "Verð ekki tiltækt",
+    "purchased": "Inneign hefur verið bætt við stöðuna þína.",
+    "empty": "Inneignarpakkar eru ekki tiltækir núna.",
+    "noMatchingProducts": "App Store skilaði engum samsvarandi inneignarpökkum.",
+    "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
+    "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
+    "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   }
 }

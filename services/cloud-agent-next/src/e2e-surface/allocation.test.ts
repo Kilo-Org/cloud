@@ -1,31 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { allocationFixture } from '../sandbox-state/model/allocation-fixtures.js';
+import {
+  initialAllocationState,
+  type AllocationView,
+} from '../control-plane/sandbox/allocation.js';
 import { projectAllocationInspection } from './allocation.js';
 
 const SANDBOX_ID = 'usr-000000000abc';
-const INTENT = { intentId: 'e2e-intent', createdAt: 1 };
 
-function record(fixture: Parameters<typeof allocationFixture>[0]) {
-  const built = allocationFixture(fixture);
-  if (!built) throw new Error('unrepresentable fixture');
-  return built;
+function view(overrides: Partial<AllocationView>): AllocationView {
+  return { ...initialAllocationState(), provider: 'cloudflare', ...overrides };
 }
 
 describe('projectAllocationInspection', () => {
-  it('reports nothing for an initial stopped record', () => {
-    expect(projectAllocationInspection(SANDBOX_ID, record({ state: 'stopped' }))).toEqual({
+  it('reports nothing for a session that never owned an allocation', () => {
+    expect(projectAllocationInspection(SANDBOX_ID, view({}))).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
       physicalState: null,
     });
   });
 
-  it('reports no live provider reference for a stopped record with a historical summary', () => {
+  it('reports a stopped allocation without a live provider reference', () => {
     expect(
-      projectAllocationInspection(
-        SANDBOX_ID,
-        record({ state: 'stopped', providerRef: 'provider-ref-9' })
-      )
+      projectAllocationInspection(SANDBOX_ID, view({ allocationId: 'alloc-1', kind: 'stopped' }))
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
@@ -33,9 +30,22 @@ describe('projectAllocationInspection', () => {
     });
   });
 
+  it('reports an unconfirmed stop as unknown with the surviving reference', () => {
+    expect(
+      projectAllocationInspection(
+        SANDBOX_ID,
+        view({ kind: 'stopped', unconfirmedProviderRef: 'provider-ref-9' })
+      )
+    ).toEqual({
+      logicalSandboxId: SANDBOX_ID,
+      physicalProviderRef: 'provider-ref-9',
+      physicalState: 'unknown',
+    });
+  });
+
   it('reports creating before a provider reference exists', () => {
     expect(
-      projectAllocationInspection(SANDBOX_ID, record({ state: 'creating', createIntent: INTENT }))
+      projectAllocationInspection(SANDBOX_ID, view({ kind: 'starting', allocationId: 'alloc-1' }))
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
@@ -43,16 +53,29 @@ describe('projectAllocationInspection', () => {
     });
   });
 
-  it('reports a running allocation by its provider reference', () => {
+  it('reports a connected allocation as running by its provider reference', () => {
     expect(
       projectAllocationInspection(
         SANDBOX_ID,
-        record({ state: 'running', providerRef: 'provider-ref-9', createIntent: INTENT })
+        view({ kind: 'connected', allocationId: 'alloc-1', providerRef: 'provider-ref-9' })
       )
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: 'provider-ref-9',
       physicalState: 'running',
+    });
+  });
+
+  it('reports a stopping allocation with its provider reference', () => {
+    expect(
+      projectAllocationInspection(
+        SANDBOX_ID,
+        view({ kind: 'stopping', allocationId: 'alloc-1', providerRef: 'provider-ref-9' })
+      )
+    ).toEqual({
+      logicalSandboxId: SANDBOX_ID,
+      physicalProviderRef: 'provider-ref-9',
+      physicalState: 'stopping',
     });
   });
 });

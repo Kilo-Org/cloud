@@ -62,7 +62,6 @@ describe('createServiceState', () => {
 
       state.process({ type: 'session.status', sessionId: 'unknown-1', status: { type: 'busy' } });
 
-      // Non-root session doesn't affect activity
       expect(state.getActivity()).toEqual({ type: 'connecting' });
     });
 
@@ -72,7 +71,6 @@ describe('createServiceState', () => {
 
       state.process({ type: 'session.status', sessionId: 'child-1', status: { type: 'busy' } });
 
-      // Activity remains busy (set manually above), not changed by child
       expect(state.getActivity()).toEqual({ type: 'busy' });
     });
 
@@ -121,7 +119,6 @@ describe('createServiceState', () => {
 
     it('idle status on root transitions any non-idle activity to idle', () => {
       const state = createServiceState(makeConfig());
-      // Activity starts as 'connecting'
       expect(state.getActivity()).toEqual({ type: 'connecting' });
 
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'idle' } });
@@ -145,6 +142,45 @@ describe('createServiceState', () => {
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
 
       expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+
+    it('scheduled on root sets a scheduled status with its wake time and idles the activity', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
+
+      state.process({
+        type: 'session.status',
+        sessionId: 'root-1',
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+    });
+
+    it('scheduled without a wake time yields a scheduled status with no time', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'scheduled' } });
+
+      expect(state.getStatus()).toEqual({ type: 'scheduled' });
+      expect(state.getStatus()).not.toHaveProperty('scheduledAt');
+    });
+
+    it('scheduled on a child does not repaint the root status', () => {
+      const state = createServiceState(makeConfig());
+      state.setStatus({ type: 'error', message: 'previous error' });
+
+      state.process({
+        type: 'session.status',
+        sessionId: 'child-1',
+        status: { type: 'scheduled' },
+      });
+
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'previous error' });
     });
   });
 
@@ -397,14 +433,11 @@ describe('createServiceState', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
 
-      // First turn: error + stopped
       state.process({ type: 'stopped', reason: 'error' });
       onError.mockClear();
 
-      // New turn: busy resets terminated
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
 
-      // session.error should now fire
       state.process({ type: 'session.error', error: 'New error' });
 
       expect(onError).toHaveBeenCalledWith('New error');
@@ -1183,7 +1216,6 @@ describe('createServiceState', () => {
 
     it('defaults activity to idle when sessionStatus is absent', () => {
       const state = createServiceState(makeConfig());
-      // Verify we start in 'connecting'
       expect(state.getActivity()).toEqual({ type: 'connecting' });
       // Connected event without sessionStatus (server has no execution-derived state)
       state.process({ type: 'connected' });
@@ -1214,17 +1246,14 @@ describe('createServiceState', () => {
 
     it('clears question when not provided on reconnect', () => {
       const state = createServiceState(makeConfig());
-      // Set a question via question.asked
       state.process({ type: 'question.asked', requestId: 'req-stale' });
       expect(state.getQuestion()).not.toBeNull();
-      // Reconnect without question — it was answered while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(state.getQuestion()).toBeNull();
     });
 
     it('clears permission when not provided on reconnect', () => {
       const state = createServiceState(makeConfig());
-      // Set a permission via permission.asked
       state.process({
         type: 'permission.asked',
         requestId: 'perm-stale',
@@ -1234,7 +1263,6 @@ describe('createServiceState', () => {
         always: [],
       });
       expect(state.getPermission()).not.toBeNull();
-      // Reconnect without permission — it was resolved while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(state.getPermission()).toBeNull();
     });
@@ -1242,10 +1270,8 @@ describe('createServiceState', () => {
     it('fires onQuestionResolved when clearing stale question on reconnect', () => {
       const onQuestionResolved = jest.fn();
       const state = createServiceState(makeConfig({ onQuestionResolved }));
-      // Set a question
       state.process({ type: 'question.asked', requestId: 'req-stale' });
       onQuestionResolved.mockClear();
-      // Reconnect — question was answered while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(onQuestionResolved).toHaveBeenCalledWith('req-stale');
     });
@@ -1253,7 +1279,6 @@ describe('createServiceState', () => {
     it('fires onPermissionResolved when clearing stale permission on reconnect', () => {
       const onPermissionResolved = jest.fn();
       const state = createServiceState(makeConfig({ onPermissionResolved }));
-      // Set a permission
       state.process({
         type: 'permission.asked',
         requestId: 'perm-stale',
@@ -1263,7 +1288,6 @@ describe('createServiceState', () => {
         always: [],
       });
       onPermissionResolved.mockClear();
-      // Reconnect — permission was resolved while disconnected
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(onPermissionResolved).toHaveBeenCalledWith('perm-stale');
     });
@@ -1272,7 +1296,6 @@ describe('createServiceState', () => {
       const onQuestionResolved = jest.fn();
       const onPermissionResolved = jest.fn();
       const state = createServiceState(makeConfig({ onQuestionResolved, onPermissionResolved }));
-      // Connect with no prior question/permission
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
       expect(onQuestionResolved).not.toHaveBeenCalled();
       expect(onPermissionResolved).not.toHaveBeenCalled();
@@ -1281,12 +1304,9 @@ describe('createServiceState', () => {
     it('clears terminated flag', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
-      // Terminate
       state.process({ type: 'stopped', reason: 'error' });
       onError.mockClear();
-      // Connect
       state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
-      // session.error should fire again
       state.process({ type: 'session.error', error: 'New error' });
       expect(onError).toHaveBeenCalledWith('New error');
     });
@@ -1612,7 +1632,6 @@ describe('createServiceState', () => {
     it('returns to initial state', () => {
       const state = createServiceState(makeConfig());
 
-      // Mutate all state
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({
         type: 'session.created',
@@ -1690,7 +1709,6 @@ describe('createServiceState', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));
 
-      // Turn 1: busy → error stopped
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       state.process({ type: 'stopped', reason: 'error' });
       expect(state.getStatus()).toEqual({
@@ -1699,12 +1717,10 @@ describe('createServiceState', () => {
         code: 'session-terminated',
       });
 
-      // Turn 2: busy resets everything
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
       expect(state.getActivity()).toEqual({ type: 'busy' });
       expect(state.getStatus()).toEqual({ type: 'idle' });
 
-      // session.error now works again
       onError.mockClear();
       state.process({ type: 'session.error', error: 'Turn 2 error' });
       expect(onError).toHaveBeenCalledWith('Turn 2 error');

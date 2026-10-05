@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Dib u noqo",
     "idle": "Hawl la'aan",
+    "scheduled": "La qorsheeyay",
     "keepEditing": "Sii wad wax ka beddelka",
     "keepRunning": "Sii wad socodsiinta",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
     "bonusCreditsExpiring": "Lacag gunno ah oo dhan {{amount}} ayaa dhacaysa {{date}}.",
-    "creditBalanceEmpty": "Lacagtii isticmaalka way kaa dhammaatay. Lacagta akoonkan waxaa laga maamulaa meel ka baxsan barnaamijka iOS.",
     "signOutTitle": "Ma ka baxaysaa?",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "deleteAccountTitle": "Ma tirtiraysaa akoonka?",
@@ -240,6 +240,7 @@
     "addPasskey": "Ku dar furaha gelitaanka",
     "passkeyDefaultName": "Furaha gelitaanka",
     "passkeyAddedOn": "La daray {{date}}",
+    "passkeyLastUsedOn": "Markii ugu dambeysay la isticmaalay {{date}}",
     "passkeyAdded": "Furaha gelitaanka waa la daray.",
     "passkeyAddFailed": "Lama dari karin furaha gelitaanka. Isku day mar kale.",
     "passkeyAddUnsupported": "Qalabkan ma abuuri karo furahayaasha gelitaanka.",
@@ -566,7 +567,14 @@
       "deletedUser": "isticmaale la tirtiray",
       "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya.",
-      "moreLinesAbove_other": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya."
+      "moreLinesAbove_other": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya.",
+      "deleteComment": "Tirtir faallada",
+      "deleteCommentTitle": "Tirtir faallada?",
+      "deleteCommentMessage": "Faalladan waxaa laga tirtiri doonaa codsiga isku-darka.",
+      "commentEditFailed": "Faaladaada lama kaydin karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "commentEditUnavailable": "Faalladan lama tafatiri karo. Waxaa laga yaabaa in la tirtiray.",
+      "commentDeleteFailed": "Faaladaada lama tirtiri karin. Hubi xiriirkaaga oo mar kale isku day.",
+      "commentDeleteUnavailable": "Faalladan lama tirtiri karo."
     },
     "couldNotOpenGitHubAppSettings": "Dejinta abka GitHub lama furi karin.",
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
     "announce": {
       "commentPosted": "Faallada waa la daabacay",
+      "commentUpdated": "Faallada waa la cusboonaysiiyay",
+      "commentDeleted": "Faallada waa la tirtiray",
       "reviewSubmitted": "Dib-u-eegista waa la gudbiyay",
       "autoMergeEnabled": "Isku-darka tooska ah waa la daaray"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Kalfadhiyada firfircoon lama soo rari karin.",
       "couldNotRefresh": "Lama cusboonaysiin karin",
       "noSessionsYetDescription": "Taleefankaaga ka bilow hawl koodh-qoris ah. Kalfadhiyadaada ayaa halkan ka soo muuqan doona.",
+      "viewHistory": "Taariikhda kalfadhiyada",
       "noMatches": "Ma jiraan kalfadhiyo u dhigma",
       "tryDifferentSearch": "Isku day erey kale oo raadinta ah.",
       "tryAdjustFilters": "Isku day inaad wax ka beddesho shaandhooyinkaaga ama ka saarto.",
       "couldNotSearch": "Kalfadhiyada lama raadin karin.",
       "completedWillAppear": "Kalfadhiyada la dhammaystiray halkan ayay soo muuqan doonaan.",
       "noPastSessions": "Ma jiraan kalfadhiyo hore",
+      "pastSessions": "Kalfadhiyo hore",
       "live": "TOOS AH",
       "updating": "Waa la cusboonaysiinayaa"
     },
@@ -2035,6 +2047,7 @@
       "idCopied": "ID-ga kalfadhiga waa la nuqulay",
       "couldNotCopyId": "ID-ga kalfadhiga nuqul lagama samayn karin.",
       "untitled": "Kalfadhi aan magac lahayn",
+      "actions": "Tallaabooyinka kalfadhiga",
       "sessionDeleted": "Kalfadhiga waa la tirtiray",
       "needsInput": "jawaab sugaya",
       "fromPlatform": "ka yimid {{platform}}",
@@ -2085,7 +2098,9 @@
       "renamePlaceholder": "Magaca kalfadhiga",
       "transcriptAccessibility": "Qoraalka kalfadhiga",
       "readOnly": "Kalfadhigan waa la akhrin karaa oo keliya.",
+      "continueInNewSession": "Sii wad kalfadhi cusub",
       "emptyDescription": "Farriin ku dir meesha hoose si aad u bilowdo.",
+      "emptyTranscriptDescription": "Kalfadhigan weli ma laha farriimo.",
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
@@ -2175,6 +2190,8 @@
       "leaveChanges": "Ka tag isbeddellada",
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
+      "selectRepositoryToStart": "Dooro kayd si aad u bilowdo.",
+      "connectProviderToStart": "Ku xidh bixiye si aad u bilowdo.",
       "promptPlaceholder": "Maxaad rabtaa inaad ka shaqayso?",
       "couldNotLoadModels": "Moodeellada lama soo shubi karin.",
       "prefillRepoAndModelUnavailable": "Kaydka iyo moodeelka kalfadhigii asalka ahaa mar dambe lama heli karo. Hoos ka dooro kuwo kale.",
@@ -2550,6 +2567,7 @@
       "selectModelBeforeSending": "Dooro moodeel ka hor intaadan dirin.",
       "preparingPlaceholder": "Deegaanka waa la diyaarinayaa...",
       "finalizingPlaceholder": "Waa la dhammaystirayaa...",
+      "sessionLoadFailed": "Seshan lama soo gelin karin. Marka hore mar kale isku day.",
       "cannotReceiveFiles": "Kalfadhigan ma qaabili karo faylal. Ka saar lifaaqyada si aad u dirto farriintaada.",
       "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo Dir si aad mar kale isku daydo.",
       "discardAttachmentsMessage": "Faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
@@ -2619,6 +2637,7 @@
       "provider": "Bixiyaha",
       "totalCost": "Kharashka guud",
       "usageReflectsLatest": "Isticmaalku wuxuu muujinayaa jawaabtii ugu dambaysay ee kaaliyuhu dhammeeyay.",
+      "usageUnavailable": "Isticmaalka context lama heli karo",
       "tokenUsage": "Isticmaalka halbeegyada qoraalka",
       "cacheRate": "Heerka kaydka ku meelgaarka ah",
       "modelsCount": "Moodeellada ({{displayCount}})",
@@ -2653,7 +2672,10 @@
     "markdownImage": {
       "load": "Soo shub",
       "loadWithHost": "Soo shub {{host}}",
-      "httpsOnly": "Sawirrada HTTPS oo keliya ayaa la oggol yahay."
+      "httpsOnly": "Sawirrada HTTPS oo keliya ayaa la oggol yahay.",
+      "trustTitle": "Soo shub sawirka ka yimid {{host}}?",
+      "trustMessage": "Aaminka {{host}} wuxuu soo shubaa sawirradiisa adigoon mar walba weydiin. Waxaad mar dambe ka noqon kartaa Martigeliyeyaasha la aaminay.",
+      "loadOnce": "Soo shub hal mar"
     },
     "markdownLink": {
       "invalidLink": "Xiriiriyahan lama furi karo.",
@@ -2760,7 +2782,8 @@
     "optionsExpiredDescription": "Dib u noqo oo xulahan mar kale ka fur shaashaddii hore."
   },
   "sessionRow": {
-    "needsInput": "JAWAAB SUGAYA"
+    "needsInput": "JAWAAB SUGAYA",
+    "scheduled": "LA QORSHEEYAY"
   },
   "voiceInput": {
     "listening": "Waa la dhegaysanayaa...",
@@ -3165,7 +3188,12 @@
     "subtitle": "Martigeliyeyaasha aad oggolaatay in la furo adigoon la weydiin",
     "emptyTitle": "Ma jiraan martigeliyeyaal la aaminay",
     "emptyDescription": "Markaad aaminto martigeliyaha xiriiriyaha, xiriiriyuhu wuu furmaa adigoon mar kale la weydiin.",
+    "imagesSectionTitle": "Martigeliyeyaasha sawirka la aaminay",
+    "imagesSectionDescription": "Sawirrada martigeliyeyaashan waxaa la soo shubaa adigoon mar kale weydiin.",
+    "imagesSectionEmpty": "Ma jiraan martigeliyeyaal sawir la aaminay",
     "revoke": "Ka noqo aaminaadda {{host}}",
+    "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
+    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
     "backToPreferences": "Ku noqo doorashooyinka"
   },
   "quickChat": {
@@ -3195,7 +3223,8 @@
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
     "openSession": "Fur",
     "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo.",
-    "newestResult": "Natiijada ugu cusub"
+    "newestResult": "Natiijada ugu cusub",
+    "scheduledWakes": "wuxuu soo toosaa {{time}}"
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",
@@ -3429,5 +3458,17 @@
       "unboundToast": "Dib u fur fur",
       "unbindFailed": "Waa la furi waayay repo"
     }
+  },
+  "credits": {
+    "title": "Iibso lacag adeeg",
+    "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
+    "packLabel": "Ku dar {{amount}} oo lacag adeeg ah",
+    "priceUnavailable": "Qiimaha lama heli karo",
+    "purchased": "Lacag adeeg ayaa lagu daray dheelitirkaaga.",
+    "empty": "Xirmooyinka lacagta adeeg hadda lama heli karo.",
+    "noMatchingProducts": "App Store ma soo celin xirmooyin lacag adeeg oo u dhigma.",
+    "noMatchingProductsPlay": "Google Play ma soo celin xirmooyin lacag adeeg oo u dhigma.",
+    "purchaseOwnedByAnotherAccount": "Lacagta adeeg ee ku jirta Apple Account-kan waxaa leh akoon kale oo Kilo ah. Isticmaalka, soo gal akoonkaas Kilo.",
+    "purchaseOwnedByAnotherAccountPlay": "Lacagta adeeg ee ku yaal xisaabtan Google Play waxaa leh koonto Kilo oo kale. Isticmaalka, ku saxiix bax koontada Kilo-ga ah."
   }
 }

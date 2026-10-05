@@ -2,6 +2,7 @@ import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
+import { dateTimeFormat } from '@/lib/intl-cache';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -136,6 +137,23 @@ export function projectOptionKey(gitUrl: string): string {
  */
 export function formatMeta(timestamp: string, nowMs?: number): string {
   return timeAgo(parseTimestamp(timestamp), undefined, nowMs).toLocaleUpperCase(i18n.language);
+}
+
+/**
+ * Clock time of a scheduled session's wake, in the active language
+ * (e.g. `"9:00 AM"`), for the `SCHEDULED · <wake>` eyebrow.
+ *
+ * Returns `null` when the timestamp does not parse, so a missing or garbage
+ * `scheduledAt` shows the `SCHEDULED` label with no time rather than an
+ * `"Invalid Date"` or a midnight that the CLI never reported. The caller
+ * appends the value only when it is non-null.
+ */
+export function formatScheduledWake(at: string): string | null {
+  const date = parseTimestamp(at);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return dateTimeFormat(i18n.language, { hour: 'numeric', minute: '2-digit' }).format(date);
 }
 
 /**

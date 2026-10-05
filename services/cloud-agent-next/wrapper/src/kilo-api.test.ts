@@ -698,6 +698,35 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     }
   });
 
+  it('probes one tool part and returns only metadata', async () => {
+    const stub = startStub(200, {
+      info: { id: 'assistant_1', role: 'assistant' },
+      parts: [
+        {
+          id: 'part_1',
+          type: 'tool',
+          sessionID: 'ses_1',
+          messageID: 'assistant_1',
+          tool: 'bash',
+          state: { status: 'completed', input: { command: 'secret' }, output: 'é', title: 'run' },
+        },
+      ],
+    });
+    const result = await createClient(stub.url).probeMessagePart?.(
+      'ses_1',
+      '/workspace/exact',
+      'assistant_1',
+      'part_1',
+      new AbortController().signal
+    );
+    expect(result).toEqual({ status: 'completed', outputBytes: 2 });
+    expect(stub.requests[0]).toMatchObject({
+      method: 'GET',
+      pathname: '/session/ses_1/message/assistant_1',
+      directory: '/workspace/exact',
+    });
+  });
+
   it('accepts genuinely empty successful session status and pending-input results', async () => {
     expect(await createClient(startStub(200, {}).url).getSessionStatuses()).toEqual({});
     expect(await createClient(startStub(200, []).url).getQuestions()).toEqual([]);

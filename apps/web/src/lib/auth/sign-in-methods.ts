@@ -1,4 +1,4 @@
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 
 const supportedProviders = new Set<string>(ProdNonSSOAuthProviders);

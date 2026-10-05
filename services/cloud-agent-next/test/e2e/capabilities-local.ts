@@ -10,14 +10,27 @@
  * Docker inspection.
  */
 
+import { createDrizzleClient, cloud_agent_session_runs } from '@kilocode/db';
+import { and, eq } from 'drizzle-orm';
 import {
+  captureControlPlaneWrapperProcess,
   captureControlWrapperProcess,
+  containerGitRemoteUrl,
+  containerProcessEnvironment,
+  containerProcessIsLive,
+  CONTROL_PLANE_WRAPPER_BASENAME,
+  findControlPlaneKiloRuntime,
+  inspectControlPlaneSummaryCount,
+  inspectControlPlaneUserMessageParts,
+  LEGACY_CONTROL_WRAPPER_BASENAME,
   recycleControlConnection,
   signalKiloServerProcess,
   waitForNewSandboxPresent,
+  type KiloServerProcessHandle,
 } from './sandbox-control.js';
 import {
   currentOwnedSandbox,
+  reclaimOwnedSandboxes,
   snapshotSandboxIds,
   stopOwnedSandboxFamily,
   waitForOwnedSandbox,
@@ -38,6 +51,9 @@ import { startCallbackServer, type CallbackRecord } from './callback-server.js';
 import type {
   CallbackObservation,
   CallbackPayload,
+  ControlPlaneRuntimeObservation,
+  ReportRow,
+  ReportsObservation,
   SandboxFaultAllocation,
   SandboxFaultObservation,
   SandboxFaultTarget,
@@ -155,6 +171,15 @@ export function createLocalCallbacks(): CallbackObservation {
 function createLocalSandboxFaults(): SandboxFaultObservation {
   /** Frozen wrapper handles keyed by cloudAgentSessionId, for exact `CONT`. */
   const frozenHandles = new Map<string, Awaited<ReturnType<typeof captureControlWrapperProcess>>>();
+  /**
+   * Frozen Kilo-server handles keyed by cloudAgentSessionId. A stopped Kilo
+   * cannot answer discovery, so `unfreezeKiloServerProcess` must reuse this
+   * captured handle rather than rediscovering the process.
+   */
+  const frozenKiloHandles = new Map<
+    string,
+    Awaited<ReturnType<typeof captureControlWrapperProcess>>
+  >();
 
   const requireOwnedContainer = async (
     target: SandboxFaultAllocation
@@ -164,7 +189,14 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
         `sandboxFaults: refusing to act without an observed allocation reference for ${target.cloudAgentSessionId}`
       );
     }
-    const container = await currentOwnedSandbox(target.cloudAgentSessionId, target.kiloSessionId);
+    // One docker ownership scan can miss under load: `findControlPlaneKiloRuntime`
+    // is invoked once per candidate and a single timed-out exec makes the shot
+    // return null. Retry before refusing to act.
+    let container = await currentOwnedSandbox(target.cloudAgentSessionId, target.kiloSessionId);
+    for (let attempt = 1; container === null && attempt < 4; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      container = await currentOwnedSandbox(target.cloudAgentSessionId, target.kiloSessionId);
+    }
     if (!container) {
       throw new Error(
         `sandboxFaults: no exclusively owned container for ${target.cloudAgentSessionId}`
@@ -192,6 +224,27 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     `${handle.containerId}:${handle.processId}`;
 
   /**
+   * Capture a control wrapper by plane. Absent basename means the legacy
+   * wrapper; new-plane scenarios pass the control-plane basename so a legacy
+   * container is never matched and vice versa.
+   */
+  const captureWrapper = async (
+    containerId: string,
+    wrapperProcessBasename?: string
+  ): Promise<KiloServerProcessHandle> => {
+    if (wrapperProcessBasename === CONTROL_PLANE_WRAPPER_BASENAME) {
+      return captureControlPlaneWrapperProcess(containerId);
+    }
+    if (
+      wrapperProcessBasename !== undefined &&
+      wrapperProcessBasename !== LEGACY_CONTROL_WRAPPER_BASENAME
+    ) {
+      throw new Error(`sandboxFaults: unsupported wrapper basename ${wrapperProcessBasename}`);
+    }
+    return captureControlWrapperProcess(containerId);
+  };
+
+  /**
    * Prove the currently observed wrapper is the captured one before an
    * induction operation acts. This is a guard, never a rediscovery path: a
    * mismatch (or a wrapper that can no longer be observed) fails closed rather
@@ -202,7 +255,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
     target: SandboxFaultTarget
   ): Promise<void> => {
     const expected = requireExpectedWrapper(target);
-    const handle = await captureControlWrapperProcess(containerId);
+    const handle = await captureWrapper(containerId, target.wrapperProcessBasename);
     const observed = wrapperInstanceId(handle);
     if (observed !== expected) {
       throw new Error(
@@ -214,10 +267,31 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
   /** The one worker-log end cursor behind both cursor-shaped capability names. */
   const captureWorkerLogCursor = async (): Promise<number> => (await captureLogCursor()).fromByte;
 
+  /**
+   * Discover the `kilo serve` process for the session and bind it to the
+   * already-verified container. `findControlPlaneKiloRuntime` proves the root
+   * through the live Kilo listener; the container must be the owned allocation.
+   */
+  const captureKiloServerHandle = async (
+    containerId: string,
+    target: SandboxFaultAllocation
+  ): Promise<KiloServerProcessHandle> => {
+    const runtime = await findControlPlaneKiloRuntime(target.kiloSessionId);
+    if (!runtime) {
+      throw new Error(`sandboxFaults: no Kilo runtime for ${target.kiloSessionId}`);
+    }
+    if (runtime.container.id !== containerId) {
+      throw new Error(
+        `sandboxFaults: Kilo runtime container ${runtime.container.id} does not match owned ${containerId}`
+      );
+    }
+    return { containerId, processId: runtime.processId };
+  };
+
   return {
     captureWrapperIdentity: async allocation => {
       const container = await requireOwnedContainer(allocation);
-      const handle = await captureControlWrapperProcess(container.id);
+      const handle = await captureWrapper(container.id, allocation.wrapperProcessBasename);
       return { instanceId: wrapperInstanceId(handle), pid: handle.processId };
     },
     killOwnedContainer: async target => {
@@ -242,6 +316,23 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
         detail: `stopped ${container.name} (${killed.length} processes)`,
       };
     },
+    recycleWrapperSocket: async target => {
+      const container = await requireOwnedContainer(target);
+      const expected = requireExpectedWrapper(target);
+      const handle = await captureWrapper(container.id, target.wrapperProcessBasename);
+      const observed = wrapperInstanceId(handle);
+      if (observed !== expected) {
+        throw new Error(
+          `sandboxFaults: observed wrapper ${observed} does not match expected ${expected}`
+        );
+      }
+      await recycleControlConnection(handle);
+      return {
+        recycled: true,
+        pid: handle.processId,
+        detail: `recycled control wrapper pid=${handle.processId} in ${container.name}`,
+      };
+    },
     freezeWrapperProcess: async target => {
       const container = await requireOwnedContainer(target);
       const expected = requireExpectedWrapper(target);
@@ -250,7 +341,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
           `sandboxFaults: refusing to freeze ${target.cloudAgentSessionId}: a frozen wrapper handle is already outstanding`
         );
       }
-      const handle = await captureControlWrapperProcess(container.id);
+      const handle = await captureWrapper(container.id, target.wrapperProcessBasename);
       const observed = wrapperInstanceId(handle);
       if (observed !== expected) {
         throw new Error(
@@ -282,12 +373,86 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
       await signalKiloServerProcess(handle, 'CONT');
       frozenHandles.delete(target.cloudAgentSessionId);
     },
+    killWrapperProcess: async target => {
+      const container = await requireOwnedContainer(target);
+      const expected = requireExpectedWrapper(target);
+      const handle = await captureWrapper(container.id, target.wrapperProcessBasename);
+      const observed = wrapperInstanceId(handle);
+      if (observed !== expected) {
+        throw new Error(
+          `sandboxFaults: observed wrapper ${observed} does not match expected ${expected}`
+        );
+      }
+      await signalKiloServerProcess(handle, 'KILL');
+      frozenHandles.delete(target.cloudAgentSessionId);
+      return {
+        killed: true,
+        pid: handle.processId,
+        detail: `killed control wrapper pid=${handle.processId} in ${container.name}`,
+      };
+    },
+    killKiloServerProcess: async target => {
+      const container = await requireOwnedContainer(target);
+      await requireMatchingWrapper(container.id, target);
+      const handle = await captureKiloServerHandle(container.id, target);
+      await signalKiloServerProcess(handle, 'KILL');
+      frozenKiloHandles.delete(target.cloudAgentSessionId);
+      return {
+        killed: true,
+        pid: handle.processId,
+        detail: `killed kilo serve pid=${handle.processId} in ${container.name}`,
+      };
+    },
+    freezeKiloServerProcess: async target => {
+      const container = await requireOwnedContainer(target);
+      await requireMatchingWrapper(container.id, target);
+      if (frozenKiloHandles.has(target.cloudAgentSessionId)) {
+        throw new Error(
+          `sandboxFaults: refusing to freeze ${target.cloudAgentSessionId}: a frozen Kilo handle is already outstanding`
+        );
+      }
+      const handle = await captureKiloServerHandle(container.id, target);
+      await signalKiloServerProcess(handle, 'STOP');
+      frozenKiloHandles.set(target.cloudAgentSessionId, handle);
+      return {
+        frozen: true,
+        pid: handle.processId,
+        detail: `froze kilo serve pid=${handle.processId} in ${container.name}`,
+      };
+    },
+    unfreezeKiloServerProcess: async target => {
+      const handle = frozenKiloHandles.get(target.cloudAgentSessionId);
+      if (!handle) {
+        throw new Error(
+          `sandboxFaults: refusing to unfreeze ${target.cloudAgentSessionId}: no retained frozen Kilo handle`
+        );
+      }
+      const container = await requireOwnedContainer(target);
+      if (container.id !== handle.containerId) {
+        throw new Error(
+          `sandboxFaults: frozen Kilo container ${handle.containerId} does not match observed ${container.id}`
+        );
+      }
+      await requireMatchingWrapper(container.id, target);
+      await signalKiloServerProcess(handle, 'CONT');
+      frozenKiloHandles.delete(target.cloudAgentSessionId);
+    },
+    captureKiloServerIdentity: async allocation => {
+      const container = await requireOwnedContainer(allocation);
+      const handle = await captureKiloServerHandle(container.id, allocation);
+      return { pid: handle.processId };
+    },
+    kiloServerProcessExists: async (allocation, pid) => {
+      const container = await requireOwnedContainer(allocation);
+      return containerProcessIsLive(container.id, pid);
+    },
     captureEvidenceCursor: captureWorkerLogCursor,
     observeReapEvidence: async input => {
       if (!Number.isFinite(input.waitMs) || input.waitMs <= 0) {
         throw new Error(`sandboxFaults: invalid reap-evidence wait ${input.waitMs}`);
       }
       const required = (evidence: SandboxFaultReapEvidence): boolean => {
+        if (input.controlPlane) return evidence.providerStopObserved;
         if (!input.inflight) {
           return (
             evidence.physicalStopCause !== null &&
@@ -330,7 +495,9 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
         const allocationName =
           stop && typeof stop.allocationId === 'string'
             ? await deriveSandboxAllocationId(input.sandboxId, stop.allocationId)
-            : undefined;
+            : input.controlPlane
+              ? input.sandboxId
+              : undefined;
         evidence = collectReapEvidence(records, {
           reapedAllocationRef: input.reapedAllocationRef,
           sandboxId: input.sandboxId,
@@ -373,21 +540,27 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
       }
       if (attachRequestId === undefined) throw new Error('attach did not expose a request id');
 
-      // Refuse a replacement allocation or wrapper before acting, exactly as
-      // `freezeWrapperProcess` does.
+      // Refuse a replacement allocation before acting. The wrapper is captured
+      // at signal time so the new-plane scenario can recycle during attach
+      // instead of after a separate identity wait that loses the window.
       const target: SandboxFaultTarget = {
         cloudAgentSessionId: input.sessionId,
         kiloSessionId: input.kiloSessionId,
         expectedAllocationRef: input.containerId,
-        expectedWrapperInstanceId: input.expectedWrapperInstanceId,
+        expectedWrapperInstanceId: input.expectedWrapperInstanceId ?? 'pending',
+        ...(input.wrapperProcessBasename
+          ? { wrapperProcessBasename: input.wrapperProcessBasename }
+          : {}),
       };
       const container = await requireOwnedContainer(target);
-      const expected = requireExpectedWrapper(target);
-      const handle = await captureControlWrapperProcess(container.id);
+      const handle = await captureWrapper(container.id, input.wrapperProcessBasename);
       const observed = wrapperInstanceId(handle);
-      if (observed !== expected) {
+      if (
+        input.expectedWrapperInstanceId !== undefined &&
+        observed !== input.expectedWrapperInstanceId
+      ) {
         throw new Error(
-          `sandboxFaults: observed wrapper ${observed} does not match expected ${expected}`
+          `sandboxFaults: observed wrapper ${observed} does not match expected ${input.expectedWrapperInstanceId}`
         );
       }
 
@@ -484,7 +657,161 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
   };
 }
 
-export function createLocalScenarioEnvironment(): ScenarioEnvironment {
+/**
+ * The local profile's persisted-report observation (plan B11). The new plane's
+ * terminal report reaches the queue consumer, which writes one
+ * `cloud_agent_session_runs` row per message; a schema-invalid report is dropped
+ * there, so reading the row (not a worker-log line) is what proves the report
+ * survived. The harness queries it directly with `DATABASE_URL`. When no
+ * connection string is set the profile provides no `reports` and a
+ * report-dependent scenario is `unsupported`.
+ */
+export function createLocalReports(databaseUrl: string): ReportsObservation {
+  const client = createDrizzleClient({
+    connectionString: databaseUrl,
+    poolConfig: { application_name: 'cloud-agent-next-e2e-reports', max: 1 },
+  });
+
+  const readRow = async (
+    cloudAgentSessionId: string,
+    messageId: string
+  ): Promise<ReportRow | null> => {
+    const rows = await client.db
+      .select({
+        messageId: cloud_agent_session_runs.message_id,
+        status: cloud_agent_session_runs.status,
+        failureStage: cloud_agent_session_runs.failure_stage,
+        failureCode: cloud_agent_session_runs.failure_code,
+        failureResponsibility: cloud_agent_session_runs.failure_responsibility,
+        failureReason: cloud_agent_session_runs.failure_reason,
+        terminalAt: cloud_agent_session_runs.terminal_at,
+      })
+      .from(cloud_agent_session_runs)
+      .where(
+        and(
+          eq(cloud_agent_session_runs.cloud_agent_session_id, cloudAgentSessionId),
+          eq(cloud_agent_session_runs.message_id, messageId)
+        )
+      )
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      messageId: row.messageId,
+      status: row.status,
+      ...(row.failureStage === null ? {} : { failureStage: row.failureStage }),
+      ...(row.failureCode === null ? {} : { failureCode: row.failureCode }),
+      ...(row.failureResponsibility === null
+        ? {}
+        : { failureResponsibility: row.failureResponsibility }),
+      ...(row.failureReason === null ? {} : { failureReason: row.failureReason }),
+      ...(row.terminalAt === null ? {} : { terminalAt: row.terminalAt }),
+    };
+  };
+
+  return {
+    waitForReportRow: async input => {
+      const deadline = Date.now() + Math.max(1, input.timeoutMs);
+      for (;;) {
+        const row = await readRow(input.cloudAgentSessionId, input.messageId);
+        if (row) return row;
+        if (input.signal?.aborted || Date.now() >= deadline) return null;
+        await sleep(500);
+      }
+    },
+  };
+}
+
+/**
+ * The local profile's new-plane runtime proof. `proveNewPlane` captures the
+ * new-plane control wrapper in the owned container; a legacy container has no
+ * such process and the capture throws, so a `workspace_*` id alone can never
+ * false-pass as the new plane.
+ */
+export function createLocalControlPlaneRuntime(): ControlPlaneRuntimeObservation {
+  const requireContainer = async (
+    allocation: SandboxFaultAllocation
+  ): Promise<NonNullable<Awaited<ReturnType<typeof currentOwnedSandbox>>>> => {
+    if (!allocation.expectedAllocationRef) {
+      throw new Error(
+        `controlPlaneRuntime: refusing to inspect without an observed allocation for ${allocation.cloudAgentSessionId}`
+      );
+    }
+    const container = await currentOwnedSandbox(
+      allocation.cloudAgentSessionId,
+      allocation.kiloSessionId
+    );
+    if (!container) {
+      throw new Error(
+        `controlPlaneRuntime: no exclusively owned container for ${allocation.cloudAgentSessionId}`
+      );
+    }
+    if (container.id !== allocation.expectedAllocationRef) {
+      throw new Error(
+        `controlPlaneRuntime: observed container ${container.id} does not match expected ${allocation.expectedAllocationRef}`
+      );
+    }
+    return container;
+  };
+
+  return {
+    proveNewPlane: async allocation => {
+      const container = await requireContainer(allocation);
+      const handle = await captureControlPlaneWrapperProcess(container.id);
+      return { instanceId: `${handle.containerId}:${handle.processId}`, pid: handle.processId };
+    },
+    userMessageParts: async (allocation, userMessageId) => {
+      await requireContainer(allocation);
+      const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
+      if (!runtime) {
+        throw new Error(`controlPlaneRuntime: no Kilo runtime for ${allocation.kiloSessionId}`);
+      }
+      return inspectControlPlaneUserMessageParts(runtime, {
+        kiloSessionId: allocation.kiloSessionId,
+        userMessageId,
+      });
+    },
+    containerEnvironment: async allocation => {
+      await requireContainer(allocation);
+      const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
+      if (!runtime) {
+        throw new Error(`controlPlaneRuntime: no Kilo runtime for ${allocation.kiloSessionId}`);
+      }
+      return containerProcessEnvironment(runtime.container.id, runtime.processId);
+    },
+    gitRemoteUrl: async allocation => {
+      await requireContainer(allocation);
+      const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
+      if (!runtime) {
+        throw new Error(`controlPlaneRuntime: no Kilo runtime for ${allocation.kiloSessionId}`);
+      }
+      return containerGitRemoteUrl(runtime.container.id, runtime.directory);
+    },
+    summaryCount: async allocation => {
+      await requireContainer(allocation);
+      const runtime = await findControlPlaneKiloRuntime(allocation.kiloSessionId);
+      if (!runtime) {
+        throw new Error(`controlPlaneRuntime: no Kilo runtime for ${allocation.kiloSessionId}`);
+      }
+      const inspection = await inspectControlPlaneSummaryCount(runtime);
+      return inspection.summaryCount;
+    },
+  };
+}
+
+/**
+ * Mirror the Worker's containment parsing exactly
+ * (`session-registration.ts`: `!== 'false'`, so an absent value is enabled) so
+ * the harness reads the same `.dev.vars` source and there is no second flag to
+ * keep in sync.
+ */
+export function credentialContainmentEnabled(devVars: Record<string, string>): boolean {
+  return devVars.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
+}
+
+export function createLocalScenarioEnvironment(options?: {
+  credentialContainmentEnabled?: boolean;
+}): ScenarioEnvironment {
   const sandbox: SandboxObservation = {
     snapshotContainerIds: () => snapshotSandboxIds(),
     waitForOwnedContainer: async input => {
@@ -528,13 +855,30 @@ export function createLocalScenarioEnvironment(): ScenarioEnvironment {
     },
   };
 
+  const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
   return {
     profile: 'local',
     requireControlPlaneSession: false,
+    reclaimSessions: async sessions => {
+      const report = await reclaimOwnedSandboxes(sessions);
+      for (const failure of report.failures) {
+        console.warn(`sandbox reclaim: ${failure}; it stays until the idle stop`);
+      }
+    },
     sandbox,
     sessionSandbox,
     callbacks: createLocalCallbacks(),
     gates: { parkedStreamsSupported: true },
     sandboxFaults: createLocalSandboxFaults(),
+    controlPlaneRuntime: createLocalControlPlaneRuntime(),
+    // The report row lives in Postgres; without a connection string the
+    // report-dependent scenario is `unsupported`.
+    ...(databaseUrl ? { reports: createLocalReports(databaseUrl) } : {}),
+    // V2 is inert until C1 routes and launches it, so the operator opts in
+    // explicitly; without the flag V2 scenarios report `unsupported`.
+    ...(process.env.E2E_CONTROL_PLANE_V2 === '1' ? { controlPlaneV2: { ready: true } } : {}),
+    // Containment is a Worker `.dev.vars` setting; the harness reads the same
+    // source (passed in by the driver) instead of a second env flag.
+    ...(options?.credentialContainmentEnabled ? { credentialContainment: { enabled: true } } : {}),
   };
 }

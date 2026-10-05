@@ -1,14 +1,18 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 
-import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import {
+  GlanceableActiveCard,
+  GlanceableActiveCardSkeleton,
+} from '@/components/home/glanceable-active-card';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -18,8 +22,8 @@ import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
@@ -29,7 +33,6 @@ import { cn } from '@/lib/utils';
 
 // The trailing slash pins the index route.
 const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
-const MAX_ROWS = 3;
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
@@ -283,73 +286,57 @@ export function LiveSessionFeedback({
 export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const navigateToSession = useAgentSessionNavigator();
-  // One handler shared by every card row: with the row memoised, an unchanged
-  // payload leaves each row's props referentially stable and skips its render.
-  // The handler reads only the id, so it takes the shape it needs.
-  const handleRowPress = useCallback(
-    (session: { id: string }) => {
-      navigateToSession(session.id);
-    },
-    [navigateToSession]
-  );
+  const { reducedMotion } = useMotionPolicy();
+  const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
 
   return (
     <View>
-      <SectionHeader
-        label={t('home.agentSessions')}
-        actionLabel={t('home.seeAll')}
-        onActionPress={() => {
-          // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
-        }}
-      />
+      {/* An accepted empty live list renders only the `Nothing running right
+          now` card, so the `Live now` / See-all header would advertise the
+          Agents live index for sessions that do not exist. Rows and the
+          loading skeletons keep the header unchanged. */}
+      {content !== 'empty' && (
+        <SectionHeader
+          label={t('home.agentSessions')}
+          actionLabel={t('home.seeAll')}
+          onActionPress={() => {
+            // Switch tabs, then pop a previously pushed history screen to the live index.
+            router.navigate(AGENTS_INDEX_HREF as Href);
+            router.dismissTo(AGENTS_INDEX_HREF as Href);
+          }}
+        />
+      )}
       <View className="mx-4 gap-2">
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
           failureLabel={t('home.couldNotLoadActiveSessions')}
         />
-        {content === 'pending' && (
-          // The placeholder borrows the real row's geometry: the same card,
-          // the same row padding, and a 3px leading strip glued to the card
-          // edge like `SessionRow`'s `stripMode="edge"` in `AgentBadge`. The
-          // title/eyebrow therefore land on the same x-offset the arriving row
-          // draws, and the leading mark keeps its size, so replacing the
-          // placeholder with the row cannot reflow the LIVE NOW card.
-          <View className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card">
-            <View className="relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3">
-              <Skeleton className="absolute left-0 top-0 bottom-0 w-[3px] rounded-[2px]" />
-              <View className="flex-1 gap-2">
-                <Skeleton className="h-3 w-2/3 rounded" />
-                <Skeleton className="h-3 w-1/3 rounded" />
-              </View>
+        {/* One card, not a row per session: its frame and row heights are the
+            same in the pending and rows states (`GlanceableActiveCardSkeleton`
+            repeats `GlanceableActiveCard`'s box), so the swap cannot move the
+            header, feedback or the agent-create actions below. */}
+        <Animated.View layout={LinearTransition}>
+          {content === 'pending' && <GlanceableActiveCardSkeleton />}
+          {content === 'empty' && (
+            <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
+              <Text variant="muted" className="text-sm">
+                {t('home.noLiveSessions')}
+              </Text>
             </View>
-          </View>
-        )}
-        {content === 'empty' && (
-          <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
-            <Text variant="muted" className="text-sm">
-              {t('home.noLiveSessions')}
-            </Text>
-          </View>
-        )}
-        {content === 'rows' &&
-          sessions.activeSessions.slice(0, MAX_ROWS).map(session => (
-            <View
-              key={`active:${session.id}`}
-              className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card"
+          )}
+          {content === 'rows' && (
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
             >
-              <RemoteSessionRow
-                session={session}
-                variant="card"
-                interactive={false}
-                onPress={handleRowPress}
+              <GlanceableActiveCard
+                sessions={sessions.activeSessions}
+                onPressSession={handleRowPress}
               />
-            </View>
-          ))}
+            </Animated.View>
+          )}
+        </Animated.View>
       </View>
     </View>
   );

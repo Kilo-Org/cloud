@@ -201,6 +201,27 @@ const SIGNED_OUT_PROPS: Partial<GlanceableViewProps> = {
   accessibilityLabel: 'spoken label',
 };
 
+/** One scheduled session and nothing else: the wake rides beside its row. */
+const SCHEDULED_WAKE = '2026-09-24T09:00:00.000Z';
+
+const SCHEDULED_PROPS: Partial<GlanceableViewProps> = {
+  statusLine: null,
+  countLines: [
+    { label: 'Needs input', kind: 'needsInput', count: 0 },
+    { label: 'Working', kind: 'running', count: 0 },
+    { label: 'Scheduled', kind: 'scheduled', count: 1 },
+    { label: 'Idle', kind: 'idle', count: 0 },
+  ],
+  primaryLabel: 'Scheduled',
+  primaryKind: 'scheduled',
+  primaryCount: 1,
+  newestTitle: null,
+  actions: { approve: false, newAgent: false },
+  needsInputSince: null,
+  scheduledAt: SCHEDULED_WAKE,
+  accessibilityLabel: 'spoken label',
+};
+
 // ── mock-element tree helpers, shared with the render suite ─────────────────
 
 type MockElement = { kind: string; props: Record<string, unknown> };
@@ -225,6 +246,31 @@ function collectText(node: unknown): string[] {
 
 function collectOfKind(node: unknown, kind: string): MockElement[] {
   return collect(node).filter(element => element.kind === kind);
+}
+
+/**
+ * The scheduled wake: the one `Text` the layout draws as an absolute clock
+ * time (`dateStyle="time"`). The needs-input wait and the newest-result age are
+ * relative durations, so the style is what tells the wake apart.
+ */
+function wakeTexts(node: unknown): MockElement[] {
+  return collect(node).filter(
+    element => element.kind === 'Text' && element.props.dateStyle === 'time'
+  );
+}
+
+/** The count row whose own label is `label`, found through its direct children. */
+function countRowFor(node: unknown, label: string): MockElement | undefined {
+  return collect(node).find(element => {
+    const children = element.props.children;
+    return (
+      element.kind === 'HStack' &&
+      Array.isArray(children) &&
+      children.some(
+        child => (child as { props?: { children?: unknown } } | null)?.props?.children === label
+      )
+    );
+  });
 }
 
 /** Every `widgetURL` modifier argument anywhere in the tree. */
@@ -656,7 +702,7 @@ describe('runPendingWidgetActions', () => {
     // `none` is the shared contract's "caller opens the app instead": the
     // create had no draft, model, or repository, so the press lands on the
     // new-session screen — the same destination the Android twin opens.
-    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp://agent-chat/new');
+    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
   });
 
   it('hands an approve with nothing to act on to the agents list', async () => {
@@ -897,6 +943,37 @@ describe('activeAgentsWidgetLayout', () => {
     expect(slotHeight(reservedSlot(starting))).toBe(slotHeight(reservedSlot(approving)));
   });
 
+  // The owner's reported defect: a stored marker with a recognized action that
+  // the app never ran (the App Intent does not foreground the app) held
+  // "Starting…" on a settled idle-only tray. A settled surface must never draw
+  // the press line, whatever action the marker names.
+  it('never draws the press line on a settled, populated widget', () => {
+    const idleOnly: GlanceableWidgetProps = {
+      ...HAPPY_WAITING_PROPS,
+      countLines: [
+        { label: 'Needs input', kind: 'needsInput', count: 0 },
+        { label: 'Working', kind: 'running', count: 0 },
+        { label: 'Idle', kind: 'idle', count: 1 },
+      ],
+      primaryLabel: 'Idle',
+      primaryKind: 'idle',
+      primaryCount: 1,
+      pendingAction: 'new-agent',
+      pendingActionVisible: true,
+    };
+
+    for (const family of ['systemSmall', 'systemMedium', 'systemLarge'] as WidgetFamily[]) {
+      const text = collectText(renderWidget(idleOnly, family));
+      expect(text).not.toContain('Starting…');
+      expect(text).not.toContain('Approving…');
+    }
+    // The app's own newest line still reaches the reserved slot on the Home
+    // Screen families: only the transient press line is suppressed.
+    expect(collectText(renderWidget(idleOnly, 'systemMedium'))).toContain(
+      'Newest: Fix the flaky test'
+    );
+  });
+
   it('draws the New agent button for the empty state and no Approve button', () => {
     const tree = renderWidget(EMPTY_WIDGET_PROPS, 'systemSmall');
 
@@ -927,5 +1004,32 @@ describe('activeAgentsWidgetLayout', () => {
     );
     expect(styles).toContain('buttonStyle');
     expect(styles).toContain('controlSize');
+  });
+
+  // The large card is a wide card with a footer, so it draws the scheduled
+  // wake beside its row exactly as the medium card does — the same information
+  // the Android widget of that size shows. The small square has no room.
+  it('draws the scheduled wake in the large card, the same as the medium one', () => {
+    for (const family of ['systemMedium', 'systemLarge'] as WidgetFamily[]) {
+      const wake = wakeTexts(renderWidget(SCHEDULED_PROPS, family));
+
+      expect(wake).toHaveLength(1);
+      expect(wake[0]?.props.date).toEqual(new Date(SCHEDULED_WAKE));
+    }
+    expect(wakeTexts(renderWidget(SCHEDULED_PROPS, 'systemSmall'))).toEqual([]);
+  });
+
+  it('reserves the wake slot beside the scheduled row in the medium and large cards', () => {
+    for (const family of ['systemMedium', 'systemLarge'] as WidgetFamily[]) {
+      const row = countRowFor(renderWidget(SCHEDULED_PROPS, family), 'Scheduled');
+
+      // The trailing slot is laid out whether or not a wake is known, so a
+      // wake the CLI reports later cannot move the row.
+      expect(collect(row?.props.children).some(element => element.kind === 'Spacer')).toBe(true);
+    }
+    const smallRow = countRowFor(renderWidget(SCHEDULED_PROPS, 'systemSmall'), 'Scheduled');
+    expect(collect(smallRow?.props.children).some(element => element.kind === 'Spacer')).toBe(
+      false
+    );
   });
 });

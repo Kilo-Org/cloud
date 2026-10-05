@@ -4,6 +4,8 @@ import {
   setBillingContext,
   updateBillingContext,
   usageContextFromBillingContext,
+  ContainerUsageAdmissionError,
+  isNonRetryableSkuAdmissionError,
   type BillingContext,
   type BillingContextStorage,
   type BillingGenerationCloseCause,
@@ -38,6 +40,30 @@ const BILLING_FORCE_STOP_RETRY_SECONDS = 5;
 export type BillingIdentity = { sandboxClassName: SandboxClassName };
 
 export type ContainerStopParams = { reason: 'exit' | 'runtime_signal'; exitCode?: number };
+
+const sdkCallbackStateSchema = z.enum([
+  'running',
+  'healthy',
+  'stopping',
+  'stopped',
+  'stopped_with_code',
+]);
+
+type SdkStopFields = {
+  sdkCallbackState: z.infer<typeof sdkCallbackStateSchema> | 'unknown' | 'read_error';
+  sdkRecordedExitCodeAvailable: boolean;
+  sdkRecordedExitCode?: number;
+};
+
+/**
+ * Result of the pre-create interval open. The caller owns the decision to clear,
+ * fail the canonical create, or continue; this method never throws for a meter
+ * rejection.
+ */
+export type OpenIntervalOutcome =
+  | { kind: 'acked'; generation: string }
+  | { kind: 'definite_rejection'; generation: string; error: unknown }
+  | { kind: 'uncertain'; generation: string; error: unknown };
 
 export type MeteredBillingHost = {
   storage: BillingContextStorage;
@@ -79,6 +105,18 @@ const billingBlockSchema = z
 function startInputFromContext(context: BillingContext): ClientRecordStartInput {
   const { service: _service, ...usage } = usageContextFromBillingContext(context);
   return { ...usage, startEpochMs: context.startEpochMs };
+}
+
+/**
+ * Classify an admission failure from either a fresh `recordStart` or an
+ * `ensureStartAcknowledged` retry. A missing SKU or a budget rejection is
+ * definite; anything else (a transient meter outage) is uncertain.
+ */
+function isDefiniteAdmissionRejection(error: unknown): boolean {
+  return (
+    isNonRetryableSkuAdmissionError(error) ||
+    (error instanceof ContainerUsageAdmissionError && error.code === 'insufficient_credits')
+  );
 }
 
 function stoppedAtFromState(
@@ -146,8 +184,16 @@ export class MeteredBillingLifecycle {
         return { success: true };
       }
 
-      if (active && !active.measurementStarted && !block) {
-        return { success: true };
+      // An unmeasured context is admitted only when its start is already acknowledged and it
+      // carries no stop waiting for delivery. A pending stop must fall through to the
+      // stop-delivery path instead of being skipped.
+      if (active && !active.measurementStarted && !block && !active.pendingStop) {
+        const acknowledgedGeneration = await this.host.storage.get<string>(
+          START_ACK_GENERATION_STORAGE_KEY
+        );
+        if (acknowledgedGeneration === active.generation) {
+          return { success: true };
+        }
       }
 
       if (active?.measurementStarted && this.host.isContainerRunning()) {
@@ -192,12 +238,88 @@ export class MeteredBillingLifecycle {
       try {
         await this.host.usageClient.recordStart(startInputFromContext(context));
       } catch (error) {
-        await clearBillingContext(this.host.storage);
+        // Only a definite rejection of this fresh generation means the interval cannot exist.
+        // An uncertain error must keep the generation so a later attempt can settle it.
+        if (isDefiniteAdmissionRejection(error)) {
+          await clearBillingContext(this.host.storage);
+        }
         return billingAdmissionFailureFromError(error);
       }
       await this.host.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);
       await this.host.storage.delete(BILLING_BLOCK_STORAGE_KEY);
       return { success: true };
+    });
+  }
+
+  /**
+   * Pin the measurement cursor to an already-acknowledged start epoch without
+   * taking the billing queue again. The caller must already hold
+   * `runBillingExclusive`. Refuses (no write) unless the context matches the
+   * generation and no start/stop delivery is in flight.
+   */
+  private async pinAssumeHeld(generation: string, usageMeasuredAtMs: number): Promise<boolean> {
+    const context = await getBillingContext(this.host.storage);
+    if (!context) return false;
+    if (context.generation !== generation) return false;
+    if (context.measurementStarted) return false;
+    if (context.pendingHeartbeat) return false;
+    if (context.pendingStop) return false;
+    await updateBillingContext(this.host.storage, {
+      ...context,
+      measurementStarted: true,
+      usageMeasuredAtMs,
+    });
+    return true;
+  }
+
+  /**
+   * Acquire the billing queue, pin the alive cursor, and arm the measurement
+   * heartbeat. Keeps an existing cursor once `measurementStarted` is true, so a
+   * following `scheduleHeartbeat` does not restamp `Date.now()`.
+   */
+  async pinMeasurementCursor(generation: string, usageMeasuredAtMs: number): Promise<boolean> {
+    return this.runBillingExclusive(async () => {
+      const pinned = await this.pinAssumeHeld(generation, usageMeasuredAtMs);
+      await this.heartbeat.scheduleHeartbeat();
+      return pinned;
+    });
+  }
+
+  /**
+   * Open the billing interval before `createSandbox`. On a fresh generation this
+   * always attempts `recordStart`; on an existing generation it re-acknowledges
+   * instead of opening a second interval. It never clears the context or throws
+   * for a meter rejection; the caller decides.
+   */
+  async openIntervalBeforeCreate(
+    identity: BillingIdentity,
+    input: unknown
+  ): Promise<OpenIntervalOutcome> {
+    const parsed = parseSandboxBillingInput(input);
+    assertSandboxBillingAllocation(identity.sandboxClassName, parsed);
+    return this.runBillingExclusive(async () => {
+      await this.host.storage.put(PENDING_ATTRIBUTION_STORAGE_KEY, parsed);
+      const existing = await getBillingContext(this.host.storage);
+      if (existing) {
+        try {
+          await this.ensureStartAcknowledged(existing);
+          return { kind: 'acked', generation: existing.generation };
+        } catch (error) {
+          return isDefiniteAdmissionRejection(error)
+            ? { kind: 'definite_rejection', generation: existing.generation, error }
+            : { kind: 'uncertain', generation: existing.generation, error };
+        }
+      }
+      const context = await this.createBillingGeneration(identity, parsed, 'container-start');
+      try {
+        await this.ensureStartAcknowledged(context);
+      } catch (error) {
+        return isDefiniteAdmissionRejection(error)
+          ? { kind: 'definite_rejection', generation: context.generation, error }
+          : { kind: 'uncertain', generation: context.generation, error };
+      }
+      await this.host.storage.delete(BILLING_BLOCK_STORAGE_KEY);
+      return { kind: 'acked', generation: context.generation };
     });
   }
 
@@ -337,7 +459,7 @@ export class MeteredBillingLifecycle {
     // `onStop` is the first durable lifecycle signal after the container has
     // actually stopped. Do not use the earlier budget verdict or force-destroy
     // request as the usage boundary.
-    const stoppedAtMs = await this.getObservedStopTime();
+    const { stoppedAtMs, ...sdkStopFields } = await this.getObservedStopSnapshot();
     const activityExpiryRequested = this.activityExpiryRequested;
     this.activityExpiryRequested = false;
     this.runShadowTask(identity, 'stop lifecycle', async () => {
@@ -358,6 +480,7 @@ export class MeteredBillingLifecycle {
           exitCode: params?.exitCode,
           lifetimeMs: stoppedAtMs - context.startEpochMs,
           sessionId: context.sessionId,
+          ...sdkStopFields,
         })
         .info('Container stopped');
       const pending = await this.heartbeat.persistStop(
@@ -629,13 +752,38 @@ export class MeteredBillingLifecycle {
     return stored === undefined ? undefined : billingBlockSchema.parse(stored);
   }
 
-  private async getObservedStopTime(): Promise<number> {
+  private async getObservedStopSnapshot(): Promise<{ stoppedAtMs: number } & SdkStopFields> {
+    let stoppedAtMs: number | undefined;
+    let sdkStopFields: SdkStopFields = {
+      sdkCallbackState: 'read_error',
+      sdkRecordedExitCodeAvailable: false,
+    };
     try {
-      return stoppedAtFromState(await this.host.getState());
+      const state = await this.host.getState();
+      sdkStopFields.sdkCallbackState = 'unknown';
+      stoppedAtMs = stoppedAtFromState(state);
+      const parsedState = sdkCallbackStateSchema.safeParse(state?.status);
+      if (parsedState.success) sdkStopFields.sdkCallbackState = parsedState.data;
+      const code =
+        sdkStopFields.sdkCallbackState === 'stopped_with_code' ? state.exitCode : undefined;
+      // Retained SDK evidence is restricted to signed 32-bit integers, including zero.
+      if (
+        typeof code === 'number' &&
+        Number.isInteger(code) &&
+        code >= -2147483648 &&
+        code <= 2147483647
+      ) {
+        sdkStopFields = {
+          ...sdkStopFields,
+          sdkRecordedExitCodeAvailable: true,
+          sdkRecordedExitCode: code,
+        };
+      }
+      return { stoppedAtMs, ...sdkStopFields };
     } catch {
       // The lifecycle callback itself is still authoritative when the control
       // plane cannot provide a state transition timestamp.
-      return Date.now();
+      return { stoppedAtMs: stoppedAtMs ?? Date.now(), ...sdkStopFields };
     }
   }
 
@@ -706,7 +854,7 @@ export class MeteredBillingLifecycle {
         durable_object_id: this.host.durableObjectId,
         vcpu: String(capacity.vcpu),
         memory_mib: String(capacity.memoryMiB),
-        disk_mb: String(capacity.diskMB),
+        ...('diskMB' in capacity ? { disk_mb: String(capacity.diskMB) } : {}),
         ...(input.metadata?.origin ? { origin: input.metadata.origin } : {}),
       },
       startEpochMs,

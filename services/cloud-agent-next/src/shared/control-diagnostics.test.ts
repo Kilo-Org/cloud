@@ -8,6 +8,56 @@ import {
 } from './control-diagnostics.js';
 
 describe('control diagnostic schema compatibility', () => {
+  it('retains no-progress tool and workload counters without accepting tool content', () => {
+    const deadline = createControlDiagnosticRecord(
+      'session.execution',
+      {
+        phase: 'deadline_expired',
+        reason: 'no_progress',
+        rootKiloSessionId: 'ses_root',
+        kiloSessionId: 'ses_child',
+        eventType: 'message.part.updated',
+        partId: 'part_1',
+        toolStatus: 'running',
+        toolObservedAt: 10,
+        outputBytes: 0,
+        command: 'secret',
+      },
+      20
+    );
+    const workload = createControlDiagnosticRecord(
+      'control.workload',
+      {
+        phase: 'completed',
+        workloadPhase: 'stats',
+        scopeId: 'scope_1',
+        memoryMaxEvents: 4,
+        cpuUsageUsec: 900,
+        cpuThrottledUsec: 75,
+        ioReadBytes: 130,
+        toolCpuUsageUsec: 800,
+        serverCpuUsageUsec: 100,
+        toolIoReadBytes: 120,
+      },
+      21
+    );
+    const records = controlLogBatchSchema.parse({
+      version: 1,
+      sequence: 1,
+      droppedRecords: 0,
+      records: [deadline, workload],
+    }).records;
+    expect(records[0]?.fields).toMatchObject({ partId: 'part_1', toolStatus: 'running' });
+    expect(records[1]?.fields).toMatchObject({
+      cpuUsageUsec: 900,
+      memoryMaxEvents: 4,
+      toolCpuUsageUsec: 800,
+      serverCpuUsageUsec: 100,
+      toolIoReadBytes: 120,
+    });
+    expect(JSON.stringify(records)).not.toContain('secret');
+  });
+
   it('accepts records written before publication diagnostics were extended', () => {
     expect(
       controlLogBatchSchema.parse({
@@ -63,6 +113,57 @@ describe('control diagnostic schema compatibility', () => {
       pendingBytes: 512,
       socketBufferedBytes: 1024,
     });
+  });
+  it('preserves terminal control socket decision fields through the accepted batch schema', () => {
+    const record = createControlDiagnosticRecord(
+      'control.socket',
+      {
+        phase: 'reconnect_exhausted',
+        attempt: 7,
+        elapsedMs: 90_000,
+        deadlineAt: 1_700_000_090_000,
+        reason: 'reconnect_budget_exhausted',
+        wrapperInstanceId: '11111111-1111-4111-8111-111111111111',
+        connectionId: 'connection_1',
+      },
+      1
+    );
+    expect(record).toBeDefined();
+    expect(record?.fields).toMatchObject({
+      phase: 'reconnect_exhausted',
+      attempt: 7,
+      elapsedMs: 90_000,
+      deadlineAt: 1_700_000_090_000,
+      reason: 'reconnect_budget_exhausted',
+      wrapperInstanceId: '11111111-1111-4111-8111-111111111111',
+      connectionId: 'connection_1',
+    });
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 1,
+        droppedRecords: 0,
+        records: [record],
+      }).success
+    ).toBe(true);
+  });
+
+  it('drops free-text prompts and unknown secret fields from a diagnostic record', () => {
+    const prompt = 'Summarize the private customer contract';
+    const record = createControlDiagnosticRecord(
+      'control.socket',
+      {
+        phase: 'hello_rejected',
+        reason: 'permanent_hello_rejection',
+        prompt,
+        authorization: 'Bearer super-secret-token',
+      },
+      1
+    );
+    expect(record?.fields).not.toHaveProperty('prompt');
+    expect(record?.fields).not.toHaveProperty('authorization');
+    expect(JSON.stringify(record)).not.toContain(prompt);
+    expect(JSON.stringify(record)).not.toContain('super-secret-token');
   });
 });
 

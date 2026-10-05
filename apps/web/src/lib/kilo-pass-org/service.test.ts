@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
+import type Stripe from 'stripe';
 import {
   credit_transactions,
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plans,
+  kilo_pass_org_audit_records,
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_processing_runs,
   kilo_pass_org_supplements,
@@ -13,12 +15,16 @@ import { KiloPassOrgAgreementState } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { createOrganization } from '@/lib/organizations/organizations';
+import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
+import { client as stripeClient } from '@/lib/stripe-client';
+import { handleOrganizationKiloPassSubscriptionEvent } from './stripe-adapter';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { monthlyWindowFromOriginalAnchor } from './calculations';
 import {
   activatePaidAgreement,
   createParentSupplement,
   createPendingAgreement,
+  endAgreementAfterPassItemRemoved,
   nextIssuanceBoundary,
   organizationKiloPassService,
   runOrganizationPassIssuanceCron,
@@ -681,6 +687,209 @@ describe('Kilo Pass organization agreement service', () => {
 
     expect(second).toEqual({ agreementId: expect.any(String), created: true });
     expect(second.agreementId).not.toBe(first.agreementId);
+  });
+
+  it('recovers the release audit for the original agreement after a partial webhook failure', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-recovery-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const providerSubscriptionId = `sub_${crypto.randomUUID()}`;
+    const scheduleId = `sub_sched_${crypto.randomUUID()}`;
+    const original = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId,
+      providerSeatAddOnItemId: 'si_pass_original',
+      initialAllocations: [],
+    });
+    await db
+      .update(kilo_pass_org_agreements)
+      .set({ state: KiloPassOrgAgreementState.CancelAtPeriodEnd })
+      .where(eq(kilo_pass_org_agreements.id, original.agreementId));
+    const seatItem = {
+      id: 'si_seat',
+      quantity: 1,
+      price: { id: 'price_seat', product: [...SEAT_PRODUCT_IDS][0] ?? 'prod_seat' },
+    };
+    const seatOnlyEvent = (schedule: string | null) =>
+      ({
+        id: providerSubscriptionId,
+        status: 'active',
+        schedule,
+        metadata: {
+          type: 'kilo-pass-org',
+          organizationId: parent.id,
+          kiloUserId: owner.id,
+          tier: 'tier_19',
+          cadence: 'monthly',
+        },
+        items: { data: [seatItem] },
+      }) as unknown as Stripe.Subscription;
+    const ownedSchedule = (status: Stripe.SubscriptionSchedule.Status) =>
+      ({
+        id: scheduleId,
+        status,
+        metadata: { origin: 'kilo-pass-org-cancellation', agreementId: original.agreementId },
+        current_phase: { start_date: 1, end_date: 2 },
+        phases: [{ start_date: 1, end_date: 2, items: [{ price: 'price_seat', quantity: 1 }] }],
+      }) as unknown as Stripe.SubscriptionSchedule;
+    let scheduleStatus: Stripe.SubscriptionSchedule.Status = 'active';
+    let freshSubscription = seatOnlyEvent(null);
+    const auditRows = () =>
+      db
+        .select()
+        .from(kilo_pass_org_audit_records)
+        .where(
+          eq(
+            kilo_pass_org_audit_records.idempotency_key,
+            `provider-schedule-released:${scheduleId}`
+          )
+        );
+    const agreementState = async (agreementId: string) =>
+      (
+        await db
+          .select({ state: kilo_pass_org_agreements.state })
+          .from(kilo_pass_org_agreements)
+          .where(eq(kilo_pass_org_agreements.id, agreementId))
+      )[0]?.state;
+    jest
+      .spyOn(stripeClient.subscriptionSchedules, 'retrieve')
+      .mockImplementation(async () => ownedSchedule(scheduleStatus) as never);
+    const release = jest
+      .spyOn(stripeClient.subscriptionSchedules, 'release')
+      .mockImplementation(async () => {
+        scheduleStatus = 'released';
+        return ownedSchedule('released') as never;
+      });
+    jest
+      .spyOn(stripeClient.subscriptions, 'retrieve')
+      .mockImplementation(async () => freshSubscription as never);
+
+    try {
+      jest.spyOn(db, 'transaction').mockRejectedValueOnce(new Error('database unavailable'));
+      await expect(
+        handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(scheduleId))
+      ).rejects.toThrow('database unavailable');
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(await agreementState(original.agreementId)).toBe(
+        KiloPassOrgAgreementState.CancelAtPeriodEnd
+      );
+
+      await handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(null));
+      expect(await agreementState(original.agreementId)).toBe(KiloPassOrgAgreementState.Ended);
+      expect(await auditRows()).toEqual([]);
+
+      await expect(
+        handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(scheduleId))
+      ).resolves.toBe(true);
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(await auditRows()).toEqual([
+        expect.objectContaining({
+          agreement_id: original.agreementId,
+          after_json: expect.objectContaining({ scheduleId, alreadyTerminal: true }),
+        }),
+      ]);
+
+      const repurchase = await createPendingAgreement({
+        parentOrganizationId: parent.id,
+        actorUserId: owner.id,
+        tier: 'tier_19',
+        cadence: 'monthly',
+        paidSeatCount: 1,
+        issuanceAnchorAt: window.start,
+        providerSubscriptionId,
+        providerSeatAddOnItemId: 'si_pass_repurchase',
+        initialAllocations: [],
+      });
+      await db
+        .update(kilo_pass_org_agreements)
+        .set({ state: KiloPassOrgAgreementState.Active })
+        .where(eq(kilo_pass_org_agreements.id, repurchase.agreementId));
+      freshSubscription = {
+        ...seatOnlyEvent(null),
+        items: {
+          data: [
+            seatItem,
+            {
+              id: 'si_pass_repurchase',
+              quantity: 1,
+              price: { id: 'price_repurchased_pass', product: 'prod_kilo_pass' },
+            },
+          ],
+        },
+      } as unknown as Stripe.Subscription;
+
+      await handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(null));
+      await handleOrganizationKiloPassSubscriptionEvent(seatOnlyEvent(scheduleId));
+      expect(await agreementState(repurchase.agreementId)).toBe(KiloPassOrgAgreementState.Active);
+      expect(await auditRows()).toHaveLength(1);
+    } finally {
+      jest.restoreAllMocks();
+      await db
+        .delete(kilo_pass_org_audit_records)
+        .where(
+          eq(
+            kilo_pass_org_audit_records.idempotency_key,
+            `provider-schedule-released:${scheduleId}`
+          )
+        );
+    }
+  });
+
+  it('ends an agreement after pass removal and audits its schedule release once', async () => {
+    const owner = await insertTestUser();
+    const parent = await createOrganization(`kpo-removed-${crypto.randomUUID()}`, owner.id);
+    organizationIds.push(parent.id);
+    const pending = await createPendingAgreement({
+      parentOrganizationId: parent.id,
+      actorUserId: owner.id,
+      tier: 'tier_19',
+      cadence: 'monthly',
+      paidSeatCount: 1,
+      issuanceAnchorAt: window.start,
+      providerSubscriptionId: `sub_${crypto.randomUUID()}`,
+      providerSeatAddOnItemId: `si_${crypto.randomUUID()}`,
+      initialAllocations: [],
+    });
+    const scheduleId = `sub_sched_${crypto.randomUUID()}`;
+
+    await endAgreementAfterPassItemRemoved({
+      agreementId: pending.agreementId,
+      scheduleRelease: { scheduleId, status: 'released', alreadyTerminal: false },
+    });
+    await endAgreementAfterPassItemRemoved({
+      agreementId: pending.agreementId,
+      scheduleRelease: { scheduleId, status: 'released', alreadyTerminal: true },
+    });
+
+    const [agreement] = await db
+      .select({ state: kilo_pass_org_agreements.state })
+      .from(kilo_pass_org_agreements)
+      .where(eq(kilo_pass_org_agreements.id, pending.agreementId));
+    expect(agreement?.state).toBe(KiloPassOrgAgreementState.Ended);
+    const audits = await db
+      .select()
+      .from(kilo_pass_org_audit_records)
+      .where(
+        and(
+          eq(kilo_pass_org_audit_records.agreement_id, pending.agreementId),
+          eq(kilo_pass_org_audit_records.action, 'provider_schedule_released')
+        )
+      );
+    expect(audits).toEqual([
+      expect.objectContaining({
+        reason: 'pass_item_removed',
+        idempotency_key: `provider-schedule-released:${scheduleId}`,
+        after_json: expect.objectContaining({ scheduleId, alreadyTerminal: false }),
+      }),
+    ]);
+    await db
+      .delete(kilo_pass_org_audit_records)
+      .where(eq(kilo_pass_org_audit_records.agreement_id, pending.agreementId));
   });
 
   it('rejects non-child allocation and stale plan writes', async () => {

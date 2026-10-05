@@ -25,6 +25,147 @@ describe('CLIOutboundMessageSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('parses a heartbeat session with a scheduled status and wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          id: 'ses_scheduled',
+          status: 'scheduled',
+          scheduledAt: '2026-09-24T09:00:00.000Z',
+          title: 'Wake later',
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).toMatchObject({
+        status: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+    }
+  });
+
+  it('parses a scheduled heartbeat session without a wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [{ id: 'ses_scheduled', status: 'scheduled', title: 'Wake later' }],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0]).not.toHaveProperty('scheduledAt');
+    }
+  });
+
+  it('parses a heartbeat session whose producer sends an explicit null wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        { id: 'ses_busy', status: 'busy', title: 'Working', scheduledAt: null },
+        { id: 'ses_scheduled', status: 'scheduled', title: 'Wake later', scheduledAt: null },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions.map(session => session.scheduledAt)).toEqual([
+        undefined,
+        undefined,
+      ]);
+      expect(result.data.sessions.map(session => session.status)).toEqual(['busy', 'scheduled']);
+    }
+  });
+
+  it.each([
+    {},
+    { headRef: null, headSha: null },
+    { headRef: 'feature/fix', headSha: null },
+    { headRef: null, headSha: 'abc123' },
+    { headRef: 'feature/fix', headSha: 'abc123' },
+  ])('keeps all heartbeat sessions with nullable or omitted PR evidence: %j', evidence => {
+    const prLink = {
+      platform: 'github',
+      prUrl: 'https://github.com/kilo/repo/pull/7',
+      prNumber: 7,
+      ...evidence,
+    };
+    const result = CLIOutboundMessageSchema.parse({
+      type: 'heartbeat',
+      sessions: [
+        { id: validSessionId, status: 'busy', title: 'Linked session', prLink },
+        { id: 'ses_other', status: 'idle', title: 'Other session' },
+      ],
+    });
+    expect(result.type).toBe('heartbeat');
+    if (result.type === 'heartbeat') {
+      expect(result.sessions.map(session => session.id)).toEqual([validSessionId, 'ses_other']);
+      expect(JSON.parse(JSON.stringify(result.sessions[0].prLink))).toEqual({
+        platform: 'github',
+        prUrl: 'https://github.com/kilo/repo/pull/7',
+        prNumber: 7,
+        ...(evidence.headRef ? { headRef: evidence.headRef } : {}),
+        ...(evidence.headSha ? { headSha: evidence.headSha } : {}),
+      });
+    }
+  });
+
+  it.each([
+    { headRef: '' },
+    { headRef: 42 },
+    { headRef: 'x'.repeat(257) },
+    { headSha: '' },
+    { headSha: false },
+    { headSha: 'x'.repeat(65) },
+    { platform: '' },
+    { prNumber: -1 },
+    { prUrl: 'x'.repeat(2049) },
+  ])('rejects malformed PR input rather than treating it as absent: %j', invalid => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [
+          {
+            id: validSessionId,
+            status: 'busy',
+            title: 'Linked session',
+            prLink: {
+              platform: 'github',
+              prUrl: 'https://github.com/kilo/repo/pull/7',
+              prNumber: 7,
+              headRef: null,
+              headSha: null,
+              ...invalid,
+            },
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
+  it('does not let nullable PR evidence hide unrelated heartbeat errors', () => {
+    expect(
+      CLIOutboundMessageSchema.safeParse({
+        type: 'heartbeat',
+        sessions: [
+          {
+            id: validSessionId,
+            status: 'busy',
+            title: null,
+            prLink: {
+              platform: 'github',
+              prUrl: 'https://github.com/kilo/repo/pull/7',
+              prNumber: 7,
+              headRef: null,
+              headSha: null,
+            },
+          },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
   it('parses heartbeat with instance and per-session platform (kilo remote CLI)', () => {
     const msg = {
       type: 'heartbeat',
@@ -379,6 +520,35 @@ describe('CLIOutboundMessageSchema prLink', () => {
     }
   });
 
+  it('parses a prLink with headRef and headSha evidence', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          ...baseSession,
+          prLink: {
+            platform: 'github',
+            prUrl: 'https://github.com/o/r/pull/42',
+            prNumber: 42,
+            headRef: 'fix/typo',
+            headSha: 'abc123',
+          },
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0].prLink).toEqual({
+        platform: 'github',
+        prUrl: 'https://github.com/o/r/pull/42',
+        prNumber: 42,
+        headRef: 'fix/typo',
+        headSha: 'abc123',
+      });
+    }
+  });
+
   it('rejects a prLink with an oversize prUrl', () => {
     const msg = {
       type: 'heartbeat',
@@ -689,6 +859,58 @@ describe('SessionEventPayloadSchema', () => {
     expect(result.data).toHaveProperty('session.worktreeId', worktreeId);
   });
 
+  it('preserves a wake time in session rows', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const result = SessionEventPayloadSchema.parse({
+      type: 'session.created',
+      data: {
+        source: 'v2',
+        session: { ...session, status: 'scheduled', scheduledAt },
+        changedAt: session.updatedAt,
+      },
+    });
+
+    expect(result.data).toHaveProperty('session.scheduledAt', scheduledAt);
+  });
+
+  it('parses status-updated payloads carrying scheduled and scheduledAt', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const fullRow = SessionEventPayloadSchema.safeParse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        session: { ...session, status: 'scheduled', scheduledAt },
+        previousStatus: 'idle',
+        status: 'scheduled',
+        scheduledAt,
+        statusUpdatedAt: '2026-09-23T00:00:02.000Z',
+        changedAt: '2026-09-23T00:00:02.000Z',
+      },
+    });
+    expect(fullRow.success).toBe(true);
+    if (fullRow.success) {
+      expect(fullRow.data.data).toHaveProperty('session.scheduledAt', scheduledAt);
+      expect(fullRow.data.data).toHaveProperty('scheduledAt', scheduledAt);
+    }
+
+    const lightweight = SessionEventPayloadSchema.safeParse({
+      type: 'session.status.updated',
+      data: {
+        source: 'v2',
+        sessionId: validSessionId,
+        previousStatus: 'idle',
+        status: 'scheduled',
+        scheduledAt,
+        statusUpdatedAt: '2026-09-23T00:00:02.000Z',
+        changedAt: '2026-09-23T00:00:02.000Z',
+      },
+    });
+    expect(lightweight.success).toBe(true);
+    if (lightweight.success) {
+      expect(lightweight.data.data).toHaveProperty('scheduledAt', scheduledAt);
+    }
+  });
+
   it.each([null, undefined])('accepts legacy sessions with worktree ID %s', worktreeId => {
     const result = SessionEventPayloadSchema.parse({
       type: 'session.created',
@@ -719,7 +941,7 @@ describe('SessionEventPayloadSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects invalid v2 session statuses', () => {
+  it('accepts unknown v2 session statuses instead of dropping the event', () => {
     const events = [
       {
         type: 'session.updated',
@@ -754,7 +976,7 @@ describe('SessionEventPayloadSchema', () => {
     ];
 
     for (const event of events) {
-      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(false);
+      expect(SessionEventPayloadSchema.safeParse(event).success).toBe(true);
     }
   });
 

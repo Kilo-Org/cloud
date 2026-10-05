@@ -2,6 +2,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@/lib/drizzle';
@@ -41,6 +42,14 @@ export const activeSessionSchema = z.object({
    * has needed input, and Hermes only parses the ISO form.
    */
   statusUpdatedAt: z.string().optional(),
+  /**
+   * Wake time for a `scheduled` session, as an ISO 8601 string relayed on the
+   * live worker row. `z.object` strips undeclared keys, so the field must be
+   * declared here or the worker's value never reaches the client or the
+   * server-built glanceable snapshot. The cloud-agent candidate path has no
+   * wake time and omits the key; a `scheduled` row without one omits it too.
+   */
+  scheduledAt: z.string().optional(),
   /**
    * Capabilities advertised by the CLI connection that owns this session.
    * Omitted when the owning connection's latest heartbeat did not include a
@@ -129,6 +138,7 @@ type EnrichmentRow = {
   status: string | null;
   title: string | null;
   organization_id: string | null;
+  git_url: string | null;
   last_activity_at: string | null;
   status_updated_at: string | null;
   total_cost_microdollars: number | null;
@@ -137,6 +147,9 @@ type EnrichmentRow = {
   session_pr_platform: string | null;
   session_pr_url: string | null;
   session_pr_number: number | null;
+  // Set only after the session's own link passed GitHub identity verification.
+  // Null means the link must not be shown.
+  session_pr_verified_at: string | null;
   // Per-tenant PR cache columns from the LEFT JOIN.
   pr_url: string | null;
   pr_number: number | null;
@@ -173,6 +186,8 @@ function associatedPrFromRow(row: EnrichmentRow): z.infer<typeof associatedPrSch
       pr_url: row.session_pr_url,
       pr_number: row.session_pr_number,
       updated_at: row.updated_at,
+      git_url: row.git_url,
+      pr_link_verified_at: row.session_pr_verified_at,
     },
     {
       pr_url: row.pr_url,
@@ -371,7 +386,11 @@ export async function listActiveSessions({
     const url = `${SESSION_INGEST_WORKER_URL}/api/sessions/active`;
 
     try {
-      const response = await fetch(url, {
+      // Bounded: a session-ingest worker that never answers aborts inside
+      // `CONTROL_PLANE_UPSTREAM_BUDGET_MS` and rejects with
+      // `ServiceFetchTimeoutError`, which the catch below already degrades
+      // exactly as any other upstream failure does.
+      const response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -413,12 +432,14 @@ export async function listActiveSessions({
           status: cli_sessions_v2.status,
           title: cli_sessions_v2.title,
           organization_id: cli_sessions_v2.organization_id,
+          git_url: cli_sessions_v2.git_url,
           last_activity_at: cli_sessions_v2.last_activity_at,
           status_updated_at: cli_sessions_v2.status_updated_at,
           total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
           session_pr_platform: cli_sessions_v2.platform,
           session_pr_url: cli_sessions_v2.pr_url,
           session_pr_number: cli_sessions_v2.pr_number,
+          session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
           pr_url: github_branch_pull_requests.pr_url,
           pr_number: github_branch_pull_requests.pr_number,
           pr_state: github_branch_pull_requests.pr_state,
@@ -523,6 +544,7 @@ export async function listActiveSessions({
           session_pr_platform: cli_sessions_v2.platform,
           session_pr_url: cli_sessions_v2.pr_url,
           session_pr_number: cli_sessions_v2.pr_number,
+          session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
           pr_url: github_branch_pull_requests.pr_url,
           pr_number: github_branch_pull_requests.pr_number,
           pr_state: github_branch_pull_requests.pr_state,

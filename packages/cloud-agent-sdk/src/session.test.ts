@@ -17,10 +17,6 @@ import {
   textPart,
 } from './__fixtures__/helpers';
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('session pipeline integration', () => {
   const { createEvent, kilocode, resetCounter } = createEventHelpers();
 
@@ -32,39 +28,30 @@ describe('session pipeline integration', () => {
     it('user message → assistant streaming → complete', () => {
       const { storage, serviceState, feedEvent } = createTestSession();
 
-      // Session created
       feedEvent(kilocode('session.created', { info: sessionInfo('ses-1') }));
 
-      // Session goes busy
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
       expect(serviceState.getActivity()).toEqual({ type: 'busy' });
 
-      // User message
       feedEvent(kilocode('message.updated', { info: userMsg('msg-1') }));
       expect(storage.getMessageIds()).toEqual(['msg-1']);
 
-      // User message part
       feedEvent(kilocode('message.part.updated', { part: textPart('p-1', 'msg-1', 'hello') }));
       expect(storage.getParts('msg-1')).toHaveLength(1);
 
-      // Assistant message
       feedEvent(kilocode('message.updated', { info: assistantMsg('msg-2', 'msg-1') }));
       expect(storage.getMessageIds()).toEqual(['msg-1', 'msg-2']);
 
-      // Streaming part updates
       feedEvent(kilocode('message.part.updated', { part: textPart('p-2', 'msg-2', 'Hi') }));
       feedEvent(kilocode('message.part.updated', { part: textPart('p-2', 'msg-2', 'Hi there') }));
 
-      // Check final text
       const parts = storage.getParts('msg-2');
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ text: 'Hi there' }));
 
-      // Session goes idle — activity transitions to idle
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
 
-      // Complete after idle is a no-op for activity (already idle)
       feedEvent(createEvent('complete', { currentBranch: 'main' }));
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
     });
@@ -98,12 +85,10 @@ describe('session pipeline integration', () => {
         })
       );
 
-      // Deltas accumulated
       const parts = storage.getParts('msg-1');
       expect(parts).toHaveLength(1);
       expect(parts[0]).toEqual(expect.objectContaining({ text: 'Hello world' }));
 
-      // Final full snapshot replaces accumulated text
       feedEvent(
         kilocode('message.part.updated', {
           part: textPart('p-1', 'msg-1', 'Hello world!'),
@@ -127,10 +112,8 @@ describe('session pipeline integration', () => {
         })
       );
 
-      // Root message
       feedEvent(kilocode('message.updated', { info: userMsg('msg-1', 'ses-1') }));
 
-      // Child message
       feedEvent(
         kilocode('message.updated', {
           info: assistantMsg('msg-2', 'msg-1', 'child-1'),
@@ -194,7 +177,6 @@ describe('session pipeline integration', () => {
 
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
       feedEvent(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
-      // Idle status transitions activity to idle
       expect(serviceState.getActivity()).toEqual({ type: 'idle' });
 
       // Complete is redundant but harmless
@@ -304,7 +286,6 @@ describe('session pipeline integration', () => {
         })
       );
 
-      // Autocommit started
       feedEvent(
         createEvent('autocommit_started', { messageId: 'msg-1', message: 'Committing...' })
       );
@@ -314,7 +295,6 @@ describe('session pipeline integration', () => {
         message: 'Committing...',
       });
 
-      // Autocommit completed
       feedEvent(
         createEvent('autocommit_completed', {
           messageId: 'msg-1',
@@ -399,7 +379,6 @@ describe('session pipeline integration', () => {
           partID: 'p-nonexistent',
         })
       );
-      // Original part still present
       expect(storage.getParts('msg-1')).toHaveLength(1);
     });
   });
@@ -421,7 +400,6 @@ describe('session pipeline integration', () => {
     it('messages are sorted by ID', () => {
       const { storage, feedEvent } = createTestSession();
 
-      // Insert out of order
       feedEvent(kilocode('message.updated', { info: userMsg('msg-3') }));
       feedEvent(kilocode('message.updated', { info: userMsg('msg-1') }));
       feedEvent(kilocode('message.updated', { info: userMsg('msg-2') }));
@@ -515,11 +493,13 @@ describe('remote session transport state', () => {
 
     expect(session.canSend).toBe(true);
     expect(onTransportCapabilityChange).toHaveBeenCalled();
+    // An empty catalog is not a successful load: the transport self-heals it
+    // (error refresh) instead of publishing an empty `idle` catalog.
     expect(onRemoteModelStateChange).toHaveBeenLastCalledWith({
       ownerConnectionId: 'owner',
       protocol: 'v1',
-      catalog: { protocolVersion: 1, providers: [], truncated: false },
-      refresh: 'idle',
+      refresh: 'error',
+      error: 'Remote model catalog is empty',
     });
     session.destroy();
   });

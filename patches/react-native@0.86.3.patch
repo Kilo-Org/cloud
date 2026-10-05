@@ -46,8 +46,35 @@ index 226781f27bfff61ecd993be0b4937fb8e4c66465..bcb3e80b4209191b8f03bc46ca31944c
      }
    }
  
+diff --git a/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm b/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm
+index b033b7c71914d287470b7b86bd6bf39d311294ba..9f95ae0bfc84127eeb73ecee8c8d0ec05645482c 100644
+--- a/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm
++++ b/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm
+@@ -188,15 +188,18 @@ static BOOL RCTLayerTransformCollapsesAxis(CALayer *layer)
+         childComponentView,
+         @(index),
+         @([childComponentView.superview tag]));
++#ifndef NS_BLOCK_ASSERTIONS
++    NSArray<UIView *> *containerSubviews = self.currentContainerView.subviews;
++    BOOL isIndexInBounds = index >= 0 && (NSUInteger)index < containerSubviews.count;
+     RCTAssert(
+-        (self.currentContainerView.subviews.count > index) &&
+-            [self.currentContainerView.subviews objectAtIndex:index] == childComponentView,
++        isIndexInBounds && [containerSubviews objectAtIndex:index] == childComponentView,
+         @"Attempt to unmount a view which has a different index. (parent: %@, child: %@, index: %@, actual index: %@, tag at index: %@)",
+         self,
+         childComponentView,
+         @(index),
+-        @([self.currentContainerView.subviews indexOfObject:childComponentView]),
+-        @([[self.currentContainerView.subviews objectAtIndex:index] tag]));
++        @([containerSubviews indexOfObject:childComponentView]),
++        isIndexInBounds ? @([[containerSubviews objectAtIndex:index] tag]) : @"out of bounds");
++#endif
+   }
+ 
+   [childComponentView removeFromSuperview];
 diff --git a/React/Fabric/Mounting/RCTComponentViewFactory.mm b/React/Fabric/Mounting/RCTComponentViewFactory.mm
-index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb228049a33 100644
+index 608d75cadf9243244541ea61cbf8908244d6e0b8..ee13834cfdaa260a6350bc2fbea6cea6624c661e 100644
 --- a/React/Fabric/Mounting/RCTComponentViewFactory.mm
 +++ b/React/Fabric/Mounting/RCTComponentViewFactory.mm
 @@ -48,6 +48,7 @@ using namespace facebook::react;
@@ -121,27 +148,78 @@ index 608d75cadf9243244541ea61cbf8908244d6e0b8..ca2a5b9c51be747e106da2014063dfb2
    auto componentViewClassDescriptor = iterator->second;
    Class viewClass = componentViewClassDescriptor.viewClass;
  
-diff --git a/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm b/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm
---- a/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm
-+++ b/React/Fabric/Mounting/ComponentViews/View/RCTViewComponentView.mm
-@@ -188,13 +188,16 @@
-         childComponentView,
-         @(index),
-         @([childComponentView.superview tag]));
-+#ifndef NS_BLOCK_ASSERTIONS
-+    NSArray<UIView *> *containerSubviews = self.currentContainerView.subviews;
-+    BOOL isIndexInBounds = index >= 0 && (NSUInteger)index < containerSubviews.count;
-     RCTAssert(
--        (self.currentContainerView.subviews.count > index) &&
--            [self.currentContainerView.subviews objectAtIndex:index] == childComponentView,
-+        isIndexInBounds && [containerSubviews objectAtIndex:index] == childComponentView,
-         @"Attempt to unmount a view which has a different index. (parent: %@, child: %@, index: %@, actual index: %@, tag at index: %@)",
-         self,
-         childComponentView,
-         @(index),
--        @([self.currentContainerView.subviews indexOfObject:childComponentView]),
--        @([[self.currentContainerView.subviews objectAtIndex:index] tag]));
-+        @([containerSubviews indexOfObject:childComponentView]),
-+        isIndexInBounds ? @([[containerSubviews objectAtIndex:index] tag]) : @"out of bounds");
-+#endif
+diff --git a/React/Fabric/Mounting/RCTComponentViewRegistry.mm b/React/Fabric/Mounting/RCTComponentViewRegistry.mm
+index 0834bbfb7d148d86a36c0b19a8354cf5a8733677..50447241a79b2ad7a8833a039cd8fc39368b41da 100644
+--- a/React/Fabric/Mounting/RCTComponentViewRegistry.mm
++++ b/React/Fabric/Mounting/RCTComponentViewRegistry.mm
+@@ -10,6 +10,7 @@
+ #import <Foundation/NSMapTable.h>
+ #import <React/RCTAssert.h>
+ #import <React/RCTConstants.h>
++#import <React/RCTLog.h>
+ 
+ #import <React/RCTImageComponentView.h>
+ #import <React/RCTParagraphComponentView.h>
+@@ -74,6 +75,16 @@ const NSInteger RCTComponentViewRegistryRecyclePoolMaxSize = 1024;
+   RCTAssertMainQueue();
+   auto iterator = _registry.find(tag);
+   RCTAssert(iterator != _registry.end(), @"RCTComponentViewRegistry: Attempt to query unregistered component.");
++  if (iterator == _registry.end()) {
++    // A mount instruction can name a tag the registry no longer holds (KILO-APP-35C, KILO-APP-39V).
++    // Release builds compile `RCTAssert` out, so the past-the-end dereference that used to follow this
++    // lookup crashed the app in the caller (EXC_BAD_ACCESS at 0x18 in `RCTPerformMountInstructions`).
++    // Report the tag and hand back an empty descriptor; its nil view makes the mounting call sites no-ops.
++    RCTLogError(
++        @"RCTComponentViewRegistry: Attempt to query unregistered component (tag: %lld).", (long long)tag);
++    static const RCTComponentViewDescriptor unregisteredComponentViewDescriptor{};
++    return unregisteredComponentViewDescriptor;
++  }
+   return iterator->second;
+ }
+ 
+@@ -107,7 +118,8 @@ const NSInteger RCTComponentViewRegistryRecyclePoolMaxSize = 1024;
+   RCTAssertMainQueue();
+   auto &recycledViews = _recyclePool[componentHandle];
+ 
+-  if (recycledViews.size() > RCTComponentViewRegistryRecyclePoolMaxSize || !componentViewDescriptor.shouldBeRecycled) {
++  if (componentViewDescriptor.view == nil || recycledViews.size() > RCTComponentViewRegistryRecyclePoolMaxSize ||
++      !componentViewDescriptor.shouldBeRecycled) {
+     [componentViewDescriptor.view invalidate];
+     return;
    }
+diff --git a/React/Fabric/Mounting/RCTMountingManager.mm b/React/Fabric/Mounting/RCTMountingManager.mm
+index 68662f06d59bd4b1827510da747931fb223452b1..a37baa2983c34e88c86fcb45aca40c5fd84f7a87 100644
+--- a/React/Fabric/Mounting/RCTMountingManager.mm
++++ b/React/Fabric/Mounting/RCTMountingManager.mm
+@@ -78,6 +78,12 @@ static void RCTPerformMountInstructions(
+ 
+         UIView<RCTComponentViewProtocol> *newChildComponentView = newChildViewDescriptor.view;
+ 
++        if (newChildComponentView == nil) {
++          RCTLogError(
++              @"RCTPerformMountInstructions: skipping Insert for unregistered component view (tag: %lld).",
++              (long long)newChildShadowView.tag);
++          break;
++        }
+         RCTAssert(newChildShadowView.props, @"`newChildShadowView.props` must not be null.");
+ 
+         [newChildComponentView updateProps:newChildShadowView.props oldProps:nullptr];
+@@ -95,6 +101,18 @@ static void RCTPerformMountInstructions(
+         auto &oldChildShadowView = mutation.oldChildShadowView;
+         auto &oldChildViewDescriptor = [registry componentViewDescriptorWithTag:oldChildShadowView.tag];
+         auto &parentViewDescriptor = [registry componentViewDescriptorWithTag:mutation.parentTag];
++        if (oldChildViewDescriptor.view == nil) {
++          RCTLogError(
++              @"RCTPerformMountInstructions: skipping Remove for unregistered component view (tag: %lld).",
++              (long long)oldChildShadowView.tag);
++          break;
++        }
++        if (parentViewDescriptor.view == nil) {
++          RCTLogError(
++              @"RCTPerformMountInstructions: skipping Remove with unregistered parent view (tag: %lld).",
++              (long long)mutation.parentTag);
++          break;
++        }
+         [parentViewDescriptor.view unmountChildComponentView:oldChildViewDescriptor.view index:mutation.index];
+         break;
+       }

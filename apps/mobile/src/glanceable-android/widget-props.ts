@@ -7,6 +7,7 @@ import {
 import {
   type GlanceableCountKind,
   glanceableCountLines,
+  glanceableScheduledAt,
   glanceableSpokenLabel,
   type GlanceableStatus,
   glanceableStatusCopyKey,
@@ -69,7 +70,7 @@ export type AndroidWidgetProps = {
    * surface that says the counts are delayed.
    */
   statusLine: string | null;
-  /** Every count line in rank order (needs-input, running, idle), zeros included. */
+  /** Every count line in rank order (needs-input, running, scheduled, idle), zeros included. */
   countLines: AndroidWidgetCount[];
   /** Top-ranked count label; the only row that keeps the foreground color. */
   primaryLabel: string | null;
@@ -84,6 +85,13 @@ export type AndroidWidgetProps = {
   newestResultLabel: string | null;
   /** Preformatted relative time of that change, from the injected formatter. */
   newestResultAgo: string | null;
+  /**
+   * Preformatted wake of the soonest scheduled session, from the same injected
+   * formatter as `newestResultAgo`. Null when nothing is scheduled or the CLI
+   * reported a scheduled count with no `scheduledAt`: the scheduled row draws
+   * either way, and only the time beside it is conditional.
+   */
+  scheduledAgo: string | null;
   /**
    * The reserved slot under the counts: the newest session's title, the
    * in-flight action's progress or failure, or null. Its height is reserved in
@@ -164,6 +172,10 @@ export function buildAndroidWidgetProps(
   // newest result either, so a waiting or privacy-blanked widget keeps one fact.
   const newestKind = showCounts ? snapshot.newestResultKind : null;
   const newestAt = showCounts ? snapshot.newestResultAt : null;
+  // The shared helper decides the wake, so a scheduled count with no usable
+  // time reads the same way here as on every other surface: the row draws and
+  // only the time beside it is conditional.
+  const scheduledAt = showCounts ? glanceableScheduledAt(snapshot) : null;
 
   const extras = getSurfaceExtras();
   // Android's empty surface is the one that offers `New agent`, so its copy
@@ -184,6 +196,7 @@ export function buildAndroidWidgetProps(
         ? null
         : (countLines.find(line => line.kind === newestKind)?.label ?? null),
     newestResultAgo: newestKind === null || newestAt === null ? null : formatAgo(newestAt),
+    scheduledAgo: scheduledAt === null ? null : formatAgo(scheduledAt),
     newestLine: newestLineFor(extras, status, translate),
     actions: {
       // Only a permission wait can be answered from the widget, so the button
@@ -249,7 +262,9 @@ function buildExpiredWidgetProps(
       running: 0,
       needsInput: 0,
       idle: 0,
+      scheduled: 0,
       needsInputSince: null,
+      scheduledAt: null,
     },
     {},
     translate,
@@ -258,43 +273,54 @@ function buildExpiredWidgetProps(
   );
 }
 
-/** Gallery placeholder: empty copy and no counts, with no snapshot behind it. */
+/**
+ * Gallery placeholder and no-snapshot fallback: the sign-in copy and no counts.
+ *
+ * A placed widget with no snapshot has no account behind it — a fresh install or
+ * a signed-out one — so the honest claim is "Sign in to see agents", not the
+ * generic "No work in progress", which asserts the user is signed in with an
+ * empty tray. Drawing the sign-in copy here also keeps the terminal signed-out
+ * frame (which writes the same key) and this fallback from ever disagreeing. No
+ * snapshot means no state to act on, so the placeholder offers nothing.
+ */
 export function buildGenericWidgetProps(translate: (key: string) => string): AndroidWidgetProps {
-  const empty = translate('glanceable.empty');
+  const signedOut = translate('glanceable.signedOut');
   return {
-    statusLine: empty,
+    statusLine: signedOut,
     countLines: [],
     primaryLabel: null,
     newestResultKind: null,
     newestResultTitle: null,
     newestResultLabel: null,
     newestResultAgo: null,
+    scheduledAgo: null,
     newestLine: null,
-    // No snapshot means no state to act on: the placeholder offers nothing.
     actions: {
       approve: false,
       newAgent: false,
       approveLabel: translate('common.approve'),
       newAgentLabel: translate('glanceable.newAgent'),
     },
-    accessibilityLabel: empty,
+    accessibilityLabel: signedOut,
   };
 }
 
 /**
  * Ongoing notification: every ranked count, with a warning when stale, otherwise
- * the locked status copy. A pending action notice (an approve attempt that has
- * to be retried) prefixes the line, separated by a space because the notice is
- * a full sentence; the compact and promoted surfaces never carry it. Never a
- * title, organization name, or id.
+ * the locked status copy. The scheduled count carries the wake time beside it,
+ * so the card says when the next agent wakes. A pending action notice (an
+ * approve attempt that has to be retried) prefixes the line, separated by a
+ * space because the notice is a full sentence; the compact and promoted
+ * surfaces never carry it. Never a title, organization name, or id.
  */
-// eslint-disable-next-line max-params -- snapshot, flags, the two injected formatters, and the notice
+// eslint-disable-next-line max-params -- snapshot, flags, the translator, the three injected formatters, and the notice
 export function buildOngoingNotificationText(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
   translate: (key: string) => string,
   formatCount: GlanceableCountFormat = String,
-  notice: string | null = null
+  notice: string | null = null,
+  formatAgo: GlanceableAgoFormat = String
 ): string {
   const status = resolveGlanceableStatus(snapshot, flags);
   if (status === 'happy' || status === 'stale') {
@@ -302,8 +328,21 @@ export function buildOngoingNotificationText(
     // "0 Working" in a notification line is only noise.
     const lines = glanceableCountLines(snapshot).filter(line => line.count > 0);
     if (lines.length > 0) {
+      // The wake rides only the scheduled count, and only when the CLI reported
+      // one: a scheduled count with no usable time reads as the bare count.
+      const scheduledAt = glanceableScheduledAt(snapshot);
       const counts = lines
-        .map(line => `${formatCount(line.count)} ${translate(line.key)}`)
+        .map(line => {
+          const label = `${formatCount(line.count)} ${translate(line.key)}`;
+          if (line.kind !== 'scheduled' || scheduledAt === null) {
+            return label;
+          }
+          const wake = formatAgo(scheduledAt);
+          // The translator owns the word order around the placeholder; the
+          // replacer is a function so a formatted time containing `$&` is
+          // inserted literally instead of being read as a replacement pattern.
+          return `${label} ${translate('glanceable.scheduledWakes').replace('{{time}}', () => wake)}`;
+        })
         .join(', ');
       const text = status === 'stale' ? `${translate('glanceable.stale')}, ${counts}` : counts;
       return notice === null ? text : `${notice} ${text}`;

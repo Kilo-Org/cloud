@@ -1,12 +1,13 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { memo, type ReactNode, type RefObject } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { cn } from '@/lib/utils';
+import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
 
 type ToolCodeBlockProps = {
   content: string;
@@ -15,6 +16,9 @@ type ToolCodeBlockProps = {
   compact?: boolean;
   icon?: ReactNode;
   className?: string;
+  maxHeightClassName?: string;
+  scrollRef?: RefObject<HTMLPreElement | null>;
+  onScroll?: () => void;
 };
 
 export function ToolCodeBlock({
@@ -24,6 +28,9 @@ export function ToolCodeBlock({
   compact = false,
   icon,
   className,
+  maxHeightClassName = 'max-h-80',
+  scrollRef,
+  onScroll,
 }: ToolCodeBlockProps) {
   const copyButton = (
     <CopyMessageButton
@@ -57,12 +64,15 @@ export function ToolCodeBlock({
         </div>
       )}
       <pre
+        ref={scrollRef}
+        onScroll={onScroll}
         role="region"
         tabIndex={0}
         aria-label={label}
         aria-busy={isStreaming || undefined}
         className={cn(
-          'bg-background focus-visible:ring-ring max-h-80 max-w-full overflow-auto rounded-md p-2 font-mono text-xs leading-relaxed focus-visible:ring-2 focus-visible:outline-none',
+          'bg-background focus-visible:ring-ring max-w-full overflow-auto rounded-md p-2 font-mono text-xs leading-relaxed focus-visible:ring-2 focus-visible:outline-none',
+          maxHeightClassName,
           compact && 'min-w-0 flex-1'
         )}
       >
@@ -101,7 +111,23 @@ const markdownComponents: Components = {
   },
 };
 
-export function ToolMarkdown({ content, className }: { content: string; className?: string }) {
+const baseRemarkPlugins = [remarkGfm];
+
+export const ToolMarkdown = memo(function ToolMarkdown({
+  content,
+  className,
+  streaming = false,
+}: {
+  content: string;
+  className?: string;
+  streaming?: boolean;
+}) {
+  const parseCache = useMarkdownParseCache();
+  const plugins =
+    parseCache && !streaming
+      ? [remarkGfm, createMarkdownParseCachePlugin(parseCache)]
+      : baseRemarkPlugins;
+
   return (
     <div
       role="region"
@@ -113,7 +139,7 @@ export function ToolMarkdown({ content, className }: { content: string; classNam
       )}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={plugins}
         components={markdownComponents}
         urlTransform={toSafeHttpUrl}
       >
@@ -121,4 +147,4 @@ export function ToolMarkdown({ content, className }: { content: string; classNam
       </ReactMarkdown>
     </div>
   );
-}
+});

@@ -110,6 +110,15 @@ test('ai-gateway deploys only on demand, from the last completed release', () =>
   assert.equal(stage.secrets.VERCEL_PROJECT_TOKEN, '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}');
   assert.equal(gateway.jobs.promote.needs, 'stage');
   assert.equal(gateway.jobs.promote.if, "inputs.target_environment == 'production'");
+  assert.deepEqual(gateway.jobs.promote.with, {
+    deployment_url: '${{ needs.stage.outputs.deployment_url }}',
+    axiom_annotation_dataset: 'vercel',
+    axiom_expected_project: 'kilocode-ai-gateway',
+  });
+  assert.equal(
+    gateway.jobs.promote.secrets.AXIOM_ANNOTATION_TOKEN,
+    '${{ secrets.AXIOM_ANNOTATION_TOKEN }}'
+  );
 
   for (const name of ['deploy-production', 'deploy-staging', 'redeploy-web']) {
     assert.doesNotMatch(

@@ -41,12 +41,15 @@ import {
 import { toast } from 'sonner';
 import {
   DirectUserByokInferenceProviderIdSchema,
+  type DirectUserByokInferenceProviderId,
   UserByokProviderIdSchema,
+  UserByokTestModels,
+  type UserByokProviderId,
   VercelUserByokInferenceProviderIdSchema,
+  type VercelUserByokInferenceProviderId,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
   VertexCredentialsSchema,
-  type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
@@ -86,14 +89,21 @@ const VERCEL_BYOK_PROVIDERS = [
   { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Legacy Codestral-only key' },
 ];
 
+const CUSTOM_PROVIDER_OPTION = {
+  id: 'custom',
+  name: 'Custom Provider (OpenAI Compatible)',
+};
+
 const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
   id,
   name,
 }));
 
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
-  a.name.localeCompare(b.name)
-);
+const BYOK_PROVIDERS = [
+  ...DIRECT_BYOK_PROVIDERS_LIST,
+  ...VERCEL_BYOK_PROVIDERS,
+  CUSTOM_PROVIDER_OPTION,
+].toSorted((a, b) => a.name.localeCompare(b.name));
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
@@ -171,6 +181,10 @@ type BYOKDialogState = {
   apiKey: string;
   showApiKey: boolean;
   credentialError: string | null;
+  customProviderId: string;
+  customDisplayName: string;
+  customBaseUrl: string;
+  customProviderApi: string;
 };
 
 const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
@@ -180,6 +194,10 @@ const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
   apiKey: '',
   showApiKey: false,
   credentialError: null,
+  customProviderId: '',
+  customDisplayName: '',
+  customBaseUrl: '',
+  customProviderApi: 'openai-compatible',
 };
 
 function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialogState>) {
@@ -191,8 +209,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     updateBYOKDialogState,
     INITIAL_BYOK_DIALOG_STATE
   );
-  const { isDialogOpen, editingKeyId, selectedProvider, apiKey, showApiKey, credentialError } =
-    dialogState;
+  const {
+    isDialogOpen,
+    editingKeyId,
+    selectedProvider,
+    apiKey,
+    showApiKey,
+    credentialError,
+    customProviderId,
+    customDisplayName,
+    customBaseUrl,
+    customProviderApi,
+  } = dialogState;
   const setIsDialogOpen = (isDialogOpen: boolean) => updateDialogState({ isDialogOpen });
   const setEditingKeyId = (editingKeyId: string | null) => updateDialogState({ editingKeyId });
   const setSelectedProvider = (selectedProvider: string) => updateDialogState({ selectedProvider });
@@ -200,6 +228,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setShowApiKey = (showApiKey: boolean) => updateDialogState({ showApiKey });
   const setCredentialError = (credentialError: string | null) =>
     updateDialogState({ credentialError });
+  const setCustomProviderId = (customProviderId: string) => updateDialogState({ customProviderId });
+  const setCustomDisplayName = (customDisplayName: string) =>
+    updateDialogState({ customDisplayName });
+  const setCustomBaseUrl = (customBaseUrl: string) => updateDialogState({ customBaseUrl });
+  const setCustomProviderApi = (customProviderApi: string) =>
+    updateDialogState({ customProviderApi });
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -332,12 +366,46 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setApiKey('');
     setShowApiKey(false);
     setCredentialError(null);
+    setCustomProviderId('');
+    setCustomDisplayName('');
+    setCustomBaseUrl('');
+    setCustomProviderApi('openai-compatible');
   };
+
+  const isCustomProviderSelection =
+    selectedProvider === 'custom' ||
+    (editingKeyId !== null &&
+      keys?.some(
+        k =>
+          k.id === editingKeyId &&
+          k.base_url !== null &&
+          k.provider_api === 'openai-compatible'
+      ));
 
   const handleSave = () => {
     const error = validateStructuredCredentials(selectedProvider, apiKey);
     setCredentialError(error);
     if (error) return;
+    if (isCustomProviderSelection) {
+      const customId = customProviderId.trim();
+      if (!customId) {
+        toast.error('Enter a provider ID.');
+        return;
+      }
+      if (!customBaseUrl || !customBaseUrl.trim()) {
+        toast.error('Enter a base URL.');
+        return;
+      }
+      createMutation.mutate({
+        ...(organizationId && { organizationId }),
+        provider_id: customId as UserByokProviderId,
+        api_key: apiKey,
+        display_name: customDisplayName || undefined,
+        base_url: customBaseUrl || undefined,
+        provider_api: customProviderApi as 'openai-compatible' | undefined,
+      });
+      return;
+    }
     if (editingKeyId) {
       updateMutation.mutate({
         ...(organizationId && { organizationId }),
@@ -345,16 +413,37 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         api_key: apiKey,
       });
     } else {
-      const providerId = UserByokProviderIdSchema.safeParse(selectedProvider);
-      if (!providerId.success) {
-        toast.error('Select a supported provider.');
-        return;
+      if (selectedProvider === 'custom') {
+        // Custom provider: use user-entered provider ID
+        const customId = customProviderId.trim();
+        if (!customId) {
+          toast.error('Enter a provider ID.');
+          return;
+        }
+        if (!customBaseUrl || !customBaseUrl.trim()) {
+          toast.error('Enter a base URL.');
+          return;
+        }
+        createMutation.mutate({
+          ...(organizationId && { organizationId }),
+          provider_id: customId as UserByokProviderId,
+          api_key: apiKey,
+          display_name: customDisplayName || undefined,
+          base_url: customBaseUrl || undefined,
+          provider_api: customProviderApi as 'openai-compatible' | undefined,
+        });
+      } else {
+        const providerId = UserByokProviderIdSchema.safeParse(selectedProvider);
+        if (!providerId.success) {
+          toast.error('Select a supported provider.');
+          return;
+        }
+        createMutation.mutate({
+          ...(organizationId && { organizationId }),
+          provider_id: providerId.data,
+          api_key: apiKey,
+        });
       }
-      createMutation.mutate({
-        ...(organizationId && { organizationId }),
-        provider_id: providerId.data,
-        api_key: apiKey,
-      });
     }
   };
 
@@ -363,6 +452,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     const key = keys?.find((k: { id: string; provider_id: string }) => k.id === keyId);
     if (key) {
       setSelectedProvider(key.provider_id);
+      setCustomProviderId(key.provider_id);
+      setCustomDisplayName(key.display_name ?? '');
+      setCustomBaseUrl(key.base_url ?? '');
+      setCustomProviderApi(key.provider_api ?? 'openai-compatible');
     }
     setIsDialogOpen(true);
   };
@@ -771,24 +864,87 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </Alert>
                 )}
                 {editingKeyId ? (
-                  <Alert>
-                    <Lock className="size-4" />
-                    <AlertDescription>
-                      An API key is already saved for this provider. Enter a new key to replace it.
-                    </AlertDescription>
-                  </Alert>
+                    <Alert>
+                        <Lock className="size-4" />
+                        <AlertDescription>
+                            An API key is already saved for this provider. Enter a new key to replace it.
+                        </AlertDescription>
+                    </Alert>
                 ) : (
-                  <Alert>
-                    <Info className="size-4" />
-                    <AlertDescription>
-                      Your API key will be encrypted and stored securely. Once saved, it cannot be
-                      viewed again.
-                    </AlertDescription>
-                  </Alert>
+                    <Alert>
+                        <Info className="size-4" />
+                        <AlertDescription>
+                            Your API key will be encrypted and stored securely. Once saved, it cannot be
+                            viewed again.
+                        </AlertDescription>
+                    </Alert>
                 )}
-              </div>
+            </div>
 
-              {selectedProvider && getProviderModels(selectedProvider).length > 0 && (
+            {/* Custom provider fields - only show when Custom Provider is selected or editing a custom key */}
+            {isCustomProviderSelection && (
+                <div className="space-y-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="customProviderId">Provider ID</Label>
+                        <Input
+                            id="customProviderId"
+                            value={customProviderId}
+                            onChange={e => setCustomProviderId(e.target.value)}
+                            placeholder="Enter provider ID (e.g., my-custom-provider)"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            The identifier for your custom provider. This will be used to route requests to
+                            your custom endpoint.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="customDisplayName">Display Name</Label>
+                        <Input
+                            id="customDisplayName"
+                            value={customDisplayName}
+                            onChange={e => setCustomDisplayName(e.target.value)}
+                            placeholder="Enter display name (optional)"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="customBaseUrl">Base URL</Label>
+                        <Input
+                            id="customBaseUrl"
+                            value={customBaseUrl}
+                            onChange={e => setCustomBaseUrl(e.target.value)}
+                            placeholder="https://api.example.com/v1"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            The base URL for your custom API endpoint. Must be a valid HTTPS URL.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="customProviderApi">Provider API Type</Label>
+                        <Select
+                            id="customProviderApi"
+                            value={customProviderApi}
+                            onValueChange={setCustomProviderApi}
+                        >
+                            <SelectTrigger id="customProviderApi">
+                                <SelectValue placeholder="Select API type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="openai-compatible">
+                                    OpenAI Compatible
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                            The API type that your custom provider implements.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {selectedProvider && getProviderModels(selectedProvider).length > 0 && (
                 <div className="space-y-2">
                   <Label>Supported Models</Label>
                   <div className="text-muted-foreground rounded-md border p-3 text-sm">

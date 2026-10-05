@@ -22,6 +22,7 @@ import {
 } from '@/lib/ai-gateway/byok/types';
 import {
   UserByokProviderIdSchema,
+  type UserByokProviderId,
   UserByokTestModels,
   getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
@@ -31,6 +32,7 @@ import {
   getOpenRouterModelsMetadataFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@/lib/ai-gateway/byok';
@@ -49,8 +51,13 @@ const MANAGED_KEY_READ_ONLY_MESSAGE =
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 
 function validateVercelUserByokCredential(providerId: string, credential: string) {
+  // Only validate Vercel BYOK providers (those that use the Vercel AI Gateway)
   const parsedProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(providerId);
-  if (!parsedProviderId.success) return;
+  if (!parsedProviderId.success) {
+    // Not a Vercel BYOK provider (e.g., openrouter-byok or custom provider)
+    // Skip validation - these are validated at request time
+    return;
+  }
 
   try {
     getVercelInferenceProviderConfigForUserByok({
@@ -127,6 +134,102 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   return result;
 }
 
+async function testCustomOrOpenRouterByokKey(existingKey: typeof byok_api_keys.$inferSelect) {
+  const decryptedKey = decryptByokRow(existingKey);
+
+  function setup() {
+    const providerId = decryptedKey.providerId;
+
+    // Check if this is a direct BYOK provider
+    const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === providerId);
+    if (directByokProvider) {
+      const model = UserByokTestModels[providerId as UserByokProviderId] || 'gpt-4';
+      return {
+        finalProvider: providerId,
+        model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
+      };
+    }
+
+    // Check for openrouter-byok
+    if (providerId === 'openrouter-byok') {
+      const model = UserByokTestModels['openrouter-byok'] || 'gpt-4';
+      return {
+        finalProvider: 'openrouter',
+        model: createOpenAICompatible({
+          name: 'openaiCompatible',
+          apiKey: decryptedKey.decryptedAPIKey,
+          baseURL: 'https://openrouter.ai/api/v1',
+        })(model),
+      };
+    }
+
+    // Check for custom provider
+    if (decryptedKey.providerApi === 'openai-compatible' && decryptedKey.baseUrl) {
+      const model = UserByokTestModels[providerId as UserByokProviderId] || 'gpt-4';
+      return {
+        finalProvider: 'custom',
+        model: createOpenAICompatible({
+          name: 'openaiCompatible',
+          apiKey: decryptedKey.decryptedAPIKey,
+          baseURL: decryptedKey.baseUrl,
+        })(model),
+      };
+    }
+
+    // Fallback to Vercel BYOK config
+    const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
+    const model = UserByokTestModels[decryptedKey.providerId as UserByokProviderId] || 'gpt-4';
+    return {
+      finalProvider,
+      model: createGateway({
+        apiKey: VERCEL_AI_GATEWAY.apiKey,
+      })(model),
+       providerOptions: {
+         gateway: {
+           only: [finalProvider],
+           byok: { [finalProvider]: byokList },
+         } satisfies GatewayProviderOptions
+       },
+     };
+  }
+
+  try {
+    const { finalProvider, model, providerOptions } = setup();
+    const output = await generateText({
+      model,
+      prompt: 'Say hi',
+      maxOutputTokens: 1000,
+      providerOptions,
+    });
+
+    if (output.finishReason !== 'stop') {
+      logByokWarning('BYOK key test returned an unsuccessful completion', {
+        providerId: decryptedKey.providerId,
+      });
+      return { success: false, message: `API key test failed: ${output.finishReason}` };
+    }
+
+    const metadata = output.providerMetadata?.gateway?.routing as
+      | { originalModelId?: string; finalProvider?: string }
+      | undefined;
+
+    return {
+      success: true,
+      message: `API key test success. Provider: ${metadata?.finalProvider ?? finalProvider}. Model: ${metadata?.originalModelId ?? model.modelId}.`,
+    };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : undefined;
+    logByokWarning('BYOK key test request failed', {
+      providerId: decryptedKey.providerId,
+      message,
+    });
+    return {
+      success: false,
+      message: message ? `API key test failed: ${message}` : GENERIC_TEST_FAILURE_MESSAGE,
+    };
+  }
+}
+
 export const byokRouter = createTRPCRouter({
   listSupportedModels: baseProcedure
     .output(z.record(z.string(), z.array(z.string())))
@@ -147,6 +250,9 @@ export const byokRouter = createTRPCRouter({
         .select({
           id: byok_api_keys.id,
           provider_id: byok_api_keys.provider_id,
+          display_name: byok_api_keys.display_name,
+          base_url: byok_api_keys.base_url,
+          provider_api: byok_api_keys.provider_api,
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
@@ -160,10 +266,9 @@ export const byokRouter = createTRPCRouter({
             : eq(byok_api_keys.kilo_user_id, ctx.user.id)
         );
 
-      // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
       return keys.map(key => ({
         ...key,
-        provider_name: key.provider_id,
+        provider_name: key.display_name ?? key.provider_id,
       }));
     }),
 
@@ -171,14 +276,19 @@ export const byokRouter = createTRPCRouter({
     .input(CreateBYOKKeyInputSchema)
     .output(BYOKApiKeyResponseSchema)
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
-      const { organizationId, provider_id, api_key } = input;
+      const { organizationId, provider_id, api_key, display_name, base_url, provider_api } = input;
 
       // If organizationId provided, verify owner/billing access
       if (organizationId) {
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
-      validateVercelUserByokCredential(provider_id, api_key);
+      // Validate non-Vercel BYOK providers (skip validation for Vercel providers, handled elsewhere)
+      const isVercelProvider =
+        VercelUserByokInferenceProviderIdSchema.safeParse(provider_id).success;
+      if (!isVercelProvider) {
+        validateVercelUserByokCredential(provider_id, api_key);
+      }
 
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
@@ -190,12 +300,18 @@ export const byokRouter = createTRPCRouter({
           organization_id: organizationId ?? null,
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
+          display_name: display_name ?? null,
+          base_url: base_url ?? null,
+          provider_api: provider_api ?? null,
           encrypted_api_key: encrypted,
           created_by: ctx.user.id,
         })
         .returning({
           id: byok_api_keys.id,
           provider_id: byok_api_keys.provider_id,
+          display_name: byok_api_keys.display_name,
+          base_url: byok_api_keys.base_url,
+          provider_api: byok_api_keys.provider_api,
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
@@ -217,7 +333,7 @@ export const byokRouter = createTRPCRouter({
 
       return {
         ...newKey,
-        provider_name: provider_id,
+        provider_name: newKey.display_name ?? newKey.provider_id,
       };
     }),
 
@@ -278,6 +394,9 @@ export const byokRouter = createTRPCRouter({
         .returning({
           id: byok_api_keys.id,
           provider_id: byok_api_keys.provider_id,
+          display_name: byok_api_keys.display_name,
+          base_url: byok_api_keys.base_url,
+          provider_api: byok_api_keys.provider_api,
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
@@ -361,6 +480,9 @@ export const byokRouter = createTRPCRouter({
         .returning({
           id: byok_api_keys.id,
           provider_id: byok_api_keys.provider_id,
+          display_name: byok_api_keys.display_name,
+          base_url: byok_api_keys.base_url,
+          provider_api: byok_api_keys.provider_api,
           created_at: byok_api_keys.created_at,
           updated_at: byok_api_keys.updated_at,
           created_by: byok_api_keys.created_by,
@@ -395,16 +517,7 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
-      const [existingKey] = await db
-        .select({
-          organization_id: byok_api_keys.organization_id,
-          kilo_user_id: byok_api_keys.kilo_user_id,
-          provider_id: byok_api_keys.provider_id,
-          encrypted_api_key: byok_api_keys.encrypted_api_key,
-          management_source: byok_api_keys.management_source,
-        })
-        .from(byok_api_keys)
-        .where(eq(byok_api_keys.id, id));
+      const [existingKey] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, id));
 
       if (!existingKey) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
@@ -422,6 +535,11 @@ export const byokRouter = createTRPCRouter({
 
       const providerId = UserByokProviderIdSchema.safeParse(existingKey.provider_id);
       if (!providerId.success) {
+        // Check if this is a valid custom provider ID
+        if (existingKey.base_url && existingKey.provider_api === 'openai-compatible') {
+          // Proceed with custom provider test - decryptByokRow will use the raw ID
+          return testCustomOrOpenRouterByokKey(existingKey);
+        }
         return {
           success: false,
           message: `Provider ${existingKey.provider_id} is no longer supported.`,
@@ -441,17 +559,43 @@ export const byokRouter = createTRPCRouter({
       }
 
       function setup() {
-        const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
-        const model = UserByokTestModels[provider];
+        const providerId = decryptedKey.providerId;
+        const model = UserByokTestModels[providerId] || 'gpt-4';
 
-        const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === provider);
+        // Check if this is a direct BYOK provider
+        const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === providerId);
         if (directByokProvider) {
           return {
-            finalProvider: provider,
+            finalProvider: providerId,
             model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
           };
         }
 
+        // Check for openrouter-byok
+        if (providerId === 'openrouter-byok') {
+          return {
+            finalProvider: 'openrouter',
+            model: createOpenAICompatible({
+              name: 'openaiCompatible',
+              apiKey: decryptedKey.decryptedAPIKey,
+              baseURL: 'https://openrouter.ai/api/v1',
+            })(model),
+          };
+        }
+
+        // Check for custom provider
+        if (decryptedKey.providerApi === 'openai-compatible' && decryptedKey.baseUrl) {
+          return {
+            finalProvider: 'custom',
+            model: createOpenAICompatible({
+              name: 'openaiCompatible',
+              apiKey: decryptedKey.decryptedAPIKey,
+              baseURL: decryptedKey.baseUrl,
+            })(model),
+          };
+        }
+
+        // Fallback to Vercel BYOK config
         const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
         return {
           finalProvider,

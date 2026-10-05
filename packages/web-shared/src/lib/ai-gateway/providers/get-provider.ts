@@ -12,16 +12,21 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
+  getAllBYOKRowsForOrganization,
+  getAllBYOKRowsForUser,
 } from '@/lib/ai-gateway/byok';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
+import { isPrivateUrl } from '@/lib/ai-gateway/ssrf-protection';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
-import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
+import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { createAiSdkProvider } from '@/lib/ai-gateway/providers/direct-byok';
+import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import { checkOpenAiChatGptByok } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
 import { buildDirectProvider } from '@/lib/ai-gateway/providers/build-direct-provider';
@@ -54,21 +59,124 @@ export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string };
 
+async function checkOpenRouterBYOK(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  organizationId: string | undefined
+): Promise<GetProviderProviderResult | null> {
+  if (isAnonymousContext(user)) return null;
+
+  const userByok = organizationId
+    ? await getBYOKforOrganization(readDb, organizationId, ['openrouter-byok'])
+    : await getBYOKforUser(readDb, user.id, ['openrouter-byok']);
+  if (!userByok || userByok.length === 0) {
+    return null;
+  }
+
+  const openrouterByok = userByok[0];
+
+  if (openrouterByok.baseUrl && isPrivateUrl(openrouterByok.baseUrl)) {
+    console.warn(`SECURITY: OpenRouter BYOK for user ${user.id} points to a private URL: ${openrouterByok.baseUrl}`);
+    return null;
+  }
+
+  return {
+    kind: 'provider',
+    provider: {
+      id: 'openrouter-byok',
+      apiUrl: openrouterByok.baseUrl ?? 'https://openrouter.ai/api/v1',
+      apiUrlOverrides: {},
+      disableUrlSuffix: false,
+      apiKey: openrouterByok.decryptedAPIKey,
+      apiKeyHeader: null,
+      supportedChatApis: ['chat_completions', 'messages', 'responses'],
+      responseTransforms: null,
+      async transformRequest(context) {
+        if (openrouterByok.baseUrl) {
+          context.provider.apiUrl = openrouterByok.baseUrl;
+        }
+      },
+    } satisfies Provider,
+    userByok,
+    bypassAccessCheck: true,
+  };
+}
+
+async function checkCustomBYOK(
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined
+): Promise<GetProviderProviderResult | null> {
+  if (isAnonymousContext(user)) return null;
+
+  // Get all BYOK entries for the user/organization
+  const userByok = organizationId
+    ? await getAllBYOKRowsForOrganization(readDb, organizationId)
+    : await getAllBYOKRowsForUser(readDb, user.id);
+  if (!userByok || userByok.length === 0) {
+    return null;
+  }
+
+  // Look for a BYOK entry that has a base_url (indicating a custom provider)
+  // and is not a known direct BYOK provider (handled by checkDirectBYOK)
+  // or openrouter-byok (handled by checkOpenRouterBYOK)
+  const directByokIds = DIRECT_BYOK_PROVIDERS.map(p => p.id);
+  const knownProviderIds = [...directByokIds, 'openrouter-byok'];
+
+  const customByok = userByok.find(
+    byok => byok.baseUrl !== null && !knownProviderIds.includes(byok.providerId)
+  );
+  if (!customByok) {
+    return null;
+  }
+
+  if (customByok.baseUrl && isPrivateUrl(customByok.baseUrl)) {
+    console.warn(`SECURITY: Custom BYOK provider for user ${user.id} points to a private URL: ${customByok.baseUrl}`);
+    return null;
+  }
+
+  return {
+    kind: 'provider',
+    provider: {
+      id: 'custom',
+      apiUrl: customByok.baseUrl ?? 'https://openrouter.ai/api/v1',
+      apiUrlOverrides: {},
+      disableUrlSuffix: false,
+      apiKey: customByok.decryptedAPIKey,
+      apiKeyHeader: null,
+      supportedChatApis: ['chat_completions', 'messages', 'responses'],
+      responseTransforms: null,
+      async transformRequest(context) {
+        if (customByok.baseUrl) {
+          context.provider.apiUrl = customByok.baseUrl;
+        }
+      },
+    } satisfies Provider,
+    userByok: [customByok],
+    bypassAccessCheck: true,
+  };
+}
+
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
 ): Promise<GetProviderProviderResult | null> {
-  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
+  if (isAnonymousContext(user)) return null;
+
+  // Get the direct BYOK provider that matches the requested model
+  const { provider: directByok, model: directByokModel } =
+    await getDirectByokModel(requestedModel);
   if (!directByok || !directByokModel) {
     return null;
   }
+
   const userByok = organizationId
     ? await getBYOKforOrganization(readDb, organizationId, [directByok.id])
     : await getBYOKforUser(readDb, user.id, [directByok.id]);
   if (!userByok || userByok.length === 0) {
     return null;
   }
+
   return {
     kind: 'provider',
     provider: {
@@ -211,6 +319,11 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return directByokByok;
   }
 
+  const openRouterByok = await checkOpenRouterBYOK(user, requestedModel, organizationId);
+  if (openRouterByok) {
+    return openRouterByok;
+  }
+
   // An enabled "Sign in with ChatGPT" connection wins for an eligible OpenAI
   // responses request, before the Vercel BYOK lookup. A connection whose
   // credential is terminally dead must fail readably instead of resolving to
@@ -247,6 +360,11 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     if (customLlmResult) {
       return customLlmResult;
     }
+  }
+
+  const customByok = await checkCustomBYOK(user, organizationId);
+  if (customByok) {
+    return customByok;
   }
 
   const eligibleForVercelRouting =

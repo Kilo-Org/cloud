@@ -13,6 +13,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   neuralwatt: 'Neuralwatt',
   'nvidia-byok': 'NVIDIA BYOK',
   'ollama-cloud': 'Ollama Cloud',
+  'openrouter-byok': 'OpenRouter',
   'opencode-go': 'OpenCode Go',
   orcarouter: 'OrcaRouter',
   synthetic: 'Synthetic',

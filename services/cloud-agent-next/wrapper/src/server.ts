@@ -53,8 +53,6 @@ export type ServerConfig = {
   wrapperInstanceGeneration?: number;
   /** Product surface that created the session, e.g. code-review. */
   platform?: string;
-  /** Code review that must publish a summary: self-check once if none was written. */
-  publicationSelfCheck?: boolean;
 };
 
 export type ServerDependencies = {
@@ -69,6 +67,8 @@ export type ServerDependencies = {
   resetLifecycle: () => void;
   /** Notify lifecycle after an acknowledgement guard clears. */
   onDeliveryAcknowledged?: (kind: 'async-prompt' | 'sync-command' | 'failed') => void;
+  /** Notify lifecycle that a new admitted batch started. */
+  onMessageAccepted?: () => void;
   /** Workspace/Kilo readiness path */
   readySession?: (
     request: WrapperSessionReadyRequest,
@@ -357,7 +357,6 @@ export async function bindSessionContext(
       ingestToken: binding.ingestToken,
       workerAuthToken: binding.workerAuthToken,
       platform: config.platform,
-      publicationSelfCheck: config.publicationSelfCheck,
       wrapperRunId: binding.wrapperRunId,
       wrapperGeneration: binding.wrapperGeneration,
       wrapperConnectionId: binding.wrapperConnectionId,
@@ -376,7 +375,6 @@ export async function bindSessionContext(
     ingestToken: binding.ingestToken,
     workerAuthToken: binding.workerAuthToken,
     platform: config.platform,
-    publicationSelfCheck: config.publicationSelfCheck,
     wrapperRunId: binding.wrapperRunId,
     wrapperGeneration: binding.wrapperGeneration,
     wrapperConnectionId: binding.wrapperConnectionId,
@@ -538,6 +536,7 @@ export function createPromptHandler(config: ServerConfig, deps: ServerDependenci
         ? { commitCoAuthor: prompt.finalization.commitCoAuthor }
         : {}),
     });
+    if (addedMessage) deps.onMessageAccepted?.();
 
     try {
       await kiloClient.sendPromptAsync({
@@ -625,6 +624,7 @@ export function createCommandHandler(config: ServerConfig, deps: ServerDependenc
           ...(body.commitCoAuthor ? { commitCoAuthor: body.commitCoAuthor } : {}),
         })
       : false;
+    if (addedMessage) deps.onMessageAccepted?.();
 
     if (!state.isConnected) {
       try {

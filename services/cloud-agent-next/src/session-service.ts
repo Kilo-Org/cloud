@@ -16,6 +16,7 @@ import {
   normalizeKilocodeModel,
 } from './persistence/model-utils.js';
 import {
+  installationBotIdentityFromEnv,
   installationGitAuthorFromEnv,
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
@@ -26,6 +27,12 @@ import {
   resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
+import {
+  GITHUB_REVIEW_API_BASE_ENV,
+  GITHUB_REVIEW_MCP_SERVER_NAME,
+  GITHUB_REVIEW_TARGET_ENV,
+  serializeGitHubReviewTarget,
+} from './shared/github-review-target.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from './runtime-credential-proxy.js';
 import { ExecutionError } from './execution/errors.js';
@@ -1121,6 +1128,8 @@ export class SessionService {
     sessionHome?: string;
     githubRepo?: string;
     githubToken?: string;
+    githubPullRequestNumber?: number;
+    githubAppType?: 'standard' | 'lite';
     gitUrl?: string;
     gitToken?: string;
     gitlabTokenManaged?: boolean;
@@ -1155,6 +1164,8 @@ export class SessionService {
       botId: options.botId,
       githubRepo: options.githubRepo,
       githubToken: options.githubToken,
+      githubPullRequestNumber: options.githubPullRequestNumber,
+      githubAppType: options.githubAppType,
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
       gitlabTokenManaged: options.gitlabTokenManaged,
@@ -1190,6 +1201,8 @@ export class SessionService {
       originalOrgId: opts.originalOrgId,
       githubToken: context.githubToken,
       githubRepo: context.githubRepo,
+      githubPullRequestNumber: context.githubPullRequestNumber,
+      githubAppType: context.githubAppType,
       createdOnPlatform: opts.createdOnPlatform,
       callbackTarget: opts.callbackTarget,
       appendSystemPrompt: opts.appendSystemPrompt,
@@ -1219,6 +1232,8 @@ export class SessionService {
       originalOrgId,
       githubToken,
       githubRepo,
+      githubPullRequestNumber,
+      githubAppType,
       createdOnPlatform,
       callbackTarget,
       appendSystemPrompt,
@@ -1242,6 +1257,20 @@ export class SessionService {
     const mcpServers = profile?.mcpServers;
     const runtimeAgents = profile?.runtimeAgents;
     const kiloCommands = profile?.kiloCommands;
+
+    // A profile may not forge the publication tool or its trusted target, so
+    // both are stripped for every session; the real server is attached by the
+    // wrapper only when the sandbox env carries a worker-set target.
+    const sanitizedMcpServers = mcpServers
+      ? Object.fromEntries(
+          Object.entries(mcpServers).filter(([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME)
+        )
+      : undefined;
+    const isGithubCodeReview =
+      createdOnPlatform === 'code-review' &&
+      platform === 'github' &&
+      githubRepo !== undefined &&
+      githubPullRequestNumber !== undefined;
 
     const kilocodeOrganizationId = env.KILOCODE_ORG_ID_OVERRIDE ?? originalOrgId;
 
@@ -1293,6 +1322,8 @@ export class SessionService {
         delete envVars[key];
       }
     }
+    delete envVars[GITHUB_REVIEW_TARGET_ENV];
+    delete envVars[GITHUB_REVIEW_API_BASE_ENV];
 
     const providerOptions: Record<string, string> = {
       apiKey: kiloCapability,
@@ -1414,8 +1445,11 @@ export class SessionService {
       // alive for the session, which the sandbox does not budget for.
       indexing: { enabled: false },
     };
-    if (!bitbucketInputPath && mcpServers && Object.keys(mcpServers).length > 0) {
-      const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
+    if (!bitbucketInputPath && sanitizedMcpServers && Object.keys(sanitizedMcpServers).length > 0) {
+      const materialized = materializeMcpServers(
+        sanitizedMcpServers,
+        env.AGENT_ENV_VARS_PRIVATE_KEY
+      );
       configContent.mcp = materialized;
       logger.info('MCP config merged into KILO_CONFIG_CONTENT', {
         mcpServerNames: Object.keys(materialized),
@@ -1468,7 +1502,26 @@ export class SessionService {
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
     envVars.KILO_DISABLE_CODEBASE_INDEXING = 'vscode-no-workspace';
-    if (!baseEnvVars.GH_TOKEN) {
+    if (
+      isGithubCodeReview &&
+      githubToken &&
+      githubRepo &&
+      githubPullRequestNumber !== undefined &&
+      githubAppType !== undefined
+    ) {
+      // A bound code review always uses the worker-resolved token and target,
+      // even when the profile set GH_TOKEN.
+      envVars.GH_TOKEN = githubToken;
+      const botIdentity = installationBotIdentityFromEnv(env, githubAppType);
+      if (botIdentity) {
+        envVars[GITHUB_REVIEW_TARGET_ENV] = serializeGitHubReviewTarget({
+          repo: githubRepo,
+          pullRequestNumber: githubPullRequestNumber,
+          appType: githubAppType,
+          botUserId: botIdentity.userId,
+        });
+      }
+    } else if (!baseEnvVars.GH_TOKEN) {
       if (githubToken && githubRepo) {
         envVars.GH_TOKEN = githubToken;
       } else if (platform === 'github' && gitToken) {
@@ -2049,6 +2102,8 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
+      githubPullRequestNumber: github?.pullRequestNumber,
+      githubAppType: resolvedTokens.githubAppType,
       gitUrl:
         resolvedTokens.gitlabCapabilityGitUrl ??
         resolvedTokens.bitbucketCapabilityGitUrl ??
@@ -2080,6 +2135,8 @@ export class SessionService {
       originalOrgId: orgId,
       githubToken: resolvedTokens.githubToken,
       githubRepo: github?.repo,
+      githubPullRequestNumber: github?.pullRequestNumber,
+      githubAppType: resolvedTokens.githubAppType,
       createdOnPlatform: metadata.identity.createdOnPlatform,
       callbackTarget: metadata.callback?.target,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
@@ -2324,6 +2381,8 @@ export class SessionService {
       sessionHome,
       githubRepo: github?.repo,
       githubToken: resolvedTokens.githubToken,
+      githubPullRequestNumber: github?.pullRequestNumber,
+      githubAppType: resolvedTokens.githubAppType,
       gitUrl:
         resolvedTokens.gitlabCapabilityGitUrl ??
         resolvedTokens.bitbucketCapabilityGitUrl ??
@@ -3034,6 +3093,8 @@ type GetSaferEnvVarsOptions = {
   originalOrgId?: string;
   githubToken?: string;
   githubRepo?: string;
+  githubPullRequestNumber?: number;
+  githubAppType?: 'standard' | 'lite';
   createdOnPlatform?: string;
   callbackTarget?: NonNullable<CloudAgentSessionState['callback']>['target'];
   appendSystemPrompt?: string;

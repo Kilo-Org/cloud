@@ -117,8 +117,10 @@ RUN mkdir -p /opt/kilo-cloud \
     && bun build src/main.ts --outfile=/opt/kilo-cloud/kilocode-wrapper.js --target=bun --minify \
     && bun build src/restore-session.ts --outfile=/opt/kilo-cloud/kilo-restore-session.js --target=bun --minify \
     && bun build src/bitbucket-review-cli.ts --outfile=/opt/kilo-cloud/bb --target=bun --minify \
+    && bun build src/github-review-publish-mcp.ts --outfile=/opt/kilo-cloud/github-review-publish-mcp --target=bun --minify \
     && bun build src/control-plane/main.ts --outfile=/opt/kilo-cloud/kilocode-control-plane-wrapper.js --target=bun --minify \
     && chmod +x /opt/kilo-cloud/bb \
+    && chmod +x /opt/kilo-cloud/github-review-publish-mcp \
     && cp control-plane-supervisor.sh /opt/kilo-cloud/kilocode-control-plane-supervisor.sh \
     && chmod +x /opt/kilo-cloud/kilocode-control-plane-supervisor.sh \
     && ln -sf /opt/kilo-cloud/kilocode-wrapper.js /usr/local/bin/kilocode-wrapper.js \
@@ -126,6 +128,7 @@ RUN mkdir -p /opt/kilo-cloud \
     && ln -sf /opt/kilo-cloud/kilocode-control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh \
     && ln -sf /opt/kilo-cloud/kilo-restore-session.js /usr/local/bin/kilo-restore-session.js \
     && ln -sf /opt/kilo-cloud/bb /usr/local/bin/bb \
+    && ln -sf /opt/kilo-cloud/github-review-publish-mcp /usr/local/bin/github-review-publish-mcp \
     && rm -rf /tmp/wrapper-build
 
 # Boot script for rootless Docker-in-Docker.

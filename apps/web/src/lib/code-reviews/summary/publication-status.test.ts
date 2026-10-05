@@ -76,7 +76,7 @@ describe('classifyCodeReviewPublication', () => {
     ).toBe('published');
   });
 
-  it('returns published when the baseline was observed with no previous body and a marker-only current body', () => {
+  it('returns missing when a marker-only current body has no summary wording', () => {
     expect(
       classifyCodeReviewPublication({
         kind: 'summary',
@@ -84,7 +84,26 @@ describe('classifyCodeReviewPublication', () => {
         previousSummaryBody: null,
         previousSummaryObserved: true,
       })
-    ).toBe('published');
+    ).toBe('missing');
+  });
+
+  it('returns missing when the current body is only the marker and reserved sections', () => {
+    expect(
+      classifyCodeReviewPublication({
+        kind: 'summary',
+        summaryBody: [
+          '<!-- kilo-review -->',
+          '<!-- kilo-review-history -->',
+          'old',
+          '<!-- /kilo-review-history -->',
+          '---',
+          '<!-- kilo-usage -->',
+          '<sub>Reviewed by model</sub>',
+        ].join('\n'),
+        previousSummaryBody: null,
+        previousSummaryObserved: true,
+      })
+    ).toBe('missing');
   });
 
   it('returns unknown when the baseline observation failed even with a previous body', () => {

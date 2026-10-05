@@ -139,6 +139,7 @@ const MetadataRepositorySchema = z.preprocess(
           githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
           githubInstallationId: z.string().optional(),
           githubAppType: z.enum(['standard', 'lite']).optional(),
+          pullRequestNumber: z.number().int().positive().optional(),
           ...RepositoryCommonSchema,
         })
         .strip(),

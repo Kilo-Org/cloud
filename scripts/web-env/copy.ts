@@ -76,7 +76,7 @@ export function planEnvironment(
   }
 
   const byName = (left: { name: string }, right: { name: string }) =>
-    left.name.localeCompare(right.name);
+    left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
   return { variables: variables.sort(byName), skipped: skipped.sort(byName) };
 }
 

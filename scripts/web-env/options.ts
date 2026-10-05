@@ -50,6 +50,15 @@ function assertVariableName(name: string): void {
   }
 }
 
+// Existing Vercel keys may use any case, unlike new variables created by `set`.
+function assertExistingVariableName(name: string): void {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+    throw new Error(
+      'Variable names must contain only letters, digits, and underscores, and not start with a digit.'
+    );
+  }
+}
+
 function flagValue(
   args: string[],
   index: number,
@@ -133,7 +142,7 @@ function parseCopyOptions(args: string[]): CopyOptions {
       index += onlyFlag.consumed - 1;
     } else if (excludeFlag) {
       if (!excludeFlag.value) usage();
-      assertVariableName(excludeFlag.value);
+      assertExistingVariableName(excludeFlag.value);
       exclude.push(excludeFlag.value);
       index += excludeFlag.consumed - 1;
     } else {

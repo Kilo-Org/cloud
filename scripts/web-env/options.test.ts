@@ -83,3 +83,39 @@ void test('parseOptions requires distinct known projects for a copy', () => {
     /must be different projects/
   );
 });
+
+void test('parseOptions excludes existing variables with their exact case', () => {
+  assert.deepEqual(
+    parseOptions([
+      'copy',
+      '--from',
+      'kilocode-global-app',
+      '--to',
+      'kilocode-ai-gateway',
+      '--exclude',
+      'apiUrl',
+      '--exclude=Mixed_Case_2',
+    ]),
+    {
+      command: 'copy',
+      from: 'kilocode-global-app',
+      to: 'kilocode-ai-gateway',
+      dryRun: false,
+      only: undefined,
+      exclude: ['apiUrl', 'Mixed_Case_2'],
+    }
+  );
+  assert.throws(
+    () =>
+      parseOptions([
+        'copy',
+        '--from',
+        'kilocode-global-app',
+        '--to',
+        'kilocode-ai-gateway',
+        '--exclude',
+        '2FAST',
+      ]),
+    /not start with a digit/
+  );
+});

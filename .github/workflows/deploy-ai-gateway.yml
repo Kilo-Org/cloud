@@ -1,0 +1,88 @@
+name: Deploy AI Gateway
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options: [production, staging]
+        default: production
+
+permissions:
+  contents: read
+  deployments: read
+
+# Shares the scheduled deploy's group so a gateway deploy never overlaps that
+# environment's migrations.
+concurrency:
+  group: deploy-${{ inputs.target_environment }}
+  cancel-in-progress: false
+
+jobs:
+  resolve-release:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      source_sha: ${{ steps.release.outputs.source_sha }}
+
+    steps:
+      - name: Verify main branch and Vercel project
+        env:
+          VERCEL_PROJECT_ID_AI_GATEWAY: ${{ vars.VERCEL_PROJECT_ID_AI_GATEWAY }}
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::This workflow must be run from main. Got: $GITHUB_REF"
+            exit 1
+          fi
+          if [ -z "$VERCEL_PROJECT_ID_AI_GATEWAY" ]; then
+            echo "::error::Set the VERCEL_PROJECT_ID_AI_GATEWAY repository variable first"
+            exit 1
+          fi
+
+      # Deploy the commit the scheduled deploy last completed for this
+      # environment, so the gateway runs the same code as the web app against
+      # an already-migrated database.
+      - name: Find the last completed release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: |
+          set -euo pipefail
+          deployments=$(gh api "repos/$GITHUB_REPOSITORY/deployments?environment=scheduled-deploy-$TARGET_ENVIRONMENT&per_page=100" \
+            --jq '.[] | [.id, .sha] | @tsv')
+          while read -r deployment_id sha; do
+            if [ -z "$deployment_id" ]; then
+              continue
+            fi
+            state=$(gh api "repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses?per_page=1" \
+              --jq '.[0].state // empty')
+            if [ "$state" = success ]; then
+              echo "source_sha=$sha" >> "$GITHUB_OUTPUT"
+              echo "Deploying \`$sha\`, the last completed $TARGET_ENVIRONMENT release." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          done <<< "$deployments"
+          echo "::error::No completed $TARGET_ENVIRONMENT release was found"
+          exit 1
+
+  stage:
+    needs: resolve-release
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: ${{ inputs.target_environment }}
+      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
+      source_sha: ${{ needs.resolve-release.outputs.source_sha }}
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
+
+  promote:
+    needs: stage
+    if: inputs.target_environment == 'production'
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage.outputs.deployment_url }}
+    secrets:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

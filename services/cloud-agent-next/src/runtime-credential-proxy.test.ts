@@ -15,7 +15,12 @@ import {
   EXA_PROXY_PATHS,
   inferRuntimeCredentialProxyRoute,
   resolveRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyScopedIngestRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import {
+  buildVercelCredentialNetworkPolicy,
+  findMatchingCredentialInjectionRule,
+} from './sandbox-control/vercel-network-policy.js';
 
 type ControlFence = Extract<RuntimeProxyFence, { plane: 'control' }>;
 
@@ -390,6 +395,111 @@ describe('runtime credential proxy', () => {
     ['encoded traversal', 'https://worker.example.test/runtime/%252e%252e/other', null],
   ])('accepts only a safe facade %s', (_name, workerUrl, expected) => {
     expect(runtimeCredentialProxyFacadeBaseUrl(workerUrl)).toBe(expected);
+  });
+
+  it('keeps raw credentials root-only while allowing exact scoped descendant POST routes', () => {
+    const root = 'ses_12345678901234567890123456';
+    const child = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const input = {
+      targets,
+      route: 'ingest' as const,
+      method: 'POST',
+      pathname: `/api/session/${child}/ingest`,
+      search: '?v=2',
+      kiloSessionId: root,
+      contentType: 'application/json',
+    };
+    expect(resolveRuntimeCredentialProxyRoute(input)).toBeNull();
+    expect(resolveRuntimeCredentialProxyScopedIngestRoute(input)?.toString()).toBe(
+      `https://ingest.example.test/api/session/${child}/ingest?v=2`
+    );
+    for (const parentSessionId of [undefined, root, child]) {
+      const bootstrap = {
+        ...input,
+        pathname: '/api/session',
+        bodyText: JSON.stringify({ sessionId: child, parentSessionId }),
+      };
+      expect(resolveRuntimeCredentialProxyRoute(bootstrap)).toBeNull();
+      expect(resolveRuntimeCredentialProxyScopedIngestRoute(bootstrap)).not.toBeNull();
+    }
+    for (const pathname of [
+      `/api/session/${child}/export`,
+      `/api/session/${child}/title`,
+      `/api/session/${child}/ingest/`,
+      `/api/session/${child}%2fother/ingest`,
+      `/api/session/${child}%252fother/ingest`,
+      `/api/session/${child}/../ingest`,
+      `/api/session/${child}\\other/ingest`,
+      '/internal/cloud-agent/v1/session',
+      '/api/session/other/ingest',
+      `/api/session/${root}/ingest`,
+    ]) {
+      expect(resolveRuntimeCredentialProxyScopedIngestRoute({ ...input, pathname })).toBeNull();
+    }
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD']) {
+      expect(resolveRuntimeCredentialProxyScopedIngestRoute({ ...input, method })).toBeNull();
+    }
+    for (const bodyText of [
+      JSON.stringify({ sessionId: root }),
+      JSON.stringify({ sessionId: child, extra: true }),
+      JSON.stringify({ sessionId: child, parentSessionId: 'unrelated' }),
+      JSON.stringify({ sessionId: 'other' }),
+      '{}',
+      '[]',
+      '{',
+      ' '.repeat(8193),
+    ]) {
+      expect(
+        resolveRuntimeCredentialProxyScopedIngestRoute({
+          ...input,
+          pathname: '/api/session',
+          bodyText,
+        })
+      ).toBeNull();
+    }
+  });
+
+  it('mediates descendant POSTs in Vercel without injecting a raw bearer or expanding child reads', () => {
+    const root = 'ses_12345678901234567890123456';
+    const child = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const base = 'https://worker.example.test/runtime';
+    const handle = 'opaque-handle';
+    const policy = buildVercelCredentialNetworkPolicy({
+      kilo: {
+        token: 'raw-secret',
+        placeholder: 'placeholder',
+        targets,
+        rootSessionIds: [root],
+        runtimeProxy: {
+          targets: { backendBaseUrl: base, providerBaseUrl: base, sessionIngestBaseUrl: base },
+          members: [{ sessionId: 'agent_proxy', kiloSessionId: root, handle }],
+        },
+      },
+    });
+    const rules = policy.injectionRules ?? [];
+    for (const path of ['/api/session', `/api/session/${child}/ingest`]) {
+      const rule = findMatchingCredentialInjectionRule(rules, {
+        url: new URL(`${base}${path}`),
+        method: 'POST',
+        headers: new Headers({ Authorization: `Bearer ${handle}` }),
+      });
+      expect(rule?.headers.authorization).toBe(`Bearer ${handle}`);
+    }
+    for (const [method, path] of [
+      ['GET', `/api/session/${child}/export`],
+      ['GET', `/api/session/${child}/ingest`],
+      ['PUT', `/api/session/${child}/ingest`],
+      ['POST', '/internal/cloud-agent/v1/session'],
+    ]) {
+      expect(
+        findMatchingCredentialInjectionRule(rules, {
+          url: new URL(`${base}${path}`),
+          method,
+          headers: new Headers({ Authorization: `Bearer ${handle}` }),
+        })
+      ).toBeUndefined();
+    }
+    expect(JSON.stringify(rules)).not.toContain('raw-secret');
   });
 
   it('requires exact identity and strict JSON for session creation', () => {

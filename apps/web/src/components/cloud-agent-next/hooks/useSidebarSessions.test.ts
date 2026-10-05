@@ -1,4 +1,5 @@
 import type { MessageDeliveryState, UserWebSessionEventData } from '@kilocode/cloud-agent-sdk';
+import { TRPCClientError } from '@trpc/client';
 import React, { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -15,19 +16,132 @@ import {
   deriveForegroundSessionStatus,
   eventRowMatchesSidebarFilters,
   eventRowToDbSession,
+  getRunningSessionSortTime,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
   groupSidebarSessions,
   groupSidebarSessionsByDate,
   mergeWorktreeChatSessions,
+  nextPrLinkVerification,
+  PR_LINK_ATTEMPT_HISTORY_LIMIT,
+  recordPrLinkVerificationAttempt,
+  shouldRetryPrLinkVerification,
   patchSidebarWorktreeSessionStatus,
   removeSidebarDbSession,
   sessionCacheKey,
   SIDEBAR_RECONCILE_DELAY_MS,
+  SIDEBAR_RUNNING_BUMP_INTERVAL_MS,
   upsertSidebarDbSession,
+  type SidebarSortPins,
   type SidebarWorktreeDetails,
 } from './useSidebarSessions';
+
+describe('shouldRetryPrLinkVerification', () => {
+  it.each([
+    'INTERNAL_SERVER_ERROR',
+    'BAD_GATEWAY',
+    'SERVICE_UNAVAILABLE',
+    'GATEWAY_TIMEOUT',
+    'TIMEOUT',
+  ])('retries %s only once', code => {
+    const error = new TRPCClientError('Temporary failure', {
+      result: { error: { code: -32603, message: 'Temporary failure', data: { code } } },
+    });
+    expect(shouldRetryPrLinkVerification(0, error)).toBe(true);
+    expect(shouldRetryPrLinkVerification(1, error)).toBe(false);
+    expect(shouldRetryPrLinkVerification(2, error)).toBe(false);
+  });
+
+  it.each([
+    'BAD_REQUEST',
+    'TOO_MANY_REQUESTS',
+    'UNAUTHORIZED',
+    'FORBIDDEN',
+    'NOT_FOUND',
+    'PRECONDITION_FAILED',
+  ])('does not retry %s', code => {
+    const error = new TRPCClientError('Permanent failure', {
+      result: { error: { code: -32000, message: 'Permanent failure', data: { code } } },
+      cause: new TypeError('Failed to fetch'),
+    });
+    expect(shouldRetryPrLinkVerification(0, error)).toBe(false);
+  });
+
+  it('retries a tRPC network failure only once', () => {
+    const error = TRPCClientError.from(new TypeError('Failed to fetch'));
+    expect(shouldRetryPrLinkVerification(0, error)).toBe(true);
+    expect(shouldRetryPrLinkVerification(1, error)).toBe(false);
+  });
+
+  it('does not retry unknown or untyped failures', () => {
+    expect(shouldRetryPrLinkVerification(0, new Error('Unknown failure'))).toBe(false);
+    expect(shouldRetryPrLinkVerification(0, new TRPCClientError('Unknown failure'))).toBe(false);
+    expect(shouldRetryPrLinkVerification(0, { data: { code: 'TIMEOUT' } })).toBe(false);
+  });
+});
+
+describe('recordPrLinkVerificationAttempt', () => {
+  it('evicts the oldest attempt at the fixed history limit', () => {
+    const attempted = new Map<string, string>();
+    for (let index = 0; index <= PR_LINK_ATTEMPT_HISTORY_LIMIT; index++) {
+      recordPrLinkVerificationAttempt(attempted, `ses_${index}`, 'link');
+    }
+    expect(attempted.size).toBe(PR_LINK_ATTEMPT_HISTORY_LIMIT);
+    expect(attempted.has('ses_0')).toBe(false);
+    expect(attempted.get('ses_1')).toBe('link');
+    expect(attempted.get(`ses_${PR_LINK_ATTEMPT_HISTORY_LIMIT}`)).toBe('link');
+  });
+
+  it('retains attempts across candidate filter changes', () => {
+    const attempted = new Map<string, string>();
+    const first = { session_id: 'ses_first', prLinkVerificationKey: 'link-1' };
+    const second = { session_id: 'ses_second', prLinkVerificationKey: 'link-2' };
+    recordPrLinkVerificationAttempt(attempted, first.session_id, first.prLinkVerificationKey);
+    expect(nextPrLinkVerification([second], attempted)).toBe(second);
+    recordPrLinkVerificationAttempt(attempted, second.session_id, second.prLinkVerificationKey);
+    expect(nextPrLinkVerification([first], attempted)).toBeUndefined();
+  });
+
+  it('updates changed evidence without growing history and retains it as the newest attempt', () => {
+    const attempted = new Map<string, string>();
+    for (let index = 0; index < PR_LINK_ATTEMPT_HISTORY_LIMIT; index++) {
+      recordPrLinkVerificationAttempt(attempted, `ses_${index}`, 'old-link');
+    }
+    recordPrLinkVerificationAttempt(attempted, 'ses_0', 'new-link');
+    recordPrLinkVerificationAttempt(attempted, 'ses_new', 'link');
+    expect(attempted.size).toBe(PR_LINK_ATTEMPT_HISTORY_LIMIT);
+    expect(attempted.get('ses_0')).toBe('new-link');
+    expect(attempted.has('ses_1')).toBe(false);
+  });
+});
+
+describe('nextPrLinkVerification', () => {
+  it('verifies stored links even when there is no visible PR badge', () => {
+    const session = { session_id: 'ses_unverified', prLinkVerificationKey: 'link-1' };
+    expect(nextPrLinkVerification([session], new Map())).toBe(session);
+  });
+
+  it('skips sessions without a verification candidate', () => {
+    expect(nextPrLinkVerification([{ session_id: 'ses_no_link' }], new Map())).toBeUndefined();
+  });
+
+  it('attempts each session link once and proceeds to the next candidate', () => {
+    const first = { session_id: 'ses_first', prLinkVerificationKey: 'link-1' };
+    const second = { session_id: 'ses_second', prLinkVerificationKey: 'link-1' };
+    const attempted = new Map([[first.session_id, first.prLinkVerificationKey]]);
+    expect(nextPrLinkVerification([first, second], attempted)).toBe(second);
+    attempted.set(second.session_id, second.prLinkVerificationKey);
+    expect(nextPrLinkVerification([first, second], attempted)).toBeUndefined();
+  });
+
+  it('verifies again when the stored link or head evidence changes', () => {
+    const session = { session_id: 'ses_changed', prLinkVerificationKey: 'new-evidence' };
+    expect(nextPrLinkVerification([session], new Map([[session.session_id, 'old-evidence']]))).toBe(
+      session
+    );
+  });
+});
 
 Object.assign(globalThis, { React });
 
@@ -898,6 +1012,92 @@ describe('useSidebarSessions live update helpers', () => {
           { sessionId: 'ses_visible', status: 'busy' }
         ).status
       ).toBe('permission');
+    });
+  });
+
+  describe('running session sort throttling', () => {
+    const runningCreatedAt = '2026-01-03T10:00:00.000Z';
+
+    function makeRunningSession(
+      sessionId: string,
+      updatedAt: string,
+      overrides: Partial<StoredSession> = {}
+    ): StoredSession {
+      return makeStoredSession(sessionId, updatedAt, { createdAt: runningCreatedAt, ...overrides });
+    }
+
+    function pinFor(session: StoredSession): SidebarSortPins {
+      return new Map([[session.sessionId, getRunningSessionSortTime(session, true)]]);
+    }
+
+    it('sorts non-running sessions by raw recency', () => {
+      const session = makeRunningSession('ses_idle', '2026-01-03T12:00:37.000Z');
+
+      expect(getRunningSessionSortTime(session, false)).toBe(
+        new Date('2026-01-03T12:00:37.000Z').getTime()
+      );
+    });
+
+    it('advances a running session at most one bump interval past its start', () => {
+      const startedAt = new Date(runningCreatedAt).getTime();
+      const withinFirstInterval = makeRunningSession('ses_busy', '2026-01-03T10:00:30.000Z');
+      const churnedSameInterval = makeRunningSession('ses_busy', '2026-01-03T10:00:59.000Z');
+      const crossedInterval = makeRunningSession('ses_busy', '2026-01-03T10:01:05.000Z');
+
+      expect(getRunningSessionSortTime(withinFirstInterval, true)).toBe(startedAt);
+      expect(getRunningSessionSortTime(churnedSameInterval, true)).toBe(startedAt);
+      expect(getRunningSessionSortTime(crossedInterval, true)).toBe(
+        startedAt + SIDEBAR_RUNNING_BUMP_INTERVAL_MS
+      );
+    });
+
+    it('holds a running session in place while its updates churn, then lets it advance', () => {
+      const idle = makeStoredSession('ses_idle', '2026-01-03T12:00:10.000Z');
+      const churned = makeRunningSession('ses_running', '2026-01-03T12:00:45.000Z');
+      const advanced = makeRunningSession('ses_running', '2026-01-03T12:01:05.000Z');
+
+      const churnedOrder = groupSidebarSessions([churned, idle], {}, pinFor(churned)).map(item =>
+        item.type === 'session' ? item.session.sessionId : item.worktreeId
+      );
+      expect(churnedOrder).toEqual(['ses_idle', 'ses_running']);
+
+      const advancedOrder = groupSidebarSessions([advanced, idle], {}, pinFor(advanced)).map(item =>
+        item.type === 'session' ? item.session.sessionId : item.worktreeId
+      );
+      expect(advancedOrder).toEqual(['ses_running', 'ses_idle']);
+    });
+
+    it('holds a worktree group in place while its running member churns', () => {
+      const idle = makeStoredSession('ses_idle', '2026-01-03T12:00:10.000Z');
+      const churned = makeRunningSession('ses_running', '2026-01-03T12:00:45.000Z', {
+        worktreeId: 'worktree_shared',
+      });
+
+      const groups = groupSidebarSessions([churned, idle], {}, pinFor(churned));
+      expect(
+        groups.map(item => (item.type === 'session' ? item.session.sessionId : item.worktreeId))
+      ).toEqual(['ses_idle', 'worktree_shared']);
+    });
+
+    it('buckets a running session by its pinned sort time, not its raw update time', () => {
+      const running = makeStoredSession('ses_running', '2026-01-04T00:00:10.000Z', {
+        createdAt: '2026-01-03T23:58:30.000Z',
+      });
+      const pins = new Map([[running.sessionId, getRunningSessionSortTime(running, true)]]);
+
+      const result = groupSidebarSessionsByDate(
+        [running],
+        new Date('2026-01-04T00:10:00.000Z'),
+        {},
+        pins
+      );
+
+      expect(result.map(group => group.label)).toEqual(['Yesterday']);
+      expect(
+        groupSidebarSessionsByDate([running], new Date('2026-01-04T00:10:00.000Z')).map(
+          group => group.label
+        )
+      ).toEqual(['Today']);
     });
   });
 

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { INCEPTION_API_KEY } from '@/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -31,6 +32,14 @@ import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/i
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { findSupportedFimModel } from '@/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
+import {
+  bareIpLiteral,
+  bouncerDecideTier,
+  payerSharingIp,
+  rawClientIp,
+  scheduleBouncerDecide,
+} from '@/lib/bouncer/inference';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -78,6 +87,7 @@ type EditRequestBody = z.infer<typeof EditRequestBody>;
 
 export async function handleEditCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
+  const requestStartedAtMs = Date.now();
   const requestBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
@@ -145,8 +155,14 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     return temporarilyUnavailableResponse();
   }
 
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
+
+  // Resolve bouncer's identity once for this request. Edit is always signed in, so
+  // its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
+  const bouncerIp = bareIpLiteral(rawClientIp(request));
+  const bouncerRequestId = randomUUID();
 
   const promptInfo = extractEditPromptInfo(requestBody);
 
@@ -175,18 +191,29 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
-    feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
+    feature,
     session_id: taskId ?? null,
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    bouncer: {
+      requestId: bouncerRequestId,
+      occurredAt: new Date(requestStartedAtMs),
+      accountId: bouncerAccountId(user.id, organizationId),
+      clientIp: payerSharingIp(bouncerIp, feature),
+      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      requestedLogprobs: false,
+      samples: null,
+      // Edit feeds volume rules only, which do not read a prompt hash.
+      promptSimHash: null,
+    },
   };
 
   setTag('ui.ai_model', requestBody.model);
 
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
-  const { balance, settings } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
@@ -243,6 +270,18 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Report-only verdict: registered with after() and never awaited, so it cannot
+  // hold up the upstream call and survives an early return.
+  scheduleBouncerDecide({
+    requestId: bouncerRequestId,
+    ip: bouncerIp,
+    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
+    account: {
+      accountId: bouncerAccountId(user.id, organizationId),
+      tier: bouncerDecideTier(organizationId, plan, balance),
+    },
+  });
 
   sentryRootSpan()?.setAttribute(
     'edit.time_to_request_start_ms',

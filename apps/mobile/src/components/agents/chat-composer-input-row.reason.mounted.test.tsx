@@ -3,18 +3,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 
 import {
-  findAllByType,
   findByAccessibilityLabel,
   findTextInput,
   renderRow,
 } from './chat-composer-input-row.mounted.test-helpers';
-import { COMPOSER_REASON_MAX_FONT_SCALE } from './chat-composer-input-row';
 
-// `AccessibleStatus` reads `Platform.OS` at render time: Android renders a
-// polite live region, iOS announces imperatively through
-// `useStatusAnnouncement`. This suite pins iOS, so the mounted reason Text
-// carries no live-region prop; `accessible-status.mounted.test.tsx` covers the
-// Android channel.
+// The cannot-send reason moved to the fixed footer row above the composer
+// (`session-detail-content.tsx`), which owns its tone, font-scale cap and
+// wrapping. This suite pins the row's half of the split: the reason never
+// renders inside the composer, and the input keeps hinting it so the reader
+// hears why the control is gated.
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
@@ -53,40 +51,23 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 describe('ChatComposerInputRow mounted — cannot-send reason', () => {
   const REASON = 'The session could not be loaded. Retry first.';
 
-  it('delegates the reason to AccessibleStatus, hints send, keeps the input editable', async () => {
-    const props = { inputEditable: true, sendDisabledReason: REASON };
-    const renderer = await renderRow(props);
-    const [status] = renderer.root.findAllByType(AccessibleStatus);
-    expect(status?.props).toMatchObject({ message: REASON, tone: 'error' });
-    const reason = findAllByType(renderer.root, 'Text').find(n => n.props.children === REASON);
-    // The reason must not be clipped to one line: a longer translation has to
-    // keep its actionable tail ("Retry first.") on a phone width.
-    expect(reason?.props.numberOfLines).toBeUndefined();
-    expect(reason?.props.ellipsizeMode).toBeUndefined();
-    expect(reason?.props.maxFontSizeMultiplier).toBe(COMPOSER_REASON_MAX_FONT_SCALE);
-    // The row hands the announcement to `AccessibleStatus`, so the reason Text
-    // only carries a live region on Android — this iOS render has none.
-    expect(reason?.props.accessibilityLiveRegion).toBeUndefined();
-    expect(String(reason?.props.className)).toContain('text-destructive');
+  it('keeps the reason out of the composer row and hints it on the send control', async () => {
+    const renderer = await renderRow({ inputEditable: true, sendDisabledReason: REASON });
+    // The row sits inside the composer the reason used to resize; the fixed
+    // footer row above the composer is its only surface now.
+    expect(renderer.root.findAllByType(AccessibleStatus)).toHaveLength(0);
     const send = findByAccessibilityLabel(renderer.root, 'Send message');
     expect(send?.props.accessibilityHint).toBe(REASON);
     expect(findTextInput(renderer.root).props.editable).toBe(true);
-    expect(String(findTextInput(renderer.root).parent?.props.className)).toContain('flex-1');
     renderer.unmount();
   });
 
-  it('paints a neutral reason in the status tone, not the destructive one', async () => {
-    const renderer = await renderRow({
-      inputEditable: true,
-      sendDisabledReason: 'Setting up environment…',
-      sendDisabledReasonTone: 'neutral',
-    });
-    const [status] = renderer.root.findAllByType(AccessibleStatus);
-    expect(status?.props.tone).toBe('status');
-    const reason = findAllByType(renderer.root, 'Text').find(
-      n => n.props.children === 'Setting up environment…'
+  it('leaves the row without a reason surface when the host knows no reason', async () => {
+    const renderer = await renderRow({ inputEditable: true, sendDisabledReason: null });
+    expect(renderer.root.findAllByType(AccessibleStatus)).toHaveLength(0);
+    expect(findByAccessibilityLabel(renderer.root, 'Send message')?.props.accessibilityHint).toBe(
+      undefined
     );
-    expect(String(reason?.props.className)).toContain('text-muted-foreground');
     renderer.unmount();
   });
 });

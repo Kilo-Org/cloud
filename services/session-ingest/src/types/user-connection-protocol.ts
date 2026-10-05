@@ -71,6 +71,25 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
             platform: z.string().min(1).max(32),
             prUrl: z.string().max(2048),
             prNumber: z.number().int().positive(),
+            // Branch the session pushed and the commit it pushed to that
+            // branch. Optional for older CLIs; these fields supply per-session
+            // evidence for verification. Like parallel ingest, null means no
+            // evidence; normalize it to the legacy absent form without catching
+            // other errors.
+            headRef: z
+              .string()
+              .min(1)
+              .max(256)
+              .nullable()
+              .optional()
+              .transform(value => value ?? undefined),
+            headSha: z
+              .string()
+              .min(1)
+              .max(64)
+              .nullable()
+              .optional()
+              .transform(value => value ?? undefined),
           })
           .optional(),
       })

@@ -104,6 +104,56 @@ async function waitForExit(child: Bun.Subprocess, timeoutMs: number): Promise<nu
   ]);
 }
 
+/** A port that was bound and then released, so a connection is refused. */
+async function closedPort(): Promise<number> {
+  const server = Bun.serve({ port: 0, fetch: () => new Response('closed') });
+  const port = server.port;
+  await server.stop(true);
+  if (port === undefined) throw new Error('closed-port server has no TCP port');
+  return port;
+}
+
+type CapturedChild = {
+  child: Bun.Subprocess;
+  stderr: () => string;
+};
+
+/** Spawns the real wrapper with piped stderr accumulated as it is written. */
+function spawnWrapper(env: Record<string, string>): CapturedChild {
+  const chunks: string[] = [];
+  const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
+    env,
+    stdout: 'ignore',
+    stderr: 'pipe',
+  });
+  void (async () => {
+    const reader = (child.stderr as unknown as ReadableStream<Uint8Array>).getReader();
+    const decoder = new TextDecoder();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(decoder.decode(value, { stream: true }));
+      }
+    } catch {
+      // The process exited; the accumulated text is what we assert on.
+    }
+  })();
+  return { child, stderr: () => chunks.join('') };
+}
+
+function statusLine(text: string): string | undefined {
+  return text.split('\n').find(line => line.includes('"event":"wrapper.status"'));
+}
+
+function nativeLogsEnv(url: string, uploadPort: number): Record<string, string> {
+  return childEnv(url, {
+    CONTROL_PLANE_NATIVE_LOGS: '1',
+    CONTROL_LOG_UPLOAD_URL: `http://127.0.0.1:${uploadPort}/sandbox-logs/a/b/c`,
+    CONTROL_LOG_UPLOAD_GRANT: 'test-grant-value',
+  });
+}
+
 describe('control-plane wrapper process', () => {
   it('exits 0 on terminal admission rejection before welcome without reconnecting', async () => {
     const server = startControlServer('shutdown');
@@ -168,4 +218,73 @@ describe('control-plane wrapper process', () => {
       server.stop();
     }
   }, 20_000);
+
+  it('writes a production-interval status line, then exits cleanly on SIGTERM without later status', async () => {
+    const controlPort = await closedPort();
+    const uploadPort = await closedPort();
+    const handle = spawnWrapper(
+      nativeLogsEnv(`ws://127.0.0.1:${controlPort}/sandbox-control-v2/fake`, uploadPort)
+    );
+    try {
+      // The production interval is 60 s: nothing before 50 s.
+      await Bun.sleep(50_000);
+      expect(statusLine(handle.stderr())).toBeUndefined();
+
+      let found: string | undefined;
+      const deadline = Date.now() + 25_000;
+      while (Date.now() < deadline) {
+        found = statusLine(handle.stderr());
+        if (found) break;
+        await Bun.sleep(500);
+      }
+      expect(found).toBeDefined();
+      const record = JSON.parse(found ?? '{}') as {
+        event: string;
+        fields: Record<string, unknown>;
+      };
+      expect(record.event).toBe('wrapper.status');
+      expect(record.fields.phase).toBe('status');
+      expect(['connecting', 'idle']).toContain(String(record.fields.nativeConnectionPhase));
+      expect(record.fields).not.toHaveProperty('oomKills');
+      expect(record.fields).not.toHaveProperty('oomGroupKills');
+      const text = handle.stderr();
+      expect(text).not.toContain('test-credential');
+      expect(text).not.toContain('test-grant-value');
+      // Noisy, non-allowlisted events never reach the native gate.
+      expect(text).not.toContain('"event":"control.heartbeat"');
+      expect(text).not.toContain('"phase":"keepalive_sent"');
+      expect(text).not.toContain('"phase":"retry_scheduled"');
+      // The process is still alive when the line appears.
+      expect(handle.child.exitCode).toBeNull();
+      process.kill(handle.child.pid, 'SIGTERM');
+      expect(await waitForExit(handle.child, 8_000)).toBe(0);
+      const stoppedText = handle.stderr();
+      const stoppingIndex = stoppedText.indexOf('"phase":"stopping"');
+      expect(stoppingIndex).toBeGreaterThanOrEqual(0);
+      expect(stoppedText.slice(stoppingIndex)).not.toContain('"event":"wrapper.status"');
+    } finally {
+      if (handle.child.exitCode === null) handle.child.kill();
+      await handle.child.exited;
+    }
+  }, 90_000);
+
+  it('writes no wrapper.status line when the native gate is unset', async () => {
+    const controlPort = await closedPort();
+    const uploadPort = await closedPort();
+    const env = childEnv(`ws://127.0.0.1:${controlPort}/sandbox-control-v2/fake`, {
+      CONTROL_LOG_UPLOAD_URL: `http://127.0.0.1:${uploadPort}/sandbox-logs/a/b/c`,
+      CONTROL_LOG_UPLOAD_GRANT: 'test-grant-value',
+    });
+    // The gate is literally unset, not set to a falsy string.
+    delete env.CONTROL_PLANE_NATIVE_LOGS;
+    const handle = spawnWrapper(env);
+    try {
+      await Bun.sleep(70_000);
+      expect(handle.child.exitCode).toBeNull();
+      expect(statusLine(handle.stderr())).toBeUndefined();
+    } finally {
+      if (handle.child.exitCode === null) handle.child.kill();
+      await handle.child.exited;
+    }
+  }, 90_000);
 });

@@ -6448,6 +6448,15 @@ export const cli_sessions_v2 = pgTable(
     platform: text(), // PR host (e.g. github), NOT the OS.
     pr_url: text(),
     pr_number: integer(),
+    // The head ref and head commit the session reported for its own PR. Used to
+    // verify the link against GitHub before it is stored or shown. Nullable so
+    // rows written by older CLIs and pre-existing (unverified) links stay
+    // unshown until the session reports verifiable evidence.
+    pr_head_ref: text(),
+    pr_head_sha: text(),
+    // Set only after the link has been verified against GitHub. Null means the
+    // link is not trustworthy yet and must not be shown.
+    pr_link_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -6493,8 +6502,17 @@ export const cli_sessions_v2 = pgTable(
       .on(table.kilo_user_id, table.cloud_agent_worktree_id, table.updated_at)
       .concurrently()
       .where(isNotNull(table.cloud_agent_worktree_id)),
-    // Supports joins from github_branch_pull_requests on (git_url, git_branch).
+    // Supports session lookups by repository and branch.
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
+    // Supports the webhook verified-link gate, which updates sessions by
+    // `(git_url, pr_number)`. Without this index that UPDATE can only use the
+    // `git_url` prefix of the branch index above and then heap-fetches every
+    // session in the repository to test `pr_number` and the head evidence, so
+    // webhook latency and DB load grow with sessions-per-repository. Built
+    // concurrently — `cli_sessions_v2` is large.
+    index('IDX_cli_sessions_v2_git_url_pr_number')
+      .on(table.git_url, table.pr_number)
+      .concurrently(),
   ]
 );
 
@@ -6774,15 +6792,15 @@ export type CloudAgentSessionRun = typeof cloud_agent_session_runs.$inferSelect;
 export type NewCloudAgentSessionRun = typeof cloud_agent_session_runs.$inferInsert;
 
 /**
- * Per-tenant cache of the latest GitHub pull request observed for a
- * `(repo, branch)` pair. Written by the `pull_request` webhook handler
+ * Per-tenant cache of the latest GitHub state observed for a `(repo, PR number)`
+ * identity. Written by the `pull_request` webhook handler
  * and the manual `refreshAssociatedPullRequest` mutation; read by the
  * cli-sessions-v2 router to attach `associatedPr` to a session.
  *
  * Tenancy: XOR ownership columns mirror `platform_integrations`. A webhook
  * delivery from an org installation writes a row under that org; a user
  * installation writes under the user. Different tenants caching the same
- * `(git_url, git_branch)` produce separate rows and never contaminate
+ * `(git_url, pr_number)` produce separate rows and never contaminate
  * each other's reads.
  *
  * `git_url` is always stored in normalized form (see `normalizeGitUrl` in
@@ -6816,22 +6834,22 @@ export const github_branch_pull_requests = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Partial unique indexes serve as ON CONFLICT targets for the webhook
-    // upsert. Identity columns (git_url, git_branch) lead; tenant column
-    // trails since all hot-path reads supply every column anyway.
-    uniqueIndex('UQ_github_branch_prs_org')
-      .on(table.git_url, table.git_branch, table.owned_by_organization_id)
-      .where(isNotNull(table.owned_by_organization_id)),
-    uniqueIndex('UQ_github_branch_prs_user')
-      .on(table.git_url, table.git_branch, table.owned_by_user_id)
-      .where(isNotNull(table.owned_by_user_id)),
-    // The session-to-PR LEFT JOIN matches (git_url, git_branch) and picks the
-    // tenant column with an OR. Neither partial unique index above can serve
-    // that join: the planner cannot prove `owned_by_*_id IS NOT NULL` per row,
-    // so it falls back to a hash join and sequentially scans this whole table
-    // on every session list and search. This plain index restores the nested
-    // loop (292 ms to 2.8 ms on a 1M-row cache).
-    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.git_branch).concurrently(),
+    // Identity is the PR, not the branch: the cache is only a state/review
+    // cache for a PR a session already verifiably links. Branch names are
+    // reused and shared across sessions, so (git_url, git_branch) can never
+    // identify which PR belongs to which session. These partial unique indexes
+    // serve as ON CONFLICT targets for the webhook upsert, keyed by PR number.
+    uniqueIndex('UQ_github_branch_prs_repo_pr_org')
+      .on(table.git_url, table.pr_number, table.owned_by_organization_id)
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
+    uniqueIndex('UQ_github_branch_prs_repo_pr_user')
+      .on(table.git_url, table.pr_number, table.owned_by_user_id)
+      .where(isNotNull(table.pr_number))
+      .concurrently(),
+    // Reads resolve a PR by identity (git_url, pr_number); branch columns are
+    // no longer part of the join key.
+    index('IDX_github_branch_prs_url_pr_number').on(table.git_url, table.pr_number).concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(
@@ -11603,6 +11621,67 @@ export const external_side_effect_outbox = pgTable(
 
 export type ExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferSelect;
 export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferInsert;
+
+/**
+ * Durable outbox for Bouncer financial credit events (charge steps and store
+ * money events). Financial callers enqueue a row atomically with the primary
+ * write and before they acknowledge a payment or webhook; the cron drainer
+ * claims due `pending` rows, delivers them over HTTP, and marks `delivered`.
+ * On a transport failure it backs off and retries, failing a row after 8
+ * attempts; `sending` claims older than 5 minutes are reclaimed. A unique
+ * `(event_id, event_type)` — the same identity bouncer's credit ledger dedupes
+ * on, where `event_id` is the source event id (a Stripe event id or an Apple
+ * `notificationUUID`) — makes an enqueue idempotent within the retention
+ * window: a webhook replay in that window reports nothing new. Retention is
+ * bounded, so it is not a permanent dedupe; an event replayed after the window
+ * is recreated, but it keeps its original `occurredAt`, so bouncer's standing
+ * (current) computation still does not double-count it. `payload` holds the
+ * shaped wire body for the event and carries account PII (user id, client ip,
+ * card fingerprint, JA4 client-fingerprint digest); `user_id` is denormalized
+ * onto the row so user soft deletion can delete it.
+ */
+export type BouncerCreditEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_credit_event_outbox = pgTable(
+  'bouncer_credit_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The source event id; with `event_type`, the dedupe key that makes enqueue idempotent. */
+    event_id: text().notNull(),
+    /** The `CreditEvent` discriminant, for observability and metrics. */
+    event_type: text().notNull(),
+    /** The Kilo account the event is about; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerCreditEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_credit_event_outbox_event_id_type').on(
+      table.event_id,
+      table.event_type
+    ),
+    index('IDX_bouncer_credit_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_credit_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferSelect;
+export type NewBouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferInsert;
 
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 

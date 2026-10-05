@@ -54,6 +54,8 @@ type ChatInputProps = {
   onNewChat?: () => Promise<boolean>;
   onStop?: () => void;
   disabled?: boolean;
+  textareaDisabled?: boolean;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   isStreaming?: boolean;
   placeholder?: string;
   slashCommands?: SlashCommand[];
@@ -103,6 +105,8 @@ export function ChatInput({
   onNewChat,
   onStop,
   disabled = false,
+  textareaDisabled = disabled,
+  inputRef,
   isStreaming = false,
   placeholder = 'Type your message...',
   slashCommands = [],
@@ -130,7 +134,8 @@ export function ChatInput({
   const [isAttachmentSubmissionPending, setIsAttachmentSubmissionPending] = useState(false);
   const valueRef = useRef('');
   const attachmentSubmissionPendingRef = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = inputRef ?? internalTextareaRef;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commandListRef = useRef<HTMLDivElement>(null);
 
@@ -419,7 +424,7 @@ export function ChatInput({
       <div
         className={cn(
           'relative overflow-hidden bg-muted/30 focus-within:ring-ring rounded-lg border focus-within:ring-2',
-          disabled && !isStreaming && 'opacity-60',
+          textareaDisabled && !isStreaming && 'opacity-60',
           attachmentsEnabled &&
             !isAttachmentSubmissionPending &&
             attachmentUpload.isDragging &&
@@ -474,7 +479,7 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={placeholder}
-              disabled={disabled}
+              disabled={textareaDisabled}
               maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
               className="max-h-[200px] w-full resize-none overflow-y-auto border-0 bg-transparent px-3 pt-3 pb-1 text-base focus:ring-0 focus:outline-none md:text-sm"
               rows={1}

@@ -2,8 +2,7 @@ import { credit_transactions } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-import { reportCreditEvent } from '@/lib/bouncer/client';
-import { runAfterResponse } from '@/lib/after-response';
+import { enqueueCreditEvent } from '@/lib/bouncer/credit-events';
 import { processTopUp } from '@/lib/credits';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
@@ -70,6 +69,7 @@ export async function completeStoreCreditPurchase(params: {
   const amountUsd = purchase.amountUsd * purchase.quantity;
   const amountCents = roundUsdToCents(amountUsd);
   const amountMicrodollars = purchase.amountMicrodollars;
+  const isAppStore = purchase.paymentProvider === KiloPassPaymentProvider.AppStore;
 
   const attemptedCreditTransactionId = crypto.randomUUID();
   const storeTransaction = {
@@ -98,6 +98,27 @@ export async function completeStoreCreditPurchase(params: {
       amountMicrodollars,
       creditTransactionId: existing.id,
     };
+  };
+
+  /**
+   * Durably enqueues the store purchase for bouncer inside the same transaction as the grant (or
+   * the replay of it). Idempotent on the deterministic payment id, so a replay re-attempts a
+   * report the first grant's enqueue may have lost, and never duplicates a delivered one. The
+   * credit event is the store's money event, not the refund: a refund is reported by the store
+   * notification handler.
+   */
+  const enqueueBouncerPurchase = async (tx: DrizzleTransaction) => {
+    if (purchase.environment !== 'Production') return;
+    await enqueueCreditEvent(tx, {
+      type: 'store.purchase',
+      eventId: paymentId,
+      occurredAt: purchase.purchasedAtIso,
+      userId: user.id,
+      provider: isAppStore ? 'apple' : 'google',
+      referenceId: purchase.providerTransactionId,
+      environment: 'production',
+      amountCents,
+    });
   };
 
   const complete = async (tx: DrizzleTransaction) => {
@@ -152,6 +173,7 @@ export async function completeStoreCreditPurchase(params: {
           amountUsd,
         },
       });
+      await enqueueBouncerPurchase(tx);
       return {
         alreadyProcessed: false,
         amountUsd,
@@ -162,36 +184,13 @@ export async function completeStoreCreditPurchase(params: {
 
     // processTopUp returned false: this store transaction was already credited.
     // Reaching it with a processed refund event is a replayed completion of a
-    // purchase the refund already clawed back, so it stays idempotent too.
-    return asAlreadyProcessed(await findGrant());
+    // purchase the refund already clawed back, so it stays idempotent too. The
+    // grant may have committed on a previous attempt whose bouncer enqueue was
+    // lost, so re-attempt the idempotent enqueue here rather than skip it.
+    const replay = asAlreadyProcessed(await findGrant());
+    await enqueueBouncerPurchase(tx);
+    return replay;
   };
 
   return dbOrTx ? complete(dbOrTx) : db.transaction(complete);
-}
-
-/**
- * Reports a newly granted production credit pack to bouncer, post-response.
- * A replayed completion reports nothing: the first grant already did. The
- * catalog amount is in US dollars, so it is sent as cents.
- */
-export async function reportStoreCreditPurchaseToBouncer(params: {
-  userId: string;
-  purchase: ValidatedStoreCreditPurchase;
-  result: { alreadyProcessed: boolean; amountUsd: number };
-}): Promise<void> {
-  const { userId, purchase, result } = params;
-  if (result.alreadyProcessed || purchase.environment !== 'Production') return;
-  const isAppStore = purchase.paymentProvider === KiloPassPaymentProvider.AppStore;
-  await runAfterResponse(() =>
-    reportCreditEvent({
-      type: 'store.purchase',
-      amountCents: roundUsdToCents(result.amountUsd),
-      provider: isAppStore ? 'apple' : 'google',
-      eventId: storeCreditPaymentId(purchase.paymentProvider, purchase.providerTransactionId),
-      occurredAt: purchase.purchasedAtIso,
-      userId,
-      referenceId: purchase.providerTransactionId,
-      environment: 'production',
-    })
-  );
 }

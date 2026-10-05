@@ -10,6 +10,7 @@ import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sy
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
+import { clearLiveShapeHint } from '@/lib/home-live-shape';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
@@ -111,6 +112,7 @@ export function clearSessionScopedState(): void {
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
   runClear(clearSessionAutoApprove);
+  runClear(clearLiveShapeHint);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;

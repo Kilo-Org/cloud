@@ -11,6 +11,7 @@ import {
   kilocode_users,
   type User,
 } from '@kilocode/db/schema';
+import type { BouncerCreditEventOutboxDatabase } from '@kilocode/db/bouncer-credit-event-outbox';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   KiloPassAuditLogAction,
@@ -38,7 +39,8 @@ import {
 } from './store-subscription-completion';
 import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-subscription';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
-import { reportCreditEvent, type StoreEventKind } from '@/lib/bouncer/client';
+import type { StoreCreditEvent, StoreEventKind } from '@/lib/bouncer/client';
+import { enqueueCreditEvent } from '@/lib/bouncer/credit-events';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByGoogleProductId } from '@/lib/credits/store-products';
 import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
@@ -218,8 +220,11 @@ async function claimGooglePlayStoreEventForProcessing(params: {
   return existingEvent?.processed_at ? 'already_processed' : 'in_flight';
 }
 
-async function markGooglePlayStoreEventProcessed(eventId: string): Promise<void> {
-  await db
+async function markGooglePlayStoreEventProcessed(
+  eventId: string,
+  dbOrTx: DbOrTx = db
+): Promise<void> {
+  await dbOrTx
     .update(kilo_pass_store_events)
     .set({ processed_at: new Date().toISOString() })
     .where(
@@ -629,22 +634,27 @@ async function resolveGooglePlayKiloPassOwner(params: {
 }
 
 /**
- * Reports one Play money event to bouncer. Production events for a resolved Kilo account only: a
- * store event carries no card and no client IP. Call it from `after()`, post-commit.
+ * Enqueues one Play money event into bouncer's durable outbox, in the caller's transaction.
+ * Production events for a resolved Kilo account only: a store event carries no card and no client
+ * IP. The insert is atomic with the caller's primary write, so a crash or DB error retries the
+ * event instead of losing the report.
  */
-async function reportGooglePlayCreditEventToBouncer(params: {
-  environment: string;
-  eventId: string;
-  eventTimeMillis: string | number | null;
-  referenceId: string;
-  /** Null when the notification maps to no store money event. */
-  event: StoreEventKind | null;
-  userId: string | null;
-}): Promise<void> {
+async function enqueueGooglePlayCreditEventToBouncer(
+  database: BouncerCreditEventOutboxDatabase,
+  params: {
+    environment: string;
+    eventId: string;
+    eventTimeMillis: string | number | null;
+    referenceId: string;
+    /** Null when the notification maps to no store money event. */
+    event: StoreEventKind | null;
+    userId: string | null;
+  }
+): Promise<void> {
   if (params.environment !== 'Production' || params.userId === null || params.event === null) {
     return;
   }
-  await reportCreditEvent({
+  const event: StoreCreditEvent = {
     ...params.event,
     provider: 'google',
     eventId: params.eventId,
@@ -652,7 +662,8 @@ async function reportGooglePlayCreditEventToBouncer(params: {
     userId: params.userId,
     referenceId: params.referenceId,
     environment: 'production',
-  });
+  };
+  await enqueueCreditEvent(database, event);
 }
 
 export async function processGooglePlayKiloPassNotification(params: {
@@ -720,6 +731,18 @@ export async function processGooglePlayKiloPassNotification(params: {
         result: KiloPassAuditLogResult.Success,
         payload: { messageId: messageId ?? null, providerTransactionId: orderId, ...reversal },
       });
+      // A refund can leave the subscription entitled. Lifecycle notifications
+      // reconcile access; this event reverses only the exact refunded order.
+      // An order Kilo never admitted is a duplicate purchase that Kilo refunded
+      // itself (`reverseDuplicateGooglePlaySubscription`), not a customer refund.
+      await enqueueGooglePlayCreditEventToBouncer(tx, {
+        environment: snapshot.environment,
+        eventId,
+        eventTimeMillis: developerNotification.eventTimeMillis ?? null,
+        referenceId: orderId,
+        event: storePurchaseFound ? { type: 'store.refund', reason: 'other' } : null,
+        userId: owner?.id ?? null,
+      });
       await tx
         .update(kilo_pass_store_events)
         .set({ processed_at: new Date().toISOString() })
@@ -730,20 +753,6 @@ export async function processGooglePlayKiloPassNotification(params: {
           )
         );
     });
-    // A refund can leave the subscription entitled. Lifecycle notifications
-    // reconcile access; this event reverses only the exact refunded order.
-    // An order Kilo never admitted is a duplicate purchase that Kilo refunded
-    // itself (`reverseDuplicateGooglePlaySubscription`), not a customer refund.
-    await runAfterResponse(() =>
-      reportGooglePlayCreditEventToBouncer({
-        environment: snapshot.environment,
-        eventId,
-        eventTimeMillis: developerNotification.eventTimeMillis ?? null,
-        referenceId: orderId,
-        event: storePurchaseFound ? { type: 'store.refund', reason: 'other' } : null,
-        userId: owner?.id ?? null,
-      })
-    );
     return { processed: true };
   }
 
@@ -807,6 +816,14 @@ export async function processGooglePlayKiloPassNotification(params: {
     });
     if (claim === 'already_processed') return { processed: true, status: 'already_processed' };
     if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
+    // The order carries no test flag, so a license-tester refund is told apart by the
+    // purchase's `purchaseType` (0 = test), as the grant path does. The event is already
+    // processed, so a failed lookup must not drop a real refund: an unknown type reports
+    // as production. The lookup is an external call, so it stays outside the transaction.
+    const purchaseType = await getGooglePlayProductPurchase(productId, purchaseToken).then(
+      purchase => purchase.purchaseType,
+      () => undefined
+    );
     let refundedUserId: string | null = null;
     await db.transaction(async tx => {
       // Serialize with a completion of the same purchase, in either order. The
@@ -853,6 +870,16 @@ export async function processGooglePlayKiloPassNotification(params: {
           storeCreditReversal: reversal,
         },
       });
+      // Only a pack Kilo granted and clawed back is a customer refund to report; the
+      // enqueue returns early when no user was clawed back.
+      await enqueueGooglePlayCreditEventToBouncer(tx, {
+        environment: purchaseType === 0 ? 'Sandbox' : 'Production',
+        eventId,
+        eventTimeMillis: developerNotification.eventTimeMillis ?? null,
+        referenceId: orderId,
+        event: { type: 'store.refund', reason: 'other' },
+        userId: refundedUserId,
+      });
       await tx
         .update(kilo_pass_store_events)
         .set({ processed_at: new Date().toISOString() })
@@ -862,26 +889,6 @@ export async function processGooglePlayKiloPassNotification(params: {
             eq(kilo_pass_store_events.event_id, eventId)
           )
         );
-    });
-    // Only a pack Kilo granted and clawed back is a customer refund to report.
-    // The order carries no test flag, so a license-tester refund is told apart
-    // by the purchase's `purchaseType` (0 = test), as the grant path does. The
-    // event is already processed, so a failed lookup must not drop a real
-    // refund: an unknown type reports as production.
-    await runAfterResponse(async () => {
-      if (!refundedUserId) return;
-      const purchaseType = await getGooglePlayProductPurchase(productId, purchaseToken).then(
-        purchase => purchase.purchaseType,
-        () => undefined
-      );
-      await reportGooglePlayCreditEventToBouncer({
-        environment: purchaseType === 0 ? 'Sandbox' : 'Production',
-        eventId,
-        eventTimeMillis: developerNotification.eventTimeMillis ?? null,
-        referenceId: orderId,
-        event: { type: 'store.refund', reason: 'other' },
-        userId: refundedUserId,
-      });
     });
     return { processed: true };
   }
@@ -1082,7 +1089,22 @@ export async function processGooglePlayKiloPassNotification(params: {
         purchase.rawPayload.outOfAppPurchaseContext ? purchase.appAccountToken : undefined
       );
     }
-    await markGooglePlayStoreEventProcessed(eventId);
+    // Play states the amount in its currency's ISO 4217 minor units, so only USD is US cents.
+    const amountCents =
+      purchase.currency === 'USD' ? (purchase.amountChargedMinorUnits ?? undefined) : undefined;
+    // The report and the processed mark commit together, so a crash cannot mark the event
+    // processed while losing the report.
+    await db.transaction(async tx => {
+      await enqueueGooglePlayCreditEventToBouncer(tx, {
+        environment: purchase.environment,
+        eventId,
+        eventTimeMillis,
+        referenceId: purchase.providerTransactionId,
+        event: getGooglePlayBouncerReport(notificationType, amountCents),
+        userId: user.id,
+      });
+      await markGooglePlayStoreEventProcessed(eventId, tx);
+    });
     // Post-commit only — never capture inside the transaction.
     const trackedResult = completionResult as CompleteStoreKiloPassPurchaseResult | null;
     if (trackedResult && !trackedResult.alreadyProcessed) {
@@ -1100,19 +1122,6 @@ export async function processGooglePlayKiloPassNotification(params: {
         });
       });
     }
-    // Play states the amount in its currency's ISO 4217 minor units, so only USD is US cents.
-    const amountCents =
-      purchase.currency === 'USD' ? (purchase.amountChargedMinorUnits ?? undefined) : undefined;
-    await runAfterResponse(() =>
-      reportGooglePlayCreditEventToBouncer({
-        environment: purchase.environment,
-        eventId,
-        eventTimeMillis,
-        referenceId: purchase.providerTransactionId,
-        event: getGooglePlayBouncerReport(notificationType, amountCents),
-        userId: user.id,
-      })
-    );
     return { processed: true };
   }
 
@@ -1151,6 +1160,10 @@ export async function processGooglePlayKiloPassNotification(params: {
   }
 
   if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_REVOKED) {
+    const revokedUserId = await resolveGooglePlayKiloPassOwner({
+      providerSubscriptionId: purchaseToken,
+      appAccountToken: decoded.obfuscatedExternalAccountId ?? null,
+    });
     let storePurchaseFound = false;
     await db.transaction(async tx => {
       let reversal: CreditReversalResult;
@@ -1184,6 +1197,16 @@ export async function processGooglePlayKiloPassNotification(params: {
           reversedItemKinds: reversal.reversedItemKinds,
         },
       });
+      // `store.revoked` opens a bouncer fraud flag. Kilo's own duplicate-purchase
+      // reversal revokes an order it never admitted, so only an admitted order reports.
+      await enqueueGooglePlayCreditEventToBouncer(tx, {
+        environment: decoded.environment,
+        eventId,
+        eventTimeMillis,
+        referenceId: decoded.latestOrderId,
+        event: storePurchaseFound ? getGooglePlayBouncerReport(notificationType, undefined) : null,
+        userId: revokedUserId,
+      });
       await tx
         .update(kilo_pass_store_events)
         .set({ processed_at: new Date().toISOString() })
@@ -1194,21 +1217,6 @@ export async function processGooglePlayKiloPassNotification(params: {
           )
         );
     });
-    // `store.revoked` opens a bouncer fraud flag. Kilo's own duplicate-purchase
-    // reversal revokes an order it never admitted, so only an admitted order reports.
-    await runAfterResponse(async () =>
-      reportGooglePlayCreditEventToBouncer({
-        environment: decoded.environment,
-        eventId,
-        eventTimeMillis,
-        referenceId: decoded.latestOrderId,
-        event: storePurchaseFound ? getGooglePlayBouncerReport(notificationType, undefined) : null,
-        userId: await resolveGooglePlayKiloPassOwner({
-          providerSubscriptionId: purchaseToken,
-          appAccountToken: decoded.obfuscatedExternalAccountId ?? null,
-        }),
-      })
-    );
     return { processed: true };
   }
 

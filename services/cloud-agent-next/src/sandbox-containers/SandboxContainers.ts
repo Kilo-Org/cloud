@@ -2,6 +2,7 @@ import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
+import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import {
   CONTAINERS_INTERCEPT_CA_PATH,
   SANDBOX_INTERCEPT_HTTPS_ENABLED,
@@ -12,6 +13,7 @@ import {
   CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
 } from '../sandbox-control/container-paths.js';
+import { CONTROL_PLANE_NATIVE_LOGS_ENV } from '../shared/control-diagnostics.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { diagnosticCause, logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import {
@@ -92,6 +94,37 @@ function containedProcessEnv(env: Record<string, string>): Record<string, string
   };
 }
 
+const MAIN_PROCESS_SLEEP_CMDLINE = new TextEncoder().encode('sleep\0infinity');
+const MAIN_PROCESS_SUPERVISOR_CMDLINE = new TextEncoder().encode(
+  `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
+);
+
+function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+type MainProcessIdentity = 'sleep' | 'supervisor' | 'ambiguous';
+
+/**
+ * Classify PID 1 from its `/proc/1/cmdline` bytes. The two known main processes
+ * are the image default `sleep infinity` and the native supervisor entrypoint;
+ * a trailing NUL is tolerated. Timeout, non-zero, empty, and anything else is
+ * ambiguous and must fail the launch rather than guess.
+ */
+function classifyMainProcess(cmdline: Uint8Array): MainProcessIdentity {
+  const trimmed =
+    cmdline.byteLength > 0 && cmdline[cmdline.byteLength - 1] === 0
+      ? cmdline.subarray(0, cmdline.byteLength - 1)
+      : cmdline;
+  if (bytesEqual(trimmed, MAIN_PROCESS_SLEEP_CMDLINE)) return 'sleep';
+  if (bytesEqual(trimmed, MAIN_PROCESS_SUPERVISOR_CMDLINE)) return 'supervisor';
+  return 'ambiguous';
+}
+
 const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 /** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
@@ -158,6 +191,19 @@ export class SandboxContainers extends DurableObject<Env> {
   private billing: ContainersBilling | undefined;
   private schedules: ContainersBillingScheduler | undefined;
 
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    const container = this.ctx.container;
+    if (container?.running) {
+      void this.ctx.blockConcurrencyWhile(() =>
+        container.setInactivityTimeout(
+          resolveControlPlaneTimers(this.env as { CONTROL_PLANE_TIMER_DIVISOR?: string }).sandbox
+            .providerLeaseMs
+        )
+      );
+    }
+  }
+
   private runExclusive<T>(task: () => Promise<T>): Promise<T> {
     const result = this.queue.then(task, task);
     this.queue = result.then(
@@ -206,8 +252,8 @@ export class SandboxContainers extends DurableObject<Env> {
         return this.resumePreExecLaunch(
           record,
           ref,
-          input.env,
           input.instance,
+          input.env,
           input.containment === true
         );
       }
@@ -233,24 +279,44 @@ export class SandboxContainers extends DurableObject<Env> {
     input: ContainersLaunchInput
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
+    const containment = input.containment === true;
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     const record = await this.installLaunchInstance(stored, input.instance);
-    if (input.containment) await this.installContainmentProxy(container);
-    // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
+    if (containment) await this.installContainmentProxy(container);
+    return this.issueNativeSupervisor(record, ref, input.instance, input.env, containment);
+  }
+
+  /**
+   * Issue the native supervisor as PID 1: fence, start, confirm identity, mark
+   * running. Containment is installed by the caller, which owns its ordering
+   * before any physical call.
+   */
+  private async issueNativeSupervisor(
+    record: ContainersRecord,
+    ref: string,
+    instance: ContainerInstanceSize,
+    env: Record<string, string>,
+    containment: boolean
+  ): Promise<{ started: boolean }> {
+    const container = this.requiredContainer();
+    // Ownership is retained before start: an ambiguous start that takes effect
+    // must not release the allocation. Never leave `not_started` across the start.
     await this.writeRecord({
       ...record,
       state: 'launching',
       allocationRef: ref,
       stopOpId: null,
-      wrapperAttempt: 'not_started',
+      wrapperAttempt: 'exec_pending',
     });
     await this.startContainerAndActivateBilling(
       container,
       record,
-      this.startOptions(input.instance)
+      this.startOptions(instance, this.nativeLaunchEnv(env, containment))
     );
-    await this.startWrapper(container, input.env, input.containment === true);
+    // Identity is the issuance confirmation: a native start's PID 1 is the
+    // supervisor. A deadline without a match throws without a supervisor exec.
+    await this.awaitSupervisorMainProcess(container);
     await this.writeRunning(ref, 'clear');
     return { started: true };
   }
@@ -445,34 +511,41 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Resume a `not_started` launch: the wrapper exec never ran, so it is safe to
-   * start the container (when stopped) and probe before deciding. Containment is
-   * installed before any start or probe.
+   * Resume a `not_started` launch: the main process was never issued. A stopped
+   * container gets the native supervisor entrypoint; a running container is
+   * settled by PID 1 first — a verified supervisor completes issuance, the image
+   * default `sleep infinity` keeps the existing exec and broad probe.
    */
   private async resumePreExecLaunch(
     record: ContainersRecord,
     ref: string,
-    env: Record<string, string>,
     instance: ContainerInstanceSize,
+    env: Record<string, string>,
     containment: boolean
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
     if (containment) await this.installContainmentProxy(container);
-    // A stopped container is started and metered before the probe. An already
-    // running container is probed first, and billing is activated by outcome.
     if (!container.running) {
-      await this.startContainerAndActivateBilling(container, record, this.startOptions(instance));
+      return this.issueNativeSupervisor(record, ref, instance, env, containment);
     }
+    if ((await this.settleRunningMainProcess(record, ref)) === 'supervisor') {
+      return { started: true };
+    }
+    // The image default `sleep infinity` still owns the container; the wrapper
+    // exec is the thing being resumed. The broad probe and the exec retry stay.
     const probe = await this.probeWrapper(container);
     if (probe === 'ambiguous') {
-      // A wrapper probe cannot confirm the running container, so activate before
-      // signalling the ambiguity rather than leaving it unmetered.
       await this.activateBillingIfRunning(container, record);
       throw new Error('Wrapper probe was ambiguous');
     }
     if (probe === 'absent') {
-      // Skip physical start when already running, but still activate billing.
-      await this.startContainerAndActivateBilling(container, record, this.startOptions(instance));
+      // Meter the stored generation, then refuse to exec if the container stopped
+      // while the probe was in flight. Starting here would issue a native
+      // supervisor on a stopped container and race a second supervisor exec.
+      await this.activateBillingIfRunning(container, record);
+      if (container.running !== true) {
+        throw new Error('Container stopped before the wrapper exec');
+      }
       await this.startWrapper(container, env, containment);
     } else {
       await this.activateBillingIfRunning(container, record);
@@ -482,11 +555,37 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
+   * Settle the PID 1 identity of an already-running container. A verified
+   * supervisor completes issuance (billing + running); an ambiguous identity
+   * meters the stored generation and throws. The image default `sleep infinity`
+   * returns to the caller, which owns the sleep-path probe/exec.
+   */
+  private async settleRunningMainProcess(
+    record: ContainersRecord,
+    ref: string
+  ): Promise<'supervisor' | 'sleep'> {
+    const container = this.requiredContainer();
+    const identity = await this.readMainProcessIdentity(container);
+    if (identity === 'ambiguous') {
+      await this.activateBillingIfRunning(container, record);
+      throw new Error('Main process identity is ambiguous');
+    }
+    if (identity === 'supervisor') {
+      await this.activateBillingIfRunning(container, record);
+      await this.writeRunning(ref, 'clear');
+      return 'supervisor';
+    }
+    return 'sleep';
+  }
+
+  /**
    * Adopt a wrapper after a previous `launching` record whose bun exec may still
    * be in flight (pending) or may have started one (legacy). Only a physically
    * running container may be probed, and no start, bun exec or identity change is
-   * allowed. A found wrapper keeps the fence; an absent or ambiguous probe is an
-   * error, but billing is activated for the stored generation either way.
+   * allowed. A verified supervisor PID 1 already completed issuance; the image
+   * default `sleep infinity` keeps the existing broad probe. An absent or
+   * ambiguous probe is an error, but billing is activated for the stored
+   * generation either way.
    */
   private async adoptUncertainWrapper(
     stored: ContainersRecord,
@@ -499,6 +598,9 @@ export class SandboxContainers extends DurableObject<Env> {
       throw new Error('Container wrapper start is pending and the container is not running');
     }
     if (containment) await this.installContainmentProxy(container);
+    if ((await this.settleRunningMainProcess(stored, ref)) === 'supervisor') {
+      return { started: true };
+    }
     const probe = await this.probeWrapper(container);
     await this.activateBillingIfRunning(container, stored);
     if (probe === 'found') {
@@ -655,7 +757,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
     return this.awaitContainerCall(
       container.exec(['/bin/sh', CONTROL_SUPERVISOR_PATH], {
-        env: containment ? containedProcessEnv(env) : env,
+        env: this.nativeLaunchEnv(env, containment),
         cwd: '/',
       }),
       deadlineAt
@@ -706,8 +808,75 @@ export class SandboxContainers extends DurableObject<Env> {
     return container;
   }
 
-  private startOptions(instance: ContainerInstanceSize): ContainerStartupOptions {
-    return { image: this.containerImage(), instance, enableInternet: true };
+  private startOptions(
+    instance: ContainerInstanceSize,
+    env: Record<string, string>
+  ): ContainerStartupOptions {
+    // Native issuance: the main process is the supervisor, not the image default
+    // `sleep infinity`. The supervisor script is already in the image.
+    return {
+      image: this.containerImage(),
+      instance,
+      enableInternet: true,
+      entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
+      env,
+    };
+  }
+
+  /**
+   * The env for a native start and for a sleep-main-process exec. Containment CA
+   * goes on both; the stderr gate is native-only and set here, never in the
+   * shared launch-env builder.
+   */
+  private nativeLaunchEnv(
+    env: Record<string, string>,
+    containment: boolean
+  ): Record<string, string> {
+    return {
+      ...(containment ? containedProcessEnv(env) : env),
+      [CONTROL_PLANE_NATIVE_LOGS_ENV]: '1',
+    };
+  }
+
+  private async readMainProcessIdentity(container: Container): Promise<MainProcessIdentity> {
+    return this.readMainProcessIdentityWithin(container, Date.now() + PROBE_TIMEOUT_MS);
+  }
+
+  private async readMainProcessIdentityWithin(
+    container: Container,
+    deadlineAt: number
+  ): Promise<MainProcessIdentity> {
+    try {
+      const proc = await this.awaitContainerCall(
+        container.exec(['cat', '/proc/1/cmdline']),
+        deadlineAt
+      );
+      const exitCode = await this.awaitContainerCall(proc.exitCode, deadlineAt);
+      if (exitCode !== 0) return 'ambiguous';
+      const output = await this.awaitContainerCall(proc.output(), deadlineAt);
+      return classifyMainProcess(new Uint8Array(output.stdout));
+    } catch {
+      return 'ambiguous';
+    }
+  }
+
+  /**
+   * Confirm the native start issued the supervisor as PID 1, bounded by the
+   * existing wrapper readiness deadline. This is identity, not a wrapper-child
+   * poll: a deadline without a match, or a container that stops first, throws
+   * and does not exec.
+   */
+  private async awaitSupervisorMainProcess(container: Container): Promise<void> {
+    const deadlineAt = Date.now() + DEADLINE_MS.wrapperReadiness;
+    for (;;) {
+      if (container.running !== true) {
+        throw new Error('Container stopped before the supervisor main process was confirmed');
+      }
+      const identity = await this.readMainProcessIdentityWithin(container, deadlineAt);
+      if (identity === 'supervisor') return;
+      if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
+      await this.sleepWithinDeadline(deadlineAt);
+    }
   }
 
   private containerImage(): string {

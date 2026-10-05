@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import type { Event } from '@sentry/nextjs';
-import { sanitizeSentryRequestData } from '../sentry.server.config';
+import { sanitizeSentryRequestData } from '@/lib/observability/sentry-server';
 
 describe('sanitizeSentryRequestData', () => {
   test('removes the GitHub OAuth state token from request URL and query string', () => {

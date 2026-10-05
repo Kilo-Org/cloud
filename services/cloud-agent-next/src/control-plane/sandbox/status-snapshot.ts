@@ -5,9 +5,8 @@
  * model cannot leak back in through this path.
  *
  * This is a passive snapshot: `observedAt` is creation time, not a fresh probe.
- * `runtime` is intentionally omitted: the V2 allocation carries no runtime
- * versions, and inventing them would violate the bounded-runtime rule.
  */
+import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   getSandboxProviderLabel,
   type SandboxStatusSnapshot,
@@ -17,6 +16,7 @@ import type { AllocationView } from './allocation.js';
 export type AllocationStatusSnapshotInput = {
   /** The V2 allocation view, or null when the sandbox has no owner. */
   allocation: AllocationView | null;
+  containersInstance?: string;
   /** Snapshot creation time; the value of `observedAt`. */
   observedAt: number;
   /**
@@ -30,11 +30,28 @@ export function projectAllocationStatusSnapshot(
   input: AllocationStatusSnapshotInput
 ): SandboxStatusSnapshot {
   const { allocation, observedAt, inactivityTimeoutMs } = input;
+  const containersInstance = input.containersInstance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
   const base = {
     provider: getSandboxProviderLabel(allocation?.provider),
     observedAt,
     inactivityTimeoutMs,
     estimatedSleepAt: null,
+    ...(allocation?.provider === 'cloudflare-containers'
+      ? {
+          runtime: {
+            sandboxType:
+              containersInstance === 'standard-3'
+                ? ('containers-standard-3' as const)
+                : containersInstance === 'standard-4'
+                  ? ('containers-standard-4' as const)
+                  : null,
+            kiloCliVersion: null,
+            wrapperVersion: null,
+            startedAt: null,
+            stoppedAt: null,
+          },
+        }
+      : {}),
   };
   if (allocation === null) {
     return { ...base, status: 'unknown', detailCode: 'insufficient_evidence' };

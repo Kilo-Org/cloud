@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
@@ -27,13 +26,6 @@ import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
-/**
- * Cap on the OS font scale applied to the cannot-send reason. The reason wraps
- * above the controls, so a larger accessibility scale grows it vertically
- * instead of truncating the actionable tail; capping the scale bounds how far
- * it can grow. 1.6 keeps the longest translated reason whole on a phone.
- */
-export const COMPOSER_REASON_MAX_FONT_SCALE = 1.6;
 /**
  * Leading gap between the controls of this row, as a class: `ms-3` is the
  * `COMPOSER_CONTROL_GAP_DP` of `@/lib/a11y/tap-target` (0.75rem at
@@ -94,18 +86,12 @@ type ChatComposerInputRowProps = {
   /** Return submits the message instead of inserting a newline. */
   returnSendsMessage: boolean;
   /**
-   * Why send is unavailable, rendered as a reason above the controls and
-   * announced when it changes. It wraps rather than truncates: a long
-   * translation must keep its actionable tail ("Retry first.") on a phone.
-   * Null while send can proceed or when the parent knows no reason.
+   * Why send is unavailable. The fixed footer row above the composer renders
+   * it; this row carries it only as the input's accessibility hint, so the
+   * reader hears the reason at the control that is gated. Null while send can
+   * proceed or when the parent knows no reason.
    */
   sendDisabledReason?: string | null;
-  /**
-   * Tone for `sendDisabledReason`: `error` (the default) paints it in the
-   * destructive color; `neutral` keeps a progress phase ("Setting up
-   * environment…") in the status tone so it does not read as a failure.
-   */
-  sendDisabledReasonTone?: 'error' | 'neutral' | null;
   textInputStyle: TextStyle;
   voiceDisabled: boolean;
   voiceInputAvailable: boolean;
@@ -147,7 +133,6 @@ export function ChatComposerInputRow({
   placeholder,
   returnSendsMessage,
   sendDisabledReason,
-  sendDisabledReasonTone,
   textInputStyle,
   voiceDisabled,
   voiceInputAvailable,
@@ -174,19 +159,7 @@ export function ChatComposerInputRow({
   };
 
   return (
-    // The root is a column, not the old non-wrapping `flex-row`: the reason is
-    // a block of its own above the controls, so it can never squeeze the
-    // flex-1 input or push the trailing send control off the screen.
     <View className="p-2.5 px-3">
-      {sendDisabledReason ? (
-        <AccessibleStatus
-          message={sendDisabledReason}
-          tone={sendDisabledReasonTone === 'neutral' ? 'status' : 'error'}
-          maxFontSizeMultiplier={COMPOSER_REASON_MAX_FONT_SCALE}
-          className="mb-1 text-right text-xs"
-        />
-      ) : null}
-
       <View className="flex-row items-center">
         {attachmentsEnabled ? (
           <Pressable

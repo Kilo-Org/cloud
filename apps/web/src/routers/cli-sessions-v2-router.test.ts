@@ -17,7 +17,12 @@ import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo, parseGitHubPrUrl } from '@/routers/cli-sessions-v2-router';
+import {
+  getPrLinkVerificationKey,
+  parseGitHubOwnerRepo,
+  parseGitHubPrUrl,
+  projectAssociatedPr,
+} from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -133,6 +138,119 @@ let regularUser: User;
 let otherUser: User;
 let adminUser: User;
 let testOrganization: Organization;
+
+describe('projectAssociatedPr', () => {
+  const row = {
+    session_id: 'ses_projection',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    git_url: 'https://github.com/kilo/repo',
+    pr_url: null,
+    pr_number: null,
+    pr_state: null,
+    pr_title: null,
+    pr_head_sha: null,
+    pr_last_synced_at: null,
+    pr_review_decision: null,
+    review_decision_pending: null,
+    session_pr_platform: 'github',
+    session_pr_url: 'https://github.com/kilo/repo/pull/42',
+    session_pr_number: 42,
+    session_pr_head_ref: 'feature',
+    session_pr_head_sha: null,
+    session_pr_verified_at: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('omits the optional verification key for an already verified link', () => {
+    const session = projectAssociatedPr(row);
+    expect(Object.keys(session).sort()).toEqual(
+      ['session_id', 'updated_at', 'git_url', 'associatedPr'].sort()
+    );
+    expect(session).not.toHaveProperty('prLinkVerificationKey');
+    expect(session.associatedPr).toMatchObject({ number: 42, platform: 'github' });
+  });
+
+  it('includes the verification key for an unverified candidate', () => {
+    const session = projectAssociatedPr({ ...row, session_pr_verified_at: null });
+    expect(session.prLinkVerificationKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(session.associatedPr).toBeNull();
+  });
+
+  it('omits the optional verification key when there is no stored link', () => {
+    const session = projectAssociatedPr({
+      ...row,
+      session_pr_url: null,
+      session_pr_number: null,
+      session_pr_verified_at: null,
+    });
+    expect(session).not.toHaveProperty('prLinkVerificationKey');
+    expect(session.associatedPr).toBeNull();
+  });
+});
+
+describe('getPrLinkVerificationKey', () => {
+  const candidate = {
+    platform: 'github',
+    pr_url: 'https://github.com/kilo/repo/pull/77',
+    pr_number: 77,
+    pr_link_verified_at: null,
+    git_url: 'https://github.com/kilo/repo',
+    pr_head_ref: 'feature/list-x',
+    pr_head_sha: 'cafef00d',
+  };
+
+  it.each([
+    'https://github.com/Kilo/Repo.git',
+    'git@github.com:Kilo/Repo.git',
+    'ssh://git@github.com/Kilo/Repo.git',
+  ])('detects an unverified GitHub link matching repository %s', git_url => {
+    expect(getPrLinkVerificationKey({ ...candidate, git_url })).toEqual(expect.any(String));
+  });
+
+  it('accepts a PR URL subpath without requiring head evidence', () => {
+    expect(
+      getPrLinkVerificationKey({
+        ...candidate,
+        pr_url: `${candidate.pr_url}/files?diff=split#top`,
+        pr_head_ref: null,
+        pr_head_sha: null,
+      })
+    ).toEqual(expect.any(String));
+  });
+
+  it.each([
+    { platform: null },
+    { platform: 'gitlab' },
+    { pr_link_verified_at: '2026-01-01 00:00:00+00' },
+    { pr_url: null },
+    { pr_url: 'not a URL' },
+    { pr_url: 'https://gitlab.com/kilo/repo/pull/77' },
+    { pr_url: 'https://github.com/kilo/other/pull/77' },
+    { pr_url: 'https://github.com/kilo/repo/pull/78' },
+    { pr_number: null },
+    { pr_number: 0 },
+    { pr_number: -1 },
+    { pr_number: 77.5 },
+    { pr_number: 2_147_483_648 },
+    { git_url: null },
+    { git_url: 'not a repository' },
+    { git_url: 'https://github.com/kilo/repo/nested' },
+  ])('rejects non-candidate evidence %j', overrides => {
+    expect(getPrLinkVerificationKey({ ...candidate, ...overrides })).toBeUndefined();
+  });
+
+  it.each([
+    { pr_url: `${candidate.pr_url}/files` },
+    { pr_url: 'https://github.com/kilo/repo/pull/78', pr_number: 78 },
+    { git_url: 'git@github.com:kilo/repo.git' },
+    { pr_head_ref: 'feature/new-head' },
+    { pr_head_sha: 'new-sha' },
+  ])('changes the opaque key when stored link or head evidence changes: %j', overrides => {
+    const key = getPrLinkVerificationKey(candidate);
+    expect(key).toMatch(/^[a-f0-9]{64}$/);
+    expect(getPrLinkVerificationKey({ ...candidate, ...overrides })).not.toBe(key);
+    expect(getPrLinkVerificationKey({ ...candidate })).toBe(key);
+  });
+});
 
 describe('cli-sessions-v2-router', () => {
   beforeEach(() => {
@@ -2370,6 +2488,29 @@ describe('cli-sessions-v2-router', () => {
       // An unverified stored link must not render a badge or an Open-on-GitHub
       // link, even when the branch cache row exists.
       expect(unverified?.associatedPr).toBeNull();
+      expect(unverified?.prLinkVerificationKey).toEqual(expect.any(String));
+      expect(withPr?.prLinkVerificationKey).toBeUndefined();
+      expect(withoutPr?.prLinkVerificationKey).toBeUndefined();
+      expect(branchOnly?.prLinkVerificationKey).toBeUndefined();
+      expect(unverified).not.toHaveProperty('session_pr_url');
+      expect(unverified).not.toHaveProperty('session_pr_head_ref');
+      expect(unverified).not.toHaveProperty('session_pr_head_sha');
+    });
+
+    it('search and get emit the same candidate key as list without displaying an unverified PR', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const list = await caller.cliSessionsV2.list({});
+      const search = await caller.cliSessionsV2.search({
+        search_string: 'session unverified link',
+      });
+      const session = await caller.cliSessionsV2.get({ session_id: sessionUnverified });
+      const listRow = list.cliSessions.find(row => row.session_id === sessionUnverified);
+      const searchRow = search.results.find(row => row.session_id === sessionUnverified);
+
+      expect(listRow?.prLinkVerificationKey).toEqual(expect.any(String));
+      expect(searchRow?.prLinkVerificationKey).toBe(listRow?.prLinkVerificationKey);
+      expect(session.prLinkVerificationKey).toBe(listRow?.prLinkVerificationKey);
+      expect(searchRow?.associatedPr).toBeNull();
     });
 
     it('list returns live cache fields when the stored link has a trailing subpath', async () => {

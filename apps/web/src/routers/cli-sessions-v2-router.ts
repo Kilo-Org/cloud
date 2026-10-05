@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
@@ -251,6 +252,8 @@ type SessionPrRow = {
   session_pr_platform: string | null;
   session_pr_url: string | null;
   session_pr_number: number | null;
+  session_pr_head_ref: string | null;
+  session_pr_head_sha: string | null;
   /**
    * `cli_sessions_v2.pr_link_verified_at`. Non-null means the link passed
    * GitHub identity verification, so it may be shown at all (and the cache's
@@ -459,6 +462,51 @@ export function formatAssociatedPr(
   return pendingPartialFromSession(session, opts?.partialReviewDecisionPending ?? true);
 }
 
+export function getPrLinkVerificationKey(
+  session: Pick<
+    CliSessionV2,
+    | 'platform'
+    | 'pr_url'
+    | 'pr_number'
+    | 'pr_link_verified_at'
+    | 'git_url'
+    | 'pr_head_ref'
+    | 'pr_head_sha'
+  >
+): string | undefined {
+  if (
+    session.platform !== 'github' ||
+    session.pr_link_verified_at !== null ||
+    session.pr_url === null ||
+    session.pr_number === null ||
+    !Number.isInteger(session.pr_number) ||
+    session.pr_number <= 0 ||
+    session.pr_number > PG_MAX_INTEGER ||
+    !pullRequestUrlMatchesRepo(session.pr_url, session.git_url)
+  ) {
+    return undefined;
+  }
+  const parsed = parseGitHubPrUrl(session.pr_url);
+  if (
+    !parsed ||
+    parsed.number !== session.pr_number ||
+    !parseGitHubOwnerRepo(session.git_url ?? '')
+  ) {
+    return undefined;
+  }
+  return createHash('sha256')
+    .update(
+      JSON.stringify([
+        session.pr_url,
+        session.git_url,
+        session.pr_number,
+        session.pr_head_ref,
+        session.pr_head_sha,
+      ])
+    )
+    .digest('hex');
+}
+
 const createdOnPlatformField = z.string().min(1).max(100);
 
 /**
@@ -501,6 +549,8 @@ const commonSessionFieldsWithPr = {
   session_pr_platform: cli_sessions_v2.platform,
   session_pr_url: cli_sessions_v2.pr_url,
   session_pr_number: cli_sessions_v2.pr_number,
+  session_pr_head_ref: cli_sessions_v2.pr_head_ref,
+  session_pr_head_sha: cli_sessions_v2.pr_head_sha,
   session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
   total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
 } as const;
@@ -542,12 +592,13 @@ export const sessionPrJoinPredicate = and(
  * Strip the flat `pr_*` columns produced by `commonSessionFieldsWithPr` and
  * fold them into a single `associatedPr` field on each row.
  */
-function projectAssociatedPr<
+export function projectAssociatedPr<
   T extends AssociatedPrRow & SessionPrRow & { updated_at: string | null; git_url: string | null },
 >(
   row: T
 ): Omit<T, keyof AssociatedPrRow | keyof SessionPrRow> & {
   associatedPr: z.infer<typeof associatedPrSchema> | null;
+  prLinkVerificationKey?: string;
 } {
   const {
     pr_url,
@@ -561,11 +612,23 @@ function projectAssociatedPr<
     session_pr_platform,
     session_pr_url,
     session_pr_number,
+    session_pr_head_ref,
+    session_pr_head_sha,
     session_pr_verified_at,
     ...rest
   } = row;
+  const prLinkVerificationKey = getPrLinkVerificationKey({
+    platform: session_pr_platform,
+    pr_url: session_pr_url,
+    pr_number: session_pr_number,
+    pr_link_verified_at: session_pr_verified_at,
+    git_url: rest.git_url,
+    pr_head_ref: session_pr_head_ref,
+    pr_head_sha: session_pr_head_sha,
+  });
   return {
     ...rest,
+    ...(prLinkVerificationKey === undefined ? {} : { prLinkVerificationKey }),
     associatedPr: formatAssociatedPr(
       {
         platform: session_pr_platform,
@@ -1406,7 +1469,7 @@ export const cliSessionsV2Router = createTRPCRouter({
       await ensureOrganizationAccess(ctx, session.organization_id);
     }
 
-    return session;
+    return { ...session, prLinkVerificationKey: getPrLinkVerificationKey(session) };
   }),
 
   /**
@@ -1617,6 +1680,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         // Associated GitHub pull request for this session's branch, if any.
         // Populated by the pull_request webhook handler or a manual refresh.
         associatedPr: associatedPrSchema.nullable(),
+        prLinkVerificationKey: z.string().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -1717,6 +1781,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         version: session.version,
         total_cost_microdollars: session.total_cost_microdollars,
         runtimeState,
+        prLinkVerificationKey: getPrLinkVerificationKey(session),
         associatedPr: formatAssociatedPr(
           {
             platform: session.platform,

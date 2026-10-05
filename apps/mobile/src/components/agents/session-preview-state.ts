@@ -17,6 +17,10 @@ export type SessionPreviewTarget = {
   statusKind: GlanceableStatusKind | null;
   needsInput: boolean;
   totalCostMicrodollars: number | null;
+  /** Absent → no Copy session ID item. */
+  onCopySessionId?: () => void;
+  /** Absent → no View PR item. Only a session with an associated PR passes this. */
+  onViewPr?: () => void;
   /** Absent → no Rename item. */
   onRename?: (newTitle: string) => void;
   /** Opens the session — the row's own navigation, reused by the Open menu item. */

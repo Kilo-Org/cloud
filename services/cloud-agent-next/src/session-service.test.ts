@@ -3476,6 +3476,25 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(config).toMatchObject({ permission: { external_directory: 'allow' } });
   });
 
+  it.each(['cloud-agent-web', 'code-review'])(
+    'explicitly approves dotenv reads for %s-origin sessions',
+    async createdOnPlatform => {
+      const result = await buildPromptWrapperRequests(createMetadata({ createdOnPlatform }));
+
+      for (const key of ['KILO_CONFIG_CONTENT', 'OPENCODE_CONFIG_CONTENT']) {
+        const config: unknown = JSON.parse(result.readyRequest.materialized.env[key]);
+        expect(config).toMatchObject({
+          permission: {
+            read: { '*': 'allow', '*.env': 'allow', '*.env.*': 'allow' },
+            schedule_wakeup: 'deny',
+            cron_create: 'deny',
+            ...(createdOnPlatform === 'code-review' ? { edit: 'deny', webfetch: 'deny' } : {}),
+          },
+        });
+      }
+    }
+  );
+
   it('disables the scheduler and cron tools', async () => {
     const result = await buildPromptWrapperRequests(createMetadata());
     const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);

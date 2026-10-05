@@ -18,6 +18,7 @@ import {
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
+import { isPrivateUrl } from '@/lib/ai-gateway/ssrf-protection';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider, ProviderId } from '@/lib/ai-gateway/providers/types';
@@ -120,6 +121,11 @@ async function checkCustomBYOK(
     byok => byok.baseUrl !== null && !knownProviderIds.includes(byok.providerId)
   );
   if (!customByok) {
+    return null;
+  }
+
+  if (customByok.baseUrl && isPrivateUrl(customByok.baseUrl)) {
+    console.warn(`SECURITY: Custom BYOK provider for user ${user.id} points to a private URL: ${customByok.baseUrl}`);
     return null;
   }
 

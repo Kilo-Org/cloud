@@ -139,11 +139,11 @@ async function testCustomOrOpenRouterByokKey(existingKey: typeof byok_api_keys.$
 
   function setup() {
     const providerId = decryptedKey.providerId;
-    const model = UserByokTestModels[providerId as UserByokProviderId];
 
     // Check if this is a direct BYOK provider
     const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === providerId);
     if (directByokProvider) {
+      const model = UserByokTestModels[providerId as UserByokProviderId] || 'gpt-4';
       return {
         finalProvider: providerId,
         model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
@@ -152,6 +152,7 @@ async function testCustomOrOpenRouterByokKey(existingKey: typeof byok_api_keys.$
 
     // Check for openrouter-byok
     if (providerId === 'openrouter-byok') {
+      const model = UserByokTestModels['openrouter-byok'] || 'gpt-4';
       return {
         finalProvider: 'openrouter',
         model: createOpenAICompatible({
@@ -164,6 +165,7 @@ async function testCustomOrOpenRouterByokKey(existingKey: typeof byok_api_keys.$
 
     // Check for custom provider
     if (decryptedKey.providerApi === 'openai-compatible' && decryptedKey.baseUrl) {
+      const model = UserByokTestModels[providerId as UserByokProviderId] || 'gpt-4';
       return {
         finalProvider: 'custom',
         model: createOpenAICompatible({
@@ -176,6 +178,7 @@ async function testCustomOrOpenRouterByokKey(existingKey: typeof byok_api_keys.$
 
     // Fallback to Vercel BYOK config
     const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
+    const model = UserByokTestModels[decryptedKey.providerId as UserByokProviderId] || 'gpt-4';
     return {
       finalProvider,
       model: createGateway({
@@ -186,6 +189,7 @@ async function testCustomOrOpenRouterByokKey(existingKey: typeof byok_api_keys.$
           only: [finalProvider],
           byok: { [finalProvider]: byokList },
         } satisfies GatewayProviderOptions,
+      },
       },
     };
   }
@@ -557,7 +561,7 @@ export const byokRouter = createTRPCRouter({
 
       function setup() {
         const providerId = decryptedKey.providerId;
-        const model = UserByokTestModels[providerId];
+        const model = UserByokTestModels[providerId] || 'gpt-4';
 
         // Check if this is a direct BYOK provider
         const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === providerId);

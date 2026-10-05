@@ -386,8 +386,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     const error = validateStructuredCredentials(selectedProvider, apiKey);
     setCredentialError(error);
     if (error) return;
-    if (isCustomProviderSelection && customProviderId.trim()) {
+    if (isCustomProviderSelection) {
       const customId = customProviderId.trim();
+      if (!customId) {
+        toast.error('Enter a provider ID.');
+        return;
+      }
       if (!customBaseUrl || !customBaseUrl.trim()) {
         toast.error('Enter a base URL.');
         return;
@@ -860,24 +864,87 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   </Alert>
                 )}
                 {editingKeyId ? (
-                  <Alert>
-                    <Lock className="size-4" />
-                    <AlertDescription>
-                      An API key is already saved for this provider. Enter a new key to replace it.
-                    </AlertDescription>
-                  </Alert>
+                    <Alert>
+                        <Lock className="size-4" />
+                        <AlertDescription>
+                            An API key is already saved for this provider. Enter a new key to replace it.
+                        </AlertDescription>
+                    </Alert>
                 ) : (
-                  <Alert>
-                    <Info className="size-4" />
-                    <AlertDescription>
-                      Your API key will be encrypted and stored securely. Once saved, it cannot be
-                      viewed again.
-                    </AlertDescription>
-                  </Alert>
+                    <Alert>
+                        <Info className="size-4" />
+                        <AlertDescription>
+                            Your API key will be encrypted and stored securely. Once saved, it cannot be
+                            viewed again.
+                        </AlertDescription>
+                    </Alert>
                 )}
-              </div>
+            </div>
 
-              {selectedProvider && getProviderModels(selectedProvider).length > 0 && (
+            {/* Custom provider fields - only show when Custom Provider is selected or editing a custom key */}
+            {isCustomProviderSelection && (
+                <div className="space-y-2">
+                    <div className="space-y-2">
+                        <Label htmlFor="customProviderId">Provider ID</Label>
+                        <Input
+                            id="customProviderId"
+                            value={customProviderId}
+                            onChange={e => setCustomProviderId(e.target.value)}
+                            placeholder="Enter provider ID (e.g., my-custom-provider)"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            The identifier for your custom provider. This will be used to route requests to
+                            your custom endpoint.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="customDisplayName">Display Name</Label>
+                        <Input
+                            id="customDisplayName"
+                            value={customDisplayName}
+                            onChange={e => setCustomDisplayName(e.target.value)}
+                            placeholder="Enter display name (optional)"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="customBaseUrl">Base URL</Label>
+                        <Input
+                            id="customBaseUrl"
+                            value={customBaseUrl}
+                            onChange={e => setCustomBaseUrl(e.target.value)}
+                            placeholder="https://api.example.com/v1"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            The base URL for your custom API endpoint. Must be a valid HTTPS URL.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="customProviderApi">Provider API Type</Label>
+                        <Select
+                            id="customProviderApi"
+                            value={customProviderApi}
+                            onValueChange={setCustomProviderApi}
+                        >
+                            <SelectTrigger id="customProviderApi">
+                                <SelectValue placeholder="Select API type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="openai-compatible">
+                                    OpenAI Compatible
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                            The API type that your custom provider implements.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {selectedProvider && getProviderModels(selectedProvider).length > 0 && (
                 <div className="space-y-2">
                   <Label>Supported Models</Label>
                   <div className="text-muted-foreground rounded-md border p-3 text-sm">

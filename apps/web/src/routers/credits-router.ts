@@ -8,10 +8,7 @@ import {
   assertAppStoreAccountTokenMatchesUser,
   assertGooglePlayAccountTokenMatchesUser,
 } from '@/lib/credits/store-account-token';
-import {
-  completeStoreCreditPurchase,
-  reportStoreCreditPurchaseToBouncer,
-} from '@/lib/credits/store-completion';
+import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 import {
   STORE_PURCHASE_PENDING_MESSAGE,
   StoreCreditPurchaseOwnedByAnotherAccountError,
@@ -173,7 +170,6 @@ export const creditsRouter = createTRPCRouter({
           code: 'FORBIDDEN',
         });
         const result = await completeStoreCreditPurchase({ user: ctx.user, purchase });
-        await reportStoreCreditPurchaseToBouncer({ userId: ctx.user.id, purchase, result });
         return { amountUsd: result.amountUsd, alreadyProcessed: result.alreadyProcessed };
       } catch (error) {
         throw mapCreditCompletionError(error, ctx.user.id, 'complete-app-store-purchase', [
@@ -197,7 +193,6 @@ export const creditsRouter = createTRPCRouter({
           code: 'FORBIDDEN',
         });
         const result = await completeStoreCreditPurchase({ user: ctx.user, purchase });
-        await reportStoreCreditPurchaseToBouncer({ userId: ctx.user.id, purchase, result });
         // Consume only after the credit is granted: a one-time Play product must
         // be consumed to be purchasable again, and an interrupted flow can be
         // retried with the same token because the grant is idempotent. A consume

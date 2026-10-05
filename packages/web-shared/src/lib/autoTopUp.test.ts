@@ -1,5 +1,10 @@
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { auto_top_up_configs, kilocode_users, organizations } from '@kilocode/db/schema';
+import {
+  auto_top_up_configs,
+  bouncer_credit_event_outbox,
+  kilocode_users,
+  organizations,
+} from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -24,8 +29,6 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import crypto from 'node:crypto';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
-import { reportCreditEvent } from '@/lib/bouncer/client';
 import Stripe from 'stripe';
 
 // Convert dollars to microdollars
@@ -35,16 +38,6 @@ const toMicrodollars = (dollars: number) => dollars * 1_000_000;
 jest.mock('@/lib/email', () => ({
   sendAutoTopUpFailedEmail: jest.fn().mockResolvedValue({ sent: true }),
 }));
-
-// Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
-  return {
-    __esModule: true,
-    ...actual,
-    reportCreditEvent: jest.fn(),
-  };
-});
 
 jest.mock('@/lib/stripe-client', () => {
   return {
@@ -737,13 +730,17 @@ describe('invoice metadata includes traceId', () => {
         description: 'Kilo automatic top up',
       })
     );
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.attempted');
+    expect(rows[0].user_id).toBe(user.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.attempted',
         flow: 'auto_topup',
         userId: user.id,
         amountCents: 5000,
-        accountCreatedAt: user.created_at,
+        accountCreatedAt: new Date(user.created_at).toISOString(),
       })
     );
   });
@@ -783,7 +780,11 @@ describe('invoice metadata includes traceId', () => {
     const { maybePerformAutoTopUp } = await import('@/lib/autoTopUp');
     await maybePerformAutoTopUp(user);
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.attempted');
+    expect(rows[0].user_id).toBe(user.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.attempted',
         flow: 'auto_topup',
@@ -793,9 +794,7 @@ describe('invoice metadata includes traceId', () => {
     );
     // Stripe's `charge.failed` webhook reports the decline, with Stripe's event id; a local
     // report would count the same decline twice.
-    expect(reportCreditEvent).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'charge.failed' })
-    );
+    expect(rows.some(row => row.event_type === 'charge.failed')).toBe(false);
   });
 });
 

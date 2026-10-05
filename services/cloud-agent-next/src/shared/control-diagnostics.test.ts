@@ -3,11 +3,65 @@ import { heartbeatReasonFrom } from './sandbox-control-protocol.js';
 import {
   classifyRetirementCause,
   controlLogBatchSchema,
+  controlUploadFailureStartsEpisode,
+  createControlDiagnosticProjector,
   createControlDiagnosticRecord,
   diagnosticDetail,
+  isProjectableControlDiagnostic,
+  nativeConnectionPhases,
 } from './control-diagnostics.js';
 
 describe('control diagnostic schema compatibility', () => {
+  it('retains no-progress tool and workload counters without accepting tool content', () => {
+    const deadline = createControlDiagnosticRecord(
+      'session.execution',
+      {
+        phase: 'deadline_expired',
+        reason: 'no_progress',
+        rootKiloSessionId: 'ses_root',
+        kiloSessionId: 'ses_child',
+        eventType: 'message.part.updated',
+        partId: 'part_1',
+        toolStatus: 'running',
+        toolObservedAt: 10,
+        outputBytes: 0,
+        command: 'secret',
+      },
+      20
+    );
+    const workload = createControlDiagnosticRecord(
+      'control.workload',
+      {
+        phase: 'completed',
+        workloadPhase: 'stats',
+        scopeId: 'scope_1',
+        memoryMaxEvents: 4,
+        cpuUsageUsec: 900,
+        cpuThrottledUsec: 75,
+        ioReadBytes: 130,
+        toolCpuUsageUsec: 800,
+        serverCpuUsageUsec: 100,
+        toolIoReadBytes: 120,
+      },
+      21
+    );
+    const records = controlLogBatchSchema.parse({
+      version: 1,
+      sequence: 1,
+      droppedRecords: 0,
+      records: [deadline, workload],
+    }).records;
+    expect(records[0]?.fields).toMatchObject({ partId: 'part_1', toolStatus: 'running' });
+    expect(records[1]?.fields).toMatchObject({
+      cpuUsageUsec: 900,
+      memoryMaxEvents: 4,
+      toolCpuUsageUsec: 800,
+      serverCpuUsageUsec: 100,
+      toolIoReadBytes: 120,
+    });
+    expect(JSON.stringify(records)).not.toContain('secret');
+  });
+
   it('accepts records written before publication diagnostics were extended', () => {
     expect(
       controlLogBatchSchema.parse({
@@ -98,6 +152,67 @@ describe('control diagnostic schema compatibility', () => {
     ).toBe(true);
   });
 
+  it('accepts every shared native connection phase and rejects an unknown one', () => {
+    for (const phase of nativeConnectionPhases) {
+      expect(
+        createControlDiagnosticRecord(
+          'wrapper.status',
+          { phase: 'status', nativeConnectionPhase: phase },
+          1
+        )
+      ).toBeDefined();
+    }
+    expect(
+      createControlDiagnosticRecord(
+        'wrapper.status',
+        { phase: 'status', nativeConnectionPhase: 'nonsense' },
+        1
+      )
+    ).toBeUndefined();
+  });
+
+  it('accepts the periodic status and normal transition fields', () => {
+    const record = createControlDiagnosticRecord(
+      'wrapper.status',
+      {
+        phase: 'status',
+        elapsedMs: 60_000,
+        nativeConnectionPhase: 'connected',
+        attempt: 2,
+        outboxBytes: 12,
+        sessionCount: 1,
+        preparingCount: 1,
+        activeTurnCount: 1,
+        recentTerminalCount: 1,
+        runtimeCount: 1,
+        suspectedCount: 1,
+        restartingCount: 1,
+        unavailableCount: 1,
+        allocationId: 'alloc-1',
+        wrapperInstanceId: '11111111-1111-4111-8111-111111111111',
+      },
+      1
+    );
+    expect(record?.fields).toMatchObject({
+      phase: 'status',
+      nativeConnectionPhase: 'connected',
+      sessionCount: 1,
+      outboxBytes: 12,
+    });
+    expect(
+      createControlDiagnosticRecord(
+        'wrapper.lifecycle',
+        {
+          phase: 'session_outcome',
+          status: 'failed',
+          sessionId: 'ses_1',
+          outcomeReason: 'no_progress',
+        },
+        1
+      )?.fields
+    ).toMatchObject({ phase: 'session_outcome', outcomeReason: 'no_progress' });
+  });
+
   it('drops free-text prompts and unknown secret fields from a diagnostic record', () => {
     const prompt = 'Summarize the private customer contract';
     const record = createControlDiagnosticRecord(
@@ -173,5 +288,183 @@ describe('diagnosticDetail', () => {
       retirementCause: 'event_feed_unhealthy',
       detail: 'feed_failed',
     });
+  });
+});
+
+describe('native diagnostic projector', () => {
+  function collect() {
+    const lines: string[] = [];
+    return {
+      lines,
+      projector: createControlDiagnosticProjector({
+        enabled: true,
+        write: line => lines.push(line),
+        now: () => 1,
+      }),
+    };
+  }
+
+  it('no-ops unless the native gate is set', () => {
+    const lines: string[] = [];
+    const projector = createControlDiagnosticProjector({
+      enabled: false,
+      write: line => lines.push(line),
+    });
+    projector('wrapper.lifecycle', { phase: 'ready' });
+    expect(lines).toHaveLength(0);
+  });
+
+  it('projects an allowlisted lifecycle line and drops detail and reason', () => {
+    const { lines, projector } = collect();
+    projector('wrapper.lifecycle', {
+      phase: 'failed',
+      retirementCause: 'process_exited',
+      detail: 'private detail',
+      reason: 'private reason',
+    });
+    expect(lines).toHaveLength(1);
+    const record = JSON.parse(lines[0] ?? '{}') as { fields: Record<string, unknown> };
+    expect(record.fields).toMatchObject({ phase: 'failed', retirementCause: 'process_exited' });
+    expect(record.fields).not.toHaveProperty('detail');
+    expect(record.fields).not.toHaveProperty('reason');
+    expect(lines[0]).not.toContain('private');
+  });
+
+  it('does not project heartbeats, keepalive, or retry scheduling', () => {
+    const { lines, projector } = collect();
+    expect(isProjectableControlDiagnostic('control.heartbeat', { phase: 'sent' })).toBe(false);
+    projector('control.heartbeat', { phase: 'sent' });
+    projector('control.socket', { phase: 'keepalive_sent' });
+    projector('control.socket', { phase: 'keepalive_failed' });
+    projector('wrapper.lifecycle', { phase: 'retry_scheduled' });
+    expect(lines).toHaveLength(0);
+  });
+
+  it('projects the owner lines and a failed upload', () => {
+    const { lines, projector } = collect();
+    projector('control.upload', { phase: 'failed', category: 'network_failure' });
+    projector('wrapper.lifecycle', { phase: 'kilo_restarting', kiloRestartReason: 'hang' });
+    projector('wrapper.lifecycle', {
+      phase: 'prepare_failed',
+      preparationStep: 'clone',
+      subtype: 'git_clone_timeout',
+    });
+    projector('wrapper.lifecycle', { phase: 'failed', retirementCause: 'unhandled_rejection' });
+    projector('control.socket', { phase: 'connect_attempt', ok: false });
+    expect(lines).toHaveLength(5);
+  });
+
+  it('projects the normal transitions and the periodic status line and drops detail and reason', () => {
+    const { lines, projector } = collect();
+    projector('wrapper.lifecycle', { phase: 'session_ready', sessionId: 'ses_1' });
+    projector('wrapper.lifecycle', {
+      phase: 'session_outcome',
+      status: 'failed',
+      sessionId: 'ses_1',
+      outcomeReason: 'no_progress',
+    });
+    projector('wrapper.status', {
+      phase: 'status',
+      elapsedMs: 60_000,
+      nativeConnectionPhase: 'connecting',
+      attempt: 1,
+      outboxBytes: 0,
+      sessionCount: 0,
+      preparingCount: 0,
+      activeTurnCount: 0,
+      recentTerminalCount: 0,
+      runtimeCount: 0,
+      suspectedCount: 0,
+      restartingCount: 0,
+      unavailableCount: 0,
+      detail: 'private detail',
+      reason: 'private reason',
+    });
+    projector('control.workload', { phase: 'started', workloadPhase: 'applied' });
+    expect(lines).toHaveLength(4);
+    const status = JSON.parse(lines[2] ?? '{}') as { fields: Record<string, unknown> };
+    expect(status.fields).toMatchObject({ phase: 'status', nativeConnectionPhase: 'connecting' });
+    expect(status.fields).not.toHaveProperty('detail');
+    expect(status.fields).not.toHaveProperty('reason');
+    expect(lines[2]).not.toContain('private');
+  });
+
+  it('projects only the production workload apply and failure shapes', () => {
+    const { lines, projector } = collect();
+    // The actual `initializeControlWorkload` success shape.
+    projector('control.workload', {
+      phase: 'started',
+      workloadPhase: 'applied',
+      containerLimitBytes: 4_000,
+      aggregateMaxBytes: 3_000,
+      reserveBytes: 1_000,
+      appliedMaxBytes: 3_000,
+      readbackMaxBytes: 3_000,
+      cpuController: false,
+      siblingProtection: false,
+      workloadLimitSource: 'cgroup',
+    });
+    // A completed rollback is not a projectable workload event.
+    projector('control.workload', { phase: 'completed', workloadPhase: 'rollback' });
+    // Workload stats and OOM readings never become a line.
+    projector('control.workload', {
+      phase: 'completed',
+      workloadPhase: 'stats',
+      oomKills: 4,
+      oomGroupKills: 2,
+      currentBytes: 512,
+      peakBytes: 1_024,
+      pressureSomeTotal: 3,
+      pressureFullTotal: 1,
+    });
+    // A status record without the status phase is not projectable.
+    projector('wrapper.status', { nativeConnectionPhase: 'idle' });
+    // The production failure shape does project.
+    projector('control.workload', {
+      phase: 'failed',
+      workloadPhase: 'failed',
+      workloadFailure: 'flag_off',
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('"workloadPhase":"applied"');
+    expect(lines[1]).toContain('"workloadFailure":"flag_off"');
+    expect(lines.join('\n')).not.toContain('oomKills');
+  });
+
+  it('projects a socket close and hello rejection but not a successful connect attempt', () => {
+    const { lines, projector } = collect();
+    projector('control.socket', { phase: 'closed' });
+    projector('control.socket', { phase: 'hello_rejected' });
+    projector('control.socket', { phase: 'connect_attempt', ok: true });
+    expect(lines).toHaveLength(2);
+  });
+});
+
+describe('controlUploadFailureStartsEpisode', () => {
+  it('starts on the first failure and on a category change, not on repeats', () => {
+    expect(
+      controlUploadFailureStartsEpisode(undefined, {
+        category: 'http_rejection',
+        statusCode: 500,
+      })
+    ).toBe(true);
+    const server = { category: 'http_rejection' as const, statusCode: 500 };
+    // 500 then 502 is the same episode.
+    expect(
+      controlUploadFailureStartsEpisode(server, { category: 'http_rejection', statusCode: 502 })
+    ).toBe(false);
+    expect(controlUploadFailureStartsEpisode(server, { category: 'timeout' })).toBe(true);
+  });
+
+  it('treats a later 401/403 as one transition episode', () => {
+    const server = { category: 'http_rejection' as const, statusCode: 500 };
+    expect(
+      controlUploadFailureStartsEpisode(server, { category: 'http_rejection', statusCode: 403 })
+    ).toBe(true);
+    const auth = { category: 'http_rejection' as const, statusCode: 403 };
+    expect(
+      controlUploadFailureStartsEpisode(auth, { category: 'http_rejection', statusCode: 401 })
+    ).toBe(false);
+    expect(controlUploadFailureStartsEpisode(auth, { category: 'timeout' })).toBe(true);
   });
 });

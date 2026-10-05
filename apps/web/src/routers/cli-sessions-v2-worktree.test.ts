@@ -145,6 +145,9 @@ const ownershipRow = {
   platform: null,
   pr_url: null,
   pr_number: null,
+  pr_head_ref: null,
+  pr_head_sha: null,
+  pr_link_verified_at: null,
   status: null,
   status_updated_at: null,
   last_activity_at: null,
@@ -857,6 +860,11 @@ describe('cliSessionsV2 worktree PR projection', () => {
           title: 'Historical pending PR',
           git_url: GIT_URL,
           git_branch: BRANCH,
+          platform: 'github',
+          pr_url: PR_URL,
+          pr_number: 42,
+          pr_head_ref: BRANCH,
+          pr_link_verified_at: INITIAL_TIME,
           created_at: '2020-01-01T00:00:00.000Z',
           updated_at: '2020-01-01T00:00:00.000Z',
         })
@@ -953,6 +961,8 @@ describe('cliSessionsV2 worktree PR projection', () => {
         pr_url: PR_URL,
         pr_number: 42,
         platform: 'github',
+        pr_head_ref: BRANCH,
+        pr_link_verified_at: INITIAL_TIME,
         updated_at: INITIAL_TIME,
         total_cost_microdollars: 123,
       })
@@ -1011,20 +1021,39 @@ describe('cliSessionsV2 worktree PR projection', () => {
   it('selects the most recently updated PR-bearing root with a stable session-ID tie-break', async () => {
     await db
       .update(cli_sessions_v2)
-      .set({ pr_url: `${GIT_URL}/pull/1`, updated_at: INITIAL_TIME })
+      .set({
+        pr_url: `${GIT_URL}/pull/1`,
+        pr_number: 1,
+        platform: 'github',
+        pr_head_ref: BRANCH,
+        pr_link_verified_at: INITIAL_TIME,
+        updated_at: INITIAL_TIME,
+      })
       .where(eq(cli_sessions_v2.session_id, SESSION_ID));
     const winner = await insertSession({
       session_id: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
       pr_url: PR_URL,
+      pr_number: 42,
+      platform: 'github',
+      pr_head_ref: BRANCH,
+      pr_link_verified_at: INITIAL_TIME,
     });
     await insertSession({
       session_id: 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb',
       pr_url: `${GIT_URL}/pull/43`,
+      pr_number: 43,
+      platform: 'github',
+      pr_head_ref: BRANCH,
+      pr_link_verified_at: INITIAL_TIME,
     });
     await insertSession({ updated_at: '2026-08-26T02:00:00.000Z' });
     await insertSession({
       parent_session_id: SESSION_ID,
       pr_url: `${GIT_URL}/pull/99`,
+      pr_number: 99,
+      platform: 'github',
+      pr_head_ref: BRANCH,
+      pr_link_verified_at: INITIAL_TIME,
       updated_at: '2026-08-26T03:00:00.000Z',
     });
 
@@ -1036,7 +1065,7 @@ describe('cliSessionsV2 worktree PR projection', () => {
     expect(details.worktrees[WORKTREE_ID].prSession?.associatedPr?.number).toBe(42);
   });
 
-  it('uses the existing branch-cache fallback and preserves pending review flags with normalized DB timestamps', async () => {
+  it('uses live cache fields for the verified session link and preserves pending review flags with normalized DB timestamps', async () => {
     const timestamp = '2026-04-29 01:16:12.945+00';
     const isoTimestamp = '2026-04-29T01:16:12.945Z';
     await db
@@ -1044,6 +1073,11 @@ describe('cliSessionsV2 worktree PR projection', () => {
       .set({
         git_url: GIT_URL,
         git_branch: BRANCH,
+        platform: 'github',
+        pr_url: PR_URL,
+        pr_number: 42,
+        pr_head_ref: BRANCH,
+        pr_link_verified_at: timestamp,
         created_at: timestamp,
         updated_at: timestamp,
         status_updated_at: timestamp,
@@ -1089,7 +1123,16 @@ describe('cliSessionsV2 worktree PR projection', () => {
   it('prefers a stored PR link to a different branch-cache PR instead of copying the wrong PR fields', async () => {
     await db
       .update(cli_sessions_v2)
-      .set({ git_url: GIT_URL, git_branch: BRANCH, pr_url: PR_URL, updated_at: INITIAL_TIME })
+      .set({
+        git_url: GIT_URL,
+        git_branch: BRANCH,
+        platform: 'github',
+        pr_url: PR_URL,
+        pr_number: 42,
+        pr_head_ref: BRANCH,
+        pr_link_verified_at: INITIAL_TIME,
+        updated_at: INITIAL_TIME,
+      })
       .where(eq(cli_sessions_v2.session_id, SESSION_ID));
     await db.insert(github_branch_pull_requests).values({
       git_url: GIT_URL,
@@ -1126,7 +1169,11 @@ describe('cliSessionsV2 worktree PR projection', () => {
       .set({
         git_url: GIT_URL,
         git_branch: BRANCH,
+        platform: 'github',
         pr_url: `${PR_URL}/files?view=all`,
+        pr_number: 42,
+        pr_head_ref: BRANCH,
+        pr_link_verified_at: INITIAL_TIME,
         updated_at: INITIAL_TIME,
       })
       .where(eq(cli_sessions_v2.session_id, SESSION_ID));
@@ -1164,6 +1211,11 @@ describe('cliSessionsV2 worktree PR projection', () => {
       cloud_agent_worktree_id: orgWorktreeId,
       git_url: GIT_URL,
       git_branch: BRANCH,
+      platform: 'github',
+      pr_url: PR_URL,
+      pr_number: 42,
+      pr_head_ref: BRANCH,
+      pr_link_verified_at: INITIAL_TIME,
     });
     await db.insert(github_branch_pull_requests).values([
       {

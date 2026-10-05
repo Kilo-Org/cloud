@@ -292,6 +292,16 @@ function runtimeProxyInjectionRules(
       add(provider, `${basePath(provider)}/api/gateway${path}`, ['POST'], authorization);
     }
     add(ingest, `${basePath(ingest)}/api/session`, ['POST'], authorization);
+    // Only the opaque handle reaches this facade; its resolver enforces scoped ingestion.
+    rules.push(
+      createCredentialRule({
+        target: ingest,
+        path: { startsWith: `${basePath(ingest)}/api/session/` },
+        methods: ['POST'],
+        expectedAuthorization: authorization,
+        injectedAuthorization: authorization,
+      })
+    );
     const sessionId = member.kiloSessionId;
     for (const [suffix, methods] of [
       ['export', ['GET']],

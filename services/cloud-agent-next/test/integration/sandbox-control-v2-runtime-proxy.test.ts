@@ -467,12 +467,17 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         destinations.push(url.pathname);
         return new Response('authorized');
       });
+      const sessionIngestFetch = vi.fn(
+        async (_request: Request) => new Response('Not found', { status: 404 })
+      );
       const requestEnv = {
         ...env,
         WORKER_URL,
         KILOCODE_BACKEND_BASE_URL: upstream,
         KILO_OPENROUTER_BASE: upstream,
         KILO_SESSION_INGEST_URL: upstream,
+        INTERNAL_API_SECRET_PROD: { get: async () => 'integration-test-secret' },
+        SESSION_INGEST: { fetch: sessionIngestFetch },
       } as Env;
       const forward = async (currentHandle: string) => {
         for (const [index, path] of paths.entries()) {
@@ -519,8 +524,9 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       await forward(nextHandle);
       expect(destinations).toHaveLength(6);
       expect(broker.kiloIssued()).toBe(0);
+      const siblingKiloSessionId = kiloSessionId();
       const siblingDenied = await worker.fetch(
-        new Request(`${WORKER_URL}/api/session/${kiloSessionId()}/ingest`, {
+        new Request(`${WORKER_URL}/api/session/${siblingKiloSessionId}/ingest`, {
           method: 'POST',
           headers: { authorization: `Bearer ${nextHandle}` },
         }),
@@ -528,6 +534,12 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
         createExecutionContext()
       );
       expect(siblingDenied.status).toBe(404);
+      expect(sessionIngestFetch).toHaveBeenCalledOnce();
+      const scopedRequest = sessionIngestFetch.mock.calls[0]?.[0];
+      expect(scopedRequest && new URL(scopedRequest.url).pathname).toBe(
+        `/internal/cloud-agent/v1/session/${siblingKiloSessionId}/ingest`
+      );
+      expect(scopedRequest?.headers.get('X-Kilo-Root-Session')).toBe(kiloId);
       expect(destinations).toHaveLength(6);
       await runInDurableObject(sessionStub, async instance => {
         const authorization = await instance.ctx.storage.get<{ delegationExpiresAt: string }>(

@@ -290,4 +290,33 @@ describe('SectionHeader mounted layout', () => {
     expect(root.findAll(node => Object.is(node.type, 'Pressable'))).toHaveLength(0);
     expect(root.find(node => Object.is(node.type, 'Text')).children).toEqual(['Explore']);
   });
+
+  it('gives a notice all the free space and keeps the action at the outer edge', () => {
+    // Field defect (iPhone 17 Pro): a growing label took half the free space
+    // and cut "Connection lost" to "Connection l…" beside empty space.
+    const root = mount(
+      createElement(SectionHeader, {
+        label: 'Live now',
+        actionLabel: 'See all',
+        onActionPress: () => undefined,
+        notice: createElement(Text, null, 'Connection lost'),
+      })
+    );
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('Live now')
+    );
+    const slot = root.find(
+      node =>
+        Object.is(node.type, 'View') &&
+        node.findAll(
+          child => Object.is(child.type, 'Text') && child.children.includes('Connection lost')
+        ).length > 0 &&
+        String(node.props.className).includes('basis-0')
+    );
+    expect((label.props.className as string).split(' ')).not.toContain('grow');
+    expect((slot.props.className as string).split(' ')).toEqual(
+      expect.arrayContaining(['grow', 'basis-0', 'min-w-0'])
+    );
+    expect(root.findByProps({ accessibilityRole: 'button' })).toBeDefined();
+  });
 });

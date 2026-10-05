@@ -14,7 +14,6 @@ import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { sendOrgSSOUserJoinedEmail } from '@/lib/email';
 import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -113,8 +112,6 @@ async function processSSOInternal(
       organization_id: kiloOrg.id,
     });
   }
-
-  await ensureVerifiedDomainOrganizationMembership(savedUser.id);
 
   await createAuditLog({
     action: 'organization.user.login',

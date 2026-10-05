@@ -109,6 +109,20 @@ vi.mock('@/components/agents/session-preview-overlay', () => ({
 }));
 vi.mock('@/components/agents/remote-session-row', () => ({ RemoteSessionRow: 'RemoteSessionRow' }));
 vi.mock('@/components/agents/session-list-content', () => ({ FAB_MARGIN: 0, FAB_SIZE: 0 }));
+// `agent-sessions-section` (drawn by the live list screen) animates the card
+// switch with Reanimated and reads the motion policy, whose real module reaches
+// `expo-battery` -> `expo-modules-core`; neither native module loads in the
+// node-mounted harness.
+vi.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: { View: 'AnimatedView' },
+  LinearTransition: 'LinearTransition',
+  FadeIn: { duration: () => ({}) },
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: (_reducedMotion: boolean, crossfade: unknown) => crossfade,
+}));
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));

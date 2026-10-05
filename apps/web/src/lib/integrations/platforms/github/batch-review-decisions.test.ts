@@ -65,7 +65,21 @@ describe('batch-review-decisions', () => {
     });
   }
 
-  async function readRow(branch: string) {
+  async function readRow(prNumber: number) {
+    const rows = await db
+      .select()
+      .from(github_branch_pull_requests)
+      .where(
+        and(
+          eq(github_branch_pull_requests.git_url, GIT_URL),
+          eq(github_branch_pull_requests.pr_number, prNumber),
+          eq(github_branch_pull_requests.owned_by_user_id, testUserId)
+        )
+      );
+    return rows[0] ?? null;
+  }
+
+  async function readRowByBranch(branch: string) {
     const rows = await db
       .select()
       .from(github_branch_pull_requests)
@@ -135,7 +149,7 @@ describe('batch-review-decisions', () => {
       // Without abandonment the row would stay pending=true forever, causing the
       // sidebar to poll review decisions indefinitely. We give up so the badge
       // settles to its existing (possibly null) decision.
-      const row = await readRow(branch);
+      const row = await readRow(2);
       expect(row?.review_decision_pending).toBe(false);
       expect(row?.review_decision_fetching_at).toBeNull();
     });
@@ -150,7 +164,7 @@ describe('batch-review-decisions', () => {
 
       await executeBatchReviewDecisionFetch(testOwner);
 
-      const row = await readRow(branch);
+      const row = await readRow(10);
       expect(row?.pr_review_decision).toBe('approved');
       expect(row?.review_decision_pending).toBe(false);
       expect(row?.review_decision_fetching_at).toBeNull();
@@ -166,7 +180,7 @@ describe('batch-review-decisions', () => {
 
       await executeBatchReviewDecisionFetch(testOwner);
 
-      const row = await readRow(branch);
+      const row = await readRow(11);
       expect(row?.pr_review_decision).toBeNull();
       expect(row?.review_decision_pending).toBe(false);
     });
@@ -192,7 +206,7 @@ describe('batch-review-decisions', () => {
 
       // fetchBatch not called because no row with a pr_number was batch-able.
       expect(mockFetchBatch).not.toHaveBeenCalled();
-      const row = await readRow(branch);
+      const row = await readRowByBranch(branch);
       expect(row?.review_decision_pending).toBe(false);
       expect(row?.review_decision_fetching_at).toBeNull();
     });
@@ -230,7 +244,7 @@ describe('batch-review-decisions', () => {
 
       // Row was not claimed (fetching_at was set and < 2min ago), so fetch not called
       expect(mockFetchBatch).not.toHaveBeenCalled();
-      const row = await readRow(branch);
+      const row = await readRow(30);
       // pending still true, fetching_at unchanged
       expect(row?.review_decision_pending).toBe(true);
     });

@@ -18,7 +18,6 @@ const CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID =
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import type * as creditsModule from '@/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
 
 // Allow spying on processTopUp / processTopupForOrganization inside stripe.ts.
 // The mock delegates to the real implementation by default so existing tests are unaffected.
@@ -55,15 +54,6 @@ jest.mock(
   { virtual: true }
 );
 
-// Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
-  return {
-    __esModule: true,
-    ...actual,
-    reportCreditEvent: jest.fn(),
-  };
-});
 import {
   type StripeTopupMetadata,
   ensurePaymentMethodStored,
@@ -75,7 +65,6 @@ import {
   getStripeSeatsCheckoutUrl,
 } from '@/lib/stripe';
 import { client } from '@/lib/stripe-client';
-import { reportCreditEvent } from '@/lib/bouncer/client';
 import * as kiloPassOrgStripe from '@/lib/kilo-pass-org/stripe-adapter';
 import {
   type ServiceFeeAssessmentRecord,
@@ -102,6 +91,7 @@ import {
   impact_referral_reward_decisions,
   impact_referral_rewards,
   stripe_service_fee_assessments,
+  bouncer_credit_event_outbox,
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -4925,7 +4915,6 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
     jest.restoreAllMocks();
     await cleanupDbForTest();
     testUser = await insertTestUser();
-    (reportCreditEvent as jest.Mock).mockClear();
   });
 
   test('charge.succeeded reports a standalone charge once, with the payer and card', async () => {
@@ -4950,16 +4939,21 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 
     await processStripePaymentEventHook(event);
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.succeeded');
+    expect(rows[0].event_id).toBe('evt_bouncer_ok');
+    expect(rows[0].user_id).toBe(testUser.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.succeeded',
         eventId: 'evt_bouncer_ok',
         userId: testUser.id,
-        orgId: null,
         cardFingerprint: 'fp_ok',
         amountCents: 2500,
       })
     );
+    expect(rows[0].payload.orgId).toBeUndefined();
   });
 
   test('charge.succeeded skips a charge tied to an invoice', async () => {
@@ -4982,7 +4976,8 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 
     await processStripePaymentEventHook(event);
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(0);
   });
 
   test('charge.failed reports the failing payer', async () => {
@@ -5002,7 +4997,12 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 
     await processStripePaymentEventHook(event);
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.failed');
+    expect(rows[0].event_id).toBe('evt_bouncer_failed');
+    expect(rows[0].user_id).toBe(testUser.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.failed',
         eventId: 'evt_bouncer_failed',
@@ -5026,12 +5026,15 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 
     await processStripePaymentEventHook(event);
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(0);
   });
 
   test('a bouncer failure does not fail the webhook', async () => {
-    // Stripe retries a failed webhook, and later work in the delivery would be skipped.
-    jest.mocked(reportCreditEvent).mockRejectedValueOnce(new Error('bouncer down'));
+    // Stripe retries a failed webhook, and later work in the delivery would be skipped. The
+    // webhook performs no bouncer HTTP call: it commits the event to the durable outbox, so a
+    // bouncer outage can only delay delivery (the cron drainer retries) and never fails the
+    // webhook. The row is still `pending` here precisely because no inline delivery happened.
     const charge = sampleStripeCharge({
       id: 'ch_bouncer_down',
       customer: testUser.stripe_customer_id,
@@ -5044,7 +5047,11 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
     } as unknown as Stripe.Event;
 
     await expect(processStripePaymentEventHook(event)).resolves.not.toThrow();
-    expect(reportCreditEvent).toHaveBeenCalled();
+
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.failed');
+    expect(rows[0].status).toBe('pending');
   });
 
   test('charge.dispute.created reports the disputed payer', async () => {
@@ -5072,7 +5079,11 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 
     await processStripePaymentEventHook(event);
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.disputed');
+    expect(rows[0].user_id).toBe(testUser.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.disputed',
         eventId: 'evt_bouncer_disp',
@@ -5114,7 +5125,11 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 
     await processStripePaymentEventHook(event);
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.dispute_won');
+    expect(rows[0].user_id).toBe(testUser.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.dispute_won',
         eventId: 'evt_bouncer_won',
@@ -5149,7 +5164,11 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
       })
     );
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.early_fraud_warning');
+    expect(rows[0].user_id).toBe(testUser.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.early_fraud_warning',
         eventId: 'evt_bouncer_efw',
@@ -5194,7 +5213,12 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 
     await processStripePaymentEventHook(event);
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.succeeded');
+    expect(rows[0].event_id).toBe('evt_bouncer_inv');
+    expect(rows[0].user_id).toBe(testUser.id);
+    expect(rows[0].payload).toEqual(
       expect.objectContaining({
         type: 'charge.succeeded',
         eventId: 'evt_bouncer_inv',
@@ -5210,6 +5234,12 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
 });
 
 describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
+  beforeEach(async () => {
+    await db
+      .delete(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.user_id, 'user-seats'));
+  });
+
   test.each([
     // Teams seats cost $18/month billed monthly and $15/month billed annually ($180/year).
     ['monthly', 18_00 * 3],
@@ -5218,7 +5248,6 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
     const createSpy = jest.spyOn(client.checkout.sessions, 'create').mockResolvedValue({
       url: 'https://checkout.stripe.test/s',
     } as Stripe.Response<Stripe.Checkout.Session>);
-    jest.mocked(reportCreditEvent).mockClear();
 
     await getStripeSeatsCheckoutUrl({
       kiloUserId: 'user-seats',
@@ -5231,8 +5260,22 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
       attempt: { accountCreatedAt: '2026-01-01T00:00:00.000Z' },
     });
 
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'charge.attempted', flow: 'seats', amountCents })
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.user_id, 'user-seats'));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_type).toBe('charge.attempted');
+    expect(rows[0].user_id).toBe('user-seats');
+    expect(rows[0].payload).toEqual(
+      expect.objectContaining({
+        type: 'charge.attempted',
+        flow: 'seats',
+        userId: 'user-seats',
+        orgId: 'org-seats',
+        amountCents,
+        accountCreatedAt: '2026-01-01T00:00:00.000Z',
+      })
     );
     createSpy.mockRestore();
   });

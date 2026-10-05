@@ -914,13 +914,11 @@ describe('header actions row', () => {
   });
 
   it('drops a declared trailing cluster to its own row before it squeezes the title', () => {
-    // PR review at 320dp with a font scale of 2: Share, Submit review and
-    // Merge (236dp of fixed-width controls) left the title a few characters
-    // while the width-only rule kept them all on one row.
+    // A wide fixed-width cluster leaves too little room for a readable title.
     layout.width = 320;
     layout.fontScale = 2;
     const renderer = renderHeader({
-      title: 'PR review #7',
+      title: 'Detail',
       eyebrow: 'owner/repo',
       headerRight: 'RIGHT',
       headerRightWidth: 236,
@@ -934,9 +932,9 @@ describe('header actions row', () => {
     // describe, and the test above leaves a 320dp / scale 2 window behind.
     layout.width = 390;
     layout.fontScale = 1;
-    // Share and Merge alone: 44 + 44 + the `gap-1` between them.
+    // Two fixed-size icon controls with a 4dp gap.
     const renderer = renderHeader({
-      title: 'PR review #7',
+      title: 'Detail',
       eyebrow: 'owner/repo',
       headerRight: 'RIGHT',
       headerRightWidth: 92,
@@ -944,6 +942,29 @@ describe('header actions row', () => {
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
   });
+
+  it.each([false, true])(
+    'keeps compact actions beside the title when opted out (centered: %s)',
+    centerTitle => {
+      layout.width = 320;
+      layout.fontScale = 3;
+      const renderer = renderHeader({
+        title: 'PR review #7',
+        titleNumberOfLines: 1,
+        centerTitle,
+        headerRight: 'SHARE REVIEW MERGE',
+        headerRightWidth: 140,
+        allowHeaderRightStacking: false,
+      });
+
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+      expect(title.props.numberOfLines).toBe(1);
+      expect(title.props.ellipsizeMode).toBe('tail');
+      const controls = findHeaderRight(renderer.root);
+      expect(controls.children).toEqual(['SHARE REVIEW MERGE']);
+    }
+  );
 });
 
 describe('header status line', () => {
@@ -979,14 +1000,10 @@ describe('shouldStackHeaderActions', () => {
   });
 
   it('reflows for a declared trailing cluster the title cannot share the row with', () => {
-    // The PR review header at 320dp with a font scale of 2: the width-only
-    // rule kept Share, Submit review and Merge on the title's row, which left
-    // the title a few characters. The declared cluster width reflows it.
+    // Declaring a wide cluster makes it reflow before the title is squeezed.
     expect(shouldStackHeaderActions(320, 2)).toBe(false);
     expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
-    // A cluster the title still fits beside keeps the single row, and the PR
-    // review cluster stacks even at a normal phone width: 390 - 44 - 12 - 236
-    // leaves the title 98dp, below its 120dp minimum.
+    // A narrower cluster still fits beside the title at a normal phone width.
     expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
     expect(shouldStackHeaderActions(390, 1, 236)).toBe(true);
   });

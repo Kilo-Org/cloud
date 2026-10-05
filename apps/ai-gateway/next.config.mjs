@@ -1,3 +1,4 @@
+import { withSentryConfig } from '@sentry/nextjs';
 import { resolve } from 'path';
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
@@ -13,8 +14,27 @@ const nextConfig = {
     root: monorepoRoot,
   },
 
+  // packages/web-shared/src/lib/email.ts reads these at runtime.
+  outputFileTracingIncludes: {
+    '/**': ['../../packages/web-shared/src/emails/*.html'],
+  },
+
   // Same as apps/web, so gateway clients see identical trailing-slash handling.
   skipTrailingSlashRedirect: true,
 };
 
-export default nextConfig;
+/** @type {import('@sentry/nextjs').SentryBuildOptions} */
+const sentryConfig = {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+  },
+  telemetry: false,
+};
+
+export default process.env.NODE_ENV === 'development'
+  ? nextConfig
+  : withSentryConfig(nextConfig, sentryConfig);

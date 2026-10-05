@@ -126,4 +126,31 @@ describe('applySessionStatusUpdated', () => {
     expect(busy[0]?.status).toBe('busy');
     expect(busy[0]?.scheduledAt).toBeUndefined();
   });
+
+  it('takes the transition time so the newest session does not wait for a poll', () => {
+    const current = [makeCached({ id: 'a', statusUpdatedAt: '2026-01-01T00:00:00.000Z' })];
+    const result = applySessionStatusUpdated(current, {
+      sessionId: 'a',
+      status: 'question',
+      statusUpdatedAt: '2026-01-02T00:00:00.000Z',
+    });
+    expect(result[0]?.statusUpdatedAt).toBe('2026-01-02T00:00:00.000Z');
+  });
+});
+
+describe('statusUpdatedAt through socket merges', () => {
+  it('keeps the status-change time through heartbeat and snapshot merges', () => {
+    // Socket rows never carry it; losing it blanks the Home newest session.
+    const statusUpdatedAt = '2026-01-01T00:00:00.000Z';
+    const current = [makeCached({ id: 'a', statusUpdatedAt })];
+    const afterHeartbeat = mergeHeartbeatForActiveSessions(current, {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: 'running', title: 'A' }],
+    });
+    const afterSnapshot = mergeSnapshotForActiveSessions(current, [
+      { id: 'a', status: 'running', title: 'A', connectionId: 'c1' },
+    ]);
+    expect(afterHeartbeat[0]?.statusUpdatedAt).toBe(statusUpdatedAt);
+    expect(afterSnapshot[0]?.statusUpdatedAt).toBe(statusUpdatedAt);
+  });
 });

@@ -46,6 +46,16 @@ if [ "$RESTART_WINDOW_S" -lt 1 ]; then
   RESTART_WINDOW_S=1
 fi
 
+# Native-only operational stderr. SDK and Vercel exec this script with the gate
+# unset and must not gain these lines. The JSON carries closed numeric fields
+# only; never an environment dump.
+NATIVE_LOGS="${CONTROL_PLANE_NATIVE_LOGS:-}"
+native_log() {
+  if [ "$NATIVE_LOGS" = "1" ]; then
+    printf '%s\n' "$1" >&2
+  fi
+}
+
 child=""
 restarts=""
 restart_count=0
@@ -101,10 +111,13 @@ forward_term() {
     kill -TERM "$child" 2>/dev/null
     wait "$child" 2>/dev/null
   fi
+  native_log '{"source":"control-plane-supervisor","event":"supervisor_exit","exitCode":0}'
   exit 0
 }
 
 trap forward_term TERM INT
+
+native_log '{"source":"control-plane-supervisor","event":"supervisor_started"}'
 
 while true; do
   sh -c "$WRAPPER_COMMAND" &
@@ -114,14 +127,17 @@ while true; do
   child=""
 
   if [ "$code" -eq 0 ]; then
+    native_log '{"source":"control-plane-supervisor","event":"supervisor_exit","exitCode":0}'
     exit 0
   fi
 
   prune_restarts
   if [ "$restart_count" -ge "$RESTART_LIMIT" ]; then
+    native_log "{\"source\":\"control-plane-supervisor\",\"event\":\"restart_budget_exhausted\",\"exitCode\":$code,\"restartCount\":$restart_count}"
     exit "$code"
   fi
   restarts="$restarts $(date +%s)"
+  native_log "{\"source\":\"control-plane-supervisor\",\"event\":\"wrapper_restart\",\"exitCode\":$code,\"restartCount\":$((restart_count + 1))}"
 
   # Reset the backoff ladder with the window: a crash after the pruned
   # restarts wait one minimum interval, not the capped maximum.

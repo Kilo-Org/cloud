@@ -3,6 +3,10 @@ import {
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
+import type {
+  ControlDiagnosticReporter,
+  NativeConnectionPhase,
+} from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 
 /** Spec §7 Connection: the bounded outbound buffer holds at most this many frames. */
@@ -19,6 +23,15 @@ type WebSocketWithHeadersCtor = new (
 
 export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean };
 
+/** The live connection phase, derived from the shared tuple so it cannot drift. */
+export type ControlPlaneConnectionPhase = NativeConnectionPhase;
+
+export type ControlPlaneConnectionSnapshot = {
+  phase: ControlPlaneConnectionPhase;
+  attempt: number;
+  outboxBytes: number;
+};
+
 export type ControlPlaneConnectionOptions = {
   url: string;
   credential: string;
@@ -34,11 +47,14 @@ export type ControlPlaneConnectionOptions = {
   random?: () => number;
   outboxMaxFrames?: number;
   outboxMaxBytes?: number;
+  onNativeDiagnostic?: ControlDiagnosticReporter;
 };
 
 export type ControlPlaneConnection = {
   /** The wrapper identity advertised in `hello` (B10 terminal records). */
   readonly wrapperId: string;
+  /** The live phase, reconnect attempt and buffered bytes, without a recount. */
+  snapshot(): ControlPlaneConnectionSnapshot;
   start(): void;
   send(frame: ControlPlaneWrapperFrame): void;
   recycle(): void;
@@ -82,7 +98,7 @@ export function createControlPlaneConnection(
   const maxBytes = options.outboxMaxBytes ?? CONTROL_PLANE_OUTBOX_MAX_BYTES;
   const WebSocketWithHeaders = WebSocket as unknown as WebSocketWithHeadersCtor;
 
-  type Phase = 'idle' | 'connecting' | 'awaiting_welcome' | 'connected' | 'closed';
+  type Phase = ControlPlaneConnectionPhase;
   type OutboxEntry = { serialized: string; bytes: number; droppable: boolean };
 
   let phase: Phase = 'idle';
@@ -96,6 +112,27 @@ export function createControlPlaneConnection(
   const outbox: OutboxEntry[] = [];
   let outboxBytes = 0;
   let droppedEvents = 0;
+  // One native stderr line per disconnected episode. `welcome` arms the next.
+  let disconnectEpisodeReported = false;
+
+  function reportSocketLine(phase: 'closed' | 'connect_attempt' | 'hello_rejected'): void {
+    try {
+      options.onNativeDiagnostic?.('control.socket', {
+        phase,
+        ...(phase === 'connect_attempt' ? { ok: false } : {}),
+        allocationId: options.allocationId,
+        wrapperInstanceId: wrapperId,
+      });
+    } catch {
+      // The projector must never disturb the connection.
+    }
+  }
+
+  function reportDisconnectEpisode(phase: 'closed' | 'connect_attempt'): void {
+    if (disconnectEpisodeReported) return;
+    disconnectEpisodeReported = true;
+    reportSocketLine(phase);
+  }
 
   function isDroppable(frame: ControlPlaneWrapperFrame): boolean {
     return frame.type === 'session.events';
@@ -223,9 +260,12 @@ export function createControlPlaneConnection(
   function onSocketEnd(target: WebSocket, reason: string): void {
     if (socket !== target) return;
     const wasConnected = phase === 'connected';
+    const wasConnecting = phase === 'connecting' || phase === 'awaiting_welcome';
     socket = null;
     stopHeartbeat();
     if (phase === 'closed') return;
+    if (wasConnected) reportDisconnectEpisode('closed');
+    else if (wasConnecting) reportDisconnectEpisode('connect_attempt');
     phase = 'idle';
     if (wasConnected) options.onDisconnected?.(reason);
     scheduleReconnect();
@@ -249,6 +289,7 @@ export function createControlPlaneConnection(
     const frame = result.data;
     if (frame.type === 'welcome') {
       if (phase !== 'awaiting_welcome') return;
+      disconnectEpisodeReported = false;
       phase = 'connected';
       attempt = 0;
       startHeartbeat(target, frame.heartbeatAck === true);
@@ -262,6 +303,7 @@ export function createControlPlaneConnection(
     }
     if (frame.type === 'shutdown') {
       close();
+      if (frame.reason === 'hello_rejected') reportSocketLine('hello_rejected');
       options.onShutdown?.(frame.reason);
       return;
     }
@@ -278,6 +320,7 @@ export function createControlPlaneConnection(
       });
     } catch (error) {
       log(`control-plane connection failed: ${messageOf(error)}`);
+      reportDisconnectEpisode('connect_attempt');
       scheduleReconnect();
       return;
     }
@@ -308,6 +351,13 @@ export function createControlPlaneConnection(
     target.onclose = () => onSocketEnd(target, 'connection closed');
     target.onerror = () => {
       // Bun fires `error` and then `close`; the close handler drives reconnect.
+      // The episode latch makes the pair one native line. A deliberate recycle
+      // is not a failure.
+      if (socket !== target || phase === 'closed') return;
+      if (phase === 'connected') reportDisconnectEpisode('closed');
+      else if (phase === 'connecting' || phase === 'awaiting_welcome') {
+        reportDisconnectEpisode('connect_attempt');
+      }
     };
   }
 
@@ -363,5 +413,12 @@ export function createControlPlaneConnection(
     }
   }
 
-  return { wrapperId, start, send, recycle, close };
+  return {
+    wrapperId,
+    snapshot: () => ({ phase, attempt, outboxBytes }),
+    start,
+    send,
+    recycle,
+    close,
+  };
 }

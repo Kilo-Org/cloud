@@ -11,6 +11,7 @@ import {
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import {
@@ -72,6 +73,7 @@ export type PrepareDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
   runtimes: PrepareRuntimePort;
   log?: (message: string) => void;
+  onNativeDiagnostic?: ControlDiagnosticReporter;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   runSetup?: (
     command: string,
@@ -115,6 +117,10 @@ export type PreparationManager = {
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
   isPreparing(): boolean;
+  /** In-flight prepares, for the native status line. */
+  preparingCount(): number;
+  /** Prepared sessions, for the native status line. */
+  sessionCount(): number;
   installCredentials(credentials: ControlPlaneSessionCredentialsPayload): Promise<void>;
 };
 
@@ -256,6 +262,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     });
   }
 
+  function emitSessionReadyNative(sessionId: string): void {
+    // Closed native record; the directory stays in the file log.
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'session_ready',
+      sessionId,
+    });
+  }
+
   function emitFailure(sessionId: string, step: ControlPlanePreparationStep, error: unknown): void {
     const subtype = error instanceof WrapperBootstrapError ? error.subtype : undefined;
     deps.emit({
@@ -263,6 +277,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       sessionId,
       reason: 'workspace_setup_failed',
       step,
+      ...(subtype === undefined ? {} : { subtype }),
+    });
+    // Closed native record; the free-text error and git failure stay in the file log.
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'prepare_failed',
+      preparationStep: step,
       ...(subtype === undefined ? {} : { subtype }),
     });
   }
@@ -674,6 +694,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       }
       prepared.set(sessionId, { key, spec, directory, home, kilo: kiloAuth, env });
       deps.emit({ type: 'session.ready', sessionId });
+      emitSessionReadyNative(sessionId);
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
       if (owner.released) {
@@ -767,6 +788,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             }
             if (!owner.released) {
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId });
+              emitSessionReadyNative(spec.sessionId);
             }
           })().finally(() => {
             if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
@@ -793,6 +815,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     },
     isPrepared: sessionId => prepared.has(sessionId),
     isPreparing: () => preparing.size > 0,
+    preparingCount: () => preparing.size,
+    sessionCount: () => prepared.size,
     installCredentials: installCredentialsFor,
   };
 }

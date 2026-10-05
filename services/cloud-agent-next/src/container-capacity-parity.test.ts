@@ -25,6 +25,7 @@ type WranglerContainer = {
     memory_mib: number;
     disk_mb: number;
   };
+  observability?: { enabled?: boolean };
 };
 
 type MeteredWranglerContainer = {
@@ -37,7 +38,9 @@ type MeteredWranglerContainer = {
 };
 
 type WranglerConfig = {
+  observability?: { enabled?: boolean };
   containers: WranglerContainer[];
+  env?: Record<string, { containers?: WranglerContainer[] }>;
 };
 
 const SERVICE_BY_CLASS: Record<LegacySandboxClassName, string> = {
@@ -119,5 +122,36 @@ describe('production container capacity parity', () => {
     // Web labels name the memory ladder tier; disk follows the Cloudflare instance-type table.
     expect(CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard3.diskMB).toBe(16_000);
     expect(CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard4.diskMB).toBe(20_000);
+  });
+
+  it('enables native application observability on every SandboxContainers block', () => {
+    const config = parse(
+      fs.readFileSync(path.join(process.cwd(), 'wrangler.jsonc'), 'utf8')
+    ) as WranglerConfig;
+
+    // DO containers do not inherit root observability. The change is native-only:
+    // the root stays disabled and each native application block opts in.
+    expect(config.observability?.enabled).toBe(false);
+    const nativeBlocks = [
+      ...config.containers.filter(container => container.class_name === 'SandboxContainers'),
+      ...(config.env?.dev?.containers ?? []).filter(
+        container => container.class_name === 'SandboxContainers'
+      ),
+    ];
+    expect(nativeBlocks).toHaveLength(2);
+    for (const block of nativeBlocks) {
+      expect(block.observability?.enabled).toBe(true);
+    }
+
+    // No other container class opts in; the native blocks are the only ones.
+    const otherBlocks = [
+      ...config.containers.filter(container => container.class_name !== 'SandboxContainers'),
+      ...(config.env?.dev?.containers ?? []).filter(
+        container => container.class_name !== 'SandboxContainers'
+      ),
+    ];
+    for (const block of otherBlocks) {
+      expect(block.observability).toBeUndefined();
+    }
   });
 });

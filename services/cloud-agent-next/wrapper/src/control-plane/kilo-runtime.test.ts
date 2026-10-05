@@ -7,6 +7,7 @@ import {
   type ControlPlaneTimers,
 } from '../../../src/shared/control-plane-timers.js';
 import type { KiloFeedEvent, KiloEventFeedSource } from './kilo-event-feed.js';
+import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import { createTurnManager } from './turn.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 import {
@@ -21,6 +22,7 @@ import {
   type KiloRuntime,
   type KiloRuntimeOptions,
   type KiloRuntimeScheduler,
+  type KiloRuntimes,
 } from './kilo-runtime.js';
 
 function timers(overrides: Partial<ControlPlaneTimers['wrapper']> = {}): ControlPlaneTimers {
@@ -177,6 +179,7 @@ function createRuntime(options: {
   const restarts: Array<{ reason: string }> = options.restarts ?? [];
   const restartingAtOnRestart: boolean[] = [];
   const logs: string[] = [];
+  const nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }> = [];
   const runtimeRef: { current?: ReturnType<typeof createKiloRuntime> } = {};
   let unavailable = options.unavailable ?? 0;
   const runtime = createKiloRuntime({
@@ -190,6 +193,7 @@ function createRuntime(options: {
     scheduler: options.scheduler.scheduler,
     readProcessStartTime: () => undefined,
     log: message => logs.push(message),
+    onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     ...(options.isIdle
       ? {
           isIdle: async () => options.isIdle!(),
@@ -210,6 +214,7 @@ function createRuntime(options: {
     restarts,
     restartingAtOnRestart,
     logs,
+    nativeDiagnostics,
     unavailable: () => unavailable,
     runtime,
   };
@@ -557,6 +562,111 @@ describe('createKiloRuntime', () => {
     await Bun.sleep(5);
     expect(spawner.spawnCount()).toBe(2);
     expect(scheduler.intervalCount()).toBe(0);
+  });
+
+  it('emits kilo_restarting before the replacement spawn and kilo_restarted only after it', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    let releaseSpawn!: () => void;
+    let spawnCalls = 0;
+    const gate = new Promise<void>(resolve => {
+      releaseSpawn = resolve;
+    });
+    const { runtime, nativeDiagnostics } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      spawnKilo: async input => {
+        spawnCalls += 1;
+        if (spawnCalls >= 2) await gate;
+        return spawner.spawn(input);
+      },
+    });
+    await runtime.ensure();
+
+    spawner.processes[0]!.exit();
+    await waitFor(() => nativeDiagnostics.some(entry => entry.fields.phase === 'kilo_restarting'));
+    // The replacement has not spawned yet; no completed restart may be reported.
+    expect(nativeDiagnostics.some(entry => entry.fields.phase === 'kilo_restarted')).toBe(false);
+
+    releaseSpawn();
+    await waitFor(() => nativeDiagnostics.some(entry => entry.fields.phase === 'kilo_restarted'));
+    expect(nativeDiagnostics).toEqual([
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'kilo_restarting', kiloRestartReason: 'exit' },
+      },
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'kilo_restarted', kiloRestartReason: 'exit' },
+      },
+    ]);
+    await runtime.shutdown();
+  });
+
+  it('emits kilo_restart_failed and not kilo_restarted when the replacement spawn rejects', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    let spawnCalls = 0;
+    const { runtime, nativeDiagnostics } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      spawnKilo: async input => {
+        spawnCalls += 1;
+        if (spawnCalls >= 2) throw new Error('spawn boom');
+        return spawner.spawn(input);
+      },
+    });
+    await runtime.ensure();
+
+    spawner.processes[0]!.exit();
+    await waitFor(() =>
+      nativeDiagnostics.some(entry => entry.fields.phase === 'kilo_restart_failed')
+    );
+    expect(nativeDiagnostics.some(entry => entry.fields.phase === 'kilo_restarted')).toBe(false);
+    await runtime.shutdown();
+  });
+
+  it('does not emit a restart outcome when shutdown interrupts replacement preparation', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const gate = Promise.withResolvers<void>();
+    let preparations = 0;
+    const { runtime, nativeDiagnostics, logs } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      prepareFilesystem: async () => {
+        preparations += 1;
+        if (preparations === 2) await gate.promise;
+      },
+    });
+    await runtime.ensure();
+
+    spawner.processes[0]!.exit();
+    await waitFor(() => preparations === 2);
+    await runtime.shutdown();
+    gate.resolve();
+    await waitFor(() => logs.some(message => message.includes('kilo restart failed')));
+
+    expect(runtime.phase()).toBe('stopped');
+    expect(spawner.spawnCount()).toBe(1);
+    expect(nativeDiagnostics).toEqual([
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'kilo_restarting', kiloRestartReason: 'exit' },
+      },
+    ]);
   });
 
   it('runs onRestart only after the runtime reports it is no longer restarting', async () => {
@@ -960,7 +1070,12 @@ describe('createKiloRuntime', () => {
     const scheduler = createScheduler();
     const feed = createFeedFactory();
     const probe = createProbe(false);
-    const { runtime, unavailable } = createRuntime({ spawner, feed, probe, scheduler });
+    const { runtime, unavailable, nativeDiagnostics } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+    });
 
     await runtime.ensure();
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -974,6 +1089,10 @@ describe('createKiloRuntime', () => {
     expect(unavailable()).toBe(1);
     expect(spawner.spawnCount()).toBe(4);
     expect(runtime.isSuspected()).toBe(true);
+    expect(nativeDiagnostics).toContainEqual({
+      event: 'wrapper.lifecycle',
+      fields: { phase: 'kilo_unavailable' },
+    });
   });
 
   it('installs refreshed credentials by restarting without spending the crash budget', async () => {
@@ -981,7 +1100,7 @@ describe('createKiloRuntime', () => {
     const scheduler = createScheduler();
     const feed = createFeedFactory();
     const probe = createProbe(false);
-    const { runtime, restarts } = createRuntime({
+    const { runtime, restarts, nativeDiagnostics } = createRuntime({
       spawner,
       feed,
       probe,
@@ -996,6 +1115,12 @@ describe('createKiloRuntime', () => {
     await waitFor(() => spawner.spawnCount() === 2);
     expect(runtime.env.HOME).toBe('/new');
     expect(restarts).toEqual([{ reason: 'credentials' }]);
+    // A credential refresh is not a fault and is not projected.
+    expect(
+      nativeDiagnostics.filter(
+        entry => typeof entry.fields.phase === 'string' && entry.fields.phase.startsWith('kilo_')
+      )
+    ).toHaveLength(0);
 
     // The credential restart must not consume the 3-in-10 crash budget.
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -1481,6 +1606,74 @@ describe('createKiloRuntimes', () => {
     releaseShutdown.resolve();
     await retire;
     expect(runtimes.get('dir')).not.toBe(first);
+  });
+
+  it('summary counts a suspected runtime as suspected only', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-summary-pids',
+      scheduler: scheduler.scheduler,
+      spawnKilo: spawner.spawn,
+      openFeed: feed.openFeed,
+      probeHealth: probe.probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+    });
+    await runtimes.ensure({ key: 'dir', directory: '/tmp/dir', env: {} });
+    expect(runtimes.summary()).toEqual({
+      runtimeCount: 1,
+      suspectedCount: 0,
+      restartingCount: 0,
+      unavailableCount: 0,
+    });
+
+    probe.set(() => new Promise(() => {}));
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => runtimes.get('dir')?.phase() === 'suspected');
+    expect(runtimes.summary()).toEqual({
+      runtimeCount: 1,
+      suspectedCount: 1,
+      restartingCount: 0,
+      unavailableCount: 0,
+    });
+    await runtimes.shutdown();
+  });
+
+  it('summary counts a restarting runtime as restarting, not suspected', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const duringRestart: Array<ReturnType<KiloRuntimes['summary']>> = [];
+    const holder: { runtimes?: KiloRuntimes } = {};
+    let spawnCalls = 0;
+    const baseSpawn = spawner.spawn;
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-summary-restart-pids',
+      scheduler: scheduler.scheduler,
+      spawnKilo: input => {
+        spawnCalls += 1;
+        if (spawnCalls > 1 && holder.runtimes) duringRestart.push(holder.runtimes.summary());
+        return baseSpawn(input);
+      },
+      openFeed: feed.openFeed,
+      probeHealth: probe.probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+    });
+    holder.runtimes = runtimes;
+    await runtimes.ensure({ key: 'dir', directory: '/tmp/dir', env: {} });
+    spawner.processes[0]!.exit();
+    await waitFor(() => spawnCalls >= 2);
+    expect(duringRestart).toEqual([
+      { runtimeCount: 1, suspectedCount: 0, restartingCount: 1, unavailableCount: 0 },
+    ]);
+    await runtimes.shutdown();
   });
 
   it('reuses a warm runtime for the same MCP config and rejects drift', async () => {

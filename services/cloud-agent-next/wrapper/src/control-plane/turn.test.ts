@@ -5,6 +5,7 @@ import type {
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { runtimeKey } from './prepare.js';
 import {
@@ -201,6 +202,7 @@ function createHarness(
   const frames: ControlPlaneWrapperFrame[] = [];
   const logs: string[] = [];
   const diagnostics: Array<{ event: string; fields: Record<string, unknown> }> = [];
+  const nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }> = [];
   const clients = new Map<string, FakeClient>();
   const flags = new Map<string, Flags>();
   const runtimes = new Map<string, TurnKiloRuntime>();
@@ -229,6 +231,7 @@ function createHarness(
     runtimes: { get: key => runtimes.get(key) },
     log: message => logs.push(message),
     onDiagnostic: (event, fields) => diagnostics.push({ event, fields }),
+    onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     now: () => clock,
     scheduler,
     materializeAttachments: (async (message: { prompt?: string; parts?: unknown[] }) => {
@@ -268,6 +271,7 @@ function createHarness(
     frames,
     logs,
     diagnostics,
+    nativeDiagnostics,
     scheduler,
     timeouts,
     setClock: (value: number) => {
@@ -2072,5 +2076,99 @@ describe('turn clock helpers', () => {
   it('derives the runtime key from the isolation mode', () => {
     expect(runtimeKey(routeSpec())).toBe(DIRECTORY);
     expect(runtimeKey({ ...routeSpec(), runtimeIsolation: 'per-session' })).toBe(SESSION_ID);
+  });
+});
+
+describe('native session outcome transitions', () => {
+  it('projects a completed outcome once, matching the socket frame', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: KILO_SESSION, messageID: 'assistant-1', type: 'text' },
+      })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(h.nativeDiagnostics.filter(entry => entry.fields.phase === 'session_outcome')).toEqual([
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'session_outcome', status: 'completed', sessionId: SESSION_ID },
+      },
+    ]);
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed' });
+  });
+
+  it('projects a cancelled outcome once and leaves the socket frame unchanged', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.abort(SESSION_ID);
+    await settle();
+
+    expect(h.nativeDiagnostics.filter(entry => entry.fields.phase === 'session_outcome')).toEqual([
+      {
+        event: 'wrapper.lifecycle',
+        fields: { phase: 'session_outcome', status: 'cancelled', sessionId: SESSION_ID },
+      },
+    ]);
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'cancelled' });
+  });
+
+  it('projects a no_progress failure with the parsed outcomeReason', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.setClock(1);
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+
+    const native = h.nativeDiagnostics.find(entry => entry.fields.phase === 'session_outcome');
+    expect(native?.fields.status).toBe('failed');
+    expect(native?.fields.outcomeReason).toBe('no_progress');
+  });
+
+  it('never copies a Kilo assistant safeMessage into outcomeReason', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.error', {
+        sessionID: KILO_SESSION,
+        error: { name: 'ProviderAuthError', message: 'bad key' },
+      })
+    );
+    await settle();
+
+    const native = h.nativeDiagnostics.find(entry => entry.fields.phase === 'session_outcome');
+    expect(native?.fields.status).toBe('failed');
+    expect(native?.fields).not.toHaveProperty('outcomeReason');
+    expect(JSON.stringify(native?.fields)).not.toContain('bad key');
+  });
+
+  it('activeTurnCount and isActive exclude a turn waiting on the user', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    expect(h.manager.activeTurnCount()).toBe(0);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(h.manager.activeTurnCount()).toBe(1);
+    expect(h.manager.isActive()).toBe(true);
+
+    h.manager.observeKiloEvent(kiloEvent('question.asked', { sessionID: KILO_SESSION, id: 'q1' }));
+    expect(h.manager.activeTurnCount()).toBe(0);
+    expect(h.manager.isActive()).toBe(false);
+
+    h.manager.observeKiloEvent(
+      kiloEvent('question.replied', { sessionID: KILO_SESSION, requestID: 'q1' })
+    );
+    expect(h.manager.activeTurnCount()).toBe(1);
   });
 });

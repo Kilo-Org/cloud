@@ -2,11 +2,20 @@ import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import { diagnosticDetail } from '../../../src/shared/control-diagnostics.js';
+import {
+  createControlDiagnosticProjector,
+  diagnosticDetail,
+  nativeControlPlaneLogsEnabled,
+  type ControlDiagnosticReporter,
+} from '../../../src/shared/control-diagnostics.js';
 import { resolveControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { installInterceptTrustIfEnabled } from '../control/cert.js';
 import { createControlDiagnostics, type ControlDiagnostics } from '../control/diagnostics.js';
-import { closeControlWorkload, initializeControlWorkload } from '../control/workload-cgroup.js';
+import {
+  closeControlWorkload,
+  initializeControlWorkload,
+  readWorkloadStats,
+} from '../control/workload-cgroup.js';
 import {
   createControlFileLogUploader,
   type ControlFileLogUploader,
@@ -21,6 +30,7 @@ import {
 import { createPreparationManager, runtimeKey } from './prepare.js';
 import { createTurnManager, type TurnManager } from './turn.js';
 import { createControlPlaneTerminals } from './terminals.js';
+import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
@@ -61,6 +71,7 @@ export type ControlPlaneLifecycleDeps = {
   connection: ControlPlaneConnection;
   diagnostics: Pick<ControlDiagnostics, 'onDiagnostic' | 'finalize'>;
   fileLogs: Pick<ControlFileLogUploader, 'finalize'>;
+  onNativeDiagnostic?: ControlDiagnosticReporter;
   exit: (code: number) => void;
   process?: ControlPlaneProcess;
   log?: (message: string) => void;
@@ -123,6 +134,11 @@ export function createControlPlaneLifecycle(
   proc.once('SIGTERM', () => handleExitEvent('sigterm', 'SIGTERM'));
   proc.once('uncaughtException', () => handleExitEvent('uncaught_exception', 'uncaught exception'));
   proc.on('unhandledRejection', reason => {
+    // Closed native record: the free-text reason stays in the file log only.
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'failed',
+      retirementCause: 'unhandled_rejection',
+    });
     const detail = rejectionDetail(reason);
     handleExitEvent('unhandled_rejection', `unhandled rejection${detail ? `: ${detail}` : ''}`);
   });
@@ -148,12 +164,16 @@ export async function runControlPlaneWrapper(
 ): Promise<ControlPlaneLifecycle | undefined> {
   const uploadUrl = env.CONTROL_LOG_UPLOAD_URL;
   const uploadGrant = env.CONTROL_LOG_UPLOAD_GRANT;
-  const diagnostics = createControlDiagnostics({ uploadUrl, uploadGrant });
+  const projector = createControlDiagnosticProjector({
+    enabled: nativeControlPlaneLogsEnabled(env),
+  });
+  const diagnostics = createControlDiagnostics({ uploadUrl, uploadGrant, projector });
   const fileLogs = createControlFileLogUploader({
     uploadUrl,
     uploadGrant,
     wrapperLogPath: env.WRAPPER_LOG_PATH,
     onDiagnostic: diagnostics.onDiagnostic,
+    projector,
   });
   const url = env.SANDBOX_CONTROL_URL;
   const credential = env.SANDBOX_CONTROL_CREDENTIAL;
@@ -164,7 +184,7 @@ export async function runControlPlaneWrapper(
   delete env.CONTROL_WRAPPER_INSTANCE_ID;
 
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
-  await installInterceptTrustIfEnabled(logToFile);
+  await installInterceptTrustIfEnabled(logToFile, undefined, projector);
   diagnostics.start();
   fileLogs.start();
 
@@ -210,6 +230,7 @@ export async function runControlPlaneWrapper(
     timers,
     log: logToFile,
     workload,
+    onNativeDiagnostic: projector,
     onEvent: event => turnsRef.current?.observeKiloEvent(event),
     onRestart: info => turnsRef.current?.onRuntimeRestart(info),
     onUnavailable: (directory, key) => turnsRef.current?.onRuntimeUnavailable(directory, key),
@@ -220,6 +241,7 @@ export async function runControlPlaneWrapper(
     allocationId,
     timers,
     log: logToFile,
+    onNativeDiagnostic: projector,
     getHeartbeat: () => ({
       active:
         (preparationRef.current?.isPreparing() ?? false) ||
@@ -306,9 +328,11 @@ export async function runControlPlaneWrapper(
     runtimes: { get: key => runtimes.get(key) },
     log: logToFile,
     onDiagnostic: diagnostics.onDiagnostic,
+    onNativeDiagnostic: projector,
   });
   preparationRef.current = createPreparationManager({
     timers,
+    onNativeDiagnostic: projector,
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv) => {
@@ -344,13 +368,53 @@ export async function runControlPlaneWrapper(
     onDiagnostic: diagnostics.onDiagnostic,
     log: logToFile,
   });
+  const nativeStatus = createNativeStatusReporter({
+    enabled: projector.enabled,
+    project: projector,
+    snapshot: () => {
+      const connectionState = connection.snapshot();
+      const runtimeSummary = runtimes.summary();
+      const placement = workload.placement;
+      let stats: ReturnType<typeof readWorkloadStats> | undefined;
+      if (placement) {
+        try {
+          stats = readWorkloadStats(placement.parentReference);
+        } catch {
+          stats = undefined;
+        }
+      }
+      return {
+        nativeConnectionPhase: connectionState.phase,
+        attempt: connectionState.attempt,
+        outboxBytes: connectionState.outboxBytes,
+        sessionCount: preparationRef.current?.sessionCount() ?? 0,
+        preparingCount: preparationRef.current?.preparingCount() ?? 0,
+        activeTurnCount: turnsRef.current?.activeTurnCount() ?? 0,
+        recentTerminalCount: terminalsRef.current?.recentInputCount() ?? 0,
+        ...runtimeSummary,
+        ...(workload.failure !== undefined ? { workloadFailure: workload.failure } : {}),
+        ...(placement
+          ? {
+              appliedMaxBytes: placement.aggregateMaxBytes,
+              cpuController: placement.cpuController,
+            }
+          : {}),
+        ...(stats?.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
+        ...(stats?.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
+        ...(allocationId !== undefined ? { allocationId } : {}),
+        wrapperInstanceId: connection.wrapperId,
+      };
+    },
+  });
   const lifecycle = createControlPlaneLifecycle({
     connection,
     diagnostics,
     fileLogs,
+    onNativeDiagnostic: projector,
     exit: code => process.exit(code),
     log: logToFile,
     stop: async () => {
+      nativeStatus.stop();
       turnsRef.current?.shutdown();
       terminalsRef.current?.shutdown();
       await runtimes.shutdown();
@@ -361,6 +425,7 @@ export async function runControlPlaneWrapper(
     void lifecycle.shutdown(controlPlaneExitPolicy('shutdown') ?? 0, reason ?? 'sandbox shutdown');
   };
   process.on('SIGUSR1', () => lifecycle.recycle());
+  nativeStatus.start();
   lifecycle.start();
   return lifecycle;
 }

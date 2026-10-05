@@ -493,11 +493,13 @@ describe('remote session transport state', () => {
 
     expect(session.canSend).toBe(true);
     expect(onTransportCapabilityChange).toHaveBeenCalled();
+    // An empty catalog is not a successful load: the transport self-heals it
+    // (error refresh) instead of publishing an empty `idle` catalog.
     expect(onRemoteModelStateChange).toHaveBeenLastCalledWith({
       ownerConnectionId: 'owner',
       protocol: 'v1',
-      catalog: { protocolVersion: 1, providers: [], truncated: false },
-      refresh: 'idle',
+      refresh: 'error',
+      error: 'Remote model catalog is empty',
     });
     session.destroy();
   });

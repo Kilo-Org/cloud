@@ -854,14 +854,14 @@ describe('server /terminal', () => {
 });
 
 describe('server runtime credential proxy', () => {
-  async function handle(): Promise<string> {
+  async function handle(kiloSessionId = 'kilo_proxy'): Promise<string> {
     return issueRuntimeCredentialProxyHandle(
       { NEXTAUTH_SECRET: secret } as never,
       createRuntimeProxyGrant({
         plane: 'legacy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
         sessionId: 'agent_proxy',
-        kiloSessionId: 'kilo_proxy',
+        kiloSessionId,
         userId: 'usr_proxy',
         orgId: 'org_proxy',
         mode: 'contained',
@@ -1217,7 +1217,7 @@ describe('server runtime credential proxy', () => {
     }
   });
 
-  it('forwards the caller feature header while still replacing the organization header', async () => {
+  it('forwards gateway attribution headers while still replacing the organization header', async () => {
     const env = createEnv();
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
@@ -1230,6 +1230,17 @@ describe('server runtime credential proxy', () => {
         },
       }),
     });
+    const attributionHeaders = {
+      'X-Kilocode-Feature': 'code-review',
+      'X-KILOCODE-EDITORNAME': 'Kilo Cloud Agent',
+      'x-kilocode-mode': 'code',
+      'X-KILOCODE-MACHINEID': 'machine_proxy',
+      'X-KILOCODE-TASKID': 'task_proxy',
+      'X-KILOCODE-PROJECTID': 'project_proxy',
+      'X-KiloCode-Version': '7.8.1',
+      'x-kilo-session': 'session_proxy',
+      'x-kilo-request': 'request_proxy',
+    };
     const upstream = vi.fn().mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', upstream);
     try {
@@ -1240,7 +1251,7 @@ describe('server runtime credential proxy', () => {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${await handle()}`,
-              'X-Kilocode-Feature': 'code-review',
+              ...attributionHeaders,
               'X-Kilocode-OrganizationId': 'attacker-org',
               'Content-Type': 'application/json',
             },
@@ -1252,7 +1263,9 @@ describe('server runtime credential proxy', () => {
       expect(response.status).toBe(200);
       expect(upstream).toHaveBeenCalledOnce();
       const forwarded = upstream.mock.calls[0][0] as Request;
-      expect(forwarded.headers.get('x-kilocode-feature')).toBe('code-review');
+      for (const [name, value] of Object.entries(attributionHeaders)) {
+        expect(forwarded.headers.get(name)).toBe(value);
+      }
       expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
     } finally {
       vi.unstubAllGlobals();
@@ -1471,6 +1484,210 @@ describe('server runtime credential proxy', () => {
     expect(response.status).toBe(404);
     expect(upstream).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it.each(['explicit', 'facade'] as const)(
+    'bootstraps and ingests descendants through the scoped binding via %s routing',
+    async routing => {
+      const root = 'ses_12345678901234567890123456';
+      const child = 'ses_abcdefghijklmnopqrstuvwxyz';
+      const grandchild = 'ses_ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const token = jwt.sign({ exp: 4_000_000_000 }, secret);
+      const binding = vi.fn(async (request: Request) => {
+        expect(request.headers.get('Authorization')).toBe(`Bearer ${token}`);
+        expect(request.headers.get('X-Internal-Secret')).toBe('internal-secret');
+        expect(request.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('agent_proxy');
+        expect(request.headers.get('X-Kilo-Root-Session')).toBe(root);
+        expect(request.headers.get('X-Kilo-Session-Scope-Protocol')).toBe('1');
+        expect(request.headers.get('X-Kilo-Trusted-Session-Lineage')).toBeNull();
+        expect(request.headers.get('Cookie')).toBeNull();
+        expect(request.headers.get('X-API-Key')).toBeNull();
+        expect(request.redirect).toBe('manual');
+        expect(
+          await verifyRuntimeProxyAttestation({
+            value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+            secret,
+            audience: 'session-ingest',
+            userId: 'usr_proxy',
+            authorizationId: '11111111-1111-4111-8111-111111111111',
+            resourceId: 'agent_proxy',
+            bearer: token,
+          })
+        ).toBe(true);
+        return new Response('ok', { headers: { 'Set-Cookie': 'unsafe=1' } });
+      });
+      const env = Object.assign(createEnv(), {
+        WORKER_URL: 'https://worker.test/runtime',
+        INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+        SESSION_INGEST: { fetch: binding },
+      });
+      env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+        resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+          token,
+          runtimeAuthorization: {
+            userId: 'usr_proxy',
+            authorizationId: '11111111-1111-4111-8111-111111111111',
+            resourceId: 'agent_proxy',
+          },
+        }),
+      });
+      const upstream = vi.fn();
+      vi.stubGlobal('fetch', upstream);
+      try {
+        const authorization = `Bearer ${await handle(root)}`;
+        const requests = [
+          ['/api/session', { sessionId: child }],
+          ['/api/session', { sessionId: grandchild, parentSessionId: child }],
+          [`/api/session/${child}/ingest?v=2`, { data: [] }],
+          [`/api/session/${grandchild}/ingest?v=2`, { data: [] }],
+        ] as const;
+        for (const [path, body] of requests) {
+          const prefix = routing === 'facade' ? '/runtime' : '/api/runtime-credential-proxy/ingest';
+          const response = await fetchWorker(
+            new Request(`https://worker.test${prefix}${path}`, {
+              method: 'POST',
+              headers: {
+                Authorization: authorization,
+                'Content-Type': 'application/json',
+                'X-Internal-Secret': 'forged-secret',
+                'X-Kilo-Root-Session': grandchild,
+                'X-Kilo-Cloud-Agent-Session': 'agent_unrelated',
+                'X-Kilo-Session-Scope-Protocol': '999',
+                'X-Kilo-Trusted-Session-Lineage': '1',
+                [RUNTIME_PROXY_ATTESTATION_HEADER]: 'forged-proof',
+                Cookie: 'unsafe=1',
+                'X-API-Key': 'forged-key',
+              },
+              body: JSON.stringify(body),
+            }),
+            env
+          );
+          expect(response.status).toBe(200);
+          expect(response.headers.get('Set-Cookie')).toBeNull();
+        }
+        expect(binding.mock.calls.map(([request]) => new URL(request.url).pathname)).toEqual([
+          '/internal/cloud-agent/v1/session',
+          '/internal/cloud-agent/v1/session',
+          `/internal/cloud-agent/v1/session/${child}/ingest`,
+          `/internal/cloud-agent/v1/session/${grandchild}/ingest`,
+        ]);
+        for (const [index, [request]] of binding.mock.calls.entries()) {
+          expect(await request.text()).toBe(JSON.stringify(requests[index]?.[1]));
+          if (index >= 2) expect(new URL(request.url).search).toBe('?v=2');
+        }
+        expect(upstream).not.toHaveBeenCalled();
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
+  );
+
+  it('fails closed when scoped forwarding cannot obtain its internal secret', async () => {
+    const root = 'ses_12345678901234567890123456';
+    const binding = vi.fn();
+    const env = Object.assign(createEnv(), {
+      INTERNAL_API_SECRET_PROD: { get: async () => null },
+      SESSION_INGEST: { fetch: binding },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: jwt.sign({ exp: 4_000_000_000 }, secret),
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request('https://worker.test/api/runtime-credential-proxy/ingest/api/session', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${await handle(root)}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sessionId: 'ses_abcdefghijklmnopqrstuvwxyz' }),
+        }),
+        env
+      );
+      expect(response.status).toBe(502);
+      expect(binding).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('preserves root public routes and denies unsafe descendant routes without forwarding', async () => {
+    const root = 'ses_12345678901234567890123456';
+    const child = 'ses_abcdefghijklmnopqrstuvwxyz';
+    const binding = vi.fn();
+    const env = Object.assign(createEnv(), {
+      WORKER_URL: 'https://worker.test',
+      INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
+      SESSION_INGEST: { fetch: binding },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: jwt.sign({ exp: 4_000_000_000 }, secret),
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn().mockImplementation(async () => new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const authorization = `Bearer ${await handle(root)}`;
+      for (const [method, path, body] of [
+        ['POST', '/api/session', JSON.stringify({ sessionId: root })],
+        ['POST', `/api/session/${root}/ingest`, '{}'],
+        ['GET', `/api/session/${root}/export`, undefined],
+        ['POST', `/api/session/${root}/title`, '{}'],
+      ] as const) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, {
+            method,
+            headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+            body,
+          }),
+          env
+        );
+        expect(response.status).toBe(200);
+      }
+      expect(upstream).toHaveBeenCalledTimes(4);
+      for (const [method, path, body] of [
+        ['GET', `/api/session/${child}/export`, undefined],
+        ['POST', `/api/session/${child}/title`, '{}'],
+        ['GET', `/api/session/${child}/ingest`, undefined],
+        ['PUT', `/api/session/${child}/ingest`, '{}'],
+        ['POST', `/api/session/${child}/ingest/`, '{}'],
+        ['POST', `/api/session/${child}%252fother/ingest`, '{}'],
+        ['POST', '/api/session', JSON.stringify({ sessionId: child, extra: true })],
+        ['POST', '/api/session', JSON.stringify({ sessionId: child, parentSessionId: 'other' })],
+        ['POST', '/api/session', '{'],
+        ['POST', '/api/session', ' '.repeat(8193)],
+      ] as const) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, {
+            method,
+            headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+            body,
+          }),
+          env
+        );
+        expect(response.status).toBe(404);
+      }
+      expect(upstream).toHaveBeenCalledTimes(4);
+      expect(binding).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('emits the upstream status for a failed model-proxy request', async () => {

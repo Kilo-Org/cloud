@@ -78,9 +78,13 @@ repository.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
-8. The composer MUST stay disabled while preparation or finalization runs, and
-   MUST say which state it is waiting on. After preparation failure settles the
-   turn, the composer MUST be restored when the session is writable and its
+8. A writable Cloud Agent chat with a resolved queue-capable transport MUST allow
+   editing and queueing follow-up messages while preparation or finalization
+   runs, and MUST show the current phase. Temporary submission unavailability
+   MUST NOT disable its textarea or discard its draft or focus. Initial loading,
+   unresolved transports, and read-only chats MUST NOT permit submission.
+   After preparation failure settles the turn, the composer MUST be restored
+   when the session is writable and its
    transport permits sending. A later submission MUST use fresh message and
    preparation-attempt identities.
 

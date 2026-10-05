@@ -353,7 +353,7 @@ async function performAutoTopUpForEntity(
     });
 
     // Pay the invoice. The PaymentIntent is created during payment, not finalization.
-    reportChargeAttempted({
+    await reportChargeAttempted({
       flow: 'auto_topup',
       userId: bouncerUserId,
       orgId: bouncerOrgId,

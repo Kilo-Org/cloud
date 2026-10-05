@@ -15902,6 +15902,17 @@
     ],
     "searchBlob": "models.list List all available OpenRouter AI models with their ids, names, vision support, and which ones are marked as preferred. models list"
   },
+  "models.preferred": {
+    "path": "models.preferred",
+    "kind": "query",
+    "summary": "Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "preferred"
+    ],
+    "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
+  },
   "moderation.acceptTerms": {
     "path": "moderation.acceptTerms",
     "kind": "mutation",
@@ -17046,6 +17057,9 @@
               "organization.domain_claim.verify",
               "organization.domain_claim.lose_verification",
               "organization.domain_claim.remove",
+              "organization.domain_claim.cleanup_started",
+              "organization.domain_claim.cleanup_completed",
+              "organization.domain_claim.cleanup_failed",
               "organization.mode.create",
               "organization.mode.update",
               "organization.mode.delete",
@@ -30605,130 +30619,6 @@
       "organizationid"
     ],
     "searchBlob": "organizations.usageStats Get an organization's usage totals (cost, requests, tokens) over the last 30 days. organizations usagestats organizationid organizationId"
-  },
-  "organizations.verifiedDomains.create": {
-    "path": "organizations.verifiedDomains.create",
-    "kind": "mutation",
-    "summary": "Start verifying a domain for an organization. Use to claim an email domain.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "domain": {
-          "type": "string",
-          "maxLength": 512
-        }
-      },
-      "required": [
-        "organizationId",
-        "domain"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "create",
-      "organizationid",
-      "domain"
-    ],
-    "searchBlob": "organizations.verifiedDomains.create Start verifying a domain for an organization. Use to claim an email domain. organizations verifieddomains create organizationid domain organizationId domain"
-  },
-  "organizations.verifiedDomains.list": {
-    "path": "organizations.verifiedDomains.list",
-    "kind": "query",
-    "summary": "List the verified domain claims for an organization.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "list",
-      "organizationid"
-    ],
-    "searchBlob": "organizations.verifiedDomains.list List the verified domain claims for an organization. organizations verifieddomains list organizationid organizationId"
-  },
-  "organizations.verifiedDomains.refresh": {
-    "path": "organizations.verifiedDomains.refresh",
-    "kind": "mutation",
-    "summary": "Re-check the verification status of a claimed domain for an organization. Use to refresh domain verification.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "claimId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "claimId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "refresh",
-      "organizationid",
-      "claimid"
-    ],
-    "searchBlob": "organizations.verifiedDomains.refresh Re-check the verification status of a claimed domain for an organization. Use to refresh domain verification. organizations verifieddomains refresh organizationid claimid organizationId claimId"
-  },
-  "organizations.verifiedDomains.remove": {
-    "path": "organizations.verifiedDomains.remove",
-    "kind": "mutation",
-    "summary": "Remove a verified domain claim from an organization. Use to delete a domain claim.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "claimId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId",
-        "claimId"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "verifieddomains",
-      "remove",
-      "organizationid",
-      "claimid"
-    ],
-    "searchBlob": "organizations.verifiedDomains.remove Remove a verified domain claim from an organization. Use to delete a domain claim. organizations verifieddomains remove organizationid claimid organizationId claimId"
   },
   "organizations.withMembers": {
     "path": "organizations.withMembers",

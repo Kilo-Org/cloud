@@ -138,4 +138,23 @@ describe('buildSessionActionMenuItems', () => {
     expect(items.map(item => item.key)).toEqual(['open', 'exit']);
     expect(items[1]?.destructive).toBe(true);
   });
+
+  it('adds Copy session ID and View PR only when their callbacks are passed', () => {
+    const onCopySessionId = vi.fn<() => void>();
+    const onViewPr = vi.fn<() => void>();
+    const { items } = buildSessionActionMenuItems({ onOpen: noop, onCopySessionId, onViewPr });
+
+    expect(items.map(item => item.key)).toEqual(['open', 'copy', 'view-pr']);
+    expect(items.map(item => item.label)).toEqual(['Open', 'Copy session ID', 'View PR']);
+    items[1]?.run();
+    items[2]?.run();
+    expect(onCopySessionId).toHaveBeenCalledTimes(1);
+    expect(onViewPr).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits View PR for a session with no associated PR callback', () => {
+    const { items } = buildSessionActionMenuItems({ onOpen: noop, onDelete: noop });
+
+    expect(items.map(item => item.key)).not.toContain('view-pr');
+  });
 });

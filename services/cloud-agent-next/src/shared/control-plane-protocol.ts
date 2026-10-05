@@ -583,6 +583,7 @@ const controlPlaneHelloFrameSchema = z
     wrapperId: z.string().min(1).max(128),
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
+    heartbeatAck: z.literal(true).optional(),
   })
   .strict();
 
@@ -590,6 +591,7 @@ const controlPlaneWelcomeFrameSchema = z
   .object({
     type: z.literal('welcome'),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
+    heartbeatAck: z.literal(true).optional(),
   })
   .strict();
 
@@ -911,6 +913,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneWelcomeFrameSchema,
   controlPlaneShutdownFrameSchema,
   controlPlaneHeartbeatFrameSchema,
+  z.object({ type: z.literal('heartbeat_ack') }).strict(),
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionProgressFrameSchema,
   controlPlaneSessionReadyFrameSchema,

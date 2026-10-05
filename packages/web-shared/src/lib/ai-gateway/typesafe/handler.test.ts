@@ -28,7 +28,7 @@ import {
   resolveOpenRouterModelAlias,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import { logMicrodollarUsageAndReportToBouncer } from '@/lib/ai-gateway/processUsage';
 import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { systemOneRequestSchema, TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
@@ -76,7 +76,9 @@ jest.mock('@/lib/ai-gateway/providers/definitions/openrouter', () => ({
   },
 }));
 jest.mock('@/lib/ai-gateway/providerHash', () => ({ generateProviderSpecificHash: jest.fn() }));
-jest.mock('@/lib/ai-gateway/processUsage', () => ({ logMicrodollarUsage: jest.fn() }));
+jest.mock('@/lib/ai-gateway/processUsage', () => ({
+  logMicrodollarUsageAndReportToBouncer: jest.fn(),
+}));
 jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitGatewayApiMetrics: jest.fn(),
 }));
@@ -157,11 +159,19 @@ function upstreamRequest() {
   return { body: JSON.parse(init.body), headers: new Headers(init.headers) };
 }
 
+function deferredUsageCallbacks(): Array<() => Promise<unknown>> {
+  return jest
+    .mocked(after)
+    .mock.calls.map(([arg]) => arg)
+    .filter((arg): arg is () => Promise<unknown> => typeof arg === 'function');
+}
+
 async function runAfter() {
-  expect(after).toHaveBeenCalledTimes(1);
-  const [callback] = jest.mocked(after).mock.calls[0];
-  if (typeof callback !== 'function') throw new Error('Expected deferred usage callback');
-  await callback();
+  // `after()` also carries the report-only bouncer decide promise; the deferred
+  // usage write is the function callback.
+  const callbacks = deferredUsageCallbacks();
+  expect(callbacks).toHaveLength(1);
+  await callbacks[0]();
 }
 
 describe('handleSystemOneRequest', () => {
@@ -303,10 +313,10 @@ describe('handleSystemOneRequest', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(upstreamBody);
-    expect(logMicrodollarUsage).not.toHaveBeenCalled();
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
     await runAfter();
-    expect(logMicrodollarUsage).toHaveBeenCalledTimes(1);
-    expect(logMicrodollarUsage).toHaveBeenCalledWith(
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledTimes(1);
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
       expect.objectContaining({
         messageId: upstreamBody.id,
         model: TYPESAFE_MODEL,
@@ -457,7 +467,7 @@ describe('handleSystemOneRequest', () => {
     expect((await handleSystemOneRequest(makeRequest())).status).toBe(200);
     await runAfter();
 
-    expect(logMicrodollarUsage).toHaveBeenCalledWith(
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
       expect.objectContaining({ inference_provider: null, cost_mUsd: 0, market_cost: 0 }),
       expect.objectContaining({ provider: 'openrouter', user_byok: false })
     );
@@ -477,7 +487,7 @@ describe('handleSystemOneRequest', () => {
     });
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
-    expect(after).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
   it('rate limits before authentication or upstream work', async () => {
@@ -508,7 +518,7 @@ describe('handleSystemOneRequest', () => {
       expect.objectContaining({ modelId: policyModel })
     );
     await runAfter();
-    expect(logMicrodollarUsage).toHaveBeenCalledWith(
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ requested_model: model })
     );
@@ -523,7 +533,7 @@ describe('handleSystemOneRequest', () => {
       expect(await response.json()).toMatchObject({ error_type: 'model_not_found' });
       expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
       expect(mockedFetch).not.toHaveBeenCalled();
-      expect(after).not.toHaveBeenCalled();
+      expect(deferredUsageCallbacks()).toHaveLength(0);
     }
   );
 
@@ -561,7 +571,7 @@ describe('handleSystemOneRequest', () => {
     expect(await response.json()).toMatchObject({ error_type: 'invalid_request' });
     expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
-    expect(after).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
   it('formats validation errors with Zod while preserving the TypeSafe error shape', async () => {
@@ -609,7 +619,7 @@ describe('handleSystemOneRequest', () => {
     });
     expect(getOrganizationProviderPrivacy).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
-    expect(after).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
   it('denies a model rejected by the effective organization member decision', async () => {
@@ -628,7 +638,7 @@ describe('handleSystemOneRequest', () => {
     });
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
-    expect(after).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
   });
 
   it.each([
@@ -689,7 +699,7 @@ describe('handleSystemOneRequest', () => {
       expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
       expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
       expect(mockedFetch).not.toHaveBeenCalled();
-      expect(after).not.toHaveBeenCalled();
+      expect(deferredUsageCallbacks()).toHaveLength(0);
     }
   );
 
@@ -707,8 +717,8 @@ describe('handleSystemOneRequest', () => {
     });
     expect(errorExceptInTest).toHaveBeenCalledWith('OpenRouter System One balance exhausted');
     expect(wrapInSafeNextResponse).not.toHaveBeenCalled();
-    expect(after).not.toHaveBeenCalled();
-    expect(logMicrodollarUsage).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
   });
 
   it.each([400, 429, 500])(
@@ -721,8 +731,8 @@ describe('handleSystemOneRequest', () => {
 
       expect(await handleSystemOneRequest(makeRequest())).toBe(safeResponse);
       expect(wrapInSafeNextResponse).toHaveBeenCalledWith(upstream);
-      expect(after).not.toHaveBeenCalled();
-      expect(logMicrodollarUsage).not.toHaveBeenCalled();
+      expect(deferredUsageCallbacks()).toHaveLength(0);
+      expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
       expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
         expect.objectContaining({ statusCode: status, inferenceProvider: undefined })
       );
@@ -747,8 +757,8 @@ describe('handleSystemOneRequest', () => {
       'OpenRouter System One request failed',
       expect.objectContaining({ message: expect.any(String) })
     );
-    expect(after).not.toHaveBeenCalled();
-    expect(logMicrodollarUsage).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -773,7 +783,7 @@ describe('handleSystemOneRequest', () => {
     expect(errorExceptInTest).toHaveBeenCalledWith(
       'Invalid OpenRouter System One response or missing usage'
     );
-    expect(after).not.toHaveBeenCalled();
-    expect(logMicrodollarUsage).not.toHaveBeenCalled();
+    expect(deferredUsageCallbacks()).toHaveLength(0);
+    expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
   });
 });

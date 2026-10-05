@@ -7,6 +7,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDuration } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { SESSION_FOOTER_ROW_ITEM_PADDING } from './session-working-state';
 import { computeMessageStatus } from './compute-status';
 
 type WorkingIndicatorProps = {
@@ -63,7 +64,7 @@ export function WorkingIndicator({ messages, isStreaming }: Readonly<WorkingIndi
     <Animated.View
       entering={FadeIn.duration(200)}
       exiting={FadeOut.duration(150)}
-      className="flex-row items-center gap-2 px-4 py-3"
+      className={`flex-row items-center gap-2 ${SESSION_FOOTER_ROW_ITEM_PADDING}`}
     >
       <ActivityIndicator size="small" color={colors.mutedForeground} />
       <Text className="text-sm text-muted-foreground">

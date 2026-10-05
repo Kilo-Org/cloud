@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { getMonitoredModels } from '@/lib/ai-gateway/preferred-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 // Simple hardcoded key for authentication
@@ -211,6 +211,8 @@ export async function GET(
     }
     anchorTime = parsed;
   }
+
+  const monitoredModels = await getMonitoredModels();
 
   try {
     const queryStartTime = Date.now();

@@ -124,6 +124,15 @@ vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
   LinearTransition: 'LinearTransition',
+  // `agent-sessions-section` builds the row entrance with `FadeIn.duration`.
+  FadeIn: { duration: () => ({}) },
+}));
+// `agent-sessions-section` (drawn by this screen) reads the motion policy, and
+// the real module reaches `expo-battery` -> `expo-modules-core`, which the
+// node-mounted harness cannot load.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: (_reducedMotion: boolean, crossfade: unknown) => crossfade,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),

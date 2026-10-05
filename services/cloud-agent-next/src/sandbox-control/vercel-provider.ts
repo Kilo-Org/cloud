@@ -202,6 +202,7 @@ export function createVercelProviderAdapter(deps: {
         sudo: false,
         wait: false,
       });
+      return { startSource: 'image' };
     },
     async observe(ref, intent) {
       const parsed = decodeOwnedProviderRef(ref);

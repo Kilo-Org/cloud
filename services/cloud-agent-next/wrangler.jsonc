@@ -401,6 +401,9 @@
     {
       "binding": "SHARED_SANDBOX_OVERRIDES",
     },
+    {
+      "binding": "REPO_SNAPSHOTS",
+    },
   ],
 
   /**
@@ -453,6 +456,9 @@
         {
           "binding": "SHARED_SANDBOX_OVERRIDES",
         },
+        {
+          "binding": "REPO_SNAPSHOTS",
+        },
       ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
@@ -473,6 +479,7 @@
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
         "CREDENTIAL_CONTAINMENT_ENABLED": "false",
         "REPO_SNAPSHOT_ORG_IDS": "",
+        "CONTAINER_REPO_SNAPSHOT_ORG_IDS": "*",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",

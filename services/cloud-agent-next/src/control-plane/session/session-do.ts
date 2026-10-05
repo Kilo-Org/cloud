@@ -183,8 +183,10 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'sandbox_provision',
   sandbox_start: 'sandbox_boot',
   clone: 'cloning',
+  restore: 'workspace_restore',
   checkout: 'branch',
   setup: 'setup_commands',
+  snapshot: 'workspace_backup',
   kilo_runtime: 'kilo_server',
   kilo_session: 'kilo_session',
 };
@@ -193,8 +195,10 @@ const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
   sandbox_start: 'Starting sandbox',
   clone: 'Cloning repository',
+  restore: 'Using prepared repository',
   checkout: 'Checking out branch',
   setup: 'Running setup commands',
+  snapshot: 'Saving repository for faster starts',
   kilo_runtime: 'Starting Kilo runtime',
   kilo_session: 'Preparing Kilo session',
 };

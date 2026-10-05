@@ -89,6 +89,7 @@ function createFakeProvider(): { adapter: ProviderAdapter; launchEnvs: Record<st
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active' as const, ...(ref === null ? {} : { providerRef: ref }) };

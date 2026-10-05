@@ -198,6 +198,14 @@ import {
   scopeGrantId,
   writeScopeGrant,
 } from './scope-grants.js';
+import { computeRepoKey, repoSnapshotEligible } from './repo-key.js';
+import {
+  captureRequested,
+  confirmRepositoryLaunch,
+  readRepositoryLaunch,
+  recordRepositoryLaunch,
+  repositoryLaunchOptions,
+} from './repository-launch.js';
 import {
   beginWorktreeDeletion,
   controlPlaneWorktreeDeletionInputSchema,
@@ -218,6 +226,8 @@ const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const OWNER_KEY = 'control_plane_owner';
+/** Backstop over the container DO's own capture timeout; the wrapper waits slightly longer. */
+const REPOSITORY_CAPTURE_CALL_MS = 3 * 60_000 + 5_000;
 const ALLOCATION_ROW_ID = 'current';
 const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
 const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
@@ -429,6 +439,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
   private createInFlight = false;
+  /** Sessions with a repository capture running, so a replayed request does not repeat it. */
+  private readonly capturesInFlight = new Set<string>();
   private readonly billingSchedule: BillingScheduleTable;
   private vercelBilling:
     | {
@@ -1688,7 +1700,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
       }
     }
-    const { route, started } = await ensureRoute(this.routeContext(state), spec, source);
+    const repoKey = await this.repoKeyFor(spec, source);
+    const { route, started } = await ensureRoute(this.routeContext(state), spec, source, repoKey);
     if (route.state !== 'failed') {
       if (started) await this.armAlarm(state);
       if (state.kind === 'stopped') {
@@ -1713,6 +1726,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
     await this.ctx.storage.put(OWNER_KEY, normalized);
+  }
+
+  /**
+   * The repository snapshot key for a route, or null when none applies. It is hashed
+   * from the input spec: the grant rewrites `spec.env` with per-attempt credential
+   * aliases, so the stored spec would give every session its own key.
+   */
+  private async repoKeyFor(
+    spec: ControlPlaneRouteSpec,
+    source: ControlPlaneCredentialSource
+  ): Promise<string | null> {
+    if (this.provider.captureRepository === undefined) return null;
+    const route = { repoUrl: spec.git?.url, directory: spec.directory };
+    const gate = {
+      enrolledOrgIds: this.env.CONTAINER_REPO_SNAPSHOT_ORG_IDS,
+      orgId: source.orgId,
+    };
+    if (!repoSnapshotEligible(gate, route)) return null;
+    const secret = await withTimeout(
+      resolveSecret(this.env.NEXTAUTH_SECRET),
+      1_000,
+      'Repository snapshot key secret lookup timed out'
+    ).catch(() => null);
+    return computeRepoKey({ secret, userId: source.userId, ...route });
   }
 
   private async requireOwner(): Promise<string | null> {
@@ -2288,13 +2325,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // material only; the credential source stays DO-private.
     this.trySendFrame(socket, {
       type: 'session.prepare',
-      spec: {
-        ...route.spec,
-        createdOnPlatform: route.credentialSource?.createdOnPlatform,
-        ...(mcp === undefined ? {} : { mcp }),
-      },
+      spec: this.prepareFrameSpec(route, mcp),
       credentials: this.prepareCredentials(route.grant, route.sessionId),
     });
+  }
+
+  /** The route spec plus what only a frame carries: materialized MCP and the capture request. */
+  private prepareFrameSpec(
+    route: RouteRecord,
+    mcp: ControlPlaneRouteSpec['mcp']
+  ): ControlPlaneRouteSpec {
+    return {
+      ...route.spec,
+      createdOnPlatform: route.credentialSource?.createdOnPlatform,
+      ...(mcp === undefined ? {} : { mcp }),
+      ...(captureRequested(route, this.provider) ? { capture: true as const } : {}),
+    };
   }
 
   private prepareCredentials(
@@ -2396,11 +2442,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // material only; the credential source stays DO-private.
       this.trySendFrame(socket, {
         type: 'session.prepare',
-        spec: {
-          ...route.spec,
-          createdOnPlatform: route.credentialSource?.createdOnPlatform,
-          ...(mcp === undefined ? {} : { mcp }),
-        },
+        spec: this.prepareFrameSpec(route, mcp),
         credentials: this.prepareCredentials(route.grant, sessionId),
       });
     } catch {
@@ -2660,11 +2702,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
           return;
         }
         const launchDeadline = current.createDeadlineAt ?? createDeadline;
-        await withTimeout(
-          this.provider.launch(createdRef, launchEnv),
+        const launchOptions = repositoryLaunchOptions(
+          await listRoutes(this.db),
+          await readRepositoryLaunch(this.ctx.storage)
+        );
+        const launched = await withTimeout(
+          this.provider.launch(createdRef, launchEnv, launchOptions),
           remainingMs(launchDeadline),
           'Sandbox launch timed out'
         );
+        await this.recordLaunch(allocationId, launched.startSource);
         await this.dispatchResult({
           type: 'created',
           at: Date.now(),
@@ -2704,6 +2751,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } finally {
       this.createInFlight = false;
     }
+  }
+
+  /**
+   * Remember how this allocation's container started. A wrapper that connected
+   * while a slow launch was still returning has already proven the start.
+   */
+  private async recordLaunch(
+    allocationId: string,
+    startSource: Parameters<typeof recordRepositoryLaunch>[1]['startSource']
+  ): Promise<void> {
+    const state = await this.readAllocation();
+    const connected =
+      state.allocationId === allocationId &&
+      (state.kind === 'connected' || state.kind === 'disconnected');
+    await recordRepositoryLaunch(this.ctx.storage, {
+      allocationId,
+      startSource,
+      confirmed: connected,
+    });
   }
 
   private async dispatchCreateFailed(allocationId: string): Promise<void> {
@@ -2993,6 +3059,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId,
         wrapperId: frame.wrapperId,
       });
+      await confirmRepositoryLaunch(this.ctx.storage, frame.allocationId);
       return;
     }
 
@@ -3063,7 +3130,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         return;
       case 'session.ready':
+        if (frame.workspace !== undefined) {
+          logger
+            .withFields({ sessionId: frame.sessionId, workspace: frame.workspace })
+            .info('Control-plane workspace ready');
+        }
         await onRouteReady(ctx, frame.sessionId, current);
+        return;
+      case 'workspace.capture':
+        this.startRepositoryCapture(frame, currentState, current);
         return;
       case 'session.failed':
         logger
@@ -3088,6 +3163,57 @@ export class SandboxControlV2 extends DurableObject<Env> {
       default:
         return;
     }
+  }
+
+  /**
+   * Runs a wrapper's capture request off the serial queue: the snapshot of unknown
+   * duration must not hold up routes, frames or a stop. The wrapper always gets an
+   * answer, `ok: false` when nothing was saved, so it never waits out its backstop
+   * for a capture the DO already knows will not happen.
+   */
+  private startRepositoryCapture(
+    frame: Extract<ControlPlaneWrapperFrame, { type: 'workspace.capture' }>,
+    state: AllocationState,
+    current: boolean
+  ): void {
+    if (!current || this.capturesInFlight.has(frame.sessionId)) return;
+    this.capturesInFlight.add(frame.sessionId);
+    this.ctx.waitUntil(
+      this.runRepositoryCapture(frame, state).finally(() => {
+        this.capturesInFlight.delete(frame.sessionId);
+      })
+    );
+  }
+
+  private async runRepositoryCapture(
+    frame: Extract<ControlPlaneWrapperFrame, { type: 'workspace.capture' }>,
+    state: AllocationState
+  ): Promise<void> {
+    let ok = false;
+    try {
+      const route = await readRoute(this.db, frame.sessionId);
+      const provider = this.provider;
+      if (
+        route !== null &&
+        route.state === 'preparing' &&
+        route.repoKey !== null &&
+        provider.captureRepository !== undefined &&
+        state.providerRef !== null
+      ) {
+        ok = await withTimeout(
+          provider.captureRepository(state.providerRef, route.repoKey, frame.commit),
+          REPOSITORY_CAPTURE_CALL_MS,
+          'Repository capture timed out'
+        );
+      }
+    } catch {
+      ok = false;
+    }
+    const latest = await this.readAllocation();
+    if (latest.allocationId !== state.allocationId) return;
+    const socket = this.boundWrapperSocket(latest);
+    if (socket === null) return;
+    this.trySendFrame(socket, { type: 'workspace.captured', sessionId: frame.sessionId, ok });
   }
 
   private releaseBoundSockets(ws: WebSocket, allocationId: string): void {

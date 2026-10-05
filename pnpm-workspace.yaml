@@ -213,9 +213,15 @@ packageExtensions:
     dependencies:
       '@expo/config-plugins': '*'
 patchedDependencies:
+  # Text date style `elapsed`: the time since a date in its one largest unit, no
+  # seconds ("31 minutes"), for the glanceable widget and Live Activity waits.
+  '@expo/ui@57.0.17': patches/@expo+ui@57.0.17.patch
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
   expo-dev-launcher@57.0.19: patches/expo-dev-launcher@57.0.19.patch
+  # A zero badge count must not cancel every app notification: upstream called
+  # cancelAll(), which removed the ongoing Active Agents card on Android.
+  expo-notifications@57.0.17: patches/expo-notifications@57.0.17.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — unhandled deep links when getInitialURL resolves later;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,

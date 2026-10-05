@@ -31,7 +31,8 @@ jest.mock('./ToolCardShell', () => {
 });
 jest.mock('./CloudAgentProvider', () => ({ useOptionalManager: jest.fn() }));
 jest.mock('@/components/shared/TimeAgo', () => ({
-  TimeAgo: () => React.createElement('time', null, 'Message timestamp'),
+  TimeAgo: ({ timestamp }: { timestamp: number | string }) =>
+    React.createElement('time', { 'data-timestamp': timestamp }, 'Message timestamp'),
 }));
 jest.mock('@/components/shared/CopyMessageButton', () => ({ CopyMessageButton: () => null }));
 jest.mock('react-markdown', () => ({
@@ -401,6 +402,25 @@ describe('ConversationMessages', () => {
     );
   });
 
+  it('uses the last assistant creation time for a long-running turn while retaining its first identity', () => {
+    const firstCreated = Date.parse('2026-10-05T09:19:53Z');
+    const lastCreated = Date.parse('2026-10-05T09:43:07Z');
+    const first = assistantMessage('assistant-first', [textPart('progress', 'Watching CI.')], {
+      time: { created: firstCreated, completed: firstCreated + 16_000 },
+    });
+    const last = assistantMessage('assistant-last', [textPart('answer', 'CI passed.')], {
+      time: { created: lastCreated, completed: lastCreated + 7_000 },
+    });
+
+    const html = renderConversation([first, last]);
+
+    expect(html.match(/data-message-role="assistant"/g)).toHaveLength(1);
+    expect(html).toContain('data-message-id="assistant-first"');
+    expect(html).toContain(`data-timestamp="${lastCreated}"`);
+    expect(html).not.toContain(`data-timestamp="${firstCreated}"`);
+    expect(jest.mocked(MessageBubble).mock.calls.at(-1)?.[0].message.info).toBe(first.info);
+  });
+
   it('dispatches the new tool cards as independent rows without a group disclosure', () => {
     const parts = [
       { tool: 'background_process', input: { action: 'start', command: 'pnpm dev' } },
@@ -472,7 +492,7 @@ describe('ConversationMessages', () => {
     expect(html).not.toContain('Reasoning details');
     expect(html).not.toContain('Output for');
     expect(html.match(/data-message-role="assistant"/g)).toHaveLength(1);
-    expect(html.match(/<time>/g)).toHaveLength(1);
+    expect(html.match(/<time\b/g)).toHaveLength(1);
   });
 
   it.each([
@@ -636,7 +656,7 @@ describe('ConversationMessages', () => {
       expect.stringContaining('Thinking'),
     ]);
     expect(html.match(/data-message-role="assistant"/g)).toHaveLength(2);
-    expect(html.match(/<time>/g)).toHaveLength(1);
+    expect(html.match(/<time\b/g)).toHaveLength(1);
     expect(html.indexOf('Message timestamp')).toBeGreaterThan(
       html.indexOf('The previous turn is complete.')
     );

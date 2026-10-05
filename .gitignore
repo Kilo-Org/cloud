@@ -65,7 +65,6 @@ yarn-error.log*
 # local plans & prototypes
 /plans/
 /.plans/*
-!/.plans/experimental-models-2.md
 !/.plans/kilo-pass-welcome-promo-card-fingerprint-guard.md
 /.plan/
 .kilo/plans

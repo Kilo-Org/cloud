@@ -70,6 +70,7 @@ import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-rou
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
+import { adminModelTrafficRouter } from '@/routers/admin/model-traffic-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { adminUserDataExportsRouter } from '@/routers/admin/user-data-exports-router';
 import { adminUserDeletionQueueRouter } from '@/routers/admin/user-deletion-queue-router';
@@ -2600,6 +2601,7 @@ export const adminRouter = createTRPCRouter({
   // the shell-security rebrand; the key/symbol asymmetry is intentional.
   securityAdvisorContent: adminShellSecurityContentRouter,
   freeModelUsage: adminFreeModelUsageRouter,
+  modelTraffic: adminModelTrafficRouter,
   modelEvalIngest: adminModelEvalIngestRouter,
   userDataExports: adminUserDataExportsRouter,
   userDeletionQueue: adminUserDeletionQueueRouter,

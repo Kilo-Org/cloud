@@ -15,7 +15,11 @@ import {
   primaryGlanceableCount,
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
-import { getSurfaceExtras, type GlanceableSurfaceExtras } from '@/lib/glanceable/surface-extras';
+import {
+  getSurfaceExtras,
+  type GlanceableActionFeedback,
+  type GlanceableSurfaceExtras,
+} from '@/lib/glanceable/surface-extras';
 
 /** One translated count line for an Android surface. `kind` picks dot and color. */
 type AndroidWidgetCount = {
@@ -42,6 +46,13 @@ export type GlanceableCountFormat = (value: number) => string;
  * the app passes `formatGlanceableAgo`.
  */
 export type GlanceableAgoFormat = (at: string) => string;
+
+/**
+ * Format a timestamp as the active language's short clock time ("8:00 PM").
+ * Injected for the same reason as `formatAgo`; the app passes
+ * `formatGlanceableClock`.
+ */
+export type GlanceableClockFormat = (at: string) => string;
 
 /**
  * The two in-place actions a state offers, plus the translated row labels the
@@ -72,6 +83,8 @@ export type AndroidWidgetProps = {
   statusLine: string | null;
   /** Every count line in rank order (needs-input, running, scheduled, idle), zeros included. */
   countLines: AndroidWidgetCount[];
+  /** The kinds no agent is in: their rows keep their place but draw muted. */
+  zeroKinds: GlanceableCountKind[];
   /** Top-ranked count label; the only row that keeps the foreground color. */
   primaryLabel: string | null;
   /** Kind of the most recent state change; null when no row carried a timestamp. */
@@ -86,12 +99,13 @@ export type AndroidWidgetProps = {
   /** Preformatted relative time of that change, from the injected formatter. */
   newestResultAgo: string | null;
   /**
-   * Preformatted wake of the soonest scheduled session, from the same injected
-   * formatter as `newestResultAgo`. Null when nothing is scheduled or the CLI
-   * reported a scheduled count with no `scheduledAt`: the scheduled row draws
-   * either way, and only the time beside it is conditional.
+   * Preformatted clock time of the soonest scheduled wake ("8:00 PM"), from the
+   * injected clock formatter: a row shows the moment the agent wakes, not a
+   * countdown. Null when nothing is scheduled or the CLI reported a scheduled
+   * count with no `scheduledAt`: the scheduled row draws either way, and only
+   * the time beside it is conditional.
    */
-  scheduledAgo: string | null;
+  scheduledTime: string | null;
   /**
    * The reserved slot under the counts: the newest session's title, the
    * in-flight action's progress or failure, or null. Its height is reserved in
@@ -100,6 +114,12 @@ export type AndroidWidgetProps = {
    * snapshot contract keeps out of the snapshot itself (see surface-extras).
    */
   newestLine: string | null;
+  /**
+   * Which in-flight action, if any, `newestLine` reports. The layout draws an
+   * Approve in progress where the chip was, and a failed one where the newest
+   * result was, so it needs to tell the action's line from a session title.
+   */
+  actionFeedback: GlanceableActionFeedback;
   actions: AndroidWidgetActions;
   /** Spoken label: status words, counts, then Open agents. Never a title or id. */
   accessibilityLabel: string;
@@ -139,13 +159,14 @@ function newestLineFor(
 }
 
 /** Build the Android widget props from a snapshot, surface flags, and a translator. */
-// eslint-disable-next-line max-params -- snapshot, flags, the translator, and the two injected formatters
+// eslint-disable-next-line max-params -- snapshot, flags, the translator, and the three injected formatters
 export function buildAndroidWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
   translate: (key: string) => string,
   formatCount: GlanceableCountFormat = String,
-  formatAgo: GlanceableAgoFormat = String
+  formatAgo: GlanceableAgoFormat = String,
+  formatClock: GlanceableClockFormat = String
 ): AndroidWidgetProps {
   const status = resolveGlanceableStatus(snapshot, flags);
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
@@ -156,6 +177,11 @@ export function buildAndroidWidgetProps(
     kind: line.kind,
     count: formatCount(line.count),
   }));
+  // A zero row keeps its place in the grid but draws muted. Carried beside the
+  // lines, which every surface shares, rather than inside them.
+  const zeroKinds = (showCounts ? glanceableCountLines(snapshot) : [])
+    .filter(line => line.count === 0)
+    .map(line => line.kind);
   // The three facts locked frames must not carry: with no counts there is no
   // newest result either, so a waiting or privacy-blanked widget keeps one fact.
   const newestKind = showCounts ? snapshot.newestResultKind : null;
@@ -176,6 +202,7 @@ export function buildAndroidWidgetProps(
   return {
     statusLine: statusKey === null ? null : androidCopy(statusKey),
     countLines,
+    zeroKinds,
     primaryLabel: primary === null ? null : translate(primary.key),
     newestResultKind: newestKind,
     newestResultTitle: showCounts ? translate('glanceable.newestResult') : null,
@@ -184,8 +211,9 @@ export function buildAndroidWidgetProps(
         ? null
         : (countLines.find(line => line.kind === newestKind)?.label ?? null),
     newestResultAgo: newestKind === null || newestAt === null ? null : formatAgo(newestAt),
-    scheduledAgo: scheduledAt === null ? null : formatAgo(scheduledAt),
+    scheduledTime: scheduledAt === null ? null : formatClock(scheduledAt),
     newestLine: newestLineFor(extras, status, translate),
+    actionFeedback: showCounts ? extras.actionFeedback : null,
     actions: {
       // Only a permission wait can be answered from the widget, so the button
       // gates on `needsApproval` — the same count as the ongoing notification's
@@ -202,19 +230,20 @@ export function buildAndroidWidgetProps(
 }
 
 /** Every redraw checks the data deadline, including a task queued by an older alarm. */
-// eslint-disable-next-line max-params -- snapshot, the translator, and the two injected formatters
+// eslint-disable-next-line max-params -- snapshot, the translator, and the three injected formatters
 export function buildCurrentWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string,
   formatCount: GlanceableCountFormat,
-  formatAgo: GlanceableAgoFormat
+  formatAgo: GlanceableAgoFormat,
+  formatClock: GlanceableClockFormat
 ): AndroidWidgetProps {
   const expiresAt = Date.parse(snapshot.expiresAt);
   if (
     (snapshot.status === 'happy' || snapshot.status === 'stale') &&
     (!Number.isFinite(expiresAt) || expiresAt <= Date.now())
   ) {
-    return buildExpiredWidgetProps(snapshot, translate, formatCount, formatAgo);
+    return buildExpiredWidgetProps(snapshot, translate, formatCount, formatAgo, formatClock);
   }
   // The Android twin of the iOS stale timeline frame: a redraw past
   // `updatedAt + GLANCEABLE_STALE_MS` stops asserting the counts are current.
@@ -229,19 +258,21 @@ export function buildCurrentWidgetProps(
       {},
       translate,
       formatCount,
-      formatAgo
+      formatAgo,
+      formatClock
     );
   }
-  return buildAndroidWidgetProps(snapshot, {}, translate, formatCount, formatAgo);
+  return buildAndroidWidgetProps(snapshot, {}, translate, formatCount, formatAgo, formatClock);
 }
 
 /** Zero-count expired props: the single future redraw hides counts at expiresAt. */
-// eslint-disable-next-line max-params -- snapshot, the translator, and the two injected formatters
+// eslint-disable-next-line max-params -- snapshot, the translator, and the three injected formatters
 function buildExpiredWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string,
   formatCount: GlanceableCountFormat,
-  formatAgo: GlanceableAgoFormat
+  formatAgo: GlanceableAgoFormat,
+  formatClock: GlanceableClockFormat
 ): AndroidWidgetProps {
   return buildAndroidWidgetProps(
     {
@@ -257,7 +288,8 @@ function buildExpiredWidgetProps(
     {},
     translate,
     formatCount,
-    formatAgo
+    formatAgo,
+    formatClock
   );
 }
 
@@ -276,13 +308,15 @@ export function buildGenericWidgetProps(translate: (key: string) => string): And
   return {
     statusLine: signedOut,
     countLines: [],
+    zeroKinds: [],
     primaryLabel: null,
     newestResultKind: null,
     newestResultTitle: null,
     newestResultLabel: null,
     newestResultAgo: null,
-    scheduledAgo: null,
+    scheduledTime: null,
     newestLine: null,
+    actionFeedback: null,
     actions: {
       approve: false,
       newAgent: false,

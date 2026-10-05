@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- every size bucket and every surface composition shares this one widget layout module */
+/* eslint-disable max-lines -- every composition and its height and width budget share this one widget layout module */
 /* eslint-disable react-native/no-inline-styles -- react-native-android-widget primitives take style objects; NativeWind className is unavailable in the widget host */
 
 'use no memo';
@@ -9,6 +9,7 @@
 import LOGO from '../../assets/images/logo-widget.png';
 import {
   FlexWidget,
+  type FlexWidgetStyle,
   type HexColor,
   ImageWidget,
   TextWidget,
@@ -24,61 +25,57 @@ import { type AndroidWidgetProps } from './widget-props';
 
 export const WIDGET_NAME = 'ActiveAgentsWidget';
 
-/**
- * Below this width (dp) a short cell stacks its rows instead of running them.
+/*
+ * How the layout works.
  *
- * Two cells wide reports about 150–190 dp and three cells about 230–280 dp, so
- * the split sits between them. A tighter bound let a two-cell cell take the
- * row of three states and clip the last one.
- */
-const COMPACT_MAX_WIDTH_DP = 210;
-/**
- * At or above this width (dp) every state in the row can carry its label.
+ * The library draws the tree with native Android views into one bitmap the
+ * size the host reports (`info.width` x `info.height`, in dp). Nothing scrolls
+ * and nothing reflows, so a piece that does not fit is cut at the cell edge.
+ * The layout therefore budgets every composition against the cell before it
+ * draws, with an estimate of each text's width and height, and picks the
+ * richest composition that fits:
  *
- * The row draws four states. With their labels they need about 410 dp beside
- * the mark, so a four-cell phone row (about 360 dp) clipped the last state,
- * which hid the only count when every agent was idle.
- */
-export const ROW_LABEL_MIN_WIDTH_DP = 440;
-/**
- * At or above this height (dp) the mark sits above the rows and they own the
- * full width; below it the mark sits beside them.
+ * - card: a header row (the mark leading, the action trailing), the count rows
+ *   scaled with the height, and the newest-result footer pinned to the bottom
+ *   when its caption and its line both fit;
+ * - side: the mark, the count rows as a column (set tight in a one-row cell),
+ *   and the action trailing — or no action, the fallback that keeps the rows;
+ * - line: the mark and the counts run as one row, the action beside them or
+ *   under them.
  *
- * One cell tall lands anywhere from 40 dp to about 110 dp depending on the
- * device and the launcher's grid, and two cells tall starts around 150 dp, so
- * the split sits between them. A tighter bound let a one-cell cell take the
- * stacked layout and clip its last row.
- */
-const ROW_MAX_HEIGHT_DP = 130;
-/**
- * At or above this height (dp) the cell is the nightstand card: the mark, the
- * three counts, and the newest-result footer.
+ * A state with no counts (signed out, waiting, empty, locked, expired) centers
+ * the mark, its status line, and the New agent action when it offers one; a
+ * one-row cell runs them beside the mark instead.
  *
- * A four-cell-tall widget reports roughly 240–300 dp, and the tallest three-cell
- * layout stays under 220 dp, so the split sits between them. The widget config's
- * preferred cell is four tall, and `maxResizeHeight` has to reach past this
- * bound or a four-cell height would clamp and the bucket would never render.
+ * An Approve in flight draws its progress line where the chip was; a failed one
+ * draws its line over the chip, which stays as the retry.
+ *
+ * What each composition drops when the width runs out, in order: the wake
+ * time, the labels of the secondary rows, the primary label, then the mark. A
+ * count is never dropped, and the action wins over all of them.
+ *
+ * Every label is pinned to its dp size (`allowFontScaling={false}`): the cell is
+ * a fixed frame, so scaled text would push the action out of it. A user gets a
+ * larger surface by resizing the widget.
  */
-export const LARGE_MIN_HEIGHT_DP = 220;
 
-/**
- * Every label is pinned to its own dp size (`allowFontScaling={false}`), so the
- * system font scale cannot grow a count, a wake time, or the action chip's
- * caption past the box the layout reserved for it. A widget cell is a fixed
- * frame the host draws with no scrolling and no reflow, so scaled text pushed
- * the logo, the reserved newest-session line, and the 48 dp chip outside the
- * cell at Large system text. The user gets a larger surface by resizing the
- * widget, not by scaling the type inside a fixed one.
- */
+/** Below this height (dp) a cell is one launcher row: its content runs beside the mark. */
+const TALL_MIN_HEIGHT_DP = 130;
+/** At or above this height (dp) the counts card has room for its footer and the larger type. */
+const LARGE_MIN_HEIGHT_DP = 220;
 
 type Palette = {
   background: HexColor;
   foreground: HexColor;
   muted: HexColor;
+  primary: HexColor;
+  primaryForeground: HexColor;
   /** Four states, four colors — the same vocabulary the iOS surfaces draw. */
   needsInput: HexColor;
   running: HexColor;
   scheduled: HexColor;
+  /** The marker of a state no agent is in: the row stays, the ink steps back. */
+  zero: HexColor;
 };
 
 // The app's own palette, not a widget-local one: a Home Screen card that does
@@ -87,60 +84,177 @@ const LIGHT: Palette = {
   background: lightColors.background,
   foreground: lightColors.foreground,
   muted: lightColors.mutedForeground,
+  primary: lightColors.primary,
+  primaryForeground: lightColors.primaryForeground,
   needsInput: lightColors.warn,
   running: lightColors.good,
   // The muted-soft tone the session list's scheduled clock glyph uses, so the
   // widget's scheduled marker matches the row the user taps to get here.
   scheduled: lightColors.mutedSoft,
+  zero: lightColors.mutedSoft,
 };
 
 const DARK: Palette = {
   background: darkColors.background,
   foreground: darkColors.foreground,
   muted: darkColors.mutedForeground,
+  primary: darkColors.primary,
+  primaryForeground: darkColors.primaryForeground,
   needsInput: darkColors.warn,
   running: darkColors.good,
   scheduled: darkColors.mutedSoft,
+  zero: darkColors.mutedSoft,
 };
 
 // This function is evaluated only through `renderActiveAgentsWidget` and the
 // library's `buildWidgetTree`. Everything it references is explicit so the
 // React Compiler is disabled ("use no memo") and the widget host can re-evaluate
-// the source. Translated copy arrives through `props`; the English fallbacks
-// below only render while the gallery placeholder has no snapshot props.
+// the source. Translated copy arrives through `props`.
 
-type Size = 'compact' | 'row' | 'stack' | 'large';
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+/** The padding inside a one-row cell and inside a taller one. */
+const SHORT_PAD_DP = 12;
+const TALL_PAD_DP = 16;
+/** The gap between the mark and what sits beside it. */
+const MARK_GAP_DP = 12;
+/** The gap between the content and a trailing action. */
+const TRAILING_GAP_DP = 14;
+/** The minimum gap between the blocks of a tall composition. */
+const BLOCK_GAP_DP = 12;
+/** The gap between a body line and the line or action under it. */
+const BODY_GAP_DP = 8;
 
 /**
- * The size bucket, whether a `row` cell is wide enough for its labels, and the
- * reading direction. The library's flex engine has no direction of its own, so
- * every row reverses its own children and every column flips its alignment.
+ * The action's tap target and its drawn pill. The target holds Android's 48 dp
+ * minimum; the pill inside it is smaller, so the target may reach into the
+ * cell padding while the drawn part keeps its distance from the edge.
  */
-type Shape = { size: Size; rowLabels: boolean; rtl: boolean; height: number };
+const ACTION_TARGET_DP = 48;
+const ACTION_PILL_DP = 36;
+const ACTION_FONT_DP = 13;
+const ACTION_PAD_X_DP = 16;
 
-function shapeOf(info: WidgetInfo, rtl: boolean): Shape {
-  // Height first: a cell tall enough for the nightstand card takes it whatever
-  // its width, and the three counts then own a column of their own.
-  if (info.height >= LARGE_MIN_HEIGHT_DP) {
-    return { size: 'large', rowLabels: true, rtl, height: info.height };
-  }
-  // A narrow cell that is tall enough still stacks, because the rows then own
-  // the full width. Beside the mark they truncated their labels.
-  if (info.height >= ROW_MAX_HEIGHT_DP) {
-    return { size: 'stack', rowLabels: true, rtl, height: info.height };
-  }
-  if (info.width < COMPACT_MAX_WIDTH_DP) {
-    return { size: 'compact', rowLabels: true, rtl, height: info.height };
-  }
-  // A phone-wide row fits the four counts but not four labels, so the ranked
-  // state keeps its word and the other three show as a marker and a number.
-  return {
-    size: 'row',
-    rowLabels: info.width >= ROW_LABEL_MIN_WIDTH_DP,
-    rtl,
-    height: info.height,
-  };
+/** The type sizes. Count numbers and labels in one row share one size. */
+const SHORT_COUNT_FONT_DP = 13;
+const TALL_COUNT_FONT_DP = 15;
+const MAX_COUNT_FONT_DP = 28;
+/**
+ * No count row is set below this size (dp). A column that would need less
+ * gives way to the one-line row, which drops parts instead of shrinking them.
+ */
+const MIN_COUNT_FONT_DP = 12;
+const STATUS_FONT_DP = { short: 13, tall: 14, large: 16, nightstand: 18 } as const;
+/** At or above this height (dp) a count-less card sets its mark and copy a size up. */
+const NIGHTSTAND_MIN_HEIGHT_DP = 400;
+const SLOT_FONT_DP = 12;
+const FOOTER_CAPTION_FONT_DP = 11;
+const FOOTER_FONT_DP = 13;
+
+/**
+ * One pinned dp text line is about 1.32 times its font size in Roboto with
+ * font padding. Arabic, the Indic scripts, Thai, and Myanmar fall back to fonts
+ * with taller ascenders and descenders, and a column budgeted at Roboto's
+ * height cut their last row at the cell edge.
+ */
+const ROBOTO_LINE_FACTOR = 1.32;
+const TALL_SCRIPT_LINE_FACTOR = 1.62;
+const TALL_SCRIPT =
+  /[\u0600-\u08FF\u0900-\u0DFF\u0E00-\u0E7F\u1000-\u109F\uFB50-\uFDFF\uFE70-\uFEFF]/u;
+
+/** The line height factor the copy in `props` draws at. */
+function lineFactorOf(props: AndroidWidgetProps): number {
+  const copy = [
+    props.statusLine,
+    props.newestLine,
+    props.newestResultLabel,
+    props.actions.approveLabel,
+    props.actions.newAgentLabel,
+    ...props.countLines.map(line => line.label),
+  ];
+  return copy.some(text => text !== null && TALL_SCRIPT.test(text))
+    ? TALL_SCRIPT_LINE_FACTOR
+    : ROBOTO_LINE_FACTOR;
 }
+
+function lineHeight(fontSize: number, factor: number): number {
+  return Math.ceil(fontSize * factor);
+}
+
+/**
+ * Roboto advance widths per em, by character class. The host reports no
+ * measured text width, so the layout estimates it to decide what to drop
+ * before it draws; the estimate errs wide (the factor below) so a near miss
+ * drops a piece rather than cutting it.
+ */
+function charAdvance(char: string): number {
+  if (char >= '0' && char <= '9') {
+    return 0.562;
+  }
+  if (char === ' ' || char === '\u00A0' || char === '\u202F') {
+    return 0.25;
+  }
+  if ("ijlI!|.,:;'’".includes(char)) {
+    return 0.26;
+  }
+  if ('frt()[]-/'.includes(char)) {
+    return 0.35;
+  }
+  if ('mwMW…%'.includes(char)) {
+    return 0.88;
+  }
+  if (/[\u0600-\u06FF]/u.test(char)) {
+    return 0.5;
+  }
+  // CJK, kana, hangul, and everything after them: a full em.
+  if (/[\u2E80-\u{10FFFF}]/u.test(char)) {
+    return 1;
+  }
+  const code = char.codePointAt(0) ?? 0;
+  if (char !== char.toLowerCase()) {
+    return 0.66;
+  }
+  return code < 0x02_50 ? 0.54 : 0.6;
+}
+
+/**
+ * The estimated width of `text` in dp. The table is close to bold Roboto and a
+ * little over regular, and the factor adds a margin on top, so an estimate errs
+ * wide: a near miss drops a piece rather than cutting it.
+ */
+function textWidth(text: string, fontSize: number): number {
+  let em = 0;
+  for (const char of text) {
+    em += charAdvance(char);
+  }
+  return Math.ceil(em * fontSize * 1.04);
+}
+
+/** How many lines `text` takes at `width`, word-wrapped. */
+function lineCount(text: string, fontSize: number, width: number): number {
+  let lines = 1;
+  let used = 0;
+  const space = textWidth(' ', fontSize);
+  for (const word of text.split(' ')) {
+    const w = textWidth(word, fontSize);
+    if (used > 0 && used + space + w > width) {
+      lines += 1;
+      used = w;
+    } else {
+      used += (used > 0 ? space : 0) + w;
+    }
+    if (w > width) {
+      lines += Math.floor(w / width);
+    }
+  }
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
+// Pieces
+// ---------------------------------------------------------------------------
 
 /** The edge a column's content starts from. */
 function startEdge(rtl: boolean): 'flex-start' | 'flex-end' {
@@ -170,8 +284,7 @@ function dotColor(kind: GlanceableCountKind, palette: Palette): HexColor {
  * outline — the shapes differ as well as the colors, so the four states stay
  * apart for a user who cannot tell orange from green or from grey.
  */
-function stateDot(kind: GlanceableCountKind, palette: Palette, size: number) {
-  const color = dotColor(kind, palette);
+function stateDot(kind: GlanceableCountKind, color: HexColor, size: number) {
   return (
     <FlexWidget
       key="dot"
@@ -186,88 +299,128 @@ function stateDot(kind: GlanceableCountKind, palette: Palette, size: number) {
 }
 
 function logo(size: number) {
-  return <ImageWidget image={LOGO} imageWidth={size} imageHeight={size} radius={size * 0.24} />;
-}
-
-/**
- * One count line: marker, count, label. Only the label color ranks the rows,
- * because a second font size in a three-row list reads as a mistake. A
- * scheduled row also carries the wake time in a slot reserved in every state.
- */
-type RowStyle = {
-  palette: Palette;
-  size: Size;
-  fontSize: number;
-  showLabel: boolean;
-  rtl: boolean;
-  /** Preformatted wake from the props; only the scheduled row draws it. */
-  scheduledAgo: string | null;
-};
-
-/**
- * The wake time's slot beside a scheduled count row.
- *
- * The box draws on the scheduled row whenever the rows draw — a zero row too —
- * so a wake the CLI reports for a session that had none earlier fills the slot
- * without moving the rows above or below it. The text is the preformatted wake
- * from `props.scheduledAgo`, and it is absent until a wake is known.
- */
-function wakeSlot(scheduledAgo: string | null, palette: Palette, size: Size) {
   return (
-    <FlexWidget
-      key="wake"
-      style={{
-        height: WAKE_SLOT_DP[size],
-        flexDirection: 'row',
-        alignItems: 'center',
-      }}
-    >
-      {scheduledAgo === null ? null : (
-        <TextWidget
-          key="wake-text"
-          text={scheduledAgo}
-          maxLines={1}
-          truncate="END"
-          allowFontScaling={false}
-          style={{ color: palette.muted, fontSize: WAKE_FONT_DP[size] }}
-        />
-      )}
-    </FlexWidget>
+    <ImageWidget
+      key="mark"
+      image={LOGO}
+      imageWidth={size}
+      imageHeight={size}
+      radius={size * 0.24}
+    />
   );
 }
 
-function countRow(
-  line: AndroidWidgetProps['countLines'][number],
-  isPrimary: boolean,
-  { palette, size, fontSize, showLabel, rtl, scheduledAgo }: RowStyle
-) {
+/** A flexible gap: at least `min` dp, plus an even share of the free space. */
+function spacer(key: string, min = 0) {
+  return <FlexWidget key={key} style={{ flex: 1, height: min, width: min }} />;
+}
+
+type CountLine = AndroidWidgetProps['countLines'][number];
+
+/** Which parts of a count row draw: the label, and the wake text (scheduled row only). */
+type RowParts = { label: boolean; time: string | null };
+
+const dotSize = (fontSize: number): number =>
+  fontSize < 14 ? 9 : Math.min(14, Math.round(fontSize * 0.62));
+function innerGap(fontSize: number): number {
+  if (fontSize >= 18) {
+    return 8;
+  }
+  return fontSize >= 14 ? 6 : 5;
+}
+const timeFont = (fontSize: number): number => Math.max(11, Math.round(fontSize * 0.8));
+const columnGap = (fontSize: number): number => Math.round(fontSize * 0.5);
+
+function rowWidth(line: CountLine, fontSize: number, parts: RowParts) {
+  const gap = innerGap(fontSize);
+  let width = dotSize(fontSize) + gap + textWidth(line.count, fontSize);
+  if (parts.label) {
+    width += gap + textWidth(line.label, fontSize);
+  }
+  if (parts.time !== null && line.kind === 'scheduled') {
+    width += gap + textWidth(parts.time, timeFont(fontSize));
+  }
+  return width;
+}
+
+type RowStyle = {
+  palette: Palette;
+  fontSize: number;
+  rtl: boolean;
+  parts: RowParts;
+  isPrimary: boolean;
+  /** No agent is in this state: the row keeps its place but draws muted. */
+  zero: boolean;
+  /** In a column the label may shrink (and end in an ellipsis) as a last resort. */
+  shrinkLabel: boolean;
+};
+
+/**
+ * One count line: marker, count, label, and the scheduled row's wake. Only the
+ * label color ranks the rows; number and label share one size.
+ */
+function countRow(line: CountLine, style: RowStyle) {
+  const { palette, fontSize, rtl, parts, isPrimary, shrinkLabel, zero } = style;
+  let label: React.ReactNode = null;
+  if (parts.label) {
+    label = (
+      <TextWidget
+        key="label"
+        text={line.label}
+        maxLines={1}
+        truncate="END"
+        allowFontScaling={false}
+        style={{
+          color: isPrimary && !zero ? palette.foreground : palette.muted,
+          fontSize,
+        }}
+      />
+    );
+    if (shrinkLabel) {
+      label = (
+        <FlexWidget key="label-box" style={{ flex: 1 }}>
+          {label}
+        </FlexWidget>
+      );
+    }
+  }
+  const time =
+    parts.time !== null && line.kind === 'scheduled' ? (
+      <TextWidget
+        key="time"
+        text={parts.time}
+        maxLines={1}
+        allowFontScaling={false}
+        style={{ color: palette.muted, fontSize: timeFont(fontSize) }}
+      />
+    ) : null;
   return (
-    <FlexWidget key={line.label} style={{ flexDirection: 'row', alignItems: 'center', flexGap: 6 }}>
+    <FlexWidget
+      key={line.kind}
+      style={{ flexDirection: 'row', alignItems: 'center', flexGap: innerGap(fontSize) }}
+    >
       {inReadingOrder(
         [
-          stateDot(line.kind, palette, fontSize < 14 ? 9 : 10),
+          stateDot(
+            line.kind,
+            zero ? palette.zero : dotColor(line.kind, palette),
+            dotSize(fontSize)
+          ),
           <TextWidget
             key="count"
             // oxlint-disable-next-line no-literal-copy/no-literal-copy -- an already-formatted number
             text={line.count}
             maxLines={1}
             allowFontScaling={false}
-            style={{ color: palette.foreground, fontSize, fontWeight: 'bold' }}
+            // A zero row keeps its place in the grid but reads as absent: muted, not bold.
+            style={{
+              color: zero ? palette.muted : palette.foreground,
+              fontSize,
+              fontWeight: zero ? 'normal' : 'bold',
+            }}
           />,
-          showLabel ? (
-            <TextWidget
-              key="label"
-              text={line.label}
-              maxLines={1}
-              truncate="END"
-              allowFontScaling={false}
-              style={{
-                color: isPrimary ? palette.foreground : palette.muted,
-                fontSize,
-              }}
-            />
-          ) : null,
-          line.kind === 'scheduled' ? wakeSlot(scheduledAgo, palette, size) : null,
+          label,
+          time,
         ],
         rtl
       )}
@@ -275,21 +428,307 @@ function countRow(
   );
 }
 
-/** The locked copy, drawn in place of the counts. */
-function statusText(props: AndroidWidgetProps, palette: Palette, maxLines: number) {
+/** A count column's height at `fontSize`. */
+function columnHeight(
+  lines: number,
+  fontSize: number,
+  { factor, gap = columnGap(fontSize) }: { factor: number; gap?: number }
+): number {
+  return lines * lineHeight(fontSize, factor) + Math.max(0, lines - 1) * gap;
+}
+
+/**
+ * The count rows as a column. The rows keep their labels unless `labels` is
+ * false; the wake drops from a row only when the row would not fit the width
+ * with it.
+ */
+function countColumn(props: AndroidWidgetProps, palette: Palette, layout: ColumnLayout) {
+  const { fontSize, gap, width, rtl, labels } = layout;
+  return (
+    <FlexWidget
+      key="counts"
+      style={{ flexDirection: 'column', alignItems: startEdge(rtl), flexGap: gap }}
+    >
+      {props.countLines.map(line => {
+        const withTime = { label: labels, time: props.scheduledTime };
+        return countRow(line, {
+          palette,
+          fontSize,
+          rtl,
+          parts:
+            rowWidth(line, fontSize, withTime) <= width ? withTime : { label: labels, time: null },
+          isPrimary: line.label === props.primaryLabel,
+          zero: props.zeroKinds.includes(line.kind),
+          shrinkLabel: true,
+        });
+      })}
+    </FlexWidget>
+  );
+}
+
+type ColumnLayout = {
+  fontSize: number;
+  gap: number;
+  /** The width the wake must fit in beside its row. */
+  width: number;
+  rtl: boolean;
+  labels: boolean;
+};
+
+/**
+ * How much of a count row a one-line layout keeps, richest first. Each level
+ * keeps what the next one drops: the wake goes first, then the secondary
+ * labels, then the primary label.
+ */
+type LineLevel = { labels: 'all' | 'primary' | 'none'; time: boolean };
+/** Counts only: what a line keeps when nothing else fits. */
+const BARE_LINE: LineLevel = { labels: 'none', time: false };
+const LINE_LEVELS: LineLevel[] = [
+  { labels: 'all', time: true },
+  { labels: 'all', time: false },
+  { labels: 'primary', time: false },
+  BARE_LINE,
+];
+const LINE_ITEM_GAP_DP = 10;
+
+function lineParts(props: AndroidWidgetProps, line: CountLine, level: LineLevel): RowParts {
+  return {
+    label:
+      level.labels === 'all' || (level.labels === 'primary' && line.label === props.primaryLabel),
+    time: level.time ? props.scheduledTime : null,
+  };
+}
+
+function lineWidth(props: AndroidWidgetProps, level: LineLevel): number {
+  return (
+    props.countLines.reduce(
+      (sum, line) => sum + rowWidth(line, SHORT_COUNT_FONT_DP, lineParts(props, line, level)),
+      0
+    ) +
+    Math.max(0, props.countLines.length - 1) * LINE_ITEM_GAP_DP
+  );
+}
+
+/** The richest line level that fits `width`, or null. */
+function fitLine(props: AndroidWidgetProps, width: number): LineLevel | null {
+  return LINE_LEVELS.find(level => lineWidth(props, level) <= width) ?? null;
+}
+
+/** The palette and the reading direction a piece draws with. */
+type Paint = { palette: Palette; rtl: boolean };
+
+/** The counts run as one row, at the one-row cell's type size. */
+function countLine(props: AndroidWidgetProps, level: LineLevel, { palette, rtl }: Paint) {
+  const rows = props.countLines.map(line =>
+    countRow(line, {
+      palette,
+      fontSize: SHORT_COUNT_FONT_DP,
+      rtl,
+      parts: lineParts(props, line, level),
+      isPrimary: line.label === props.primaryLabel,
+      zero: props.zeroKinds.includes(line.kind),
+      shrinkLabel: false,
+    })
+  );
+  return (
+    <FlexWidget
+      key="counts"
+      style={{ flexDirection: 'row', alignItems: 'center', flexGap: LINE_ITEM_GAP_DP }}
+    >
+      {inReadingOrder(rows, rtl)}
+    </FlexWidget>
+  );
+}
+
+/** A single muted line: the newest session, or an action's progress or failure. */
+function slotLine(text: string, palette: Palette, fontSize = SLOT_FONT_DP) {
   return (
     <TextWidget
-      text={props.statusLine ?? ''}
-      maxLines={maxLines}
+      key="slot"
+      text={text}
+      maxLines={1}
       truncate="END"
       allowFontScaling={false}
-      style={{ color: palette.muted, fontSize: STATUS_FONT_DP }}
+      style={{ color: palette.muted, fontSize }}
     />
   );
 }
 
-/** The newest result itself: the state marker, the kind label, and the age. */
-function newestResultRow(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
+/** The action the state offers, if any. Approve and New agent never coexist. */
+type Action = { kind: 'approve' | 'new-agent'; label: string };
+
+function actionOf(props: AndroidWidgetProps): Action | null {
+  if (props.actions.approve) {
+    return { kind: 'approve', label: props.actions.approveLabel };
+  }
+  if (props.actions.newAgent) {
+    return { kind: 'new-agent', label: props.actions.newAgentLabel };
+  }
+  return null;
+}
+
+function actionWidth(action: Action): number {
+  return Math.max(64, 2 * ACTION_PAD_X_DP + textWidth(action.label, ACTION_FONT_DP));
+}
+
+/**
+ * The action chip. Approve is a custom `clickAction`, which makes the library
+ * launch a headless task (`register.ts`) that answers in place. New agent is an
+ * `OPEN_URI` deep link: starting an agent needs the composer, so the tap opens
+ * the app on the new-session screen. The body keeps its own `OPEN_URI` deep
+ * link, so a tap beside the chip still opens Kilo.
+ *
+ * The whole 48 dp box is the tap target; the filled pill inside it is what draws.
+ */
+function actionChip(action: Action, palette: Palette) {
+  const click =
+    action.kind === 'approve'
+      ? { clickAction: 'approve' }
+      : { clickAction: 'OPEN_URI', clickActionData: { uri: LAUNCHER_NEW_AGENT_URL } };
+  return (
+    <FlexWidget
+      key={action.kind}
+      {...click}
+      accessibilityLabel={action.label}
+      style={{
+        flexDirection: 'column',
+        justifyContent: 'center',
+        height: ACTION_TARGET_DP,
+        borderRadius: ACTION_PILL_DP / 2,
+      }}
+    >
+      <FlexWidget
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: ACTION_PILL_DP,
+          paddingHorizontal: ACTION_PAD_X_DP,
+          borderRadius: ACTION_PILL_DP / 2,
+          backgroundColor: palette.primary,
+        }}
+      >
+        <TextWidget
+          text={action.label}
+          maxLines={1}
+          allowFontScaling={false}
+          style={{
+            color: palette.primaryForeground,
+            fontSize: ACTION_FONT_DP,
+            fontWeight: 'bold',
+          }}
+        />
+      </FlexWidget>
+    </FlexWidget>
+  );
+}
+
+/**
+ * What sits where the action would: the chip, the chip under a failed
+ * Approve's note (the chip is the retry), or — while an Approve is in flight —
+ * its progress line, so the chip is not offered twice.
+ */
+type Trailing =
+  | { kind: 'action'; action: Action; note: string | null }
+  | { kind: 'progress'; text: string };
+
+/** The trailing piece; `withNote` false leaves a failed Approve's note out. */
+function trailingOf(props: AndroidWidgetProps, withNote = true): Trailing | null {
+  if (props.actionFeedback === 'approving' && props.newestLine !== null) {
+    return { kind: 'progress', text: props.newestLine };
+  }
+  const action = actionOf(props);
+  if (action === null) {
+    return null;
+  }
+  const note =
+    withNote && props.actionFeedback === 'couldNotApprove' && action.kind === 'approve'
+      ? props.newestLine
+      : null;
+  return { kind: 'action', action, note };
+}
+
+const NOTE_GAP_DP = 2;
+
+function trailingSize(trailing: Trailing, factor: number) {
+  if (trailing.kind === 'progress') {
+    return {
+      width: textWidth(trailing.text, SLOT_FONT_DP + 1),
+      height: lineHeight(SLOT_FONT_DP + 1, factor),
+    };
+  }
+  const chip = actionWidth(trailing.action);
+  return trailing.note === null
+    ? { width: chip, height: ACTION_TARGET_DP }
+    : {
+        width: Math.max(chip, textWidth(trailing.note, SLOT_FONT_DP)),
+        height: lineHeight(SLOT_FONT_DP, factor) + NOTE_GAP_DP + ACTION_TARGET_DP,
+      };
+}
+
+function renderTrailing(trailing: Trailing, palette: Palette, rtl: boolean) {
+  if (trailing.kind === 'progress') {
+    return slotLine(trailing.text, palette, SLOT_FONT_DP + 1);
+  }
+  if (trailing.note === null) {
+    return actionChip(trailing.action, palette);
+  }
+  return (
+    <FlexWidget
+      key="trailing"
+      style={{
+        flexDirection: 'column',
+        alignItems: rtl ? 'flex-start' : 'flex-end',
+        flexGap: NOTE_GAP_DP,
+      }}
+    >
+      {slotLine(trailing.note, palette)}
+      {actionChip(trailing.action, palette)}
+    </FlexWidget>
+  );
+}
+
+/** The line under the counts: the newest session, never an action's line (that trails). */
+function slotTextOf(props: AndroidWidgetProps): string | null {
+  return props.actionFeedback === null ? props.newestLine : null;
+}
+
+/**
+ * The tall card's footer: the newest result under its caption — the newest
+ * session's own line when one is known, so the card names it without saying
+ * "newest" twice — or the delayed copy under the caption when stale. Its type
+ * follows the count rows, so a tall card's footer is not a footnote under
+ * large rows: the line at about 0.7x the row size, the caption at about 0.6x,
+ * never below the base sizes.
+ */
+type Footer = {
+  caption: string | null;
+  body: 'result' | 'text';
+  text: string;
+  lines: number;
+  /** The result's age, dropped whole when the row would not fit with it. */
+  showAgo: boolean;
+  captionFont: number;
+  lineFont: number;
+};
+
+function footerOf(props: AndroidWidgetProps, width: number, rowFont: number): Footer | null {
+  if (props.countLines.length === 0) {
+    return null;
+  }
+  const captionFont = Math.max(FOOTER_CAPTION_FONT_DP, Math.round(rowFont * 0.6));
+  const lineFont = Math.max(FOOTER_FONT_DP, Math.round(rowFont * 0.7));
+  if (props.statusLine !== null) {
+    return {
+      caption: props.newestResultTitle,
+      body: 'text',
+      text: props.statusLine,
+      lines: Math.min(2, lineCount(props.statusLine, lineFont, width)),
+      showAgo: false,
+      captionFont,
+      lineFont,
+    };
+  }
   if (
     props.newestResultKind === null ||
     props.newestResultLabel === null ||
@@ -297,71 +736,86 @@ function newestResultRow(props: AndroidWidgetProps, palette: Palette, rtl: boole
   ) {
     return null;
   }
+  const labelPart = dotSize(lineFont) + 6 + textWidth(props.newestResultLabel, lineFont);
+  return {
+    caption:
+      props.actionFeedback === null && props.newestLine !== null
+        ? props.newestLine
+        : props.newestResultTitle,
+    body: 'result',
+    text: props.newestResultLabel,
+    lines: 1,
+    showAgo: labelPart + 6 + textWidth(props.newestResultAgo, lineFont) <= width,
+    captionFont,
+    lineFont,
+  };
+}
+
+function footerHeight(footer: Footer, factor: number): number {
   return (
-    <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', flexGap: 6 }}>
-      {inReadingOrder(
-        [
-          stateDot(props.newestResultKind, palette, 9),
-          <TextWidget
-            key="newest-label"
-            text={props.newestResultLabel}
-            maxLines={1}
-            truncate="END"
-            allowFontScaling={false}
-            style={{ color: palette.foreground, fontSize: 13 }}
-          />,
-          <TextWidget
-            key="newest-ago"
-            text={props.newestResultAgo}
-            maxLines={1}
-            truncate="END"
-            allowFontScaling={false}
-            style={{ color: palette.muted, fontSize: 13 }}
-          />,
-        ],
-        rtl
-      )}
-    </FlexWidget>
+    (footer.caption === null ? 0 : lineHeight(footer.captionFont, factor) + 4) +
+    footer.lines * lineHeight(footer.lineFont, factor)
   );
 }
 
-/**
- * The large cell's third fact, at the bottom of the column.
- *
- * The rows stay whatever happens, so the footer only ever moves itself. Happy
- * shows the caption and the newest result; stale keeps the caption and swaps
- * the result for its own copy, because the counts are the last known ones and
- * only the third fact is in doubt — the same composition the iOS large card
- * draws. A cell with nothing to put under the caption has no footer at all.
- */
-function newestResultFooter(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
-  if (props.countLines.length === 0) {
-    return null;
-  }
+function renderFooter(props: AndroidWidgetProps, footer: Footer, { palette, rtl }: Paint) {
   const body =
-    props.statusLine === null ? (
-      newestResultRow(props, palette, rtl)
+    footer.body === 'result' &&
+    props.newestResultKind !== null &&
+    props.newestResultLabel !== null &&
+    props.newestResultAgo !== null ? (
+      <FlexWidget key="result" style={{ flexDirection: 'row', alignItems: 'center', flexGap: 6 }}>
+        {inReadingOrder(
+          [
+            stateDot(
+              props.newestResultKind,
+              dotColor(props.newestResultKind, palette),
+              dotSize(footer.lineFont)
+            ),
+            <TextWidget
+              key="newest-label"
+              text={props.newestResultLabel}
+              maxLines={1}
+              truncate="END"
+              allowFontScaling={false}
+              style={{ color: palette.foreground, fontSize: footer.lineFont }}
+            />,
+            footer.showAgo ? (
+              <TextWidget
+                key="newest-ago"
+                text={props.newestResultAgo}
+                maxLines={1}
+                allowFontScaling={false}
+                style={{ color: palette.muted, fontSize: footer.lineFont }}
+              />
+            ) : null,
+          ],
+          rtl
+        )}
+      </FlexWidget>
     ) : (
       <TextWidget
-        text={props.statusLine}
-        maxLines={2}
+        key="result"
+        text={footer.text}
+        maxLines={footer.lines}
         truncate="END"
         allowFontScaling={false}
-        style={{ color: palette.muted, fontSize: 12 }}
+        style={{ color: palette.muted, fontSize: footer.lineFont }}
       />
     );
-  if (body === null) {
-    return null;
-  }
   return (
-    <FlexWidget style={{ flexDirection: 'column', alignItems: startEdge(rtl), flexGap: 4 }}>
-      {props.newestResultTitle === null ? null : (
+    <FlexWidget
+      key="footer"
+      style={{ flexDirection: 'column', alignItems: startEdge(rtl), flexGap: 4 }}
+    >
+      {footer.caption === null ? null : (
         <TextWidget
-          text={props.newestResultTitle}
+          key="caption"
+          text={footer.caption}
           maxLines={1}
           truncate="END"
           allowFontScaling={false}
-          style={{ color: palette.muted, fontSize: 11 }}
+          style={{ color: palette.muted, fontSize: footer.captionFont }}
         />
       )}
       {body}
@@ -369,346 +823,46 @@ function newestResultFooter(props: AndroidWidgetProps, palette: Palette, rtl: bo
   );
 }
 
-// The mark alone, never a status line beside it: stale is the one status that
-// carries both, and the iOS card drops the warning while counts show too. A
-// line under the mark cost the rows their width and read as a fourth state.
-// The large bucket is the one exception: it has a footer to put the copy in.
-const MARK_SIZE_DP = { compact: 22, row: 28, stack: 26, large: 30 } satisfies Record<Size, number>;
-/** A short cell runs its counts in a row, so the gap separates states, not lines. */
-const COUNT_GAP_DP = { compact: 3, row: 14, stack: 6, large: 8 } satisfies Record<Size, number>;
-/**
- * The newest-session line's reserved height, in every size bucket. The slot is
- * laid out whether or not it carries text, so work arriving (or an action's
- * progress line replacing the session line) never moves the count rows. The
- * large bucket composes its own newest-result footer instead of the slot, so
- * its entry is unused but keeps the lookup total over every size.
- */
-const NEWEST_LINE_DP = {
-  compact: 15,
-  row: 16,
-  stack: 18,
-  large: 18,
-} satisfies Record<Size, number>;
-/** Smaller than the count labels above it: it is context, not a fourth state. */
-const NEWEST_FONT_DP = {
-  compact: 11,
-  row: 12,
-  stack: 12,
-  large: 12,
-} satisfies Record<Size, number>;
-/**
- * The wake time beside a scheduled count row: a step down from the count it
- * annotates, and the height its slot reserves in every state so a wake the CLI
- * reports later cannot move the rows above or below it.
- */
-const WAKE_FONT_DP = { compact: 11, row: 11, stack: 12, large: 12 } satisfies Record<Size, number>;
-const WAKE_SLOT_DP = { compact: 14, row: 14, stack: 16, large: 16 } satisfies Record<Size, number>;
-/** One action-row size in every bucket, so the rows themselves never reflow. */
-const ACTION_FONT_DP = 12;
-/**
- * The action chip's tap target, in dp. The chip is the widget's only in-place
- * action, so it holds Android's 48 dp minimum target; a 12 dp label with 4 dp
- * of vertical padding drew a ~25 dp chip and a hurried tap missed it. The
- * label is centered in the taller chip.
- */
-const ACTION_TARGET_DP = 48;
-/**
- * The surface padding, in dp. A short one-cell cell is as little as 40 dp tall
- * on a dense launcher grid, so the short buckets pad tighter than the nightstand
- * card: the padding is part of the height budget the optional chrome below is
- * measured against.
- */
-const PAD_DP = { compact: 10, row: 10, stack: 10, large: 14 } satisfies Record<Size, number>;
-/** The gap between the body's counts, the reserved newest line, and the chip. */
-const BODY_GAP_DP = 6;
-/** The gap between the mark and the body when the mark sits above it. */
-const STACK_MARK_GAP_DP = 12;
-/** The locked copy's font size; it draws one or two lines depending on the cell. */
-const STATUS_FONT_DP = 13;
-/**
- * The height one pinned dp text line occupies. The widget host reports no
- * measured height, so the layout budgets its optional chrome — the reserved
- * newest line and the 48 dp action chip — against this estimate: a text line is
- * about 1.3 times its font size. A cell too short for a piece of chrome drops
- * it rather than clipping it at the cell edge, because a widget cell is a fixed
- * frame with no scrolling and no reflow.
- */
-const LINE_HEIGHT_FACTOR = 1.3;
+// ---------------------------------------------------------------------------
+// Compositions
+// ---------------------------------------------------------------------------
 
-function textLineHeight(fontSize: number): number {
-  return Math.ceil(fontSize * LINE_HEIGHT_FACTOR);
-}
-
-/** The chrome the height budget is measured against. */
-type Chrome = { layRows: boolean; statusLines: number };
-
-/** The bucket shape plus the chrome decision the body is drawn with. */
-type RenderShape = Shape & Chrome;
+/** The cell's dp size, reading direction, and the line height factor of its copy. */
+type Cell = { width: number; height: number; rtl: boolean; lineFactor: number };
 
 /**
- * The height the counts (or the locked copy) need, in dp, for the chrome
- * decision. `layRows` is the fallback a narrow-but-too-short cell takes: the
- * four states run in a single row instead of a column when the column cannot
- * fit, so the widget shows every count without clipping.
+ * A composition the cell can hold, with what it keeps. `score` ranks the
+ * candidates: the action first, then the richest content.
  */
-function countsHeight(props: AndroidWidgetProps, shape: Shape, chrome: Chrome): number {
-  const { size } = shape;
-  if (props.countLines.length === 0) {
-    return chrome.statusLines * textLineHeight(STATUS_FONT_DP);
-  }
-  const fontSize = size === 'compact' || size === 'row' ? 13 : 15;
-  const line = textLineHeight(fontSize);
-  if (chrome.layRows) {
-    return line;
-  }
+type Plan = { score: number; draw: (palette: Palette) => React.ReactNode };
+
+/** What each line level costs a plan: the labels it drops. */
+const LABELS_PENALTY = { all: 0, primary: 8, none: 20 } satisfies Record<
+  LineLevel['labels'],
+  number
+>;
+
+/** What a plan loses, as a penalty; the action outweighs everything else. */
+function penalty(dropped: {
+  action: boolean;
+  time: boolean;
+  labels: LineLevel['labels'];
+  mark: boolean;
+}) {
   return (
-    props.countLines.length * line + Math.max(0, props.countLines.length - 1) * COUNT_GAP_DP[size]
+    (dropped.action ? 1000 : 0) +
+    (dropped.mark ? 40 : 0) +
+    LABELS_PENALTY[dropped.labels] +
+    (dropped.time ? 2 : 0)
   );
 }
 
-function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: RenderShape) {
-  if (props.countLines.length === 0) {
-    return statusText(props, palette, shape.statusLines);
-  }
-  const { size, rowLabels, rtl, layRows } = shape;
-  const primaryLabel = props.primaryLabel;
-  // Every state draws its own row, zeros included, so the rows hold still as
-  // work moves between them and a narrow cell says as much as a wide one.
-  const rows = props.countLines.map(line => {
-    const isPrimary = line.label === primaryLabel;
-    return countRow(line, isPrimary, {
-      palette,
-      size,
-      fontSize: size === 'compact' || size === 'row' ? 13 : 15,
-      // A row that is stacked (there is vertical room) labels every state. A
-      // row laid out horizontally labels all of them only when the cell is wide
-      // enough; otherwise the ranked state keeps its word and the rest show
-      // their number, so a narrow row truncates no label to nothing.
-      showLabel: layRows ? (size === 'row' && rowLabels) || isPrimary : true,
-      rtl,
-      scheduledAgo: props.scheduledAgo,
-    });
-  });
-  return (
-    <FlexWidget
-      style={{
-        flexDirection: layRows ? 'row' : 'column',
-        alignItems: layRows ? 'center' : startEdge(rtl),
-        flexGap: layRows && size === 'row' ? COUNT_GAP_DP.row : COUNT_GAP_DP[size],
-      }}
-    >
-      {layRows ? inReadingOrder(rows, rtl) : rows}
-    </FlexWidget>
-  );
-}
-
-/**
- * The newest-session slot: the reserved line under the counts. Drawn as an
- * empty box when there is nothing to say, so the slot's height is reserved in
- * every size bucket and a loading→content swap cannot move the count rows.
- */
-function newestSlot(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
-  const { size, rtl } = shape;
-  return (
-    <FlexWidget
-      key="newest"
-      style={{
-        height: NEWEST_LINE_DP[size],
-        width: 'match_parent',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: startEdge(rtl),
-      }}
-    >
-      {props.newestLine === null ? null : (
-        <TextWidget
-          key="newest-text"
-          text={props.newestLine}
-          maxLines={1}
-          truncate="END"
-          allowFontScaling={false}
-          style={{ color: palette.muted, fontSize: NEWEST_FONT_DP[size] }}
-        />
-      )}
-    </FlexWidget>
-  );
-}
-
-/**
- * One action chip. Approve is a custom `clickAction`, which makes the library
- * launch a headless task (`register.ts`) that answers in place. New agent is an
- * `OPEN_URI` deep link: starting an agent needs the composer, so the tap opens
- * the app on the new-session screen. The body keeps its own `OPEN_URI` deep
- * link, so a tap beside the chips still opens Kilo.
- *
- * The chip is `ACTION_TARGET_DP` tall with the label centered: the target is
- * the whole chip, so the old padded-to-the-text height made taps miss.
- */
-function actionRow(label: string, action: 'approve' | 'new-agent', palette: Palette) {
-  const click =
-    action === 'approve'
-      ? { clickAction: 'approve' }
-      : { clickAction: 'OPEN_URI', clickActionData: { uri: LAUNCHER_NEW_AGENT_URL } };
-  return (
-    <FlexWidget
-      key={action}
-      {...click}
-      accessibilityLabel={label}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: ACTION_TARGET_DP,
-        paddingHorizontal: 10,
-        borderWidth: 1,
-        borderColor: palette.muted,
-        borderRadius: 8,
-      }}
-    >
-      <TextWidget
-        key="label"
-        text={label}
-        maxLines={1}
-        allowFontScaling={false}
-        style={{ color: palette.foreground, fontSize: ACTION_FONT_DP, fontWeight: 'bold' }}
-      />
-    </FlexWidget>
-  );
-}
-
-/** Only the actions the state offers draw; a state with neither draws no row. */
-function actionRows(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
-  const rows: React.ReactNode[] = [];
-  if (props.actions.approve) {
-    rows.push(actionRow(props.actions.approveLabel, 'approve', palette));
-  }
-  if (props.actions.newAgent) {
-    rows.push(actionRow(props.actions.newAgentLabel, 'new-agent', palette));
-  }
-  if (rows.length === 0) {
-    return null;
-  }
-  return (
-    <FlexWidget key="actions" style={{ flexDirection: 'row', alignItems: 'center', flexGap: 8 }}>
-      {inReadingOrder(rows, rtl)}
-    </FlexWidget>
-  );
-}
-
-function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
-  const { size, rtl, height } = shape;
-  // The nightstand cell: the mark on top, the counts in the middle of the
-  // column, and the third fact on the bottom edge. With no footer the mark and
-  // the status text centre the way the stack bucket composes, so the extra
-  // height never draws a hole. The large cell mirrors the iOS `systemLarge`
-  // card: it carries the counts and the footer, not the reserved newest-session
-  // slot or the action row the shorter buckets draw.
-  if (size === 'large') {
-    const body = renderCounts(props, palette, { ...shape, layRows: false, statusLines: 2 });
-    const footer = newestResultFooter(props, palette, rtl);
-    return (
-      <FlexWidget
-        clickAction="OPEN_URI"
-        clickActionData={{ uri: 'kiloapp:///cloud/sessions' }}
-        accessibilityLabel={props.accessibilityLabel}
-        style={{
-          backgroundColor: palette.background,
-          flexDirection: 'column',
-          alignItems: startEdge(rtl),
-          justifyContent: footer === null ? 'center' : 'space-between',
-          flexGap: 12,
-          height: 'match_parent',
-          width: 'match_parent',
-          padding: PAD_DP.large,
-        }}
-      >
-        {logo(MARK_SIZE_DP[size])}
-        {body}
-        {footer}
-      </FlexWidget>
-    );
-  }
-
-  // The height budget. A cell is a fixed frame the host draws with no scrolling,
-  // so the optional chrome — the reserved newest line and the 48 dp action chip
-  // — is included only while the estimated content still fits. Below three grid
-  // rows the mark, the four count rows, the reserved line, and the chip do not
-  // all fit, and drawing them anyway clipped the chip at the cell edge in the
-  // empty and idle-only states. The counts are never dropped: when a stacked
-  // column cannot fit, a short narrow cell runs them in one row instead.
-  const available = height - 2 * PAD_DP[size];
-  const wantsActions = props.actions.approve || props.actions.newAgent;
-  // The locked copy takes a second line only when the wanted chip still fits
-  // under it. A one-row cell (about 104 dp) fits one line and the 48 dp chip
-  // but not two lines and the chip, and the chip is the copy's only action.
-  const statusLine = textLineHeight(STATUS_FONT_DP);
-  const chipFitsUnderOneLine =
-    wantsActions && statusLine + BODY_GAP_DP + ACTION_TARGET_DP <= available;
-  const chipReserve = chipFitsUnderOneLine ? BODY_GAP_DP + ACTION_TARGET_DP : 0;
-  const statusLines = available >= 2 * statusLine + chipReserve ? 2 : 1;
-  const stacked = countsHeight(props, shape, { layRows: false, statusLines });
-  const layRows = size === 'row' || (size === 'compact' && stacked > available);
-  const chrome: Chrome = { layRows, statusLines };
-  const base = countsHeight(props, shape, chrome);
-  const showActions = wantsActions && base + BODY_GAP_DP + ACTION_TARGET_DP <= available;
-  const slotFits = base + BODY_GAP_DP + NEWEST_LINE_DP[size] <= available;
-  const slotWithActionsFits =
-    base + BODY_GAP_DP + NEWEST_LINE_DP[size] + BODY_GAP_DP + ACTION_TARGET_DP <= available;
-  const showSlot = showActions ? slotWithActionsFits : slotFits;
-  const bodyHeight =
-    base +
-    (showSlot ? BODY_GAP_DP + NEWEST_LINE_DP[size] : 0) +
-    (showActions ? BODY_GAP_DP + ACTION_TARGET_DP : 0);
-  // The mark sits above the body in the stack bucket, where it costs height; a
-  // short cell puts it beside the body, where only its own size must fit. Never
-  // clip the mark: drop it when the cell cannot hold it beside the content.
-  const showMark =
-    size === 'stack'
-      ? MARK_SIZE_DP[size] + STACK_MARK_GAP_DP + bodyHeight <= available
-      : MARK_SIZE_DP[size] <= available;
-  const mark = showMark ? logo(MARK_SIZE_DP[size]) : null;
-  const body = (
-    <FlexWidget
-      key="body"
-      style={{
-        flexDirection: 'column',
-        alignItems: startEdge(rtl),
-        flexGap: BODY_GAP_DP,
-        ...(size === 'stack' ? { width: 'match_parent' as const } : {}),
-      }}
-    >
-      {renderCounts(props, palette, { ...shape, ...chrome })}
-      {showSlot ? newestSlot(props, palette, shape) : null}
-      {showActions ? actionRows(props, palette, rtl) : null}
-    </FlexWidget>
-  );
-  // Short cells put the mark beside the counts; a tall cell stacks the mark on
-  // top and lets the counts sit at the bottom, the same composition as the iOS
-  // small family.
-  if (size === 'stack') {
-    return (
-      <FlexWidget
-        clickAction="OPEN_URI"
-        clickActionData={{ uri: 'kiloapp:///cloud/sessions' }}
-        accessibilityLabel={props.accessibilityLabel}
-        style={{
-          backgroundColor: palette.background,
-          flexDirection: 'column',
-          alignItems: startEdge(rtl),
-          // Centred, not spread: with no affordance under the counts the block
-          // is the mark and the rows, and spreading those two to the edges
-          // leaves a hole between them.
-          justifyContent: 'center',
-          flexGap: STACK_MARK_GAP_DP,
-          height: 'match_parent',
-          width: 'match_parent',
-          padding: PAD_DP[size],
-        }}
-      >
-        {mark}
-        {body}
-      </FlexWidget>
-    );
-  }
+/** The whole cell: the background, and the deep link a tap anywhere opens. */
+function root(
+  props: AndroidWidgetProps,
+  palette: Palette,
+  { style, children }: { style: FlexWidgetStyle; children: React.ReactNode }
+) {
   return (
     <FlexWidget
       clickAction="OPEN_URI"
@@ -716,37 +870,593 @@ function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape
       accessibilityLabel={props.accessibilityLabel}
       style={{
         backgroundColor: palette.background,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: startEdge(rtl),
-        flexGap: size === 'compact' ? 10 : 14,
         height: 'match_parent',
         width: 'match_parent',
-        padding: PAD_DP[size],
+        ...style,
       }}
     >
-      {/* No array here: a wrapper element per slot would add a layout node. */}
-      {rtl ? body : mark}
-      {rtl ? mark : body}
+      {children}
     </FlexWidget>
   );
 }
 
+/** A row whose start and end sit at its two edges, mirrored for RTL. */
+function spreadRow(key: string, [start, end]: [React.ReactNode, React.ReactNode], rtl: boolean) {
+  return (
+    <FlexWidget
+      key={key}
+      style={{ flexDirection: 'row', alignItems: 'center', width: 'match_parent' }}
+    >
+      {inReadingOrder([start, spacer(`${key}-gap`), end], rtl)}
+    </FlexWidget>
+  );
+}
+
+/** The type sizes a card's count column may take, largest first. */
+function countSizes(large: boolean): number[] {
+  const sizes: number[] = [];
+  for (
+    let size = large ? MAX_COUNT_FONT_DP : TALL_COUNT_FONT_DP;
+    size >= MIN_COUNT_FONT_DP;
+    size -= 1
+  ) {
+    sizes.push(size);
+  }
+  return sizes;
+}
+
 /**
- * Distinct light and dark layouts through the library's theme callback. A
- * nightstand-tall cell tops the mark, hangs the counts in the middle and pins
- * the newest result to the bottom; a tall short cell stacks the three states
- * under the mark; a short wide cell runs them beside it in a row; a short
- * narrow cell stacks them beside it.
+ * The counts card: header, scaled count rows, and the footer when it fits.
+ *
+ * The header holds the mark and the action. When the two do not fit side by
+ * side the mark keeps the header and the action takes its own row at the
+ * bottom of the card, so neither sits alone at an edge. Only a card too short
+ * for that row gives the header to the action alone (`chipOnly`), which ranks
+ * below every composition that keeps the mark.
+ */
+function cardPlan(
+  props: AndroidWidgetProps,
+  cell: Cell,
+  { note, chipOnly }: { note: boolean; chipOnly: boolean }
+): Plan | null {
+  const { rtl } = cell;
+  const pad = TALL_PAD_DP;
+  const aw = cell.width - 2 * pad;
+  const ah = cell.height - 2 * pad;
+  const large = cell.height >= LARGE_MIN_HEIGHT_DP;
+  const markSize = large ? 30 : 26;
+  const lines = props.countLines.length;
+  const factor = cell.lineFactor;
+  const trailing = trailingOf(props, note);
+  const trailingBox = trailing === null ? null : trailingSize(trailing, factor);
+  const showTrailing = trailingBox !== null && trailingBox.width <= aw;
+  if (chipOnly && !showTrailing) {
+    return null;
+  }
+  const actionBelow = !chipOnly && showTrailing && markSize + MARK_GAP_DP + trailingBox.width > aw;
+  let headerHeight = markSize;
+  if (chipOnly) {
+    headerHeight = trailingBox?.height ?? 0;
+  } else if (showTrailing && !actionBelow) {
+    headerHeight = Math.max(markSize, trailingBox.height);
+  }
+  const bottomHeight = actionBelow ? BLOCK_GAP_DP + trailingBox.height : 0;
+
+  const footerHeightAt = (fontSize: number): number | null => {
+    const footer = footerOf(props, aw, fontSize);
+    return footer === null ? null : BLOCK_GAP_DP + footerHeight(footer, factor);
+  };
+  const freeAt = (fontSize: number, withFooter: boolean): number =>
+    ah - headerHeight - bottomHeight - (withFooter ? (footerHeightAt(fontSize) ?? 0) : 0);
+  const fits = (fontSize: number, withFooter: boolean): boolean =>
+    BLOCK_GAP_DP + columnHeight(lines, fontSize, { factor }) <= freeAt(fontSize, withFooter);
+  // The rows share one size: the largest that fits the height, leaves the card
+  // room to breathe, and fits the longest label; the minimum when no size fits
+  // that label, which then ends in an ellipsis.
+  const pickSize = (withFooter: boolean): number | null => {
+    const fitting = countSizes(large).filter(size => fits(size, withFooter));
+    if (fitting.length === 0) {
+      return null;
+    }
+    const roomy = fitting.filter(
+      size => columnHeight(lines, size, { factor }) <= freeAt(size, withFooter) * 0.75
+    );
+    const pool = roomy.length > 0 ? roomy : fitting.slice(-1);
+    return (
+      pool.find(size =>
+        props.countLines.every(line => rowWidth(line, size, { label: true, time: null }) <= aw)
+      ) ??
+      pool.at(-1) ??
+      null
+    );
+  };
+  // The footer is the third fact: it may not shrink the rows below the tall
+  // card's base size (or below what the longest label allows anyway).
+  const bare = pickSize(false);
+  if (bare === null) {
+    return null;
+  }
+  const footed = footerHeightAt(TALL_COUNT_FONT_DP) === null ? null : pickSize(true);
+  const withFooter = footed !== null && footed >= Math.min(bare, TALL_COUNT_FONT_DP);
+  const fontSize = withFooter ? footed : bare;
+  const footer = withFooter ? footerOf(props, aw, fontSize) : null;
+  const keepsTime =
+    props.scheduledTime === null ||
+    props.countLines.every(
+      line => rowWidth(line, fontSize, { label: true, time: props.scheduledTime }) <= aw
+    );
+  return {
+    score:
+      -penalty({
+        action: trailing !== null && !showTrailing,
+        time: !keepsTime,
+        labels: 'all',
+        mark: chipOnly,
+      }) + (withFooter ? 1 : 0),
+    draw: palette => {
+      const action =
+        showTrailing && trailing !== null ? renderTrailing(trailing, palette, rtl) : null;
+      const header = chipOnly
+        ? action
+        : spreadRow('header', [logo(markSize), actionBelow ? null : action], rtl);
+      const counts = countColumn(props, palette, {
+        fontSize,
+        gap: columnGap(fontSize),
+        width: aw,
+        rtl,
+        labels: true,
+      });
+      return root(props, palette, {
+        style: { flexDirection: 'column', alignItems: startEdge(rtl), padding: pad },
+        children: [
+          header,
+          spacer('above-counts', BLOCK_GAP_DP),
+          counts,
+          spacer('below-counts', footer === null ? 0 : BLOCK_GAP_DP),
+          footer === null ? null : renderFooter(props, footer, { palette, rtl }),
+          actionBelow ? <FlexWidget key="action-gap" style={{ height: BLOCK_GAP_DP }} /> : null,
+          actionBelow ? action : null,
+        ],
+      });
+    },
+  };
+}
+
+/**
+ * The mark, the count rows as a column, and the action trailing. Without the
+ * action (`withAction` false) it is the short narrow cell's fallback that keeps
+ * every label when the counts cannot run as one line beside the action.
+ */
+function sidePlan(
+  props: AndroidWidgetProps,
+  cell: Cell,
+  { short, withAction, note }: { short: boolean; withAction: boolean; note: boolean }
+): Plan | null {
+  const { rtl } = cell;
+  const pad = short ? SHORT_PAD_DP : TALL_PAD_DP - 2;
+  const aw = cell.width - 2 * pad;
+  const ah = cell.height - 2 * pad;
+  const trailing = withAction ? trailingOf(props, note) : null;
+  const trailingBox = trailing === null ? null : trailingSize(trailing, cell.lineFactor);
+  const baseFont = short ? SHORT_COUNT_FONT_DP : 14;
+  const gapFor = (size: number) => (short ? 2 : columnGap(size));
+  const lines = props.countLines.length;
+  const heightAt = (size: number) =>
+    columnHeight(lines, size, { factor: cell.lineFactor, gap: gapFor(size) });
+  if (trailingBox !== null && trailingBox.height > cell.height - 2 * (pad - 6)) {
+    return null;
+  }
+  const colWidth = (option: { labels: boolean; time: boolean; size: number }) =>
+    Math.max(
+      ...props.countLines.map(line =>
+        rowWidth(line, option.size, {
+          label: option.labels,
+          time: option.time ? props.scheduledTime : null,
+        })
+      )
+    );
+  const trailingPart = trailingBox === null ? 0 : TRAILING_GAP_DP + trailingBox.width;
+  const markSize = short ? 24 : 26;
+  const room = (mark: boolean) => aw - trailingPart - (mark ? markSize + MARK_GAP_DP : 0);
+  // Richest first, in the overflow order: the wake, then the labels (after the
+  // whole column shrinks to the minimum size for them), then the mark.
+  const chosen = [
+    { labels: true, time: true, mark: true, size: baseFont },
+    { labels: true, time: false, mark: true, size: baseFont },
+    { labels: true, time: false, mark: true, size: MIN_COUNT_FONT_DP },
+    { labels: false, time: false, mark: true, size: baseFont },
+    { labels: false, time: false, mark: false, size: baseFont },
+  ].find(option => heightAt(option.size) <= ah && colWidth(option) <= room(option.mark));
+  if (chosen === undefined) {
+    return null;
+  }
+  const { labels, time, mark: showMark, size: fontSize } = chosen;
+  const gap = gapFor(fontSize);
+  const colHeight = heightAt(fontSize);
+  const slot = slotTextOf(props);
+  const showSlot =
+    slot !== null &&
+    colHeight + BODY_GAP_DP + lineHeight(SLOT_FONT_DP, cell.lineFactor) <= ah &&
+    !short;
+  return {
+    score:
+      -penalty({
+        action: !withAction && trailingOf(props) !== null,
+        time: !time && props.scheduledTime !== null,
+        labels: labels ? 'all' : 'none',
+        mark: !showMark,
+      }) - 3,
+    draw: palette => {
+      const body = (
+        <FlexWidget
+          key="body"
+          style={{ flexDirection: 'column', alignItems: startEdge(rtl), flexGap: BODY_GAP_DP }}
+        >
+          {countColumn(props, palette, {
+            fontSize,
+            gap,
+            width: time ? Number.POSITIVE_INFINITY : 0,
+            rtl,
+            labels,
+          })}
+          {showSlot ? slotLine(slot, palette) : null}
+        </FlexWidget>
+      );
+      const start = (
+        <FlexWidget
+          key="start"
+          style={{ flexDirection: 'row', alignItems: 'center', flexGap: MARK_GAP_DP }}
+        >
+          {inReadingOrder([showMark ? logo(markSize) : null, body], rtl)}
+        </FlexWidget>
+      );
+      return root(props, palette, {
+        style: { flexDirection: 'row', alignItems: 'center', padding: pad },
+        children: inReadingOrder(
+          [
+            start,
+            spacer('gap', TRAILING_GAP_DP),
+            trailing === null ? null : renderTrailing(trailing, palette, rtl),
+          ],
+          rtl
+        ),
+      });
+    },
+  };
+}
+
+/**
+ * The mark and the counts as one row, with the action beside them, under them,
+ * or (`alone`) not at all.
+ */
+function linePlan(
+  props: AndroidWidgetProps,
+  cell: Cell,
+  { layout, note }: { layout: 'beside' | 'below' | 'alone'; note: boolean }
+): Plan | null {
+  const { rtl } = cell;
+  const pad = cell.height < TALL_MIN_HEIGHT_DP ? SHORT_PAD_DP : TALL_PAD_DP - 2;
+  const aw = cell.width - 2 * pad;
+  const ah = cell.height - 2 * pad;
+  const countHeight = lineHeight(SHORT_COUNT_FONT_DP, cell.lineFactor);
+  const wanted = trailingOf(props, note);
+  const trailing = layout === 'alone' ? null : wanted;
+  if (layout !== 'alone' && trailing === null) {
+    return null;
+  }
+  const beside = layout === 'beside';
+  const trailingBox = trailing === null ? null : trailingSize(trailing, cell.lineFactor);
+  const markSize = ah >= 40 ? 28 : 24;
+  const slot = slotTextOf(props);
+  const slotHeight = BODY_GAP_DP + lineHeight(SLOT_FONT_DP, cell.lineFactor);
+  let bodyHeight = countHeight;
+  if (layout === 'below' && trailingBox !== null) {
+    bodyHeight += BODY_GAP_DP + trailingBox.height;
+  }
+  if (bodyHeight > ah) {
+    return null;
+  }
+  // The 48 dp target may reach into the padding; its drawn pill may not.
+  if (beside && trailingBox !== null && trailingBox.height > cell.height - 2 * (pad - 6)) {
+    return null;
+  }
+  const showSlot = slot !== null && bodyHeight + slotHeight <= ah;
+  const trailingWidth = trailingBox?.width ?? 0;
+  const room = (mark: boolean): number =>
+    aw -
+    (mark && markSize <= ah ? markSize + MARK_GAP_DP : 0) -
+    (beside ? TRAILING_GAP_DP + trailingWidth : 0);
+  let showMark = markSize <= ah;
+  let level = fitLine(props, room(showMark));
+  if (level === null && showMark) {
+    showMark = false;
+    level = fitLine(props, room(false));
+  }
+  if (level === null || (layout === 'below' && trailingWidth > room(showMark))) {
+    return null;
+  }
+  const chosen = level;
+  return {
+    score:
+      -penalty({
+        action: layout === 'alone' && wanted !== null,
+        time: !chosen.time && props.scheduledTime !== null,
+        labels: chosen.labels,
+        mark: !showMark,
+      }) - (beside ? 6 : 5),
+    draw: palette => {
+      const body = (
+        <FlexWidget
+          key="body"
+          style={{ flexDirection: 'column', alignItems: startEdge(rtl), flexGap: BODY_GAP_DP }}
+        >
+          {countLine(props, chosen, { palette, rtl })}
+          {showSlot ? slotLine(slot, palette) : null}
+          {layout === 'below' && trailing !== null ? renderTrailing(trailing, palette, rtl) : null}
+        </FlexWidget>
+      );
+      return root(props, palette, {
+        style: { flexDirection: 'row', alignItems: 'center', padding: pad },
+        children: inReadingOrder(
+          [
+            showMark ? logo(markSize) : null,
+            showMark ? <FlexWidget key="mark-gap" style={{ width: MARK_GAP_DP }} /> : null,
+            body,
+            beside && trailing !== null ? spacer('gap', TRAILING_GAP_DP) : null,
+            beside && trailing !== null ? renderTrailing(trailing, palette, rtl) : null,
+          ],
+          rtl
+        ),
+      });
+    },
+  };
+}
+
+/**
+ * Every counts composition the cell can hold. A failed Approve's note rides
+ * above the retry chip when there is room; the variants without it rank lower.
+ */
+function countPlans(props: AndroidWidgetProps, cell: Cell): Plan[] {
+  const tall = cell.height >= TALL_MIN_HEIGHT_DP;
+  const short = !tall;
+  const failed = props.actionFeedback === 'couldNotApprove';
+  return (failed ? [true, false] : [true]).flatMap(note =>
+    [
+      tall ? cardPlan(props, cell, { note, chipOnly: false }) : null,
+      tall ? cardPlan(props, cell, { note, chipOnly: true }) : null,
+      sidePlan(props, cell, { short, withAction: true, note }),
+      sidePlan(props, cell, { short, withAction: false, note }),
+      linePlan(props, cell, { layout: 'below', note }),
+      linePlan(props, cell, { layout: 'beside', note }),
+      linePlan(props, cell, { layout: 'alone', note }),
+    ]
+      .filter((plan): plan is Plan => plan !== null)
+      // Without the failure's note a plan ranks below the same plan with it.
+      .map(plan => (failed && !note ? { score: plan.score - 3, draw: plan.draw } : plan))
+  );
+}
+
+/** The centered composition's type and mark sizes, a step up for each taller bound. */
+function centeredSizes(height: number) {
+  if (height >= NIGHTSTAND_MIN_HEIGHT_DP) {
+    return { fontSize: STATUS_FONT_DP.nightstand, markSize: 48 };
+  }
+  if (height >= LARGE_MIN_HEIGHT_DP) {
+    return { fontSize: STATUS_FONT_DP.large, markSize: 40 };
+  }
+  return { fontSize: STATUS_FONT_DP.tall, markSize: 30 };
+}
+
+/** A tall cell's count-less composition: mark, copy, and action, centered on both axes. */
+function centeredStatusPlan(props: AndroidWidgetProps, cell: Cell): Plan | null {
+  const text = props.statusLine ?? '';
+  const action = actionOf(props);
+  const pad = TALL_PAD_DP;
+  const aw = cell.width - 2 * pad;
+  const ah = cell.height - 2 * pad;
+  const { fontSize, markSize } = centeredSizes(cell.height);
+  const lines = Math.min(3, lineCount(text, fontSize, Math.min(aw, 260)));
+  const textHeight = lines * lineHeight(fontSize, cell.lineFactor);
+  const showAction = action !== null && actionWidth(action) <= aw;
+  const actionPart = showAction ? BLOCK_GAP_DP + ACTION_TARGET_DP : 0;
+  const showMark = markSize + BLOCK_GAP_DP + textHeight + actionPart <= ah;
+  if (!showMark && textHeight + actionPart > ah) {
+    return null;
+  }
+  return {
+    score: -penalty({
+      action: action !== null && !showAction,
+      time: false,
+      labels: 'all',
+      mark: !showMark,
+    }),
+    draw: palette =>
+      root(props, palette, {
+        style: {
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexGap: BLOCK_GAP_DP,
+          padding: pad,
+        },
+        children: [
+          showMark ? logo(markSize) : null,
+          <TextWidget
+            key="status"
+            text={text}
+            maxLines={lines}
+            truncate="END"
+            allowFontScaling={false}
+            style={{ color: palette.muted, fontSize, textAlign: 'center' }}
+          />,
+          showAction ? actionChip(action, palette) : null,
+        ],
+      }),
+  };
+}
+
+/**
+ * A one-row count-less composition (or a tall cell's fallback): the mark, the
+ * copy, and the action beside the copy, under it, or (`alone`) not at all.
+ */
+function rowStatusPlan(
+  props: AndroidWidgetProps,
+  cell: Cell,
+  layout: 'beside' | 'below' | 'alone'
+): Plan | null {
+  const { rtl } = cell;
+  const text = props.statusLine ?? '';
+  const action = layout === 'alone' ? null : actionOf(props);
+  if (layout !== 'alone' && action === null) {
+    return null;
+  }
+  const pad = cell.height >= TALL_MIN_HEIGHT_DP ? TALL_PAD_DP - 2 : SHORT_PAD_DP;
+  // The 48 dp target may reach into the padding; its drawn pill may not.
+  if (layout === 'beside' && ACTION_TARGET_DP > cell.height - 2 * (pad - 6)) {
+    return null;
+  }
+  const aw = cell.width - 2 * pad;
+  const ah = cell.height - 2 * pad;
+  const fontSize = STATUS_FONT_DP.short;
+  const markSize = ah >= 40 ? 28 : 24;
+  const actionWide = action === null ? 0 : actionWidth(action);
+  const roomFor = (mark: boolean): number =>
+    aw -
+    (mark ? markSize + MARK_GAP_DP : 0) -
+    (layout === 'beside' ? TRAILING_GAP_DP + actionWide : 0);
+  const fitsWith = (mark: boolean): boolean =>
+    roomFor(mark) >= 48 && (layout !== 'below' || actionWide <= roomFor(mark));
+  const showMark = fitsWith(true);
+  if (!showMark && !fitsWith(false)) {
+    return null;
+  }
+  const room = roomFor(showMark);
+  const reserve = layout === 'below' ? BODY_GAP_DP + ACTION_TARGET_DP : 0;
+  const maxLines = Math.floor((ah - reserve) / lineHeight(fontSize, cell.lineFactor));
+  if (maxLines < 1) {
+    return null;
+  }
+  const wanted = lineCount(text, fontSize, room);
+  const lines = Math.min(maxLines, 2, wanted);
+  return {
+    score:
+      -penalty({
+        action: layout === 'alone' && actionOf(props) !== null,
+        time: false,
+        labels: 'all',
+        mark: !showMark,
+      }) -
+      (wanted > lines ? 4 : 0) -
+      // One line beside the action reads better than two squeezed beside it.
+      (layout === 'beside' ? 2 * (lines - 1) : 0) -
+      (layout === 'below' ? 1 : 0) -
+      10,
+    draw: palette => {
+      const copy = (
+        <TextWidget
+          key="status"
+          text={text}
+          maxLines={lines}
+          truncate="END"
+          allowFontScaling={false}
+          style={{ color: palette.muted, fontSize, textAlign: rtl ? 'right' : 'left' }}
+        />
+      );
+      let body: React.ReactNode = copy;
+      if (layout === 'beside') {
+        body = (
+          <FlexWidget key="copy" style={{ flex: 1 }}>
+            {copy}
+          </FlexWidget>
+        );
+      } else if (layout === 'below' && action !== null) {
+        body = (
+          <FlexWidget
+            key="body"
+            style={{ flexDirection: 'column', alignItems: startEdge(rtl), flexGap: BODY_GAP_DP }}
+          >
+            {copy}
+            {actionChip(action, palette)}
+          </FlexWidget>
+        );
+      }
+      return root(props, palette, {
+        style: { flexDirection: 'row', alignItems: 'center', padding: pad },
+        children: inReadingOrder(
+          [
+            showMark ? logo(markSize) : null,
+            showMark ? <FlexWidget key="mark-gap" style={{ width: MARK_GAP_DP }} /> : null,
+            body,
+            layout === 'beside' ? (
+              <FlexWidget key="gap" style={{ width: TRAILING_GAP_DP }} />
+            ) : null,
+            layout === 'beside' && action !== null ? actionChip(action, palette) : null,
+          ],
+          rtl
+        ),
+      });
+    },
+  };
+}
+
+/** Every count-less composition the cell can hold. */
+function statusPlans(props: AndroidWidgetProps, cell: Cell): Plan[] {
+  return [
+    cell.height >= TALL_MIN_HEIGHT_DP ? centeredStatusPlan(props, cell) : null,
+    rowStatusPlan(props, cell, 'beside'),
+    rowStatusPlan(props, cell, 'below'),
+    rowStatusPlan(props, cell, 'alone'),
+  ].filter((plan): plan is Plan => plan !== null);
+}
+
+/** The fallback when no composition fits: the counts as a tight line, nothing else. */
+function fallbackPlan(props: AndroidWidgetProps, cell: Cell): Plan {
+  return {
+    score: Number.NEGATIVE_INFINITY,
+    draw: palette =>
+      root(props, palette, {
+        style: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: SHORT_PAD_DP,
+        },
+        children:
+          props.countLines.length === 0
+            ? slotLine(props.statusLine ?? '', palette, STATUS_FONT_DP.short)
+            : countLine(props, BARE_LINE, { palette, rtl: cell.rtl }),
+      }),
+  };
+}
+
+function bestPlan(props: AndroidWidgetProps, cell: Cell): Plan {
+  const plans = props.countLines.length === 0 ? statusPlans(props, cell) : countPlans(props, cell);
+  let best = fallbackPlan(props, cell);
+  for (const plan of plans) {
+    if (plan.score > best.score) {
+      best = plan;
+    }
+  }
+  return best;
+}
+
+/**
+ * Distinct light and dark layouts through the library's theme callback, drawn
+ * from one plan so both themes keep the same composition.
  */
 export function renderActiveAgentsWidget(
   props: AndroidWidgetProps,
   info: WidgetInfo,
   rtl = false
 ): WidgetRepresentation {
-  const shape = shapeOf(info, rtl);
+  const plan = bestPlan(props, {
+    width: info.width,
+    height: info.height,
+    rtl,
+    lineFactor: lineFactorOf(props),
+  });
   return {
-    light: renderSurface(props, LIGHT, shape),
-    dark: renderSurface(props, DARK, shape),
+    light: plan.draw(LIGHT) as React.JSX.Element,
+    dark: plan.draw(DARK) as React.JSX.Element,
   };
 }

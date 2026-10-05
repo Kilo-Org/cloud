@@ -115,12 +115,13 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   it('restores unexpired persisted counts after a fresh process starts', async () => {
     const handler = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handler, width);
-    // Two agents wait, so the widget offers the in-place approval under the
-    // counts (and in its reserved newest line, which is empty here).
+    // Two agents wait, so the widget offers the in-place approval with the
+    // counts. Where the chip sits is the layout's call, so only the content is
+    // compared here.
     const expected = ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'];
 
-    expect(collectText(rendered.light)).toEqual(expected);
-    expect(collectText(rendered.dark)).toEqual(expected);
+    expect(collectText(rendered.light).toSorted()).toEqual(expected.toSorted());
+    expect(collectText(rendered.dark).toSorted()).toEqual(expected.toSorted());
     expect(rendered.light.props).toMatchObject({
       clickAction: 'OPEN_URI',
       clickActionData: { uri: 'kiloapp:///cloud/sessions' },
@@ -311,17 +312,9 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     // ...and the redraw after it drops the line without moving the rows.
     const settled = collectText(settledRender?.light);
     expect(settled).not.toContain('Approving…');
-    expect(settled).toEqual([
-      '2',
-      'Needs input',
-      '2',
-      'Working',
-      '0',
-      'Scheduled',
-      '0',
-      'Idle',
-      'Approve',
-    ]);
+    expect(settled.toSorted()).toEqual(
+      ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'].toSorted()
+    );
     expect(settledRender?.light.props).toMatchObject({
       clickAction: 'OPEN_URI',
       clickActionData: { uri: 'kiloapp:///cloud/sessions' },
@@ -365,19 +358,14 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     const handler = await registerAfterRestart(snapshotFor());
 
     const renders = await runWidgetClickTask(handler, width, 'approve');
+    const text = collectText(renders.at(-1)?.light);
 
-    expect(collectText(renders.at(-1)?.light)).toEqual([
-      '2',
-      'Needs input',
-      '2',
-      'Working',
-      '0',
-      'Scheduled',
-      '0',
-      'Idle',
-      'Could not approve',
-      'Approve',
-    ]);
+    // The chip stays to retry. The failure rides over it where the cell has
+    // room; a 120 dp cell (narrower than any launcher cell) has none.
+    expect(text.filter(line => line !== 'Could not approve').toSorted()).toEqual(
+      ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'].toSorted()
+    );
+    expect(text.includes('Could not approve')).toBe(width >= 172);
     // A failure stays on the widget, whose retry row and body tap remain.
     expect(mocks.linking.openURL).not.toHaveBeenCalled();
   });

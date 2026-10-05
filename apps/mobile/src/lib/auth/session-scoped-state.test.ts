@@ -19,9 +19,6 @@ vi.mock('@/lib/telemetry/error-sink', () => telemetryMock);
 // The stored PR recents are the other account-bound store this clear owns; the
 // recents module reaches SecureStore on import, so it is mocked here.
 vi.mock('@/lib/pr-review/recent-prs', () => recentPrsMock);
-// The Home live-shape hint reaches SecureStore on import; the clear itself is
-// a best-effort call this reset only has to reach.
-vi.mock('@/lib/home-live-shape', () => ({ clearLiveShapeHint: vi.fn() }));
 
 /* eslint-disable import/first */
 // vi.mock is hoisted by Vitest before the real import resolves.

@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one suite covering every Home live state: pending shapes, card, empty, and header notices */
+/* eslint-disable max-lines -- one suite covering every Home live state: pending, card, zero state, and header notices */
 import { type ComponentProps, createElement, type ReactNode } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
@@ -13,16 +13,6 @@ const navigateSpy = vi.hoisted(() => vi.fn());
 const dismissToSpy = vi.hoisted(() => vi.fn());
 const sessionDestination = vi.hoisted(() => ({ id: '' }));
 const connectivity = vi.hoisted(() => ({ offline: false }));
-const liveShape = vi.hoisted(() => ({
-  hint: 'rows' as 'rows' | 'empty',
-  persisted: [] as string[],
-}));
-vi.mock('@/lib/home-live-shape', () => ({
-  readLiveShapeHint: () => liveShape.hint,
-  persistLiveShapeHint: (shape: string) => {
-    liveShape.persisted.push(shape);
-  },
-}));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
@@ -199,8 +189,6 @@ beforeEach(() => {
   dismissToSpy.mockClear();
   sessionDestination.id = '';
   connectivity.offline = false;
-  liveShape.hint = 'rows';
-  liveShape.persisted = [];
 });
 afterEach(() => {
   act(() => renderer?.unmount());
@@ -211,8 +199,6 @@ afterEach(() => {
 const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNT_ROW = 'h-6 flex-row items-center gap-2';
 const NEWEST_BLOCK = 'h-[68px] justify-center gap-1 px-4';
-const EMPTY_FRAME =
-  'min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4';
 
 function newestButton() {
   const button = nodes('Pressable').find(
@@ -305,30 +291,24 @@ describe('Home live section', () => {
     expect(classes('View')).toContain(CARD_FRAME);
     expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
     expect(classes('View')).toContain(NEWEST_BLOCK);
-    expect(liveShape.persisted).toEqual(['rows']);
   });
 
-  it('draws an empty-card placeholder when the section last settled empty', async () => {
-    liveShape.hint = 'empty';
-    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
-    expect(classes('View')).toContain(EMPTY_FRAME);
-    expect(classes('View')).not.toContain(CARD_FRAME);
-    expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
-    expect(node('SectionHeader').props.actionLabel).toBeUndefined();
-
-    // The settled empty card replaces a box of its own frame.
+  it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
     await render();
-    expect(classes('View')).toContain(EMPTY_FRAME);
+    expect(classes('View')).toContain(CARD_FRAME);
+    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
+    expect(classes('View')).toContain(`${NEWEST_BLOCK} items-center`);
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).toContain(`0\n${label}`);
+    }
     expect(text()).toContain(i18n.t('home.noLiveSessions'));
-    expect(liveShape.persisted).toEqual(['empty']);
-  });
-
-  it('keeps the header without See all when the accepted live list is empty', async () => {
-    await render();
-    expect(nodes('SectionHeader')).toHaveLength(1);
+    // Nothing to open: the newest block is not a button.
+    expect(
+      nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')
+    ).toBe(false);
+    // The header keeps See all's box but hides it.
     expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
-    expect(node('SectionHeader').props.actionLabel).toBeUndefined();
-    expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    expect(node('SectionHeader').props.actionHidden).toBe(true);
   });
 
   it('moves the offline notice into the header and keeps the card in place', async () => {

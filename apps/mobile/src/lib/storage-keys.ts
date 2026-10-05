@@ -91,8 +91,6 @@ export const ACTIVE_USER_ID_KEY = 'active-user-id';
  */
 export const LOGOUT_CLEANUP_TOMBSTONE_KEY = 'logout-cleanup-tombstone';
 export const KILOCLAW_OWNED_KEY = 'kiloclaw-owned';
-/** Last settled Home `Live now` shape (`rows` | `empty`); picks the cold-start placeholder. */
-export const HOME_LIVE_SHAPE_KEY = 'home-live-shape';
 export const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 export const TOKEN_EXPIRES_AT_KEY = 'auth-token-expires-at';
 export const LEGACY_EXCHANGE_DONE_KEY = 'auth-legacy-exchange-done';

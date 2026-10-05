@@ -62,7 +62,8 @@ type GlanceableActiveCardProps = {
  * the four ranked state counts with the shared state dots, the soonest
  * scheduled wake beside its count, and the newest session with its state and
  * relative age. Tapping the newest session opens it; `See all` in the section
- * header opens the live index.
+ * header opens the live index. With no sessions it is the zero state: every
+ * count reads 0 and the newest block centers `Nothing running`, in the same box.
  */
 export function GlanceableActiveCard({
   sessions,
@@ -129,7 +130,7 @@ export function GlanceableActiveCard({
         accessibilityLabel={newestSession === null ? undefined : newestLabel}
         className="active:opacity-70"
       >
-        <View className={NEWEST_BLOCK_CLASS}>
+        <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
           {newestTitle !== null && newestKind !== null ? (
             <>
               <View className="h-5 justify-center">
@@ -147,7 +148,11 @@ export function GlanceableActiveCard({
                 ) : null}
               </View>
             </>
-          ) : null}
+          ) : (
+            <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+              {t('home.noLiveSessions')}
+            </Text>
+          )}
         </View>
       </Pressable>
     </View>

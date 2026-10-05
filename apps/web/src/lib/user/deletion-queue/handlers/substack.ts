@@ -5,6 +5,7 @@ import { getEnvVariable } from '@/lib/dotenvx';
 import { db } from '@/lib/drizzle';
 import {
   USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL,
+  USER_DELETION_SUBSTACK_PAGE_SIZE,
   USER_DELETION_SUBSTACK_TIMEOUT_MS,
   USER_DELETION_SUBSTACK_USER_AGENT,
 } from '@/lib/user/deletion-queue/deletion-constants';
@@ -146,16 +147,81 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
   }
 
   const targetEmail = emailOrOutcome.trim().toLowerCase();
+  const headers = {
+    Cookie: cookie,
+    Accept: 'application/json',
+    'User-Agent': USER_DELETION_SUBSTACK_USER_AGENT,
+  };
+  let found = false;
+  const seenEmails = new Set<string>();
+  for (let page = 0; page < 100; page += 1) {
+    if (continueIfLowTime(context, step.progress_json)) {
+      return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
+    }
+    const lookup = await substackFetch(
+      context,
+      `${publication}/api/v1/subscriber?offset=${page * USER_DELETION_SUBSTACK_PAGE_SIZE}&limit=${USER_DELETION_SUBSTACK_PAGE_SIZE}`,
+      { method: 'GET', headers }
+    );
+    if ('outcome' in lookup) return lookup.outcome;
+    if (lookup.response.status === 401 || lookup.response.status === 403) {
+      return { kind: 'manual_action_required', errorCode: 'credential_expired' };
+    }
+    if (!lookup.response.ok) return classifyResponse(lookup.response);
+
+    const payload = await readJsonUnknown(lookup.response);
+    if (
+      !isRecord(payload) ||
+      !Array.isArray(payload.subscribers) ||
+      payload.subscribers.length > USER_DELETION_SUBSTACK_PAGE_SIZE
+    ) {
+      return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
+    }
+    const emails: string[] = [];
+    for (const subscriber of payload.subscribers) {
+      if (
+        !isRecord(subscriber) ||
+        typeof subscriber.email !== 'string' ||
+        !subscriber.email.trim() ||
+        !(
+          (typeof subscriber.id === 'string' && subscriber.id.trim()) ||
+          (typeof subscriber.id === 'number' && Number.isFinite(subscriber.id))
+        )
+      ) {
+        return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
+      }
+      emails.push(subscriber.email.trim().toLowerCase());
+    }
+    if (emails.includes(targetEmail)) {
+      found = true;
+      break;
+    }
+    if (Object.keys(payload).some(key => key !== 'subscribers')) {
+      return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
+    }
+    for (const email of emails) {
+      if (seenEmails.has(email)) {
+        return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
+      }
+      seenEmails.add(email);
+    }
+    if (emails.length < USER_DELETION_SUBSTACK_PAGE_SIZE) {
+      return (step.progress_json.processed_count ?? 0) === 0
+        ? { kind: 'not_applicable' }
+        : { kind: 'succeeded', progress: incrementProcessed(step.progress_json, 0) };
+    }
+  }
+  if (!found) {
+    return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
+  }
+  const reserve = continueIfLowTime(context, step.progress_json);
+  if (reserve) return reserve;
   const remove = await substackFetch(
     context,
     `${publication}/api/v1/subscriber/${encodeURIComponent(targetEmail)}?disable_email=true`,
     {
       method: 'DELETE',
-      headers: {
-        Cookie: cookie,
-        Accept: 'application/json',
-        'User-Agent': USER_DELETION_SUBSTACK_USER_AGENT,
-      },
+      headers,
     }
   );
   if ('outcome' in remove) return remove.outcome;

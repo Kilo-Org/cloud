@@ -60,6 +60,17 @@ describe('deletionAttentionHint', () => {
     );
   });
 
+  it('distinguishes 403 permission from expiration and explains TOTP reauth', () => {
+    expect(deletionAttentionHint('substack_forbidden')?.action).toMatch(/permission/);
+    expect(deletionAttentionHint('substack_forbidden')?.title).not.toMatch(/expired/i);
+    expect(deletionAttentionHint('substack_totp_invalid')?.action).toMatch(/base32/);
+    expect(deletionAttentionHint('substack_reauth_method_unsupported')?.title).toMatch(/TOTP/);
+    expect(deletionAttentionHint('substack_reauth_rejected')?.action).toMatch(/TOTP secret/);
+    expect(deletionAttentionHint('substack_reauth_incomplete')?.action).toMatch(/Retry/);
+    expect(deletionAttentionHint('substack_cookie_persist_failed')?.action).toMatch(/fresh cookie/);
+    expect(deletionAttentionHint('substack_credential_changed')?.action).toMatch(/replaced/);
+  });
+
   it('falls back for other HTTP statuses', () => {
     expect(deletionAttentionHint('http_401')).toEqual({
       title: 'Provider returned HTTP 401',

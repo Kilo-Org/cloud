@@ -146,6 +146,41 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Substack credential expired',
     action: 'Replace the Substack session credential, then Retry.',
   },
+  substack_forbidden: {
+    title: 'Substack denied access (HTTP 403)',
+    action:
+      'This is a publication permission or access problem, not proof the session expired. Confirm the service account can access the publication, then Retry.',
+  },
+  substack_totp_invalid: {
+    title: 'Stored Substack TOTP secret is invalid',
+    action:
+      'Store a new Substack credential with a valid base32 TOTP secret, or leave TOTP blank for cookie-only, then Retry.',
+  },
+  substack_reauth_method_unsupported: {
+    title: 'Substack did not offer TOTP reauthentication',
+    action:
+      'Substack returned an unsupported reauthentication method. Sign in to the service account manually, store a fresh cookie, then Retry.',
+  },
+  substack_reauth_rejected: {
+    title: 'Substack rejected the reauthentication code',
+    action:
+      'Check the service account TOTP secret and clock, store a corrected credential, then Retry.',
+  },
+  substack_reauth_incomplete: {
+    title: 'Substack did not confirm reauthentication',
+    action:
+      'Retry. If the service account requires manual verification, sign in manually, store a fresh cookie, then Retry.',
+  },
+  substack_cookie_persist_failed: {
+    title: 'Refreshed Substack cookie was not saved',
+    action:
+      'Test the credential again to persist the refreshed cookie, or store a fresh cookie, then Retry.',
+  },
+  substack_credential_changed: {
+    title: 'Substack credential changed during test',
+    action:
+      'Another admin replaced the credential while it was tested. Test the current credential again before Retry.',
+  },
   posthog_checkpoint_invalid: {
     title: 'PostHog deletion checkpoint is invalid',
     action:

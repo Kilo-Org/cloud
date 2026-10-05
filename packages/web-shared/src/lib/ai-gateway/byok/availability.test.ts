@@ -5,12 +5,18 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
+  getVercelModelsFromDatabase: jest.fn(),
+  isValidOpenRouterModelId: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
 }));
 
-import { getVercelModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getVercelModelsFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   addUserByokAvailability,
@@ -51,6 +57,9 @@ const metadata: StoredModelMap = {
 beforeEach(() => {
   jest.resetAllMocks();
   mockedMapModelIdToVercel.mockImplementation(async modelId => modelId);
+  // Gateway keys are covered in model-providers.test.ts; keep them out of these cases.
+  jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set());
+  jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
 });
 
 describe('addUserByokAvailability', () => {

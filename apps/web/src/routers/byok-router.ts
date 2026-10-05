@@ -21,17 +21,23 @@ import {
   type BYOKApiKeyResponse,
 } from '@/lib/byok/types';
 import {
+  GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   UserByokTestModels,
   getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
+  getLanguageModelIds,
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { decryptByokRow } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -120,11 +126,21 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     result[providerId].push(model.name + ' (' + model.id + ')');
   };
 
+  const openRouterLanguageModelIds = new Set(getLanguageModelIds(openRouterModelMetadata));
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
+    const isGatewayByokModel =
+      openRouterLanguageModelIds.has(openRouterModel.id) &&
+      !isFreeModelExcludingCustomLlms(openRouterModel.id);
+    if (isGatewayByokModel) {
+      addSupportedModel(GatewayUserByokProviderIdSchema.enum.openrouter, openRouterModel);
+    }
     const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
     if (!vercelModel) continue;
     if (vercelModel.type !== 'language') continue;
+    if (isGatewayByokModel) {
+      addSupportedModel(GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway'], openRouterModel);
+    }
     for (const endpoint of vercelModel.endpoints) {
       const providerId = getVercelUserByokProviderIdForEndpoint(
         endpoint.provider_name ?? endpoint.tag
@@ -430,6 +446,25 @@ export const byokRouter = createTRPCRouter({
             model: (
               await createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey, model)
             )(model),
+          };
+        }
+
+        if (provider === GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway']) {
+          return {
+            finalProvider: provider,
+            model: createGateway({ apiKey: decryptedKey.decryptedAPIKey })(model),
+          };
+        }
+
+        if (provider === GatewayUserByokProviderIdSchema.enum.openrouter) {
+          return {
+            finalProvider: provider,
+            model: createOpenAICompatible({
+              name: 'openrouter',
+              baseURL: OPENROUTER.apiUrl,
+              apiKey: decryptedKey.decryptedAPIKey,
+              headers: ATTRIBUTION_HEADERS,
+            })(model),
           };
         }
 

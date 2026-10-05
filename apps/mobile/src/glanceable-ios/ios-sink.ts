@@ -20,7 +20,10 @@ import {
   type GlanceableSink,
   type GlanceableSinkContext,
 } from '@/lib/glanceable/sink-registry';
-import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
+import {
+  getLiveActivityEnabled,
+  getNotificationPermissionGranted,
+} from '@/lib/glanceable/live-activity-switch';
 import { getWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
@@ -159,6 +162,11 @@ function startCard(
       instance => instance.getInfo().state !== 'dismissed'
     );
     if (remaining.length > 0) {
+      return;
+    }
+    // The first start raises iOS's "Allow Live Activities?" prompt. Wait for the
+    // user's notification opt-in; the grant replays eligible work (see register).
+    if (!getNotificationPermissionGranted()) {
       return;
     }
     const started = ActiveAgentsLiveActivity.start(

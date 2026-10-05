@@ -34,7 +34,6 @@ import {
   update as updateLiveUpdate,
 } from './live-update';
 import { isNotificationPermissionGranted } from './permission';
-import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
   buildCompactNotificationText,
@@ -311,19 +310,15 @@ async function retryPendingStart(): Promise<void> {
 }
 
 /**
- * App foreground: when the ongoing cannot start (denied) and work is pending,
- * show the Open Settings alert once. When permission is granted, start at once.
- * The alert needs a foreground Activity, so this never runs on the headless path.
+ * App foreground: start the pending ongoing once permission is granted, for
+ * example after the user turned notifications on in Settings. A missing
+ * permission stays silent: the user never asked for this surface, and the
+ * Notifications screen owns the request.
  */
 export async function handleAppStateActive(): Promise<void> {
-  if (pending === null) {
-    return;
-  }
-  if (await isNotificationPermissionGranted()) {
+  if (pending !== null && (await isNotificationPermissionGranted())) {
     await retryPendingStart();
-    return;
   }
-  showAndroidPermissionAlertOnce();
 }
 
 export const androidSink: GlanceableSink = {

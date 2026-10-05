@@ -24,6 +24,7 @@ import {
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
@@ -155,9 +156,14 @@ export async function getOrganizationByokProviderIds(
   return providers.map(provider => provider.providerId);
 }
 
+/**
+ * `getAllowedProviders` returns the organization's allowed providers for a
+ * model, or undefined when every provider is allowed.
+ */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
-  enabledProviderIds: UserByokProviderId[]
+  enabledProviderIds: UserByokProviderId[],
+  getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
@@ -176,7 +182,12 @@ export async function addUserByokAvailability(
           : []),
         ...(await getModelGatewayUserByokProviders(model.id)),
       ];
-      const hasUserByokAvailable = modelProviders.some(provider => enabledProviders.has(provider));
+      const hasUserByokAvailable = await hasEnabledUserByokForModel({
+        modelId: model.id,
+        modelProviders,
+        enabledProviderIds: enabledProviders,
+        allowedProviders: getAllowedProviders(model.id),
+      });
       return { ...model, hasUserByokAvailable };
     })
   );

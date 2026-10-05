@@ -57,6 +57,7 @@ type PermissionCall = {
   response: string;
   message?: string;
   directory?: string;
+  interactive?: boolean;
 };
 
 type FakeClient = ReturnType<typeof createFakeClient>;
@@ -73,6 +74,7 @@ function createFakeClient() {
   let commandImpl: (opts: CommandCall) => Promise<unknown> = async () => ({});
   let summaryImpl: (opts: SummaryCall) => Promise<boolean> = async () => true;
   let probeImpl: WrapperKiloClient['probeMessagePart'];
+  let permissionImpl: () => Promise<boolean> = async () => true;
   const client = {
     sendPromptAsync: async (opts: PromptCall) => {
       prompts.push(opts);
@@ -102,11 +104,17 @@ function createFakeClient() {
       permissionId: string,
       response: string,
       message?: string,
-      _interactive?: boolean,
+      interactive?: boolean,
       directory?: string
     ) => {
-      permissionAnswers.push({ permissionId, response, message, directory });
-      return true;
+      permissionAnswers.push({
+        permissionId,
+        response,
+        message,
+        directory,
+        ...(interactive !== undefined ? { interactive } : {}),
+      });
+      return permissionImpl();
     },
     listCommands: async () => ({
       commands: [{ name: 'compact', description: 'Compact the conversation' }],
@@ -125,6 +133,9 @@ function createFakeClient() {
     questionAnswers,
     questionRejections,
     permissionAnswers,
+    setPermissionImpl: (impl: () => Promise<boolean>) => {
+      permissionImpl = impl;
+    },
     setPromptImpl: (impl: (opts: PromptCall) => Promise<void>) => {
       promptImpl = impl;
     },
@@ -1985,6 +1996,228 @@ describe('turn finalization', () => {
     expect(autoCommitCalls[0].env).toEqual({ FOO: 'bar' });
     h.manager.abort(SESSION_ID);
     expect(autoCommitCalls[0].signal?.aborted).toBe(true);
+  });
+});
+
+describe('automatic permissions', () => {
+  it('retries a transient permission reply failure without prompting the user', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    let attempts = 0;
+    h.client(routeSpec()).setPermissionImpl(async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('temporary reply failure');
+      return true;
+    });
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
+    );
+    await settle();
+    expect(attempts).toBe(2);
+    expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+    expect(h.manager.activeTurnCount()).toBe(1);
+  });
+
+  it('keeps the no-progress deadline active even if an automatic reply event is missing', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
+    );
+    await settle();
+    h.advance(SESSION_TIMERS.noProgressMs + 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'no_progress' }]);
+  });
+
+  it.each([KILO_SESSION, 'ses_child'])(
+    'auto-approves owned permissions from %s without pausing or forwarding a prompt',
+    async kiloSessionId => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(
+        kiloEvent('session.created', { info: { id: 'ses_child', parentID: KILO_SESSION } })
+      );
+      const event = kiloEvent('permission.asked', {
+        sessionID: kiloSessionId,
+        id: 'p1',
+        permission: 'read',
+        patterns: ['apps/web/.env.test'],
+      });
+      h.manager.observeKiloEvent(event);
+      h.manager.observeKiloEvent(event);
+      await settle();
+
+      expect(h.client(routeSpec()).permissionAnswers).toEqual([
+        { permissionId: 'p1', response: 'always', message: undefined, directory: DIRECTORY },
+      ]);
+      expect(h.manager.activeTurnCount()).toBe(1);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.replied', { sessionID: kiloSessionId, requestID: 'p1' })
+      );
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed' }]);
+    }
+  );
+
+  it('does not answer unrelated permissions or user questions, or resume a question on an automatic permission reply', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.asked', { sessionID: 'ses_unrelated', id: 'p_other' })
+    );
+    h.manager.observeKiloEvent(kiloEvent('question.asked', { sessionID: KILO_SESSION, id: 'q1' }));
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
+    );
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.replied', { sessionID: KILO_SESSION, requestID: 'p1' })
+    );
+
+    expect(h.client(routeSpec()).permissionAnswers.map(answer => answer.permissionId)).toEqual([
+      'p1',
+    ]);
+    expect(h.client(routeSpec()).questionAnswers).toEqual([]);
+    expect(h.client(routeSpec()).questionRejections).toEqual([]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'question.asked')).toHaveLength(1);
+    expect(h.manager.activeTurnCount()).toBe(0);
+    await h.manager.answer(SESSION_ID, { action: 'answer', questionId: 'q1', answers: [['yes']] });
+    expect(h.manager.activeTurnCount()).toBe(1);
+  });
+
+  it.each(['skillShell', 'sandboxEscalation'])(
+    'keeps CLI-enforced %s human approvals interactive',
+    async flag => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.asked', {
+          sessionID: KILO_SESSION,
+          id: 'p1',
+          metadata: { [flag]: true },
+        })
+      );
+      await settle();
+      expect(h.client(routeSpec()).permissionAnswers).toEqual([]);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toHaveLength(
+        1
+      );
+      expect(h.manager.activeTurnCount()).toBe(0);
+    }
+  );
+
+  it('surfaces a failed auto-approval instead of hiding the pending permission', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.client(routeSpec()).setPermissionImpl(async () => {
+      throw new Error('reply unavailable');
+    });
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
+    );
+    await settle();
+    expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toHaveLength(
+      1
+    );
+    expect(h.manager.activeTurnCount()).toBe(0);
+    expect(h.client(routeSpec()).permissionAnswers).toHaveLength(2);
+    h.client(routeSpec()).setPermissionImpl(async () => true);
+    await h.manager.answer(SESSION_ID, {
+      action: 'permission',
+      permissionId: 'p1',
+      response: 'reject',
+    });
+    expect(h.manager.activeTurnCount()).toBe(1);
+    expect(h.logs.some(log => log.includes('automatic permission reply failed'))).toBe(true);
+  });
+
+  it('does not publish a stale permission after release while its reply was in flight', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    let rejectReply: ((error: Error) => void) | undefined;
+    h.client(routeSpec()).setPermissionImpl(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectReply = reject;
+        })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
+    );
+    h.manager.release(SESSION_ID);
+    rejectReply?.(new Error('reply unavailable'));
+    await settle();
+    expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+  });
+
+  it.each([KILO_SESSION, 'ses_child'])(
+    'rejects code-review permissions from %s without approving or forwarding them',
+    async kiloSessionId => {
+      const h = createHarness();
+      const spec = routeSpec({ createdOnPlatform: 'code-review' });
+      h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(
+        kiloEvent('session.created', { info: { id: 'ses_child', parentID: KILO_SESSION } })
+      );
+      h.manager.observeKiloEvent(
+        kiloEvent('permission.asked', {
+          sessionID: kiloSessionId,
+          id: 'p1',
+          permission: 'edit',
+          metadata: { skillShell: true },
+        })
+      );
+      await settle();
+      expect(h.client(spec).permissionAnswers).toMatchObject([
+        {
+          permissionId: 'p1',
+          response: 'reject',
+          directory: DIRECTORY,
+          message: expect.stringContaining('code-review non-interactive mode'),
+        },
+      ]);
+      expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
+      expect(h.manager.activeTurnCount()).toBe(1);
+    }
+  );
+
+  it('fails closed if a code-review permission cannot be rejected', async () => {
+    const h = createHarness();
+    const spec = routeSpec({ createdOnPlatform: 'code-review' });
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.client(spec).setPermissionImpl(async () => {
+      throw new Error('reply unavailable');
+    });
+    h.manager.observeKiloEvent(
+      kiloEvent('permission.asked', { sessionID: KILO_SESSION, id: 'p1' })
+    );
+    await settle();
+    expect(h.client(spec).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'Code-review permission rejection failed' },
+    ]);
+    expect(eventFrames(h.frames).filter(event => event.type === 'permission.asked')).toEqual([]);
   });
 });
 

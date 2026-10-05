@@ -29,7 +29,7 @@ import { deleteProjectAssets } from '@/lib/r2/app-builder-assets';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { encryptWithPublicKey, type EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
-import { modelSupportsImages } from '@/lib/ai-gateway/providers/model-capabilities';
+import { modelSupportsImages } from '@/lib/providers/model-capabilities';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 import type {

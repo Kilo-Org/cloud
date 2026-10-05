@@ -8,10 +8,7 @@ import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restric
 import type { ModelRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
-import {
-  computeSnapshotDiff,
-  type SnapshotDiff,
-} from '@/lib/ai-gateway/providers/openrouter/snapshot-diff';
+import { computeSnapshotDiff, type SnapshotDiff } from '@/lib/providers/openrouter/snapshot-diff';
 
 export type RelevantChanges = {
   /** providerSlug -> sorted list of normalized model ids newly accessible via that provider */

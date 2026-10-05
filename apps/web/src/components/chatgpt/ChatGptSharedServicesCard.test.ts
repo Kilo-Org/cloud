@@ -17,7 +17,7 @@ jest.mock('@/components/ui/dialog', () => ({
 
 import { describe, expect, it, jest } from '@jest/globals';
 import type { ReactNode } from 'react';
-import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
+import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 import { CHATGPT_USAGE_SETTINGS_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 import {
   canManageSharedServices,

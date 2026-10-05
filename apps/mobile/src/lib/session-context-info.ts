@@ -1,6 +1,10 @@
 import {
   calculateContextUsagePercentage,
+  type ContextLengthIndex,
   type ContextUsage,
+  createContextLengthIndex,
+  recordContextLength,
+  takeContextLength,
 } from '@kilocode/cloud-agent-sdk/context-usage';
 
 import { type SessionModelOption } from './hooks/use-session-model-options';
@@ -36,15 +40,6 @@ export function resolveSessionContextInfo(
     contextWindow,
     percentage,
   };
-}
-
-type ContextLengthIndex = {
-  lengths: Map<string, number>;
-  conflicts: Set<string>;
-};
-
-function createContextLengthIndex(): ContextLengthIndex {
-  return { lengths: new Map(), conflicts: new Set() };
 }
 
 function isRecordable(option: SessionModelOption): option is SessionModelOption & {
@@ -85,43 +80,15 @@ function resolveContextWindow(
   }
 
   if (contextUsage.providerID === 'kilo') {
-    return takeLength(kiloIndex, contextUsage.modelID);
+    return takeContextLength(kiloIndex, contextUsage.modelID);
   }
   const remoteIndex = remoteIndices.get(contextUsage.providerID);
   if (!remoteIndex) {
     return undefined;
   }
-  return takeLength(remoteIndex, contextUsage.modelID);
+  return takeContextLength(remoteIndex, contextUsage.modelID);
 }
 
 function isFinitePositive(value: number): boolean {
   return Number.isFinite(value) && value > 0;
-}
-
-// First positive value wins. A later conflicting value permanently removes
-// the identity so we never return an arbitrary guess.
-function recordContextLength(index: ContextLengthIndex, id: string, value: number): void {
-  if (index.conflicts.has(id)) {
-    return;
-  }
-  const existing = index.lengths.get(id);
-  if (existing === undefined) {
-    index.lengths.set(id, value);
-    return;
-  }
-  if (existing !== value) {
-    index.lengths.delete(id);
-    index.conflicts.add(id);
-  }
-}
-
-function takeLength(index: ContextLengthIndex, id: string): number | undefined {
-  if (index.conflicts.has(id)) {
-    return undefined;
-  }
-  const value = index.lengths.get(id);
-  if (value === undefined) {
-    return undefined;
-  }
-  return isFinitePositive(value) ? value : undefined;
 }

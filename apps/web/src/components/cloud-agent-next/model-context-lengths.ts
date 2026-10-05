@@ -1,4 +1,9 @@
-import type { ContextUsage } from '@kilocode/cloud-agent-sdk/context-usage';
+import {
+  createContextLengthIndex,
+  recordContextLength,
+  type ContextLengthIndex,
+  type ContextUsage,
+} from '@kilocode/cloud-agent-sdk/context-usage';
 
 type ModelContextLength = {
   id: string;
@@ -15,63 +20,38 @@ type ProviderModelContextLength = {
 
 export type ContextLengthByProviderAndModel = ReadonlyMap<string, ReadonlyMap<string, number>>;
 
-// First positive value wins; a later conflicting value blacklists the id so a
-// model with inconsistent context lengths is treated as unknown rather than
-// resolving to an arbitrary one.
-function recordUniqueContextLength(
-  lengths: Map<string, number>,
-  conflicts: Set<string>,
-  id: string,
-  contextLength: number
-): void {
-  if (!Number.isFinite(contextLength) || contextLength <= 0) return;
-  if (conflicts.has(id)) return;
-
-  const existingContextLength = lengths.get(id);
-  if (existingContextLength === undefined) {
-    lengths.set(id, contextLength);
-  } else if (existingContextLength !== contextLength) {
-    lengths.delete(id);
-    conflicts.add(id);
-  }
-}
-
 export function buildContextLengthByModelId(
   models: readonly ModelContextLength[]
 ): ReadonlyMap<string, number> {
-  const contextLengthByModelId = new Map<string, number>();
-  const conflictingModelIds = new Set<string>();
+  const index = createContextLengthIndex();
 
   for (const model of models) {
     const contextLength = model.context_length;
     if (contextLength === undefined || contextLength === null) continue;
-    recordUniqueContextLength(contextLengthByModelId, conflictingModelIds, model.id, contextLength);
+    recordContextLength(index, model.id, contextLength);
   }
 
-  return contextLengthByModelId;
+  return index.lengths;
 }
 
 export function buildContextLengthByProviderAndModel(
   providers: readonly ProviderModelContextLength[]
 ): ContextLengthByProviderAndModel {
-  const lengths = new Map<string, Map<string, number>>();
-  const conflicts = new Map<string, Set<string>>();
+  const indexByProvider = new Map<string, ContextLengthIndex>();
+  const lengths = new Map<string, ReadonlyMap<string, number>>();
 
   for (const provider of providers) {
-    let providerLengths = lengths.get(provider.id);
-    if (!providerLengths) {
-      providerLengths = new Map();
-      lengths.set(provider.id, providerLengths);
-    }
-    let providerConflicts = conflicts.get(provider.id);
-    if (!providerConflicts) {
-      providerConflicts = new Set();
-      conflicts.set(provider.id, providerConflicts);
+    let index = indexByProvider.get(provider.id);
+    if (!index) {
+      index = createContextLengthIndex();
+      indexByProvider.set(provider.id, index);
     }
 
     for (const model of provider.models) {
-      recordUniqueContextLength(providerLengths, providerConflicts, model.id, model.limits.context);
+      recordContextLength(index, model.id, model.limits.context);
     }
+
+    lengths.set(provider.id, index.lengths);
   }
 
   return lengths;

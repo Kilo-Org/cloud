@@ -163,3 +163,34 @@ export function calculateContextUsagePercentage(
   const percentage = Math.round((contextTokens / contextWindow) * 100);
   return Number.isFinite(percentage) ? percentage : undefined;
 }
+
+export type ContextLengthIndex = {
+  lengths: Map<string, number>;
+  conflicts: Set<string>;
+};
+
+export function createContextLengthIndex(): ContextLengthIndex {
+  return { lengths: new Map(), conflicts: new Set() };
+}
+
+// First positive value wins; a later conflicting value blacklists the id so a
+// model with inconsistent context lengths is treated as unknown rather than
+// resolving to an arbitrary one.
+export function recordContextLength(index: ContextLengthIndex, id: string, value: number): void {
+  if (!Number.isFinite(value) || value <= 0) return;
+  if (index.conflicts.has(id)) return;
+  const existing = index.lengths.get(id);
+  if (existing === undefined) {
+    index.lengths.set(id, value);
+  } else if (existing !== value) {
+    index.lengths.delete(id);
+    index.conflicts.add(id);
+  }
+}
+
+export function takeContextLength(index: ContextLengthIndex, id: string): number | undefined {
+  if (index.conflicts.has(id)) return undefined;
+  const value = index.lengths.get(id);
+  if (value === undefined) return undefined;
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}

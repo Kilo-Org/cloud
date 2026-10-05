@@ -1,5 +1,10 @@
 import type { AssistantMessage, UserMessage } from '@kilocode/app-shared/opencode';
 import { calculateContextUsagePercentage, findLatestContextUsage } from './context-usage';
+import {
+  createContextLengthIndex,
+  recordContextLength,
+  takeContextLength,
+} from './context-usage';
 
 function assistantMessage(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
   return {
@@ -427,5 +432,48 @@ describe('calculateContextUsagePercentage', () => {
 
   it('preserves percentages above one hundred', () => {
     expect(calculateContextUsagePercentage(101, 100)).toBe(101);
+  });
+});
+
+describe('context length index primitives', () => {
+  it('records and resolves a positive length', () => {
+    const index = createContextLengthIndex();
+    recordContextLength(index, 'model-a', 200_000);
+
+    expect(takeContextLength(index, 'model-a')).toBe(200_000);
+  });
+
+  it('ignores non-positive or non-finite lengths', () => {
+    const index = createContextLengthIndex();
+    recordContextLength(index, 'zero', 0);
+    recordContextLength(index, 'negative', -1);
+    recordContextLength(index, 'nan', Number.NaN);
+    recordContextLength(index, 'infinite', Number.POSITIVE_INFINITY);
+
+    expect(takeContextLength(index, 'zero')).toBeUndefined();
+    expect(takeContextLength(index, 'negative')).toBeUndefined();
+    expect(takeContextLength(index, 'nan')).toBeUndefined();
+    expect(takeContextLength(index, 'infinite')).toBeUndefined();
+  });
+
+  it('keeps agreeing duplicate ids', () => {
+    const index = createContextLengthIndex();
+    recordContextLength(index, 'model-a', 200_000);
+    recordContextLength(index, 'model-a', 200_000);
+
+    expect(takeContextLength(index, 'model-a')).toBe(200_000);
+  });
+
+  it('permanently blacklists a conflicting duplicate id', () => {
+    const index = createContextLengthIndex();
+    recordContextLength(index, 'model-a', 200_000);
+    recordContextLength(index, 'model-a', 80_000);
+    recordContextLength(index, 'model-a', 200_000);
+
+    expect(takeContextLength(index, 'model-a')).toBeUndefined();
+  });
+
+  it('returns undefined for a missing id', () => {
+    expect(takeContextLength(createContextLengthIndex(), 'missing')).toBeUndefined();
   });
 });

@@ -18,15 +18,10 @@ packages/trpc/dist/
 *.tsbuildinfo
 next-env.d.ts
 
-# env & secrets
-.env*.local*
-!.env*.example*
+# secrets (.env* is ignored as a class below)
 .dev.vars
 .dev.vars.*
 !.dev.vars.example*
-.env.keys
-.env.grafana
-.env.sentry-build-plugin
 .tokens.json
 .test-token
 *.pem
@@ -126,9 +121,6 @@ supabase/.temp
 TMP_CI_commit_msg.txt
 *.csv
 run-milvus-test.sh
-
-.beads/
-.env*.local
 .tests/
 
 # Ignore stray .env-prefixed files but preserve committed example/test/envrc files.

@@ -111,7 +111,7 @@ terminal. Nothing else.
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
 | Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
 | Cancel one queued message | That message → `cancelled`. |
-| Backstop alarm | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 65 minutes → `failed` (`no_outcome`). |
+| Backstop alarm | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 125 minutes → `failed` (`no_outcome`). |
 
 Stop still forwards a best-effort abort to an existing ready Kilo route when no
 message is queued or accepted and the wrapper has no active turn. It does not
@@ -122,7 +122,7 @@ lost notifications; the Sandbox DO and the wrapper settle every normal case earl
 are derived from the owners' timers so the backstop never ends work that its owner still runs:
 queued = reconnect window (90 s) + one preparation attempt (12 min) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
-sandbox); accepted = turn hard cap (60 min) + 5 min. After every message change the Session DO sets
+sandbox); accepted = turn hard cap (120 min) + 5 min. After every message change the Session DO sets
 the alarm to the earliest backstop, transport-recovery, report or callback obligation, and clears it
 when none remains (for example after Stop and successful terminal reporting).
 
@@ -440,12 +440,15 @@ options are command arguments, not Git config.
   - `completed`: Kilo emitted `session.turn.close` with reason `completed`, finalization is done,
     and no later prompt remains unfinished. `session.idle` and a `superseded` turn-close are not
     completion signals. The wrapper does not keep a copy of Kilo's native prompt queue.
-  - `failed`: Kilo reports a final error; 7 minutes without real progress; the 60-minute hard cap;
-    Kilo restarted during the turn after real progress, or a second time; prompt submission failed.
-    For no progress and the cap, the wrapper aborts the Kilo session first. Real progress is text,
-    reasoning or tool events from the routed root session or any session resolved into its
-    descendant tree; busy, retry and heartbeat events are not, and waiting on the user pauses the
-    clock.
+  - `failed`: Kilo reports a final error; 7 minutes without real progress while no tool part is
+    running; the 120-minute hard cap; Kilo restarted during the turn after real progress, or a
+    second time; prompt submission failed. For no progress and the cap, the wrapper aborts the
+    Kilo session first. Real progress is text, reasoning or tool events from the routed root
+    session or any session resolved into its descendant tree; busy, retry and heartbeat events are
+    not, and waiting on the user pauses the clock. The turn owns a set of running tool parts keyed
+    by Kilo session ID and part ID: a part that is `running` in the routed root session or its
+    resolved descendant tree holds the no-progress clock until Kilo reports that part completed or
+    errored; Kilo owns each tool's own timeout, and the 120-minute cap still applies.
   - `cancelled`: the turn was aborted.
 - Finalization (auto-commit, condense) runs after Kilo's completed turn-close. The wrapper sends a `finalizing`
   event when it starts. Its failures are warning events; the outcome stays `completed`. A prompt
@@ -524,7 +527,7 @@ them through one development-only override.
 | Owner | Timer | Value | On expiry |
 |---|---|---|---|
 | Session DO | Queued backstop | 16.5 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
-| Session DO | Accepted backstop | 65 min from accept | `failed` (`no_outcome`) |
+| Session DO | Accepted backstop | 125 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
 | Sandbox DO | Provider create call | 2 min | Retry after the pause below while a route deadline remains |
@@ -544,8 +547,8 @@ them through one development-only override.
 | Wrapper | Kilo health request | 5 s | Restart Kilo |
 | Wrapper | SSE reconnects | 6 in 2 min | Restart Kilo |
 | Wrapper | Kilo restart budget | 3 in 10 min | Routes `failed` (`agent_unavailable`) |
-| Wrapper | No real progress | 7 min | Abort; `failed` (`no_progress`) |
-| Wrapper | Turn hard cap | 60 min | Abort; `failed` (`execution_limit`) |
+| Wrapper | No real progress and no running tool | 7 min | Abort; `failed` (`no_progress`) |
+| Wrapper | Turn hard cap | 120 min | Abort; `failed` (`execution_limit`) |
 | Wrapper | Reconnect backoff | 1 s to 30 s, forever | — |
 | Supervisor | Wrapper restarts | 5 in 10 min | Stop restarting |
 
@@ -566,11 +569,11 @@ them through one development-only override.
 | Kilo crash or dead event stream | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
 | Kilo final error | Wrapper | None (Kilo already retried) | Accepted fail with Kilo's reason |
-| No real progress 7 min | Wrapper | Abort the turn | Accepted fail (`no_progress`) |
-| Turn over 60 min | Wrapper | Abort the turn | Accepted fail (`execution_limit`) |
+| No real progress and no running tool 7 min | Wrapper | Abort the turn | Accepted fail (`no_progress`) |
+| Turn over 120 min | Wrapper | Abort the turn | Accepted fail (`execution_limit`) |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
-| Notification lost | Session DO backstop | — | Fail at 16.5 or 65 min |
+| Notification lost | Session DO backstop | — | Fail at 16.5 or 125 min |
 | User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
@@ -711,7 +714,10 @@ counts.
     failure on session release. The plane does not poll the provider for a dead container.
 15. **Idle stop with a pending question.** After 10 idle minutes the sandbox stops and the turn
     fails (`sandbox_stopped`); the answer or a new message continues the chat on a new sandbox.
-16. **No progress.** A turn with no real progress for 7 minutes fails (`no_progress`).
+16. **No progress.** A turn with no real progress and no running tool part for 7 minutes fails
+    (`no_progress`). A turn whose only activity is a tool part `running` in the routed root session
+    or its resolved descendant tree is not failed until Kilo reports that part completed or errored,
+    or until the 120-minute hard cap (`execution_limit`).
 17. **Auto-commit fails.** The turn completes with a visible warning.
 18. **Question answered live.** A question during a turn is answered; the same turn continues and
     completes.
@@ -738,7 +744,7 @@ counts.
     overflow drops newest, loss diagnostics stay bounded/internal and expired queue heads make no RPC.
     Heartbeats, alarms, stop and reconnect continue while notifications are held. Release retires
     references; reconstruction replays no notification backlog. Public events, reports, callbacks
-     and the 16.5/65-minute lost-notification backstops are unchanged.
+     and the 16.5/125-minute lost-notification backstops are unchanged.
 22. **Permanent versus transient creation failure.** Balance lost after send preflight fails queued
     work promptly with `billing_blocked`, not preparation timeout. Proven local invalid configuration
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,
@@ -759,6 +765,12 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
 - A turn submitted again after a Kilo restart can cost a second model request when the first one
   reached the provider but produced no output yet.
 - The cause of the Kilo hang is inside Kilo and is not fixed here; the restart only recovers it.
+- A running tool part holds the turn until it completes or errors. A hung tool with no effective
+  timeout (a subagent, or an MCP call that resets on progress) or a part whose completion was lost
+  in an event-stream gap therefore fails at the 120-minute cap (`execution_limit`) instead of after
+  seven minutes (`no_progress`). The general turn cap is now 120 minutes and the lost-outcome
+  Session backstop is 125 minutes; a turn with nothing running still fails `no_progress` after
+  seven minutes.
 - A prompt frame lost when the socket breaks stays `accepted` until the next outcome or the backstop.
 - Notifications are best effort; the Session DO backstop bounds a lost one.
 - An unconfirmed provider stop is logged; the container may run until the provider stops it.

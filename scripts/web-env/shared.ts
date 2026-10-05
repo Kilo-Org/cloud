@@ -357,7 +357,9 @@ export type EnvRecord = {
   value?: string;
 };
 
+// Vercel returns `target` as either one string or an array of strings.
 function stringArray(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string')
     : [];

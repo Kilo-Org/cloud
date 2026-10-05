@@ -466,6 +466,7 @@ if (command === 'whoami') {
   respond({
     envs: [
       { id: 'env-1', key: 'PLAIN_VALUE', type: 'plain', value: 'visible', target: ['production'] },
+      { id: 'env-3', key: 'apiUrl', type: 'encrypted', target: 'development' },
       {
         id: 'env-2',
         key: 'SECRET_TOKEN',
@@ -535,7 +536,7 @@ void test('resolveVercelContexts skips projects that do not exist in Vercel yet'
   });
 });
 
-void test('listEnvRecords keeps only plain values and normalizes targets', async () => {
+void test('listEnvRecords keeps only plain values and normalizes string and array targets', async () => {
   await withFakeVercel(directory => {
     assert.deepEqual(
       listEnvRecords({ project: 'kilocode-global-app', orgId: 'team-id', cwd: directory }),
@@ -548,6 +549,15 @@ void test('listEnvRecords keeps only plain values and normalizes targets', async
           customEnvironmentIds: [],
           gitBranch: undefined,
           value: 'visible',
+        },
+        {
+          id: 'env-3',
+          key: 'apiUrl',
+          type: 'encrypted',
+          target: ['development'],
+          customEnvironmentIds: [],
+          gitBranch: undefined,
+          value: undefined,
         },
         {
           id: 'env-2',

@@ -11,6 +11,7 @@ export { ReasoningDetailsTransform };
 
 export type ProviderId =
   | 'openrouter'
+  | 'openrouter-byok'
   | 'direct-byok'
   | 'inception'
   | 'martian'
@@ -23,6 +24,9 @@ export type ProviderId =
 export type BYOKResult = {
   decryptedAPIKey: string;
   providerId: UserByokProviderId;
+  baseUrl?: string | null;
+  displayName?: string | null;
+  providerApi?: string | null;
 };
 
 export type TransformRequestContext = {

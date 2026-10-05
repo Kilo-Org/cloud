@@ -92,13 +92,22 @@ export async function addUserByokAvailability(
 export function decryptByokRow({
   encrypted_api_key,
   provider_id,
+  base_url,
+  display_name,
+  provider_api,
 }: {
   encrypted_api_key: EncryptedData;
   provider_id: string;
+  base_url?: string | null;
+  display_name?: string | null;
+  provider_api?: string | null;
 }) {
   return {
     decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
     providerId: UserByokProviderIdSchema.parse(provider_id),
+    baseUrl: base_url ?? null,
+    displayName: display_name ?? null,
+    providerApi: provider_api ?? null,
   };
 }
 

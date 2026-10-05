@@ -41,8 +41,12 @@ import {
 import { toast } from 'sonner';
 import {
   DirectUserByokInferenceProviderIdSchema,
+  type DirectUserByokInferenceProviderId,
   UserByokProviderIdSchema,
+  UserByokTestModels,
+  type UserByokProviderId,
   VercelUserByokInferenceProviderIdSchema,
+  type VercelUserByokInferenceProviderId,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
   VertexCredentialsSchema,
@@ -86,12 +90,17 @@ const VERCEL_BYOK_PROVIDERS = [
   { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Legacy Codestral-only key' },
 ];
 
+const CUSTOM_PROVIDER_OPTION = {
+  id: 'custom',
+  name: 'Custom Provider (OpenAI Compatible)',
+};
+
 const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
   id,
   name,
 }));
 
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
+const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS, CUSTOM_PROVIDER_OPTION].toSorted((a, b) =>
   a.name.localeCompare(b.name)
 );
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
@@ -171,6 +180,10 @@ type BYOKDialogState = {
   apiKey: string;
   showApiKey: boolean;
   credentialError: string | null;
+  customProviderId: string;
+  customDisplayName: string;
+  customBaseUrl: string;
+  customProviderApi: string;
 };
 
 const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
@@ -180,6 +193,10 @@ const INITIAL_BYOK_DIALOG_STATE: BYOKDialogState = {
   apiKey: '',
   showApiKey: false,
   credentialError: null,
+  customProviderId: '',
+  customDisplayName: '',
+  customBaseUrl: '',
+  customProviderApi: 'openai-compatible',
 };
 
 function updateBYOKDialogState(state: BYOKDialogState, update: Partial<BYOKDialogState>) {
@@ -191,8 +208,18 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     updateBYOKDialogState,
     INITIAL_BYOK_DIALOG_STATE
   );
-  const { isDialogOpen, editingKeyId, selectedProvider, apiKey, showApiKey, credentialError } =
-    dialogState;
+  const {
+    isDialogOpen,
+    editingKeyId,
+    selectedProvider,
+    apiKey,
+    showApiKey,
+    credentialError,
+    customProviderId,
+    customDisplayName,
+    customBaseUrl,
+    customProviderApi,
+  } = dialogState;
   const setIsDialogOpen = (isDialogOpen: boolean) => updateDialogState({ isDialogOpen });
   const setEditingKeyId = (editingKeyId: string | null) => updateDialogState({ editingKeyId });
   const setSelectedProvider = (selectedProvider: string) => updateDialogState({ selectedProvider });
@@ -200,6 +227,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setShowApiKey = (showApiKey: boolean) => updateDialogState({ showApiKey });
   const setCredentialError = (credentialError: string | null) =>
     updateDialogState({ credentialError });
+  const setCustomProviderId = (customProviderId: string) => updateDialogState({ customProviderId });
+  const setCustomDisplayName = (customDisplayName: string) => updateDialogState({ customDisplayName });
+  const setCustomBaseUrl = (customBaseUrl: string) => updateDialogState({ customBaseUrl });
+  const setCustomProviderApi = (customProviderApi: string) => updateDialogState({ customProviderApi });
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -332,6 +363,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setApiKey('');
     setShowApiKey(false);
     setCredentialError(null);
+    setCustomProviderId('');
+    setCustomDisplayName('');
+    setCustomBaseUrl('');
+    setCustomProviderApi('openai-compatible');
   };
 
   const handleSave = () => {
@@ -345,16 +380,37 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         api_key: apiKey,
       });
     } else {
-      const providerId = UserByokProviderIdSchema.safeParse(selectedProvider);
-      if (!providerId.success) {
-        toast.error('Select a supported provider.');
-        return;
+      if (selectedProvider === 'custom') {
+        // Custom provider: use user-entered provider ID
+        const customId = customProviderId.trim();
+        if (!customId) {
+          toast.error('Enter a provider ID.');
+          return;
+        }
+        if (!customBaseUrl || !customBaseUrl.trim()) {
+          toast.error('Enter a base URL.');
+          return;
+        }
+        createMutation.mutate({
+          ...(organizationId && { organizationId }),
+          provider_id: customId as UserByokProviderId,
+          api_key: apiKey,
+          display_name: customDisplayName || undefined,
+          base_url: customBaseUrl || undefined,
+          provider_api: customProviderApi as 'openai-compatible' | undefined,
+        });
+      } else {
+        const providerId = UserByokProviderIdSchema.safeParse(selectedProvider);
+        if (!providerId.success) {
+          toast.error('Select a supported provider.');
+          return;
+        }
+        createMutation.mutate({
+          ...(organizationId && { organizationId }),
+          provider_id: providerId.data,
+          api_key: apiKey,
+        });
       }
-      createMutation.mutate({
-        ...(organizationId && { organizationId }),
-        provider_id: providerId.data,
-        api_key: apiKey,
-      });
     }
   };
 
@@ -363,6 +419,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     const key = keys?.find((k: { id: string; provider_id: string }) => k.id === keyId);
     if (key) {
       setSelectedProvider(key.provider_id);
+      setCustomProviderId(key.provider_id);
+      setCustomDisplayName(key.display_name ?? '');
+      setCustomBaseUrl(key.base_url ?? '');
+      setCustomProviderApi(key.provider_api ?? 'openai-compatible');
     }
     setIsDialogOpen(true);
   };

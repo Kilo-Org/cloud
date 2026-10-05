@@ -464,6 +464,56 @@ describe('Cloud Agent session scope routes', () => {
     expect(query.sql).toContain('"cloud_agent_worktree_id"');
   });
 
+  it('bootstraps a grandchild under an existing parent in the authorized root scope', async () => {
+    const grandchildSessionId = 'ses_ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const child = persistedRow();
+    const { db, insertedValues, selectConditions } = makeDb(
+      [
+        [
+          {
+            sessionId: rootSessionId,
+            organizationId: child.organization_id,
+            cloudAgentSessionScopeId: cloudAgentSessionId,
+          },
+        ],
+        [{ sessionId: childSessionId }],
+      ],
+      [persistedRow({ session_id: grandchildSessionId, parent_session_id: childSessionId })]
+    );
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    const putValidated = vi.fn(async () => undefined);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ putValidated } as never);
+    const response = await makeApp().fetch(
+      new Request('http://local/session', {
+        method: 'POST',
+        headers: assertionHeaders(),
+        body: JSON.stringify({ sessionId: grandchildSessionId, parentSessionId: childSessionId }),
+      }),
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(insertedValues).toContainEqual(
+      expect.objectContaining({
+        session_id: grandchildSessionId,
+        parent_session_id: childSessionId,
+        cloud_agent_session_scope_id: cloudAgentSessionId,
+        organization_id: child.organization_id,
+        cloud_agent_session_id: null,
+      })
+    );
+    expect(new PgDialect().sqlToQuery(selectConditions[1]).params).toEqual([
+      childSessionId,
+      'usr_test',
+      cloudAgentSessionId,
+      child.organization_id,
+    ]);
+    expect(putValidated).toHaveBeenCalledWith({
+      sessionId: grandchildSessionId,
+      organizationId: child.organization_id,
+      cloudAgentSessionScopeId: cloudAgentSessionId,
+    });
+  });
+
   it('does not create a child when the asserted root belongs to another user or root scope', async () => {
     const { db, insertedValues, selectConditions } = makeDb([[]], []);
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -582,17 +632,8 @@ describe('Cloud Agent session scope routes', () => {
     );
   });
 
-  it('requires the asserted session scope during child ingest authorization', async () => {
-    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
-      kiloSessionId: childSessionId,
-      organizationId: null,
-      cloudAgentSessionScopeId: cloudAgentSessionId,
-    });
-    vi.mocked(handleDirectIngestRequest).mockResolvedValue({
-      status: 200,
-      body: { success: true },
-    } as never);
-
+  it('denies unrelated sessions through the existing scoped ingest authorization', async () => {
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue(null);
     const response = await makeApp().fetch(
       new Request(`http://local/session/${childSessionId}/ingest?v=2`, {
         method: 'POST',
@@ -601,12 +642,43 @@ describe('Cloud Agent session scope routes', () => {
       }),
       env
     );
-
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     expect(resolveAccessibleKiloSession).toHaveBeenCalledWith(expect.anything(), {
       kiloUserId: 'usr_test',
       kiloSessionId: childSessionId,
       expectedCloudAgentSessionScopeId: cloudAgentSessionId,
     });
+    expect(handleDirectIngestRequest).not.toHaveBeenCalled();
   });
+
+  it.each([childSessionId, 'ses_ABCDEFGHIJKLMNOPQRSTUVWXYZ'])(
+    'requires the asserted session scope during descendant %s ingest authorization',
+    async sessionId => {
+      vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
+        kiloSessionId: sessionId,
+        organizationId: null,
+        cloudAgentSessionScopeId: cloudAgentSessionId,
+      });
+      vi.mocked(handleDirectIngestRequest).mockResolvedValue({
+        status: 200,
+        body: { success: true },
+      } as never);
+
+      const response = await makeApp().fetch(
+        new Request(`http://local/session/${sessionId}/ingest?v=2`, {
+          method: 'POST',
+          headers: assertionHeaders(),
+          body: JSON.stringify({ data: [] }),
+        }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(resolveAccessibleKiloSession).toHaveBeenCalledWith(expect.anything(), {
+        kiloUserId: 'usr_test',
+        kiloSessionId: sessionId,
+        expectedCloudAgentSessionScopeId: cloudAgentSessionId,
+      });
+    }
+  );
 });

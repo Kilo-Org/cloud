@@ -7,6 +7,7 @@ const organizationId = '22222222-2222-4222-8222-222222222222';
 const mockListQueryFn = jest.fn(() => Promise.resolve({ cliSessions: [] }));
 const mockListOptions = jest.fn((input, options) => ({
   input,
+  queryKey: [['cliSessionsV2', 'list'], { input, type: 'query' }],
   queryFn: mockListQueryFn,
   ...options,
 }));
@@ -20,6 +21,7 @@ jest.mock('@/lib/trpc/utils', () => ({
       list: { queryOptions: mockListOptions, pathFilter: jest.fn() },
       search: { queryOptions: jest.fn(() => ({})), queryKey: jest.fn() },
       worktreeDetails: { queryOptions: jest.fn(() => ({})) },
+      refreshAssociatedPullRequest: { mutationOptions: jest.fn(() => ({})) },
     },
   }),
 }));
@@ -32,6 +34,7 @@ jest.mock('jotai', () => ({
 jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({}),
   useQuery: () => ({ isLoading: false }),
+  useMutation: () => ({ mutate: jest.fn(), isPending: false }),
   useQueries: ({
     queries,
     combine,
@@ -137,6 +140,20 @@ describe('sidebar folder history queries', () => {
     expect(maxActive).toBe(4);
     expect(mockListQueryFn).toHaveBeenCalledTimes(250);
     expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(249);
+  });
+
+  it('forwards the original tRPC query key and request context', async () => {
+    renderToStaticMarkup(createElement(Sidebar, { folderWorktreeIds: [worktreeId] }));
+    const [query]: { queryKey: unknown[]; queryFn: (context: object) => Promise<unknown> }[] =
+      mockFolderQueries.mock.calls[0][0];
+    const context = {
+      client: {},
+      queryKey: query.queryKey,
+      signal: new AbortController().signal,
+      meta: { source: 'folder-history' },
+    };
+    await query.queryFn(context);
+    expect(mockListQueryFn).toHaveBeenCalledWith(context);
   });
 
   it('does not send a queued request after it is aborted', async () => {

@@ -843,7 +843,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
               ? context =>
                   limitFolderQueries(() => {
                     context.signal.throwIfAborted();
-                    return queryFn(context);
+                    return queryFn({ ...context, queryKey: queryOptions.queryKey });
                   })
               : queryFn,
         },

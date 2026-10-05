@@ -5,18 +5,39 @@ import type { EncryptedData } from '@/lib/ai-gateway/byok/encryption';
 import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import {
+  GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
+  type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
-import { getVercelModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getVercelModelsFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { hasEnabledUserByokForModel } from '@/lib/ai-gateway/byok/availability';
 
+/**
+ * Returns every user BYOK provider whose key can serve `modelId`: first the
+ * inference providers routed through Vercel, then the gateway keys in order of
+ * preference.
+ */
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
+  const [inferenceProviders, gatewayProviders] = await Promise.all([
+    getModelInferenceUserByokProviders(modelId),
+    getModelGatewayUserByokProviders(modelId),
+  ]);
+  return [...inferenceProviders, ...gatewayProviders];
+}
+
+async function getModelInferenceUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
   if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
@@ -37,6 +58,27 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
     providers.unshift('codestral');
   }
   return providers;
+}
+
+/**
+ * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
+ * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
+ * take them over.
+ */
+export async function getModelGatewayUserByokProviders(
+  modelId: string
+): Promise<GatewayUserByokProviderId[]> {
+  if (isKiloExclusiveModel(modelId) || isFreeModel(modelId)) {
+    return [];
+  }
+  const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    mapModelIdToVercel(modelId),
+    isValidOpenRouterModelId(modelId),
+  ]);
+  return GatewayUserByokProviderIdSchema.options.filter(providerId =>
+    providerId === 'vercel-ai-gateway' ? vercelModels.has(vercelModelId) : isOpenRouterModel
+  );
 }
 
 export async function getUserByokProviderIds(
@@ -72,18 +114,26 @@ function parseUserByokProviderIds(rows: { provider_id: string }[]): UserByokProv
   });
 }
 
+/**
+ * `getAllowedProviders` returns the organization's allowed providers for a
+ * model, or undefined when every provider is allowed.
+ */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
-  enabledProviderIds: UserByokProviderId[]
+  enabledProviderIds: UserByokProviderId[],
+  getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
   return Promise.all(
     models.map(async model => {
       const hasUserByokAvailable =
         !isKiloExclusiveModel(model.id) &&
-        (await getModelUserByokProviders(model.id)).some(provider =>
-          enabledProviders.has(provider)
-        );
+        (await hasEnabledUserByokForModel({
+          modelId: model.id,
+          modelProviders: await getModelUserByokProviders(model.id),
+          enabledProviderIds: enabledProviders,
+          allowedProviders: getAllowedProviders(model.id),
+        }));
       return { ...model, hasUserByokAvailable };
     })
   );

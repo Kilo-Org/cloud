@@ -12,3 +12,7 @@ export const OPENROUTER = {
   responseTransforms: null,
   async transformRequest() {},
 } as const satisfies Provider;
+
+export function createUserOpenRouterProvider(apiKey: string): Provider {
+  return { ...OPENROUTER, apiKey };
+}

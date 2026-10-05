@@ -4277,49 +4277,60 @@
         "provider_id": {
           "anyOf": [
             {
-              "type": "string",
-              "enum": [
-                "anthropic",
-                "azure",
-                "bedrock",
-                "deepseek",
-                "fireworks",
-                "google",
-                "inception",
-                "openai",
-                "minimax",
-                "mistral",
-                "moonshotai",
-                "nebius",
-                "novita",
-                "perplexity",
-                "vertex",
-                "xai",
-                "xiaomi",
-                "zai"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "anthropic",
+                    "azure",
+                    "bedrock",
+                    "deepseek",
+                    "fireworks",
+                    "google",
+                    "inception",
+                    "openai",
+                    "minimax",
+                    "mistral",
+                    "moonshotai",
+                    "nebius",
+                    "novita",
+                    "perplexity",
+                    "vertex",
+                    "xai",
+                    "xiaomi",
+                    "zai"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "alibaba-token-plan",
+                    "byteplus-coding",
+                    "chutes-byok",
+                    "codestral",
+                    "edenai",
+                    "inceptron-byok",
+                    "kimi-coding",
+                    "martian",
+                    "morph-byok",
+                    "neuralwatt",
+                    "nvidia-byok",
+                    "ollama-cloud",
+                    "opencode-go",
+                    "orcarouter",
+                    "synthetic",
+                    "xiaomi-token-plan-ams",
+                    "xiaomi-token-plan-sgp",
+                    "zai-coding"
+                  ]
+                }
               ]
             },
             {
               "type": "string",
               "enum": [
-                "alibaba-token-plan",
-                "byteplus-coding",
-                "chutes-byok",
-                "codestral",
-                "edenai",
-                "inceptron-byok",
-                "kimi-coding",
-                "martian",
-                "morph-byok",
-                "neuralwatt",
-                "nvidia-byok",
-                "ollama-cloud",
-                "opencode-go",
-                "orcarouter",
-                "synthetic",
-                "xiaomi-token-plan-ams",
-                "xiaomi-token-plan-sgp",
-                "zai-coding"
+                "vercel-ai-gateway",
+                "openrouter"
               ]
             }
           ]

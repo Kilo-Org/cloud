@@ -14,6 +14,18 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
     mockGetOrganizationByokProviderIds(...args),
 }));
 
+const mockCanRouteToVercel = jest.fn();
+const mockResolveOrganizationMemberModelDecision = jest.fn();
+
+jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
+  canRouteToVercel: (...args: unknown[]) => mockCanRouteToVercel(...args),
+}));
+
+jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+  resolveOrganizationMemberModelDecision: (...args: unknown[]) =>
+    mockResolveOrganizationMemberModelDecision(...args),
+}));
+
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
 
 const KILO_EXCLUSIVE_MODEL = 'stealth/qwen3.6-plus';
@@ -139,5 +151,53 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: true });
     expect(mockGetOrganizationByokProviderIds).toHaveBeenCalledWith(fakeDb, 'org-1');
     expect(mockGetUserByokProviderIds).not.toHaveBeenCalled();
+  });
+
+  describe('organization Vercel AI Gateway key', () => {
+    beforeEach(() => {
+      mockGetModelUserByokProviders.mockResolvedValue(['vercel-ai-gateway']);
+      mockGetOrganizationByokProviderIds.mockResolvedValue(['vercel-ai-gateway']);
+      mockResolveOrganizationMemberModelDecision.mockResolvedValue({
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['groq', 'virtual']) },
+      });
+    });
+
+    async function eligibility() {
+      return computeCloudAgentNextBalanceCheckEligibility({
+        fromDb: fakeDb,
+        user: fakeUser,
+        modelId: NON_EXCLUSIVE_MODEL,
+        organizationId: 'org-1',
+      });
+    }
+
+    it('counts the key when Vercel can honor the allowed providers', async () => {
+      mockCanRouteToVercel.mockResolvedValue(true);
+
+      expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: true });
+      expect(mockResolveOrganizationMemberModelDecision).toHaveBeenCalledWith({
+        organizationId: 'org-1',
+        kiloUserId: fakeUser.id,
+        modelId: NON_EXCLUSIVE_MODEL,
+      });
+      const getRoutingProviderConfig = mockCanRouteToVercel.mock
+        .calls[0][1] as () => Promise<unknown>;
+      await expect(getRoutingProviderConfig()).resolves.toEqual({ only: ['groq'] });
+    });
+
+    it('does not count the key when routing would fall through to a Kilo-paid route', async () => {
+      mockCanRouteToVercel.mockResolvedValue(false);
+
+      expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: false });
+    });
+
+    it('counts the key without a routing check when the organization allows every provider', async () => {
+      mockResolveOrganizationMemberModelDecision.mockResolvedValue({
+        decision: { allowed: true },
+      });
+
+      expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: true });
+      expect(mockCanRouteToVercel).not.toHaveBeenCalled();
+    });
   });
 });

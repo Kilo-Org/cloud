@@ -18,7 +18,10 @@ import {
   isFableModel,
   isOpus5Model,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  isGatewayUserByokProviderId,
+  OpenRouterInferenceProviderIdSchema,
+} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
@@ -273,7 +276,16 @@ export async function applyProviderSpecificLogic(
   sessionId: string | null,
   taskId: string | null
 ) {
-  await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  // A user's own gateway key bills their account, so Kilo's routing preferences
+  // and fallback models do not override what the request and their account ask for.
+  const usesUserGatewayKey =
+    userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
+
+  if (usesUserGatewayKey) {
+    delete requestToMutate.body.models;
+  } else {
+    await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
+  }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
@@ -314,7 +326,7 @@ export async function applyProviderSpecificLogic(
     applyAnthropicModelSettings(requestToMutate, extraHeaders);
   }
 
-  if (provider.id === 'openrouter' || provider.id === 'vercel') {
+  if (!usesUserGatewayKey && (provider.id === 'openrouter' || provider.id === 'vercel')) {
     applyPreferredProvider(requestedModel, requestToMutate.body);
   }
 

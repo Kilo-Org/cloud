@@ -13,11 +13,11 @@ import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'callback-secret',
 }));
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://app.example.test',
 }));
 

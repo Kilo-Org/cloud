@@ -36,10 +36,13 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { parse as csvParse } from 'csv-parse/sync';
 import pLimit from 'p-limit';
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, gt, isNull, sql, inArray } from 'drizzle-orm';
-import { computeExpiration, type ExpiringTransaction } from '@/lib/creditExpiration';
+import {
+  computeExpiration,
+  type ExpiringTransaction,
+} from '@kilocode/web-shared/lib/creditExpiration';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

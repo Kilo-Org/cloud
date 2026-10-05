@@ -2,7 +2,7 @@ import 'server-only';
 
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { getModelTraffic, MODEL_TRAFFIC_RANGE_IDS } from '@/lib/ai-gateway/model-traffic';
 
 export const adminModelTrafficRouter = createTRPCRouter({

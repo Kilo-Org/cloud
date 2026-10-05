@@ -2,7 +2,7 @@ import { describe, it, expect, jest } from '@jest/globals';
 
 const mockLimit = jest.fn<() => Promise<Array<{ models: unknown }>>>().mockResolvedValue([]);
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -11,7 +11,7 @@ jest.mock('@/lib/drizzle', () => ({
     })),
   },
 }));
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 
 describe('mapModelIdToVercel', () => {
   describe('catalog aliases', () => {

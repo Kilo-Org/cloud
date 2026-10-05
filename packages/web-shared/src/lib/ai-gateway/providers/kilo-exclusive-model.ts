@@ -1,12 +1,12 @@
 import {
   OpenRouterInferenceProviderIdSchema,
   type OpenRouterInferenceProviderId,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   isOpenRouterProviderConfig,
   type GatewayRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export type KiloExclusiveModelFlag =
   | 'reasoning'

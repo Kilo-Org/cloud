@@ -6,10 +6,10 @@ import { WorkOS } from '@workos-inc/node';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
-import { WORKOS_API_KEY } from '@/lib/config.server';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { sentryLogger } from '@/lib/utils.server';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   organization_domain_claims,
   organizations,

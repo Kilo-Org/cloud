@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { GET } from './route';
 

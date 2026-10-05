@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import type { User } from '@kilocode/db/schema';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const mockGetUserFromAuthOrRedirect = jest.fn<Promise<User>, []>();
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuthOrRedirect: () => mockGetUserFromAuthOrRedirect(),
 }));
 

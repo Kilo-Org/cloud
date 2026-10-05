@@ -1,4 +1,4 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
 import Stripe from 'stripe';
 import { captureMessage } from '@sentry/nextjs';

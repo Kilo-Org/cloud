@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getRawOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET() {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });

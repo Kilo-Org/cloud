@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config, type User } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
-import { AUTO_FREE_FALLBACK_CONFIG } from '@/lib/ai-gateway/auto-model/auto-free-config';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { AUTO_FREE_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 
 let admin: User;

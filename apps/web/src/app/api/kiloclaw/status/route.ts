@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import {
   getActiveInstance,
   getActiveOrgInstance,

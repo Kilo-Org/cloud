@@ -3,9 +3,9 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { randomInt, randomUUID, createHmac } from 'crypto';
 import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
-import { normalizeEmail } from '@/lib/email-address';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 
 /**
  * Step-up codes that authorize a single data-export download URL.

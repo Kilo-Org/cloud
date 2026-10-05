@@ -1,7 +1,7 @@
 'use client';
 
 import { OrganizationPageHeader } from '@/components/organizations/OrganizationPageHeader';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { CodeIndexingView } from '@/components/code-indexing/CodeIndexingView';

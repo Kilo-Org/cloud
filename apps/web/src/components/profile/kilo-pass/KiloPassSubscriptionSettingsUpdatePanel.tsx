@@ -2,7 +2,7 @@ import { ArrowRight, Check, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { cn } from '@/lib/utils';
 
 import { getTierName } from './utils';

@@ -4,7 +4,7 @@
  * harness because that's where the Drizzle migrations, seed helpers, and
  * Jest setup already live.
  */
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -14,8 +14,8 @@ import {
   agent_environment_profile_skills,
   agent_environment_profile_agents,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   mergeProfileConfiguration,
   ProfileNotFoundError,

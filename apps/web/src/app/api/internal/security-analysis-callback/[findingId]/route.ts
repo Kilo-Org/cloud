@@ -1,6 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { CALLBACK_TOKEN_SECRET, SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@/lib/config.server';
+import {
+  CALLBACK_TOKEN_SECRET,
+  SECURITY_AUTO_ANALYSIS_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { z } from 'zod';
 

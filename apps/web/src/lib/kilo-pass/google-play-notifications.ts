@@ -12,14 +12,14 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import type { BouncerCreditEventOutboxDatabase } from '@kilocode/db/bouncer-credit-event-outbox';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   decodeGooglePlaySubscriptionPurchase,
   mapGooglePlayKiloPassPurchase,
@@ -39,8 +39,8 @@ import {
 } from './store-subscription-completion';
 import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-subscription';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
-import type { StoreCreditEvent, StoreEventKind } from '@/lib/bouncer/client';
-import { enqueueCreditEvent } from '@/lib/bouncer/credit-events';
+import type { StoreCreditEvent, StoreEventKind } from '@kilocode/web-shared/lib/bouncer/client';
+import { enqueueCreditEvent } from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByGoogleProductId } from '@/lib/credits/store-products';
 import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
@@ -50,7 +50,7 @@ import {
   reverseStoreCreditPurchase,
   STORE_FULL_MILLIUNITS,
 } from '@/lib/credits/store-refund';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
 type DbOrTx = DrizzleTransaction | typeof db;

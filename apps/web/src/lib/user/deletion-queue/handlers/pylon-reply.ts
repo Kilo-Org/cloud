@@ -5,9 +5,9 @@ import {
   UserDeletionStepStatus,
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
-import { getEnvVariable } from '@/lib/dotenvx';
-import { USER_DELETION_PYLON_REPLY_HTML } from '@/lib/user/deletion-queue/deletion-constants';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { USER_DELETION_PYLON_REPLY_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   deletionEmailsEqual,
   isInternalOrRelayEmail,

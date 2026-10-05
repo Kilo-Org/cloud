@@ -10,9 +10,9 @@
  */
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
-import { sendOrganizationInviteEmail } from '@/lib/email';
-import { sentryLogger } from '@/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sendOrganizationInviteEmail } from '@kilocode/web-shared/lib/email';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   claimDueInviteEmails,
   markInviteEmailDelivered,

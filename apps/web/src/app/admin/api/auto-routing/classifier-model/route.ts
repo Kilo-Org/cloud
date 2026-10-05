@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server';
 import {
   getAutoRoutingClassifierModel,
   updateAutoRoutingClassifierModel,
-} from '@/lib/ai-gateway/auto-routing-admin-client';
-import { getUserFromAuth } from '@/lib/user/server';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET() {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });

@@ -1,5 +1,5 @@
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { ORGANIZATION_AUTO_TARGET_MODELS } from '@/lib/ai-gateway/auto-model';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { ORGANIZATION_AUTO_TARGET_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 export { MAX_ORGANIZATION_AUTO_ROUTES } from '@kilocode/db/schema-types';
 
 export const ORGANIZATION_AUTO_MODEL_FLAG = 'organization-auto-model-routing';

@@ -2,13 +2,13 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
-} from '@/lib/ai-gateway/gateway-account-rate-limit';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   getOrganizationProviderPrivacy,
   creditsBlockedResponse,
@@ -16,33 +16,36 @@ import {
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import { logMicrodollarUsageAndReportToBouncer } from '@/lib/ai-gateway/processUsage';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { systemOneRequestSchema, systemOneResponseSchema } from '@/lib/ai-gateway/typesafe/schemas';
-import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { toMicrodollars } from '@/lib/microdollars';
-import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
-import type { ProxyErrorType } from '@/lib/proxy-error-types';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  systemOneRequestSchema,
+  systemOneResponseSchema,
+} from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
+import { FEATURE_HEADER, validateFeatureHeader } from '@kilocode/web-shared/lib/feature-detection';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
   payerSharingIp,
   rawClientIp,
   scheduleBouncerDecide,
-} from '@/lib/bouncer/inference';
+} from '@kilocode/web-shared/lib/bouncer/inference';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });

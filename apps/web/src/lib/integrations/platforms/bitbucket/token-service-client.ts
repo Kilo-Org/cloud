@@ -6,12 +6,12 @@ import {
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
+import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
 import {
   BITBUCKET_REPOSITORY_LIST_AUDIENCE,
   generateBoundedInternalServiceToken,
   TOKEN_EXPIRY,
-} from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/tokens';
 
 export const BitbucketRepositorySchema = z
   .object({

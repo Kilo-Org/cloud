@@ -1,11 +1,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { organizations } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, sql } from 'drizzle-orm';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 
 export async function POST(

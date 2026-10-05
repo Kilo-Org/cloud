@@ -12,17 +12,17 @@ import {
   commitSignInCode,
   releaseSignInCode,
   consumeSignInCode,
-} from '@/lib/auth/magic-link-tokens';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
   findUserByNormalizedEmail,
   findUserIdByAuthProvider,
   type CreateOrUpdateUserArgs,
 } from '@/lib/user';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   checkNativeAdmission,
@@ -40,8 +40,8 @@ import {
   createDeviceSessionWithAttestedKey,
 } from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const posthogClient = PostHogClient();
 
@@ -257,7 +257,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     let verified;
     try {
       if (data.serverAuthCode) {
-        const { GOOGLE_CLIENT_ID } = await import('@/lib/config.server');
+        const { GOOGLE_CLIENT_ID } = await import('@kilocode/web-shared/lib/config.server');
         if (!data.googleClientId || data.googleClientId !== GOOGLE_CLIENT_ID) {
           return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
         }

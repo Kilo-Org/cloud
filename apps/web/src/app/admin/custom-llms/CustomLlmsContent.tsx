@@ -31,7 +31,7 @@ import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { toast } from 'sonner';
 import { Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';

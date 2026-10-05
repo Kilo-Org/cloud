@@ -1,15 +1,15 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { after } from 'next/server';
-import { sendBalanceAlertEmail } from '@/lib/email';
-import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
-import { db } from '@/lib/drizzle';
+import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
+import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_memberships,
   organization_user_usage,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { and, eq, sql } from 'drizzle-orm';
 import { createOrganization, addUserToOrganization, getOrganizationMembers } from './organizations';
 import {
@@ -19,14 +19,14 @@ import {
   scheduleOrganizationLowBalanceAlert,
   updateOrganizationUserLimit,
 } from './organization-usage';
-import { createOrganizationUsage } from '@/tests/helpers/microdollar-usage.helper';
+import { createOrganizationUsage } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 
-jest.mock('@/lib/email', () => ({
-  ...jest.requireActual('@/lib/email'),
+jest.mock('@kilocode/web-shared/lib/email', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/email'),
   sendBalanceAlertEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/notifications-worker-client', () => ({
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   dispatchLowBalancePush: jest.fn().mockResolvedValue(undefined),
   dispatchSecurityFindingPush: jest.fn().mockResolvedValue(undefined),
 }));

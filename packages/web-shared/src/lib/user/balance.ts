@@ -1,8 +1,8 @@
-import { createTimer } from '@/lib/timer';
-import { processLocalExpirations } from '@/lib/creditExpiration';
+import { createTimer } from '@kilocode/web-shared/lib/timer';
+import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { after } from 'next/server';
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
-import type { UserForBalance } from '@/lib/user/balance-types';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import { subHours } from 'date-fns';
 
 export type BalanceForUser = Awaited<ReturnType<typeof getBalanceForUser>>;

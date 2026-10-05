@@ -1,6 +1,6 @@
 // consider using customer data downloads instead in the stripe UI
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import Stripe from 'stripe';
 import fs from 'fs';
 

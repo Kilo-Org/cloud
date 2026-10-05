@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   createScheduledJobRun: jest.fn(() => ({ runId: 'run-id' })),

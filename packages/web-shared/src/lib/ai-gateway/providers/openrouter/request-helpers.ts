@@ -1,13 +1,13 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
-import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
+import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
   GatewayRequest,
   GatewayResponsesRequest,
   MessageWithReasoning,
   OpenCodeSpecificProperties,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export function getMaxTokens(request: GatewayRequest) {
   if (request.kind === 'responses') {

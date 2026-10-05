@@ -1,19 +1,25 @@
 import type { Organization } from '@kilocode/db/schema';
-import type { OrganizationAutoModelSettings } from '@/lib/organizations/organization-types';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import type { OrganizationAutoModelSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
-} from '@/lib/model-allow.server';
-import { CUSTOM_LLM_PREFIX, normalizeModelId } from '@/lib/ai-gateway/model-utils';
+} from '@kilocode/web-shared/lib/model-allow.server';
+import {
+  CUSTOM_LLM_PREFIX,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   formatDirectByokModelId,
   getDirectByokModel,
-} from '@/lib/ai-gateway/providers/direct-byok';
-import { getBYOKforOrganization } from '@/lib/ai-gateway/byok';
-import { readDb, type DrizzleTransaction } from '@/lib/drizzle';
-import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getBYOKforOrganization } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { TRPCError } from '@trpc/server';
 export {
   getOrganizationAutoRoute,
@@ -21,11 +27,11 @@ export {
   isOrganizationAutoTargetModel,
   MAX_ORGANIZATION_AUTO_ROUTES,
   ORGANIZATION_AUTO_MODEL_FLAG,
-} from '@/lib/organizations/organization-auto-model-shared';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
 import {
   isOrganizationAutoTargetModel,
   ORGANIZATION_AUTO_MODEL_FLAG,
-} from '@/lib/organizations/organization-auto-model-shared';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
 
 type OrganizationAutoPolicyOrganization = Pick<Organization, 'id' | 'plan' | 'settings'>;
 

@@ -5,8 +5,8 @@ import { captureException } from '@sentry/nextjs';
 import {
   AdminSlackNotificationError,
   sendAdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
-import type { ServiceFeeFlow } from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
+import type { ServiceFeeFlow } from '@kilocode/web-shared/lib/service-fees/types';
 
 export const SERVICE_FEE_MISSED_SENTRY_TAG = 'service_fee_missed';
 

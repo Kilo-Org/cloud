@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as z from 'zod';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 export type RunAnalyticsEngineQuery = <Row>(
   sql: string,

@@ -1,20 +1,20 @@
 import type { Organization } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import {
   ORGANIZATION_BILLING_ROLES,
   ORGANIZATION_MANAGE_ROLES,
 } from '@kilocode/app-shared/organizations';
-import { baseProcedure } from '@/lib/trpc/init';
-import type { TRPCContext } from '@/lib/trpc/init';
+import { baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
   elevateViaKiloAdmin,
   organizationTarget,
   organizationsTarget,
   recordKiloAdminElevation,
-} from '@/lib/admin/admin-access-log';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray } from 'drizzle-orm';
 import * as z from 'zod';

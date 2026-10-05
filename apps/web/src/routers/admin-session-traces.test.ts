@@ -9,13 +9,13 @@ jest.mock('@/lib/session-ingest-client', () => ({
   fetchSessionSnapshot: (...args: unknown[]) => mockFetchSessionSnapshot(...args),
 }));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
 import {
   getSessionContainerMetrics,
   getSessionContainerMetricsForInfo,
 } from '@/routers/admin/session-container-telemetry';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cliSessions,
   cli_sessions_v2,

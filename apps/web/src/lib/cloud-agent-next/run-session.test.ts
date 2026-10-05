@@ -4,7 +4,7 @@ import type { CloudAgentNextClient } from './cloud-agent-client';
 const mockDisconnect = jest.fn();
 let mockEventToEmit: CloudAgentEvent | undefined;
 
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: (name: string) =>
     name === 'NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL' ? 'https://worker.example.com' : undefined,
 }));

@@ -6,7 +6,7 @@ const mockIsCloudDataExportUIEnabled = jest.fn();
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuthOrRedirect: mockGetUserFromAuthOrRedirect,
 }));
 jest.mock('@/lib/user-data-export-ui', () => ({

@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { approveDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
-import { APP_URL } from '@/lib/constants';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import * as z from 'zod';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const TokensSchema = z.object({
   code: z.string().min(1),

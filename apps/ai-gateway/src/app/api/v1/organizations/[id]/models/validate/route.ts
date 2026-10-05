@@ -1,1 +1,1 @@
-export { handleOrganizationModelValidationRequest as POST } from '@/lib/ai-gateway/handlers/organization-model-validation';
+export { handleOrganizationModelValidationRequest as POST } from '@kilocode/web-shared/lib/ai-gateway/handlers/organization-model-validation';

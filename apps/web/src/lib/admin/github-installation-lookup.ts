@@ -2,7 +2,7 @@ import 'server-only';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 import { and, asc, eq, ilike, inArray, or } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import {
   getGitHubAppCredentials,

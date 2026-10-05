@@ -3,7 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 
 export type ReviewAnalyticsOwner = { type: 'org'; id: string };

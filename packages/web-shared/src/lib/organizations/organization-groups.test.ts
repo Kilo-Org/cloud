@@ -3,7 +3,7 @@ import {
   OrganizationGroupInputSchema,
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { normalizeOrganizationGroupPolicy } from './organization-groups';
 
 describe('organization group policies', () => {

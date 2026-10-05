@@ -1,11 +1,11 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 
 // Its own module so the gateway's organization model routes can mount this
 // procedure without the rest of the settings router.

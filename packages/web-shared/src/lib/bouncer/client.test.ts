@@ -2,15 +2,15 @@ import { beforeAll, afterEach, describe, expect, it, jest } from '@jest/globals'
 
 const mockConfigState = { bouncerUrl: 'https://bouncer.example.com' as string | null };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BOUNCER_URL() {
     return mockConfigState.bouncerUrl;
   },
   INTERNAL_API_SECRET: 'test-internal-secret',
 }));
 
-import type * as BouncerClient from '@/lib/bouncer/client';
-import { parseBouncerCreditEventBody } from '@/lib/bouncer/credit-event-schema';
+import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id, so the client
 // is loaded after the config mock is registered (same convention as the store-completion tests).
@@ -22,7 +22,7 @@ let normalizeJa4: typeof BouncerClient.normalizeJa4;
 
 beforeAll(() => {
   ({ deliverCreditEvent, decide, reportUsageEvent, creditEventWireBody, normalizeJa4 } =
-    jest.requireActual<typeof BouncerClient>('@/lib/bouncer/client'));
+    jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
 });
 
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;

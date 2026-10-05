@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import { captureException } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import type { User } from '@kilocode/db/schema';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 jest.mock('next/server', () => {
   return {
@@ -19,17 +19,17 @@ jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureException: jest.fn(),
 }));
-jest.mock('@/lib/user/server');
-jest.mock('@/lib/organizations/organization-usage');
-jest.mock('@/lib/autoTopUpInFlight');
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
+jest.mock('@kilocode/web-shared/lib/autoTopUpInFlight');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/is-free-model', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
   isFreeModel: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
   return {
     ...actual,
     countAndStoreTranscriptionUsage: jest.fn(),

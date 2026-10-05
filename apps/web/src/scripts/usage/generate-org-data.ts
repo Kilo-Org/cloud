@@ -20,7 +20,7 @@
  * needed after inserting records with this script.
  */
 import { strict as assert } from 'node:assert';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';

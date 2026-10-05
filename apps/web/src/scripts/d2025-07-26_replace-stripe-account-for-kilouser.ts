@@ -1,5 +1,5 @@
-import { createStripeCustomer } from '@/lib/stripe-client';
-import { db } from '@/lib/drizzle';
+import { createStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

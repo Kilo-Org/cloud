@@ -58,10 +58,15 @@ import {
   isOpenAiTokenSharingGrant,
 } from '@kilocode/web-shared/lib/auth/openai/config';
 import {
+  markOpenAiChatGptNotEligible,
   openAiChatGptSharedServicesOwner,
   saveOpenAiChatGptConnection,
 } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import {
+  OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE,
+  probeOpenAiChatGptEligibility,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/eligibility';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -294,6 +299,12 @@ async function persistOpenAiChatGptConnection(
       },
       userId
     );
+    // OpenAI refuses some accounts and workspaces outright. The probe finds
+    // that now, so the card explains it instead of the first request failing.
+    // The refused row is kept, disabled, so the card can show the reason.
+    if (!(await probeOpenAiChatGptEligibility(accessToken))) {
+      await markOpenAiChatGptNotEligible(owner, accessToken, OPENAI_CHATGPT_NOT_ELIGIBLE_MESSAGE);
+    }
   } catch (error) {
     captureException(error, {
       tags: { operation: 'openai_chatgpt_connection_persist' },

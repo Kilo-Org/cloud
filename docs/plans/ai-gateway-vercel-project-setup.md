@@ -180,7 +180,7 @@ For each environment, check:
 
 - [ ] Postgres connection headroom: the gateway adds Fluid instances in two regions on top of the web projects. Check pool and server limits on the primary and both replicas. The gateway rate limit code records an earlier connection-pool exhaustion.
 - [ ] Axiom monitors and dashboards, and Sentry alerts, that filter on a project name include `kilocode-ai-gateway`.
-- [ ] Optional: annotate gateway promotes in Axiom like `promote-app` does (`axiom_annotation_dataset` and `axiom_expected_project` in `deploy-ai-gateway.yml`).
+- [ ] Optional: annotate gateway promotes in Axiom like `promote-app` in `deploy-production.yml` does. That is a code change: the `promote` job in `deploy-ai-gateway.yml` has to pass the `axiom_annotation_dataset` and `axiom_expected_project: kilocode-ai-gateway` inputs of `promote-vercel-deployment.yml`, and the `AXIOM_ANNOTATION_TOKEN` secret.
 - [ ] Reconcile the IP blocks of `kilocode-global-app` with `kilocode-app`; they have drifted.
 
 ## Out of scope

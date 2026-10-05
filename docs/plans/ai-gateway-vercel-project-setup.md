@@ -146,7 +146,14 @@ Rate-limit counters are per project. While web and the gateway both serve infere
 
 ### 8. Add domains and DNS
 
-Choose the hostnames first. For example, `ai-gateway.kilo.ai` for production and `staging-ai-gateway.kilo.ai` for staging. The existing ones are `api.kilo.ai` (`kilocode-app`), `global-api.kilo.ai` (`kilocode-global-app`), and `staging-api.kilo.ai` (`kilocode-app` staging).
+Choose the hostnames first. For example, `ai-gateway.kilo.ai` for production and `staging-ai-gateway.kilo.ai` for staging. The existing hostnames:
+
+| Project | Production | Staging |
+|---|---|---|
+| `kilocode-app` | `app.kilo.ai`, `api.kilo.ai`; `api.kilocode.ai`; `app.kilocode.ai` redirects to `app.kilo.ai` | `staging-app.kilo.ai`, `staging-api.kilo.ai`, `staging-app.kilocode.ai`, `staging-api.kilocode.ai` |
+| `kilocode-global-app` | `global-api.kilo.ai` | None; only deployment URLs, which Vercel Authentication protects |
+
+`packages/web-shared/src/lib/constants.ts` already falls back to `https://staging-app.kilo.ai` as the app URL for Vercel's `staging` target, so gateway staging links open the web staging app.
 
 - [ ] In the project's Domains settings, add the production hostname to production and the staging hostname to the `staging` environment.
 - [ ] `kilo.ai` uses external DNS at the registrar (`registrar-servers.com` nameservers), not Vercel DNS. At the registrar, add the CNAME record that Vercel shows for each hostname. The existing web hostnames point at project-specific `*.vercel-dns-016.com` targets.
@@ -180,7 +187,7 @@ For each environment, check:
 
 - [ ] Postgres connection headroom: the gateway adds Fluid instances in two regions on top of the web projects. Check pool and server limits on the primary and both replicas. The gateway rate limit code records an earlier connection-pool exhaustion.
 - [ ] Axiom monitors and dashboards, and Sentry alerts, that filter on a project name include `kilocode-ai-gateway`.
-- [ ] Optional: annotate gateway promotes in Axiom like `promote-app` in `deploy-production.yml` does. That is a code change: the `promote` job in `deploy-ai-gateway.yml` has to pass the `axiom_annotation_dataset` and `axiom_expected_project: kilocode-ai-gateway` inputs of `promote-vercel-deployment.yml`, and the `AXIOM_ANNOTATION_TOKEN` secret.
+- [ ] After #7177 merges, production promotes are annotated in Axiom's `vercel` dataset as `kilocode-ai-gateway · <sha>`. Check that the first annotation appears.
 - [ ] Reconcile the IP blocks of `kilocode-global-app` with `kilocode-app`; they have drifted.
 
 ## Out of scope

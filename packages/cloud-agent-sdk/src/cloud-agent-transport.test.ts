@@ -98,6 +98,32 @@ beforeEach(() => {
 });
 
 describe('CloudAgentTransport event routing', () => {
+  it.each([
+    ['question.asked', { id: 'request-1' }],
+    ['question.replied', { requestID: 'request-1' }],
+    ['question.rejected', { requestID: 'request-1' }],
+    ['permission.asked', { id: 'request-1', permission: 'bash' }],
+    ['permission.replied', { requestID: 'request-1' }],
+  ])(
+    'suppresses historical %s until connected, then delivers current interactions',
+    async (type, properties) => {
+      const { transport, serviceEvents } = createTransportWithSinks();
+      transport.connect();
+      await flushPromises();
+      const previousEvents = [...serviceEvents];
+
+      sendRaw(kilocode(type, properties));
+      expect(serviceEvents).toEqual(previousEvents);
+
+      sendRaw(createEvent('connected', {}));
+      sendRaw(kilocode(type, properties));
+      expect(serviceEvents.at(-1)).toEqual(
+        expect.objectContaining({ type, requestId: 'request-1' })
+      );
+      transport.destroy();
+    }
+  );
+
   it('routes chat events to onChatEvent', async () => {
     const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
 
@@ -628,6 +654,36 @@ describe('CloudAgentTransport command delegation', () => {
 });
 
 describe('CloudAgentTransport snapshot refetch on reconnect', () => {
+  it('does not resurrect answered questions during reconnect replay', async () => {
+    jest.useFakeTimers();
+    const { transport, serviceEvents } = createTransportWithSinks();
+    try {
+      transport.connect();
+      await flushMicrotasks();
+      sendRaw(createEvent('connected', {}));
+      sendRaw(kilocode('question.asked', { id: 'answered-question' }));
+      sendRaw(kilocode('question.replied', { requestID: 'answered-question' }));
+
+      const reconnectedWs = await simulateReconnect(
+        kilocode('question.asked', { id: 'answered-question' })
+      );
+      expect(serviceEvents.filter(event => event.type === 'question.asked')).toHaveLength(1);
+      sendRawOn(reconnectedWs, kilocode('question.replied', { requestID: 'answered-question' }));
+      expect(serviceEvents.filter(event => event.type === 'question.replied')).toHaveLength(1);
+
+      sendRawOn(reconnectedWs, createEvent('connected', {}));
+      sendRawOn(reconnectedWs, kilocode('question.asked', { id: 'pending-question' }));
+      expect(serviceEvents.at(-1)).toEqual({
+        type: 'question.asked',
+        requestId: 'pending-question',
+        questions: undefined,
+      });
+    } finally {
+      transport.destroy();
+      jest.useRealTimers();
+    }
+  });
+
   // Microtask-based flush that works under jest.useFakeTimers()
   // (unlike flushPromises which uses setTimeout and hangs with fake timers)
   async function flushMicrotasks(): Promise<void> {

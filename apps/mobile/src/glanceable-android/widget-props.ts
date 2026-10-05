@@ -108,37 +108,25 @@ export type AndroidWidgetProps = {
 /**
  * Resolve the reserved slot's line.
  *
- * The slot is visible on every surface that offers an in-place action — the two
- * count statuses, including an idle-only tray, and the empty one — because a
- * create's progress and failure have nowhere else to appear, and the empty
- * surface and an idle-only tray are the ones that offer `New agent`. The
- * newest-session *title* still draws only where the counts do, so a locked or
- * empty surface never carries a stale title; an action in flight or a failed
- * action owns the slot ahead of the title, so the widget never shows the newest
- * session as if it were the action's result.
+ * The slot is visible on the two count statuses, the ones that can offer the
+ * in-place Approve, because its progress and failure have nowhere else to
+ * appear. A locked or empty surface never carries a stale title; an approve in
+ * flight or a failed approve owns the slot ahead of the title, so the widget
+ * never shows the newest session as if it were the approve's result.
  */
 function newestLineFor(
   extras: GlanceableSurfaceExtras,
   status: GlanceableStatus,
   translate: (key: string) => string
 ): string | null {
-  if (status !== 'happy' && status !== 'stale' && status !== 'empty') {
+  if (status !== 'happy' && status !== 'stale') {
     return null;
   }
   if (extras.actionFeedback === 'approving') {
     return translate('glanceable.approving');
   }
-  if (extras.actionFeedback === 'starting') {
-    return translate('common.starting');
-  }
   if (extras.actionFeedback === 'couldNotApprove') {
     return translate('glanceable.couldNotApprove');
-  }
-  if (extras.actionFeedback === 'couldNotStart') {
-    return translate('glanceable.couldNotStart');
-  }
-  if (status !== 'happy' && status !== 'stale') {
-    return null;
   }
   const title = extras.newestSessionTitle;
   if (title === null) {

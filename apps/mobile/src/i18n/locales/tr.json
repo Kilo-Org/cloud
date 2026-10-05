@@ -3218,7 +3218,6 @@
     "newAgent": "Yeni ajan",
     "approving": "Onaylanıyor...",
     "couldNotApprove": "Onaylanamadı",
-    "couldNotStart": "Başlatılamadı",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",

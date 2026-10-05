@@ -10,13 +10,7 @@ import {
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import {
-  failureFeedback,
-  runningFeedback,
-  runWidgetAction,
-  type WidgetAction,
-} from '@/lib/glanceable/widget-actions';
-import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
+import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
@@ -71,35 +65,25 @@ export async function applyWidgetLanguage(): Promise<void> {
   await applyStoredLanguage();
 }
 
-/** The custom click actions the widget's own rows emit (never OPEN_APP/OPEN_URI). */
-function isWidgetAction(value: string | undefined): value is WidgetAction {
-  return value === 'approve' || value === 'new-agent';
-}
+/**
+ * The one custom click action the widget emits; New agent and the body are
+ * `OPEN_URI` deep links the host handles without JS.
+ */
+const APPROVE_CLICK_ACTION = 'approve';
 
-/** Where an unfinished action lands: the same agents list the body tap opens. */
+/** Where an Approve with nothing to answer lands: the agents list the body tap opens. */
 const OPEN_AGENTS_URI = 'kiloapp:///cloud/sessions';
-/**
- * Where a create with nothing to start from lands: the new-session screen.
- *
- * `LAUNCHER_NEW_AGENT_URL` is the canonical `kiloapp:///cloud/sessions/new` the
- * launcher shortcuts already use; `resolveIncomingUrl` maps it to
- * `/(app)/agent-chat/new`. The old widget-local `kiloapp://agent-chat/new`
- * matched no universal-link row, so the deep link resolved to null and the tap
- * dead-ended. One source of truth keeps the widget and the shortcuts agreeing.
- */
-const OPEN_NEW_AGENT_URI = LAUNCHER_NEW_AGENT_URL;
 
 /**
- * Run one in-place action and redraw the widget the user is looking at. The
- * action's request goes out with its progress line already drawn, and the
- * redraw after it re-reads native storage: a successful action republishes the
- * tray through the sink, which writes the new snapshot there (see
- * `runWidgetAction`). A custom clickAction itself never opens the app — it
- * launches a headless task — but an action that cannot complete in place hands
- * the user to the app instead of dead-ending on the widget.
+ * Run the in-place Approve and redraw the widget the user is looking at. The
+ * request goes out with its progress line already drawn, and the redraw after
+ * it re-reads native storage: a successful approve republishes the tray through
+ * the sink, which writes the new snapshot there (see `runWidgetApprove`). A
+ * custom clickAction itself never opens the app — it launches a headless task —
+ * but an approve that cannot complete in place hands the user to the app
+ * instead of dead-ending on the widget.
  */
-async function handleWidgetAction(
-  action: WidgetAction,
+async function handleWidgetApprove(
   task: Pick<WidgetTaskHandlerProps, 'renderWidget' | 'widgetInfo'>,
   currentProps: () => AndroidWidgetProps
 ): Promise<void> {
@@ -107,25 +91,22 @@ async function handleWidgetAction(
   const draw = () => {
     renderWidget(renderActiveAgentsWidget(currentProps(), widgetInfo, isWidgetRtl()));
   };
-  setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: runningFeedback(action) });
+  setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: 'approving' });
   draw();
-  const result = await runWidgetAction(action);
+  const result = await runWidgetApprove();
   setSurfaceExtras({
     ...getSurfaceExtras(),
-    // The failure line is the action's own retry copy, and the row that was
-    // tapped stays offered; the body tap still opens Kilo.
-    actionFeedback: result.kind === 'failed' ? failureFeedback(action) : null,
+    // The failure line is Approve's own retry copy, and Approve stays offered;
+    // the body tap still opens Kilo.
+    actionFeedback: result.kind === 'failed' ? 'couldNotApprove' : null,
   });
   draw();
   // Nothing to act on, or the agent asked a free-form question the widget must
-  // never invent an answer to: the action hands the user to the app. The
-  // create action lands on the new-session screen when it had no draft or
-  // repository to start from; a failed call stays on the widget, whose retry
-  // row and body tap remain offered.
+  // never invent an answer to: open the agents list. A failed call stays on the
+  // widget, whose retry row and body tap remain offered.
   if (result.kind === 'none' || result.kind === 'no-permission') {
-    const uri = action === 'approve' ? OPEN_AGENTS_URI : OPEN_NEW_AGENT_URI;
     try {
-      await Linking.openURL(uri);
+      await Linking.openURL(OPEN_AGENTS_URI);
     } catch {
       // A host that cannot start the Activity leaves the settled widget on
       // screen; the task itself must not fail on the open.
@@ -191,8 +172,8 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
       ? props
       : buildCurrentWidgetProps(snapshot, translate, formatGlanceableCount, formatGlanceableAgo);
   };
-  if (widgetAction === 'WIDGET_CLICK' && isWidgetAction(clickAction)) {
-    await handleWidgetAction(clickAction, task, currentProps);
+  if (widgetAction === 'WIDGET_CLICK' && clickAction === APPROVE_CLICK_ACTION) {
+    await handleWidgetApprove(task, currentProps);
     return;
   }
   renderWidget(renderActiveAgentsWidget(currentProps(), widgetInfo, isWidgetRtl()));

@@ -50,12 +50,11 @@ type WidgetProps = GlanceableWidgetProps;
  * The press patch. `@expo/ui` types `onPress` as `() => void`, but in the
  * widget process the bundle calls the handler and merges the returned patch
  * into the pressed entry's props (its `findAndCallOnPress`), so the return
- * value is load-bearing. The patch rides in these two fields; the app maps
- * them back to the action (see `pendingActionOf` in widget-actions).
+ * value is load-bearing. The app maps the marker back to the action (see
+ * `pendingActionOf` in widget-actions).
  */
 type WidgetPressPatch = {
   pendingAction: GlanceableWidgetAction;
-  pendingActionVisible: boolean;
 };
 
 /**
@@ -347,50 +346,18 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
 
   // The newest-session slot and the action row are Home Screen families only:
   // the Lock Screen families keep their generic layout, which is what the
-  // snapshot privacy contract protects. While a press is unanswered, the App
-  // Intent's patch owns the slot with the pressed action's copy, so the press
-  // is visible in place before the app answers; when the app answers it pushes
-  // fresh props, and the slot shows the failure line or the newest session.
+  // snapshot privacy contract protects.
   //
   // The height is declared inside this function, not at module scope: the
   // widget transform stringifies this function's source alone and the widget
   // process evaluates it against widget globals, so a module-scope binding
-  // would be a `ReferenceError` at render. The literal copy fallbacks follow
-  // the same rule as `COPY` above: the widget process is the only consumer.
+  // would be a `ReferenceError` at render.
   const NEWEST_SLOT_HEIGHT = 16;
-  // The press patch carries which action was pressed, so the slot names it
-  // instead of always reading "Approving…" under a New agent tap. The baked
-  // fallbacks carry the typographic ellipsis their catalog keys use
-  // (`common.starting`, `glanceable.approving`), so the gallery placeholder
-  // matches the pushed copy in this same reserved slot.
-  //
-  // A press marker never draws on a settled surface. A widget button's App
-  // Intent runs in the widget extension and does not foreground the app, so the
-  // marker it writes into the stored timeline is cleared only by the next sweep
-  // (see `hasPressMarker` in widget-actions). Until then it must not hold
-  // "Starting…" beside populated counts: a marker that names a known action —
-  // the owner's stored `pendingAction: 'new-agent'`, `pendingActionVisible:
-  // true` on an idle-only tray — still drew the lingering start line. The line
-  // draws only where no count rows are drawn, so it cannot contradict data the
-  // app has already answered with; the sweep clears the marker from the
-  // timeline, and the app's own `newestTitle` still reaches the slot on every
-  // surface.
-  const pendingActionKind: GlanceableWidgetAction | null =
-    props.pendingAction === 'approve' || props.pendingAction === 'new-agent'
-      ? props.pendingAction
-      : null;
-  const pressCopy =
-    pendingActionKind === 'new-agent'
-      ? (COPY.starting ?? 'Starting…')
-      : (COPY.approving ?? 'Approving…');
-  const newestLine =
-    props.pendingActionVisible === true && pendingActionKind !== null && counts.length === 0
-      ? pressCopy
-      : (props.newestTitle ?? null);
+  const newestLine = props.newestTitle ?? null;
   const actions = props.actions ?? { approve: false, newAgent: false };
   // The slot is laid out whether or not it carries a line, so a title arriving
-  // after a process restart, the press line taking the slot, and the answer
-  // replacing it move neither the count rows above nor the actions below.
+  // after a process restart, or an approve's progress line replacing it, moves
+  // neither the count rows above nor the actions below.
   const newestSlot = (
     <VStack alignment="leading" spacing={0} modifiers={[frame({ height: NEWEST_SLOT_HEIGHT })]}>
       {newestLine === null ? null : (
@@ -410,15 +377,23 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   );
 
   // The patch a press returns marks the action in the pressed entry's props;
-  // the app sweeps it up, runs it, and pushes the answer. `onPress` is the
-  // shared prop that @expo/ui's widget Button turns into the native
-  // `onButtonPress` event the widget bundle dispatches, so a tap opens the
-  // press patch in place instead of the app — the body keeps its own
-  // `widgetURL` deep link for taps beside the buttons. `WidgetButton` is the
-  // narrow local view of the shared Button whose `onPress` carries the patch
-  // the bundle reads; the shared `onPress: () => void` type would forbid the
-  // value-returning handler the widget press depends on.
+  // the app sweeps it up and runs it. `onPress` is the shared prop that
+  // @expo/ui's widget Button turns into the native `onButtonPress` event the
+  // widget bundle dispatches — the body keeps its own `widgetURL` deep link for
+  // taps beside the buttons. `WidgetButton` is the narrow local view of the
+  // shared Button whose `onPress` carries the patch the bundle reads; the
+  // shared `onPress: () => void` type would forbid the value-returning handler
+  // the widget press depends on.
+  //
+  // Approve answers in place, so its intent stays in the background. New agent
+  // needs the composer: `openAppWhenRun` selects the foregrounding intent in
+  // the patched expo-widgets button view, so the tap brings Kilo up and the
+  // app's press listener opens the new-session screen. Without it the intent
+  // only marked the timeline, and nothing happened until the next launch. It
+  // is a prop of that view, not of `@expo/ui`'s `Button`, so it travels as the
+  // plain extra prop the widget process serialises with the rest.
   const WidgetButton = Button as (props: WidgetButtonProps) => React.JSX.Element;
+  const openButtonProps = { openAppWhenRun: true };
   const actionButtons = (
     <HStack alignment="center" spacing={8}>
       {actions.approve ? (
@@ -429,18 +404,19 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
             controlSize('small'),
             font({ textStyle: 'caption' }),
           ]}
-          onPress={() => ({ pendingAction: 'approve', pendingActionVisible: true })}
+          onPress={() => ({ pendingAction: 'approve' })}
         />
       ) : null}
       {actions.newAgent ? (
         <WidgetButton
+          {...openButtonProps}
           label={COPY.newAgent}
           modifiers={[
             buttonStyle('bordered'),
             controlSize('small'),
             font({ textStyle: 'caption' }),
           ]}
-          onPress={() => ({ pendingAction: 'new-agent', pendingActionVisible: true })}
+          onPress={() => ({ pendingAction: 'new-agent' })}
         />
       ) : null}
     </HStack>

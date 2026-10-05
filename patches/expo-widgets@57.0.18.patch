@@ -1,5 +1,5 @@
 diff --git a/build/ExpoWidgets.d.ts b/build/ExpoWidgets.d.ts
-index 7f139d2..500bdd5 100644
+index 7f139d2f379eece8f1f1f07b7130fba82040089e..500bdd5d0fb2f3df05df1a0204faadbd483c573f 100644
 --- a/build/ExpoWidgets.d.ts
 +++ b/build/ExpoWidgets.d.ts
 @@ -3,6 +3,7 @@ import type { ExpoWidgetsEvents, NativeLiveActivity, NativeLiveActivityFactory,
@@ -11,7 +11,7 @@ index 7f139d2..500bdd5 100644
      LiveActivityFactory: typeof NativeLiveActivityFactory;
      LiveActivity: typeof NativeLiveActivity;
 diff --git a/build/ExpoWidgets.ios.d.ts b/build/ExpoWidgets.ios.d.ts
-index 7df2b6c..17dacae 100644
+index 7df2b6c4483b096c3444fd6e43f901244b5c5de7..17dacae521aa4c3efe7c27cbed76eeb2e06652f0 100644
 --- a/build/ExpoWidgets.ios.d.ts
 +++ b/build/ExpoWidgets.ios.d.ts
 @@ -3,6 +3,7 @@ import type { ExpoWidgetsEvents, NativeLiveActivity, NativeLiveActivityFactory,
@@ -23,7 +23,7 @@ index 7df2b6c..17dacae 100644
      readonly LiveActivityFactory: typeof NativeLiveActivityFactory;
      readonly LiveActivity: typeof NativeLiveActivity;
 diff --git a/build/ExpoWidgets.js b/build/ExpoWidgets.js
-index aabbb41..735541f 100644
+index aabbb41259038993305302607e0156e4d61cf4bd..735541f32bd89f368eecbd00fc8fc58357207cb2 100644
 --- a/build/ExpoWidgets.js
 +++ b/build/ExpoWidgets.js
 @@ -12,7 +12,10 @@ class LiveActivityStub {
@@ -61,7 +61,7 @@ index aabbb41..735541f 100644
      LiveActivityFactory: LiveActivityFactoryStub,
      LiveActivity: LiveActivityStub,
 diff --git a/build/Widgets.d.ts b/build/Widgets.d.ts
-index d4b5aac..038f4c2 100644
+index d4b5aacee380c056855f68c5ca62c9af24304745..038f4c2491bacc01ab3aac1fb1305d0f58a23789 100644
 --- a/build/Widgets.d.ts
 +++ b/build/Widgets.d.ts
 @@ -37,12 +37,17 @@ export declare class LiveActivity<T extends object = object> {
@@ -130,7 +130,7 @@ index d4b5aac..038f4c2 100644
  //# sourceMappingURL=Widgets.d.ts.map
 \ No newline at end of file
 diff --git a/build/Widgets.js b/build/Widgets.js
-index 9099a1b..789689a 100644
+index 9099a1bb3c10eaddc41518ba5b82117284f82135..789689aec6229cbef0ccecfefda2ec6a74c5e392 100644
 --- a/build/Widgets.js
 +++ b/build/Widgets.js
 @@ -53,13 +53,17 @@ export class LiveActivity {
@@ -213,7 +213,7 @@ index 9099a1b..789689a 100644
  //# sourceMappingURL=Widgets.js.map
 \ No newline at end of file
 diff --git a/build/Widgets.types.d.ts b/build/Widgets.types.d.ts
-index 15e0268..0903ad4 100644
+index 15e026868625ce20a3e359e5cc8e5c7e937c4650..0903ad44c63d8b510b208018dca25e3cba6d84f8 100644
 --- a/build/Widgets.types.d.ts
 +++ b/build/Widgets.types.d.ts
 @@ -260,12 +260,16 @@ export declare class NativeWidgetObject extends SharedObject {
@@ -236,7 +236,7 @@ index 15e0268..0903ad4 100644
      end(dismissalPolicy?: string, afterDate?: number, state?: string, contentDate?: number): Promise<void>;
      getPushToken(): Promise<string | null>;
 diff --git a/ios/LiveActivity.swift b/ios/LiveActivity.swift
-index 5f34eb2..b775244 100644
+index 5f34eb2b67a0c2389c8ad8e09c71aa391a0c65ef..b7752440d7375830fa31afdd943624636e4590d2 100644
 --- a/ios/LiveActivity.swift
 +++ b/ios/LiveActivity.swift
 @@ -12,6 +12,24 @@ final class LiveActivity: SharedObject {
@@ -265,7 +265,7 @@ index 5f34eb2..b775244 100644
      guard #available(iOS 16.2, *) else { throw LiveActivitiesNotSupportedException() }
  
 diff --git a/ios/LiveActivityFactory.swift b/ios/LiveActivityFactory.swift
-index 4b8a632..7f4524c 100644
+index 4b8a632965ddb507aeeb54a4d8944f455e5dffd7..7f4524c9b4ae2409aff7e2d59d4623ef5d23bd9c 100644
 --- a/ios/LiveActivityFactory.swift
 +++ b/ios/LiveActivityFactory.swift
 @@ -9,9 +9,16 @@ final class LiveActivityFactory: SharedObject {
@@ -319,13 +319,163 @@ index 4b8a632..7f4524c 100644
      instances = instances.filter { activeIDs.contains($0.key) }
  
 diff --git a/ios/Widgets/AppIntent.swift b/ios/Widgets/AppIntent.swift
-index 972fa4f..97c1a0f 100644
+index 972fa4f190d5da8f961218bcbe2436964ac34acf..8ddb97e28fa3cdd57a1439635cf39e60fac52bf4 100644
 --- a/ios/Widgets/AppIntent.swift
 +++ b/ios/Widgets/AppIntent.swift
-@@ -100,6 +100,17 @@ struct WidgetUserInteraction: AppIntent {
+@@ -49,57 +49,126 @@ struct WidgetUserInteraction: AppIntent {
+   }
+ 
+   func perform() async throws -> some IntentResult {
+-    guard let source else {
+-      return .result()
+-    }
++    performWidgetUserInteraction(
++      source: source,
++      target: target,
++      entryIndex: entryIndex,
++      environmentString: environmentString
++    )
++    return .result()
++  }
++}
+ 
+-    let layout = WidgetsStorage.getString(forKey: "__expo_widgets_\(source)_layout") ?? ""
+-    let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline")
++/// The intent a widget button whose press must land the user inside the app
++/// uses. `WidgetUserInteraction` performs without foregrounding the app, so a
++/// press that needs the app only marks the timeline until the next launch.
++/// `openAppWhenRun` asks the system for the foreground, so the app is up — and
++/// its press listener attached — when the marker the press records is consumed.
++@available(iOS 16.0, *)
++struct WidgetOpenInteraction: AppIntent {
++  // title is not used for non-discoverable intents, but it is required
++  static var title: LocalizedStringResource = "Open App"
++  static var isDiscoverable: Bool = false
++  static var openAppWhenRun: Bool = true
+ 
+-    guard let timeline,
+-          let entryIndex,
+-          timeline.indices.contains(entryIndex),
+-          let entry = timeline[entryIndex] as? [String: Any],
+-          let props = entry["props"] as? [String: Any],
+-          let environmentData = environmentString?.data(using: .utf8),
+-          var environment = try? JSONSerialization.jsonObject(with: environmentData) as? [String: Any] else {
+-      return .result()
+-    }
+-    environment["target"] = target
+-
+-    let newProps: [String: Any]?
+-    switch evaluateWidgetButtonPress(layout: layout, props: props, environment: environment) {
+-    case .success(let result):
+-      newProps = result
+-    case .failure(let error):
+-      print("[ExpoWidgets] Button press evaluation failed: \(error.message)")
+-      newProps = nil
+-    }
++  @Parameter(title: "source")
++  var source: String?
+ 
+-    if let newProps {
+-      var newEntry = entry
+-      if let originalProps = entry["props"] as? [String: Any] {
+-        newEntry["props"] = originalProps.merging(newProps) { _, new in new }
+-      }
+-      guard var newTimeline = timeline as? [[String: Any]] else {
+-        return .result()
+-      }
+-      newTimeline[entryIndex] = newEntry
+-      WidgetsStorage.set(newTimeline, forKey: "__expo_widgets_\(source)_timeline")
+-    }
++  @Parameter(title: "target")
++  var target: String?
+ 
+-    WidgetsEvents.shared.sendNotification(type: .userEvent, data: [
+-      "source": source as Any,
+-      "target": target as Any,
+-      "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+-    ])
++  @Parameter(title: "entryIndex")
++  var entryIndex: Int?
+ 
+-    WidgetCenter.shared.reloadTimelines(ofKind: source)
++  @Parameter(title: "environmentString")
++  var environmentString: String?
+ 
++  init() {}
++  init(source: String?, target: String?, entryIndex: Int?, environmentString: String?) {
++    self.source = source
++    self.target = target
++    self.entryIndex = entryIndex
++    self.environmentString = environmentString
++  }
++
++  func perform() async throws -> some IntentResult {
++    performWidgetUserInteraction(
++      source: source,
++      target: target,
++      entryIndex: entryIndex,
++      environmentString: environmentString
++    )
+     return .result()
    }
  }
  
++/// The press both widget intents perform: merge the layout's press patch into
++/// the pressed entry, notify the app, and reload the widget.
++func performWidgetUserInteraction(
++  source: String?,
++  target: String?,
++  entryIndex: Int?,
++  environmentString: String?
++) {
++  guard let source else {
++    return
++  }
++
++  let layout = WidgetsStorage.getString(forKey: "__expo_widgets_\(source)_layout") ?? ""
++  let timeline = WidgetsStorage.getArray(forKey: "__expo_widgets_\(source)_timeline")
++
++  guard let timeline,
++        let entryIndex,
++        timeline.indices.contains(entryIndex),
++        let entry = timeline[entryIndex] as? [String: Any],
++        let props = entry["props"] as? [String: Any],
++        let environmentData = environmentString?.data(using: .utf8),
++        var environment = try? JSONSerialization.jsonObject(with: environmentData) as? [String: Any] else {
++    return
++  }
++  environment["target"] = target
++
++  let newProps: [String: Any]?
++  switch evaluateWidgetButtonPress(layout: layout, props: props, environment: environment) {
++  case .success(let result):
++    newProps = result
++  case .failure(let error):
++    print("[ExpoWidgets] Button press evaluation failed: \(error.message)")
++    newProps = nil
++  }
++
++  if let newProps {
++    var newEntry = entry
++    if let originalProps = entry["props"] as? [String: Any] {
++      newEntry["props"] = originalProps.merging(newProps) { _, new in new }
++    }
++    guard var newTimeline = timeline as? [[String: Any]] else {
++      return
++    }
++    newTimeline[entryIndex] = newEntry
++    WidgetsStorage.set(newTimeline, forKey: "__expo_widgets_\(source)_timeline")
++  }
++
++  WidgetsEvents.shared.sendNotification(type: .userEvent, data: [
++    "source": source as Any,
++    "target": target as Any,
++    "timestamp": Int(Date().timeIntervalSince1970 * 1000)
++  ])
++
++  WidgetCenter.shared.reloadTimelines(ofKind: source)
++}
++
 +/// The one press event both Live Activity intents send. The app's JavaScript
 +/// listener is the single handler for a button press, so which intent ran is
 +/// not something the app has to tell apart.
@@ -340,7 +490,7 @@ index 972fa4f..97c1a0f 100644
  @available(iOS 16.0, *)
  struct LiveActivityUserInteraction: LiveActivityIntent {
    // title is not used for non-discoverable intents, but it is required
-@@ -119,11 +130,40 @@ struct LiveActivityUserInteraction: LiveActivityIntent {
+@@ -119,11 +188,40 @@ struct LiveActivityUserInteraction: LiveActivityIntent {
    }
  
    func perform() async throws -> some IntentResult {
@@ -387,7 +537,7 @@ index 972fa4f..97c1a0f 100644
      return .result()
    }
 diff --git a/ios/Widgets/Buttons.swift b/ios/Widgets/Buttons.swift
-index 55fb9b3..e13e8ea 100644
+index 55fb9b3d5fa04d38ab8c2a8b3de7f7656afc401e..259fcca8967c428461b98943e63a61404553c93d 100644
 --- a/ios/Widgets/Buttons.swift
 +++ b/ios/Widgets/Buttons.swift
 @@ -1,4 +1,5 @@
@@ -400,15 +550,47 @@ index 55fb9b3..e13e8ea 100644
    @Field var target: String?
    @Field var entryIndex: Int?
    @Field var environmentString: String?
-+  /// Whether this button's press opens the app. A Live Activity intent performs
-+  /// in the app's process without foregrounding it, so a button whose press has
++  /// Whether this button's press opens the app. Widget and Live Activity
++  /// intents perform without foregrounding the app, so a button whose press has
 +  /// to show the user something declares this and gets the intent variant that
 +  /// asks the system for the foreground.
 +  @Field var openAppWhenRun: Bool?
  }
  
  @available(iOS 17.0, *)
-@@ -41,12 +47,17 @@ struct LiveActivityButtonView: ExpoSwiftUI.View {
+@@ -14,14 +20,27 @@ struct WidgetButtonView: ExpoSwiftUI.View {
+   @ObservedObject var props: ButtonProps
+ 
+   var body: some View {
+-    SwiftUI.Button(
+-      role: props.role?.toNativeRole(),
+-      intent: WidgetUserInteraction(
++    if props.openAppWhenRun == true {
++      button(intent: WidgetOpenInteraction(
++        source: props.source,
++        target: props.target,
++        entryIndex: props.entryIndex,
++        environmentString: props.environmentString
++      ))
++    } else {
++      button(intent: WidgetUserInteraction(
+         source: props.source,
+         target: props.target,
+         entryIndex: props.entryIndex,
+         environmentString: props.environmentString
+-      )
++      ))
++    }
++  }
++
++  private func button<I: AppIntent>(intent: I) -> some View {
++    SwiftUI.Button(
++      role: props.role?.toNativeRole(),
++      intent: intent
+     ) {
+       if let label = props.label {
+         if let systemImage = props.systemImage {
+@@ -41,12 +60,17 @@ struct LiveActivityButtonView: ExpoSwiftUI.View {
    @ObservedObject var props: ButtonProps
  
    var body: some View {
@@ -431,6 +613,7 @@ index 55fb9b3..e13e8ea 100644
        if let label = props.label {
          if let systemImage = props.systemImage {
 diff --git a/ios/Widgets/TimelineProvider.swift b/ios/Widgets/TimelineProvider.swift
+index da0010ad8654932a6d3dac046892f5cfb6fc4de9..5533dd9753e9a22abfe42e94f1df2bc50809f6cb 100644
 --- a/ios/Widgets/TimelineProvider.swift
 +++ b/ios/Widgets/TimelineProvider.swift
 @@ -30,6 +30,16 @@ public struct WidgetsTimelineProvider: TimelineProvider {
@@ -451,7 +634,7 @@ diff --git a/ios/Widgets/TimelineProvider.swift b/ios/Widgets/TimelineProvider.s
      let timeline = Timeline<WidgetsTimelineEntry>(entries: entries, policy: .atEnd)
      completion(timeline)
 diff --git a/ios/Widgets/Utils.swift b/ios/Widgets/Utils.swift
-index 2b4c044..e5a0b1e 100644
+index 2b4c044b597de7e0fab42dbc47af14d8bb521838..e5a0b1ee15272312d707698d739aa5af62cc42ff 100644
 --- a/ios/Widgets/Utils.swift
 +++ b/ios/Widgets/Utils.swift
 @@ -56,6 +56,16 @@ func getLiveActivityNodes(forName name: String, props: String = "{}", environmen
@@ -472,7 +655,7 @@ index 2b4c044..e5a0b1e 100644
    var env: [String: Any] = [
      "showsContainerBackground": environment.showsWidgetContainerBackground,
 diff --git a/ios/Widgets/WidgetLiveActivity.swift b/ios/Widgets/WidgetLiveActivity.swift
-index 24d4571..adc15b9 100644
+index 24d4571a52d3ebe9d785b5d049d8e134a149d513..adc15b9e81de6953f7338f8509bde6d38f66d20d 100644
 --- a/ios/Widgets/WidgetLiveActivity.swift
 +++ b/ios/Widgets/WidgetLiveActivity.swift
 @@ -35,9 +35,11 @@ public struct WidgetLiveActivity: Widget {
@@ -499,7 +682,7 @@ index 24d4571..adc15b9 100644
        }
        return island
 diff --git a/ios/WidgetsModule.swift b/ios/WidgetsModule.swift
-index b1b4295..70e6235 100644
+index b1b4295e22726e6fe501aa5e514b56061dea57a1..70e62359a00194d6844f36ad8ecf9374314c85ea 100644
 --- a/ios/WidgetsModule.swift
 +++ b/ios/WidgetsModule.swift
 @@ -63,6 +63,14 @@ public final class WidgetsModule: Module {
@@ -550,7 +733,7 @@ index b1b4295..70e6235 100644
          try await instance.update(props: props, staleDate: staleDate)
        }
 diff --git a/src/ExpoWidgets.ts b/src/ExpoWidgets.ts
-index b118f91..5395c5f 100644
+index b118f9142e1a2a97c0b3683ee8a42a642a955e4d..5395c5f3afe80186251f4b04e22485353d3841bd 100644
 --- a/src/ExpoWidgets.ts
 +++ b/src/ExpoWidgets.ts
 @@ -24,7 +24,10 @@ class LiveActivityStub {
@@ -591,7 +774,7 @@ index b118f91..5395c5f 100644
    LiveActivityFactory: LiveActivityFactoryStub as typeof NativeLiveActivityFactory,
    LiveActivity: LiveActivityStub as typeof NativeLiveActivity,
 diff --git a/src/Widgets.ts b/src/Widgets.ts
-index 51ea140..cc9a812 100644
+index 51ea140b4309c347d6f98290051be1c5062bff70..cc9a81223abfe7240914a19ed174ce9c41bc42bb 100644
 --- a/src/Widgets.ts
 +++ b/src/Widgets.ts
 @@ -85,13 +85,23 @@ export class LiveActivity<T extends object = object> {
@@ -693,7 +876,7 @@ index 51ea140..cc9a812 100644
 +  return ExpoWidgetsModule.areLiveActivitiesEnabled();
 +}
 diff --git a/src/Widgets.types.ts b/src/Widgets.types.ts
-index fee5c74..22afeb2 100644
+index fee5c7475b52218fa0e192a1d347dd32cb0fe1f8..22afeb2398e2777e32ebe7c105c96e64a84aa03d 100644
 --- a/src/Widgets.types.ts
 +++ b/src/Widgets.types.ts
 @@ -289,13 +289,14 @@ export declare class NativeWidgetObject extends SharedObject {

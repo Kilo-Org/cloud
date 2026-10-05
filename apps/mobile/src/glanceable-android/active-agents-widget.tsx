@@ -18,6 +18,7 @@ import {
 
 import { type GlanceableCountKind } from '@/lib/glanceable/presentation';
 import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
+import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
 
 import { type AndroidWidgetProps } from './widget-props';
 
@@ -534,18 +535,24 @@ function newestSlot(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
 }
 
 /**
- * One in-place action. A custom `clickAction` string makes the library launch a
- * headless task (`register.ts`) instead of opening the app, so the body keeps
- * its own `OPEN_URI` deep link and a tap beside the rows still opens Kilo.
+ * One action chip. Approve is a custom `clickAction`, which makes the library
+ * launch a headless task (`register.ts`) that answers in place. New agent is an
+ * `OPEN_URI` deep link: starting an agent needs the composer, so the tap opens
+ * the app on the new-session screen. The body keeps its own `OPEN_URI` deep
+ * link, so a tap beside the chips still opens Kilo.
  *
  * The chip is `ACTION_TARGET_DP` tall with the label centered: the target is
  * the whole chip, so the old padded-to-the-text height made taps miss.
  */
-function actionRow(label: string, clickAction: 'approve' | 'new-agent', palette: Palette) {
+function actionRow(label: string, action: 'approve' | 'new-agent', palette: Palette) {
+  const click =
+    action === 'approve'
+      ? { clickAction: 'approve' }
+      : { clickAction: 'OPEN_URI', clickActionData: { uri: LAUNCHER_NEW_AGENT_URL } };
   return (
     <FlexWidget
-      key={clickAction}
-      clickAction={clickAction}
+      key={action}
+      {...click}
       accessibilityLabel={label}
       style={{
         flexDirection: 'row',

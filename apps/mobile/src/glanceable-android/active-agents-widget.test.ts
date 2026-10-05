@@ -140,6 +140,13 @@ function findElement(
   return findElement(element.props.children, match);
 }
 
+const NEW_AGENT_URI = 'kiloapp:///cloud/sessions/new';
+
+/** The New agent chip: the one element that deep-links to the new-session screen. */
+function isNewAgentChip(element: MockElement): boolean {
+  return element.props.clickActionData?.uri === NEW_AGENT_URI;
+}
+
 function collectStyles(node: unknown): Record<string, unknown>[] {
   const styles: Record<string, unknown>[] = [];
   const visit = (current: unknown): void => {
@@ -343,9 +350,7 @@ describe('renderActiveAgentsWidget', () => {
     expect(
       findElement(light, element => element.props.text === 'No agents waiting')?.props.maxLines
     ).toBe(1);
-    expect(
-      findElement(light, element => element.props.clickAction === 'new-agent')?.props.style?.height
-    ).toBe(48);
+    expect(findElement(light, isNewAgentChip)?.props.style?.height).toBe(48);
   });
 
   it('drops the New agent chip rather than clipping it in a cell too short for it', () => {
@@ -353,9 +358,7 @@ describe('renderActiveAgentsWidget', () => {
 
     const short = render(props, { width: 150, height: 70 }).light;
     expect(collectText(short)).toEqual(['No agents waiting']);
-    expect(
-      findElement(short, element => element.props.clickAction === 'new-agent')
-    ).toBeUndefined();
+    expect(findElement(short, isNewAgentChip)).toBeUndefined();
     expect(short.props.clickAction).toBe('OPEN_URI');
 
     // A cell with room for both keeps the second line of copy and the chip.
@@ -591,10 +594,7 @@ describe('renderActiveAgentsWidget', () => {
         render(approveProps, { width: 250 }).light,
         element => element.props.clickAction === 'approve'
       ),
-      findElement(
-        render(emptyProps, { width: 250 }).light,
-        element => element.props.clickAction === 'new-agent'
-      ),
+      findElement(render(emptyProps, { width: 250 }).light, isNewAgentChip),
     ];
 
     for (const chip of chips) {
@@ -608,10 +608,11 @@ describe('renderActiveAgentsWidget', () => {
     const light = render(props, { width: 250 }).light;
 
     expect(collectText(light)).toEqual(['No agents waiting', 'New agent']);
-    expect(
-      findElement(light, element => element.props.clickAction === 'new-agent')?.props
-        .accessibilityLabel
-    ).toBe('New agent');
+    const chip = findElement(light, isNewAgentChip);
+    expect(chip?.props.accessibilityLabel).toBe('New agent');
+    // Starting an agent needs the composer, so the chip is a plain deep link to
+    // the new-session screen that the host opens without a headless task.
+    expect(chip?.props.clickAction).toBe('OPEN_URI');
     expect(findElement(light, element => element.props.clickAction === 'approve')).toBeUndefined();
   });
 
@@ -621,11 +622,7 @@ describe('renderActiveAgentsWidget', () => {
 
     expect(collectText(light)).toEqual(['Waiting for agents']);
     expect(
-      findElement(
-        light,
-        element =>
-          element.props.clickAction !== undefined && element.props.clickAction !== 'OPEN_URI'
-      )
+      findElement(light, element => element !== light && element.props.clickAction !== undefined)
     ).toBeUndefined();
   });
 

@@ -114,22 +114,6 @@ describe('ActiveAgentsWidget families', () => {
     expect(layout).toContain("const denseRows = family !== 'systemLarge';");
   });
 
-  it('draws the press line only while the marker names a known action on a count-less surface', () => {
-    const layout = read(__dirname, 'active-agents-widget.tsx');
-
-    // A partial write (or a marker from a later app version) can leave only the
-    // visible flag: it must not hold "Starting…" on a settled widget.
-    expect(layout).toContain(
-      "props.pendingAction === 'approve' || props.pendingAction === 'new-agent'"
-    );
-    // A recognized action is not enough: the owner's stored marker names
-    // `new-agent` and still lingered on a settled idle-only tray, so the guard
-    // also requires a count-less surface. Only the empty surface draws it.
-    expect(layout).toContain(
-      'props.pendingActionVisible === true && pendingActionKind !== null && counts.length === 0'
-    );
-  });
-
   it('decodes raw app-group count rows instead of mapping them blindly', () => {
     const layout = read(__dirname, 'active-agents-widget.tsx');
 
@@ -146,18 +130,5 @@ describe('ActiveAgentsWidget families', () => {
     expect(layout).not.toContain('GLYPH[primaryKind');
     expect(layout).not.toContain('GLYPH[newestResultKind');
     expect(layout).not.toContain('GLYPH[line.kind');
-  });
-
-  it('strips an orphaned press flag from the stored timeline', () => {
-    const actions = read(__dirname, 'widget-actions.ts');
-
-    // The layout guard only hides the orphan; the sweep must also clear it, or
-    // it would outlive its press in the app group.
-    expect(actions).toContain('function hasPressMarker(');
-    expect(actions).toContain(
-      'props?.pendingActionVisible === true || pendingActionOf(props) !== null'
-    );
-    expect(actions).toContain('hasPressMarker(entry.props)');
-    expect(actions).toContain('if (marked.size > 0)');
   });
 });

@@ -17,7 +17,17 @@ export type CopyOptions = {
   exclude: string[];
 };
 
-export type Options = SetOptions | CopyOptions;
+export type PathRewrite = { from: string; to: string };
+
+export type CopyFirewallOptions = {
+  command: 'copy-firewall';
+  from: Project;
+  to: Project;
+  dryRun: boolean;
+  rewritePaths: PathRewrite[];
+};
+
+export type Options = SetOptions | CopyOptions | CopyFirewallOptions;
 
 function usage(): never {
   throw new Error(
@@ -26,6 +36,8 @@ function usage(): never {
       '       [--development-file PATH] [--staging-file PATH] [--production-file PATH]',
       '       pnpm web:env copy --from PROJECT --to PROJECT [--dry-run] [--only ENVIRONMENT]',
       '       [--exclude VARIABLE]...',
+      '       pnpm web:env copy-firewall --from PROJECT --to PROJECT [--dry-run]',
+      '       [--rewrite-path FROM=TO]...',
       `       ENVIRONMENT: ${ENVIRONMENTS.join(' | ')}`,
       `       PROJECT: ${PROJECTS.join(' | ')}`,
     ].join('\n')
@@ -155,8 +167,55 @@ function parseCopyOptions(args: string[]): CopyOptions {
   return { command: 'copy', from, to, dryRun, only, exclude };
 }
 
+function pathRewrite(value: string | undefined): PathRewrite {
+  const separator = value?.indexOf('=') ?? -1;
+  const from = value?.slice(0, separator) ?? '';
+  const to = value?.slice(separator + 1) ?? '';
+  if (separator < 0 || !from.startsWith('/') || !to.startsWith('/')) {
+    throw new Error('--rewrite-path takes FROM=TO, where both paths start with /.');
+  }
+  return { from, to };
+}
+
+function parseCopyFirewallOptions(args: string[]): CopyFirewallOptions {
+  let from: Project | undefined;
+  let to: Project | undefined;
+  let dryRun = false;
+  const rewritePaths: PathRewrite[] = [];
+
+  for (let index = 1; index < args.length; index += 1) {
+    if (args[index] === '--dry-run') {
+      dryRun = true;
+      continue;
+    }
+
+    const fromFlag = flagValue(args, index, '--from');
+    const toFlag = flagValue(args, index, '--to');
+    const rewriteFlag = flagValue(args, index, '--rewrite-path');
+    if (fromFlag) {
+      if (from) usage();
+      from = project(fromFlag.value);
+      index += fromFlag.consumed - 1;
+    } else if (toFlag) {
+      if (to) usage();
+      to = project(toFlag.value);
+      index += toFlag.consumed - 1;
+    } else if (rewriteFlag) {
+      rewritePaths.push(pathRewrite(rewriteFlag.value));
+      index += rewriteFlag.consumed - 1;
+    } else {
+      usage();
+    }
+  }
+
+  if (!from || !to) usage();
+  if (from === to) throw new Error('--from and --to must be different projects.');
+  return { command: 'copy-firewall', from, to, dryRun, rewritePaths };
+}
+
 export function parseOptions(args: string[]): Options {
   if (args[0] === 'set') return parseSetOptions(args);
   if (args[0] === 'copy') return parseCopyOptions(args);
+  if (args[0] === 'copy-firewall') return parseCopyFirewallOptions(args);
   usage();
 }

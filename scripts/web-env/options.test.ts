@@ -119,3 +119,47 @@ void test('parseOptions excludes existing variables with their exact case', () =
     /not start with a digit/
   );
 });
+
+void test('parseOptions parses a firewall copy with path rewrites', () => {
+  assert.deepEqual(
+    parseOptions([
+      'copy-firewall',
+      '--from',
+      'kilocode-app',
+      '--to',
+      'kilocode-ai-gateway',
+      '--rewrite-path',
+      '/api/gateway/=/api/v1/',
+      '--rewrite-path=/api/openrouter/=/api/v1/',
+      '--dry-run',
+    ]),
+    {
+      command: 'copy-firewall',
+      from: 'kilocode-app',
+      to: 'kilocode-ai-gateway',
+      dryRun: true,
+      rewritePaths: [
+        { from: '/api/gateway/', to: '/api/v1/' },
+        { from: '/api/openrouter/', to: '/api/v1/' },
+      ],
+    }
+  );
+});
+
+void test('parseOptions rejects path rewrites that are not absolute FROM=TO pairs', () => {
+  for (const rewrite of ['/api/gateway/', 'api/gateway/=/api/v1/', '/api/gateway/=api/v1/']) {
+    assert.throws(
+      () =>
+        parseOptions([
+          'copy-firewall',
+          '--from',
+          'kilocode-app',
+          '--to',
+          'kilocode-ai-gateway',
+          '--rewrite-path',
+          rewrite,
+        ]),
+      /--rewrite-path takes FROM=TO/
+    );
+  }
+});

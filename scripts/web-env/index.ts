@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runCopy } from './copy.js';
+import { runCopyFirewall } from './firewall.js';
 import { parseOptions, type SetOptions } from './options.js';
 import {
   ENVIRONMENTS,
@@ -236,6 +237,7 @@ async function runSet(options: SetOptions): Promise<void> {
 async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
   if (options.command === 'copy') await runCopy(options);
+  else if (options.command === 'copy-firewall') await runCopyFirewall(options);
   else await runSet(options);
 }
 

@@ -182,6 +182,16 @@ pnpm web:env copy --from kilocode-global-app --to kilocode-ai-gateway --dry-run
 
 The command reads every Development, Staging, and Production variable of the source project and writes it to the destination with the same sensitivity. Vercel decrypts non-sensitive values, but never returns sensitive ones, so those are read from the `Kilo Web ENV Production` items that `pnpm web:env set` maintains. That requires read access to the vault. The plan lists every variable it does not copy, with the reason: sensitive ones without a 1Password value, ones Vercel did not decrypt, empty ones, branch-specific ones, unsupported Vercel types, and any passed with `--exclude VARIABLE`. Add the missing ones with `pnpm web:env set`. Use `--only ENVIRONMENT` to copy one environment. Staging needs a `staging` custom environment in both projects. The copy does not redeploy; the destination's next deployment picks up the values.
 
+To give a new project the same Vercel Firewall as an existing one, copy the active firewall config:
+
+```bash
+pnpm web:env copy-firewall --from kilocode-app --to kilocode-ai-gateway \
+  --rewrite-path /api/gateway/v1/=/api/v1/ --rewrite-path /api/openrouter/v1/=/api/v1/ \
+  --rewrite-path /api/gateway/=/api/v1/ --rewrite-path /api/openrouter/=/api/v1/ --dry-run
+```
+
+The command replaces the destination's whole firewall config with the source's custom rules, IP rules, OWASP (`crs`) and managed rulesets, and firewall and BotID switches. That includes the rules that code checks with `checkRateLimit` from `@vercel/firewall`, such as `gateway-inference`. Rule conditions are copied as-is, except that `--rewrite-path FROM=TO` rewrites path conditions that match a path or path prefix; the longest `FROM` wins. The plan prints every rewrite and flags conditions it cannot rewrite safely, such as regex or substring paths and host matches. It does not copy system bypass rules or Attack Challenge Mode, and it stops if the source uses rulesets it cannot copy. Rate-limit counters are per project, so a client gets a separate budget in each project.
+
 ### 4. Prepare the database
 
 The project uses PostgreSQL 18 with pgvector, running via Docker. Prepare the local database with:

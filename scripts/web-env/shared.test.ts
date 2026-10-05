@@ -10,6 +10,7 @@ import {
   redeployLatest,
   resolveVault,
   resolveVercelContexts,
+  vercelApi,
   setVaultValue,
   stripSurroundingQuotes,
   type VaultEnvironment,
@@ -629,6 +630,56 @@ void test('readVaultValues reads the production and staging fields of each item'
     else process.env.FAKE_OP_LOG = originalLog;
     if (originalExisting === undefined) delete process.env.FAKE_OP_EXISTING;
     else process.env.FAKE_OP_EXISTING = originalExisting;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+const FAKE_PNPM_VERCEL_PUT = `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const stdin = fs.readFileSync(0, 'utf8');
+fs.appendFileSync(process.env.FAKE_VERCEL_LOG, JSON.stringify({ args, stdin }) + '\\n');
+process.stdout.write(JSON.stringify({ active: { version: 2 } }));
+`;
+
+void test('vercelApi sends a PUT body over stdin, not argv', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-put-test-'));
+  const logFile = path.join(directory, 'vercel.jsonl');
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_VERCEL_PUT, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLog = process.env.FAKE_VERCEL_LOG;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+  process.env.FAKE_VERCEL_LOG = logFile;
+
+  try {
+    assert.deepEqual(
+      vercelApi(
+        { project: 'kilocode-ai-gateway', orgId: 'team-id', cwd: directory },
+        '/v1/security/firewall/config?projectId=kilocode-ai-gateway',
+        'Update the firewall',
+        { method: 'PUT', body: { firewallEnabled: true } }
+      ),
+      { active: { version: 2 } }
+    );
+    const invocation = JSON.parse(readFileSync(logFile, 'utf8').trim()) as {
+      args: string[];
+      stdin: string;
+    };
+    assert.deepEqual(invocation.args.slice(2, 8), [
+      'api',
+      '/v1/security/firewall/config?projectId=kilocode-ai-gateway&teamId=team-id',
+      '--raw',
+      '--method',
+      'PUT',
+      '--input',
+    ]);
+    assert.equal(invocation.args[8], '-');
+    assert.equal(invocation.stdin, '{"firewallEnabled":true}');
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalLog === undefined) delete process.env.FAKE_VERCEL_LOG;
+    else process.env.FAKE_VERCEL_LOG = originalLog;
     rmSync(directory, { recursive: true, force: true });
   }
 });

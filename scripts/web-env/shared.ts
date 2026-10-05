@@ -26,9 +26,9 @@ export type OnePasswordContext = {
 };
 export type VaultEnvironment = Extract<Environment, 'staging' | 'production'>;
 
-type JsonRecord = Record<string, unknown>;
+export type JsonRecord = Record<string, unknown>;
 
-function isRecord(value: unknown): value is JsonRecord {
+export function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -42,11 +42,11 @@ function parseJson(value: string, operation: string): JsonRecord {
   throw new Error(`${operation} returned an unexpected response.`);
 }
 
-function records(value: unknown): JsonRecord[] {
+export function records(value: unknown): JsonRecord[] {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
-function stringValue(record: JsonRecord, key: string): string | undefined {
+export function stringValue(record: JsonRecord, key: string): string | undefined {
   return typeof record[key] === 'string' ? record[key] : undefined;
 }
 
@@ -261,7 +261,7 @@ export type VercelContexts = {
   missingProjects: Project[];
 };
 
-class VercelApiError extends Error {
+export class VercelApiError extends Error {
   constructor(
     operation: string,
     readonly code: string | undefined,
@@ -289,10 +289,18 @@ function apiResponse(output: string, operation: string): JsonRecord {
   return response;
 }
 
-function vercelApi(context: VercelContext, endpoint: string, operation: string): JsonRecord {
+export function vercelApi(
+  context: VercelContext,
+  endpoint: string,
+  operation: string,
+  request?: { method: 'PUT'; body: JsonRecord }
+): JsonRecord {
+  const args = request
+    ? [...apiArgs(context, endpoint), '--method', request.method, '--input', '-']
+    : apiArgs(context, endpoint);
   let output: string;
   try {
-    output = vercel(context, apiArgs(context, endpoint), undefined, {
+    output = vercel(context, args, request ? JSON.stringify(request.body) : undefined, {
       includeFailureOutput: true,
     });
   } catch (error) {

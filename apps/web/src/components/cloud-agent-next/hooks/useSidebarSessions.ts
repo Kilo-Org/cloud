@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
@@ -657,6 +658,34 @@ type UseSidebarSessionsReturn = {
   renameSessionLocally: (sessionId: string, newTitle: string) => void;
 };
 
+export const PR_LINK_ATTEMPT_HISTORY_LIMIT = 1000;
+
+export function recordPrLinkVerificationAttempt(
+  attempted: Map<string, string>,
+  sessionId: string,
+  verificationKey: string
+) {
+  attempted.delete(sessionId);
+  attempted.set(sessionId, verificationKey);
+  if (attempted.size > PR_LINK_ATTEMPT_HISTORY_LIMIT) {
+    const oldestSessionId = attempted.keys().next().value;
+    if (oldestSessionId !== undefined) attempted.delete(oldestSessionId);
+  }
+}
+
+export function shouldRetryPrLinkVerification(failureCount: number, error: unknown): boolean {
+  if (failureCount >= 1 || !(error instanceof TRPCClientError)) return false;
+  const code: unknown = error.data?.code;
+  return (
+    code === 'INTERNAL_SERVER_ERROR' ||
+    code === 'BAD_GATEWAY' ||
+    code === 'SERVICE_UNAVAILABLE' ||
+    code === 'GATEWAY_TIMEOUT' ||
+    code === 'TIMEOUT' ||
+    (code === undefined && error.cause instanceof TypeError)
+  );
+}
+
 export function nextPrLinkVerification(
   sessions: readonly { session_id: string; prLinkVerificationKey?: string }[],
   attempted: ReadonlyMap<string, string>
@@ -744,7 +773,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
   const attemptedPrLinks = useRef(new Map<string, string>());
   const { mutate: verifyPrLink, isPending: isVerifyingPrLink } = useMutation({
     ...trpc.cliSessionsV2.refreshAssociatedPullRequest.mutationOptions(),
-    retry: 1,
+    retry: shouldRetryPrLinkVerification,
     onSuccess: result => {
       if (result.associatedPr !== null) reconcileSidebarQueries();
     },
@@ -754,7 +783,11 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     if (isVerifyingPrLink || !verificationSessions) return;
     const session = nextPrLinkVerification(verificationSessions, attemptedPrLinks.current);
     if (!session?.prLinkVerificationKey) return;
-    attemptedPrLinks.current.set(session.session_id, session.prLinkVerificationKey);
+    recordPrLinkVerificationAttempt(
+      attemptedPrLinks.current,
+      session.session_id,
+      session.prLinkVerificationKey
+    );
     verifyPrLink({ sessionId: session.session_id });
   }, [verificationSessions, isVerifyingPrLink, verifyPrLink]);
 

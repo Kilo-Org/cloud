@@ -592,7 +592,7 @@ export const sessionPrJoinPredicate = and(
  * Strip the flat `pr_*` columns produced by `commonSessionFieldsWithPr` and
  * fold them into a single `associatedPr` field on each row.
  */
-function projectAssociatedPr<
+export function projectAssociatedPr<
   T extends AssociatedPrRow & SessionPrRow & { updated_at: string | null; git_url: string | null },
 >(
   row: T
@@ -617,17 +617,18 @@ function projectAssociatedPr<
     session_pr_verified_at,
     ...rest
   } = row;
+  const prLinkVerificationKey = getPrLinkVerificationKey({
+    platform: session_pr_platform,
+    pr_url: session_pr_url,
+    pr_number: session_pr_number,
+    pr_link_verified_at: session_pr_verified_at,
+    git_url: rest.git_url,
+    pr_head_ref: session_pr_head_ref,
+    pr_head_sha: session_pr_head_sha,
+  });
   return {
     ...rest,
-    prLinkVerificationKey: getPrLinkVerificationKey({
-      platform: session_pr_platform,
-      pr_url: session_pr_url,
-      pr_number: session_pr_number,
-      pr_link_verified_at: session_pr_verified_at,
-      git_url: rest.git_url,
-      pr_head_ref: session_pr_head_ref,
-      pr_head_sha: session_pr_head_sha,
-    }),
+    ...(prLinkVerificationKey === undefined ? {} : { prLinkVerificationKey }),
     associatedPr: formatAssociatedPr(
       {
         platform: session_pr_platform,

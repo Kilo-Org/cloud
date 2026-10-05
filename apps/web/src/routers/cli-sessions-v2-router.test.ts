@@ -21,6 +21,7 @@ import {
   getPrLinkVerificationKey,
   parseGitHubOwnerRepo,
   parseGitHubPrUrl,
+  projectAssociatedPr,
 } from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
@@ -137,6 +138,54 @@ let regularUser: User;
 let otherUser: User;
 let adminUser: User;
 let testOrganization: Organization;
+
+describe('projectAssociatedPr', () => {
+  const row = {
+    session_id: 'ses_projection',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    git_url: 'https://github.com/kilo/repo',
+    pr_url: null,
+    pr_number: null,
+    pr_state: null,
+    pr_title: null,
+    pr_head_sha: null,
+    pr_last_synced_at: null,
+    pr_review_decision: null,
+    review_decision_pending: null,
+    session_pr_platform: 'github',
+    session_pr_url: 'https://github.com/kilo/repo/pull/42',
+    session_pr_number: 42,
+    session_pr_head_ref: 'feature',
+    session_pr_head_sha: null,
+    session_pr_verified_at: '2026-01-01T00:00:00.000Z',
+  };
+
+  it('omits the optional verification key for an already verified link', () => {
+    const session = projectAssociatedPr(row);
+    expect(Object.keys(session).sort()).toEqual(
+      ['session_id', 'updated_at', 'git_url', 'associatedPr'].sort()
+    );
+    expect(session).not.toHaveProperty('prLinkVerificationKey');
+    expect(session.associatedPr).toMatchObject({ number: 42, platform: 'github' });
+  });
+
+  it('includes the verification key for an unverified candidate', () => {
+    const session = projectAssociatedPr({ ...row, session_pr_verified_at: null });
+    expect(session.prLinkVerificationKey).toMatch(/^[a-f0-9]{64}$/);
+    expect(session.associatedPr).toBeNull();
+  });
+
+  it('omits the optional verification key when there is no stored link', () => {
+    const session = projectAssociatedPr({
+      ...row,
+      session_pr_url: null,
+      session_pr_number: null,
+      session_pr_verified_at: null,
+    });
+    expect(session).not.toHaveProperty('prLinkVerificationKey');
+    expect(session.associatedPr).toBeNull();
+  });
+});
 
 describe('getPrLinkVerificationKey', () => {
   const candidate = {

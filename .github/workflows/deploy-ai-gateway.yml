@@ -84,5 +84,11 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage.outputs.deployment_url }}
+      # The gateway has no dedicated Axiom dataset. Its logs reach Axiom through
+      # the Axiom Vercel integration's drain, which feeds the shared `vercel`
+      # dataset, so annotate promotes there.
+      axiom_annotation_dataset: vercel
+      axiom_expected_project: kilocode-ai-gateway
     secrets:
+      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

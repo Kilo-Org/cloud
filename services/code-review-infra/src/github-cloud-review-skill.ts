@@ -58,6 +58,15 @@ gh api repos/<OWNER>/<REPO>/pulls/<PR>/reviews --input -
 The body must include current commit_id, event: "COMMENT", and one comments array.
 
 - Never use gh pr review, gh pr comment, or individual inline-comment writes.
+## Publish The Summary
+
+- If a tool named code_review_publish_review_summary is listed, publish the summary by calling it with the final summary wording only. The tool owns the comment target, marker, history, footer, idempotency, and verification, so do not build those yourself.
+- When that tool is listed, do not use gh for the summary. The gh summary commands below are the fallback only when the tool is not listed.
+- Inline review writes are unchanged: keep using the gh api reviews --input form above.
+- If the tool returns a recoverable error (rejected_body or unverified), fix the wording and call the tool once more. Do not fall back to gh for the summary.
+
+## Update The Summary With Gh (Fallback Only)
+
 - Create the summary only with:
 
 \`\`\`bash

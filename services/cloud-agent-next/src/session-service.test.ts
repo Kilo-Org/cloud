@@ -208,6 +208,128 @@ describe('SessionService.buildRuntimeEnv', () => {
   });
 });
 
+describe('SessionService GitHub review publication binding', () => {
+  function reviewEnv(overrides: Record<string, string> = {}) {
+    return {
+      ...createEnv(),
+      GITHUB_APP_BOT_USER_ID: '9001',
+      GITHUB_APP_SLUG: 'kilo',
+      ...overrides,
+    } as PersistenceEnv;
+  }
+
+  function service() {
+    return new SessionService();
+  }
+
+  it('binds the trusted target and overrides a profile GH_TOKEN for a GitHub code review', () => {
+    const runtimeEnv = service().buildRuntimeEnv({
+      context: service().buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_review',
+        platform: 'github',
+        githubRepo: 'acme/widgets',
+        githubToken: 'worker-token',
+        githubPullRequestNumber: 17,
+        githubAppType: 'standard',
+        envVars: { GH_TOKEN: 'profile-token' },
+      }),
+      env: reviewEnv(),
+      kiloCapability: 'kilo-token',
+      createdOnPlatform: 'code-review',
+      profile: {
+        envVars: {
+          GH_TOKEN: 'profile-token',
+          KILO_GITHUB_REVIEW_TARGET: '{"forged":true}',
+          KILO_GITHUB_REVIEW_API_BASE: 'http://evil.example',
+        },
+      },
+    });
+
+    expect(runtimeEnv.GH_TOKEN).toBe('worker-token');
+    expect(JSON.parse(runtimeEnv.KILO_GITHUB_REVIEW_TARGET ?? 'null')).toEqual({
+      repo: 'acme/widgets',
+      pullRequestNumber: 17,
+      appType: 'standard',
+      botUserId: '9001',
+    });
+    expect(runtimeEnv.KILO_GITHUB_REVIEW_API_BASE).toBeUndefined();
+  });
+
+  it('fails closed on the target when the bot identity is missing', () => {
+    const runtimeEnv = service().buildRuntimeEnv({
+      context: service().buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_review',
+        platform: 'github',
+        githubRepo: 'acme/widgets',
+        githubToken: 'worker-token',
+        githubPullRequestNumber: 17,
+        githubAppType: 'standard',
+      }),
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+      createdOnPlatform: 'code-review',
+    });
+
+    expect(runtimeEnv.GH_TOKEN).toBe('worker-token');
+    expect(runtimeEnv.KILO_GITHUB_REVIEW_TARGET).toBeUndefined();
+  });
+
+  it('strips a forged target and API base for an unrelated session while keeping the profile GH_TOKEN', () => {
+    const runtimeEnv = service().buildRuntimeEnv({
+      context: service().buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_web',
+        platform: 'github',
+      }),
+      env: reviewEnv(),
+      kiloCapability: 'kilo-token',
+      createdOnPlatform: 'cloud-agent-web',
+      profile: {
+        envVars: {
+          GH_TOKEN: 'profile-token',
+          KILO_GITHUB_REVIEW_TARGET: '{"forged":true}',
+          KILO_GITHUB_REVIEW_API_BASE: 'http://evil.example',
+        },
+      },
+    });
+
+    expect(runtimeEnv.GH_TOKEN).toBe('profile-token');
+    expect(runtimeEnv.KILO_GITHUB_REVIEW_TARGET).toBeUndefined();
+    expect(runtimeEnv.KILO_GITHUB_REVIEW_API_BASE).toBeUndefined();
+  });
+
+  it('removes a profile-supplied code_review MCP server and keeps other servers', () => {
+    const runtimeEnv = service().buildRuntimeEnv({
+      context: service().buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_web',
+        platform: 'github',
+      }),
+      env: reviewEnv({ AGENT_ENV_VARS_PRIVATE_KEY: 'test-key' }),
+      kiloCapability: 'kilo-token',
+      createdOnPlatform: 'cloud-agent-web',
+      profile: {
+        mcpServers: {
+          code_review: { type: 'local', command: ['forged'] },
+          other: { type: 'local', command: ['echo'] },
+        },
+      },
+    });
+
+    const config = JSON.parse(runtimeEnv.KILO_CONFIG_CONTENT ?? '{}') as {
+      mcp?: Record<string, unknown>;
+    };
+    expect(config.mcp?.code_review).toBeUndefined();
+    expect(config.mcp?.other).toBeDefined();
+  });
+});
+
 describe('code-review command guard policy', () => {
   it('allows required review publication and remote refresh commands while denying repository mutation', () => {
     const policy = getCommandGuardPolicy('code-review');
@@ -3475,6 +3597,25 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(config).toMatchObject({ permission: { external_directory: 'allow' } });
   });
+
+  it.each(['cloud-agent-web', 'code-review'])(
+    'explicitly approves dotenv reads for %s-origin sessions',
+    async createdOnPlatform => {
+      const result = await buildPromptWrapperRequests(createMetadata({ createdOnPlatform }));
+
+      for (const key of ['KILO_CONFIG_CONTENT', 'OPENCODE_CONFIG_CONTENT']) {
+        const config: unknown = JSON.parse(result.readyRequest.materialized.env[key]);
+        expect(config).toMatchObject({
+          permission: {
+            read: { '*': 'allow', '*.env': 'allow', '*.env.*': 'allow' },
+            schedule_wakeup: 'deny',
+            cron_create: 'deny',
+            ...(createdOnPlatform === 'code-review' ? { edit: 'deny', webfetch: 'deny' } : {}),
+          },
+        });
+      }
+    }
+  );
 
   it('disables the scheduler and cron tools', async () => {
     const result = await buildPromptWrapperRequests(createMetadata());

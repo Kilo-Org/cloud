@@ -56,7 +56,7 @@ import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import {
   selectedProfileIdAtom,
   resetSessionFormAtom,

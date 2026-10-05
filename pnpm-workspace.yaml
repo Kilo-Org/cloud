@@ -70,20 +70,6 @@ minimumReleaseAgeExclude:
   - '@cloudflare/workerd-linux-64@1.20260918.1'
   - '@cloudflare/workerd-linux-arm64@1.20260918.1'
   - '@cloudflare/workerd-windows-64@1.20260918.1'
-  # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
-  # expects, plus the exact transitive versions that aligned graph resolves to.
-  # Each entry exempts exactly the listed package@version required by that
-  # alignment; any other or future version of these packages stays age-gated.
-  - expo@57.0.21
-  - '@expo/ui@57.0.17'
-  - expo-router@57.0.20
-  - expo-widgets@57.0.18
-  - babel-preset-expo@57.0.11
-  - expo-modules-core@57.0.17
-  - expo-modules-jsi@57.1.0
-  - '@expo/cli@57.0.23'
-  - '@expo/metro-file-map@57.0.3'
-  - expo-glass-effect@57.0.2
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -193,9 +179,9 @@ overrides:
   # and constructs its own WebClient, so the versions must agree. 7.x is the
   # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
-  # Direct `@expo/ui@57.0.17` (expo-widgets peer) and expo-router's `^57.0.9`
+  # Direct `@expo/ui@57.0.21` (expo-widgets peer) and expo-router's `^57.0.21`
   # otherwise resolve to two native-module copies. Force one version.
-  '@expo/ui': 57.0.17
+  '@expo/ui': 57.0.21
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
@@ -213,20 +199,20 @@ packageExtensions:
     dependencies:
       '@expo/config-plugins': '*'
 patchedDependencies:
-  # Text date style `elapsed`: the time since a date in its one largest unit, no
-  # seconds ("31 minutes"), for the glanceable widget and Live Activity waits.
-  '@expo/ui@57.0.17': patches/@expo+ui@57.0.17.patch
+  # Text date styles for the glanceable widgets and Live Activity: `elapsed`
+  # ("31 minutes", no seconds) and `ago` ("3 minutes ago").
+  '@expo/ui@57.0.21': patches/@expo+ui@57.0.21.patch
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
-  expo-dev-launcher@57.0.19: patches/expo-dev-launcher@57.0.19.patch
+  expo-dev-launcher@57.0.20: patches/expo-dev-launcher@57.0.20.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
-  expo-notifications@57.0.17: patches/expo-notifications@57.0.17.patch
+  expo-notifications@57.0.21: patches/expo-notifications@57.0.21.patch
   # Repo-local features the SDK lacks, carried onto each SDK patch release:
   # router — unhandled deep links when getInitialURL resolves later;
   # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
   # includeEnded instance reads, factory-registered push-to-start URL.
-  expo-router@57.0.20: patches/expo-router@57.0.20.patch
+  expo-router@57.0.24: patches/expo-router@57.0.24.patch
   # Typed-routes generation must skip colocated tests, exactly like the Metro
   # blockList in apps/mobile/metro.config.js already does for the runtime
   # bundle. A `*.test.tsx` next to a route registers as a route, and a
@@ -234,13 +220,13 @@ patchedDependencies:
   # layout; the generator then drops the group's entire subtree, so every
   # `(tabs)` route vanishes from the generated `Href` union and typecheck
   # rejects valid navigations.
-  '@expo/router-server@57.0.9': patches/@expo+router-server@57.0.9.patch
+  '@expo/router-server@57.0.11': patches/@expo+router-server@57.0.11.patch
   expo-server-sdk: patches/expo-server-sdk.patch
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
-  expo-task-manager@57.0.16: patches/expo-task-manager@57.0.16.patch
-  expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
+  expo-task-manager@57.0.21: patches/expo-task-manager@57.0.21.patch
+  expo-widgets@57.0.22: patches/expo-widgets@57.0.22.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
   # Fabric mounting race: RCTComponentViewFactory registers component views from
   # the JS thread without the class-map mutex, so a mounting transaction can

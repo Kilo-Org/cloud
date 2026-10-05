@@ -351,6 +351,8 @@ const config: ExpoConfig = {
       },
     ],
     'expo-web-browser',
+    // Must stay before '@sentry/react-native/expo': it edits the RNSentrySDK.start() line that plugin writes.
+    './plugins/withReactMountLogBreadcrumbs',
     [
       '@sentry/react-native/expo',
       {

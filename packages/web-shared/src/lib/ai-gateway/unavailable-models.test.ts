@@ -9,6 +9,8 @@ describe('unavailable models', () => {
     expect(isUnavailableModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
     expect(isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(isUnavailableModel('google/gemma-4-31b-it')).toBe(false);
+    expect(isUnavailableModel('qwen/qwen3.8-27b:free')).toBe(true);
+    expect(isUnavailableModel('qwen/qwen3.8-27b')).toBe(false);
     expect(isUnavailableModel('openai/gpt-oss-20b:free')).toBe(false);
   });
 
@@ -17,6 +19,8 @@ describe('unavailable models', () => {
     expect(familyHasUnavailableFreeModel('google/gemma-4-26b-a4b-it')).toBe(true);
     expect(familyHasUnavailableFreeModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(familyHasUnavailableFreeModel('google/gemma-4-31b-it')).toBe(true);
+    expect(familyHasUnavailableFreeModel('qwen/qwen3.8-27b:free')).toBe(true);
+    expect(familyHasUnavailableFreeModel('qwen/qwen3.8-27b')).toBe(true);
     expect(familyHasUnavailableFreeModel('cohere/north-mini-code')).toBe(false);
   });
 });

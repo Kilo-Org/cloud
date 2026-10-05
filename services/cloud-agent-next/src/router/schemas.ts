@@ -497,6 +497,13 @@ const PrepareSessionSharedFields = {
     .optional(),
   bitbucketIntegrationId: z.string().uuid().optional(),
   bitbucketPullRequestId: z.number().int().positive().safe().optional(),
+  githubPullRequestNumber: z
+    .number()
+    .int()
+    .positive()
+    .safe()
+    .optional()
+    .describe('GitHub pull request number the code review must publish its summary to'),
   bitbucketExpectedHeadSha: z
     .string()
     .regex(/^[0-9a-f]{40}$/)

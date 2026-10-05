@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter/inject-extra-provider-models';
+import { injectExtraProviderModels } from '@/lib/providers/openrouter/inject-extra-provider-models';
 import {
   modelRetainsPrompts,
   modelTrains,

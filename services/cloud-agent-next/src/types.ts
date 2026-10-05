@@ -161,6 +161,10 @@ export type SessionContext = {
   botId?: string;
   githubRepo?: string;
   githubToken?: string;
+  /** GitHub PR number a bound code review publishes its summary to. */
+  githubPullRequestNumber?: number;
+  /** Resolved GitHub App type for a bound code review. */
+  githubAppType?: 'standard' | 'lite';
   /** Generic git URL (e.g., GitLab, Bitbucket) */
   gitUrl?: string;
   /** Token for generic git authentication (e.g., GitLab token) */

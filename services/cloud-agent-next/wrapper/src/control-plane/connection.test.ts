@@ -314,6 +314,27 @@ async function connect(
   return connection;
 }
 
+describe('control-plane turn cap and accepted backstop', () => {
+  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
+
+    const margin =
+      CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
+    expect(margin).toBe(300_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBeGreaterThan(
+      CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs
+    );
+
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
+    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
+    expect(scaled.session.acceptedBackstopMs).toBe(372_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
+    expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
+  });
+});
+
 describe('controlPlaneReconnectDelayMs', () => {
   it('grows from the minimum to the maximum and adds bounded jitter', () => {
     const timers = timerOverrides({ reconnectBackoffMinMs: 50, reconnectBackoffMaxMs: 800 });

@@ -6,7 +6,7 @@ import {
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
-import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
+import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';

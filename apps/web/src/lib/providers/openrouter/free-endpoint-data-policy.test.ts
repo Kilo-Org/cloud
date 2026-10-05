@@ -4,7 +4,7 @@ import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/pro
 import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
-} from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
+} from '@/lib/providers/openrouter/free-endpoint-data-policy';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 function offering(slug: string, isFree = false): OpenRouterModel {

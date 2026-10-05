@@ -23,6 +23,7 @@ export type SessionRepositoryRequest =
       repo: string;
       githubIntegrationId?: string;
       githubAccessPurpose?: 'workflow' | 'agent';
+      pullRequestNumber?: number;
       branch?: string;
     }
   | {

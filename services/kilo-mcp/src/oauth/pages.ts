@@ -54,6 +54,7 @@ export function consentPage(input: {
     `<h1>Connect to Kilo MCP</h1>` +
     `<p><strong>${escapeHtml(input.clientName)}</strong> is asking to connect to Kilo MCP ` +
     `with your Kilo account.</p>` +
+    `<p><strong>Beta:</strong> Kilo MCP is in beta. Its tools and behavior can change.</p>` +
     `<p>Requested access: <code>${escapeHtml(input.scope)}</code></p>` +
     `<a class="cta" href="${escapeHtml(input.webSignInUrl)}" target="_blank" ` +
     `rel="noopener noreferrer">Continue with Kilo sign-in</a>` +

@@ -64,7 +64,7 @@ const METADATA_VALUE_LIMIT = 512;
  * and is omitted when absent. When the merge would exceed the entry limit the
  * caller's oldest entries are dropped before the required ones.
  */
-function withTraceabilityMetadata(
+export function withTraceabilityMetadata(
   metadata: Record<string, string> | null | undefined,
   sessionId: string | null
 ): Record<string, string> {

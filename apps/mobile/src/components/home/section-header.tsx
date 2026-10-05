@@ -13,6 +13,11 @@ type SectionHeaderProps = {
   actionLabel?: string;
   onActionPress?: () => void;
   /**
+   * Keeps the action's box but makes it invisible, inert and hidden from
+   * screen readers, so hiding it cannot change the header's size.
+   */
+  actionHidden?: boolean;
+  /**
    * Optional one-line status between the label and the action. It takes only
    * the free space on the label's line (zero basis), so it can never wrap the
    * row or change the header's height when it appears.
@@ -24,6 +29,7 @@ export function SectionHeader({
   label,
   actionLabel,
   onActionPress,
+  actionHidden = false,
   notice,
 }: Readonly<SectionHeaderProps>) {
   return (
@@ -41,9 +47,12 @@ export function SectionHeader({
       {actionLabel && onActionPress ? (
         <Pressable
           onPress={onActionPress}
+          disabled={actionHidden}
           hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={actionLabel}
+          accessibilityRole={actionHidden ? undefined : 'button'}
+          accessibilityLabel={actionHidden ? undefined : actionLabel}
+          accessibilityElementsHidden={actionHidden}
+          importantForAccessibility={actionHidden ? 'no-hide-descendants' : undefined}
           // The row packs each flex line to its end (`justify-end`) and only the
           // label grows, so this box lands on the row's outer edge: the physical
           // right in LTR, the physical left in RTL. `justify-between` would put a
@@ -57,7 +66,10 @@ export function SectionHeader({
           // `text-left`/`text-right`: React Native swaps those two under RTL
           // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
           // is RTL).
-          className="max-w-full shrink-0 flex-row active:opacity-70"
+          className={cn(
+            'max-w-full shrink-0 flex-row active:opacity-70',
+            actionHidden && 'opacity-0'
+          )}
         >
           <Text
             className={cn(

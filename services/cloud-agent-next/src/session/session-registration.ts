@@ -1516,6 +1516,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
         githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
+        pullRequestNumber: repository.pullRequestNumber,
         branch: repository.branch,
       };
     case 'gitlab':

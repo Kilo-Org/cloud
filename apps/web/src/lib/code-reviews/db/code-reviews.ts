@@ -5,7 +5,7 @@
  * Follows Drizzle ORM patterns used throughout the codebase.
  */
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -31,8 +31,8 @@ import {
   getTableColumns,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest } from '@/lib/utils.server';
-import { sanitizePostgresString } from '@/lib/sanitize-jsonb';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { sanitizePostgresString } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import { CreateReviewParamsSchema } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 import { codeReviewLedgerIntent, settleCodeReviewLedgerRow } from '../code-review-ledger';
@@ -44,11 +44,8 @@ import type {
   Owner,
 } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
-import type {
-  CodeReviewCouncilResult,
-  CodeReviewPublicationStatus,
-  CodeReviewTerminalReason,
-} from '@kilocode/db/schema-types';
+import type { CodeReviewCouncilResult, CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import { CodeReviewPublicationStatus } from '@kilocode/db/schema-types';
 import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
@@ -1000,6 +997,86 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
   if (snapshotted) return snapshotted;
 
   return (await getCodeReviewAttemptForReview(review.id, attempt.id)) ?? attempt;
+}
+
+const PUBLICATION_STATUS_VALUES = new Set<string>(Object.values(CodeReviewPublicationStatus));
+
+export async function getCodeReviewAttemptPublicationStatus(
+  attemptId: string
+): Promise<CodeReviewPublicationStatus | null> {
+  const [attempt] = await db
+    .select({ publication_status: cloud_agent_code_review_attempts.publication_status })
+    .from(cloud_agent_code_review_attempts)
+    .where(eq(cloud_agent_code_review_attempts.id, attemptId))
+    .limit(1);
+  const value = attempt?.publication_status;
+  return value !== null && value !== undefined && PUBLICATION_STATUS_VALUES.has(value)
+    ? (value as CodeReviewPublicationStatus)
+    : null;
+}
+
+export type RecordPublicationOutcomeResult = 'recorded' | 'already_recorded' | 'write_failed';
+
+/**
+ * Compare-and-set the attempt publication status and the review's sentence in
+ * one transaction. The sentence is written to the review's `error_message`
+ * (what the card renders), only for a failure status, and coalesced against an
+ * existing value so an unrelated stored message is never replaced. A CAS that
+ * matched no row is `already_recorded` when the stored value is present, and
+ * `write_failed` only when the transaction throws.
+ */
+export async function claimCodeReviewAttemptPublicationOutcome(params: {
+  attemptId: string;
+  reviewId: string;
+  status: CodeReviewPublicationStatus;
+  sentence: string | null;
+}): Promise<RecordPublicationOutcomeResult> {
+  try {
+    return await db.transaction(async tx => {
+      const claimed = await tx
+        .update(cloud_agent_code_review_attempts)
+        .set({
+          publication_status: params.status,
+          updated_at: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.id, params.attemptId),
+            isNull(cloud_agent_code_review_attempts.publication_status)
+          )
+        )
+        .returning({ id: cloud_agent_code_review_attempts.id });
+
+      if (claimed.length === 0) {
+        const [stored] = await tx
+          .select({ publication_status: cloud_agent_code_review_attempts.publication_status })
+          .from(cloud_agent_code_review_attempts)
+          .where(eq(cloud_agent_code_review_attempts.id, params.attemptId))
+          .limit(1);
+        return stored?.publication_status != null
+          ? ('already_recorded' as const)
+          : ('write_failed' as const);
+      }
+
+      if (params.sentence !== null) {
+        await tx
+          .update(cloud_agent_code_reviews)
+          .set({
+            error_message: sql`coalesce(${cloud_agent_code_reviews.error_message}, ${params.sentence})`,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(cloud_agent_code_reviews.id, params.reviewId));
+      }
+
+      return 'recorded' as const;
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'claimCodeReviewAttemptPublicationOutcome' },
+      extra: { attemptId: params.attemptId, reviewId: params.reviewId, status: params.status },
+    });
+    return 'write_failed';
+  }
 }
 
 export async function recordCodeReviewAttemptPublicationStatus(

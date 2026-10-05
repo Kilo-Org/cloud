@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { createAppAuth } from '@octokit/auth-app';
 import { Octokit } from '@octokit/rest';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { exchangeGitHubOAuthCode } from '@/lib/integrations/platforms/github/adapter';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
-import { failureResult } from '@/lib/maybe-result';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { consumeInstallState } from '@/lib/integrations/github/install-state';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
@@ -15,7 +15,7 @@ import {
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
 import type * as InstallStateModule from '@/lib/integrations/github/install-state';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   github_install_states,
   kilocode_users,
@@ -33,16 +33,16 @@ import {
   findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/bot/github-link-state');
 jest.mock('@/lib/bot-identity');
 jest.mock('@/lib/integrations/platforms/github/adapter');
@@ -85,7 +85,7 @@ jest.mock('@/lib/integrations/github/installation-authorization', () => ({
     },
   })),
 }));
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
@@ -104,7 +104,7 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
   lockGitHubInstallationIdentity: jest.fn(async () => undefined),
   effectiveAppTypeCondition: jest.fn(() => undefined),
 }));
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   isOrganizationMember: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -862,7 +862,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     });
 
     // Override to return the matching org owner
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 
@@ -951,7 +951,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     });
 
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 
@@ -1099,7 +1099,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
       created_at: new Date().toISOString(),
     });
 
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 
@@ -1175,7 +1175,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     const mockedCreatePending = jest.mocked(createPendingIntegration);
     mockedCreatePending.mockResolvedValue(undefined as never);
 
-    jest.doMock('@/routers/organizations/utils', () => ({
+    jest.doMock('@kilocode/web-shared/routers/organizations/utils', () => ({
       ensureOrganizationAccess: jest.fn(),
     }));
 

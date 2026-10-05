@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
 import { z } from 'zod';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
@@ -601,8 +601,14 @@ export async function findKiloReviewComment(
 ): Promise<{ commentId: number; body: string } | null> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments: Array<{ id: number; body?: string | null; updated_at: string }> = [];
+  const comments: Array<{
+    id: number;
+    body?: string | null;
+    updated_at: string;
+    performed_via_github_app?: { id?: number | string } | null;
+  }> = [];
   let reachedScanLimit = false;
 
   for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
@@ -626,7 +632,11 @@ export async function findKiloReviewComment(
     totalComments: comments.length,
   });
 
-  const markedComments = comments.filter(c => c.body?.includes('<!-- kilo-review -->'));
+  const markedComments = comments.filter(
+    c =>
+      c.body?.includes('<!-- kilo-review -->') &&
+      String(c.performed_via_github_app?.id ?? '') === appId
+  );
 
   if (markedComments.length > 0) {
     const latestComment = markedComments.sort((a, b) => {

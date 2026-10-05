@@ -22,6 +22,7 @@ import {
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
+  SandboxProviderConfiguration,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
@@ -136,8 +137,8 @@ type StartOptions = {
   allocationName?: string;
   billing?: unknown;
   containment?: { kilocode?: boolean; github?: boolean };
-  provider?: 'cloudflare' | 'vercel';
-  configuration?: { provider: 'vercel'; resources: { vcpus: number; memory: number } };
+  provider?: 'cloudflare' | 'vercel' | 'cloudflare-containers';
+  configuration?: SandboxProviderConfiguration;
   meter?: ContainerUsageRpcMethods;
   preparingRoute?: string;
   admissionError?: string;
@@ -1014,7 +1015,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await runAlarm(stub);
     await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
 
-    await setDeadline(stub, { last_frame_at: Date.now() - (5 * MINUTE + 1_000) });
+    await setDeadline(stub, { last_frame_at: Date.now() - (TIMERS.reconnectMs + 1_000) });
     await runAlarm(stub);
 
     await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
@@ -1148,6 +1149,39 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     expect(provider.leaseCalls).toHaveLength(1);
     expect((await readState(stub)).lastActivityAt).toBe(activityBefore);
+  });
+
+  it('logs a failed lease renewal without disconnecting the allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await connectAndHello(provider, stub);
+
+    await runInDurableObject(stub, async instance => {
+      const renewal = vi
+        .spyOn(provider.adapter, 'ensureLeaseAtLeast')
+        .mockRejectedValue(new Error('provider lease failed'));
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await (instance as unknown as { runLease(): Promise<void> }).runLease();
+
+        expect(withFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'lease_renewal_failed',
+            allocationName: SANDBOX_ID,
+            errorName: 'Error',
+            cause: 'provider_lease_failed',
+          })
+        );
+        expect(warn).toHaveBeenCalledWith('Sandbox control diagnostic');
+        expect((await instance.getAllocationState()).kind).toBe('connected');
+      } finally {
+        renewal.mockRestore();
+        withFields.mockRestore();
+        warn.mockRestore();
+      }
+    });
   });
 
   it('persists liveness on the heartbeat, not on every event frame', async () => {
@@ -1342,6 +1376,56 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await runAlarm(stub);
     await waitFor(() => expect(provider.stopCalls).toContain(provider.refs[0]));
   });
+
+  it.each(['standard-3', 'standard-4', undefined] as const)(
+    'reports the pinned Containers instance %s without provider calls and after eviction',
+    async instance => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider, {
+        provider: 'cloudflare-containers',
+        ...(instance === undefined
+          ? {}
+          : { configuration: { provider: 'cloudflare-containers', instance } }),
+      });
+      await awaitStarting(provider, stub);
+      expect((await stub.getStatusSnapshot()).runtime).toBeUndefined();
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.put('control_plane_owner', 'owner-1')
+      );
+      const providerCalls = [
+        vi.spyOn(provider.adapter, 'create'),
+        vi.spyOn(provider.adapter, 'launch'),
+        vi.spyOn(provider.adapter, 'observe'),
+        vi.spyOn(provider.adapter, 'stop'),
+        vi.spyOn(provider.adapter, 'ensureLeaseAtLeast'),
+        vi.spyOn(provider.adapter, 'ensureBillingAdmission'),
+      ];
+      const expectedRuntime = {
+        sandboxType: instance === 'standard-3' ? 'containers-standard-3' : 'containers-standard-4',
+        kiloCliVersion: null,
+        wrapperVersion: null,
+        startedAt: null,
+        stoppedAt: null,
+      };
+      const before = await readState(stub);
+      const alarm = await readAlarm(stub);
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        status: 'starting',
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readAlarm(stub)).toEqual(alarm);
+      for (const call of providerCalls) expect(call).not.toHaveBeenCalled();
+
+      await evictAllDurableObjects();
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect((await readState(stub)).allocationId).toBe(before.allocationId);
+    }
+  );
 
   it('rebuilds its provider adapter from the stored pin after eviction', async () => {
     const provider = createFakeProvider();

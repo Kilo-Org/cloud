@@ -1,4 +1,5 @@
-import { type ComponentProps, createElement } from 'react';
+/* eslint-disable max-lines -- one suite covering every Home live state: pending, card, zero state, and header notices */
+import { type ComponentProps, createElement, type ReactNode } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,7 +27,12 @@ vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: (_reduced: boolean, crossfade: unknown) => crossfade,
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', Platform: { OS: 'ios' } }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  Platform: { OS: 'ios' },
+  I18nManager: { isRTL: false },
+}));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
@@ -71,7 +77,14 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+// A host element that still renders the header notice. The factory is hoisted
+// above the static imports, so it loads React itself.
+vi.mock('@/components/home/section-header', async () => {
+  const { createElement: create } = await import('react');
+  return {
+    SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
+  };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -185,6 +198,17 @@ afterEach(() => {
 
 const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNT_ROW = 'h-6 flex-row items-center gap-2';
+const NEWEST_BLOCK = 'h-[68px] justify-center gap-1 px-4';
+
+function newestButton() {
+  const button = nodes('Pressable').find(
+    candidate => candidate.props.accessibilityRole === 'button'
+  );
+  if (!button) {
+    throw new Error('Missing newest session button');
+  }
+  return button;
+}
 
 describe('Home live section', () => {
   it('draws the four ranked state counts with the shared state dots', async () => {
@@ -219,18 +243,28 @@ describe('Home live section', () => {
         session('newer', 'running', { statusUpdatedAt: new Date().toISOString() }),
       ],
     });
-    expect(text()).toContain('Newest: newer');
-    expect(text()).toContain('Newest result');
+    expect(text()).toContain('newer');
     expect(text()).toContain('Working');
     expect(text()).toContain('Just now');
-    const newest = nodes('Pressable').find(
-      candidate => candidate.props.accessibilityRole === 'button'
-    );
-    if (!newest) {
-      throw new Error('Missing newest session button');
-    }
-    (newest.props.onPress as () => void)();
+    expect(newestButton().props.accessibilityLabel).toBe('newer, Working, Just now');
+    (newestButton().props.onPress as () => void)();
     expect(sessionDestination.id).toBe('newer');
+  });
+
+  it('never leaves the newest block blank while a session is live', async () => {
+    // No row carries a status time and the only title is the backend
+    // placeholder: the block still names the session, as the list rows do.
+    await render({
+      ...settled,
+      activeSessions: [
+        session('fresh', 'busy', { title: 'New session - 2026-10-04T08:00:00.000Z' }),
+      ],
+    });
+    expect(text()).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(text()).toContain('Working');
+    expect(text()).not.toContain('2026-10-04');
+    (newestButton().props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('fresh');
   });
 
   it('keeps See all navigation to the Agents live index', async () => {
@@ -249,51 +283,53 @@ describe('Home live section', () => {
     expect(nodes('Skeleton').length).toBeGreaterThan(0);
     expect(classes('View')).toContain(CARD_FRAME);
     expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain('h-[68px] gap-1 px-4 py-3');
-    // The old row-shaped placeholder is gone.
-    expect(classes('View')).not.toContain(
-      'min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card'
-    );
+    expect(classes('View')).toContain(NEWEST_BLOCK);
     expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
 
     // The loaded card occupies the same frame and row heights.
     await render({ ...settled, activeSessions: [session('a1')] });
     expect(classes('View')).toContain(CARD_FRAME);
     expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain('h-[68px] gap-1 px-4 py-3');
+    expect(classes('View')).toContain(NEWEST_BLOCK);
   });
 
-  it('renders no live-sessions header when the accepted live list is empty', async () => {
+  it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
     await render();
-    expect(nodes('SectionHeader')).toHaveLength(0);
+    expect(classes('View')).toContain(CARD_FRAME);
+    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
+    expect(classes('View')).toContain(`${NEWEST_BLOCK} items-center`);
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).toContain(`0\n${label}`);
+    }
     expect(text()).toContain(i18n.t('home.noLiveSessions'));
-    expect(classes('View')).toContain(
-      'min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4'
-    );
+    // Nothing to open: the newest block is not a button.
+    expect(
+      nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')
+    ).toBe(false);
+    // The header keeps See all's box but hides it.
+    expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
+    expect(node('SectionHeader').props.actionHidden).toBe(true);
   });
 
-  it('shows the header while the live list is still pending', async () => {
-    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
-    expect(nodes('SectionHeader')).toHaveLength(1);
-    expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
-  });
-
-  it('keeps the card and its newest action while the phone disconnects', async () => {
+  it('moves the offline notice into the header and keeps the card in place', async () => {
     const sessions = {
       ...settled,
       activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
     };
     await render(sessions);
-    const frame = classes('View').find(className => className === CARD_FRAME);
-    const newest = nodes('Pressable').find(
-      candidate => candidate.props.accessibilityRole === 'button'
-    );
+    const before = classes('View');
+    const newest = newestButton();
     connectivity.offline = true;
     await render(sessions);
-    expect(classes('View')).toContain(frame);
-    expect(
-      nodes('Pressable').find(candidate => candidate.props.accessibilityRole === 'button')
-    ).toBe(newest);
+    // No view joins the section body: the notice lives in the header row.
+    expect(classes('View')).toEqual(before);
+    expect(newestButton()).toBe(newest);
+    // The notice renders inside the header row, not in the section body.
     expect(text()).toContain('No internet connection');
+    expect(
+      node('SectionHeader').findAll(candidate =>
+        candidate.children.includes('No internet connection')
+      )
+    ).not.toHaveLength(0);
   });
 });

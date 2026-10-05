@@ -169,7 +169,9 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     expect(peer.statusCalls).toHaveLength(1);
     expect((await rows(stub))[0]?.state).toBe('queued');
     expect(await recoveryAt(stub)).toBeUndefined();
-    expect(await alarmAt(stub)).toBe((await rows(stub))[0]!.created_at + 20 * 60_000);
+    expect(await alarmAt(stub)).toBe(
+      (await rows(stub))[0]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
+    );
   });
 
   it('retires accepted work when not_ready returns a new ready owner, without recursive delivery or replay', async () => {
@@ -294,7 +296,9 @@ describe('SandboxSessionV2 queued transport recovery', () => {
         await bounded(recover(stub, peer));
         expect(await recoveryAt(stub)).toBeUndefined();
         expect((await rows(stub))[0]?.state).toBe('queued');
-        expect(await alarmAt(stub)).toBe((await rows(stub))[0]!.created_at + 20 * 60_000);
+        expect(await alarmAt(stub)).toBe(
+          (await rows(stub))[0]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
+        );
       } finally {
         pending.resolve(peer.view('preparing'));
       }
@@ -334,7 +338,9 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       peer.prepareView = peer.view(state);
       await stub.onRoute(peer.view(state));
       expect(await recoveryAt(stub)).toBeUndefined();
-      expect(await alarmAt(stub)).toBe((await rows(stub))[0]!.created_at + 20 * 60_000);
+      expect(await alarmAt(stub)).toBe(
+        (await rows(stub))[0]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
+      );
       expect(peer.deliverCalls).toHaveLength(0);
       expect(peer.statusCalls).toHaveLength(1);
     }
@@ -497,7 +503,9 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     const statusCalls = peer.statusCalls.length;
     await runInDurableObject(stub, instance => instance.alarm());
     expect(peer.statusCalls).toHaveLength(statusCalls);
-    expect(await alarmAt(stub)).toBe((await rows(stub))[1]!.created_at + 20 * 60_000);
+    expect(await alarmAt(stub)).toBe(
+      (await rows(stub))[1]!.created_at + CONTROL_PLANE_TIMERS.session.queuedBackstopMs
+    );
     await stub.onRoute({ state: 'ready', attemptId: 'unconfirmed-stale-hint' });
     expect(await recoveryAt(stub)).toBeUndefined();
     await stub.send(prompt('fresh-interaction'));

@@ -1,50 +1,56 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { simHash64 } from '@/lib/bouncer/simhash';
+import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
-import { getUserFromAuth } from '@/lib/user/server';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   JWT_TOKEN_VERSION,
   validateAuthorizationHeader,
   isRejectedCredentialReason,
-} from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/tokens';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
+import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { accountForMicrodollarUsage, INVALID_TOKEN_CODE } from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
-import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  accountForMicrodollarUsage,
+  INVALID_TOKEN_CODE,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  ReasoningDetailsTransform,
+  type Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
-} from '@/lib/ai-gateway/auto-routing-denied-models';
-import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
-import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { rewriteModelResponse } from '@/lib/ai-gateway/rewriteModelResponse';
-import { readDb } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   checkFreeModelRateLimit,
   checkFreeModelRateLimitByUser,
   checkPromotionLimit,
   logFreeModelRequest,
-} from '@/lib/free-model-rate-limiter';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
-import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import { decide, type DecideVerdict } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/free-model-rate-limiter';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { stepfun_37_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { decide, type DecideVerdict } from '@kilocode/web-shared/lib/bouncer/client';
 import { NextRequest } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
@@ -64,39 +70,44 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-jest.mock('@/lib/user/server');
-jest.mock('@/lib/organizations/organization-usage');
-jest.mock('@/lib/autoTopUpInFlight');
-jest.mock('@/lib/creditTransactions', () => ({
-  ...(jest.requireActual('@/lib/creditTransactions') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
+jest.mock('@kilocode/web-shared/lib/autoTopUpInFlight');
+jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/creditTransactions') as Record<string, unknown>),
   summarizeUserPayments: jest.fn(async () => ({
     payments_count: 1,
     payments_total_microdollars: 0,
   })),
 }));
-jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
-jest.mock('@/lib/free-model-rate-limiter');
-jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
-  getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
-}));
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/free-model-rate-limiter');
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
+  () => ({
+    getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
+  })
+);
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
 }));
-jest.mock('@/lib/ai-gateway/providers/get-provider');
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
-jest.mock('@/lib/ai-gateway/providers/upstream-request');
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   getToolsAvailable: jest.fn(() => false),
   getToolsUsed: jest.fn(() => false),
 }));
-jest.mock('@/lib/ai-gateway/rewriteModelResponse', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/rewriteModelResponse');
-  const { wrapInSafeNextResponse } = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse');
+  const { wrapInSafeNextResponse } = jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'
+  );
   return {
     ...actual,
     // Mirror the production passthrough; these tests exercise the route, not
@@ -106,28 +117,28 @@ jest.mock('@/lib/ai-gateway/rewriteModelResponse', () => {
     ),
   };
 });
-jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
   return {
     ...actual,
     accountForMicrodollarUsage: jest.fn(),
     captureProxyError: jest.fn(),
   };
 });
-jest.mock('@/lib/ai-gateway/auto-routing-decision');
-jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-decision');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
   collectDataCollectionRequiredAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
 }));
-jest.mock('@/lib/ai-gateway/processUsage', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/processUsage');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage');
   return {
     ...(actual as Record<string, unknown>),
     logMicrodollarUsage: jest.fn(),
   };
 });
-jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/auto-model/resolution');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution');
   return {
     ...(actual as Record<string, unknown>),
     applyResolvedAutoModel: jest.fn(),
@@ -135,8 +146,8 @@ jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
 });
 // Bouncer is report-only and never changes the response; mock it so the decide
 // call shape and its failure modes can be asserted.
-jest.mock('@/lib/bouncer/client', () => ({
-  ...(jest.requireActual('@/lib/bouncer/client') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
   decide: jest.fn(async () => null),
   reportUsageEvent: jest.fn(async () => undefined),
 }));

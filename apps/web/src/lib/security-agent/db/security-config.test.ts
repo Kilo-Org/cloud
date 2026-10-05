@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { agent_configs, security_agent_commands, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const mockEnqueueBacklogFindings = jest.fn<(params: { tx?: unknown }) => Promise<number>>();
 const mockResetOwnerAutoAnalysisEnabledAt =

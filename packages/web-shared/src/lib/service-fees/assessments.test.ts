@@ -14,9 +14,9 @@ import {
   upsertServiceFeeAssessment,
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
-import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
-import type { PrepareAssessmentInput } from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
+import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@kilocode/web-shared/lib/service-fees/constants';
+import type { PrepareAssessmentInput } from '@kilocode/web-shared/lib/service-fees/types';
 
 function createMemoryAssessmentStore(): ServiceFeeAssessmentStore {
   const rows = new Map<string, ServiceFeeAssessmentRecord>();

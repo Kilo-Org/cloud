@@ -1259,7 +1259,11 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker);
 
-    const { prepareFrame } = await prepareWarmRoute(stub, provider);
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, { ...credentialsSource(SESSION), createdOnPlatform: 'code-review' })
+    );
 
     expect(prepareFrame?.type).toBe('session.prepare');
     const serialized = JSON.stringify(prepareFrame);
@@ -1270,6 +1274,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(serialized).not.toContain('"userId"');
 
     if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.createdOnPlatform).toBe('code-review');
     expect(prepareFrame.credentials?.kilo.token).toMatch(/^kcp1\./);
     expect(prepareFrame.credentials?.git?.token).toMatch(/^kcp1\./);
     expect(prepareFrame.credentials?.git?.platform).toBe('github');
@@ -1571,7 +1576,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     // No usable grant and no frame: the route leaves `ready` so the Session DO
     // fails its queued messages with the real reason instead of waiting for the
-    // 20-minute backstop.
+    // queued backstop.
     expect(result).toBe('not_ready');
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,

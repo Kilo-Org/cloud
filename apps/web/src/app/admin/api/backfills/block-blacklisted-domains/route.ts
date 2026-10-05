@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { and, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
-import { getBlacklistedDomains } from '@/lib/blacklist-domains-config';
+import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { revokeGatewayGrantsForBlockedUsers } from '@/lib/mcp-gateway/blocking-service';
 
 /**

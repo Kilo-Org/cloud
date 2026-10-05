@@ -1,6 +1,6 @@
 import { organizations } from '@kilocode/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
 export const FEATURE_ADOPTION_KEYS = [

@@ -9,9 +9,9 @@ import {
   normalizeJa4,
   type CreditEvent,
   type CreditFlow,
-} from '@/lib/bouncer/client';
-import { db } from '@/lib/drizzle';
-import { sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   enqueueBouncerCreditEvent,
   type BouncerCreditEventOutboxDatabase,

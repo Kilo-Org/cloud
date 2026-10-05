@@ -77,8 +77,10 @@ RUN cd /tmp/wrapper-build/wrapper && \
     bun build src/main.ts --outfile=/usr/local/bin/kilocode-wrapper.js --target=bun --minify && \
     bun build src/restore-session.ts --outfile=/usr/local/bin/kilo-restore-session.js --target=bun --minify && \
     bun build src/bitbucket-review-cli.ts --outfile=/usr/local/bin/bb --target=bun --minify && \
+    bun build src/github-review-publish-mcp.ts --outfile=/usr/local/bin/github-review-publish-mcp --target=bun --minify && \
     bun build src/control-plane/main.ts --outfile=/usr/local/bin/kilocode-control-plane-wrapper.js --target=bun --minify && \
     chmod +x /usr/local/bin/bb && \
+    chmod +x /usr/local/bin/github-review-publish-mcp && \
     cp control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh && \
     chmod +x /usr/local/bin/kilocode-control-plane-supervisor.sh && \
     rm -rf /tmp/wrapper-build

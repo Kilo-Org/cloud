@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { isCronAuthorizationValid } from '@/lib/cron-auth';
 import { dispatchEnterpriseRecommendationsDigests } from '@/lib/organizations/recommendations-digest';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');

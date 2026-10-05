@@ -4,6 +4,7 @@ import {
   SANDBOX_INTERCEPT_HTTPS_ENABLED,
   SANDBOX_INTERCEPT_HTTPS_ENV,
 } from '../../../src/shared/container-intercept.js';
+import type { ControlDiagnosticProjector } from '../../../src/shared/control-diagnostics.js';
 
 export type CertLogger = (message: string) => void;
 
@@ -45,11 +46,16 @@ async function waitForCertFile(certPath: string): Promise<boolean> {
 
 export async function trustRuntimeCert(
   log: CertLogger = console.error,
-  paths: RuntimeCertPaths = DEFAULT_RUNTIME_CERT_PATHS
+  paths: RuntimeCertPaths = DEFAULT_RUNTIME_CERT_PATHS,
+  projector?: ControlDiagnosticProjector
 ): Promise<void> {
   const { certPath, systemBundlePaths } = paths;
   if (!(await waitForCertFile(certPath))) {
     log('Certificate not found, refusing to start without HTTPS interception enabled');
+    projector?.('wrapper.lifecycle', {
+      phase: 'start_failed',
+      interceptTrustFailure: 'cert_unavailable',
+    });
     process.exit(1);
   }
 
@@ -58,6 +64,10 @@ export async function trustRuntimeCert(
     certContent = readFileSync(certPath, 'utf8');
   } catch {
     log('Failed to read runtime certificate, refusing to start without HTTPS interception enabled');
+    projector?.('wrapper.lifecycle', {
+      phase: 'start_failed',
+      interceptTrustFailure: 'cert_unreadable',
+    });
     process.exit(1);
   }
 
@@ -73,6 +83,10 @@ export async function trustRuntimeCert(
     log(
       'Failed to append runtime certificate, refusing to start without HTTPS interception enabled'
     );
+    projector?.('wrapper.lifecycle', {
+      phase: 'start_failed',
+      interceptTrustFailure: 'cert_append_failed',
+    });
     process.exit(1);
   }
 
@@ -86,8 +100,9 @@ export async function trustRuntimeCert(
 
 export async function installInterceptTrustIfEnabled(
   log: CertLogger = console.error,
-  paths: RuntimeCertPaths = DEFAULT_RUNTIME_CERT_PATHS
+  paths: RuntimeCertPaths = DEFAULT_RUNTIME_CERT_PATHS,
+  projector?: ControlDiagnosticProjector
 ): Promise<void> {
   if (process.env[SANDBOX_INTERCEPT_HTTPS_ENV] !== SANDBOX_INTERCEPT_HTTPS_ENABLED) return;
-  await trustRuntimeCert(log, paths);
+  await trustRuntimeCert(log, paths, projector);
 }

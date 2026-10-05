@@ -214,6 +214,7 @@ function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
 
 type MessageBubbleProps = {
   message: StoredMessage;
+  displayTimestamp?: number;
   isStreaming?: boolean;
   /** Delivery state for this message, if any (surfaced via cloud.message.* events). */
   deliveryState?: MessageDeliveryState;
@@ -230,13 +231,14 @@ type MessageBubbleProps = {
  */
 export function MessageBubble({
   message,
+  displayTimestamp,
   isStreaming: isStreamingProp,
   deliveryState,
   getChildMessages,
   onOpenChildSession,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
-  const timestamp = message.info.time.created;
+  const timestamp = displayTimestamp ?? message.info.time.created;
   const deliveryBadge = getDeliveryBadge(deliveryState);
 
   const getTextForCopy = useCallback(

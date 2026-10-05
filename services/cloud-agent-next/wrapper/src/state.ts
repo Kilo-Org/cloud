@@ -3,6 +3,7 @@ import type {
   WrapperCommitCoAuthor,
   WrapperPromptAgent,
 } from '../../src/shared/wrapper-bootstrap.js';
+import type { PublicationRecoverySignal } from './publication-recovery.js';
 import type { LogUploader } from './log-uploader.js';
 export type { LogUploader } from './log-uploader.js';
 
@@ -12,8 +13,6 @@ export type SessionContext = {
   ingestToken?: string;
   workerAuthToken: string;
   platform?: string;
-  /** Code review that must publish a summary: self-check once if none was written. */
-  publicationSelfCheck?: boolean;
   wrapperRunId?: string;
   wrapperGeneration?: number;
   wrapperConnectionId?: string;
@@ -57,9 +56,11 @@ export class WrapperState {
   private lastActivityAt = Date.now();
   private _lastError: LastError | null = null;
   private _lastAssistantMessageId: string | null = null;
+  private _publicationSignal: PublicationRecoverySignal | null = null;
+  private _publicationSignalGeneration: number | undefined = undefined;
+  private _publicationSignalConnectionId: string | undefined = undefined;
+  private _assistantOutputLimit = false;
   private _observedGateResult: 'pass' | 'fail' | null = null;
-  private _summaryPublicationObserved = false;
-  private _publicationSelfCheckSent = false;
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
   private _logUploader: LogUploader | null = null;
 
@@ -193,27 +194,6 @@ export class WrapperState {
     return gateResult;
   }
 
-  get summaryPublicationObserved(): boolean {
-    return this._summaryPublicationObserved;
-  }
-
-  observeSummaryPublication(): void {
-    this._summaryPublicationObserved = true;
-  }
-
-  /** The batch should get its one publication self-check before it seals. */
-  get needsPublicationSelfCheck(): boolean {
-    return (
-      this.session?.publicationSelfCheck === true &&
-      !this._summaryPublicationObserved &&
-      !this._publicationSelfCheckSent
-    );
-  }
-
-  markPublicationSelfCheckSent(): void {
-    this._publicationSelfCheckSent = true;
-  }
-
   getStatus(): WrapperStatus {
     return {
       state: this._isFinalizing ? 'finalizing' : this.isActive ? 'active' : 'idle',
@@ -246,7 +226,6 @@ export class WrapperState {
       this.session.ingestToken !== context.ingestToken ||
       this.session.workerAuthToken !== context.workerAuthToken ||
       this.session.platform !== context.platform ||
-      this.session.publicationSelfCheck !== context.publicationSelfCheck ||
       this.session.wrapperRunId !== context.wrapperRunId ||
       this.session.wrapperGeneration !== context.wrapperGeneration ||
       this.session.wrapperConnectionId !== context.wrapperConnectionId;
@@ -263,6 +242,45 @@ export class WrapperState {
     this.session = null;
     this.clearAllMessages();
     this._lastAssistantMessageId = null;
+    this._publicationSignal = null;
+    this._publicationSignalGeneration = undefined;
+    this._publicationSignalConnectionId = undefined;
+    this._assistantOutputLimit = false;
+  }
+
+  observePublicationSignal(signal: PublicationRecoverySignal): void {
+    this._publicationSignal = signal;
+    this._publicationSignalGeneration = this.session?.wrapperGeneration;
+    this._publicationSignalConnectionId = this.session?.wrapperConnectionId;
+  }
+
+  consumePublicationSignal(): PublicationRecoverySignal | null {
+    const signal = this._publicationSignal;
+    this._publicationSignal = null;
+    if (!signal || !this.session) return null;
+    if (
+      this._publicationSignalGeneration !== this.session.wrapperGeneration ||
+      this._publicationSignalConnectionId !== this.session.wrapperConnectionId
+    ) {
+      return null;
+    }
+    this._publicationSignalGeneration = undefined;
+    this._publicationSignalConnectionId = undefined;
+    return signal;
+  }
+
+  observeAssistantOutputLimit(): void {
+    this._assistantOutputLimit = true;
+  }
+
+  clearAssistantOutputLimit(): void {
+    this._assistantOutputLimit = false;
+  }
+
+  consumeAssistantOutputLimit(): boolean {
+    const observed = this._assistantOutputLimit;
+    this._assistantOutputLimit = false;
+    return observed;
   }
 
   beginDeliveryAcknowledgement(): boolean {
@@ -321,7 +339,5 @@ export class WrapperState {
     this._deliveryAcknowledgementsInFlight = 0;
     this._isFinalizing = false;
     this._observedGateResult = null;
-    this._summaryPublicationObserved = false;
-    this._publicationSelfCheckSent = false;
   }
 }

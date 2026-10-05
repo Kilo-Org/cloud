@@ -1846,13 +1846,8 @@ export function SessionDetailContent({
       />
     </View>
   );
-  // The PR link shares the goal row so the header stays at two rows. The row
-  // mounts only once it holds data: while the fetch is in flight a no-goal,
-  // no-PR session reserves no row, so the transcript never jumps when the fetch
-  // lands with nothing. The wrapper's FadeIn reveals the PR when it lands.
   const associatedPr = fetchedData?.associatedPr ?? null;
-  const prBadge = <SessionPrBadge pr={associatedPr} loading={false} />;
-  const hasPrRow = associatedPr !== null;
+  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : undefined;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -2253,7 +2248,7 @@ export function SessionDetailContent({
               />
             </Animated.View>
           ) : null}
-          {sessionGoal !== null || hasPrRow ? (
+          {sessionGoal !== null ? (
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}

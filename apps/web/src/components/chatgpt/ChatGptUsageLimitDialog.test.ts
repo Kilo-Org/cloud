@@ -19,7 +19,7 @@ import {
   USAGE_LIMIT_DESCRIPTION,
   USAGE_LIMIT_TITLE,
 } from './ChatGptUsageLimitDialog';
-import { CHATGPT_USAGE_SETTINGS_URL } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { CHATGPT_USAGE_SETTINGS_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 
 function render(): string {
   return renderToStaticMarkup(createElement(ChatGptUsageLimitContent));

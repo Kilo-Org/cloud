@@ -8,7 +8,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, asc, eq, gt, inArray, isNull, ne } from 'drizzle-orm';
 
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export const KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR =
   'Cannot change organization hierarchy while it has Kilo Pass allocations';

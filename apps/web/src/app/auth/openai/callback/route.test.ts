@@ -6,7 +6,7 @@ jest.mock('@/lib/user/next-auth-options', () => ({
   nextAuthHttpHandler: (...args: [NextRequest, unknown]) => mockNextAuthHttpHandler(...args),
 }));
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSession: () => mockGetUserFromSession(),
 }));
 

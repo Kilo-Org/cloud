@@ -6,7 +6,7 @@ import {
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
 import { kiloclaw_instances } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type ActiveKiloClawInstance = {
   id: string;

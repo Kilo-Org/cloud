@@ -1,6 +1,6 @@
 import { readFile } from 'fs/promises';
 import * as z from 'zod';
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import {
   referral_codes,
   referral_code_usages,
@@ -8,10 +8,13 @@ import {
   user_admin_notes,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, gt } from 'drizzle-orm';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
-import { referralRedeemingBonus, referralReferringBonus } from '@/lib/promoCreditCategories';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { successResult } from '@/lib/maybe-result';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import {
+  referralRedeemingBonus,
+  referralReferringBonus,
+} from '@kilocode/web-shared/lib/promoCreditCategories';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 
 type ReferredUserNotLoggedEvent = {
   eventTime: Date;

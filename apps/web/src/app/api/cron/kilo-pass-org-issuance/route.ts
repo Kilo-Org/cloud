@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { CRON_SECRET } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { dispatchOrganizationPassBlockedNotifications } from '@/lib/kilo-pass-org/notifications';
 import { runOrganizationPassIssuanceCron } from '@/lib/kilo-pass-org/service';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 if (!CRON_SECRET) throw new Error('CRON_SECRET is not configured in environment variables');
 

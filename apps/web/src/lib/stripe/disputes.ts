@@ -33,14 +33,14 @@ import { and, desc, eq, inArray, isNotNull, isNull, lt, not, or, sql } from 'dri
 import type Stripe from 'stripe';
 
 import { terminateCodingPlanImmediately } from '@/lib/coding-plans';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { client } from '@/lib/stripe-client';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
 

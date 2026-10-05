@@ -4,10 +4,10 @@ import { createPublicKey, randomUUID } from 'node:crypto';
 import {
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY,
-} from '@/lib/config.server';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_SCHEME,

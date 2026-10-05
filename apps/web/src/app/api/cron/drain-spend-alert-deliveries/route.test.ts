@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 jest.mock('@/lib/spend-alerts/delivery', () => ({
   drainPendingSpendAlertDeliveries: jest.fn(),
   spendAlertDeliveryDeps: { sendEmail: jest.fn(), dispatchPush: jest.fn() },
 }));
 const mockSentryLog = jest.fn();
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => mockSentryLog) }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => mockSentryLog),
+}));
 
 import { drainPendingSpendAlertDeliveries } from '@/lib/spend-alerts/delivery';
 import { GET, maxDuration } from './route';

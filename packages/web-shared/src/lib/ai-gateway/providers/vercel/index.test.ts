@@ -8,12 +8,12 @@ import {
   hasCompatibleVercelInferenceProvider,
   isVercelRoutingOptOut,
   passesVercelRoutingPercentage,
-} from '@/lib/ai-gateway/providers/vercel';
-import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { getRandomNumber } from '@kilocode/web-shared/lib/ai-gateway/getRandomNumber';
 import type {
   GatewayRequest,
   OpenRouterProviderConfig,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 const originalFriendliApiKey = process.env.FRIENDLI_API_KEY;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
@@ -301,21 +301,22 @@ describe('shouldRouteToVercel', () => {
 
   async function loadShouldRouteToVercel(options?: { optOut?: boolean }) {
     jest.resetModules();
-    jest.doMock('@/lib/ai-gateway/providers/routing-config', () => ({
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/routing-config', () => ({
       getRuntimeGatewayRoutingConfig: jest.fn(async () => ({
         vercelPaid: 100,
         vercelFree: 100,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
       })),
     }));
-    jest.doMock('@/lib/ai-gateway/is-free-model', () => ({
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
       isFreeModel: jest.fn(() => false),
     }));
-    jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['anthropic']),
     }));
-    return (await import('@/lib/ai-gateway/providers/vercel')).shouldRouteToVercel;
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel'))
+      .shouldRouteToVercel;
   }
 
   it('uses resolved provider policy instead of unrestricted request preferences', async () => {
@@ -609,12 +610,12 @@ describe('applyVercelSettings managed requests', () => {
     const getVercelInferenceProvidersMock = jest
       .fn<(modelId: string) => Promise<string[] | null>>()
       .mockResolvedValue(vercelInferenceProviders);
-    jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: getVercelInferenceProvidersMock,
       getVercelModelsFromDatabase: jest.fn(),
     }));
     const { applyVercelSettings: applyManagedSettings } =
-      await import('@/lib/ai-gateway/providers/vercel');
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel');
 
     await applyManagedSettings(requestedModel, request, null);
     return getVercelInferenceProvidersMock;

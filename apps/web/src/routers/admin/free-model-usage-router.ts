@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { and, count, gte } from 'drizzle-orm';
 import { headers } from 'next/headers';
@@ -10,7 +10,7 @@ import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
   ADMIN_RATE_LIMIT_TEST_MODEL,
-} from '@/lib/constants';
+} from '@kilocode/web-shared/lib/constants';
 import { sql } from 'drizzle-orm';
 
 function getWindowStart(): Date {

@@ -4,6 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
+import type {
+  ControlDiagnosticReporter,
+  KiloRestartFaultReason,
+} from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
@@ -136,14 +140,14 @@ export async function cleanupStaleKiloPidfiles(deps: StaleKiloPidfileDeps): Prom
   return killed;
 }
 
-export type KiloRestartReason = 'hang' | 'exit' | 'feed' | 'credentials';
+export type KiloRestartReason = KiloRestartFaultReason | 'credentials';
 
 /**
  * The runtime's one lifecycle phase. `running` is healthy, `suspected` has seen
  * silence, `restarting` is replacing Kilo, `unavailable` spent the crash
  * budget, and `stopped` was shut down.
  */
-type KiloRuntimePhase = 'running' | 'suspected' | 'restarting' | 'unavailable' | 'stopped';
+export type KiloRuntimePhase = 'running' | 'suspected' | 'restarting' | 'unavailable' | 'stopped';
 
 export type KiloRuntimeScheduler = {
   now(): number;
@@ -238,6 +242,7 @@ export type KiloRuntimeOptions = {
   workload?: ControlWorkload;
   pidfileDirectory: string;
   log?: (message: string) => void;
+  onNativeDiagnostic?: ControlDiagnosticReporter;
   onEvent?: (event: KiloFeedEvent) => void;
   /** Fired after Kilo comes back with a fresh process; B8 hands over busy turns. */
   onRestart?: (info: { directory: string; reason: KiloRestartReason }) => void;
@@ -275,6 +280,8 @@ export type KiloRuntime = {
   /** Restarts with the pending credentials when the runtime is idle. B8 calls this. */
   applyPendingCredentials(canRestart: () => boolean): Promise<boolean>;
   isRetiredClient(client: WrapperKiloClient): boolean;
+  /** The live phase; the native status line counts these without a second reader. */
+  phase(): KiloRuntimePhase;
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
@@ -798,6 +805,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         stopWatchdog();
         log(`control-plane kilo runtime unavailable directory=${options.directory}`);
         options.onUnavailable?.(options.directory);
+        options.onNativeDiagnostic?.('wrapper.lifecycle', { phase: 'kilo_unavailable' });
         return false;
       }
       restarts.push(now);
@@ -829,6 +837,14 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     log(
       `control-plane kilo restarting directory=${options.directory} reason=${reason} pid=${kiloProcess?.pid ?? 'none'}${diagnostic}`
     );
+    // The decision, before the process is replaced. A credential refresh is not
+    // a fault and is not projected.
+    if (reason !== 'credentials') {
+      options.onNativeDiagnostic?.('wrapper.lifecycle', {
+        phase: 'kilo_restarting',
+        kiloRestartReason: reason,
+      });
+    }
     try {
       // Share the start with `ensure` so a concurrent ensure cannot spawn a
       // second Kilo while the old process is being replaced (L3).
@@ -847,15 +863,30 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         }`
       );
       if (currentPhase() !== 'stopped') phase = 'suspected';
+      if (currentPhase() !== 'stopped' && reason !== 'credentials') {
+        options.onNativeDiagnostic?.('wrapper.lifecycle', {
+          phase: 'kilo_restart_failed',
+          kiloRestartReason: reason,
+        });
+      }
       return false;
     }
     // The restart is complete before callbacks run, so a handler that calls
     // `ensure`/`isRestarting` sees a healthy runtime. A throwing handler must
     // not reject `restart()`, whose callers are fire-and-forget.
-    if (currentPhase() !== 'stopped') phase = 'running';
+    const restarted = currentPhase() !== 'stopped';
+    if (restarted) phase = 'running';
     log(
       `control-plane kilo restarted directory=${options.directory} reason=${reason} pid=${kiloProcess?.pid ?? 'none'}`
     );
+    // A restart that landed on a shutdown is not a completed restart; do not
+    // report it as healthy.
+    if (restarted && reason !== 'credentials') {
+      options.onNativeDiagnostic?.('wrapper.lifecycle', {
+        phase: 'kilo_restarted',
+        kiloRestartReason: reason,
+      });
+    }
     try {
       options.onRestart?.({ directory: options.directory, reason });
     } catch (error) {
@@ -924,6 +955,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       pendingCredentials = true;
     },
     applyPendingCredentials,
+    phase: currentPhase,
     isSuspected: isSuspectedPhase,
     isRestarting: () => phase === 'restarting',
     isUnavailable: () => phase === 'unavailable',
@@ -960,6 +992,13 @@ export type KiloRuntimes = {
   remove(key: string): void;
   suspected(): boolean;
   unavailable(): boolean;
+  /** One walk of the existing runtimes map for the native status line. */
+  summary(): {
+    runtimeCount: number;
+    suspectedCount: number;
+    restartingCount: number;
+    unavailableCount: number;
+  };
   /** Live runtimes serving one directory; worktree deletion retires them (R2). */
   runtimesForDirectory(directory: string): KiloRuntime[];
   /** Stops and removes every runtime serving one directory (worktree deletion). */
@@ -1049,6 +1088,23 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
     },
     suspected: anySuspected,
     unavailable: () => [...runtimes.values()].some(runtime => runtime.isUnavailable()),
+    summary() {
+      let suspectedCount = 0;
+      let restartingCount = 0;
+      let unavailableCount = 0;
+      for (const runtime of runtimes.values()) {
+        const phase = runtime.phase();
+        if (phase === 'suspected') suspectedCount += 1;
+        else if (phase === 'restarting') restartingCount += 1;
+        else if (phase === 'unavailable') unavailableCount += 1;
+      }
+      return {
+        runtimeCount: runtimes.size,
+        suspectedCount,
+        restartingCount,
+        unavailableCount,
+      };
+    },
     runtimesForDirectory: directory =>
       [...runtimes.values()].filter(runtime => runtime.directory === directory),
     async retireDirectory(directory) {

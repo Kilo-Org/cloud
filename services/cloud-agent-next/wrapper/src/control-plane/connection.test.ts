@@ -112,14 +112,14 @@ describe('acknowledged heartbeat', () => {
     expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatAckTimeoutMs).toBe(15_000);
     expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatNegotiationMs).toBe(1_000);
     expect(CONTROL_PLANE_TIMERS.sandbox.heartbeatMs).toBe(45_000);
-    expect(CONTROL_PLANE_TIMERS.sandbox.reconnectMs).toBe(300_000);
+    expect(CONTROL_PLANE_TIMERS.sandbox.reconnectMs).toBe(90_000);
     expect(CONTROL_PLANE_TIMERS.wrapper.reconnectBackoffMinMs).toBe(1_000);
     expect(CONTROL_PLANE_TIMERS.wrapper.reconnectBackoffMaxMs).toBe(30_000);
     const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
     expect(scaled.wrapper.heartbeatIntervalMs).toBe(50);
     expect(scaled.wrapper.heartbeatAckTimeoutMs).toBe(150);
     expect(scaled.sandbox.heartbeatMs).toBe(450);
-    expect(scaled.sandbox.reconnectMs).toBe(3_000);
+    expect(scaled.sandbox.reconnectMs).toBe(900);
   });
   it('uses a legacy hello fallback and never times out an unnegotiated peer', async () => {
     await withTestSocket(async (_connection, socket, disconnected) => {
@@ -314,6 +314,27 @@ async function connect(
   return connection;
 }
 
+describe('control-plane turn cap and accepted backstop', () => {
+  it('derives the 125-minute accepted backstop from the 120-minute cap', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs).toBe(7_200_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBe(7_500_000);
+
+    const margin =
+      CONTROL_PLANE_TIMERS.session.acceptedBackstopMs - CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs;
+    expect(margin).toBe(300_000);
+    expect(CONTROL_PLANE_TIMERS.session.acceptedBackstopMs).toBeGreaterThan(
+      CONTROL_PLANE_TIMERS.wrapper.turnHardCapMs
+    );
+
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
+    expect(scaled.wrapper.turnHardCapMs).toBe(72_000);
+    // The accepted-backstop margin is not scaled, so it does not shrink with the cap.
+    expect(scaled.session.acceptedBackstopMs).toBe(372_000);
+    expect(scaled.session.acceptedBackstopMs).toBe(scaled.wrapper.turnHardCapMs + margin);
+    expect(scaled.session.acceptedBackstopMs).toBeGreaterThan(scaled.wrapper.turnHardCapMs);
+  });
+});
+
 describe('controlPlaneReconnectDelayMs', () => {
   it('grows from the minimum to the maximum and adds bounded jitter', () => {
     const timers = timerOverrides({ reconnectBackoffMinMs: 50, reconnectBackoffMaxMs: 800 });
@@ -341,6 +362,33 @@ describe('createControlPlaneConnection', () => {
       sandbox.setMode('accept');
       await waitFor(() => connected === 1);
       expect(sandbox.connectionCount()).toBe(1);
+    } finally {
+      connection.close();
+      sandbox.stop();
+    }
+  });
+
+  it('snapshots the live phase, attempt and outbox bytes without a url or credential', async () => {
+    const sandbox = createFakeSandbox();
+    sandbox.setMode('reject');
+    const connection = await connect(sandbox, {
+      timers: timerOverrides({ reconnectBackoffMinMs: 5, reconnectBackoffMaxMs: 15 }),
+    });
+    try {
+      connection.send({
+        type: 'session.outcome',
+        sessionId: 'session-1',
+        status: 'completed',
+        lastMessageId: 'message-1',
+      });
+      await waitFor(() => sandbox.attempts() >= 1);
+      const snapshot = connection.snapshot();
+      expect(snapshot.phase).not.toBe('connected');
+      expect(snapshot.attempt).toBeGreaterThanOrEqual(1);
+      expect(snapshot.outboxBytes).toBeGreaterThan(0);
+      expect(snapshot).not.toHaveProperty('url');
+      expect(snapshot).not.toHaveProperty('credential');
+      expect(JSON.stringify(snapshot)).not.toContain('secret-credential');
     } finally {
       connection.close();
       sandbox.stop();

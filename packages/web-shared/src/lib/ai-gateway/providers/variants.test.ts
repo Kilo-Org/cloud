@@ -4,7 +4,7 @@ import {
   getFallbackModelVariants,
   REASONING_VARIANTS_BINARY,
   REASONING_VARIANTS_NONE_MEDIUM_HIGH,
-} from '@/lib/ai-gateway/providers/variants';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
 
 describe('getFallbackModelVariants', () => {
   test.each(['google/gemma-4-26b-a4b-it', 'vendor/longcat-preview', 'poolside/laguna-s-2.1:free'])(

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { pool } from '@/lib/drizzle';
+import { pool } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * Diagnostics for the Frankfurt-local usage write.

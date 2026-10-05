@@ -3,7 +3,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import * as serverConfig from '@/lib/config.server';
+import * as serverConfig from '@kilocode/web-shared/lib/config.server';
 
 const KILO_OWNED_DOMAINS = ['kilocode.ai', 'kilo.ai'] as const;
 

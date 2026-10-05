@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BITBUCKET_CLIENT_ID: 'bitbucket-client-id',
   BITBUCKET_CLIENT_SECRET: 'bitbucket-client-secret',
 }));

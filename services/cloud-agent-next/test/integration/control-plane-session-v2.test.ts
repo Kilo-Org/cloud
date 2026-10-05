@@ -2019,7 +2019,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await sessionStub.send(promptPayload('m2'));
 
     // The policy failure fails the route and releases the queued message with
-    // the real reason now, without running the 20-minute backstop.
+    // the real reason now, without running the queued backstop.
     expect(await messageStatus(sessionStub, 'm2')).toBe('failed');
     expect(await readMessageReason(sessionStub, 'm2')).toBe('workspace_setup_failed');
     expect(await readAlarm(sessionStub)).toBeNull();
@@ -2061,7 +2061,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     // A plain issuance failure is not a provider policy failure, but with an
     // expired old grant it is just as unrecoverable: the route must fail now
-    // instead of leaving the queued message for the 20-minute backstop.
+    // instead of leaving the queued message for the queued backstop.
     await setGrantExpiry(sandboxStub, sessionId, Date.now() - 1);
     await runInDurableObject(sandboxStub, async instance => {
       Object.assign(instance, {

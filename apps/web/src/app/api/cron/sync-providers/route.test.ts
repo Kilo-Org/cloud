@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   createScheduledJobRun: jest.fn(() => ({ runId: 'run-id' })),
@@ -9,16 +9,16 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter/sync-providers', () => ({
+jest.mock('@/lib/providers/openrouter/sync-providers', () => ({
   syncAndStoreProviders: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert', () => ({
+jest.mock('@/lib/providers/openrouter/sync-providers-stale-alert', () => ({
   alertIfSyncProvidersStale: jest.fn(),
 }));
 
-import { alertIfSyncProvidersStale } from '@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert';
-import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
+import { alertIfSyncProvidersStale } from '@/lib/providers/openrouter/sync-providers-stale-alert';
+import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET, maxDuration } from './route';
 

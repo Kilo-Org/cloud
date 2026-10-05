@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
   NOTIFICATIONS_WORKER_URL: 'https://notifications.test',
 }));

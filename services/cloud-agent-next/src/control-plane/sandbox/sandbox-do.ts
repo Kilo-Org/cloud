@@ -537,6 +537,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const allocation = owner === null ? null : await this.getAllocationState();
       return projectAllocationStatusSnapshot({
         allocation,
+        containersInstance:
+          this.providerPin?.configuration?.provider === 'cloudflare-containers'
+            ? this.providerPin.configuration.instance
+            : undefined,
         observedAt: Date.now(),
         inactivityTimeoutMs: this.sandboxTimers().idleMs,
       });
@@ -1853,7 +1857,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
         // No usable grant: fail the route as the prepare path does, so the
         // Session DO starts a fresh attempt or releases the queued messages with
-        // the real reason, instead of leaving them for the 20-minute backstop.
+        // the real reason, instead of leaving them for the queued backstop.
         // If the route stayed `ready`, `prepare` would return the same ready
         // view and deliver would keep returning `not_ready`.
         await onRouteFailed(
@@ -2284,7 +2288,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // material only; the credential source stays DO-private.
     this.trySendFrame(socket, {
       type: 'session.prepare',
-      spec: mcp === undefined ? route.spec : { ...route.spec, mcp },
+      spec: {
+        ...route.spec,
+        createdOnPlatform: route.credentialSource?.createdOnPlatform,
+        ...(mcp === undefined ? {} : { mcp }),
+      },
       credentials: this.prepareCredentials(route.grant, route.sessionId),
     });
   }
@@ -2388,7 +2396,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // material only; the credential source stays DO-private.
       this.trySendFrame(socket, {
         type: 'session.prepare',
-        spec: mcp === undefined ? route.spec : { ...route.spec, mcp },
+        spec: {
+          ...route.spec,
+          createdOnPlatform: route.credentialSource?.createdOnPlatform,
+          ...(mcp === undefined ? {} : { mcp }),
+        },
         credentials: this.prepareCredentials(route.grant, sessionId),
       });
     } catch {
@@ -2838,7 +2850,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.provider.ensureLeaseAtLeast(state.providerRef, this.sandboxTimers().providerLeaseMs),
       this.sandboxTimers().providerStopAttemptMs,
       'Sandbox lease renewal timed out'
-    ).catch(() => undefined);
+    ).catch(error => {
+      logControlDiagnostic(
+        'lease_renewal_failed',
+        {
+          allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+          allocationId: state.allocationId,
+          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+        },
+        'warn'
+      );
+    });
   }
 
   private async runCloseSocket(state: AllocationState): Promise<void> {

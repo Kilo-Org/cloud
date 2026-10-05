@@ -1,24 +1,24 @@
 import 'server-only';
 
-import type { OrganizationGroupModelAccessPolicy } from '@/lib/organizations/group-policies/organization-group-policies';
+import type { OrganizationGroupModelAccessPolicy } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
-import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getKiloExclusiveInferenceProviderRestriction } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   VIRTUAL_PROVIDER,
   withoutVirtualProvider,
-} from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { isModelRestrictionExempt } from '@/lib/model-allow.server';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { isModelRestrictionExempt } from '@kilocode/web-shared/lib/model-allow.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrganizationGroupPolicyContext,
   type OrganizationGroupPolicyContext,
-} from '@/lib/organizations/organization-group-policy-context.server';
+} from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 
 export type EffectiveOrganizationModelPolicy = {
   requireModelInCurrentSnapshot: boolean;

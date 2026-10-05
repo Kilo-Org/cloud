@@ -2,10 +2,10 @@ import { and, eq, notExists, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
-import { generateBoundedInternalServiceToken } from '@/lib/tokens';
-import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
+import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
 import type {

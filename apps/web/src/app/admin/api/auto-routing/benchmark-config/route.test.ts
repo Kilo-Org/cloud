@@ -3,27 +3,29 @@ import type { User } from '@kilocode/db';
 import {
   getBenchmarkConfig,
   updateBenchmarkConfig,
-} from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { getUserFromAuth } from '@/lib/user/server';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
-import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type * as OpenRouterModule from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkConfig: jest.fn(),
   updateBenchmarkConfig: jest.fn(),
 }));
 
 // Stub the catalog so tests don't depend on any specific provider file.
 // 'test-exclusive/chat-only' maps to a synthetic gateway that lacks Messages support.
-jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+  );
   const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
-    '@/lib/ai-gateway/providers/definitions/openrouter'
+    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
   );
   const stubModel: KiloExclusiveModel = {
     public_id: 'test-exclusive/chat-only',

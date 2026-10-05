@@ -1,6 +1,6 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
 import { organization_seats_purchases } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
 
 /**

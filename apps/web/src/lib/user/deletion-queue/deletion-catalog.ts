@@ -3,7 +3,7 @@ import {
   USER_DELETION_CATALOG_VERSION,
   USER_DELETION_ID_ONLY_CATALOG_VERSION,
   USER_DELETION_MAX_ORDINARY_ATTEMPTS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 export const UserDeletionPhase = {
   Teardown: 'teardown',

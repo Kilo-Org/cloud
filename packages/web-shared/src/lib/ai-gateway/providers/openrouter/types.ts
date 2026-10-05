@@ -1,12 +1,12 @@
 import type OpenAI from 'openai';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import type { ReasoningDetailUnion } from '@/lib/ai-gateway/custom-llm/reasoning-details';
+import type { ReasoningDetailUnion } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import type {
   AzureCredentials,
   BedrockCredentials,
   VertexCredentials,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type Anthropic from '@anthropic-ai/sdk';
 
 // Base types for OpenRouter API that don't depend on other lib files

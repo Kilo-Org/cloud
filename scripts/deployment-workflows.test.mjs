@@ -87,6 +87,48 @@ test('successful main CI selects the tested deployment SHA', () => {
   }
 });
 
+test('ai-gateway deploys only on demand, from the last completed release', () => {
+  const gateway = workflow('deploy-ai-gateway');
+  assert.deepEqual(Object.keys(gateway.on), ['workflow_dispatch']);
+  assert.deepEqual(gateway.on.workflow_dispatch.inputs.target_environment.options, [
+    'production',
+    'staging',
+  ]);
+  assert.equal(gateway.concurrency.group, 'deploy-${{ inputs.target_environment }}');
+  assert.equal(production.concurrency.group, 'deploy-production');
+  assert.equal(staging.concurrency.group, 'deploy-staging');
+  assert.equal(gateway.concurrency['cancel-in-progress'], false);
+
+  const release = gateway.jobs['resolve-release'].steps.find(step => step.id === 'release');
+  assert.match(release.run, /environment=scheduled-deploy-\$TARGET_ENVIRONMENT/);
+  assert.match(release.run, /\[ "\$state" = success \]/);
+
+  const stage = gateway.jobs.stage;
+  assert.equal(stage.needs, 'resolve-release');
+  assert.equal(stage.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+  assert.equal(stage.with.source_sha, '${{ needs.resolve-release.outputs.source_sha }}');
+  assert.equal(stage.secrets.VERCEL_PROJECT_TOKEN, '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}');
+  assert.equal(gateway.jobs.promote.needs, 'stage');
+  assert.equal(gateway.jobs.promote.if, "inputs.target_environment == 'production'");
+  assert.deepEqual(gateway.jobs.promote.with, {
+    deployment_url: '${{ needs.stage.outputs.deployment_url }}',
+    axiom_annotation_dataset: 'vercel',
+    axiom_expected_project: 'kilocode-ai-gateway',
+  });
+  assert.equal(
+    gateway.jobs.promote.secrets.AXIOM_ANNOTATION_TOKEN,
+    '${{ secrets.AXIOM_ANNOTATION_TOKEN }}'
+  );
+
+  for (const name of ['deploy-production', 'deploy-staging', 'redeploy-web']) {
+    assert.doesNotMatch(
+      readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'),
+      /AI_GATEWAY/,
+      `${name} must not deploy the ai-gateway`
+    );
+  }
+});
+
 test('staging and production Worker changes use independent deployment baselines', () => {
   assert.equal(workers.concurrency.group, 'deploy-workers-${{ inputs.target_environment }}');
   assert.equal(

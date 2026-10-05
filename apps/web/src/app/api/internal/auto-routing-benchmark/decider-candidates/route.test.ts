@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { listAutoRoutingDeciderCandidates } from '@/lib/model-stats/auto-routing-decider-candidates';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
 }));
 

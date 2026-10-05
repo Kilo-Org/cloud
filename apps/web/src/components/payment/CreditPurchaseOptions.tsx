@@ -18,7 +18,7 @@ import {
   MINIMUM_TOP_UP_AMOUNT,
   FIRST_TOPUP_BONUS_AMOUNT,
   PROMO_CREDIT_EXPIRY_HRS,
-} from '@/lib/constants';
+} from '@kilocode/web-shared/lib/constants';
 import { formatDollars } from '@/lib/utils';
 import { FirstTopupBonusPromo } from './FirstTopupBonusPromo';
 import { AlertTriangle, Coins } from 'lucide-react';

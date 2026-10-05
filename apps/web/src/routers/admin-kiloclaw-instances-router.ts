@@ -1,5 +1,9 @@
-import { adminProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import {
+  adminProcedure,
+  createTRPCRouter,
+  UpstreamApiError,
+} from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getOrphanVolumeContextProtections,
   insertKiloClawSubscriptionChangeLog,
@@ -56,7 +60,7 @@ import type {
   ResizeMachineResponse,
   RestoreVolumeSnapshotResponse,
 } from '@/lib/kiloclaw/types';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { InstanceTierKeySchema } from '@kilocode/kiloclaw-instance-tiers';

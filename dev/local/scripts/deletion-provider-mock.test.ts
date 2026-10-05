@@ -212,9 +212,9 @@ test('missing@local.test is empty or 404 across providers', async () => {
     });
     assert.equal(cio.status, 404);
 
-    const substack = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (substack.body as { subscribers: Array<{ email: string }> }).subscribers;
-    assert.ok(!subscribers.some(row => row.email === 'missing@local.test'));
+    const substack = await searchSubscribers(origin, 'missing@local.test');
+    assert.deepEqual((substack.body as { subscribers: unknown[] }).subscribers, []);
+    assert.equal((substack.body as { count: number }).count, 0);
   });
 });
 
@@ -241,18 +241,45 @@ test('Pylon #1430 contact delete is 429 and #1431 reply is 429', async () => {
   });
 });
 
-test('Substack first page includes exact matches plus decoys without prior priming', async () => {
+test('Substack filtered search uses the live contract and paginates decoys', async () => {
   await withMock(async origin => {
-    const listed = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (listed.body as { subscribers: Array<{ id: string; email: string }> })
-      .subscribers;
-    assert.ok(subscribers.some(row => row.email === 'ok@local.test' && row.id));
-    assert.ok(subscribers.some(row => row.email === 'expired-substack@local.test'));
-    assert.ok(!subscribers.some(row => row.email === 'missing@local.test'));
-    assert.ok(!subscribers.some(row => row.email === 'no-substack@local.test'));
-    const decoys = subscribers.filter(row => row.id.startsWith('partial-'));
-    assert.ok(decoys.length >= 2);
-    const refused = await requestJson(origin, `/api/v1/subscriber/${decoys[0]?.id}`, {
+    await requestJson(origin, '/api/projects/proj/persons?email=ok-contract%40example.com');
+    await requestJson(origin, '/api/projects/proj/persons?email=ok-decoy%40example.com');
+    const listed = await searchSubscribers(origin, 'ok', 0, 1);
+    const body = listed.body as {
+      count: number;
+      subscribers: Array<{
+        user_email_address: string;
+        user_id: number;
+        subscription_id: number;
+        is_subscribed: boolean;
+      }>;
+      order: unknown;
+      tagAssignments: unknown;
+    };
+    assert.equal(listed.status, 200);
+    assert.ok(body.count > 1);
+    assert.equal(body.subscribers.length, 1);
+    assert.equal(typeof body.subscribers[0]?.user_id, 'number');
+    assert.equal(typeof body.subscribers[0]?.subscription_id, 'number');
+    assert.equal(body.subscribers[0]?.is_subscribed, false);
+    assert.deepEqual(body.order, { by: 'subscription_created_at', direction: 'desc' });
+    assert.deepEqual(body.tagAssignments, {});
+    const next = await searchSubscribers(origin, 'ok', 1, 1);
+    assert.equal((next.body as { count: number }).count, body.count);
+    assert.notDeepEqual((next.body as { subscribers: unknown[] }).subscribers, body.subscribers);
+    const exact = await searchSubscribers(origin, 'ok-contract@example.com');
+    assert.equal((exact.body as { count: number }).count, 1);
+    const absent = await searchSubscribers(origin, 'missing@example.com');
+    assert.equal((absent.body as { count: number }).count, 0);
+    assert.ok(!Object.hasOwn(absent.body as object, 'tagAssignments'));
+    const invalid = await requestJson(origin, '/api/v1/subscriber-stats', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ search: 'ok@example.com' }),
+    });
+    assert.equal(invalid.status, 400);
+    const refused = await requestJson(origin, '/api/v1/subscriber/partial-prefix-decoy', {
       method: 'DELETE',
     });
     assert.equal(refused.status, 409);
@@ -300,18 +327,26 @@ test('Substack delete-by-email uses disable_email=true and already-gone bodies',
 
 test('Substack deletes the exact match and 401s expired-substack', async () => {
   await withMock(async origin => {
-    const listed = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (listed.body as { subscribers: Array<{ id: string; email: string }> })
-      .subscribers;
-    const ok = subscribers.find(row => row.email === 'ok@local.test');
-    const expired = subscribers.find(row => row.email === 'expired-substack@local.test');
-    assert.ok(ok);
-    assert.ok(expired);
-    const deleted = await requestJson(origin, `/api/v1/subscriber/${ok.id}`, { method: 'DELETE' });
+    await requestJson(origin, '/api/projects/proj/persons?email=ok-contract%40example.com');
+    await requestJson(
+      origin,
+      '/api/projects/proj/persons?email=expired-substack-contract%40example.com'
+    );
+    const listed = await searchSubscribers(origin, 'ok-contract@example.com');
+    assert.equal((listed.body as { count: number }).count, 1);
+    const deleted = await requestJson(
+      origin,
+      '/api/v1/subscriber/ok-contract%40example.com?disable_email=true',
+      { method: 'DELETE' }
+    );
     assert.equal(deleted.status, 200);
-    const unauthorized = await requestJson(origin, `/api/v1/subscriber/${expired.id}`, {
-      method: 'DELETE',
-    });
+    const unauthorized = await requestJson(
+      origin,
+      '/api/v1/subscriber/expired-substack-contract%40example.com?disable_email=true',
+      {
+        method: 'DELETE',
+      }
+    );
     assert.equal(unauthorized.status, 401);
     const profile = await requestJson(origin, '/api/v1/user/profile/self');
     assert.equal(profile.status, 200);
@@ -368,9 +403,8 @@ test('fail-pylon contact search is 500 and no-substack is absent from Substack',
       '/api/projects/proj/persons?email=no-substack%40local.test'
     );
     assert.equal((posthog.body as { results: unknown[] }).results.length, 1);
-    const listed = await requestJson(origin, '/api/v1/subscriber?offset=0&limit=50');
-    const subscribers = (listed.body as { subscribers: Array<{ email: string }> }).subscribers;
-    assert.ok(!subscribers.some(row => row.email === 'no-substack@local.test'));
+    const listed = await searchSubscribers(origin, 'no-substack@local.test');
+    assert.equal((listed.body as { count: number }).count, 0);
   });
 });
 
@@ -404,3 +438,16 @@ test('binds 127.0.0.1 only', async () => {
     assert.equal(handle.host, '127.0.0.1');
   });
 });
+
+function searchSubscribers(origin: string, search: string, offset = 0, limit = 50) {
+  return requestJson(origin, '/api/v1/subscriber-stats', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      filters: { search, order_by_desc_nulls_last: 'subscription_created_at' },
+      limit,
+      offset,
+      includeTags: true,
+    }),
+  });
+}

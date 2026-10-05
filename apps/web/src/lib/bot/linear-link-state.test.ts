@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import crypto from 'node:crypto';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { createLinearBotLinkState, verifyLinearBotLinkState } from './linear-link-state';
 
 const USER_ID = 'kilo-user-1';

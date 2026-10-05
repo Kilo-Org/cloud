@@ -32,7 +32,7 @@ jest.mock('next/headers', () => ({
 }));
 
 const mockGetUserFromAuthOrRedirect = jest.fn<Promise<User>, [string?]>();
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuthOrRedirect: (...args: [string?]) => mockGetUserFromAuthOrRedirect(...args),
 }));
 

@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
-import { db, type db as defaultDb } from '@/lib/drizzle';
+import { db, type db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   buildExaUsageLogPartitionIndexDefinitions,
   buildExaUsageLogPartitionIndexDropStatement,

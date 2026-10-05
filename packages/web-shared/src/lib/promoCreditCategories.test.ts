@@ -1,4 +1,4 @@
-import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
+import { promoCategoriesOld } from '@kilocode/web-shared/lib/promoCreditCategoriesOld';
 import { buildSelfServicePromos, promoCreditCategories } from './promoCreditCategories';
 
 import * as z from 'zod';

@@ -1,14 +1,15 @@
 import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
 import {
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
+  controlPlaneFailureReasonSchema,
   type ControlPlaneAnswerReply,
   type ControlPlaneOutcome,
   type ControlPlanePromptPayload,
   type ControlPlaneRouteSpec,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
-import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
+import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
 import {
@@ -57,6 +58,8 @@ export type TurnManagerDeps = {
   runtimes: { get(key: string): TurnKiloRuntime | undefined };
   log?: (message: string) => void;
   onDiagnostic?: ControlDiagnosticReporter;
+  /** The one native projector, for the normal `session_outcome` transition. */
+  onNativeDiagnostic?: ControlDiagnosticReporter;
   now?: () => number;
   scheduler?: TurnScheduler;
   materializeAttachments?: typeof materializeMessageAttachments;
@@ -104,6 +107,13 @@ export type Turn = {
   progressed: boolean;
   resubmitted: boolean;
   /**
+   * Tool parts currently `running` in this turn's routed root session or its
+   * resolved descendant tree, keyed by `<kilo session id>\0<part id>`. Kilo owns
+   * each tool's own timeout, so a nonempty set holds the no-progress clock, but
+   * never the hard cap. Diagnostic `lastTool` is not decision state.
+   */
+  runningParts: Set<string>;
+  /**
    * Diagnostic only: real-progress events seen from descendant sessions in this
    * turn's tree, counted alongside the root progress they mark. This count is
    * reported at expiry to distinguish "descendant progress arrived" from "no
@@ -131,6 +141,8 @@ type TurnRoute = {
   kiloSessionId: string;
   directory: string;
   runtimeKey: string;
+  createdOnPlatform?: string;
+  automaticPermissions: Set<string>;
 };
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
@@ -154,14 +166,16 @@ export type TurnDeadlineAction = 'no_progress' | 'execution_limit';
 
 /**
  * The pure outcome clock. The 7-minute real-progress clock pauses while the
- * turn waits on the user; the 60-minute cap does not.
+ * turn waits on the user; a nonempty running set holds no-progress failure; the
+ * 120-minute cap does not.
  */
 export function turnDeadlineAction(
-  turn: Pick<Turn, 'startedAt' | 'lastProgressAt' | 'pausedMs' | 'waitingSince'>,
+  turn: Pick<Turn, 'startedAt' | 'lastProgressAt' | 'pausedMs' | 'waitingSince' | 'runningParts'>,
   now: number,
   timers: TurnTimers
 ): TurnDeadlineAction | null {
   if (now - turn.startedAt >= timers.turnHardCapMs) return 'execution_limit';
+  if (turn.runningParts.size > 0) return null;
   if (noProgressElapsedMs(turn, now) >= timers.noProgressMs) return 'no_progress';
   return null;
 }
@@ -285,6 +299,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
         : { providerOwnership: facts.providerOwnership }),
       lastMessageId,
     });
+    // Closed native record for every status. `outcomeReason` is the parsed
+    // failure enum only; an assistant `safeMessage` does not parse and is never
+    // copied. `assistantReason` stays on the socket frame.
+    const outcomeReason = controlPlaneFailureReasonSchema.safeParse(reason);
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'session_outcome',
+      status,
+      sessionId: turn.route.sessionId,
+      ...(outcomeReason.success ? { outcomeReason: outcomeReason.data } : {}),
+    });
     resetTurn(turn.route.sessionId);
     maybeApplyPendingCredentials(turn.route.runtimeKey);
   }
@@ -349,6 +373,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       pausedMs: 0,
       progressed: false,
       resubmitted: false,
+      runningParts: new Set(),
       descendantProgressEvents: 0,
       submitting: Promise.resolve(),
     };
@@ -850,6 +875,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       const action = turnDeadlineAction(turn, at, timers);
       if (
         action === null &&
+        turn.runningParts.size === 0 &&
         noProgressElapsedMs(turn, at) >= timers.noProgressMs - 60_000 &&
         turn.preDeadlineProbedAt !== turn.lastProgressAt
       ) {
@@ -866,6 +892,51 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const parentRoot = resolveRootKiloSession(child.parentId);
     if (parentRoot === undefined) return;
     childRoots.set(child.childId, parentRoot);
+  }
+
+  async function answerAutomaticPermission(route: TurnRoute, event: KiloFeedEvent): Promise<void> {
+    const permissionId = event.properties.id;
+    if (typeof permissionId !== 'string') return;
+    const turn = turns.get(route.sessionId);
+    const codeReview = route.createdOnPlatform === 'code-review';
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const runtime = deps.runtimes.get(route.runtimeKey);
+        if (runtime === undefined) throw new Error('Kilo runtime unavailable');
+        const success = await runtime.client.answerPermission(
+          permissionId,
+          codeReview ? 'reject' : 'always',
+          codeReview
+            ? 'Permission rejected for code-review non-interactive mode. Continue using another read-only, non-interactive method if available.'
+            : undefined,
+          undefined,
+          route.directory
+        );
+        if (!success) throw new Error('Permission reply was not accepted');
+        return;
+      } catch (error) {
+        log(
+          `turn: automatic permission reply failed - ${error instanceof Error ? error.message : String(error)}`
+        );
+        if (
+          routes.get(route.sessionId) !== route ||
+          !route.automaticPermissions.has(permissionId)
+        ) {
+          return;
+        }
+        if (attempt === 0) continue;
+        route.automaticPermissions.delete(permissionId);
+        if (codeReview) {
+          if (turn !== undefined && turns.get(route.sessionId) === turn) {
+            void abortKilo(route);
+            sendOutcome(turn, 'failed', 'Code-review permission rejection failed');
+          }
+          return;
+        }
+        emitEvents(route.sessionId, [{ type: event.type, properties: event.properties }]);
+        if (turn !== undefined && turns.get(route.sessionId) === turn) beginWaiting(turn);
+      }
+    }
   }
 
   async function publishCommandsFor(sessionId: string): Promise<void> {
@@ -910,6 +981,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return matched;
   }
 
+  /** Turns not waiting on the user; the heartbeat and the status line share it. */
+  function activeTurnCount(): number {
+    let count = 0;
+    for (const turn of turns.values()) {
+      if (turn.waitingSince !== null) continue;
+      count += 1;
+    }
+    return count;
+  }
+
   return {
     canRestartRuntime,
 
@@ -927,6 +1008,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
         kiloSessionId: spec.kiloSessionId,
         directory: spec.directory,
         runtimeKey: runtimeKey(spec),
+        createdOnPlatform: spec.createdOnPlatform,
+        automaticPermissions: existing?.automaticPermissions ?? new Set(),
       };
       routes.set(spec.sessionId, route);
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
@@ -974,12 +1057,39 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (root === undefined) return;
       const sessionId = turnByKiloSession.get(root);
       if (sessionId === undefined) return;
+      const route = routes.get(sessionId);
+      if (route === undefined) return;
+      if (event.type === 'permission.replied' && typeof event.properties.requestID === 'string') {
+        if (route.automaticPermissions.delete(event.properties.requestID)) return;
+      }
+      if (event.type === 'permission.asked' && typeof event.properties.id === 'string') {
+        const metadata = event.properties.metadata;
+        const requiresHuman =
+          isRecord(metadata) &&
+          (metadata.skillShell === true || metadata.sandboxEscalation === true);
+        if (route.createdOnPlatform === 'code-review' || !requiresHuman) {
+          if (!route.automaticPermissions.has(event.properties.id)) {
+            route.automaticPermissions.add(event.properties.id);
+            void answerAutomaticPermission(route, event);
+          }
+          return;
+        }
+      }
       emitEvents(sessionId, [{ type: event.type, properties: event.properties }]);
       if (event.type === 'session.deleted' && eventSessionId !== root) {
         if (eventSessionId !== undefined) childRoots.delete(eventSessionId);
       }
       const turn = turns.get(sessionId);
       if (turn === undefined) return;
+      if (
+        event.type === 'session.deleted' &&
+        eventSessionId !== undefined &&
+        eventSessionId !== root
+      ) {
+        for (const partKey of turn.runningParts) {
+          if (partKey.startsWith(`${eventSessionId}\0`)) turn.runningParts.delete(partKey);
+        }
+      }
       // A subagent's question still pauses the root turn (spec §6).
       applyInteraction(turn, event.type);
       const realProgress = isRealProgress(turn, event.type, event.properties);
@@ -988,22 +1098,22 @@ export function createTurnManager(deps: TurnManagerDeps) {
         const part = event.properties.part;
         if (isRecord(part) && part.type === 'tool' && eventSessionId !== undefined) {
           const state = part.state;
-          if (
-            typeof part.id === 'string' &&
-            typeof part.messageID === 'string' &&
-            isRecord(state) &&
-            typeof state.status === 'string'
-          ) {
-            turn.lastTool = {
-              sessionId: eventSessionId,
-              messageId: part.messageID,
-              partId: part.id,
-              status: state.status,
-              observedAt: now(),
-              ...(typeof state.output === 'string'
-                ? { outputBytes: Buffer.byteLength(state.output, 'utf8') }
-                : {}),
-            };
+          if (isRecord(state) && typeof state.status === 'string' && typeof part.id === 'string') {
+            const partKey = `${eventSessionId}\0${part.id}`;
+            if (state.status === 'running') turn.runningParts.add(partKey);
+            else turn.runningParts.delete(partKey);
+            if (typeof part.messageID === 'string') {
+              turn.lastTool = {
+                sessionId: eventSessionId,
+                messageId: part.messageID,
+                partId: part.id,
+                status: state.status,
+                observedAt: now(),
+                ...(typeof state.output === 'string'
+                  ? { outputBytes: Buffer.byteLength(state.output, 'utf8') }
+                  : {}),
+              };
+            }
           }
         }
       }
@@ -1026,6 +1136,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
     onRuntimeRestart(info: { directory: string; reason: KiloRestartReason; key: string }): void {
       void publishCommandsForRuntimeKey(info.key);
       for (const turn of turnsForRuntimeKey(info.key)) {
+        // Kilo is replaced, so no part it reported can still be running.
+        turn.runningParts.clear();
         if (turn.phase === 'finalizing') {
           if (turn.submittedSinceIdle || hasUndispatchedPrompt(turn)) {
             // A follow-up was received or dispatched after finalization
@@ -1075,12 +1187,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     isActive(): boolean {
-      for (const turn of turns.values()) {
-        if (turn.waitingSince !== null) continue;
-        return true;
-      }
-      return false;
+      return activeTurnCount() > 0;
     },
+
+    activeTurnCount,
 
     tick,
 

@@ -1,6 +1,6 @@
 'use server';
 
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 
 import { captureException, startSpan } from '@sentry/nextjs';
 

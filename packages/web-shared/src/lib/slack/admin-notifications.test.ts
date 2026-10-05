@@ -4,7 +4,7 @@ const WEBHOOK_URL = 'https://hooks.slack.com/services/test/webhook/url';
 
 async function loadModule(webhookUrl: string | undefined) {
   jest.resetModules();
-  jest.doMock('@/lib/config.server', () => ({
+  jest.doMock('@kilocode/web-shared/lib/config.server', () => ({
     SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL: webhookUrl,
   }));
   return import('./admin-notifications');
@@ -12,7 +12,7 @@ async function loadModule(webhookUrl: string | undefined) {
 
 afterEach(() => {
   jest.restoreAllMocks();
-  jest.dontMock('@/lib/config.server');
+  jest.dontMock('@kilocode/web-shared/lib/config.server');
 });
 
 describe('sendAdminSlackNotification', () => {

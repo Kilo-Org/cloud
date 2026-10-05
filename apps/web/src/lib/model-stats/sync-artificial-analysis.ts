@@ -1,8 +1,8 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq, sql, isNotNull } from 'drizzle-orm';
-import { fetchWithBackoff } from '@/lib/fetchWithBackoff';
-import { ARTIFICIAL_ANALYSIS_API_KEY } from '@/lib/config.server';
+import { fetchWithBackoff } from '@kilocode/web-shared/lib/fetchWithBackoff';
+import { ARTIFICIAL_ANALYSIS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import * as z from 'zod';
 
 /**

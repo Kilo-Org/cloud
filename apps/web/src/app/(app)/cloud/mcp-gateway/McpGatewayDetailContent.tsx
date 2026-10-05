@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationWithMembersResponse } from '@/lib/organizations/organization-types';
+import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 import { Button } from '@/components/ui/button';
 import { ConnectionStatusBadge } from './ConnectionStatusBadge';

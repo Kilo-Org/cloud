@@ -9,7 +9,7 @@
  * 2. Ticket completion (status update API) to dispatch next in queue
  */
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_triage_tickets, type AutoTriageTicket } from '@kilocode/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 import type { Owner } from '../core';
@@ -17,7 +17,7 @@ import { prepareTriagePayload } from '../triggers/prepare-triage-payload';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { updateTriageTicketStatus } from '../db/triage-tickets';
 import { captureException } from '@sentry/nextjs';
-import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { triageWorkerClient } from '../client/triage-worker-client';
 import { AUTO_TRIAGE_CONSTANTS } from '../core/constants';
 

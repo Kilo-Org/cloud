@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Search, Filter, ChevronDown, X } from 'lucide-react';
 import { useState } from 'react';
-import type { AuditLogAction } from '@/lib/organizations/organization-audit-logs';
+import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import type { AuditLogsFilters } from './useAuditLogsFilters';
 
 type AuditLogsFiltersProps = {

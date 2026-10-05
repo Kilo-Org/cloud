@@ -1,6 +1,6 @@
 import { organization_group_memberships } from '@kilocode/db/schema';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray } from 'drizzle-orm';
 
 export function hasCustomLlmAccess(

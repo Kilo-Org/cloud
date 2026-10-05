@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { posthogQuery } from '@/lib/posthog-query';

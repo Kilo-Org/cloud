@@ -1,4 +1,4 @@
-import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
+import { getRandomNumber } from '@kilocode/web-shared/lib/ai-gateway/getRandomNumber';
 
 export function passesRoutingPercentage(
   cohort: 'vercel',

@@ -1,8 +1,8 @@
 import { eq, inArray, or } from 'drizzle-orm';
 import { cliSessions, sharedCliSessions } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { deleteBlobs, type FileName } from '@/lib/r2/cli-sessions';
-import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
 import {
   continueIfLowTime,

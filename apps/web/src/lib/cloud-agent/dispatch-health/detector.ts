@@ -1,5 +1,5 @@
-import type { db as defaultDb } from '@/lib/drizzle';
-import { sql } from '@/lib/drizzle';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import { sql } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
 
 export const DISPATCH_HEALTH_COHORT_WINDOW_MINUTES = 15;

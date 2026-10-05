@@ -2288,7 +2288,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // material only; the credential source stays DO-private.
     this.trySendFrame(socket, {
       type: 'session.prepare',
-      spec: mcp === undefined ? route.spec : { ...route.spec, mcp },
+      spec: {
+        ...route.spec,
+        createdOnPlatform: route.credentialSource?.createdOnPlatform,
+        ...(mcp === undefined ? {} : { mcp }),
+      },
       credentials: this.prepareCredentials(route.grant, route.sessionId),
     });
   }
@@ -2392,7 +2396,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // material only; the credential source stays DO-private.
       this.trySendFrame(socket, {
         type: 'session.prepare',
-        spec: mcp === undefined ? route.spec : { ...route.spec, mcp },
+        spec: {
+          ...route.spec,
+          createdOnPlatform: route.credentialSource?.createdOnPlatform,
+          ...(mcp === undefined ? {} : { mcp }),
+        },
         credentials: this.prepareCredentials(route.grant, sessionId),
       });
     } catch {

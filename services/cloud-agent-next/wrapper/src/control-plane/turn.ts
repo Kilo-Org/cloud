@@ -134,6 +134,8 @@ type TurnRoute = {
   kiloSessionId: string;
   directory: string;
   runtimeKey: string;
+  createdOnPlatform?: string;
+  automaticPermissions: Set<string>;
 };
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
@@ -881,6 +883,51 @@ export function createTurnManager(deps: TurnManagerDeps) {
     childRoots.set(child.childId, parentRoot);
   }
 
+  async function answerAutomaticPermission(route: TurnRoute, event: KiloFeedEvent): Promise<void> {
+    const permissionId = event.properties.id;
+    if (typeof permissionId !== 'string') return;
+    const turn = turns.get(route.sessionId);
+    const codeReview = route.createdOnPlatform === 'code-review';
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const runtime = deps.runtimes.get(route.runtimeKey);
+        if (runtime === undefined) throw new Error('Kilo runtime unavailable');
+        const success = await runtime.client.answerPermission(
+          permissionId,
+          codeReview ? 'reject' : 'always',
+          codeReview
+            ? 'Permission rejected for code-review non-interactive mode. Continue using another read-only, non-interactive method if available.'
+            : undefined,
+          undefined,
+          route.directory
+        );
+        if (!success) throw new Error('Permission reply was not accepted');
+        return;
+      } catch (error) {
+        log(
+          `turn: automatic permission reply failed - ${error instanceof Error ? error.message : String(error)}`
+        );
+        if (
+          routes.get(route.sessionId) !== route ||
+          !route.automaticPermissions.has(permissionId)
+        ) {
+          return;
+        }
+        if (attempt === 0) continue;
+        route.automaticPermissions.delete(permissionId);
+        if (codeReview) {
+          if (turn !== undefined && turns.get(route.sessionId) === turn) {
+            void abortKilo(route);
+            sendOutcome(turn, 'failed', 'Code-review permission rejection failed');
+          }
+          return;
+        }
+        emitEvents(route.sessionId, [{ type: event.type, properties: event.properties }]);
+        if (turn !== undefined && turns.get(route.sessionId) === turn) beginWaiting(turn);
+      }
+    }
+  }
+
   async function publishCommandsFor(sessionId: string): Promise<void> {
     const route = routes.get(sessionId);
     if (route === undefined) return;
@@ -950,6 +997,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
         kiloSessionId: spec.kiloSessionId,
         directory: spec.directory,
         runtimeKey: runtimeKey(spec),
+        createdOnPlatform: spec.createdOnPlatform,
+        automaticPermissions: existing?.automaticPermissions ?? new Set(),
       };
       routes.set(spec.sessionId, route);
       turnByKiloSession.set(spec.kiloSessionId, spec.sessionId);
@@ -997,6 +1046,24 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (root === undefined) return;
       const sessionId = turnByKiloSession.get(root);
       if (sessionId === undefined) return;
+      const route = routes.get(sessionId);
+      if (route === undefined) return;
+      if (event.type === 'permission.replied' && typeof event.properties.requestID === 'string') {
+        if (route.automaticPermissions.delete(event.properties.requestID)) return;
+      }
+      if (event.type === 'permission.asked' && typeof event.properties.id === 'string') {
+        const metadata = event.properties.metadata;
+        const requiresHuman =
+          isRecord(metadata) &&
+          (metadata.skillShell === true || metadata.sandboxEscalation === true);
+        if (route.createdOnPlatform === 'code-review' || !requiresHuman) {
+          if (!route.automaticPermissions.has(event.properties.id)) {
+            route.automaticPermissions.add(event.properties.id);
+            void answerAutomaticPermission(route, event);
+          }
+          return;
+        }
+      }
       emitEvents(sessionId, [{ type: event.type, properties: event.properties }]);
       if (event.type === 'session.deleted' && eventSessionId !== root) {
         if (eventSessionId !== undefined) childRoots.delete(eventSessionId);

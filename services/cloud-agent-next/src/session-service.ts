@@ -1365,7 +1365,7 @@ export class SessionService {
     const permission: Record<string, unknown> = {
       external_directory: 'allow',
       ...(!isInteractive && { question: 'deny' }),
-      read: 'allow',
+      read: { '*': 'allow', '*.env': 'allow', '*.env.*': 'allow' },
       edit: 'allow',
       glob: 'allow',
       grep: 'allow',
@@ -1399,7 +1399,6 @@ export class SessionService {
       const bitbucketReviewPolicy =
         commandGuardPolicy.policyName === 'bitbucket-code-review-read-only';
       Object.assign(permission, {
-        read: 'allow',
         edit:
           commandGuardPolicy.policyName === 'security-remediation-pr'
             ? 'allow'

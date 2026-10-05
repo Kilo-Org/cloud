@@ -224,6 +224,7 @@ export const controlPlaneRouteSpecSchema = z
     sessionId: z.string().min(1),
     kiloSessionId: z.string().min(1),
     directory: z.string().min(1).max(1024),
+    createdOnPlatform: z.string().max(256).optional(),
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
     git: controlPlaneRouteGitSchema.optional(),

@@ -39,7 +39,8 @@ const ConversationMessageGroup = memo(
     onOpenPreparationDetails,
   }: ConversationMessageGroupProps) {
     const first = messages[0];
-    if (!first) return null;
+    const last = messages.at(-1);
+    if (!first || !last) return null;
 
     const displayMessage =
       messages.length === 1
@@ -50,6 +51,7 @@ const ConversationMessageGroup = memo(
       <MessageErrorBoundary>
         <MessageBubble
           message={displayMessage}
+          displayTimestamp={last.info.time.created}
           isStreaming={isStreaming}
           deliveryState={deliveryState}
           getChildMessages={getChildMessages}

@@ -155,10 +155,6 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
 }));
-vi.mock('@/lib/home-live-shape', () => ({
-  readLiveShapeHint: () => 'rows',
-  persistLiveShapeHint: vi.fn(),
-}));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => state.internet,
 }));

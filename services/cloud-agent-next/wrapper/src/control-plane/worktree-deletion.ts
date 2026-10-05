@@ -18,6 +18,12 @@ export type ControlPlaneWorktreeDeletionDeps = {
   retireDirectory: (directory: string) => Promise<void>;
   detachRoot?: (kiloSessionId: string) => void;
   detachTerminals?: (directory: string) => Promise<void>;
+  /** Destructive deletion only: runs before any cleanup stage, suppressing capture. */
+  onDeletionBegin?: (directory: string) => void;
+  /** Destructive deletion only: runs after directory removal is confirmed. */
+  onDeletionComplete?: (directory: string) => void;
+  /** Destructive deletion only: runs when deletion did not complete, so capture resumes. */
+  onDeletionFailed?: (directory: string) => void;
   onDiagnostic?: ControlDiagnosticReporter;
   log?: (message: string) => void;
 };
@@ -34,6 +40,10 @@ export function createControlPlaneWorktreeDeletion(deps: ControlPlaneWorktreeDel
   handle(frame: ControlPlaneWorktreeDeletionRequestFrame): Promise<void>;
 } {
   async function handle(frame: ControlPlaneWorktreeDeletionRequestFrame): Promise<void> {
+    // Only the destructive phase suppresses capture; `prepareDeletion` is a
+    // non-destructive manifest discovery that may not be followed by a delete.
+    const destructive = frame.type !== 'worktree.prepareDeletion';
+    if (destructive) deps.onDeletionBegin?.(frame.payload.directory);
     try {
       const cleanup: WorktreeCleanupDeps = {
         clients: deps.clients(frame.payload.directory),
@@ -49,8 +59,10 @@ export function createControlPlaneWorktreeDeletion(deps: ControlPlaneWorktreeDel
               sessionIds: await prepareWorktreeDeletion(frame.payload, cleanup),
             }
           : await deleteWorktree(frame.payload, cleanup);
+      if (destructive) deps.onDeletionComplete?.(frame.payload.directory);
       deps.emit({ type: 'worktree.result', requestId: frame.requestId, ok: true, result });
     } catch (error) {
+      if (destructive) deps.onDeletionFailed?.(frame.payload.directory);
       const message = error instanceof Error ? error.message : 'Worktree cleanup is incomplete';
       deps.log?.(`worktree deletion failed: ${message}`);
       deps.emit({

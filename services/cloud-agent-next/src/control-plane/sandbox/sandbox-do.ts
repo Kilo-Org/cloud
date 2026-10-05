@@ -103,6 +103,12 @@ import {
   type SessionAttachPayload,
 } from '../../shared/sandbox-control-protocol.js';
 import { MCPServerConfigSchema } from '../../persistence/schemas.js';
+import { mintWorktreeStateGrant } from '../../sandbox-control/worktree-state-grant.js';
+import {
+  worktreeStateEndpointUrl,
+  worktreeStateIdentitySchema,
+} from '../../shared/worktree-state.js';
+import { normalizeWorkerOrigin } from '../../sandbox-control/worker-origin.js';
 import {
   McpAttachValidationError,
   McpConfigurationError,
@@ -247,6 +253,7 @@ const wrapperSocketAttachmentSchema = z.object({
   connectionId: z.string().optional(),
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
+  worktreeState: z.literal(true).optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
@@ -1578,7 +1585,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       },
       issueGrant: (spec, source) =>
         withTimeout(
-          this.issueRouteGrant(spec, source),
+          this.issueRouteGrant(spec, source, state),
           this.grantIssueTimeoutMs(),
           'Credential grant issuance timed out'
         ),
@@ -1722,11 +1729,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async issueRouteGrant(
     spec: ControlPlaneRouteSpec,
-    source: ControlPlaneCredentialSource
+    source: ControlPlaneCredentialSource,
+    state: AllocationState
   ): Promise<RouteGrantIssue> {
     const provider = this.currentProvider();
-    const outboundContainerId =
-      this.outboundContainerIdFor(await this.readAllocation()) ?? undefined;
+    const outboundContainerId = this.outboundContainerIdFor(state) ?? undefined;
     const base: SessionAttachPayload = {
       directory: spec.directory,
       ...(spec.branch ? { branch: spec.branch } : {}),
@@ -1789,6 +1796,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     }
     return { grant, spec: this.projectRouteSpec(spec, payload) };
+  }
+
+  /**
+   * Endpoint and grant the wrapper uses to persist this worktree's uncommitted
+   * changes and put them back on a rebuilt sandbox. Minted without knowing the
+   * wrapper capability so it can be stored with the route; `sendSessionPrepare`
+   * strips it for a wrapper that never offered `worktreeState`.
+   */
+  private async mintWorktreeState(
+    userId: string,
+    scopeId: string
+  ): Promise<ControlPlaneSessionCredentialsPayload['worktreeState']> {
+    const workerUrl = normalizeWorkerOrigin(this.env.WORKER_URL);
+    if (!workerUrl) return undefined;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return undefined;
+    const parsed = worktreeStateIdentitySchema.safeParse({ userId, scopeId });
+    if (!parsed.success) return undefined;
+    try {
+      return {
+        url: worktreeStateEndpointUrl(workerUrl, parsed.data),
+        grant: mintWorktreeStateGrant(parsed.data, secret),
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   private publishRouteGrant(route: RouteRecord): void {
@@ -1908,7 +1941,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Bound the token-service round trip so a warm-route `deliver` cannot
       // hang forever; the grant-issue bound is the provider-stop bound.
       issued = await withTimeout(
-        this.issueRouteGrant(route.spec, source),
+        this.issueRouteGrant(route.spec, source, state),
         this.grantIssueTimeoutMs(),
         'Credential grant re-issue timed out'
       );
@@ -1918,9 +1951,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
-    const payload: ControlPlaneSessionCredentialsPayload = {
-      ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-    };
+    const payload = await this.prepareCredentialsFor(socket, route, issued.grant);
     this.trySendFrame(socket, { type: 'session.credentials', ...payload });
     return 'issued';
   }
@@ -2113,7 +2144,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (route.credentialSource === null) continue;
         try {
           const issued = await withTimeout(
-            this.issueRouteGrant(route.spec, route.credentialSource),
+            this.issueRouteGrant(route.spec, route.credentialSource, next),
             this.grantIssueTimeoutMs(),
             'Credential binding timed out'
           );
@@ -2243,7 +2274,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return validated.data;
   }
 
-  private sendSessionPrepare(state: AllocationState, route: RouteRecord): void {
+  /**
+   * Credentials payload for a frame, with a worktree-state endpoint added only
+   * for a wrapper that offered the capability in its `hello`. It travels in the
+   * per-frame credentials and is never persisted, so an older deploy can still
+   * read the stored route row.
+   */
+  private async prepareCredentialsFor(
+    socket: WebSocket,
+    route: RouteRecord,
+    grant: SessionCredentialGrant
+  ): Promise<ControlPlaneSessionCredentialsPayload> {
+    const base = sessionCredentialsPayloadFromGrant(grant, route.sessionId);
+    const source = route.credentialSource;
+    if (source === null || this.readAttachment(socket)?.worktreeState !== true) {
+      return controlPlaneSessionCredentialsPayloadSchema.parse(base);
+    }
+    const worktreeState = await this.mintWorktreeState(
+      source.userId,
+      source.scopeId ?? route.spec.sessionId
+    );
+    return controlPlaneSessionCredentialsPayloadSchema.parse(
+      worktreeState === undefined ? base : { ...base, worktreeState }
+    );
+  }
+
+  private async sendSessionPrepare(state: AllocationState, route: RouteRecord): Promise<void> {
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
     // A route without a grant never reaches `preparing` (issuance failure marks
@@ -2286,24 +2342,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     // The frame carries the wrapper-safe spec plus the issued credential
     // material only; the credential source stays DO-private.
+    const spec = {
+      ...route.spec,
+      createdOnPlatform: route.credentialSource?.createdOnPlatform,
+      ...(mcp === undefined ? {} : { mcp }),
+    };
     this.trySendFrame(socket, {
       type: 'session.prepare',
-      spec: {
-        ...route.spec,
-        createdOnPlatform: route.credentialSource?.createdOnPlatform,
-        ...(mcp === undefined ? {} : { mcp }),
-      },
-      credentials: this.prepareCredentials(route.grant, route.sessionId),
+      spec,
+      credentials: await this.prepareCredentialsFor(socket, route, route.grant),
     });
-  }
-
-  private prepareCredentials(
-    grant: SessionCredentialGrant,
-    sessionId: string
-  ): ControlPlaneSessionCredentialsPayload {
-    return controlPlaneSessionCredentialsPayloadSchema.parse(
-      sessionCredentialsPayloadFromGrant(grant, sessionId)
-    );
   }
 
   /**
@@ -2394,14 +2442,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       // The frame carries the wrapper-safe spec plus the issued credential
       // material only; the credential source stays DO-private.
+      const spec = {
+        ...route.spec,
+        createdOnPlatform: route.credentialSource?.createdOnPlatform,
+        ...(mcp === undefined ? {} : { mcp }),
+      };
       this.trySendFrame(socket, {
         type: 'session.prepare',
-        spec: {
-          ...route.spec,
-          createdOnPlatform: route.credentialSource?.createdOnPlatform,
-          ...(mcp === undefined ? {} : { mcp }),
-        },
-        credentials: this.prepareCredentials(route.grant, sessionId),
+        spec,
+        credentials: await this.prepareCredentialsFor(socket, route, route.grant),
       });
     } catch {
       // A throw here (read/parse/bind) must still fail the fenced attempt; the
@@ -2978,6 +3027,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId,
         wrapperId: frame.wrapperId,
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+        ...(frame.worktreeState ? { worktreeState: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.

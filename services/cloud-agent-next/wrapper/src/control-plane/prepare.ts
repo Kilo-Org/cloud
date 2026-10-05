@@ -41,6 +41,13 @@ import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
+import {
+  logWorktreeState,
+  restoreWorktreeState,
+  type WorktreeStateRestoreResult,
+} from '../worktree-state.js';
+import { WORKTREE_STATE_RESTORE_BUDGET_MS } from '../../../src/shared/worktree-state.js';
+import { rememberWorktreeStateEndpoint } from './worktree-state-endpoints.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
 
 const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
@@ -126,6 +133,7 @@ export type PrepareDeps = {
   ) => Promise<ExecResult>;
   restore?: typeof restoreSession;
   seedRegistration?: typeof seedSessionIngestRegistration;
+  restoreWorktreeState?: typeof restoreWorktreeState;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
   sessionExists?: (
     client: WrapperKiloClient,
@@ -262,6 +270,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       }));
   const restore = deps.restore ?? restoreSession;
   const seedRegistration = deps.seedRegistration ?? seedSessionIngestRegistration;
+  const restoreWorktreeStateStep = deps.restoreWorktreeState ?? restoreWorktreeState;
   const configureGitAuthor = deps.configureGitAuthor ?? configureWorkspaceGitAuthor;
   const sessionExists = deps.sessionExists ?? defaultSessionExists;
   const sleep = deps.sleep ?? defaultSleep;
@@ -656,6 +665,28 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     throw lastError;
   }
 
+  /**
+   * Puts a previous sandbox's uncommitted work back into a freshly prepared
+   * worktree. This runs after clone/checkout/setup and before the bootstrap
+   * marker: the one moment a rebuilt sandbox is clean. A skipped restore leaves
+   * the worktree exactly as the rebuild left it and never fails preparation.
+   */
+  async function restoreWorktreeStateFor(
+    credentials: ControlPlaneSessionCredentialsPayload | undefined,
+    directory: string,
+    env: Record<string, string>
+  ): Promise<void> {
+    const endpoint = credentials?.worktreeState;
+    if (!endpoint) return;
+    const restored: WorktreeStateRestoreResult = await restoreWorktreeStateStep({
+      directory,
+      endpoint,
+      env,
+      signal: AbortSignal.timeout(WORKTREE_STATE_RESTORE_BUDGET_MS),
+    });
+    logWorktreeState('restore', directory, restored);
+  }
+
   async function runPrepare(
     spec: ControlPlaneRouteSpec,
     credentials: ControlPlaneSessionCredentialsPayload | undefined,
@@ -675,6 +706,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     const key = runtimeKey(spec);
     const directory = spec.directory;
+    rememberWorktreeStateEndpoint(directory, credentials?.worktreeState);
     const kiloAuth: WorktreeKiloAuth = {
       scopeId: kiloConfig.scopeId,
       token: kiloToken,
@@ -717,6 +749,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         );
         currentStep = 'setup';
         await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
+        await restoreWorktreeStateFor(credentials, directory, env);
         await writeBootstrapMarker(directory);
       });
       if (owner.released) return;
@@ -772,6 +805,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<void> {
     const route = prepared.get(credentials.sessionId);
     if (!route) return;
+    rememberWorktreeStateEndpoint(route.directory, credentials.worktreeState);
     const nextEnv = buildWorktreeKiloEnvironment(
       route.directory,
       route.home,

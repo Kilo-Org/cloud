@@ -15,6 +15,8 @@ export type FakeWrapperHelloInput = {
   wrapperId: string;
   allocationId: string;
   protocolVersion?: number;
+  heartbeatAck?: boolean;
+  worktreeState?: boolean;
 };
 
 /**
@@ -118,6 +120,8 @@ export class FakeWrapper {
       wrapperId: input.wrapperId,
       allocationId: input.allocationId,
       protocolVersion: input.protocolVersion ?? CONTROL_PLANE_PROTOCOL_VERSION,
+      ...(input.heartbeatAck ? { heartbeatAck: true } : {}),
+      ...(input.worktreeState ? { worktreeState: true } : {}),
     });
     return this.next();
   }

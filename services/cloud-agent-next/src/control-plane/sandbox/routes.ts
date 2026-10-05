@@ -65,7 +65,7 @@ export type RouteContext = {
   now: () => number;
   routePreparationMs: number;
   /** Sends `session.prepare` when a wrapper socket is bound; a no-op otherwise. */
-  sendPrepare: (route: RouteRecord) => void;
+  sendPrepare: (route: RouteRecord) => Promise<void>;
   /** Short bounded notification to the session's V2 DO; dropped on failure. */
   notify: (sessionId: string, update: ControlPlaneRouteUpdate) => Promise<void>;
   /**
@@ -360,7 +360,7 @@ export async function startAttempt(
   for (let attempt = 1; attempt <= ATTEMPT_POLICY_ATTEMPTS; attempt += 1) {
     if (await ctx.applyPolicy(issued.grant)) {
       ctx.publishGrant(route);
-      ctx.sendPrepare(route);
+      await ctx.sendPrepare(route);
       return route;
     }
   }
@@ -413,7 +413,7 @@ export async function onWrapperConnected(ctx: RouteContext, restarted: boolean):
         await onRouteFailed(ctx, route.sessionId, 'workspace_setup_failed', undefined, true);
         continue;
       }
-      ctx.sendPrepare(route);
+      await ctx.sendPrepare(route);
     }
   }
 }

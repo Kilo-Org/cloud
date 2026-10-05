@@ -303,7 +303,9 @@ notification, so a lost notification never leaves it waiting.
 The wrapper heartbeat (every 5 s) carries `active`. The sandbox is active while a route prepares,
 a Kilo session is busy or finalizing and not waiting for the user, a terminal has input, or a message
 was delivered in the last minute. After 10 minutes without activity the Sandbox DO stops the
-sandbox. Waiting on a question or permission is not activity. While the sandbox is active, the
+sandbox. Waiting on a question or permission is not activity. The wrapper reports a turn's outcome
+only after capturing the worktree's uncommitted state, so the stop cannot discard it (see *Worktree
+state persistence*). While the sandbox is active, the
 Sandbox DO renews the provider lease (`ensureLeaseAtLeast`) so the provider does not expire a busy
 sandbox on its own.
 
@@ -416,6 +418,42 @@ Retry-After handler. Every redirect fails the operation, including a same-origin
 renamed or transferred repository, so the caller must use the current direct repository URL. The
 options are command arguments, not Git config.
 
+After setup commands and before the bootstrap marker is written, the wrapper restores any captured
+uncommitted worktree state (see *Worktree state persistence*). The restore is best-effort and
+bounded; a skip leaves the rebuilt checkout exactly as setup left it and never fails preparation.
+
+### Worktree state persistence
+
+The idle stop destroys the shared physical sandbox, so uncommitted work would otherwise be lost.
+The wrapper captures the worktree delta after each turn and restores it after setup on a rebuilt
+sandbox.
+
+- The bundle is a `git diff HEAD --binary` patch plus the untracked files `git` reports
+  (`ls-files --others --exclude-standard`). `.gitignore`d dependency and build output is excluded
+  because setup commands recreate it. The bundle is capped and a capture that cannot fit is
+  skipped, never truncated.
+- The capture runs before the turn's outcome is reported, so the idle stop cannot outrun it. It is
+  bounded and best-effort: a capture that fails, exceeds its budget or finds an unmerged index is
+  skipped and never fails the turn. A clean worktree is skipped and clears any stored bundle.
+- The Sandbox DO mints one grant per worktree scope and delivers `worktreeState { url, grant }` in
+  the frame credentials on `session.prepare`, refreshing it whenever the frame is re-sent (including
+  `session.credentials` re-issue). The wrapper uploads the bundle to the worker route and downloads
+  it on restore. The field is never persisted in the stored route spec, so an older deploy can still
+  read the route row.
+- Restore runs only when the rebuilt checkout is on the same commit the bundle was captured
+  against; otherwise it is skipped rather than risking a half-applied worktree. Restoring never
+  overwrites a file the rebuild already produced.
+- Grants last 12 hours; bundles are written with a 24 hour expiry. Expiry is enforced in-band (a
+  read past expiry deletes and misses, and a clean capture deletes its stale bundle), so a
+  deployment should also provision an R2 lifecycle rule on the `worktree-state/v1/` prefix at or
+  below 24 hours to reclaim bundles orphaned by a cold worktree deletion or an abandoned scope.
+- Worktree deletion suppresses capture while the destructive stage runs and discards the bundle only
+  after directory removal is confirmed; a failed deletion keeps the endpoint and bundle so the
+  surviving worktree keeps capturing.
+- The field is capability-negotiated like `heartbeatAck`: a wrapper offers `worktreeState` in its
+  first `hello`, and the Sandbox DO only sends the credentials field to a wrapper that offered it. A
+  wrapper that never offered it keeps the prior behaviour and never sees the field.
+
 ### Prompts and turn outcome
 
 - `session.prompt` is submitted to Kilo with `messageID` = `messageId`, in arrival order, also while
@@ -457,6 +495,9 @@ options are command arguments, not Git config.
   wrapper does not send `completed` for that earlier close. Each finalization step has one timeout that
   covers the whole step. A finalization timeout or failure never aborts the Kilo session, so it
   cannot cancel a newer prompt.
+- Before a terminal outcome is reported, the wrapper captures the worktree's uncommitted state (see
+  *Worktree state persistence*). A prompt that arrives during the capture is handled by the
+  finalization rechecks; the capture is bounded and never fails the turn.
 
 ### Kilo supervision
 

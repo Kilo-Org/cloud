@@ -1,4 +1,4 @@
-import { db, type db as defaultDb } from '@/lib/drizzle';
+import { db, type db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { sql } from 'drizzle-orm';
 
 export type CreditTransactionIndexScriptArgs = {

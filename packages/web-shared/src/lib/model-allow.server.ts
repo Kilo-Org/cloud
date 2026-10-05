@@ -1,12 +1,12 @@
 import 'server-only';
-import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { getKiloExclusiveInferenceProviderRestriction } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   CUSTOM_LLM_PREFIX,
   KILO_AUTO_MODEL_PREFIX,
   normalizeModelId,
-} from '@/lib/ai-gateway/model-utils';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 export type ProviderAwareAllowPredicate = (modelId: string) => Promise<boolean>;
 

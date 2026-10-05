@@ -17,10 +17,18 @@ import {
   GatewayError,
   parseStaticHeaders,
 } from '@kilocode/mcp-gateway';
-import { adminProcedure, baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
-import { organizationTarget, recordKiloAdminElevation } from '@/lib/admin/admin-access-log';
+import {
+  adminProcedure,
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
+import {
+  organizationTarget,
+  recordKiloAdminElevation,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 

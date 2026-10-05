@@ -1,12 +1,12 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   GatewayConfigSchema,
   GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
-} from '@/lib/ai-gateway/gateway-config';
-import type { GatewayConfig } from '@/lib/ai-gateway/gateway-config';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
+import type { GatewayConfig } from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 import { ai_gateway_config } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 
 async function readConfig(): Promise<GatewayConfig> {

@@ -8,11 +8,11 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   getAutoRoutingMode,
   updateAutoRoutingMode,
-} from '@/lib/ai-gateway/auto-routing-admin-client';
-import { getUserFromAuth } from '@/lib/user/server';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 
 function workerResultResponse(result: { status: number; body: unknown }): NextResponse {
   if (result.status >= 400) {

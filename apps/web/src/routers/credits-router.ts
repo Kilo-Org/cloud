@@ -3,7 +3,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   assertAppStoreAccountTokenMatchesUser,
   assertGooglePlayAccountTokenMatchesUser,

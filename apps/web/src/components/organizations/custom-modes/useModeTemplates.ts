@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { load } from 'js-yaml';
 import * as z from 'zod';
-import { OrganizationModeConfigSchema } from '@/lib/organizations/organization-types';
-import type { OrganizationModeConfig } from '@/lib/organizations/organization-types';
+import { OrganizationModeConfigSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OrganizationModeConfig } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 // Schema for the mode config within the content field
 const ModeConfigContentSchema = z.object({

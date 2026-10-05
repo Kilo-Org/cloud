@@ -1,13 +1,15 @@
 import { createHash } from 'node:crypto';
-import { redisClient } from '@/lib/redis';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import {
   consumeGitHubUserAuthorizationState,
   createGitHubUserAuthorizationState,
 } from './user-authorization-state';
 
-jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret' }));
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret',
+}));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { set: jest.fn(), getdel: jest.fn() },
 }));
 

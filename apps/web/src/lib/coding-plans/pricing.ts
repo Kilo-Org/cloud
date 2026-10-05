@@ -1,8 +1,8 @@
-import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import {
   BYTEPLUS_CODING_MODEL_IDS,
   BYTEPLUS_CODING_PROVIDER_ID,
-} from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/byteplus-coding';
 
 export const CODING_PLAN_IDS = [
   'minimax-token-plan-plus',

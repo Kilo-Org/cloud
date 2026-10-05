@@ -3,7 +3,7 @@ import type { StoredModel } from '@kilocode/db/schema-types';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
   buildDataCollectionRequiredModelIds,
   buildModelIdToProviderSlugsIndex,
@@ -11,7 +11,7 @@ import {
   getEndpointProviderSlugs,
   getSnapshotModelVariantId,
   narrowProviderSlugsToVariant,
-} from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 const MODEL = 'nvidia/nemotron-3.5-lightning';
 const FREE_MODEL = `${MODEL}:free`;

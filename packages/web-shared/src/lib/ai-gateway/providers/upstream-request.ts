@@ -1,19 +1,22 @@
 import { debugSaveProxyResponseStream } from '../../debugUtils';
 import { fetchWithBackoff } from '../../fetchWithBackoff';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type {
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
   GatewayMessagesRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { getReasoningEffortTimeoutSuggestion } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { GatewayChatApiKind, Provider } from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { getReasoningEffortTimeoutSuggestion } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import type {
+  GatewayChatApiKind,
+  Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { after, NextResponse } from 'next/server';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { withRequestId } from '@/lib/ai-gateway/request-id';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 
 type UpstreamFetchFailureFamily =
   | 'request_timeout'

@@ -12,7 +12,7 @@ import { useState } from 'react';
 import type { RootRouter } from '@/routers/root-router';
 import { TRPCProvider } from '@/lib/trpc/utils';
 import { buildInfo } from '@/lib/buildInfo';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createNoRetryEventSource } from '@/lib/trpc/noRetryEventSource';
 
 function getUrl() {

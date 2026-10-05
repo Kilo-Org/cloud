@@ -1,27 +1,30 @@
 // The store mock must be registered before the router is loaded: this suite
 // runs against the mocked connection store, never against the database.
-jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn(),
   clearOpenAiChatGptConnection: jest.fn(),
   readOpenAiChatGptUsageLimit: jest.fn(),
 }));
 
-jest.mock('@/routers/organizations/utils', () => {
-  const actual = jest.requireActual('@/routers/organizations/utils') as Record<string, unknown>;
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/routers/organizations/utils') as Record<
+    string,
+    unknown
+  >;
   return { ...actual, ensureOrganizationAccess: jest.fn() };
 });
 
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,
   readOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
-} from '@/lib/ai-gateway/openai-chatgpt/store';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { OpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/types';
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 
 const createCaller = createCallerFactory(rootRouter);
 

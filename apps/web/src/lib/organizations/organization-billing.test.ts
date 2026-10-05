@@ -9,9 +9,9 @@ import {
   createOrganization,
   findOrganizationByStripeCustomerId,
   inviteUserToOrganization,
-} from '@/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   credit_transactions,
@@ -21,7 +21,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
-import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
+import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@kilocode/web-shared/lib/autoTopUpConstants';
 
 type SendViaMailgunParams = { to: string; subject: string; html: string; replyTo?: string };
 const captureExceptionMock = jest.fn();
@@ -37,16 +37,16 @@ const mockResolveStripeReceiptUrl = jest.fn<
   [string, { skipInAutomatedTest?: boolean }?]
 >(async () => null);
 
-jest.mock('@/lib/email-mailgun', () => ({
+jest.mock('@kilocode/web-shared/lib/email-mailgun', () => ({
   getEmailVerificationRecipient: (email: string) => email,
   sendViaMailgun: (params: SendViaMailgunParams) => sendViaMailgunMock(params),
 }));
 
-jest.mock('@/lib/email-neverbounce', () => ({
+jest.mock('@kilocode/web-shared/lib/email-neverbounce', () => ({
   verifyEmail: (email: string) => verifyEmailMock(email),
 }));
 
-jest.mock('@/lib/credits', () => ({
+jest.mock('@kilocode/web-shared/lib/credits', () => ({
   resolveStripeReceiptUrl: (...args: [string, { skipInAutomatedTest?: boolean }?]) =>
     mockResolveStripeReceiptUrl(...args),
 }));

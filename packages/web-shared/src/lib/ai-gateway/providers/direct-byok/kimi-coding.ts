@@ -1,8 +1,8 @@
 import {
   COMPATIBLE_USER_AGENT,
   type DirectByokProvider,
-} from '@/lib/ai-gateway/providers/direct-byok/types';
-import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 
 export default {
   id: 'kimi-coding',

@@ -1,31 +1,39 @@
 import { describe, expect, test } from '@jest/globals';
-import type * as ModelsModule from '@/lib/ai-gateway/models';
-import type * as AutoModelModule from '@/lib/ai-gateway/auto-model';
-import type * as AnthropicModule from '@/lib/ai-gateway/providers/anthropic.constants';
-import type * as GoogleModule from '@/lib/ai-gateway/providers/google';
-import type * as QwenModule from '@/lib/ai-gateway/providers/qwen';
-import type * as StepFunModule from '@/lib/ai-gateway/providers/stepfun';
+import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/models';
+import type * as AutoModelModule from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import type * as AnthropicModule from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import type * as GoogleModule from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import type * as QwenModule from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+import type * as StepFunModule from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 
 jest.mock('server-only', () => {
   throw new Error('Client-safe model modules must not import server-only modules');
 });
 
-jest.mock('@/lib/dotenvx', () => {
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => {
   throw new Error('Client-safe model modules must not read server credentials');
 });
 
 describe('client-safe model imports', () => {
   test('loads model preferences, auto-model IDs and vendor helpers without server dependencies', () => {
     jest.isolateModules(() => {
-      const models = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
-      const autoModel = jest.requireActual<typeof AutoModelModule>('@/lib/ai-gateway/auto-model');
-      const anthropic = jest.requireActual<typeof AnthropicModule>(
-        '@/lib/ai-gateway/providers/anthropic.constants'
+      const models = jest.requireActual<typeof ModelsModule>(
+        '@kilocode/web-shared/lib/ai-gateway/models'
       );
-      const google = jest.requireActual<typeof GoogleModule>('@/lib/ai-gateway/providers/google');
-      const qwen = jest.requireActual<typeof QwenModule>('@/lib/ai-gateway/providers/qwen');
+      const autoModel = jest.requireActual<typeof AutoModelModule>(
+        '@kilocode/web-shared/lib/ai-gateway/auto-model'
+      );
+      const anthropic = jest.requireActual<typeof AnthropicModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants'
+      );
+      const google = jest.requireActual<typeof GoogleModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/google'
+      );
+      const qwen = jest.requireActual<typeof QwenModule>(
+        '@kilocode/web-shared/lib/ai-gateway/providers/qwen'
+      );
       const stepfun = jest.requireActual<typeof StepFunModule>(
-        '@/lib/ai-gateway/providers/stepfun'
+        '@kilocode/web-shared/lib/ai-gateway/providers/stepfun'
       );
 
       expect(models.buildPreferredModels([])).toContain(models.PRIMARY_DEFAULT_MODEL);

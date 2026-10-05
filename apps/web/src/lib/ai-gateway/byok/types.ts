@@ -1,4 +1,4 @@
-import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import * as z from 'zod';
 
 // API response type (never includes decrypted key)

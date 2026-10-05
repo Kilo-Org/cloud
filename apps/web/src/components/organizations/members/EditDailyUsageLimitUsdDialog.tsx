@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { OrganizationMemberResponse } from '@/lib/organizations/organization-types';
+import type { OrganizationMemberResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateDailyUsageLimitUsd } from '@/app/api/organizations/hooks';

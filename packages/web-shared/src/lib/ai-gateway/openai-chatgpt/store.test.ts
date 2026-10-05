@@ -1,4 +1,4 @@
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(),
     insert: jest.fn(),
@@ -7,13 +7,16 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYOK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
 }));
 
-import { db } from '@/lib/drizzle';
-import { encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  encryptApiKey,
+  type EncryptedData,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   clearOpenAiChatGptConnection,
   getOpenAiChatGptConnection,

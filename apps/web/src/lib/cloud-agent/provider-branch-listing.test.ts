@@ -25,7 +25,7 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   fetchGitLabBranches: (...args: unknown[]) => mockFetchGitLabBranches(...args),
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   logExceptInTest: () => {},
   warnExceptInTest: () => {},
 }));

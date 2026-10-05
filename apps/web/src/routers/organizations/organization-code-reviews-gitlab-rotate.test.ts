@@ -16,10 +16,10 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 // pulls in the real gitlab-service. Using global `jest` keeps the mocks hoisted.
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   organization_audit_logs,

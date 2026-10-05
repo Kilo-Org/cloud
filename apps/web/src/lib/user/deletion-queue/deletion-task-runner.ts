@@ -2,7 +2,7 @@ import { captureException } from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
 import { type UserDeletionStepKey, UserDeletionStepStatus } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { catalogEntryFor } from '@/lib/user/deletion-queue/deletion-catalog';
 import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcomes';
 import type {

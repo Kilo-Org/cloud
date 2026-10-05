@@ -16,8 +16,8 @@ import { useMemo } from 'react';
 import {
   getOrganizationAutoRoute,
   hasActiveOrganizationModelPolicy,
-} from '@/lib/organizations/organization-auto-model-shared';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 
 type NewModeFormProps = {
   organizationId: string;

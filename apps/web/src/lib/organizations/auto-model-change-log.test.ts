@@ -3,7 +3,7 @@ import type { Organization } from '@kilocode/db/schema';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { computeSnapshotDiff } from '@/lib/ai-gateway/providers/openrouter/snapshot-diff';
 import {
   buildAutoChangeMessage,

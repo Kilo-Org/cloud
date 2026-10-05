@@ -34,7 +34,7 @@ import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   addReactionToPR,
   createPRComment,
@@ -55,7 +55,7 @@ import {
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
@@ -73,7 +73,7 @@ import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
 } from '@/lib/code-reviews/summary/usage-footer';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type {
   CloudAgentCodeReview,
   CloudAgentCodeReviewAttempt,

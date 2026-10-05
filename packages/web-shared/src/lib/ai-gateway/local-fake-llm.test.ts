@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   appendLocalFakeDeterministicCatalogModels,
   getLocalFakeDeterministicCatalogEntry,
@@ -10,8 +10,8 @@ import {
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
   LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
-} from '@/lib/ai-gateway/local-fake-llm';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 function replaceEnv(overrides: {
   NODE_ENV?: NodeJS.ProcessEnv['NODE_ENV'];

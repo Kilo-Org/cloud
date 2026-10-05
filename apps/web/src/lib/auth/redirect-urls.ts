@@ -1,4 +1,4 @@
-import { SSO_SIGNIN_PATH, type AuthErrorType } from '@/lib/auth/constants';
+import { SSO_SIGNIN_PATH, type AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 
 export function authFailureRedirectUrl(error: AuthErrorType, isAccountLinking: boolean): string {
   const baseUrl = isAccountLinking ? '/connected-accounts' : '/users/sign_in';

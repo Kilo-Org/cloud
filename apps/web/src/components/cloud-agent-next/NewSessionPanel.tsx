@@ -101,7 +101,7 @@ import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
 import { billingPayerPresentation } from './billing-payer-presentation';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import {
   buildCloudAgentAttachments,

@@ -1,4 +1,4 @@
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 export {
   KILO_PASS_MONTHLY_RAMP_BASE_BONUS_PERCENT,
   KILO_PASS_MONTHLY_RAMP_CAP_BONUS_PERCENT,

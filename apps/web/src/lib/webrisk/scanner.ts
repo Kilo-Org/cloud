@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { deployments } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { createWebRiskClient, type CheckUrlResult } from './web-risk-client';

@@ -1,10 +1,13 @@
 import { type User } from '@kilocode/db/schema';
-import { type BalanceForUser, getBalanceForUser } from '@/lib/user/balance';
-import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
-import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
-import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
-import { summarizeUserPayments } from '@/lib/creditTransactions';
-import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
+import { type BalanceForUser, getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
+import type { UserOrganizationWithSeats } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
+import {
+  hasOrganizationEverPaid,
+  hasUserEverPaid,
+} from '@kilocode/web-shared/lib/creditTransactions';
 
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 

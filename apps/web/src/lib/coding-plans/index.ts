@@ -5,8 +5,8 @@ import { addDays } from 'date-fns';
 import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
-import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   getCodingPlanValidationResult,
@@ -20,9 +20,9 @@ import {
   isCodingPlanId,
   type CodingPlanId,
 } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { sentryLogger } from '@/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   byok_api_keys,
   coding_plan_availability_intents,

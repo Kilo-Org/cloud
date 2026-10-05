@@ -1,15 +1,15 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { generateOrganizationApiToken } from '@/lib/tokens';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   canIssueLegacyOrganizationToken,
   createDelegatedResourceToken,
   isDelegableResource,
   TypedResourceDelegationError,
 } from '@/lib/auth/resource-delegation';
-import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const organizationId = (await params).id;

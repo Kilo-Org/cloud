@@ -2,7 +2,7 @@ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals
 import type * as securityFindingsModule from '@/lib/security-agent/db/security-findings';
 import type * as securityAnalysisModule from '@/lib/security-agent/db/security-analysis';
 import type * as triageModule from './triage-service';
-import type * as tokensModule from '@/lib/tokens';
+import type * as tokensModule from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 import type { SessionSnapshot } from '@/lib/session-ingest-client';
 import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
@@ -53,7 +53,7 @@ jest.mock('@/lib/security-agent/db/security-analysis', () => ({
   AUTO_ANALYSIS_OWNER_CAP: 2,
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
   isResourceTokenIssuanceEnabled: () => false,
 }));
@@ -62,7 +62,7 @@ jest.mock('./triage-service', () => ({
   triageSecurityFinding: mockTriageSecurityFinding,
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateApiToken: mockGenerateApiToken,
   generateCloudAgentWorkflowToken: mockGenerateCloudAgentWorkflowToken,
   generateWorkflowGatewayToken: mockGenerateWorkflowGatewayToken,
@@ -93,7 +93,7 @@ jest.mock('./extraction-service', () => ({
   extractSandboxAnalysis: jest.fn(() => Promise.resolve()),
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: (_scope: string, level: string) =>
     level === 'error' ? mockErrorLogger : mockInfoLogger,
 }));

@@ -1,6 +1,6 @@
 import type { inferRouterInputs } from '@trpc/server';
 import * as z from 'zod';
-import { PublicOrganizationMembersSchema } from '@/lib/organizations/organization-types';
+import { PublicOrganizationMembersSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import {
   BreakdownInputSchema,

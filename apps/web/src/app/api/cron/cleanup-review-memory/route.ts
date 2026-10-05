@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { pruneExpiredReviewMemoryData } from '@/lib/code-reviews/review-memory/db';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');

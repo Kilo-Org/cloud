@@ -4,8 +4,8 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
-import { db } from '@/lib/drizzle';
-import { adminProcedure } from '@/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { adminProcedure } from '@kilocode/web-shared/lib/trpc/init';
 
 export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) => {
   const currentUser = await getCurrentUserFromPrimary(ctx.user.id);

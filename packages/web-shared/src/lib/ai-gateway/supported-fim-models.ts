@@ -1,7 +1,7 @@
 import type {
   OpenRouterModel,
   OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 export type FimProvider = 'mistral' | 'inception';
 

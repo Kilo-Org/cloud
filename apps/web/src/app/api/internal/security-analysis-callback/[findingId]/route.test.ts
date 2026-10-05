@@ -3,7 +3,7 @@ import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { NextRequest } from 'next/server';
 import type * as routeModule from './route';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
   SECURITY_AUTO_ANALYSIS_WORKER_URL: 'https://security-auto-analysis.test',
 }));

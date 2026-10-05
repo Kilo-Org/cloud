@@ -3,7 +3,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   disconnectBitbucketOAuthIntegration,
@@ -24,12 +24,12 @@ import {
 } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-credentials';
 import { BitbucketWorkspaceAccessTokenError } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-adapter';
 import { cleanupBitbucketCodeReviewerForIntegration } from '@/lib/integrations/platforms/bitbucket/code-review-cleanup';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
   organizationBillingProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { platform_integrations } from '@kilocode/db/schema';
 
 const AccessTokenSchema = z.string().trim().min(1).max(8_192);

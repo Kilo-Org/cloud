@@ -1,12 +1,12 @@
 // The connection read is stubbed before the component module is loaded:
 // @swc/jest emits the static imports first, so the mock only reaches a module
 // that is imported after the stub is registered (see `renderChatGptUsageLink`).
-jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptConnection: jest.fn(),
 }));
 
 import { describe, expect, it, jest } from '@jest/globals';
-import { CHATGPT_USAGE_SETTINGS_URL } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { CHATGPT_USAGE_SETTINGS_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 
 const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
 
@@ -17,7 +17,7 @@ const USAGE_LINK_SUMMARY = 'View and manage your ChatGPT usage';
 async function renderChatGptUsageLink(hasConnection: boolean): Promise<string> {
   jest.resetModules();
   const [store, link, server] = await Promise.all([
-    import('@/lib/ai-gateway/openai-chatgpt/store'),
+    import('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store'),
     import('@/components/chatgpt/ChatGptUsageLink'),
     import('react-dom/server'),
   ]);

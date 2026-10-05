@@ -1,45 +1,54 @@
-import { isPdfSupportingModel } from '@/lib/ai-gateway/models';
-import { getPreferredModels } from '@/lib/ai-gateway/preferred-models';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,
   LOCAL_FAKE_LLM_API_KEY,
-} from '@/lib/ai-gateway/local-fake-llm';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,
-} from '@/lib/organizations/organization-types';
-import { errorExceptInTest } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   convertFromKiloExclusiveModel,
   type KiloExclusiveModel,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
-import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
-import { AUTO_MODELS, type AutoModel } from '@/lib/ai-gateway/auto-model';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
-import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
-import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
-import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
-import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getPreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  getTerminalBenchSummaries,
+  terminalBenchFor,
+} from '@kilocode/web-shared/lib/model-stats/terminal-bench';
+import {
+  getEnkryptBenchmarks,
+  publishEnkryptModels,
+} from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import {
+  isFreeNemotronModel,
+  NVIDIA_TRIAL_TOS,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
+import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { addMonths } from 'date-fns';
-import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
+import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
 // Re-export from shared module for backwards compatibility
-export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+export { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 export {
   getModelDisplayPricing,
   undoPricingDiscount,
-} from '@/lib/ai-gateway/providers/openrouter/display-pricing';
-export type { EndpointPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+export type { EndpointPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
 export function buildAutoModelCatalogEntry(m: AutoModel): OpenRouterModel {
   const input_modalities = ['text'];

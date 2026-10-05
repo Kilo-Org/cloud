@@ -5,19 +5,19 @@ import {
   CLAUDE_OPUS_STEALTH_MODEL_ID,
   CLAUDE_SONNET_STEALTH_MODEL_ID,
   CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
   GEMMA_4_26B_A4B_IT_ID,
   GEMMA_4_26B_A4B_IT_FREE_ID,
-} from '@/lib/ai-gateway/providers/google';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import type {
   KiloExclusiveModel,
   Pricing,
   PricingTiers,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { type ProviderId } from '@/lib/ai-gateway/providers/types';
-import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { type ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 const CLAUDE_OPUS_STEALTH_PRICING: PricingTiers = [
   {

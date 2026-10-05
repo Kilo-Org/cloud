@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   BitbucketOrganizationRepositoryListResultSchema,

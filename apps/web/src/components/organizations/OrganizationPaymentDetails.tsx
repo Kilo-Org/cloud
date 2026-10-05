@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
-import type { OrganizationRole, TimePeriod } from '@/lib/organizations/organization-types';
+import type {
+  OrganizationRole,
+  TimePeriod,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { OrganizationContextProvider } from './OrganizationContext';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationInvoicesCard } from './OrganizationInvoicesCard';

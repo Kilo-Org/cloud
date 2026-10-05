@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import type { AutoFreeConfig } from '@kilocode/db/schema-types';
 import { isAutoFreeEligibleModelId, readConfiguredAutoFreeModels } from './auto-free-config';

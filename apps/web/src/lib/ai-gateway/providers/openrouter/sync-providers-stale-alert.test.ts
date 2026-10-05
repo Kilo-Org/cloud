@@ -4,11 +4,11 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://app.kilo.ai',
 }));
 
-import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
+import type { AdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
   alertIfSyncProvidersStale,
   buildStaleSyncAlertNotification,

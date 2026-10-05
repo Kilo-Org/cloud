@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import type { Stripe } from '@stripe/stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { STRIPE_PUBLISHABLE_KEY } from '@/lib/constants';
+import { STRIPE_PUBLISHABLE_KEY } from '@kilocode/web-shared/lib/constants';
 
 // Cache the Stripe promise to avoid recreating it on each render
 let stripePromise: Promise<Stripe | null> | null = null;

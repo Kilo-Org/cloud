@@ -2,7 +2,7 @@ import {
   ERROR_FINISH_REASONS,
   NON_ERROR_FINISH_REASONS,
   isErrorFinishReason,
-} from '@/lib/ai-gateway/finishReason';
+} from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
 describe('finishReason', () => {
   it('classifies known error finish_reasons as errors', () => {

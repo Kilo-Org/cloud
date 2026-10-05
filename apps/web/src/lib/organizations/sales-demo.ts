@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
   credit_transactions,
@@ -18,7 +18,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { demoOrganizationSettings } from './sales-demo-settings';
 import { populateSalesDemoUsage } from './sales-demo-usage';
 

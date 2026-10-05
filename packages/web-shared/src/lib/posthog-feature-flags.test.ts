@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 
-jest.mock('@/lib/posthog', () => {
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
   const mockGetFeatureFlag = jest.fn();
 
   return {
@@ -28,11 +28,11 @@ jest.mock('@sentry/nextjs', () => {
 import {
   isFeatureFlagEnabledOrDevelopment,
   isReleaseToggleEnabled,
-} from '@/lib/posthog-feature-flags';
+} from '@kilocode/web-shared/lib/posthog-feature-flags';
 
 const posthogMock: {
   mockGetFeatureFlag: jest.Mock;
-} = jest.requireMock('@/lib/posthog');
+} = jest.requireMock('@kilocode/web-shared/lib/posthog');
 
 const sentryMock: {
   mockCaptureException: jest.Mock;

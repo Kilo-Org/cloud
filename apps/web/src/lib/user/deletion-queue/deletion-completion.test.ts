@@ -5,7 +5,7 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { catalogForVersion, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
 import {
   advanceDeletionGates,
@@ -13,7 +13,7 @@ import {
 } from '@/lib/user/deletion-queue/deletion-completion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcomes';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('deletion completion gates', () => {
   beforeEach(async () => {

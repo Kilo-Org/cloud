@@ -1,1 +1,1 @@
-export { handleFimCompletionsRequest as POST } from '@/lib/ai-gateway/handlers/fim-completions';
+export { handleFimCompletionsRequest as POST } from '@kilocode/web-shared/lib/ai-gateway/handlers/fim-completions';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { APP_URL } from '@/lib/constants';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { buildPurchasePresentation } from '@/lib/kilo-pass/purchase-presentation';
 import {
   KILO_PASS_MANAGE_CTA_LABEL,

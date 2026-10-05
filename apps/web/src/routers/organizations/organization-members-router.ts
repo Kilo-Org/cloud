@@ -6,8 +6,8 @@ import {
   getOrganizationMembers,
   inviteUserToOrganization,
   getAcceptInviteUrl,
-} from '@/lib/organizations/organizations';
-import { updateOrganizationUserLimit } from '@/lib/organizations/organization-usage';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { updateOrganizationUserLimit } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   organization_memberships,
   organization_invitations,
@@ -15,15 +15,15 @@ import {
   organizations,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
-import { db, sql } from '@/lib/drizzle';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
   organizationAdminMutationProcedure,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import {
   enqueueInviteEmail,
@@ -32,9 +32,9 @@ import {
 import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import * as z from 'zod';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { successResult } from '@/lib/maybe-result';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
@@ -42,8 +42,8 @@ import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client
 import {
   OrganizationRoleSchema,
   PublicOrganizationMembersSchema,
-} from '@/lib/organizations/organization-types';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 const MAX_DAILY_LIMIT_USD = 2000;
 

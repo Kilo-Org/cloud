@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
 import { isFeedbackRateLimitError, submitUserFeedback } from '@/lib/feedback/submit';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 /**
  * HTTP twin of the `feedback.submit` tRPC mutation. An authenticated agent

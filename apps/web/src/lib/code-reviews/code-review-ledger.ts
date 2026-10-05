@@ -17,8 +17,8 @@ import {
 import { kilocode_users, operation_ledgers } from '@kilocode/db/schema';
 import type { CodeReviewTriggerSource } from '@kilocode/db/schema-types';
 
-import { db } from '@/lib/drizzle';
-import { logExceptInTest } from '@/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * The ledger intent for a review's trigger source. `trigger_source` is null

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 
 jest.mock('next/headers', () => ({
   headers: jest.fn().mockResolvedValue(new Headers()),

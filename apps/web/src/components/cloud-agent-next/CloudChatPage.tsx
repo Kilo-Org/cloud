@@ -66,7 +66,7 @@ import {
   useOlderMessagesPagination,
 } from './older-messages-scroll';
 import { billingPayerPresentation } from './billing-payer-presentation';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import { WorktreeChangesView } from './WorktreeChanges';
 import { WorktreeFilePane } from './WorktreeFilePane';

@@ -1,10 +1,13 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { generateApiToken } from '@/lib/tokens';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { isGastownEnabled } from '@/lib/gastown/feature-flags';
-import { getUserOrgMemberships } from '@/lib/organizations/organizations';
-import { recordKiloAdminElevationForRequest, serviceTarget } from '@/lib/admin/admin-access-log';
+import { getUserOrgMemberships } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  recordKiloAdminElevationForRequest,
+  serviceTarget,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 
 const ONE_HOUR_SECONDS = 60 * 60;
 

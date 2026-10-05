@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import { rotateRefreshToken } from '@/lib/auth/device-sessions';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const requestSchema = z.object({
   refreshToken: z.string().min(1),

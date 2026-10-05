@@ -1,5 +1,5 @@
-import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
-import { shutdownPosthog } from '@/lib/posthog';
+import { closeAllDrizzleConnections, db } from '@kilocode/web-shared/lib/drizzle';
+import { shutdownPosthog } from '@kilocode/web-shared/lib/posthog';
 import { sql } from 'drizzle-orm';
 
 export async function run() {

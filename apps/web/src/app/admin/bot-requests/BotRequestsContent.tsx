@@ -32,9 +32,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { PAGE_SIZE_OPTIONS } from '@/types/pagination';
-import type { PageSize, PaginationMetadata } from '@/types/pagination';
-import { getPaginationHelpers } from '@/types/pagination';
+import { PAGE_SIZE_OPTIONS } from '@kilocode/web-shared/types/pagination';
+import type { PageSize, PaginationMetadata } from '@kilocode/web-shared/types/pagination';
+import { getPaginationHelpers } from '@kilocode/web-shared/types/pagination';
 import {
   useWeeklyActiveUsers,
   useNewUsersPerDay,

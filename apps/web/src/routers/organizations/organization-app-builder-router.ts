@@ -1,10 +1,10 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import * as appBuilderService from '@/lib/app-builder/app-builder-service';
 import {
   createProjectBaseSchema,
@@ -15,7 +15,7 @@ import {
   legacySessionMessagesBaseSchema,
   migrateToGitHubSchema,
 } from '@/routers/app-builder/schemas';
-import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
+import { getBalanceForOrganizationUser } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { MIN_BALANCE_FOR_APP_BUILDER } from '@/lib/app-builder/constants';
 import { buildAccessLevelEligibility } from '@/lib/access-level-eligibility';
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';

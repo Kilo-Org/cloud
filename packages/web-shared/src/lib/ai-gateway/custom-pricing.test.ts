@@ -1,8 +1,11 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
-import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import {
+  QWEN37_MAX_MODEL_ID,
+  QWEN37_PLUS_MODEL_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,

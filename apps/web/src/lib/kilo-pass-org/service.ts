@@ -27,7 +27,7 @@ import {
   KiloPassTier,
 } from '@kilocode/db/schema-types';
 import { and, asc, desc, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   bridgeRatio,
   monthlyWindowFromOriginalAnchor,

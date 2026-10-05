@@ -4,10 +4,17 @@ import { isIP } from 'net';
 
 import { after, type NextRequest } from 'next/server';
 
-import { isCloudflareIP } from '@/lib/cloudflare-ip';
-import { isUserRateLimitedFeature, type FeatureValue } from '@/lib/feature-detection';
-import { decide, type DecideTier, type DecideVerdict } from '@/lib/bouncer/client';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
+import {
+  isUserRateLimitedFeature,
+  type FeatureValue,
+} from '@kilocode/web-shared/lib/feature-detection';
+import {
+  decide,
+  type DecideTier,
+  type DecideVerdict,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 /** Report-only decide runs in `after()` and never holds up the upstream request. */
 export const BOUNCER_DECIDE_TIMEOUT_MS = 30_000;

@@ -1,4 +1,6 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "skipMiddlewareRequestBody": true,
   "crons": [
     {
       "path": "/api/cron/sync-model-stats",

@@ -21,6 +21,23 @@ const nextConfig = {
 
   // Same as apps/web, so gateway clients see identical trailing-slash handling.
   skipTrailingSlashRedirect: true,
+
+  // The apps/web security headers that matter for API-only JSON and SSE
+  // responses. The others (X-Frame-Options, COOP, COEP, CORP,
+  // Permissions-Policy, X-XSS-Protection) govern how browsers render, frame,
+  // or embed documents and subresources, which this app does not serve.
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+        ],
+      },
+    ];
+  },
 };
 
 /** @type {import('@sentry/nextjs').SentryBuildOptions} */

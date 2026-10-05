@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Organization } from '@kilocode/db/schema';
+import { captureException } from '@sentry/nextjs';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
@@ -91,9 +92,23 @@ export function renderNonAutolinkedText(str: string): RawHtml {
   return new RawHtml(escapeHtml(str).replace(/[/.]/g, '$&&#8203;'));
 }
 
-export function renderTemplate(name: string, vars: TemplateVars): string {
+// Report an unreadable template before any caller can swallow the error; the
+// low-balance alert, for one, only logs send failures from after().
+function readTemplate(name: string): string {
   const templatePath = path.join(process.cwd(), 'src', 'emails', `${name}.html`);
-  const html = fs.readFileSync(templatePath, 'utf-8');
+  try {
+    return fs.readFileSync(templatePath, 'utf-8');
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'email_template', email_template: name },
+      extra: { templatePath },
+    });
+    throw error;
+  }
+}
+
+export function renderTemplate(name: string, vars: TemplateVars): string {
+  const html = readTemplate(name);
   return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
     if (!(key in vars)) {
       throw new Error(`Missing template variable '${key}' in email template '${name}'`);

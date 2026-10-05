@@ -1014,7 +1014,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await runAlarm(stub);
     await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
 
-    await setDeadline(stub, { last_frame_at: Date.now() - (5 * MINUTE + 1_000) });
+    await setDeadline(stub, { last_frame_at: Date.now() - (TIMERS.reconnectMs + 1_000) });
     await runAlarm(stub);
 
     await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));

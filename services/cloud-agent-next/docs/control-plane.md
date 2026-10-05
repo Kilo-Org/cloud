@@ -111,7 +111,7 @@ terminal. Nothing else.
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
 | Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
 | Cancel one queued message | That message → `cancelled`. |
-| Backstop alarm | `queued` older than 20 minutes → `failed` (`preparation_timeout`). `accepted` older than 65 minutes → `failed` (`no_outcome`). |
+| Backstop alarm | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 65 minutes → `failed` (`no_outcome`). |
 
 Stop still forwards a best-effort abort to an existing ready Kilo route when no
 message is queued or accepted and the wrapper has no active turn. It does not
@@ -120,7 +120,7 @@ rewrite terminal message outcomes or prepare/wake a stopped sandbox.
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
 are derived from the owners' timers so the backstop never ends work that its owner still runs:
-queued = reconnect window (5 min) + one preparation attempt (12 min) + 3 min, which covers the
+queued = reconnect window (90 s) + one preparation attempt (12 min) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
 sandbox); accepted = turn hard cap (60 min) + 5 min. After every message change the Session DO sets
 the alarm to the earliest backstop, transport-recovery, report or callback obligation, and clears it
@@ -196,7 +196,7 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 | `connected` | `disconnected` | Socket closed, or no heartbeat for 45 s | — |
 | `connected` | `stopping` | No activity for 10 min, or explicit stop or delete | Idle 10 min |
 | `disconnected` | `connected` | Wrapper `hello`, same or new `wrapperId` | — |
-| `disconnected` | `stopping` | No activity for 10 min, or 5 min after the last heartbeat, or explicit stop or delete | Idle 10 min, or reconnect 5 min, whichever is earlier |
+| `disconnected` | `stopping` | No activity for 10 min, or 90 s after the last frame received, or explicit stop or delete | Idle 10 min, or reconnect 90 s, whichever is earlier |
 | `stopping` | `stopped` | Provider confirms stop, or the existing stop ladder ends | Existing ladder |
 | any | `stopped` | Provider reports the sandbox gone | — |
 
@@ -499,7 +499,7 @@ them through one development-only override.
 
 | Owner | Timer | Value | On expiry |
 |---|---|---|---|
-| Session DO | Queued backstop | 20 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
+| Session DO | Queued backstop | 16.5 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
 | Session DO | Accepted backstop | 65 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
@@ -508,7 +508,7 @@ them through one development-only override.
 | Sandbox DO | Wrapper first connect | 5 min from launch | Stop the sandbox |
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
-| Sandbox DO | Reconnect | 5 min from the last frame received | Stop the sandbox |
+| Sandbox DO | Reconnect | 90 s from the last frame received | Stop the sandbox |
 | Sandbox DO | Route preparation | 12 min per preparation attempt | Route `failed` (`preparation_timeout`) |
 | Sandbox DO | Session notification | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop |
 | Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
@@ -536,7 +536,7 @@ them through one development-only override.
 | Clone network error | Wrapper | 3 attempts | Queued fail (`workspace_setup_failed`) |
 | Setup command fails | Wrapper | None | Queued fail with the command output visible |
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
-| Socket down 5 min | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
+| Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
 | Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
 | Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_restarted`) |
 | Kilo crash or dead event stream | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang |
@@ -546,7 +546,7 @@ them through one development-only override.
 | Turn over 60 min | Wrapper | Abort the turn | Accepted fail (`execution_limit`) |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
-| Notification lost | Session DO backstop | — | Fail at 20 or 65 min |
+| Notification lost | Session DO backstop | — | Fail at 16.5 or 65 min |
 | User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
@@ -670,8 +670,8 @@ counts.
    settle B's work. Reconstruction retains recovery/backstop deadlines; Stop, cancellation and deletion
    clear queued recovery without dispatch or duplicate reports/callbacks. Persistent transport loss
    exhausts the one pass without polling preparation or replaying accepted work.
-10. **Socket drop, wrapper returns within 5 minutes.** The turn completes; no message fails.
-11. **Socket down for 5 minutes.** The sandbox stops; accepted messages fail (`connection_lost`);
+10. **Socket drop, wrapper returns within 90 seconds.** The turn completes; no message fails.
+11. **Socket down for 90 seconds.** The sandbox stops; accepted messages fail (`connection_lost`);
     the next message creates a new sandbox in the same chat with restored history.
 12. **Kilo killed after the turn made progress.** The wrapper restarts Kilo; accepted messages fail
     (`agent_restarted`); the next message works without a new sandbox.
@@ -711,7 +711,7 @@ counts.
     overflow drops newest, loss diagnostics stay bounded/internal and expired queue heads make no RPC.
     Heartbeats, alarms, stop and reconnect continue while notifications are held. Release retires
     references; reconstruction replays no notification backlog. Public events, reports, callbacks
-     and the 20/65-minute lost-notification backstops are unchanged.
+     and the 16.5/65-minute lost-notification backstops are unchanged.
 22. **Permanent versus transient creation failure.** Balance lost after send preflight fails queued
     work promptly with `billing_blocked`, not preparation timeout. Proven local invalid configuration
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,
@@ -737,5 +737,9 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
 - An unconfirmed provider stop is logged; the container may run until the provider stops it.
 - A killed container is not found by polling the provider. It is a wrapper connection that does not
   return. The user waits at most the reconnect window, then the message fails `connection_lost`.
+- The reconnect window is short so a queued message does not wait long on a wrapper that is gone. A
+  live wrapper reconnects within seconds (backoff 1 s to 30 s; supervisor restart 1 s to 16 s), but
+  one cut off from the Sandbox DO for longer than 90 s, for example during a platform outage, loses
+  its accepted turn (`connection_lost`).
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
   the legacy plane.

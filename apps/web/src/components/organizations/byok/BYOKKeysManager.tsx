@@ -372,10 +372,36 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setCustomProviderApi('openai-compatible');
   };
 
+  const isCustomProviderSelection =
+    selectedProvider === 'custom' ||
+    (editingKeyId !== null &&
+      keys?.some(
+        k =>
+          k.id === editingKeyId &&
+          k.base_url !== null &&
+          k.provider_api === 'openai-compatible'
+      ));
+
   const handleSave = () => {
     const error = validateStructuredCredentials(selectedProvider, apiKey);
     setCredentialError(error);
     if (error) return;
+    if (isCustomProviderSelection && customProviderId.trim()) {
+      const customId = customProviderId.trim();
+      if (!customBaseUrl || !customBaseUrl.trim()) {
+        toast.error('Enter a base URL.');
+        return;
+      }
+      createMutation.mutate({
+        ...(organizationId && { organizationId }),
+        provider_id: customId as UserByokProviderId,
+        api_key: apiKey,
+        display_name: customDisplayName || undefined,
+        base_url: customBaseUrl || undefined,
+        provider_api: customProviderApi as 'openai-compatible' | undefined,
+      });
+      return;
+    }
     if (editingKeyId) {
       updateMutation.mutate({
         ...(organizationId && { organizationId }),

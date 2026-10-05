@@ -12,6 +12,8 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getModelUserByokProviders,
+  getAllBYOKRowsForOrganization,
+  getAllBYOKRowsForUser,
 } from '@/lib/ai-gateway/byok';
 import { custom_llm2, type User } from '@kilocode/db/schema';
 import { readDb } from '@/lib/drizzle';
@@ -102,8 +104,8 @@ async function checkCustomBYOK(
 
   // Get all BYOK entries for the user/organization
   const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, [])
-    : await getBYOKforUser(readDb, user.id, []);
+    ? await getAllBYOKRowsForOrganization(readDb, organizationId)
+    : await getAllBYOKRowsForUser(readDb, user.id);
   if (!userByok || userByok.length === 0) {
     return null;
   }
@@ -111,32 +113,11 @@ async function checkCustomBYOK(
   // Look for a BYOK entry that has a base_url (indicating a custom provider)
   // and is not a known direct BYOK provider (handled by checkDirectBYOK)
   // or openrouter-byok (handled by checkOpenRouterBYOK)
-  const directByokIds = [
-    'alibaba-token-plan',
-    'byteplus-coding',
-    'chutes-byok',
-    'codestral',
-    'edenai',
-    'inceptron-byok',
-    'kimi-coding',
-    'martian',
-    'morph-byok',
-    'neuralwatt',
-    'nvidia-byok',
-    'ollama-cloud',
-    'openrouter-byok',
-    'opencode-go',
-    'orcarouter',
-    'synthetic',
-    'xiaomi-token-plan-ams',
-    'xiaomi-token-plan-sgp',
-    'zai-coding',
-  ] as const;
+  const directByokIds = DIRECT_BYOK_PROVIDERS.map(p => p.id);
+  const knownProviderIds = [...directByokIds, 'openrouter-byok'];
 
   const customByok = userByok.find(
-    byok =>
-      byok.baseUrl !== null &&
-      !directByokIds.includes(byok.providerId as (typeof directByokIds)[number])
+    byok => byok.baseUrl !== null && !knownProviderIds.includes(byok.providerId)
   );
   if (!customByok) {
     return null;
@@ -172,32 +153,37 @@ async function checkDirectBYOK(
   if (isAnonymousContext(user)) return null;
 
   // Get the direct BYOK provider that matches the requested model
-  const { provider: directProvider, model } = await getDirectByokModel(requestedModel);
-  if (!directProvider || !model) return null;
+  const { provider: directByok, model: directByokModel } =
+    await getDirectByokModel(requestedModel);
+  if (!directByok || !directByokModel) {
+    return null;
+  }
 
   const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, [directProvider.id])
-    : await getBYOKforUser(readDb, user.id, [directProvider.id]);
-  if (!userByok || userByok.length === 0) return null;
+    ? await getBYOKforOrganization(readDb, organizationId, [directByok.id])
+    : await getBYOKforUser(readDb, user.id, [directByok.id]);
+  if (!userByok || userByok.length === 0) {
+    return null;
+  }
 
   return {
     kind: 'provider',
     provider: {
-      id: directProvider.id as ProviderId,
-      apiUrl: directProvider.base_url ?? 'https://openrouter.ai/api/v1',
-      apiUrlOverrides: {},
+      id: 'direct-byok',
+      apiUrl: directByok.base_url,
+      apiUrlOverrides: directByok.base_url_overrides,
       disableUrlSuffix: false,
       apiKey: userByok[0].decryptedAPIKey,
       apiKeyHeader: null,
-      supportedChatApis: ['chat_completions', 'messages', 'responses'],
+      supportedChatApis: directByok.supported_chat_apis,
       responseTransforms: null,
       async transformRequest(context) {
-        if (directProvider.base_url) {
-          context.provider.apiUrl = directProvider.base_url;
-        }
+        context.request.body.model = directByokModel.id;
+        delete context.request.body.provider;
+        directByok.transformRequest(context);
       },
     } satisfies Provider,
-    userByok: [userByok[0]],
+    userByok,
     bypassAccessCheck: true,
   };
 }

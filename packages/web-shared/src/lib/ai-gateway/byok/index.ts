@@ -101,10 +101,17 @@ export function decryptByokRow({
   base_url?: string | null;
   display_name?: string | null;
   provider_api?: string | null;
-}) {
+}): {
+  decryptedAPIKey: string;
+  providerId: string;
+  baseUrl: string | null;
+  displayName: string | null;
+  providerApi: string | null;
+} {
+  const parsedProviderId = UserByokProviderIdSchema.safeParse(provider_id);
   return {
     decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: UserByokProviderIdSchema.parse(provider_id),
+    providerId: parsedProviderId.success ? parsedProviderId.data : provider_id,
     baseUrl: base_url ?? null,
     displayName: display_name ?? null,
     providerApi: provider_api ?? null,
@@ -123,6 +130,9 @@ export async function getBYOKforUser(
     .select({
       encrypted_api_key: byok_api_keys.encrypted_api_key,
       provider_id: byok_api_keys.provider_id,
+      base_url: byok_api_keys.base_url,
+      display_name: byok_api_keys.display_name,
+      provider_api: byok_api_keys.provider_api,
     })
     .from(byok_api_keys)
     .where(
@@ -132,6 +142,25 @@ export async function getBYOKforUser(
         inArray(byok_api_keys.provider_id, providerIds)
       )
     )
+    .orderBy(byok_api_keys.created_at);
+
+  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
+}
+
+export async function getAllBYOKRowsForUser(
+  fromDb: typeof db,
+  userId: string
+): Promise<BYOKResult[] | null> {
+  const rows = await fromDb
+    .select({
+      encrypted_api_key: byok_api_keys.encrypted_api_key,
+      provider_id: byok_api_keys.provider_id,
+      base_url: byok_api_keys.base_url,
+      display_name: byok_api_keys.display_name,
+      provider_api: byok_api_keys.provider_api,
+    })
+    .from(byok_api_keys)
+    .where(and(eq(byok_api_keys.kilo_user_id, userId), eq(byok_api_keys.is_enabled, true)))
     .orderBy(byok_api_keys.created_at);
 
   return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
@@ -149,6 +178,9 @@ export async function getBYOKforOrganization(
     .select({
       encrypted_api_key: byok_api_keys.encrypted_api_key,
       provider_id: byok_api_keys.provider_id,
+      base_url: byok_api_keys.base_url,
+      display_name: byok_api_keys.display_name,
+      provider_api: byok_api_keys.provider_api,
     })
     .from(byok_api_keys)
     .where(
@@ -156,6 +188,30 @@ export async function getBYOKforOrganization(
         eq(byok_api_keys.organization_id, organizationId),
         eq(byok_api_keys.is_enabled, true),
         inArray(byok_api_keys.provider_id, providerIds)
+      )
+    )
+    .orderBy(byok_api_keys.created_at);
+
+  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
+}
+
+export async function getAllBYOKRowsForOrganization(
+  fromDb: typeof db | DrizzleTransaction,
+  organizationId: string
+): Promise<BYOKResult[] | null> {
+  const rows = await fromDb
+    .select({
+      encrypted_api_key: byok_api_keys.encrypted_api_key,
+      provider_id: byok_api_keys.provider_id,
+      base_url: byok_api_keys.base_url,
+      display_name: byok_api_keys.display_name,
+      provider_api: byok_api_keys.provider_api,
+    })
+    .from(byok_api_keys)
+    .where(
+      and(
+        eq(byok_api_keys.organization_id, organizationId),
+        eq(byok_api_keys.is_enabled, true)
       )
     )
     .orderBy(byok_api_keys.created_at);

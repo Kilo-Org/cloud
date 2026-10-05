@@ -246,7 +246,9 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     const glyph = glyphFor(line.kind);
     const textStyle: RowStyle = compact ? 'caption' : rowStyle;
     const zero = line.count === 0;
-    const timed = !compact && timedRows && line.label.length <= timeLabelBudget;
+    // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
+    const labelLength = typeof line.label === 'string' ? line.label.length : 0;
+    const timed = !compact && timedRows && labelLength <= timeLabelBudget;
     // One time at most per row: a needs-input wait or a scheduled wake, never
     // both. The wait is a duration ("31 minutes") and the wake a clock time
     // ("9:00 AM"): a wait is an interval the user is enduring, a wake is the

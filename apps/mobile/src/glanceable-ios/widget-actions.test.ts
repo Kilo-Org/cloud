@@ -823,6 +823,19 @@ describe('activeAgentsWidgetLayout', () => {
     }
   });
 
+  it('renders a stored count row that carries no label in every family', () => {
+    // A timeline another app version wrote can hold a row without a string
+    // label; a throw here is the red error box in every family.
+    const props = {
+      ...HAPPY_WAITING_PROPS,
+      countLines: [{ count: 2, kind: 'needsInput' }],
+    } as unknown as GlanceableWidgetProps;
+    const families: WidgetFamily[] = ['systemSmall', 'systemMedium', 'systemLarge'];
+    for (const family of families) {
+      expect(() => renderWidget(props, family)).not.toThrow();
+    }
+  });
+
   it('draws the newest-session line and the Approve button in the small family', () => {
     const tree = renderWidget(HAPPY_WAITING_PROPS, 'systemSmall');
 

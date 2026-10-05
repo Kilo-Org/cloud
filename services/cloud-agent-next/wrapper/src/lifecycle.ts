@@ -3,15 +3,17 @@ import type { WrapperKiloClient } from './kilo-api.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
-import {
-  decidePublicationRecovery,
-  PUBLICATION_RECOVERY_PROMPT,
-} from './publication-recovery.js';
+import { decidePublicationRecovery, PUBLICATION_RECOVERY_PROMPT } from './publication-recovery.js';
 
 const DRAIN_DELAY_MS = 250;
 export const STABLE_ROOT_IDLE_MS = 3_000;
 const SSE_TRANSPORT_TIMEOUT_MS = 15_000;
 const AUTO_COMMIT_TIMEOUT_MS = 120_000;
+// The recovery prompt submit is a local async ack. A stalled ack must fail
+// fast instead of holding the batch open until the DO no-output watchdog. This
+// bounds only the submit: once delivered, the recovery turn is sealed through
+// the normal stable-idle path and runs unbounded.
+export const PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS = 15_000;
 
 export type LifecycleConfig = {
   workspacePath: string;
@@ -304,6 +306,11 @@ export function createLifecycleManager(
     const armId = publicationRecoveryArmId + 1;
     publicationRecoveryArmId = armId;
     const isCurrentArm = () => publicationRecoveryArmId === armId;
+    const submitTimeout = setTimeout(() => {
+      if (!isCurrentArm()) return;
+      logToFile('publication check: submit timed out');
+      controller.abort();
+    }, PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS);
     try {
       await deps.kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
@@ -331,6 +338,7 @@ export function createLifecycleManager(
       // never seal the new batch from a stale arm.
       return isCurrentArm() ? 'failed' : 'superseded';
     } finally {
+      clearTimeout(submitTimeout);
       if (publicationRecoverySubmitController === controller) {
         publicationRecoverySubmitController = null;
       }

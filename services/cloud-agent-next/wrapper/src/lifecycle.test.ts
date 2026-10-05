@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from 'bun:test';
 import { WrapperState } from './state';
-import { createLifecycleManager } from './lifecycle';
+import { createLifecycleManager, PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS } from './lifecycle';
 import {
   assistantReportsNoActionableOutput,
   classifyPublicationToolPart,
@@ -494,6 +494,56 @@ describe('publication recovery lifecycle', () => {
         'wrapper_finalizing'
       );
       expect(harness.events.map(event => event.streamEventType)).not.toContain('complete');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('aborts a hung recovery submit at the submit bound and fails fast', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness({ abortDeferred: true });
+      await triggerRecovery(harness);
+      expect(harness.sendCalls).toBe(1);
+
+      // The submit is still pending: it must not hold the batch open.
+      expect(harness.abortCalls).toBe(0);
+      expect(harness.events.map(event => event.streamEventType)).not.toContain(
+        'wrapper_finalizing'
+      );
+
+      jest.advanceTimersByTime(PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS);
+      await flushMicrotasks();
+
+      expect(harness.abortCalls).toBe(1);
+      expect(harness.events.some(event => event.streamEventType === 'error')).toBe(true);
+
+      harness.resolveDeferredAbort();
+      await flushMicrotasks();
+
+      expect(harness.events.map(event => event.streamEventType)).toContain('wrapper_finalizing');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not bound a productive post-delivery recovery turn', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness();
+      await triggerRecovery(harness);
+      expect(harness.sendCalls).toBe(1);
+
+      // The submit resolved. A long productive turn must not be aborted or
+      // sealed by any leftover submit bound.
+      jest.advanceTimersByTime(PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS * 10);
+      await flushMicrotasks();
+
+      expect(harness.abortCalls).toBe(0);
+      expect(harness.events.some(event => event.streamEventType === 'error')).toBe(false);
+      expect(harness.events.map(event => event.streamEventType)).not.toContain(
+        'wrapper_finalizing'
+      );
     } finally {
       jest.useRealTimers();
     }

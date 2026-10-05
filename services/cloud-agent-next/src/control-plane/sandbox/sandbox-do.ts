@@ -537,6 +537,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const allocation = owner === null ? null : await this.getAllocationState();
       return projectAllocationStatusSnapshot({
         allocation,
+        containersInstance:
+          this.providerPin?.configuration?.provider === 'cloudflare-containers'
+            ? this.providerPin.configuration.instance
+            : undefined,
         observedAt: Date.now(),
         inactivityTimeoutMs: this.sandboxTimers().idleMs,
       });

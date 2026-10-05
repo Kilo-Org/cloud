@@ -1203,6 +1203,9 @@ export const AuditLogAction = z.enum([
   'organization.domain_claim.verify',
   'organization.domain_claim.lose_verification',
   'organization.domain_claim.remove',
+  'organization.domain_claim.cleanup_started',
+  'organization.domain_claim.cleanup_completed',
+  'organization.domain_claim.cleanup_failed',
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
@@ -2264,7 +2267,13 @@ export const CustomLlmDefinitionSchema = z.object({
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 export const AutoFreeModelSchema = z.object({
-  model: z.string().trim().min(1),
+  model: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9./:~-]+$/,
+      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
+    ),
   weight: z.number().int().positive(),
   reasoning: z.object({
     enabled: z.boolean().optional(),

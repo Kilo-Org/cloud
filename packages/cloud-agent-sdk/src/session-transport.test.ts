@@ -392,6 +392,70 @@ describe('session transport delegation (cloud agent)', () => {
     session.destroy();
   });
 
+  it.each(['answer', 'reject'] as const)(
+    '%s clears the acknowledged question without a live resolution event',
+    async action => {
+      const api = createMockApi();
+      let acknowledge: (result: { success: boolean }) => void = () => {};
+      api[action].mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            acknowledge = resolve;
+          })
+      );
+      const session = createCloudAgentResolvedSession(api);
+      await connectSession(session);
+      const questions = [{ question: 'Pick one', header: 'Q', options: [] }];
+      session.state.process({ type: 'question.asked', requestId: 'req-1', questions });
+      session.state.process({ type: 'question.asked', requestId: 'req-2', questions });
+
+      const submission =
+        action === 'answer'
+          ? session.answer({ requestId: 'req-1', answers: [['yes']] })
+          : session.reject({ requestId: 'req-1' });
+      expect(session.state.getQuestion()?.requestId).toBe('req-1');
+      acknowledge({ success: true });
+      await submission;
+
+      expect(session.state.getQuestion()?.requestId).toBe('req-2');
+      session.state.process({ type: 'question.replied', requestId: 'req-1' });
+      expect(session.state.getQuestion()?.requestId).toBe('req-2');
+      if (action === 'answer') {
+        await session.answer({ requestId: 'req-2', answers: [['yes']] });
+      } else {
+        await session.reject({ requestId: 'req-2' });
+      }
+      expect(session.state.getQuestion()).toBeNull();
+      session.destroy();
+    }
+  );
+
+  it.each(['answer', 'reject'] as const)(
+    '%s keeps the question available for retry when submission fails',
+    async action => {
+      const api = createMockApi();
+      api[action].mockRejectedValueOnce(new Error('Network error'));
+      api[action].mockResolvedValueOnce({ success: false });
+      const session = createCloudAgentResolvedSession(api);
+      await connectSession(session);
+      session.state.process({
+        type: 'question.asked',
+        requestId: 'req-1',
+        questions: [{ question: 'Pick one', header: 'Q', options: [] }],
+      });
+
+      const submit = () =>
+        action === 'answer'
+          ? session.answer({ requestId: 'req-1', answers: [['yes']] })
+          : session.reject({ requestId: 'req-1' });
+      await expect(submit()).rejects.toThrow('Network error');
+      expect(session.state.getQuestion()?.requestId).toBe('req-1');
+      await expect(submit()).rejects.toThrow('Please try again.');
+      expect(session.state.getQuestion()?.requestId).toBe('req-1');
+      session.destroy();
+    }
+  );
+
   it('session.respondToPermission() delegates to api.respondToPermission', async () => {
     const api = createMockApi();
     const session = createCloudAgentResolvedSession(api);

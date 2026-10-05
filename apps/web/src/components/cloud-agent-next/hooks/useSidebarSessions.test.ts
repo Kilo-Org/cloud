@@ -15,6 +15,7 @@ import {
   deriveForegroundSessionStatus,
   eventRowMatchesSidebarFilters,
   eventRowToDbSession,
+  getRunningSessionSortTime,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
@@ -25,7 +26,9 @@ import {
   removeSidebarDbSession,
   sessionCacheKey,
   SIDEBAR_RECONCILE_DELAY_MS,
+  SIDEBAR_RUNNING_BUMP_INTERVAL_MS,
   upsertSidebarDbSession,
+  type SidebarSortPins,
   type SidebarWorktreeDetails,
 } from './useSidebarSessions';
 
@@ -898,6 +901,92 @@ describe('useSidebarSessions live update helpers', () => {
           { sessionId: 'ses_visible', status: 'busy' }
         ).status
       ).toBe('permission');
+    });
+  });
+
+  describe('running session sort throttling', () => {
+    const runningCreatedAt = '2026-01-03T10:00:00.000Z';
+
+    function makeRunningSession(
+      sessionId: string,
+      updatedAt: string,
+      overrides: Partial<StoredSession> = {}
+    ): StoredSession {
+      return makeStoredSession(sessionId, updatedAt, { createdAt: runningCreatedAt, ...overrides });
+    }
+
+    function pinFor(session: StoredSession): SidebarSortPins {
+      return new Map([[session.sessionId, getRunningSessionSortTime(session, true)]]);
+    }
+
+    it('sorts non-running sessions by raw recency', () => {
+      const session = makeRunningSession('ses_idle', '2026-01-03T12:00:37.000Z');
+
+      expect(getRunningSessionSortTime(session, false)).toBe(
+        new Date('2026-01-03T12:00:37.000Z').getTime()
+      );
+    });
+
+    it('advances a running session at most one bump interval past its start', () => {
+      const startedAt = new Date(runningCreatedAt).getTime();
+      const withinFirstInterval = makeRunningSession('ses_busy', '2026-01-03T10:00:30.000Z');
+      const churnedSameInterval = makeRunningSession('ses_busy', '2026-01-03T10:00:59.000Z');
+      const crossedInterval = makeRunningSession('ses_busy', '2026-01-03T10:01:05.000Z');
+
+      expect(getRunningSessionSortTime(withinFirstInterval, true)).toBe(startedAt);
+      expect(getRunningSessionSortTime(churnedSameInterval, true)).toBe(startedAt);
+      expect(getRunningSessionSortTime(crossedInterval, true)).toBe(
+        startedAt + SIDEBAR_RUNNING_BUMP_INTERVAL_MS
+      );
+    });
+
+    it('holds a running session in place while its updates churn, then lets it advance', () => {
+      const idle = makeStoredSession('ses_idle', '2026-01-03T12:00:10.000Z');
+      const churned = makeRunningSession('ses_running', '2026-01-03T12:00:45.000Z');
+      const advanced = makeRunningSession('ses_running', '2026-01-03T12:01:05.000Z');
+
+      const churnedOrder = groupSidebarSessions([churned, idle], {}, pinFor(churned)).map(item =>
+        item.type === 'session' ? item.session.sessionId : item.worktreeId
+      );
+      expect(churnedOrder).toEqual(['ses_idle', 'ses_running']);
+
+      const advancedOrder = groupSidebarSessions([advanced, idle], {}, pinFor(advanced)).map(item =>
+        item.type === 'session' ? item.session.sessionId : item.worktreeId
+      );
+      expect(advancedOrder).toEqual(['ses_running', 'ses_idle']);
+    });
+
+    it('holds a worktree group in place while its running member churns', () => {
+      const idle = makeStoredSession('ses_idle', '2026-01-03T12:00:10.000Z');
+      const churned = makeRunningSession('ses_running', '2026-01-03T12:00:45.000Z', {
+        worktreeId: 'worktree_shared',
+      });
+
+      const groups = groupSidebarSessions([churned, idle], {}, pinFor(churned));
+      expect(
+        groups.map(item => (item.type === 'session' ? item.session.sessionId : item.worktreeId))
+      ).toEqual(['ses_idle', 'worktree_shared']);
+    });
+
+    it('buckets a running session by its pinned sort time, not its raw update time', () => {
+      const running = makeStoredSession('ses_running', '2026-01-04T00:00:10.000Z', {
+        createdAt: '2026-01-03T23:58:30.000Z',
+      });
+      const pins = new Map([[running.sessionId, getRunningSessionSortTime(running, true)]]);
+
+      const result = groupSidebarSessionsByDate(
+        [running],
+        new Date('2026-01-04T00:10:00.000Z'),
+        {},
+        pins
+      );
+
+      expect(result.map(group => group.label)).toEqual(['Yesterday']);
+      expect(
+        groupSidebarSessionsByDate([running], new Date('2026-01-04T00:10:00.000Z')).map(
+          group => group.label
+        )
+      ).toEqual(['Today']);
     });
   });
 

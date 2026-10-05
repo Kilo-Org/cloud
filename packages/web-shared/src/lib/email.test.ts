@@ -1,3 +1,8 @@
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureException: jest.fn(),
+}));
+
 jest.mock('@/lib/email-mailgun', () => ({
   getEmailVerificationRecipient: jest.fn(() => null),
   sendViaMailgun: jest.fn().mockResolvedValue({}),
@@ -11,6 +16,7 @@ import {
   sendSpendAlertEmail,
   subjects,
 } from '@/lib/email';
+import { captureException } from '@sentry/nextjs';
 import { sendViaMailgun } from '@/lib/email-mailgun';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
@@ -23,6 +29,18 @@ describe('email rendering helpers', () => {
 
     expect(rendered.html).toBe(
       '&lt;b&gt;https:/&#8203;/&#8203;evil.&#8203;example&lt;/&#8203;b&gt; www.&#8203;bad.&#8203;example acme.&#8203;com'
+    );
+  });
+});
+
+describe('template loading', () => {
+  it('reports an unreadable template to Sentry and rethrows', () => {
+    expect(() => renderTemplate('doesNotExist', {})).toThrow(/ENOENT/);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'ENOENT' }),
+      expect.objectContaining({
+        tags: { source: 'email_template', email_template: 'doesNotExist' },
+      })
     );
   });
 });

@@ -75,7 +75,11 @@ import {
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { resolveVercelSandboxRuntimeConfig } from '../../agent-sandbox/vercel/vercel-runtime-config.js';
 import type { VercelSandboxNetworkPolicy } from '../../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { getManagedOutboundContainerId, getSandboxNamespace } from '../../sandbox-id.js';
+import {
+  getManagedOutboundContainerId,
+  getOutboundContainerId,
+  getSandboxNamespace,
+} from '../../sandbox-id.js';
 import { sessionDoName } from '../../session-plane.js';
 import { logger } from '../../logger.js';
 import {
@@ -242,6 +246,7 @@ const wrapperSocketAttachmentSchema = z.object({
   allocationId: z.string().optional(),
   connectionId: z.string().optional(),
   wrapperId: z.string().optional(),
+  heartbeatAck: z.literal(true).optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
@@ -532,6 +537,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const allocation = owner === null ? null : await this.getAllocationState();
       return projectAllocationStatusSnapshot({
         allocation,
+        containersInstance:
+          this.providerPin?.configuration?.provider === 'cloudflare-containers'
+            ? this.providerPin.configuration.instance
+            : undefined,
         observedAt: Date.now(),
         inactivityTimeoutMs: this.sandboxTimers().idleMs,
       });
@@ -1848,7 +1857,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
         // No usable grant: fail the route as the prepare path does, so the
         // Session DO starts a fresh attempt or releases the queued messages with
-        // the real reason, instead of leaving them for the 20-minute backstop.
+        // the real reason, instead of leaving them for the queued backstop.
         // If the route stayed `ready`, `prepare` would return the same ready
         // view and deliver would keep returning `not_ready`.
         await onRouteFailed(
@@ -1920,6 +1929,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /** The managed outbound container id for the current provider/allocation. */
   private outboundContainerIdFor(state: AllocationState): string | null {
+    // The container is the containment boundary. When containment is off there
+    // is no proxy container to name, and the environment may not even bind the
+    // containment namespaces (the e2e Worker strips them).
+    if (!this.credentialContainmentEnabled()) return null;
     const provider = this.currentProvider();
     if (!providerUsesOutboundCredentialProxy(provider)) return null;
     if (provider === 'cloudflare-containers') {
@@ -1975,15 +1988,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * direct credentials.
    */
   private credentialContainmentEnabled(): boolean {
-    const containment = this.providerPin?.containment ?? null;
-    if (containment === null) return this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
+    const containment = this.resolvedContainment();
     return containment.kilocode || containment.github;
   }
 
-  private matchesContainment(required: CredentialContainmentRequirements): boolean {
-    const stored =
+  /**
+   * The one resolved containment requirement for this sandbox: the
+   * Worker-selected per-requirement value, else the environment default. Every
+   * consumer (grants and the provider create intent) reads this, so the physical
+   * container class and the grant can never disagree.
+   */
+  private resolvedContainment(): CredentialContainmentRequirements {
+    return (
       this.providerPin?.containment ??
-      getWorktreeCredentialContainment(this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false');
+      getWorktreeCredentialContainment(this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false')
+    );
+  }
+
+  private matchesContainment(required: CredentialContainmentRequirements): boolean {
+    const stored = this.resolvedContainment();
     return (
       stored.kilocode === required.kilocode &&
       stored.github === required.github &&
@@ -2578,7 +2601,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           intentId: allocationId,
           createdAt: Date.now(),
           allocationName: pin.allocationName ?? this.sandboxId,
-          ...(pin.containment === null ? {} : { containment: pin.containment }),
+          containment: this.resolvedContainment(),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
           ...(pin.provider === 'vercel'
             ? { networkPolicy: buildControlNetworkPolicy(await this.activeGrants(Date.now())) }
@@ -2596,6 +2619,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
         createdRef = created.providerRef;
+        if (pin.provider === 'cloudflare' || pin.provider === 'cloudflare-containers') {
+          try {
+            const containerInstanceId =
+              pin.provider === 'cloudflare-containers'
+                ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
+                : getOutboundContainerId(this.env, intent.allocationName ?? this.sandboxId, {
+                    managedScmContainment: this.credentialContainmentEnabled(),
+                  });
+            logControlDiagnostic('container_launch_identity', {
+              sandboxId: this.sandboxId,
+              allocationId,
+              allocationName: intent.allocationName,
+              provider: pin.provider,
+              containerInstanceId,
+            });
+          } catch {
+            // Observability cannot turn a successful provider create into a failed allocation.
+          }
+        }
         await this.dispatchResult({
           type: 'provider-ref',
           at: Date.now(),
@@ -2800,7 +2842,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.provider.ensureLeaseAtLeast(state.providerRef, this.sandboxTimers().providerLeaseMs),
       this.sandboxTimers().providerStopAttemptMs,
       'Sandbox lease renewal timed out'
-    ).catch(() => undefined);
+    ).catch(error => {
+      logControlDiagnostic(
+        'lease_renewal_failed',
+        {
+          allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+          allocationId: state.allocationId,
+          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+        },
+        'warn'
+      );
+    });
   }
 
   private async runCloseSocket(state: AllocationState): Promise<void> {
@@ -2901,6 +2954,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const attachment = this.readAttachment(ws);
 
     if (frame.type === 'hello') {
+      if (attachment?.connectionId !== undefined) return;
       const credential = typeof attachment?.credential === 'string' ? attachment.credential : null;
       const accepted = await this.validateAllocationCredential(frame.allocationId, credential);
       if (!accepted) {
@@ -2915,10 +2969,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
         allocationId: frame.allocationId,
         connectionId,
         wrapperId: frame.wrapperId,
+        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.
-      this.sendFrame(ws, { type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+      this.sendFrame(ws, {
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+      });
       await this.applyEvent({
         type: 'hello-accepted',
         at: Date.now(),
@@ -2941,6 +3000,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
 
     if (frame.type === 'heartbeat') {
+      if (
+        !connectionMatches(
+          await this.readAllocation(),
+          attachment.allocationId,
+          attachment.connectionId
+        )
+      )
+        return;
       await this.applyEvent({
         type: 'heartbeat',
         at: Date.now(),
@@ -2948,6 +3015,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId: attachment.connectionId,
         active: frame.active,
       });
+      if (
+        attachment.heartbeatAck &&
+        connectionMatches(
+          await this.readAllocation(),
+          attachment.allocationId,
+          attachment.connectionId
+        ) &&
+        ws.readyState === WebSocket.OPEN &&
+        this.readAttachment(ws)?.connectionId === attachment.connectionId
+      ) {
+        this.sendFrame(ws, { type: 'heartbeat_ack' });
+      }
       return;
     }
 

@@ -2,6 +2,7 @@ import type { WrapperState } from './state.js';
 import type { WrapperKiloClient } from './kilo-api.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
+import { sendPublicationSelfCheck } from './publication-self-check.js';
 import { getCurrentBranch, logToFile } from './utils.js';
 
 const DRAIN_DELAY_MS = 250;
@@ -254,8 +255,36 @@ export function createLifecycleManager(
       armStableIdleCandidate();
       return;
     }
+    if (state.needsPublicationSelfCheck) {
+      void sendPublicationSelfCheckBeforeSealing();
+      return;
+    }
     if (state.beginFinalizing()) {
       triggerDrainAndClose();
+    }
+  }
+
+  /**
+   * Instead of sealing, ask the agent once to check its review work. The self-check is more
+   * activity in the same turn: the batch seals on the next stable root idle, under the turn's
+   * normal idle and liveness handling.
+   */
+  async function sendPublicationSelfCheckBeforeSealing(): Promise<void> {
+    const session = state.currentSession;
+    if (!session) return;
+    const generation = lifecycleGeneration;
+    state.markPublicationSelfCheckSent();
+    clearStableIdleCandidate();
+    const sent = await sendPublicationSelfCheck({
+      kiloSessionId: session.kiloSessionId,
+      agent: state.batchFinalizationConfig?.agent,
+      kiloClient,
+      onEvent: event => state.sendToIngest(event),
+    });
+    // Kilo stayed idle, so seal through the normal stable-idle path.
+    if (!sent && generation === lifecycleGeneration && !isAborted) {
+      rootIdleCandidatePresent = true;
+      armStableIdleCandidate();
     }
   }
 

@@ -465,13 +465,35 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       if (!transport?.answer) {
         throw new Error('CloudAgentSession transport.answer is not configured');
       }
-      return transport.answer(payload);
+      return Promise.resolve(transport.answer(payload)).then(result => {
+        if (
+          result &&
+          typeof result === 'object' &&
+          'success' in result &&
+          result.success === false
+        ) {
+          throw new Error('Failed to submit answer. Please try again.');
+        }
+        serviceState.process({ type: 'question.replied', requestId: payload.requestId });
+        return result;
+      });
     },
     reject: payload => {
       if (!transport?.reject) {
         throw new Error('CloudAgentSession transport.reject is not configured');
       }
-      return transport.reject(payload);
+      return Promise.resolve(transport.reject(payload)).then(result => {
+        if (
+          result &&
+          typeof result === 'object' &&
+          'success' in result &&
+          result.success === false
+        ) {
+          throw new Error('Failed to dismiss question. Please try again.');
+        }
+        serviceState.process({ type: 'question.rejected', requestId: payload.requestId });
+        return result;
+      });
     },
     respondToPermission: payload => {
       if (!transport?.respondToPermission) {

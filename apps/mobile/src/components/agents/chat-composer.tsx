@@ -182,19 +182,14 @@ type ChatComposerProps = {
    */
   sendDisabled?: boolean;
   /**
-   * Why send is unavailable, rendered as a one-line reason beside the send
-   * control and announced when it changes. Null/omitted while send can proceed
-   * or when the host knows no reason — including while the session is still
-   * opening. Each actionable cannot-send state supplies its own reason (the
-   * load-error state: "The session could not be loaded. Retry first.").
+   * Why send is unavailable. The screen renders it in the fixed footer row
+   * above this composer; the composer forwards it to the input row only as the
+   * input's accessibility hint. Null/omitted while send can proceed or when the
+   * host knows no reason — including while the session is still opening. Each
+   * actionable cannot-send state supplies its own reason (the load-error state:
+   * "The session could not be loaded. Retry first.").
    */
   sendDisabledReason?: string | null;
-  /**
-   * The tone for `sendDisabledReason`: `error` for a genuine failure, `neutral`
-   * for a progress phase. Omitted defaults to the error tone, matching the
-   * previous behavior.
-   */
-  sendDisabledReasonTone?: 'error' | 'neutral' | null;
   isStreaming?: boolean;
   placeholder?: string;
   mode: AgentMode;
@@ -263,7 +258,6 @@ export function ChatComposer({
   disabled = false,
   sendDisabled = false,
   sendDisabledReason = null,
-  sendDisabledReasonTone = null,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
   mode,
@@ -1446,7 +1440,6 @@ export function ChatComposer({
               placeholder={placeholder}
               returnSendsMessage={returnSendsMessage}
               sendDisabledReason={sendDisabledReason}
-              sendDisabledReasonTone={sendDisabledReasonTone}
               textInputStyle={textInputStyle}
               voiceDisabled={control.voiceDisabled}
               voiceInputAvailable={voiceInput.available}

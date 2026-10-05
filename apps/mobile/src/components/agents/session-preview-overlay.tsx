@@ -230,6 +230,8 @@ function SessionPreviewContent({
     () =>
       buildSessionActionMenuItems({
         onOpen: target.onOpen,
+        onCopySessionId: target.onCopySessionId,
+        onViewPr: target.onViewPr,
         onRename: target.onRename ? handleRename : undefined,
         onExit: target.onExit,
         onDelete: onDelete
@@ -238,7 +240,15 @@ function SessionPreviewContent({
             }
           : undefined,
       }),
-    [target.onOpen, target.onRename, target.onExit, onDelete, handleRename]
+    [
+      target.onOpen,
+      target.onCopySessionId,
+      target.onViewPr,
+      target.onRename,
+      target.onExit,
+      onDelete,
+      handleRename,
+    ]
   );
 
   // The header strip alone owns the pan, so the transcript keeps its own scroll.

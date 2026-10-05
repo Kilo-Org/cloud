@@ -9,6 +9,7 @@ import type {
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
+import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
 import * as processUtils from '../utils.js';
@@ -55,6 +56,7 @@ type Harness = {
   manager: ReturnType<typeof createPreparationManager>;
   frames: ControlPlaneWrapperFrame[];
   logs: string[];
+  nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }>;
   gitCalls: string[][];
   authorCalls: Array<{ name: string; email: string } | undefined>;
   ensureCalls: () => number;
@@ -94,6 +96,7 @@ function createHarness(
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
   const logs: string[] = [];
+  const nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }> = [];
   const gitCalls: string[][] = [];
   const authorCalls: Array<{ name: string; email: string } | undefined> = [];
   const ensureInputs: EnsureInput[] = [];
@@ -159,6 +162,7 @@ function createHarness(
     timers: activeTimers,
     emit: frame => frames.push(frame),
     log: message => logs.push(message),
+    onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     runtimes,
     inheritedEnv: {},
     homeRoot: '/tmp/prepare-test-homes',
@@ -205,6 +209,7 @@ function createHarness(
     manager,
     frames,
     logs,
+    nativeDiagnostics,
     gitCalls,
     authorCalls,
     ensureCalls: () => ensureCalls,
@@ -690,6 +695,17 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec);
 
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'checkout' });
+    const checkoutLine = harness.nativeDiagnostics.find(
+      entry =>
+        entry.event === 'wrapper.lifecycle' &&
+        entry.fields.phase === 'prepare_failed' &&
+        entry.fields.preparationStep === 'checkout'
+    );
+    expect(checkoutLine).toBeDefined();
+    expect(checkoutLine?.fields).not.toHaveProperty('detail');
+    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'session_ready')).toBe(
+      false
+    );
   });
 
   it('reports a Kilo session timeout with the kilo_import_timeout subtype', async () => {
@@ -704,6 +720,67 @@ describe('createPreparationManager', () => {
       step: 'kilo_session',
       subtype: 'kilo_import_timeout',
     });
+    // The native owner line carries the closed step and subtype, never the error text.
+    expect(harness.nativeDiagnostics).toContainEqual({
+      event: 'wrapper.lifecycle',
+      fields: {
+        phase: 'prepare_failed',
+        preparationStep: 'kilo_session',
+        subtype: 'kilo_import_timeout',
+      },
+    });
+  });
+
+  it('projects one session_ready line per ready emit, with the session id and no directory', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    await harness.manager.prepare(spec);
+    const first = harness.nativeDiagnostics.filter(
+      entry => entry.event === 'wrapper.lifecycle' && entry.fields.phase === 'session_ready'
+    );
+    expect(first).toEqual([
+      { event: 'wrapper.lifecycle', fields: { phase: 'session_ready', sessionId: spec.sessionId } },
+    ]);
+    expect(JSON.stringify(first[0]?.fields)).not.toContain(spec.directory);
+
+    // A re-prepare ready is a new line, not a latched one.
+    await harness.manager.prepare({ ...spec, attemptId: 'attempt-2' });
+    const ready = harness.nativeDiagnostics.filter(entry => entry.fields.phase === 'session_ready');
+    expect(ready).toHaveLength(2);
+    expect(harness.nativeDiagnostics.some(entry => entry.fields.phase === 'prepare_failed')).toBe(
+      false
+    );
+  });
+
+  it('reports preparingCount and sessionCount from the owner maps', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec();
+    expect(harness.manager.preparingCount()).toBe(0);
+    expect(harness.manager.sessionCount()).toBe(0);
+
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    expect(harness.manager.isPreparing()).toBe(true);
+    expect(harness.manager.preparingCount()).toBe(1);
+    expect(harness.manager.sessionCount()).toBe(0);
+
+    resume.resolve();
+    await running;
+    expect(harness.manager.isPreparing()).toBe(false);
+    expect(harness.manager.preparingCount()).toBe(0);
+    // An idle prepared session still counts.
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
+    expect(harness.manager.sessionCount()).toBe(1);
+
+    harness.manager.release(spec.sessionId);
+    expect(harness.manager.sessionCount()).toBe(0);
   });
 
   it('does not publish silent setup command bodies containing inline credentials', async () => {
@@ -1169,7 +1246,40 @@ describe('createPreparationManager', () => {
     const output = events
       .flatMap(frame => (frame.type === 'session.events' ? frame.events : []))
       .find(event => event.type === 'session.setup.output');
-    expect(output?.properties.output).toContain('installing dependencies');
+    expect(output?.properties.output).toBe('installing dependencies\n');
     expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'setup' });
+  });
+
+  it('separates streamed setup output and normalizes terminal progress like the legacy path', async () => {
+    const harness = createHarness();
+    harness.setSetupOutput(onOutput => {
+      onOutput('stdout', '\u001b[32mProgress: resolved 10\u001b[0m\r\n');
+      onOutput('stdout', 'Progress: resolved 15\rProgress: resolved 20\n');
+      onOutput('stderr', 'warning: kilo-token-');
+      onOutput('stderr', '1\n');
+      onOutput('stdout', 'Done');
+    });
+
+    await harness.manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
+
+    const events = harness.frames.flatMap(frame =>
+      frame.type === 'session.events' ? frame.events : []
+    );
+    const output = events
+      .filter(event => event.type === 'session.setup.output')
+      .map(event => event.properties.output);
+    expect(output).toEqual([
+      'Progress: resolved 10\n',
+      'Progress: resolved 20\n',
+      'warning: [REDACTED]\n',
+      'Done\n',
+    ]);
+    expect(output.join('')).toBe(
+      'Progress: resolved 10\nProgress: resolved 20\nwarning: [REDACTED]\nDone\n'
+    );
+    expect(events.at(-1)).toMatchObject({
+      type: 'session.setup.finished',
+      properties: { command: 1, exitCode: 0 },
+    });
   });
 });

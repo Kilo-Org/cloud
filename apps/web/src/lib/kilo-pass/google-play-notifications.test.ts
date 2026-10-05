@@ -3,6 +3,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, eq, sql } from 'drizzle-orm';
 
 import {
+  bouncer_credit_event_outbox,
   credit_transactions,
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
@@ -23,7 +24,6 @@ import {
   KiloPassPaymentProvider,
 } from '@/lib/kilo-pass/enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
 import { toMicrodollars } from '@/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
@@ -79,24 +79,8 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
   trackKiloPassPurchaseCompleted: jest.fn(),
 }));
 
-// Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
-  return {
-    __esModule: true,
-    ...actual,
-    reportCreditEvent: jest.fn(),
-  };
-});
-
-// The mock is registered above; a static import would bind the real module instead.
-type BouncerClientMock = {
-  reportCreditEvent: jest.Mock;
-};
-
-function getBouncerClientMock(): jest.Mock {
-  return (jest.requireMock('@/lib/bouncer/client') as BouncerClientMock).reportCreditEvent;
-}
+// Bouncer store events are durable: the SUT enqueues them in the outbox table, so tests read the
+// real rows instead of a transport mock.
 
 type PosthogTrackingMock = {
   trackKiloPassPurchaseCompleted: jest.Mock;
@@ -108,6 +92,12 @@ function getPosthogTrackingMock(): PosthogTrackingMock {
 }
 
 let processGooglePlayKiloPassNotification: typeof GooglePlayNotifications.processGooglePlayKiloPassNotification;
+
+// The SUT is imported dynamically after the mocks are registered. Bind it at file scope so every
+// describe (and any --testNamePattern filter, which skips a describe's own beforeAll) sees it.
+beforeAll(async () => {
+  ({ processGooglePlayKiloPassNotification } = await import('./google-play-notifications'));
+});
 
 const GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
 
@@ -195,7 +185,6 @@ describe('processGooglePlayKiloPassNotification', () => {
 
   beforeAll(async () => {
     dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS);
-    ({ processGooglePlayKiloPassNotification } = await import('./google-play-notifications'));
   });
 
   afterAll(() => {
@@ -2270,12 +2259,30 @@ describe('processGooglePlayKiloPassNotification', () => {
 });
 
 describe('Google Play bouncer store events', () => {
-  let reportCreditEvent: jest.Mock;
+  /** The durable outbox row one event produced, or null when nothing was enqueued. */
+  async function outboxRowFor(eventId: string) {
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, eventId))
+      .limit(1);
+    return rows[0] ?? null;
+  }
 
-  beforeEach(() => {
-    reportCreditEvent = getBouncerClientMock();
-    reportCreditEvent.mockClear();
-  });
+  /**
+   * Whether a store event is marked processed. Every enqueue commits in the same transaction as
+   * the processed mark, so both are present after one notification.
+   */
+  async function storeEventProcessed(eventId: string): Promise<boolean> {
+    const row = await db.query.kilo_pass_store_events.findFirst({
+      where: and(
+        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+        eq(kilo_pass_store_events.event_id, eventId)
+      ),
+      columns: { processed_at: true },
+    });
+    return Boolean(row?.processed_at);
+  }
 
   /** Completes one paid purchase so the subscription resolves to `accountId`. */
   async function subscribe(token: string, orderId: string, accountId: string) {
@@ -2287,7 +2294,6 @@ describe('Google Play bouncer store events', () => {
         messageId: `setup-${token}`,
       }),
     });
-    reportCreditEvent.mockClear();
   }
 
   function voidedMessage(messageId: string, purchaseToken: string, orderId: string) {
@@ -2318,17 +2324,20 @@ describe('Google Play bouncer store events', () => {
       pubsubMessage: voidedMessage('void-report', token, orderId),
     });
 
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-      type: 'store.refund',
-      reason: 'other',
-      provider: 'google',
+    const row = await outboxRowFor('void-report');
+    expect(row).toMatchObject({ event_type: 'store.refund', user_id: user.id, status: 'pending' });
+    expect(row?.payload).toEqual({
       eventId: 'void-report',
-      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+      occurredAt: '2026-05-15T00:00:00.000Z',
       userId: user.id,
+      provider: 'google',
       referenceId: orderId,
       environment: 'production',
+      type: 'store.refund',
+      reason: 'other',
     });
+    // The enqueue committed atomically with the processed mark, so both are present.
+    expect(await storeEventProcessed('void-report')).toBe(true);
   });
 
   it('grants base credits to a same-month renewal after the refunded order', async () => {
@@ -2397,17 +2406,19 @@ describe('Google Play bouncer store events', () => {
       }),
     });
 
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-      type: 'store.purchase',
-      amountCents: 1900,
-      provider: 'google',
+    const row = await outboxRowFor('purchase-report');
+    expect(row).toMatchObject({ event_type: 'store.purchase', user_id: user.id });
+    expect(row?.payload).toEqual({
       eventId: 'purchase-report',
-      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+      occurredAt: '2026-05-15T00:00:00.000Z',
       userId: user.id,
+      provider: 'google',
       referenceId: orderId,
       environment: 'production',
+      type: 'store.purchase',
+      amountCents: 1900,
     });
+    expect(await storeEventProcessed('purchase-report')).toBe(true);
   });
 
   it('reports a production revoked subscription', async () => {
@@ -2424,16 +2435,18 @@ describe('Google Play bouncer store events', () => {
       }),
     });
 
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-      type: 'store.revoked',
-      provider: 'google',
+    const row = await outboxRowFor('revoked-report');
+    expect(row).toMatchObject({ event_type: 'store.revoked', user_id: user.id });
+    expect(row?.payload).toEqual({
       eventId: 'revoked-report',
-      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+      occurredAt: '2026-05-15T00:00:00.000Z',
       userId: user.id,
+      provider: 'google',
       referenceId: orderId,
       environment: 'production',
+      type: 'store.revoked',
     });
+    expect(await storeEventProcessed('revoked-report')).toBe(true);
   });
 
   it("does not flag the owner when Play revokes an order Kilo never admitted (Kilo's duplicate reversal)", async () => {
@@ -2453,7 +2466,7 @@ describe('Google Play bouncer store events', () => {
       }),
     });
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    expect(await outboxRowFor('duplicate-revoked-report')).toBeNull();
   });
 
   it('skips a sandbox notification', async () => {
@@ -2472,7 +2485,7 @@ describe('Google Play bouncer store events', () => {
       }),
     });
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    expect(await outboxRowFor('sandbox-report')).toBeNull();
   });
 
   it('skips a production notification that resolves no Kilo user', async () => {
@@ -2487,7 +2500,7 @@ describe('Google Play bouncer store events', () => {
       }),
     });
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    expect(await outboxRowFor('orphan-report')).toBeNull();
   });
 
   function voidedCreditPackMessage(messageId: string, purchaseToken: string, orderId: string) {
@@ -2529,17 +2542,19 @@ describe('Google Play bouncer store events', () => {
       pubsubMessage: voidedCreditPackMessage('credit-pack-void', purchaseToken, orderId),
     });
 
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-      type: 'store.refund',
-      reason: 'other',
-      provider: 'google',
-      eventId: expect.any(String),
-      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+    const row = await outboxRowFor('credit-pack-void');
+    expect(row).toMatchObject({ event_type: 'store.refund', user_id: user.id });
+    expect(row?.payload).toEqual({
+      eventId: 'credit-pack-void',
+      occurredAt: '2026-05-15T00:00:00.000Z',
       userId: user.id,
+      provider: 'google',
       referenceId: orderId,
       environment: 'production',
+      type: 'store.refund',
+      reason: 'other',
     });
+    expect(await storeEventProcessed('credit-pack-void')).toBe(true);
   });
 
   it('reports nothing for a refunded license-tester credit pack', async () => {
@@ -2576,7 +2591,7 @@ describe('Google Play bouncer store events', () => {
       ),
     });
     expect(clawback?.amount_microdollars).toBe(-toMicrodollars(10));
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    expect(await outboxRowFor('credit-pack-void-tester')).toBeNull();
   });
 
   it('still reports a credit-pack refund when the purchase lookup fails', async () => {
@@ -2610,8 +2625,9 @@ describe('Google Play bouncer store events', () => {
       ),
     });
 
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toMatchObject({
+    const row = await outboxRowFor('credit-pack-void-lookup-fail');
+    expect(row).toMatchObject({ event_type: 'store.refund', user_id: user.id });
+    expect(row?.payload).toMatchObject({
       type: 'store.refund',
       userId: user.id,
       referenceId: orderId,
@@ -2633,6 +2649,6 @@ describe('Google Play bouncer store events', () => {
       pubsubMessage: voidedCreditPackMessage('credit-pack-void-ungranted', purchaseToken, orderId),
     });
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    expect(await outboxRowFor('credit-pack-void-ungranted')).toBeNull();
   });
 });

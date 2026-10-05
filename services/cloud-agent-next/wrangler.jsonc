@@ -271,6 +271,7 @@
     {
       "class_name": "SandboxContainers",
       "scheduling_policy": "durable_object",
+      "observability": { "enabled": true },
       "images": {
         "app": {
           "dockerfile": "./Dockerfile.containers",
@@ -613,6 +614,7 @@
         {
           "class_name": "SandboxContainers",
           "scheduling_policy": "durable_object",
+          "observability": { "enabled": true },
           "images": {
             "app": {
               "dockerfile": "./Dockerfile.containers",

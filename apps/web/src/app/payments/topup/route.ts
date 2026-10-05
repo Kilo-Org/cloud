@@ -9,7 +9,7 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { clientIpFromHeaders } from '@/lib/admin/admin-access-log';
-import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import { ipCountryFromHeaders, ja4FromHeaders } from '@/lib/bouncer/credit-events';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -94,6 +94,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
       accountCreatedAt,
       ip: clientIpFromHeaders(request.headers),
       ipCountry: ipCountryFromHeaders(request.headers),
+      ja4: ja4FromHeaders(request.headers),
     }
   );
 

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, setSystemTime } from 'bun:test';
 import type { WrapperKiloClient, WrapperPty, WrapperPtySize } from '../kilo-api.js';
 import type { KiloRuntime, KiloRuntimes } from './kilo-runtime.js';
 import { createControlPlaneTerminals } from './terminals.js';
@@ -58,6 +58,7 @@ function fakeRuntime(client: WrapperKiloClient): KiloRuntime {
     installCredentials: async () => undefined,
     applyPendingCredentials: async () => false,
     isRetiredClient: () => false,
+    phase: () => 'running',
     isSuspected: () => false,
     isRestarting: () => false,
     isUnavailable: () => false,
@@ -74,6 +75,12 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
     remove: () => undefined,
     suspected: () => false,
     unavailable: () => false,
+    summary: () => ({
+      runtimeCount: runtime ? 1 : 0,
+      suspectedCount: 0,
+      restartingCount: 0,
+      unavailableCount: 0,
+    }),
     runtimesForDirectory: () => (runtime ? [runtime] : []),
     async retireDirectory() {},
     async shutdown() {},
@@ -279,6 +286,7 @@ describe('control-plane terminal adapter (B10)', () => {
     sockets.reverse = undefined;
     const terminals = attachedTerminals(fakeClient(serverUrl));
     expect(terminals.hasRecentInput()).toBe(false);
+    expect(terminals.recentInputCount()).toBe(0);
 
     await terminals.handle({
       type: 'terminal.create',
@@ -302,13 +310,54 @@ describe('control-plane terminal adapter (B10)', () => {
 
     // An open, idle PTY is not activity.
     expect(terminals.hasRecentInput()).toBe(false);
+    expect(terminals.recentInputCount()).toBe(0);
     const reverse = sockets.reverse as Bun.ServerWebSocket<{ path: string }> | undefined;
     if (!reverse) throw new Error('reverse socket was not opened');
     reverse.send('keystroke');
     await waitFor(() => terminals.hasRecentInput());
+    expect(terminals.recentInputCount()).toBe(1);
 
     await terminals.forgetSession(session.sessionId);
     expect(terminals.hasRecentInput()).toBe(false);
+    expect(terminals.recentInputCount()).toBe(0);
+    terminals.shutdown();
+  });
+
+  it('counts recent input only inside the 30 s window', async () => {
+    sockets.reverse = undefined;
+    const terminals = attachedTerminals(fakeClient(serverUrl));
+    await terminals.handle({
+      type: 'terminal.create',
+      requestId: 'request_create',
+      session,
+      payload: { operationId: '00000000-0000-4000-8000-000000000004' },
+    });
+    const connected = terminals.handle({
+      type: 'terminal.connect',
+      requestId: 'request_connect',
+      session,
+      payload: {
+        ownerId: 'user_1',
+        ptyId,
+        bridgeGeneration: crypto.randomUUID(),
+        capability: 'a'.repeat(64),
+      },
+    });
+    await waitFor(() => sockets.reverse !== undefined);
+    await connected;
+    const reverse = sockets.reverse as Bun.ServerWebSocket<{ path: string }> | undefined;
+    if (!reverse) throw new Error('reverse socket was not opened');
+    reverse.send('keystroke');
+    await waitFor(() => terminals.recentInputCount() === 1);
+    expect(terminals.hasRecentInput()).toBe(true);
+
+    try {
+      setSystemTime(new Date(Date.now() + 31_000));
+      expect(terminals.recentInputCount()).toBe(0);
+      expect(terminals.hasRecentInput()).toBe(false);
+    } finally {
+      setSystemTime();
+    }
     terminals.shutdown();
   });
 });

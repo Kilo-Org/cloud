@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { SESSION_FOOTER_ROW_ITEM_PADDING } from './session-working-state';
 import { sessionStatusErrorMessage, statusCopyKeyForCode } from './session-terminal-error';
 
 type SessionStatusIndicatorProps = {
@@ -15,7 +16,7 @@ type SessionStatusIndicatorProps = {
 
 export function SessionStatusIndicator({ indicator }: Readonly<SessionStatusIndicatorProps>) {
   return (
-    <View className="flex-row items-center gap-2 px-4 py-2">
+    <View className={`flex-row items-center gap-2 ${SESSION_FOOTER_ROW_ITEM_PADDING}`}>
       <IndicatorContent indicator={indicator} />
     </View>
   );

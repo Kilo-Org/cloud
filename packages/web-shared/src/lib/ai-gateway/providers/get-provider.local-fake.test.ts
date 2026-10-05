@@ -9,6 +9,9 @@ import { getBYOKforUser, getModelUserByokProviders } from '@/lib/ai-gateway/byok
 import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { TransformRequestContext } from '@/lib/ai-gateway/providers/types';
+import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
+import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
 
@@ -378,5 +381,66 @@ describe('getProvider ChatGPT connection routing order', () => {
       bypassAccessCheck: false,
     });
     env.restore();
+  });
+});
+
+describe('getProvider direct BYOK routing', () => {
+  afterEach(() => {
+    jest.mocked(getDirectByokModel).mockReset().mockResolvedValue({ provider: null, model: null });
+    jest.mocked(getBYOKforUser).mockReset();
+  });
+
+  test('removes the OpenRouter provider config before the provider transform runs', async () => {
+    const directByokTransform = jest.fn((context: TransformRequestContext) => {
+      expect(context.request.body.provider).toBeUndefined();
+    });
+    jest.mocked(getDirectByokModel).mockResolvedValue({
+      provider: {
+        id: 'nvidia-byok',
+        base_url: 'https://direct-byok.example/v1',
+        base_url_overrides: {},
+        supported_chat_apis: ['chat_completions', 'responses', 'messages'],
+        default_ai_sdk_provider: 'openai-compatible',
+        transformRequest: directByokTransform,
+        models: async () => [],
+      },
+      model: {
+        id: 'upstream-model',
+        name: 'Upstream Model',
+        context_length: 1000,
+        max_completion_tokens: 1000,
+      },
+    });
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([{ decryptedAPIKey: 'user-direct-key', providerId: 'nvidia-byok' }]);
+
+    const result = await getProvider(providerInput('nvidia-byok/upstream-model'));
+    if (result.kind !== 'provider') throw new Error('expected provider result');
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'nvidia-byok/upstream-model',
+        messages: [],
+        provider: { only: ['openai'], data_collection: 'deny' },
+      },
+    };
+    await result.provider.transformRequest({
+      provider: result.provider,
+      model: 'nvidia-byok/upstream-model',
+      request,
+      originalHeaders: getFraudDetectionHeaders(new Headers()),
+      extraHeaders: {},
+      userByok: result.userByok,
+      kilo_user_id: user.id,
+      organization_id: null,
+      session_id: null,
+    });
+
+    expect(result.provider.id).toBe('direct-byok');
+    expect(directByokTransform).toHaveBeenCalledTimes(1);
+    expect(request.body).not.toHaveProperty('provider');
+    expect(request.body.model).toBe('upstream-model');
   });
 });

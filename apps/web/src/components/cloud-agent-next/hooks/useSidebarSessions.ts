@@ -7,7 +7,13 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryFunctionContext,
+} from '@tanstack/react-query';
 import { TRPCClientError } from '@trpc/client';
 import pLimit from 'p-limit';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -840,7 +846,7 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
           ...queryOptions,
           queryFn:
             typeof queryFn === 'function'
-              ? context =>
+              ? (context: QueryFunctionContext) =>
                   limitFolderQueries(() => {
                     context.signal.throwIfAborted();
                     return queryFn({ ...context, queryKey: queryOptions.queryKey });

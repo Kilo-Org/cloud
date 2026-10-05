@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { security_advisor_scans } from '@kilocode/db/schema';
 import { and, count, eq, gte } from 'drizzle-orm';
 import { RATE_LIMIT_PER_DAY } from './schemas';

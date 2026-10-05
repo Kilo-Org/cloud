@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export const OWNED_BY_USER_DELETE_PAGE_SIZE = 200;
 

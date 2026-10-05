@@ -4,7 +4,7 @@ import {
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
   OrganizationGroupPolicyTypeSchema,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -21,16 +21,16 @@ import {
   setOrganizationMemberGroups,
   updateOrganizationGroupMetadata,
   updateOrganizationGroupDetails,
-} from '@/lib/organizations/organization-groups';
-import { createTRPCRouter } from '@/lib/trpc/init';
+} from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
   organizationBillingProcedure,
   organizationMemberProcedure,
   organizationAdminMutationProcedure,
-} from '@/routers/organizations/utils';
-import { getModelAccessPolicyEditorData } from '@/lib/organizations/group-policies/model-access/model-access.server';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { getModelAccessPolicyEditorData } from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';
 
 const GroupIdInputSchema = OrganizationIdInputSchema.extend({ groupId: z.uuid() }).strict();
 

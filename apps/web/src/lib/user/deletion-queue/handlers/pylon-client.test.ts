@@ -1,5 +1,5 @@
 import { UserDeletionStepKey } from '@kilocode/db/schema-types';
-import { USER_DELETION_PYLON_API_BASE } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_PYLON_API_BASE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { pylonHost, pylonRequest } from '@/lib/user/deletion-queue/handlers/pylon-client';
 

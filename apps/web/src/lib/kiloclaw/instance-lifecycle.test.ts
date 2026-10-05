@@ -1,4 +1,4 @@
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(),
     update: jest.fn(),
@@ -10,7 +10,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => ({
   KiloClawInternalClient: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   autoResumeIfSuspended,

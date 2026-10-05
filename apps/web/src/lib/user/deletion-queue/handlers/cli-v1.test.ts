@@ -10,11 +10,11 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { deleteBlobs } from '@/lib/r2/cli-sessions';
 import { handleCliV1Blobs } from '@/lib/user/deletion-queue/handlers/cli-v1';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@/lib/r2/cli-sessions', () => ({
   deleteBlobs: jest.fn(async () => undefined),

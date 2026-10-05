@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   feature,
   mode,
@@ -11,20 +11,20 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
+import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import {
   mutateOrganizationUsage,
   updateOrganizationUserLimit,
-} from '@/lib/organizations/organization-usage';
-import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
-import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
+import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { GPT_SOL_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { GLM_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
+import { KIMI_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import { demoOrganizationSettings, SALES_DEMO_REMAINING_MICRODOLLARS } from './sales-demo-settings';
-import type { FEATURE_VALUES } from '@/lib/feature-detection';
+import type { FEATURE_VALUES } from '@kilocode/web-shared/lib/feature-detection';
 
 // Stable per-1K-token rates (microdollars) for the current paid models. Rates
 // are illustrative only; the seed step needs determinism, not exact billing.

@@ -8,7 +8,7 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import { createDeletionInProgressBlockedReason } from '@kilocode/db/user-soft-delete';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export async function disableUserAccessForDeletion(
   tx: DrizzleTransaction,

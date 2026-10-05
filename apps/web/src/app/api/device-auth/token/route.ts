@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { consumeDeviceAuthByDeviceCode } from '@/lib/device-auth/device-auth';
 import * as z from 'zod';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const TokenBodySchema = z.object({
   deviceCode: z.string().min(1),

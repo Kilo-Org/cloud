@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { CodeReviewPayload } from '../triggers/prepare-review-payload';
-import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@/lib/config.server';
+import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@kilocode/web-shared/lib/config.server';
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import * as z from 'zod';
 

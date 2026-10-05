@@ -23,16 +23,16 @@
  * one for legacy deny-list mode orgs) so the synthetic diff is relevant.
  */
 import { eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organization_audit_logs, organizations } from '@kilocode/db/schema';
-import type { NormalizedOpenRouterResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { computeSnapshotDiff } from '@/lib/ai-gateway/providers/openrouter/snapshot-diff';
 import {
   buildAutoChangeMessage,
   computeRelevantChangesForOrg,
   relevantChangesIsEmpty,
 } from '@/lib/organizations/auto-model-change-log';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
 type Scenario = 'added' | 'removed' | 'mixed';
 

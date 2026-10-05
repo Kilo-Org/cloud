@@ -3,7 +3,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { GoogleAuth } from 'google-auth-library';
 import type { JWTInput } from 'google-auth-library';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 export const GOOGLE_PLAY_PACKAGE_NAME = 'com.kilocode.kiloapp';
 

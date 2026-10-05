@@ -69,7 +69,7 @@ import {
   getCodingPlanBillingDate,
   getCodingPlanDisplayStatus,
 } from '@/components/subscriptions/helpers';
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { useTRPC } from '@/lib/trpc/utils';
 

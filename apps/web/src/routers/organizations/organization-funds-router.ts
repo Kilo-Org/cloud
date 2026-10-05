@@ -1,14 +1,14 @@
 import { credit_transactions, organizations } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
-} from '@/routers/organizations/utils';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { TRPCError } from '@trpc/server';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';

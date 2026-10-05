@@ -1,25 +1,31 @@
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   buildAutoModelCatalogEntry,
   getEnhancedOpenRouterModels,
-} from '@/lib/ai-gateway/providers/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
   getEffectiveModelDecision,
   evaluateEffectiveModelAccessPolicy,
-} from '@/lib/organizations/effective-model-access.server';
-import { listAvailableCustomLlms } from '@/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@/lib/ai-gateway/providers/direct-byok';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import { isOrganizationAutoEnabled } from '@/lib/organizations/organization-auto-model';
-import { addUserByokAvailability, getOrganizationByokProviderIds } from '@/lib/ai-gateway/byok';
-import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
-import { tagOpenAiChatGptByokModels } from '@/lib/ai-gateway/openai-chatgpt/routing';
-import { readDb } from '@/lib/drizzle';
-import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
+import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
+import {
+  addUserByokAvailability,
+  getOrganizationByokProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getEnkryptBenchmarks,
+  publishEnkryptModels,
+} from '@kilocode/web-shared/lib/model-stats/enkrypt';
 import {
   getOrganizationGroupPolicyContext,
   type OrganizationPolicySubject,
-} from '@/lib/organizations/organization-group-policy-context.server';
+} from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 
 export async function getAvailableModelsForOrganization(
   organizationId: string,

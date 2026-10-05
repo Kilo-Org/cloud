@@ -1,4 +1,4 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { getDatabaseClientConfig } from '@kilocode/db';
 import { pg } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -9,7 +9,7 @@ import { z } from 'zod';
  * Client for the data export database: a separate, read-only Postgres instance
  * loaded out of band to back the user data export feature.
  *
- * Three things make this deliberately different from `@/lib/drizzle`:
+ * Three things make this deliberately different from `@kilocode/web-shared/lib/drizzle`:
  *
  * 1. It is lazy. The primary pool is created at import time because the app
  *    cannot serve a single request without it. This database is optional, so

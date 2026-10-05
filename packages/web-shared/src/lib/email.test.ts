@@ -3,7 +3,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('@/lib/email-mailgun', () => ({
+jest.mock('@kilocode/web-shared/lib/email-mailgun', () => ({
   getEmailVerificationRecipient: jest.fn(() => null),
   sendViaMailgun: jest.fn().mockResolvedValue({}),
 }));
@@ -15,11 +15,11 @@ import {
   sendAccountDeletionCompletedEmail,
   sendSpendAlertEmail,
   subjects,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import { captureException } from '@sentry/nextjs';
-import { sendViaMailgun } from '@/lib/email-mailgun';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
+import { sendViaMailgun } from '@kilocode/web-shared/lib/email-mailgun';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 describe('email rendering helpers', () => {
   it('escapes HTML while neutralizing URL autolinking', () => {

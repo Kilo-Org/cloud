@@ -33,9 +33,9 @@ import { useKiloPassChurnkeyCancelFlow } from '@/components/profile/kilo-pass/us
 import type { KiloPassSubscription } from '@/components/profile/kilo-pass/kiloPassSubscription';
 import { KiloPassSubscriptionSettingsModal } from '@/components/profile/kilo-pass/KiloPassSubscriptionSettingsModal';
 import { KiloPassBonusRampDialog } from '@/components/profile/kilo-pass/KiloPassBonusRampDialog';
-import { computeMonthlyCadenceBonusPercent } from '@/lib/kilo-pass/bonus';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
-import { KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT } from '@/lib/kilo-pass/constants';
+import { computeMonthlyCadenceBonusPercent } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   computeUsageProgressModel,
   computeRenewInfoRowModel,

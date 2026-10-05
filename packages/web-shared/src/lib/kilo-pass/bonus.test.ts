@@ -1,4 +1,4 @@
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   computeMonthlyCadenceBonusPercent,
   isKiloPassSelectionEligibleForKiloclawCommitUpsell,

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { repairExpiredOrganizationPassBonuses } from './bonus-repair';
 
 export async function runOrganizationPassBonusRepairCron(

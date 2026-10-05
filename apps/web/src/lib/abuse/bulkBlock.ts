@@ -1,7 +1,7 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
-import { successResult, type CustomResult } from '@/lib/maybe-result';
+import { successResult, type CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 import { revokeGatewayGrantsForBlockedUsers } from '@/lib/mcp-gateway/blocking-service';
 
 export type BulkBlockResponse = CustomResult<

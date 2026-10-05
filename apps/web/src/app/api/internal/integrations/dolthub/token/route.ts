@@ -20,7 +20,7 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import * as dolthubService from '@/lib/integrations/dolthub-service';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 

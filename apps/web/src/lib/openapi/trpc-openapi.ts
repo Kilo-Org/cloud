@@ -3,7 +3,10 @@ import {
   publicTrpcOpenApiProcedures,
   type TrpcOpenApiProcedure,
 } from '@/lib/openapi/trpc-registry';
-import { TrpcErrorResponseSchema, trpcSuccessResponseJsonSchema } from '@/lib/trpc/transport';
+import {
+  TrpcErrorResponseSchema,
+  trpcSuccessResponseJsonSchema,
+} from '@kilocode/web-shared/lib/trpc/transport';
 
 type JsonSchema = Record<string, unknown>;
 

@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createMagicLinkToken } from '@/lib/auth/magic-link-tokens';
-import { sendMagicLinkEmail } from '@/lib/email';
+import { createMagicLinkToken } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { sendMagicLinkEmail } from '@kilocode/web-shared/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';

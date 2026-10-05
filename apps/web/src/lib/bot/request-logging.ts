@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { after } from 'next/server';

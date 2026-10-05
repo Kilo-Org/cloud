@@ -2,8 +2,8 @@
 import 'server-only';
 
 import { credit_transactions } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { client } from '@/lib/stripe-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { captureMessage } from '@sentry/nextjs';
 import { inArray } from 'drizzle-orm';
 import type Stripe from 'stripe';

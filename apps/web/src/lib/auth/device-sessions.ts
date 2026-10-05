@@ -1,9 +1,9 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt } from 'drizzle-orm';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
 

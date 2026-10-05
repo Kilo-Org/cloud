@@ -2,9 +2,9 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { sql } from 'drizzle-orm';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
-import { sendUserDataExportReadyEmail } from '@/lib/email';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sendUserDataExportReadyEmail } from '@kilocode/web-shared/lib/email';
 import { markDelivery, markRetryableDelivery } from './delivery-state';
 
 const BodySchema = z.object({ exportId: z.string().uuid() }).strict();

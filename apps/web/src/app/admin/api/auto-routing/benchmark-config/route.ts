@@ -4,12 +4,12 @@ import { NextResponse } from 'next/server';
 import {
   getBenchmarkConfig,
   updateBenchmarkConfig,
-} from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import {
   gatewayChatApisForModel,
   modelServesAllGatewayChatApis,
 } from '@/lib/ai-gateway/model-api-kinds';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET() {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });

@@ -4,7 +4,7 @@ import { Octokit } from '@octokit/rest';
 import { captureException } from '@sentry/nextjs';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 import { getGitHubAppCredentials, type GitHubAppType } from './app-selector';
 import { disconnectStoredGitHubUserAuthorization } from './user-authorization-client';

@@ -14,7 +14,7 @@ import type {
 } from '@kilocode/db/schema-types';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { CodeReviewAnalyticsManifestParseResult } from './contracts';
 import { getReviewAnalyticsEnabledFromConfig } from './settings';
 import type { ReviewAnalyticsOwner, ReviewAnalyticsPlatform } from './settings';

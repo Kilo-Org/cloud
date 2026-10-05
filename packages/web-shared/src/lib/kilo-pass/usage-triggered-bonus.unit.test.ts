@@ -1,16 +1,16 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
+import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   KiloPassPaymentProvider,
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   computeUsageTriggeredMonthlyBonusDecision,
   computeUsageTriggeredYearlyIssueMonth,
-} from '@/lib/kilo-pass/usage-triggered-bonus';
-import { getKiloPassWelcomePromoPolicy } from '@/lib/kilo-pass/welcome-promo-context';
+} from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { getKiloPassWelcomePromoPolicy } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
 
 describe('usage-triggered-bonus (unit)', () => {
   describe('computeUsageTriggeredMonthlyBonusDecision', () => {

@@ -1,4 +1,4 @@
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 const unavailableModelIds: ReadonlySet<string> = new Set([
   'google/gemma-4-26b-a4b-it:free', // usable through kilo-auto

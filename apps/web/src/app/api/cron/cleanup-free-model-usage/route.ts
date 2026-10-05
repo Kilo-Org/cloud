@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { asc, lt } from 'drizzle-orm';
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 const RETENTION_DAYS = 7;
 const BATCH_SIZE = 50_000;

@@ -1,8 +1,8 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { DeployPageClient } from './DeployPageClient';
 import { notFound } from 'next/navigation';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 
 export default async function OrganizationDeployPage({
   params,

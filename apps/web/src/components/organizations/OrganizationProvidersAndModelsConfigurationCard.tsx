@@ -13,7 +13,7 @@ import { AvailableModelsDialog } from './providers-and-models/AvailableModelsDia
 import { useOrganizationConfiguration } from './providers-and-models/useOrganizationConfiguration';
 import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
 import type { ProviderSelection } from '@/components/models/util';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 type OrganizationProvidersAndModelsConfigurationCardProps = {
   organizationId: string;

@@ -1,13 +1,13 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
-import { toMicrodollars } from '@/lib/microdollars';
-import { errorExceptInTest } from '@/lib/utils.server';
-import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import type {
   NotYetCostedUsageStats,
   VercelProviderAttempt,
   VercelProviderMetaData,
-} from '@/lib/ai-gateway/processUsage.types';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
 type OpenRouterCostFields = {
   cost?: number;

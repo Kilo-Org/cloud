@@ -2,24 +2,24 @@ import 'server-only';
 
 import { kilo_pass_audit_log, kilo_pass_subscriptions } from '@kilocode/db/schema';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 
 import { KiloPassError } from '@/lib/kilo-pass/errors';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import { openPauseEvent, closePauseEvent } from '@/lib/kilo-pass/pause-events';
-import { getKiloPassSubscriptionMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
-import { getStripeEndedAtIso } from '@/lib/kilo-pass/stripe-handlers-utils';
-import { client as stripe } from '@/lib/stripe-client';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { openPauseEvent, closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
+import { getKiloPassSubscriptionMetadata } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
+import { getStripeEndedAtIso } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import type Stripe from 'stripe';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 function isStripeResourceMissing(error: unknown): boolean {
   return (

@@ -20,7 +20,7 @@ import {
   type ConnectionState,
 } from '@/lib/cloud-agent-next/websocket-manager';
 import type { CloudAgentEvent, StreamError } from '@/lib/cloud-agent-next/event-types';
-import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
+import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { isInFlightReviewStatus } from '@kilocode/app-shared/code-review';
 import { getCodeReviewDisplayBehavior } from './code-review-stream-behavior';
 import { fetchStreamTicket } from './fetch-stream-ticket';

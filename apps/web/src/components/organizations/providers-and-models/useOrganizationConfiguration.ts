@@ -6,7 +6,7 @@ import {
   useOpenRouterModelsAndProviders,
   useOpenRouterProviders,
 } from '@/lib/ai-gateway/hooks';
-import type { OpenRouterProvider } from '@/lib/organizations/organization-types';
+import type { OpenRouterProvider } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 export type ConfigurationData = {
   allModelsAllowed: boolean;

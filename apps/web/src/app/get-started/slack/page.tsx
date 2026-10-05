@@ -1,9 +1,9 @@
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { redirect } from 'next/navigation';
 import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
-import { allow_fake_login } from '@/lib/constants';
+import { allow_fake_login } from '@kilocode/web-shared/lib/constants';
 import { SlackGetStartedFlow } from './_components/SlackGetStartedFlow';
 
 export default async function GetStartedSlackPage({

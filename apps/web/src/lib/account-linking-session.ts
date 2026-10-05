@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import jwt from 'jsonwebtoken';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 const LINKING_COOKIE_NAME = 'account-linking-session';
 const LINKING_COOKIE_MAX_AGE = 60 * 15; // 15 minutes

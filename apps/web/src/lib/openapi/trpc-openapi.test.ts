@@ -9,7 +9,7 @@ import {
   UpstreamApiError,
   trpcErrorFormatter,
   trpcSuccessResponseSchema,
-} from '@/lib/trpc/transport';
+} from '@kilocode/web-shared/lib/trpc/transport';
 
 const t = initTRPC.create({ errorFormatter: trpcErrorFormatter });
 

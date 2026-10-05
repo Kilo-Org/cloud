@@ -2,7 +2,7 @@ import React from 'react';
 import { notFound } from 'next/navigation';
 import { GitBranch } from 'lucide-react';
 import { AnimatedLogo } from '@/components/AnimatedLogo';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   fetchSharedSessionMetadata,
   fetchSharedSessionSnapshot,

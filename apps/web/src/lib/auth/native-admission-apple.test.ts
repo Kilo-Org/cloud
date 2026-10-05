@@ -23,7 +23,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   APPLE_TEAM_ID: 'WRPHYY66V6',
   APPLE_APP_BUNDLE_ID: 'com.reelreel.app.dev',
 }));

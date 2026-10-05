@@ -2,12 +2,12 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import { ai_gateway_sync_providers_state } from '@kilocode/db/schema';
-import { APP_URL } from '@/lib/constants';
-import { db } from '@/lib/drizzle';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
 import { eq } from 'drizzle-orm';
 
 export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;

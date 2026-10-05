@@ -15,7 +15,7 @@ import {
   type UserDeletionManualEvidence,
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { disableUserAccessForDeletion } from '@/lib/user/deletion-queue/deletion-access';
 import { catalogEntryFor, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
@@ -28,7 +28,7 @@ import {
   USER_DELETION_RATE_LIMIT_ATTENTION_MS,
   USER_DELETION_RETRY_BASE_MS,
   USER_DELETION_RETRY_CAP_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   writeDeletionActivity,
   writeDeletionAudit,

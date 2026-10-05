@@ -1,10 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getOpenRouterModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { handleModelEndpointsRequest } from './model-endpoints';
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
 }));
 

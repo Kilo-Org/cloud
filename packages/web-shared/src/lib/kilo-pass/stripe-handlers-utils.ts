@@ -1,5 +1,5 @@
-import { computeIssueMonth } from '@/lib/kilo-pass/issuance';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { computeIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { captureException } from '@sentry/nextjs';
 import type Stripe from 'stripe';
 

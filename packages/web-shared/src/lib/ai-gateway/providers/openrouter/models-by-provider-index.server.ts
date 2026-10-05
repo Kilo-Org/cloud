@@ -1,23 +1,23 @@
 import { modelsByProvider } from '@kilocode/db/schema';
 import type { StoredModel } from '@kilocode/db/schema-types';
-import { readDb } from '@/lib/drizzle';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   getOpenRouterModelsMetadataFromDatabase,
   getVercelModelsMetadataFromDatabase,
   type StoredModelMap,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   normalizeInferenceProviderId,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { modelTrains } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { modelTrains } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import type {
   NormalizedOpenRouterResponse,
   OpenRouterModel,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { desc } from 'drizzle-orm';
 
 export type ModelIdToProviderSlugsIndex = ReadonlyMap<string, ReadonlySet<string>>;

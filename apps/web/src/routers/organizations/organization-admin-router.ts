@@ -1,6 +1,6 @@
 import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_memberships,
@@ -32,8 +32,8 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
-import { toMicrodollars } from '@/lib/microdollars';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { isValidUUID } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
@@ -41,16 +41,16 @@ import {
   getOrganizationById,
   addUserToOrganization,
   markOrganizationAsDeleted,
-} from '@/lib/organizations/organizations';
-import { OrganizationRoleSchema } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { TRPCError } from '@trpc/server';
-import { successResult } from '@/lib/maybe-result';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { getAdminCreditTransactionsForOrganization } from '@kilocode/web-shared/lib/creditTransactions';
 import {
   assertOrganizationHierarchyChangeAllowed,
   KILO_PASS_ORG_HIERARCHY_ALLOCATION_ERROR,
@@ -61,7 +61,7 @@ import {
   computeNextExpirationAmount,
   processOrganizationExpirations,
   closeOutExpiringOrganizationCredits,
-} from '@/lib/creditExpiration';
+} from '@kilocode/web-shared/lib/creditExpiration';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
@@ -78,8 +78,8 @@ import {
   ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MAX_LENGTH,
   ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH,
   setOrganizationServiceFeeExemption,
-} from '@/lib/service-fees/organization-exemptions';
-import { createDefaultOrganizationServiceFeeExemptionStore } from '@/lib/service-fees/drizzle-store';
+} from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import { createDefaultOrganizationServiceFeeExemptionStore } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),

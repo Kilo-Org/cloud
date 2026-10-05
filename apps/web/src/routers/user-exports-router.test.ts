@@ -6,7 +6,7 @@ jest.mock('@/lib/user-data-export-ui', () => ({
 }));
 import { eq, sql } from 'drizzle-orm';
 import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   magic_link_tokens,
   organization_memberships,
@@ -16,13 +16,13 @@ import {
 } from '@kilocode/db/schema';
 import { createCallerForUser } from '@/routers/test-utils';
 import { __test__, userExportsRouter } from '@/routers/user-exports-router';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
-// Partial mocks: `@/lib/email` also exports the template registry that sibling
+// Partial mocks: `@kilocode/web-shared/lib/email` also exports the template registry that sibling
 // routers read at import time, so the real module must stay intact.
-jest.mock('@/lib/email', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/email', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@kilocode/web-shared/lib/email');
   return { ...actual, sendDataExportDownloadCodeEmail: jest.fn() };
 });
 // The firewall check needs a request scope, which the tRPC caller does not have.
@@ -41,7 +41,7 @@ jest.mock('@/lib/user-data-export-worker-client', () => {
 });
 
 import { isDataExportDownloadCodeRateLimited } from '@/lib/auth/data-export-download-code-rate-limit';
-import { sendDataExportDownloadCodeEmail } from '@/lib/email';
+import { sendDataExportDownloadCodeEmail } from '@kilocode/web-shared/lib/email';
 import { requestUserDataExportDownload } from '@/lib/user-data-export-worker-client';
 
 const mockRateLimited = jest.mocked(isDataExportDownloadCodeRateLimited);

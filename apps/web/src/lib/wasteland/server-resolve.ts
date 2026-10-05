@@ -2,10 +2,13 @@ import 'server-only';
 import type { User } from '@kilocode/db/schema';
 import { createTRPCClient, httpLink } from '@trpc/client';
 import type { WrappedWastelandRouter } from '@/lib/wasteland/types/router';
-import { WASTELAND_URL } from '@/lib/constants';
-import { generateApiToken } from '@/lib/tokens';
-import { getUserOrgMemberships } from '@/lib/organizations/organizations';
-import { recordKiloAdminElevationForRequest, serviceTarget } from '@/lib/admin/admin-access-log';
+import { WASTELAND_URL } from '@kilocode/web-shared/lib/constants';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { getUserOrgMemberships } from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  recordKiloAdminElevationForRequest,
+  serviceTarget,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
 
 /**

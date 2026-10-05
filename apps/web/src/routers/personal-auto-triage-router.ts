@@ -1,4 +1,4 @@
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import {
   getAgentConfigForOwner,

@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { UpstreamApiError } from '@/lib/trpc/init';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
 import { KiloClawApiError } from './kiloclaw-internal-client';
 
 type ProvisionErrorPayload = { message?: string; code?: string };

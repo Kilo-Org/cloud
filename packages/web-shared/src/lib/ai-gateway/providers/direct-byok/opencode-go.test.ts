@@ -1,5 +1,5 @@
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { applyTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import type { GatewayRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';

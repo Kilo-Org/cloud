@@ -1,12 +1,12 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
-import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   activeSessionSchema,
   listActiveSessions,

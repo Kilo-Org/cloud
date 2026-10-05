@@ -1282,4 +1282,87 @@ describe('createPreparationManager', () => {
       properties: { command: 1, exitCode: 0 },
     });
   });
+
+  describe('managed GitHub invocation options', () => {
+    const url = 'https://github.com/acme/repo.git';
+    const token = `kcp1.${Buffer.from('synthetic-sandbox').toString('base64url')}.github.${'ab12'.repeat(16)}`;
+    const config = [
+      '-c',
+      'http.https://github.com/.proactiveAuth=basic',
+      '-c',
+      'http.https://github.com/.followRedirects=false',
+    ] as const;
+
+    it.each([url, 'https://github.com:443/acme/repo.git'])(
+      'keeps both options on every clone retry for %s',
+      async cloneUrl => {
+        const harness = createHarness();
+        let attempts = 0;
+        harness.setGit(args =>
+          args.includes('clone') && ++attempts < 3
+            ? result(128, 'fatal: unable to access: Connection reset by peer')
+            : result(0)
+        );
+        const spec = routeSpec({
+          git: { url: cloneUrl, token, platform: 'github' },
+        });
+        await harness.manager.prepare(spec);
+        const clones = harness.gitCalls.filter(args => args.includes('clone'));
+        expect(clones).toHaveLength(3);
+        for (const args of clones) expect(args.slice(0, 5)).toEqual([...config, 'clone']);
+        expect(harness.gitCalls.filter(args => args[0] === '-c')).toEqual(clones);
+        expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+      }
+    );
+
+    it('scopes both options to cached review-ref fetch, not checkout or credential refresh', async () => {
+      const harness = createHarness(FAST_TIMERS, { hasGit: true });
+      const spec = routeSpec({
+        git: { url, token, platform: 'github' },
+        branch: 'refs/pull/12/head',
+      });
+      await harness.manager.prepare(spec);
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token, platform: 'github' },
+        kilo: { token: 'kilo-token-2' },
+      });
+      const fetch = harness.gitCalls.find(args => args.includes('fetch'));
+      expect(fetch?.slice(0, 5)).toEqual([...config, 'fetch']);
+      expect(fetch).toContain(spec.branch);
+      expect(harness.gitCalls.some(args => args.includes('clone'))).toBe(false);
+      expect(harness.gitCalls.some(args => args[0] === 'checkout')).toBe(true);
+      expect(harness.gitCalls.some(args => args[0] === 'remote')).toBe(true);
+      for (const args of harness.gitCalls.filter(args => args !== fetch)) {
+        expect(args).not.toContain(config[1]);
+        expect(args).not.toContain(config[3]);
+      }
+      expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+    });
+
+    it.each([
+      ['direct token', url, 'ghp-direct', 'github'],
+      ['missing token', url, undefined, 'github'],
+      ['wrong purpose', url, token.replace('.github.', '.kilo.'), 'github'],
+      ['wrong platform', url, token, 'gitlab'],
+      ['missing platform', url, token, undefined],
+      ['HTTP', 'http://github.com/acme/repo.git', token, 'github'],
+      ['other hostname', 'https://github.com.evil.test/acme/repo.git', token, 'github'],
+      ['alternate port', 'https://github.com:8443/acme/repo.git', token, 'github'],
+    ] as const)(
+      'omits both options on clone and fetch for %s',
+      async (_name, url, token, platform) => {
+        const harness = createHarness();
+        await harness.manager.prepare(
+          routeSpec({ git: { url, token, platform }, branch: 'refs/pull/12/head' })
+        );
+        expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(true);
+        expect(harness.gitCalls.some(args => args[0] === 'fetch')).toBe(true);
+        for (const args of harness.gitCalls) {
+          expect(args).not.toContain(config[1]);
+          expect(args).not.toContain(config[3]);
+        }
+      }
+    );
+  });
 });

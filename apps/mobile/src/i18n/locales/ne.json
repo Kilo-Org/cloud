@@ -2047,6 +2047,7 @@
       "idCopied": "सत्रको ID प्रतिलिपि गरियो",
       "couldNotCopyId": "सत्रको ID प्रतिलिपि गर्न सकिएन।",
       "untitled": "शीर्षकविहीन सत्र",
+      "actions": "सत्रका कार्यहरू",
       "sessionDeleted": "सत्र मेटियो",
       "needsInput": "जवाफ चाहिन्छ",
       "fromPlatform": "{{platform}} बाट",
@@ -2099,6 +2100,7 @@
       "readOnly": "यो सत्र पढ्न मात्र मिल्छ।",
       "continueInNewSession": "नयाँ सत्रमा जारी राख्नुहोस्",
       "emptyDescription": "सुरु गर्न तल सन्देश पठाउनुहोस्।",
+      "emptyTranscriptDescription": "यो सत्रमा अहिलेसम्म कुनै सन्देश छैन।",
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देश छैन",
       "renameAccessibility": "सत्रको नाम बदल्नुहोस्: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "पठाउनुअघि एउटा मोडेल चयन गर्नुहोस्।",
       "preparingPlaceholder": "वातावरण तयार गर्दै...",
       "finalizingPlaceholder": "समाप्त गर्दै...",
+      "sessionLoadFailed": "सत्र लोड गर्न सकिएन। पहिले फेरि प्रयास गर्नुहोस्।",
       "cannotReceiveFiles": "यो सत्रले फाइलहरू लिन सक्दैन। आफ्नो सन्देश पठाउन संलग्न फाइलहरू हटाउनुहोस्।",
       "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न ‘पठाउनुहोस्’ मा ट्याप गर्नुहोस्।",
       "discardAttachmentsMessage": "कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
@@ -2634,6 +2637,7 @@
       "provider": "प्रदायक",
       "totalCost": "कुल लागत",
       "usageReflectsLatest": "यो प्रयोग विवरण सहायकले पूरा गरेको पछिल्लो उत्तरमा आधारित छ।",
+      "usageUnavailable": "सन्दर्भ प्रयोग अनुपलब्ध छ",
       "tokenUsage": "टोकन प्रयोग",
       "cacheRate": "क्यास दर",
       "modelsCount": "मोडेलहरू ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "लोड गर्नुहोस्",
       "loadWithHost": "{{host}} लोड गर्नुहोस्",
-      "httpsOnly": "HTTPS का तस्बिरहरू मात्र लोड गर्न मिल्छ।"
+      "httpsOnly": "HTTPS का तस्बिरहरू मात्र लोड गर्न मिल्छ।",
+      "trustTitle": "{{host}} बाट तस्बिर लोड गर्ने?",
+      "trustMessage": "{{host}} लाई विश्वास गरेपछि यसका तस्बिरहरू हरेक पटक नसोधी लोड हुन्छन्। पछि विश्वसनीय होस्टहरूमा गएर यो हटाउन सक्नुहुन्छ।",
+      "loadOnce": "एक पटक लोड गर्नुहोस्"
     },
     "markdownLink": {
       "invalidLink": "यो लिङ्क खोल्न मिल्दैन।",
@@ -3181,8 +3188,12 @@
     "subtitle": "अनुमति नसोधी खोल्न मिल्ने विश्वसनीय होस्टहरू",
     "emptyTitle": "कुनै विश्वसनीय होस्ट छैन",
     "emptyDescription": "लिङ्कको होस्टलाई विश्वसनीय मानेपछि त्यसका लिङ्कहरू फेरि अनुमति नसोधी खुल्छन्।",
+    "imagesSectionTitle": "विश्वसनीय तस्बिर होस्टहरू",
+    "imagesSectionDescription": "यी होस्टका तस्बिरहरू फेरि नसोधी लोड हुन्छन्।",
+    "imagesSectionEmpty": "कुनै विश्वसनीय तस्बिर होस्ट छैन",
     "revoke": "{{host}} को विश्वसनीयता हटाउनुहोस्",
     "revokeMessage": "यो होस्टका लिङ्कहरूले फेरि पुष्टि माग्नेछन्।",
+    "revokeImageMessage": "यो होस्टका तस्बिरहरूले फेरि पुष्टि माग्नेछन्।",
     "backToPreferences": "प्राथमिकताहरूमा फर्कनुहोस्"
   },
   "quickChat": {

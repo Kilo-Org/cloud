@@ -1500,6 +1500,7 @@
       "readOnly": "Cette session est en lecture seule.",
       "continueInNewSession": "Continuer dans une nouvelle session",
       "emptyDescription": "Envoyez un message ci-dessous pour commencer.",
+      "emptyTranscriptDescription": "Cette session ne contient encore aucun message.",
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
       "renameAccessibility": "Renommer la session : {{title}}",
@@ -1975,6 +1976,7 @@
       "selectModelBeforeSending": "Sélectionnez un modèle avant d'envoyer le message.",
       "preparingPlaceholder": "Configuration de l'environnement…",
       "finalizingPlaceholder": "Finalisation…",
+      "sessionLoadFailed": "La session n'a pas pu être chargée. Réessayez d'abord.",
       "cannotReceiveFiles": "Cette session ne peut pas recevoir de fichiers. Retirez les pièces jointes pour envoyer votre message.",
       "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer.",
       "discardAttachmentsMessage": "Les fichiers transférés qui ne sont liés à aucun message envoyé seront supprimés.",
@@ -2045,6 +2047,7 @@
       "provider": "Fournisseur",
       "totalCost": "Coût total",
       "usageReflectsLatest": "L'utilisation correspond à la dernière réponse complète de l'assistant.",
+      "usageUnavailable": "Utilisation du contexte indisponible",
       "tokenUsage": "Utilisation des jetons",
       "cacheRate": "Taux d'utilisation du cache",
       "modelsCount": "Modèles ({{displayCount}})",
@@ -2081,7 +2084,10 @@
     "markdownImage": {
       "load": "Charger",
       "loadWithHost": "Charger {{host}}",
-      "httpsOnly": "Seules les images accessibles en HTTPS sont autorisées."
+      "httpsOnly": "Seules les images accessibles en HTTPS sont autorisées.",
+      "trustTitle": "Charger l'image depuis {{host}} ?",
+      "trustMessage": "En faisant confiance à {{host}}, ses images se chargent sans demander à chaque fois. Vous pouvez retirer cette confiance plus tard dans Sites de confiance.",
+      "loadOnce": "Charger une fois"
     },
     "markdownLink": {
       "invalidLink": "Ce lien ne peut pas être ouvert.",
@@ -2462,6 +2468,7 @@
       "idCopied": "Identifiant de la session copié",
       "couldNotCopyId": "Impossible de copier l'identifiant de la session.",
       "untitled": "Session sans titre",
+      "actions": "Actions de la session",
       "sessionDeleted": "Session supprimée",
       "needsInput": "intervention requise",
       "fromPlatform": "depuis {{platform}}",
@@ -3224,8 +3231,12 @@
     "subtitle": "Sites autorisés à s'ouvrir sans confirmation",
     "emptyTitle": "Aucun site de confiance",
     "emptyDescription": "Les liens vers les sites de confiance s'ouvrent sans nouvelle demande de confirmation.",
+    "imagesSectionTitle": "Sites d'images de confiance",
+    "imagesSectionDescription": "Les images de ces sites se chargent sans redemander.",
+    "imagesSectionEmpty": "Aucun site d'images de confiance",
     "revoke": "Retirer {{host}} des sites de confiance",
     "revokeMessage": "Les liens vers ce site demanderont à nouveau une confirmation.",
+    "revokeImageMessage": "Les images de ce site demanderont à nouveau une confirmation.",
     "backToPreferences": "Retour aux préférences"
   },
   "quickChat": {

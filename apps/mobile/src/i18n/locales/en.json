@@ -2057,6 +2057,7 @@
       "idCopied": "Session ID copied",
       "couldNotCopyId": "Could not copy session ID",
       "untitled": "Untitled session",
+      "actions": "Session actions",
       "sessionDeleted": "Session deleted",
       "needsInput": "needs input",
       "fromPlatform": "from {{platform}}",
@@ -2107,6 +2108,7 @@
       "readOnly": "This is a read-only session",
       "continueInNewSession": "Continue in a new session",
       "emptyDescription": "Send a message below to get started.",
+      "emptyTranscriptDescription": "This session has no messages yet.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "renameAccessibility": "Rename session: {{title}}",
@@ -2410,7 +2412,10 @@
     "markdownImage": {
       "load": "Load",
       "loadWithHost": "Load {{host}}",
-      "httpsOnly": "HTTPS images only"
+      "httpsOnly": "HTTPS images only",
+      "trustTitle": "Load image from {{host}}?",
+      "trustMessage": "Trusting {{host}} loads its images without asking each time. You can revoke it later under Trusted hosts.",
+      "loadOnce": "Load once"
     },
     "preparation": {
       "exitCode": "Exit code: {{code}}",
@@ -2595,6 +2600,7 @@
       "selectModelBeforeSending": "Select a model before sending",
       "preparingPlaceholder": "Setting up environment...",
       "finalizingPlaceholder": "Wrapping up...",
+      "sessionLoadFailed": "The session could not be loaded. Retry first.",
       "cannotReceiveFiles": "This session can't receive files. Remove the attachments to send your message.",
       "couldNotAttachFiles": "Couldn't attach files. Tap send to try again."
     },
@@ -2665,6 +2671,7 @@
       "provider": "Provider",
       "totalCost": "Total cost",
       "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
+      "usageUnavailable": "Context usage unavailable",
       "tokenUsage": "Token usage",
       "cacheRate": "Cache rate",
       "modelsCount_one": "Model ({{displayCount}})",
@@ -2738,8 +2745,12 @@
     "subtitle": "Hosts you trust to open without asking",
     "emptyTitle": "No trusted hosts",
     "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "imagesSectionTitle": "Trusted image hosts",
+    "imagesSectionDescription": "Images from these hosts load without asking again.",
+    "imagesSectionEmpty": "No trusted image hosts",
     "revoke": "Revoke {{host}}",
     "revokeMessage": "Links to this host will ask for confirmation again.",
+    "revokeImageMessage": "Images from this host will ask for confirmation again.",
     "backToPreferences": "Back to preferences"
   },
   "forceUpdate": {

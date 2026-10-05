@@ -2097,6 +2097,7 @@
       "idCopied": "ID relácie bolo skopírované",
       "couldNotCopyId": "ID relácie sa nepodarilo skopírovať.",
       "untitled": "Relácia bez názvu",
+      "actions": "Akcie s reláciou",
       "sessionDeleted": "Relácia bola odstránená",
       "needsInput": "čaká na odpoveď",
       "fromPlatform": "z {{platform}}",
@@ -2155,6 +2156,7 @@
       "readOnly": "Táto relácia je iba na čítanie.",
       "continueInNewSession": "Pokračovať v novej relácii",
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
+      "emptyTranscriptDescription": "Táto relácia zatiaľ neobsahuje žiadne správy.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
       "renameAccessibility": "Premenovať reláciu: {{title}}",
@@ -2639,6 +2641,7 @@
       "selectModelBeforeSending": "Pred odoslaním vyber model.",
       "preparingPlaceholder": "Pripravuje sa prostredie…",
       "finalizingPlaceholder": "Dokončuje sa…",
+      "sessionLoadFailed": "Reláciu sa nepodarilo načítať. Najprv to skúste znova.",
       "cannotReceiveFiles": "Táto relácia nemôže prijímať súbory. Ak chceš odoslať správu, odstráň prílohy.",
       "couldNotAttachFiles": "Súbory sa nepodarilo priložiť. Klepnutím na Odoslať to skús znova.",
       "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
@@ -2710,6 +2713,7 @@
       "provider": "Poskytovateľ",
       "totalCost": "Celkové náklady",
       "usageReflectsLatest": "Údaje o využití zodpovedajú poslednej dokončenej odpovedi asistenta.",
+      "usageUnavailable": "Využitie kontextu nie je k dispozícii",
       "tokenUsage": "Využitie tokenov",
       "cacheRate": "Podiel využitia vyrovnávacej pamäte",
       "modelsCount": "Modely ({{displayCount}})",
@@ -2748,7 +2752,10 @@
     "markdownImage": {
       "load": "Načítať",
       "loadWithHost": "Načítať {{host}}",
-      "httpsOnly": "Načítať možno iba obrázky cez HTTPS."
+      "httpsOnly": "Načítať možno iba obrázky cez HTTPS.",
+      "trustTitle": "Načítať obrázok z {{host}}?",
+      "trustMessage": "Ak serveru {{host}} dôveruješ, jeho obrázky sa budú načítavať bez každodenného pýtania. Neskôr to môžeš odobrať v Dôveryhodné servery.",
+      "loadOnce": "Načítať raz"
     },
     "markdownLink": {
       "invalidLink": "Tento odkaz sa nedá otvoriť.",
@@ -3267,8 +3274,12 @@
     "subtitle": "Servery, ktorých odkazy sa otvárajú bez potvrdenia",
     "emptyTitle": "Žiadne dôveryhodné servery",
     "emptyDescription": "Ak označíš server za dôveryhodný, odkazy naň sa budú otvárať bez ďalšieho potvrdenia.",
+    "imagesSectionTitle": "Dôveryhodné servery obrázkov",
+    "imagesSectionDescription": "Obrázky z týchto serverov sa načítavajú bez ďalšieho pýtania.",
+    "imagesSectionEmpty": "Žiadne dôveryhodné servery obrázkov",
     "revoke": "Zrušiť dôveru serveru {{host}}",
     "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
+    "revokeImageMessage": "Obrázky z tohto servera budú opäť vyžadovať potvrdenie.",
     "backToPreferences": "Späť na predvoľby"
   },
   "quickChat": {

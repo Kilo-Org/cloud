@@ -2047,6 +2047,7 @@
       "idCopied": "ID-ja e seancës u kopjua",
       "couldNotCopyId": "Nuk u kopjua ID-ja e seancës.",
       "untitled": "Seancë pa titull",
+      "actions": "Veprimet e seancës",
       "sessionDeleted": "Seanca u fshi",
       "needsInput": "pret përgjigje",
       "fromPlatform": "nga {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Kjo seancë është vetëm për lexim.",
       "continueInNewSession": "Vazhdo në një seancë të re",
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
+      "emptyTranscriptDescription": "Kjo seancë ende nuk ka mesazhe.",
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
       "renameAccessibility": "Riemërto seancën: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "Zgjidh një model para se të dërgosh mesazhin.",
       "preparingPlaceholder": "Duke konfiguruar mjedisin...",
       "finalizingPlaceholder": "Duke përfunduar...",
+      "sessionLoadFailed": "Sesioni nuk mund të ngarkohej. Provo përsëri fillimisht.",
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiq bashkëngjitjet për të dërguar mesazhin tënd.",
       "couldNotAttachFiles": "Nuk u bashkëngjitën skedarët. Prek butonin e dërgimit për të provuar përsëri.",
       "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
@@ -2634,6 +2637,7 @@
       "provider": "Ofruesi",
       "totalCost": "Kostoja totale",
       "usageReflectsLatest": "Përdorimi pasqyron përgjigjen më të fundit të përfunduar të asistentit.",
+      "usageUnavailable": "Përdorimi i kontekstit nuk është i disponueshëm",
       "tokenUsage": "Përdorimi i tokenëve",
       "cacheRate": "Përqindja nga memoria e përkohshme",
       "modelsCount": "Modelet ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "Ngarko",
       "loadWithHost": "Ngarko {{host}}",
-      "httpsOnly": "Lejohen vetëm imazhe me HTTPS."
+      "httpsOnly": "Lejohen vetëm imazhe me HTTPS.",
+      "trustTitle": "Ngarko imazhin nga {{host}}?",
+      "trustMessage": "Kur i beson {{host}}, imazhet e tij ngarkohen pa pyetur çdo herë. Mund t'i hiqni besimin më vonë te Serverët e besuar.",
+      "loadOnce": "Ngarko një herë"
     },
     "markdownLink": {
       "invalidLink": "Kjo lidhje nuk mund të hapet.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Serverët që lejon të hapen pa konfirmim",
     "emptyTitle": "Nuk ka serverë të besuar",
     "emptyDescription": "Kur i beson serverit të një lidhjeje, lidhja hapet pa kërkuar përsëri konfirmim.",
+    "imagesSectionTitle": "Serverët e besuar të imazheve",
+    "imagesSectionDescription": "Imazhet nga këta serverë ngarkohen pa pyetur përsëri.",
+    "imagesSectionEmpty": "Nuk ka serverë të besuar të imazheve",
     "revoke": "Hiq besimin për {{host}}",
     "revokeMessage": "Lidhjet për këtë server do të kërkojnë përsëri konfirmim.",
+    "revokeImageMessage": "Imazhet nga ky server do të kërkojnë përsëri konfirmim.",
     "backToPreferences": "Kthehu te preferencat"
   },
   "quickChat": {

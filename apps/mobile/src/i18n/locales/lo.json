@@ -2047,6 +2047,7 @@
       "idCopied": "ຄັດລອກ ID ເຊດຊັນແລ້ວ",
       "couldNotCopyId": "ບໍ່ສາມາດຄັດລອກ ID ເຊດຊັນໄດ້.",
       "untitled": "ເຊດຊັນບໍ່ມີຊື່",
+      "actions": "ຕົວເລືອກເຊດຊັນ",
       "sessionDeleted": "ລຶບເຊດຊັນແລ້ວ",
       "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
       "fromPlatform": "ຈາກ {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "ເຊດຊັນນີ້ອ່ານໄດ້ຢ່າງດຽວ.",
       "continueInNewSession": "ສືບຕໍ່ໃນເຊດຊັນໃໝ່",
       "emptyDescription": "ສົ່ງຂໍ້ຄວາມຂ້າງລຸ່ມເພື່ອເລີ່ມຕົ້ນ.",
+      "emptyTranscriptDescription": "ເຊດຊັນນີ້ຍັງບໍ່ມີຂໍ້ຄວາມ.",
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "ເລືອກໂມເດວກ່ອນສົ່ງ.",
       "preparingPlaceholder": "ກຳລັງຕັ້ງຄ່າສະພາບແວດລ້ອມ…",
       "finalizingPlaceholder": "ກຳລັງເຮັດຂັ້ນຕອນສຸດທ້າຍ…",
+      "sessionLoadFailed": "ບໍ່ສາມາດໂຫຼດເຊສຊັນໄດ້. ລອງອີກຄັ້ງກ່ອນ.",
       "cannotReceiveFiles": "ເຊດຊັນນີ້ຮັບໄຟລ໌ບໍ່ໄດ້. ເອົາໄຟລ໌ແນບອອກເພື່ອສົ່ງຂໍ້ຄວາມ.",
       "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌ໄດ້. ແຕະປຸ່ມສົ່ງເພື່ອລອງໃໝ່.",
       "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ.",
@@ -2634,6 +2637,7 @@
       "provider": "ຜູ້ໃຫ້ບໍລິການ",
       "totalCost": "ຄ່າໃຊ້ຈ່າຍທັງໝົດ",
       "usageReflectsLatest": "ຂໍ້ມູນການໃຊ້ງານອີງຕາມຄຳຕອບຫຼ້າສຸດທີ່ຜູ້ຊ່ວຍຕອບສຳເລັດແລ້ວ.",
+      "usageUnavailable": "ການນຳໃຊ້ບໍລິບົດບໍ່ສາມາດໃຊ້ໄດ້",
       "tokenUsage": "ການໃຊ້ໂທເຄັນ",
       "cacheRate": "ອັດຕາການໃຊ້ແຄັດ",
       "modelsCount": "ໂມເດວ ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "ໂຫຼດ",
       "loadWithHost": "ໂຫຼດ {{host}}",
-      "httpsOnly": "ຮອງຮັບສະເພາະຮູບພາບຜ່ານ HTTPS ເທົ່ານັ້ນ."
+      "httpsOnly": "ຮອງຮັບສະເພາະຮູບພາບຜ່ານ HTTPS ເທົ່ານັ້ນ.",
+      "trustTitle": "ໂຫຼດຮູບຈາກ {{host}} ຫຼືບໍ່?",
+      "trustMessage": "ການໄວ້ໃຈ {{host}} ຈະໂຫຼດຮູບຂອງມັນໂດຍບໍ່ຖາມທຸກຄັ້ງ. ທ່ານສາມາດຍົກເລີກໄດ້ພາຍຫຼັງໃນໂຮສທີ່ໄວ້ໃຈໄດ້.",
+      "loadOnce": "ໂຫຼດເທື່ອດຽວ"
     },
     "markdownLink": {
       "invalidLink": "ບໍ່ສາມາດເປີດລິ້ງນີ້ໄດ້.",
@@ -3181,8 +3188,12 @@
     "subtitle": "ໂຮສທີ່ທ່ານໄວ້ໃຈໃຫ້ເປີດໂດຍບໍ່ຕ້ອງຖາມກ່ອນ",
     "emptyTitle": "ຍັງບໍ່ມີໂຮສທີ່ໄວ້ໃຈໄດ້",
     "emptyDescription": "ເມື່ອທ່ານເລືອກໄວ້ໃຈໂຮສຂອງລິ້ງ ລິ້ງຈາກໂຮສນັ້ນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
+    "imagesSectionTitle": "ໂຮສຮູບທີ່ໄວ້ໃຈໄດ້",
+    "imagesSectionDescription": "ຮູບຈາກໂຮສເຫຼົ່ານີ້ຈະໂຫຼດໂດຍບໍ່ຖາມອີກ.",
+    "imagesSectionEmpty": "ຍັງບໍ່ມີໂຮສຮູບທີ່ໄວ້ໃຈໄດ້",
     "revoke": "ຍົກເລີກການໄວ້ໃຈ {{host}}",
     "revokeMessage": "ລິ້ງໄປຫາໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
+    "revokeImageMessage": "ຮູບຈາກໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
     "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
   },
   "quickChat": {

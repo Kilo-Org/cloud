@@ -19,9 +19,10 @@ export type AllocationKind = (typeof ALLOCATION_KINDS)[number];
  * are data the table and the timers need, not side flags that re-encode it.
  *
  * `connectionId` is the identity of the socket that most recently completed
- * `hello` for this allocation. Frames and closes are only applied when the
- * socket's attachment carries the same id, so a replaced or rejected socket
- * cannot move a healthy allocation.
+ * `hello` for this allocation, retained across disconnect as the physical
+ * binding. Frames and closes apply only while connected and when the socket's
+ * attachment carries the same id, so a replaced or rejected socket cannot move
+ * a healthy allocation.
  *
  * The provider kind is not here: the persisted provider pin owns it (M1).
  */
@@ -95,7 +96,19 @@ export type AllocationEvent =
       wrapperId: string;
     }
   | { type: 'heartbeat'; at: number; allocationId: string; connectionId: string; active: boolean }
-  | { type: 'socket-closed'; at: number; allocationId: string; connectionId: string }
+  /**
+   * `origin` distinguishes the two producers of an identical close: the wrapper
+   * or its transport closed the socket (`peer`), or the owner closed it after the
+   * heartbeat deadline (`heartbeat_timeout`). Diagnostic-only; the reducer does
+   * not read it.
+   */
+  | {
+      type: 'socket-closed';
+      at: number;
+      allocationId: string;
+      connectionId: string;
+      origin: 'peer' | 'heartbeat_timeout';
+    }
   | { type: 'provider-gone'; at: number }
   /** `reason` is why the caller stops the sandbox; every stop must name one. */
   | { type: 'stop-requested'; at: number; reason: ControlPlaneFailureReason }
@@ -318,7 +331,7 @@ export function reduceAllocation(
       if (!connectionMatches(state, event.allocationId, event.connectionId)) {
         return { state, effects: NO_EFFECTS };
       }
-      return { state: { ...state, kind: 'disconnected', connectionId: null }, effects: NO_EFFECTS };
+      return { state: { ...state, kind: 'disconnected' }, effects: NO_EFFECTS };
     }
 
     case 'provider-gone': {

@@ -661,7 +661,12 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
-      { requestId: 'iad1::iad1::request-id', tier: 'paid', accountId: 'user:user-123' },
+      {
+        requestId: expect.any(String),
+        tier: 'paid',
+        accountId: 'user:user-123',
+        ip: '127.0.0.1',
+      },
       { timeoutMs: 30_000 }
     );
   });
@@ -710,8 +715,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
       { timeoutMs: 30_000 }
     );
-    // Bouncer has no account for an anonymous caller, so no usage event.
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer).toBeUndefined();
+    // Anonymous usage is keyed on the IP with no payer account.
+    const anonymousBouncer = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer;
+    expect(anonymousBouncer?.accountId).toBeNull();
+    expect(anonymousBouncer?.clientIp).toBe('127.0.0.1');
+    expect(anonymousBouncer?.requestId).toEqual(expect.any(String));
   });
 
   it('carries the bouncer usage-event fields into the usage context', async () => {
@@ -737,14 +745,38 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
     expect(usageContext?.bouncer).toEqual({
-      requestId: 'iad1::usage-request-id',
+      requestId: expect.any(String),
       occurredAt: expect.any(Date),
+      accountId: 'user:user-123',
+      clientIp: '127.0.0.1',
       clientAttributed: true,
       requestedLogprobs: true,
       samples: 2,
       promptSimHash: simHash64('explain the failing test'),
     });
   });
+
+  it.each(['not-an-address', 'fe80::1%eth0'])(
+    'still reports usage and decides without an ip when the header is %s',
+    async forwardedFor => {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody(), { 'x-forwarded-for': forwardedFor }) as never
+      );
+
+      // A value bouncer's typia check rejects must not reach it: bouncer rejects the
+      // whole event, which would drop the usage ledger row instead of just the field.
+      expect(response.status).toBe(200);
+      const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+      expect(usageContext?.bouncer?.clientIp).toBeUndefined();
+      expect(mockedDecide).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: 'paid', accountId: 'user:user-123' }),
+        { timeoutMs: 30_000 }
+      );
+      expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();
+    }
+  );
 
   it('sends upstream without waiting for a slow decide and keeps the work alive after response', async () => {
     const pending = Promise.withResolvers<DecideVerdict | null>();

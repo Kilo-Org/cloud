@@ -1534,6 +1534,7 @@
       "idCopied": "Oturum kimliği kopyalandı",
       "couldNotCopyId": "Oturum kimliği kopyalanamadı.",
       "untitled": "Başlıksız oturum",
+      "actions": "Oturum işlemleri",
       "sessionDeleted": "Oturum silindi",
       "needsInput": "yanıt bekliyor",
       "fromPlatform": "{{platform}} üzerinden",
@@ -1586,6 +1587,7 @@
       "readOnly": "Bu oturum salt okunur.",
       "continueInNewSession": "Yeni oturumda devam et",
       "emptyDescription": "Başlamak için aşağıdan bir mesaj gönder.",
+      "emptyTranscriptDescription": "Bu oturumda henüz mesaj yok.",
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
@@ -2052,6 +2054,7 @@
       "selectModelBeforeSending": "Göndermeden önce bir model seç.",
       "preparingPlaceholder": "Ortam hazırlanıyor...",
       "finalizingPlaceholder": "Tamamlanıyor...",
+      "sessionLoadFailed": "Oturum yüklenemedi. Önce yeniden deneyin.",
       "cannotReceiveFiles": "Bu oturum dosya alamıyor. Mesajını göndermek için ekleri kaldır.",
       "couldNotAttachFiles": "Dosyalar eklenemedi. Tekrar denemek için gönder düğmesine dokun.",
       "discardAttachmentsMessage": "Henüz bir mesaja eklenmemiş yüklemeler silinecek.",
@@ -2121,6 +2124,7 @@
       "provider": "Sağlayıcı",
       "totalCost": "Toplam maliyet",
       "usageReflectsLatest": "Kullanım bilgileri, asistanın tamamlanan son yanıtına dayanır.",
+      "usageUnavailable": "Bağlam kullanımı kullanılamıyor",
       "tokenUsage": "Token kullanımı",
       "cacheRate": "Önbellek oranı",
       "modelsCount": "Modeller ({{displayCount}})",
@@ -2155,7 +2159,10 @@
     "markdownImage": {
       "load": "Yükle",
       "loadWithHost": "{{host}} adresinden yükle",
-      "httpsOnly": "Yalnızca HTTPS üzerinden sunulan görseller yüklenebilir."
+      "httpsOnly": "Yalnızca HTTPS üzerinden sunulan görseller yüklenebilir.",
+      "trustTitle": "{{host}} adresinden görsel yüklensin mi?",
+      "trustMessage": "{{host}} sunucusuna güvenmek, görsellerini her seferinde sormadan yükler. Bunu daha sonra Güvenilen sunucular altından kaldırabilirsin.",
+      "loadOnce": "Bir kez yükle"
     },
     "markdownLink": {
       "invalidLink": "Bu bağlantı açılamıyor.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Onay istemeden açılmasına izin verdiğin sunucular",
     "emptyTitle": "Güvenilen sunucu yok",
     "emptyDescription": "Bir bağlantının sunucusunu güvenilir olarak işaretlediğinde o sunucunun bağlantıları tekrar onay istemeden açılır.",
+    "imagesSectionTitle": "Güvenilen görsel sunucuları",
+    "imagesSectionDescription": "Bu sunuculardaki görseller tekrar sorulmadan yüklenir.",
+    "imagesSectionEmpty": "Güvenilen görsel sunucusu yok",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
     "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
+    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek.",
     "backToPreferences": "Tercihlere dön"
   },
   "quickChat": {

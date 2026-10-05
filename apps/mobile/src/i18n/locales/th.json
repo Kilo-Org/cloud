@@ -2047,6 +2047,7 @@
       "idCopied": "คัดลอก ID เซสชันแล้ว",
       "couldNotCopyId": "ไม่สามารถคัดลอก ID เซสชันได้",
       "untitled": "เซสชันไม่มีชื่อ",
+      "actions": "การดำเนินการกับเซสชัน",
       "sessionDeleted": "ลบเซสชันแล้ว",
       "needsInput": "รอข้อมูลจากคุณ",
       "fromPlatform": "จาก {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "เซสชันนี้เปิดให้อ่านได้อย่างเดียว",
       "continueInNewSession": "ดำเนินการต่อในเซสชันใหม่",
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
+      "emptyTranscriptDescription": "เซสชันนี้ยังไม่มีข้อความ",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
       "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "เลือกโมเดลก่อนส่ง",
       "preparingPlaceholder": "กำลังตั้งค่าสภาพแวดล้อม...",
       "finalizingPlaceholder": "กำลังทำงานขั้นสุดท้าย...",
+      "sessionLoadFailed": "ไม่สามารถโหลดเซสชันได้ ลองอีกครั้งก่อน",
       "cannotReceiveFiles": "เซสชันนี้ไม่สามารถรับไฟล์ได้ นำไฟล์แนบออกเพื่อส่งข้อความของคุณ",
       "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง",
       "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",
@@ -2634,6 +2637,7 @@
       "provider": "ผู้ให้บริการ",
       "totalCost": "ค่าใช้จ่ายรวม",
       "usageReflectsLatest": "ข้อมูลการใช้งานอ้างอิงจากคำตอบล่าสุดที่ผู้ช่วยสร้างเสร็จแล้ว",
+      "usageUnavailable": "ไม่สามารถดูการใช้บริบทได้",
       "tokenUsage": "การใช้โทเคน",
       "cacheRate": "อัตราแคช",
       "modelsCount": "โมเดล ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "โหลด",
       "loadWithHost": "โหลด {{host}}",
-      "httpsOnly": "โหลดได้เฉพาะรูปภาพผ่าน HTTPS"
+      "httpsOnly": "โหลดได้เฉพาะรูปภาพผ่าน HTTPS",
+      "trustTitle": "โหลดรูปภาพจาก {{host}} หรือไม่?",
+      "trustMessage": "การเชื่อถือ {{host}} จะโหลดรูปภาพโดยไม่ถามทุกครั้ง คุณสามารถยกเลิกได้ภายหลังในโฮสต์ที่เชื่อถือ",
+      "loadOnce": "โหลดครั้งเดียว"
     },
     "markdownLink": {
       "invalidLink": "ไม่สามารถเปิดลิงก์นี้ได้",
@@ -3181,8 +3188,12 @@
     "subtitle": "โฮสต์ที่คุณอนุญาตให้เปิดลิงก์ได้โดยไม่ต้องถาม",
     "emptyTitle": "ไม่มีโฮสต์ที่เชื่อถือ",
     "emptyDescription": "เมื่อคุณเชื่อถือโฮสต์ของลิงก์ แอปจะเปิดลิงก์จากโฮสต์นั้นโดยไม่ถามอีก",
+    "imagesSectionTitle": "โฮสต์รูปภาพที่เชื่อถือ",
+    "imagesSectionDescription": "รูปภาพจากโฮสต์เหล่านี้จะโหลดโดยไม่ถามอีก",
+    "imagesSectionEmpty": "ไม่มีโฮสต์รูปภาพที่เชื่อถือ",
     "revoke": "เลิกเชื่อถือ {{host}}",
     "revokeMessage": "ลิงก์ไปยังโฮสต์นี้จะขอการยืนยันอีกครั้ง",
+    "revokeImageMessage": "รูปภาพจากโฮสต์นี้จะขอการยืนยันอีกครั้ง",
     "backToPreferences": "กลับไปที่การตั้งค่า"
   },
   "quickChat": {

@@ -181,6 +181,15 @@ type ChatComposerProps = {
    * Retry instead of only Retry.
    */
   sendDisabled?: boolean;
+  /**
+   * Why send is unavailable. The screen renders it in the fixed footer row
+   * above this composer; the composer forwards it to the input row only as the
+   * input's accessibility hint. Null/omitted while send can proceed or when the
+   * host knows no reason — including while the session is still opening. Each
+   * actionable cannot-send state supplies its own reason (the load-error state:
+   * "The session could not be loaded. Retry first.").
+   */
+  sendDisabledReason?: string | null;
   isStreaming?: boolean;
   placeholder?: string;
   mode: AgentMode;
@@ -248,6 +257,7 @@ export function ChatComposer({
   onStop,
   disabled = false,
   sendDisabled = false,
+  sendDisabledReason = null,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
   mode,
@@ -1429,6 +1439,7 @@ export function ChatComposer({
               paperclipDisabled={control.paperclipDisabled}
               placeholder={placeholder}
               returnSendsMessage={returnSendsMessage}
+              sendDisabledReason={sendDisabledReason}
               textInputStyle={textInputStyle}
               voiceDisabled={control.voiceDisabled}
               voiceInputAvailable={voiceInput.available}

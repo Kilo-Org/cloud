@@ -1,5 +1,4 @@
 import { describe, expect, it } from '@jest/globals';
-import { preferredModels } from '@/lib/ai-gateway/models';
 import type { ModelOption } from './ModelCombobox';
 import { buildModelOptionGroups, getModelOptionKeywords } from './model-combobox-options';
 
@@ -24,7 +23,7 @@ describe('model combobox options', () => {
       },
     ] satisfies ModelOption[];
 
-    expect(buildModelOptionGroups(options)).toEqual([
+    expect(buildModelOptionGroups(options, [])).toEqual([
       { id: 'provider:anthropic-local', heading: 'Anthropic Local', models: [options[0]] },
       { id: 'provider:custom-openai', heading: 'Custom OpenAI', models: [options[1]] },
     ]);
@@ -40,11 +39,17 @@ describe('model combobox options', () => {
   });
 
   it('keeps existing Gateway options in Recommended and All Models groups', () => {
-    const preferred = { id: preferredModels[0], name: 'Preferred Gateway model' };
+    const preferred = { id: 'provider/preferred-model', name: 'Preferred Gateway model' };
+    const secondPreferred = { id: 'provider/second-model', name: 'A second preferred model' };
     const other = { id: 'provider/other-model', name: 'Other Gateway model' };
 
-    expect(buildModelOptionGroups([other, preferred])).toEqual([
-      { id: 'recommended', heading: 'Recommended', models: [preferred] },
+    expect(
+      buildModelOptionGroups(
+        [other, secondPreferred, preferred],
+        [preferred.id, secondPreferred.id]
+      )
+    ).toEqual([
+      { id: 'recommended', heading: 'Recommended', models: [preferred, secondPreferred] },
       { id: 'all-models', heading: 'All Models', models: [other] },
     ]);
     expect(getModelOptionKeywords(other)).toContain('provider/other-model');

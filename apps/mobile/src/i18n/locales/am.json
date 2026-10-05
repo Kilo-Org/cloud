@@ -2047,6 +2047,7 @@
       "idCopied": "የክፍለ ጊዜ መለያ ተቀድቷል",
       "couldNotCopyId": "የክፍለ ጊዜውን መለያ መቅዳት አልተቻለም።",
       "untitled": "ርዕስ የሌለው ክፍለ ጊዜ",
+      "actions": "የክፍለ ጊዜ ተግባራት",
       "sessionDeleted": "ክፍለ ጊዜው ተሰርዟል",
       "needsInput": "ምላሽ ይፈልጋል",
       "fromPlatform": "ከ{{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "ይህን ክፍለ ጊዜ ማንበብ ብቻ ይቻላል።",
       "continueInNewSession": "በአዲስ ክፍለ ጊዜ ይቀጥሉ",
       "emptyDescription": "ለመጀመር ከታች መልእክት ይላኩ።",
+      "emptyTranscriptDescription": "ይህ ክፍለ ጊዜ እስካሁን ምንም መልእክቶች የሉትም።",
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "ከመላክዎ በፊት ሞዴል ይምረጡ።",
       "preparingPlaceholder": "የሥራ አካባቢውን በማዘጋጀት ላይ...",
       "finalizingPlaceholder": "በማጠናቀቅ ላይ...",
+      "sessionLoadFailed": "ክፍለ ጊዜው ሊጫን አልቻለም። መጀመሪያ እንደገና ይሞክሩ።",
       "cannotReceiveFiles": "ይህ ክፍለ ጊዜ ፋይሎችን መቀበል አይችልም። መልእክትዎን ለመላክ አባሪዎቹን ያስወግዱ።",
       "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር የመላኪያ አዝራሩን ይንኩ።",
       "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
@@ -2634,6 +2637,7 @@
       "provider": "አቅራቢ",
       "totalCost": "ጠቅላላ ወጪ",
       "usageReflectsLatest": "አጠቃቀሙ በረዳቱ የመጨረሻ የተጠናቀቀ ምላሽ ላይ የተመሠረተ ነው።",
+      "usageUnavailable": "የአውድ አጠቃቀም አይገኝም",
       "tokenUsage": "የቶከን አጠቃቀም",
       "cacheRate": "የመሸጎጫ አጠቃቀም መጠን",
       "modelsCount": "ሞዴሎች ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "ይጫኑ",
       "loadWithHost": "{{host}}ን ይጫኑ",
-      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።"
+      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።",
+      "trustTitle": "ከ{{host}} ምስል ይጫኑ?",
+      "trustMessage": "{{host}}ን ማመን ምስሎቹን በየጊዜው ሳይጠይቅ ይጭናል። በኋላ ከታመኑ አስተናጋጆች ላይ ሊያስወግዱት ይችላሉ።",
+      "loadOnce": "አንድ ጊዜ ጫን"
     },
     "markdownLink": {
       "invalidLink": "ይህ አገናኝ ሊከፈት አይችልም።",
@@ -3181,8 +3188,12 @@
     "subtitle": "እንደገና ሳይጠይቁዎት እንዲከፈቱ የፈቀዱላቸው አስተናጋጆች",
     "emptyTitle": "የታመኑ አስተናጋጆች የሉም",
     "emptyDescription": "የአገናኝ አስተናጋጅን እንደታመነ ካደረጉት፣ አገናኞቹ እንደገና ሳይጠይቁዎት ይከፈታሉ።",
+    "imagesSectionTitle": "የታመኑ የምስል አስተናጋጆች",
+    "imagesSectionDescription": "ከእነዚህ አስተናጋጆች የሚመጡ ምስሎች እንደገና ሳይጠይቁ ይጫናሉ።",
+    "imagesSectionEmpty": "የታመኑ የምስል አስተናጋጆች የሉም",
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
     "revokeMessage": "ወደዚህ አስተናጋጅ የሚወስዱ አገናኞች እንደገና ማረጋገጫ ይጠይባሉ።",
+    "revokeImageMessage": "ከዚህ አስተናጋጅ የሚመጡ ምስሎች እንደገና ማረጋገጫ ይጠይባሉ።",
     "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
   },
   "quickChat": {

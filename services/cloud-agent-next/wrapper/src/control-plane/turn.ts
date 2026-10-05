@@ -1,12 +1,14 @@
 import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
 import {
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
+  controlPlaneFailureReasonSchema,
   type ControlPlaneAnswerReply,
   type ControlPlaneOutcome,
   type ControlPlanePromptPayload,
   type ControlPlaneRouteSpec,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
+import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
@@ -55,6 +57,9 @@ export type TurnManagerDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
   runtimes: { get(key: string): TurnKiloRuntime | undefined };
   log?: (message: string) => void;
+  onDiagnostic?: ControlDiagnosticReporter;
+  /** The one native projector, for the normal `session_outcome` transition. */
+  onNativeDiagnostic?: ControlDiagnosticReporter;
   now?: () => number;
   scheduler?: TurnScheduler;
   materializeAttachments?: typeof materializeMessageAttachments;
@@ -101,6 +106,24 @@ export type Turn = {
   pausedMs: number;
   progressed: boolean;
   resubmitted: boolean;
+  /**
+   * Diagnostic only: real-progress events seen from descendant sessions in this
+   * turn's tree, counted alongside the root progress they mark. This count is
+   * reported at expiry to distinguish "descendant progress arrived" from "no
+   * descendant progress arrived at all". It never affects any accounting.
+   */
+  descendantProgressEvents: number;
+  lastProgressSessionId?: string;
+  lastProgressEventType?: string;
+  lastTool?: {
+    sessionId: string;
+    messageId: string;
+    partId: string;
+    status: string;
+    observedAt: number;
+    outputBytes?: number;
+  };
+  preDeadlineProbedAt?: number;
   /** Aborts the running finalization step (timeout or Stop). */
   stepAbort?: AbortController;
   submitting: Promise<void>;
@@ -265,6 +288,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
         : { providerOwnership: facts.providerOwnership }),
       lastMessageId,
     });
+    // Closed native record for every status. `outcomeReason` is the parsed
+    // failure enum only; an assistant `safeMessage` does not parse and is never
+    // copied. `assistantReason` stays on the socket frame.
+    const outcomeReason = controlPlaneFailureReasonSchema.safeParse(reason);
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'session_outcome',
+      status,
+      sessionId: turn.route.sessionId,
+      ...(outcomeReason.success ? { outcomeReason: outcomeReason.data } : {}),
+    });
     resetTurn(turn.route.sessionId);
     maybeApplyPendingCredentials(turn.route.runtimeKey);
   }
@@ -329,6 +362,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       pausedMs: 0,
       progressed: false,
       resubmitted: false,
+      descendantProgressEvents: 0,
       submitting: Promise.resolve(),
     };
     turns.set(route.sessionId, turn);
@@ -368,9 +402,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
   // pins the sandbox. A wait ends only on `question.replied`/`question.rejected`/
   // `permission.replied` or a delivered answer (spec §7 "waiting on the user
   // pauses the clock").
-  function markProgress(turn: Turn): void {
+  function markProgress(turn: Turn, sessionId: string | undefined, eventType: string): void {
     turn.progressed = true;
     turn.lastProgressAt = now();
+    turn.lastProgressSessionId = sessionId;
+    turn.lastProgressEventType = eventType;
     // Pause credit belongs to the interval since the last progress, so a wait
     // that fully elapsed before this progress cannot be spent as credit after it.
     turn.pausedMs = 0;
@@ -592,9 +628,72 @@ export function createTurnManager(deps: TurnManagerDeps) {
     if (turn !== undefined) endWaiting(turn);
   }
 
+  function probeLastTool(turn: Turn, stage: 'pre_deadline' | 'deadline'): void {
+    const tool = turn.lastTool;
+    if (tool === undefined) return;
+    const fields = {
+      phase: 'freshness',
+      probeStage: stage,
+      sessionId: turn.route.sessionId,
+      kiloSessionId: tool.sessionId,
+      messageId: tool.messageId,
+      partId: tool.partId,
+    };
+    let probe: WrapperKiloClient['probeMessagePart'];
+    try {
+      probe = deps.runtimes.get(turn.route.runtimeKey)?.client.probeMessagePart;
+    } catch {
+      deps.onDiagnostic?.('session.execution', { ...fields, probeStatus: 'unavailable' });
+      return;
+    }
+    if (probe === undefined) return;
+    // The pre-deadline sample can finish before cancellation. Neither probe
+    // delays nor refreshes the seven-minute no-progress clock.
+    try {
+      void probe(
+        tool.sessionId,
+        turn.route.directory,
+        tool.messageId,
+        tool.partId,
+        AbortSignal.timeout(1_500)
+      ).then(
+        part =>
+          deps.onDiagnostic?.('session.execution', {
+            ...fields,
+            probeStatus: part === null ? 'missing' : 'found',
+            toolStatus: part?.status,
+            outputBytes: part?.outputBytes,
+          }),
+        () => deps.onDiagnostic?.('session.execution', { ...fields, probeStatus: 'unavailable' })
+      );
+    } catch {
+      deps.onDiagnostic?.('session.execution', { ...fields, probeStatus: 'unavailable' });
+    }
+  }
+
   function failDeadline(turn: Turn, action: TurnDeadlineAction): void {
     const reason = action === 'execution_limit' ? 'execution_limit' : 'no_progress';
-    log(`turn: ${reason} aborting session ${turn.route.kiloSessionId}`);
+    const lastTool = turn.lastTool;
+    deps.onDiagnostic?.('session.execution', {
+      phase: 'deadline_expired',
+      reason,
+      sessionId: turn.route.sessionId,
+      rootKiloSessionId: turn.route.kiloSessionId,
+      kiloSessionId: turn.lastProgressSessionId,
+      eventType: turn.lastProgressEventType,
+      lastEventAt: turn.lastProgressAt,
+      elapsedMs: noProgressElapsedMs(turn, now()),
+      descendantProgressEvents: turn.descendantProgressEvents,
+      messageId: lastTool?.messageId,
+      partId: lastTool?.partId,
+      toolStatus: lastTool?.status,
+      toolObservedAt: lastTool?.observedAt,
+      outputBytes: lastTool?.outputBytes,
+    });
+    probeLastTool(turn, 'deadline');
+    log(
+      `turn: ${reason} aborting session ${turn.route.kiloSessionId} descendantProgressEvents=${turn.descendantProgressEvents}`
+    );
     turn.stepAbort?.abort(new Error(reason));
     void abortKilo(turn.route);
     sendOutcome(turn, 'failed', reason);
@@ -749,7 +848,6 @@ export function createTurnManager(deps: TurnManagerDeps) {
       onKiloError(turn, properties);
       return;
     }
-    if (isRealProgress(turn, type, properties)) markProgress(turn);
   }
 
   function tick(): void {
@@ -763,6 +861,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
         continue;
       }
       const action = turnDeadlineAction(turn, at, timers);
+      if (
+        action === null &&
+        noProgressElapsedMs(turn, at) >= timers.noProgressMs - 60_000 &&
+        turn.preDeadlineProbedAt !== turn.lastProgressAt
+      ) {
+        turn.preDeadlineProbedAt = turn.lastProgressAt;
+        probeLastTool(turn, 'pre_deadline');
+      }
       if (action !== null) failDeadline(turn, action);
     }
   }
@@ -815,6 +921,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (turn.route.runtimeKey === runtimeKeyValue) matched.push(turn);
     }
     return matched;
+  }
+
+  /** Turns not waiting on the user; the heartbeat and the status line share it. */
+  function activeTurnCount(): number {
+    let count = 0;
+    for (const turn of turns.values()) {
+      if (turn.waitingSince !== null) continue;
+      count += 1;
+    }
+    return count;
   }
 
   return {
@@ -889,7 +1005,38 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (turn === undefined) return;
       // A subagent's question still pauses the root turn (spec §6).
       applyInteraction(turn, event.type);
-      if (eventSessionId !== root) return;
+      const realProgress = isRealProgress(turn, event.type, event.properties);
+      if (realProgress) markProgress(turn, eventSessionId, event.type);
+      if (event.type === 'message.part.updated') {
+        const part = event.properties.part;
+        if (isRecord(part) && part.type === 'tool' && eventSessionId !== undefined) {
+          const state = part.state;
+          if (
+            typeof part.id === 'string' &&
+            typeof part.messageID === 'string' &&
+            isRecord(state) &&
+            typeof state.status === 'string'
+          ) {
+            turn.lastTool = {
+              sessionId: eventSessionId,
+              messageId: part.messageID,
+              partId: part.id,
+              status: state.status,
+              observedAt: now(),
+              ...(typeof state.output === 'string'
+                ? { outputBytes: Buffer.byteLength(state.output, 'utf8') }
+                : {}),
+            };
+          }
+        }
+      }
+      if (eventSessionId !== root) {
+        // Diagnostic only: count the descendant progress that was marked above,
+        // so a no-progress expiry can report whether descendant progress reached
+        // the manager.
+        if (realProgress) turn.descendantProgressEvents += 1;
+        return;
+      }
       if (event.type === 'message.updated') {
         const info = event.properties.info;
         if (isRecord(info) && info.role === 'assistant' && typeof info.id === 'string') {
@@ -951,12 +1098,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     },
 
     isActive(): boolean {
-      for (const turn of turns.values()) {
-        if (turn.waitingSince !== null) continue;
-        return true;
-      }
-      return false;
+      return activeTurnCount() > 0;
     },
+
+    activeTurnCount,
 
     tick,
 

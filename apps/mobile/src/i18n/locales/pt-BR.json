@@ -1512,6 +1512,7 @@
       "idCopied": "ID da sessão copiado",
       "couldNotCopyId": "Não foi possível copiar o ID da sessão.",
       "untitled": "Sessão sem título",
+      "actions": "Ações da sessão",
       "sessionDeleted": "Sessão excluída",
       "needsInput": "aguardando resposta",
       "fromPlatform": "de {{platform}}",
@@ -1567,6 +1568,7 @@
       "readOnly": "Esta sessão é somente para leitura.",
       "continueInNewSession": "Continuar em uma nova sessão",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
+      "emptyTranscriptDescription": "Esta sessão ainda não tem mensagens.",
       "scrollToBottom": "Rolar para o final",
       "emptyTitle": "Nenhuma mensagem ainda",
       "renameAccessibility": "Renomear sessão: {{title}}",
@@ -2042,6 +2044,7 @@
       "selectModelBeforeSending": "Selecione um modelo antes de enviar.",
       "preparingPlaceholder": "Configurando ambiente...",
       "finalizingPlaceholder": "Finalizando...",
+      "sessionLoadFailed": "Não foi possível carregar a sessão. Tente novamente primeiro.",
       "cannotReceiveFiles": "Esta sessão não pode receber arquivos. Remova os anexos para enviar sua mensagem.",
       "couldNotAttachFiles": "Não foi possível anexar os arquivos. Toque em Enviar para tentar novamente.",
       "discardAttachmentsMessage": "Os arquivos enviados ainda não vinculados a uma mensagem serão excluídos.",
@@ -2112,6 +2115,7 @@
       "provider": "Provedor",
       "totalCost": "Custo total",
       "usageReflectsLatest": "O uso corresponde à última resposta concluída do assistente.",
+      "usageUnavailable": "Uso de contexto indisponível",
       "tokenUsage": "Uso de tokens",
       "cacheRate": "Taxa de cache",
       "modelsCount": "Modelos ({{displayCount}})",
@@ -2148,7 +2152,10 @@
     "markdownImage": {
       "load": "Carregar",
       "loadWithHost": "Carregar {{host}}",
-      "httpsOnly": "Só é possível carregar imagens via HTTPS."
+      "httpsOnly": "Só é possível carregar imagens via HTTPS.",
+      "trustTitle": "Carregar imagem de {{host}}?",
+      "trustMessage": "Ao confiar em {{host}}, as imagens dele serão carregadas sem perguntar a cada vez. Você pode revogar isso depois em Domínios confiáveis.",
+      "loadOnce": "Carregar uma vez"
     },
     "markdownLink": {
       "invalidLink": "Este link não pode ser aberto.",
@@ -3224,8 +3231,12 @@
     "subtitle": "Domínios cujos links abrem sem pedir confirmação",
     "emptyTitle": "Nenhum domínio confiável",
     "emptyDescription": "Ao marcar um domínio como confiável, seus links abrem sem pedir confirmação novamente.",
+    "imagesSectionTitle": "Domínios confiáveis de imagens",
+    "imagesSectionDescription": "As imagens desses domínios são carregadas sem perguntar novamente.",
+    "imagesSectionEmpty": "Nenhum domínio confiável de imagens",
     "revoke": "Deixar de confiar em {{host}}",
     "revokeMessage": "Os links para este domínio voltarão a pedir confirmação.",
+    "revokeImageMessage": "As imagens deste domínio voltarão a pedir confirmação.",
     "backToPreferences": "Voltar às preferências"
   },
   "quickChat": {

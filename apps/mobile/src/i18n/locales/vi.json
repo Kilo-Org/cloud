@@ -1534,6 +1534,7 @@
       "idCopied": "Đã sao chép ID phiên",
       "couldNotCopyId": "Không thể sao chép ID phiên.",
       "untitled": "Phiên chưa đặt tên",
+      "actions": "Thao tác với phiên",
       "sessionDeleted": "Đã xóa phiên",
       "needsInput": "cần phản hồi",
       "fromPlatform": "từ {{platform}}",
@@ -1586,6 +1587,7 @@
       "readOnly": "Bạn chỉ có thể xem phiên này.",
       "continueInNewSession": "Tiếp tục trong phiên mới",
       "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
+      "emptyTranscriptDescription": "Phiên này chưa có tin nhắn.",
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "renameAccessibility": "Đổi tên phiên: {{title}}",
@@ -2052,6 +2054,7 @@
       "selectModelBeforeSending": "Hãy chọn mô hình trước khi gửi.",
       "preparingPlaceholder": "Đang thiết lập môi trường...",
       "finalizingPlaceholder": "Đang hoàn tất...",
+      "sessionLoadFailed": "Không thể tải phiên. Hãy thử lại trước.",
       "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
       "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại.",
       "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
@@ -2121,6 +2124,7 @@
       "provider": "Nhà cung cấp",
       "totalCost": "Tổng chi phí",
       "usageReflectsLatest": "Mức sử dụng được tính theo phản hồi gần nhất mà trợ lý đã hoàn tất.",
+      "usageUnavailable": "Mức sử dụng ngữ cảnh không khả dụng",
       "tokenUsage": "Mức sử dụng token",
       "cacheRate": "Tỷ lệ dùng bộ nhớ đệm",
       "modelsCount": "Mô hình ({{displayCount}})",
@@ -2155,7 +2159,10 @@
     "markdownImage": {
       "load": "Tải",
       "loadWithHost": "Tải {{host}}",
-      "httpsOnly": "Chỉ hỗ trợ hình ảnh qua HTTPS."
+      "httpsOnly": "Chỉ hỗ trợ hình ảnh qua HTTPS.",
+      "trustTitle": "Tải hình ảnh từ {{host}}?",
+      "trustMessage": "Tin cậy {{host}} sẽ tải hình ảnh của máy chủ này mà không hỏi mỗi lần. Bạn có thể bỏ tin cậy sau trong Máy chủ được tin cậy.",
+      "loadOnce": "Tải một lần"
     },
     "markdownLink": {
       "invalidLink": "Không thể mở liên kết này.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Máy chủ được phép mở liên kết mà không cần xác nhận",
     "emptyTitle": "Chưa có máy chủ được tin cậy",
     "emptyDescription": "Khi bạn đánh dấu máy chủ là tin cậy, liên kết đến máy chủ đó sẽ mở mà không cần xác nhận lại.",
+    "imagesSectionTitle": "Máy chủ hình ảnh được tin cậy",
+    "imagesSectionDescription": "Hình ảnh từ các máy chủ này được tải mà không hỏi lại.",
+    "imagesSectionEmpty": "Chưa có máy chủ hình ảnh được tin cậy",
     "revoke": "Bỏ tin cậy {{host}}",
     "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
+    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại.",
     "backToPreferences": "Quay lại cài đặt"
   },
   "quickChat": {

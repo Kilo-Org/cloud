@@ -2047,6 +2047,7 @@
       "idCopied": "ID sesyon an kopye",
       "couldNotCopyId": "Pa t ka kopye ID sesyon an.",
       "untitled": "Sesyon san tit",
+      "actions": "Aksyon pou sesyon an",
       "sessionDeleted": "Sesyon an efase",
       "needsInput": "bezwen repons",
       "fromPlatform": "ki soti sou {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Ou ka li sesyon sa a sèlman.",
       "continueInNewSession": "Kontinye nan yon nouvo sesyon",
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
+      "emptyTranscriptDescription": "Sesyon sa a pa gen okenn mesaj ankò.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
       "renameAccessibility": "Chanje non sesyon an: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "Chwazi yon modèl anvan ou voye mesaj la.",
       "preparingPlaceholder": "Ap prepare anviwònman an...",
       "finalizingPlaceholder": "Ap fini...",
+      "sessionLoadFailed": "Pa t kapab chaje sesyon an. Eseye ankò dabò.",
       "cannotReceiveFiles": "Sesyon sa a pa ka resevwa fichye. Retire fichye atache yo pou voye mesaj ou a.",
       "couldNotAttachFiles": "Nou pa t ka atache fichye yo. Peze Voye pou eseye ankò.",
       "discardAttachmentsMessage": "Tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
@@ -2634,6 +2637,7 @@
       "provider": "Founisè",
       "totalCost": "Pri total",
       "usageReflectsLatest": "Itilizasyon sa a baze sou dènye repons asistan an fin bay la.",
+      "usageUnavailable": "Itilizasyon kontèks la pa disponib",
       "tokenUsage": "Itilizasyon jeton",
       "cacheRate": "Pousantaj kach",
       "modelsCount": "Modèl ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "Chaje",
       "loadWithHost": "Chaje {{host}}",
-      "httpsOnly": "Se imaj HTTPS sèlman ki aksepte."
+      "httpsOnly": "Se imaj HTTPS sèlman ki aksepte.",
+      "trustTitle": "Chaje imaj la soti nan {{host}}?",
+      "trustMessage": "Lè ou fè {{host}} konfyans, imaj li yo chaje san li pa mande chak fwa. Ou ka retire konfyans lan pita nan Domèn ou fè konfyans.",
+      "loadOnce": "Chaje yon sèl fwa"
     },
     "markdownLink": {
       "invalidLink": "Lyen sa a pa ka louvri.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Domèn ou pèmèt louvri san konfimasyon",
     "emptyTitle": "Pa gen domèn ou fè konfyans",
     "emptyDescription": "Lè ou fè domèn yon lyen konfyans, lyen an louvri san li pa mande konfimasyon ankò.",
+    "imagesSectionTitle": "Domèn imaj ou fè konfyans",
+    "imagesSectionDescription": "Imaj ki soti nan domèn sa yo chaje san li pa mande ankò.",
+    "imagesSectionEmpty": "Pa gen domèn imaj ou fè konfyans",
     "revoke": "Retire {{host}}",
     "revokeMessage": "Lyen pou domèn sa a ap mande konfimasyon ankò.",
+    "revokeImageMessage": "Imaj ki soti nan domèn sa a ap mande konfimasyon ankò.",
     "backToPreferences": "Tounen nan preferans yo"
   },
   "quickChat": {

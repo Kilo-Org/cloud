@@ -11,6 +11,8 @@ import {
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
+import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import {
@@ -22,7 +24,12 @@ import {
   type ProcessOutputStream,
 } from '../utils.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
-import { formatGitResultFailure, gitOperationError } from '../git-errors.js';
+import {
+  cleanTerminalOutput,
+  formatGitResultFailure,
+  gitOperationError,
+  type GitRouteClass,
+} from '../git-errors.js';
 import { authenticatedGitUrl } from '../control/git-url.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
 import {
@@ -30,7 +37,6 @@ import {
   type WorktreeKiloAuth,
 } from '../control/worktree-runtime.js';
 import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
-import { stripAnsi } from '../event-parser.js';
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
@@ -48,6 +54,47 @@ const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
 const STEP_RETRY_ATTEMPTS = 2;
 /** Upper bound on one setup-output event so a chatty command cannot flood the wire. */
 const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
+
+/**
+ * Spec §7: eligible managed GitHub HTTPS preparation clone/fetch opts into the
+ * two invocation-scoped native Git options together. `proactiveAuth=basic`
+ * makes the first request carry the existing URL-bound control alias so
+ * contained resolution, repository-authorized redemption and the bounded
+ * Retry-After handler run instead of an anonymous first request;
+ * `followRedirects=false` fails every redirect (including a same-origin one)
+ * rather than letting Git reattach the alias to a redirected request. Never one
+ * option without the other, and never on an ineligible command.
+ */
+const MANAGED_GITHUB_PREPARATION_GIT_CONFIG = [
+  '-c',
+  'http.https://github.com/.proactiveAuth=basic',
+  '-c',
+  'http.https://github.com/.followRedirects=false',
+] as const;
+
+/**
+ * The single eligibility decision for the two invocation-scoped options. Both
+ * options or neither: the command must be preparation clone/fetch, the platform
+ * must be managed GitHub, the token must parse as a `github` control alias, and
+ * the URL must be the direct HTTPS default-port github.com URL. Callers judge
+ * `spec.git.url`, never the password parsed back out of the authenticated URL.
+ */
+function managedGitHubPreparationGitArgs(spec: ControlPlaneRouteSpec, command: string): string[] {
+  if (command !== 'clone' && command !== 'fetch') return [];
+  const git = spec.git;
+  if (!git || git.platform !== 'github') return [];
+  if (!git.token || parseControlPlaneCredential(git.token)?.purpose !== 'github') return [];
+  let url: URL;
+  try {
+    url = new URL(git.url);
+  } catch {
+    return [];
+  }
+  // WHATWG `URL.port` is '' for both `https://github.com/...` and an explicit
+  // `:443`, so explicit 443 is eligible and only a non-empty port is excluded.
+  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.port !== '') return [];
+  return [...MANAGED_GITHUB_PREPARATION_GIT_CONFIG];
+}
 
 export type PrepareRuntimePort = {
   ensure(input: {
@@ -68,6 +115,7 @@ export type PrepareDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
   runtimes: PrepareRuntimePort;
   log?: (message: string) => void;
+  onNativeDiagnostic?: ControlDiagnosticReporter;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
   runSetup?: (
     command: string,
@@ -111,6 +159,10 @@ export type PreparationManager = {
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
   isPreparing(): boolean;
+  /** In-flight prepares, for the native status line. */
+  preparingCount(): number;
+  /** Prepared sessions, for the native status line. */
+  sessionCount(): number;
   installCredentials(credentials: ControlPlaneSessionCredentialsPayload): Promise<void>;
 };
 
@@ -252,6 +304,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     });
   }
 
+  function emitSessionReadyNative(sessionId: string): void {
+    // Closed native record; the directory stays in the file log.
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'session_ready',
+      sessionId,
+    });
+  }
+
   function emitFailure(sessionId: string, step: ControlPlanePreparationStep, error: unknown): void {
     const subtype = error instanceof WrapperBootstrapError ? error.subtype : undefined;
     deps.emit({
@@ -259,6 +319,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       sessionId,
       reason: 'workspace_setup_failed',
       step,
+      ...(subtype === undefined ? {} : { subtype }),
+    });
+    // Closed native record; the free-text error and git failure stay in the file log.
+    deps.onNativeDiagnostic?.('wrapper.lifecycle', {
+      phase: 'prepare_failed',
+      preparationStep: step,
       ...(subtype === undefined ? {} : { subtype }),
     });
   }
@@ -339,8 +405,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     emitProgress(spec.sessionId, 'clone');
     await mkdir(directory);
     if (!spec.git) return;
+    // Diagnostic route class only: a managed credential was injected into the
+    // clone URL, otherwise the plain (direct) URL is used. Never log the URL.
+    const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
     if (!(await hasGit(directory))) {
       const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
+      const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
       let lastError: WrapperBootstrapError | undefined;
       for (let attempt = 1; attempt <= CLONE_RETRY_ATTEMPTS; attempt += 1) {
         signal.throwIfAborted();
@@ -351,19 +421,22 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             `Retrying clone (attempt ${attempt} of ${CLONE_RETRY_ATTEMPTS})`
           );
         }
-        const cloned = await runGit(['clone', '--progress', cloneUrl, directory], {
-          env,
-          inheritEnv: false,
-          signal,
-          onOutput: createGitProgressReporter(progressText =>
-            emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
-          ),
-        });
+        const cloned = await runGit(
+          [...gitConfigArgs, 'clone', '--progress', cloneUrl, directory],
+          {
+            env,
+            inheritEnv: false,
+            signal,
+            onOutput: createGitProgressReporter(progressText =>
+              emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
+            ),
+          }
+        );
         if (cloned.exitCode === 0) {
           lastError = undefined;
           break;
         }
-        lastError = gitOperationError(cloned, 'clone', redact);
+        lastError = gitOperationError(cloned, 'clone', redact, gitRoute);
         if (!isNetworkFailure(lastError.subtype) || attempt === CLONE_RETRY_ATTEMPTS) break;
         await sleep(CLONE_RETRY_BACKOFF_MS[attempt - 1] ?? 0, signal);
       }
@@ -379,12 +452,22 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const branch = spec.branch ?? `session/${spec.kilo?.scopeId ?? spec.sessionId}`;
     if (isSyntheticReviewRef(branch) && spec.branchMode !== 'working') {
       await checkoutSyntheticReviewRef({
-        runGit: (args, options) =>
-          runGit(args, { ...options, cwd: directory, env, inheritEnv: false, signal }),
+        runGit: (args, options) => {
+          const gitConfigArgs =
+            args[0] === 'fetch' ? managedGitHubPreparationGitArgs(spec, 'fetch') : [];
+          return runGit([...gitConfigArgs, ...args], {
+            ...options,
+            cwd: directory,
+            env,
+            inheritEnv: false,
+            signal,
+          });
+        },
         workspacePath: directory,
         branchName: branch,
         signal,
         redact,
+        route: gitRoute,
       });
     } else {
       let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
@@ -397,9 +480,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ]);
         signal.throwIfAborted();
         if (existingBranch.exitCode !== 0 && existingBranch.exitCode !== 1) {
+          const lookup = gitOperationError(existingBranch, 'checkout', redact, gitRoute);
           throw new WrapperBootstrapError({
             code: 'WORKSPACE_SETUP_FAILED',
-            subtype: gitOperationError(existingBranch, 'checkout', redact).subtype,
+            subtype: lookup.subtype,
+            ...(lookup.gitFailure === undefined ? {} : { gitFailure: lookup.gitFailure }),
             message: formatGitResultFailure(existingBranch, 'git branch lookup failed', redact),
             retryable: true,
           });
@@ -414,9 +499,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           ]);
           signal.throwIfAborted();
           if (remoteBranch.exitCode !== 0 && remoteBranch.exitCode !== 1) {
+            const lookup = gitOperationError(remoteBranch, 'checkout', redact, gitRoute);
             throw new WrapperBootstrapError({
               code: 'WORKSPACE_SETUP_FAILED',
-              subtype: gitOperationError(remoteBranch, 'checkout', redact).subtype,
+              subtype: lookup.subtype,
+              ...(lookup.gitFailure === undefined ? {} : { gitFailure: lookup.gitFailure }),
               message: formatGitResultFailure(remoteBranch, 'git branch lookup failed', redact),
               retryable: true,
             });
@@ -435,7 +522,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ),
       });
       signal.throwIfAborted();
-      if (checked.exitCode !== 0) throw gitOperationError(checked, 'checkout', redact);
+      if (checked.exitCode !== 0) throw gitOperationError(checked, 'checkout', redact, gitRoute);
     }
     await configureGitAuthor(
       directory,
@@ -473,7 +560,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         properties: { command: commandNumber, commandCount: commands.length },
       });
       const output = createOutputRedactor(
-        text => redact(stripAnsi(text)),
+        text => redact(cleanTerminalOutput(text)),
         text => {
           if (signal.aborted) return;
           const cleaned = text.trim();
@@ -483,7 +570,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             type: CONTROL_PLANE_SETUP_EVENTS.output,
             properties: {
               command: commandNumber,
-              output: cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT),
+              output: `${cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT - 1)}\n`,
             },
           });
         }
@@ -662,6 +749,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       }
       prepared.set(sessionId, { key, spec, directory, home, kilo: kiloAuth, env });
       deps.emit({ type: 'session.ready', sessionId });
+      emitSessionReadyNative(sessionId);
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
       if (owner.released) {
@@ -671,6 +759,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       log(
         `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
           error instanceof Error ? error.message : String(error)
+        }${
+          error instanceof WrapperBootstrapError && error.gitFailure ? ` ${error.gitFailure}` : ''
         }`
       );
       emitFailure(sessionId, currentStep, error);
@@ -753,6 +843,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
             }
             if (!owner.released) {
               deps.emit({ type: 'session.ready', sessionId: spec.sessionId });
+              emitSessionReadyNative(spec.sessionId);
             }
           })().finally(() => {
             if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
@@ -779,6 +870,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     },
     isPrepared: sessionId => prepared.has(sessionId),
     isPreparing: () => preparing.size > 0,
+    preparingCount: () => preparing.size,
+    sessionCount: () => prepared.size,
     installCredentials: installCredentialsFor,
   };
 }

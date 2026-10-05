@@ -69,25 +69,38 @@ export function extractStatusFromItem(item: IngestBatch[number]): string | null 
 }
 
 /**
- * The PR-link triple, emitted atomically. `prNumber` is serialized to a string so it
+ * The PR-link tuple, emitted atomically. `prNumber` is serialized to a string so it
  * flows through the same `string | null` change-map channel as every other extractable
- * key; `computeSessionMetadataUpdates` converts it back with `Number`.
+ * key; `computeSessionMetadataUpdates` converts it back with `Number`. `prHeadRef` and
+ * `prHeadSha` are the session's own per-link evidence, null when the CLI omitted them.
  */
 export type SessionPrLinkExtract =
-  | { prPlatform: string; prUrl: string; prNumber: string }
-  | { prPlatform: null; prUrl: null; prNumber: null };
+  | {
+      prPlatform: string;
+      prUrl: string;
+      prNumber: string;
+      prHeadRef: string | null;
+      prHeadSha: string | null;
+    }
+  | {
+      prPlatform: null;
+      prUrl: null;
+      prNumber: null;
+      prHeadRef: null;
+      prHeadSha: null;
+    };
 
 export function extractSessionPrLink(item: IngestBatch[number]): SessionPrLinkExtract | undefined {
   if (item.type !== 'session_pr_link') return undefined;
 
-  const { platform, prUrl, prNumber } = item.data;
+  const { platform, prUrl, prNumber, headRef, headSha } = item.data;
 
-  // Any null field clears the whole link: persist null for all three keys.
+  // Any null field clears the whole link: persist null for all five keys.
   if (platform === null || prUrl === null || prNumber === null) {
-    return { prPlatform: null, prUrl: null, prNumber: null };
+    return { prPlatform: null, prUrl: null, prNumber: null, prHeadRef: null, prHeadSha: null };
   }
 
-  // A non-null set must be well-formed; otherwise drop all three keys (metadata no-op).
+  // A non-null set must be well-formed; otherwise drop all five keys (metadata no-op).
   if (
     typeof platform !== 'string' ||
     platform.length === 0 ||
@@ -100,5 +113,19 @@ export function extractSessionPrLink(item: IngestBatch[number]): SessionPrLinkEx
     return undefined;
   }
 
-  return { prPlatform: platform, prUrl, prNumber: String(prNumber) };
+  // Head evidence is optional: a malformed value reads as absent (null) rather
+  // than dropping an otherwise well-formed link, so the repo/head-ref fallback
+  // still applies.
+  const normalizedHeadRef =
+    typeof headRef === 'string' && headRef.trim().length > 0 ? headRef.trim() : null;
+  const normalizedHeadSha =
+    typeof headSha === 'string' && headSha.trim().length > 0 ? headSha.trim() : null;
+
+  return {
+    prPlatform: platform,
+    prUrl,
+    prNumber: String(prNumber),
+    prHeadRef: normalizedHeadRef,
+    prHeadSha: normalizedHeadSha,
+  };
 }

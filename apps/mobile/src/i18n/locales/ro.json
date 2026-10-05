@@ -2072,6 +2072,7 @@
       "idCopied": "ID-ul sesiunii a fost copiat",
       "couldNotCopyId": "Nu s-a putut copia ID-ul sesiunii.",
       "untitled": "Sesiune fără titlu",
+      "actions": "Acțiuni pentru sesiune",
       "sessionDeleted": "Sesiune ștearsă",
       "needsInput": "așteaptă un răspuns",
       "fromPlatform": "din {{platform}}",
@@ -2127,6 +2128,7 @@
       "readOnly": "Această sesiune poate fi doar citită.",
       "continueInNewSession": "Continuă într-o sesiune nouă",
       "emptyDescription": "Trimite un mesaj mai jos pentru a începe.",
+      "emptyTranscriptDescription": "Această sesiune nu are încă mesaje.",
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
@@ -2602,6 +2604,7 @@
       "selectModelBeforeSending": "Selectează un model înainte de a trimite mesajul.",
       "preparingPlaceholder": "Se configurează mediul...",
       "finalizingPlaceholder": "Se finalizează...",
+      "sessionLoadFailed": "Sesiunea nu a putut fi încărcată. Reîncercați mai întâi.",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
       "couldNotAttachFiles": "Nu s-au putut atașa fișierele. Atinge butonul de trimitere pentru a încerca din nou.",
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
@@ -2672,6 +2675,7 @@
       "provider": "Furnizor",
       "totalCost": "Cost total",
       "usageReflectsLatest": "Datele de utilizare corespund celui mai recent răspuns finalizat al asistentului.",
+      "usageUnavailable": "Utilizarea contextului nu este disponibilă",
       "tokenUsage": "Utilizarea tokenurilor",
       "cacheRate": "Rată de utilizare a cache-ului",
       "modelsCount": "Modele ({{displayCount}})",
@@ -2708,7 +2712,10 @@
     "markdownImage": {
       "load": "Încarcă",
       "loadWithHost": "Încarcă {{host}}",
-      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS."
+      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS.",
+      "trustTitle": "Încărcați imaginea de la {{host}}?",
+      "trustMessage": "Dacă ai încredere în {{host}}, imaginile sale se încarcă fără a întreba de fiecare dată. Poți retrage acest lucru mai târziu în Gazde de încredere.",
+      "loadOnce": "Încarcă o dată"
     },
     "markdownLink": {
       "invalidLink": "Acest link nu poate fi deschis.",
@@ -3224,8 +3231,12 @@
     "subtitle": "Gazde ale căror linkuri se deschid fără confirmare",
     "emptyTitle": "Nicio gazdă de încredere",
     "emptyDescription": "Dacă marchezi gazda unui link ca fiind de încredere, linkurile acesteia se vor deschide fără o nouă confirmare.",
+    "imagesSectionTitle": "Gazde de imagini de încredere",
+    "imagesSectionDescription": "Imaginile de la aceste gazde se încarcă fără a mai întreba.",
+    "imagesSectionEmpty": "Nicio gazdă de imagini de încredere",
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "revokeMessage": "Linkurile către această gazdă vor cere din nou confirmare.",
+    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare.",
     "backToPreferences": "Înapoi la preferințe"
   },
   "quickChat": {

@@ -5,7 +5,8 @@ import { join } from 'node:path';
 
 const SUPERVISOR_PATH = join(import.meta.dir, '..', '..', 'control-plane-supervisor.sh');
 
-const FAKE_SOURCE = `const { appendFileSync, readFileSync, writeFileSync } = require('node:fs');
+const FAKE_SOURCE = `process.stderr.write('child-start\\n');
+const { appendFileSync, readFileSync, writeFileSync } = require('node:fs');
 const log = process.env.FAKE_LOG;
 let runs = 0;
 try {
@@ -53,20 +54,39 @@ type SpawnOptions = {
 
 function spawnSupervisor(harness: Harness, options: SpawnOptions): Bun.Subprocess {
   return Bun.spawn(['sh', SUPERVISOR_PATH], {
-    env: {
-      ...process.env,
-      CONTROL_PLANE_WRAPPER_COMMAND: `exec bun ${harness.fake}`,
-      CONTROL_PLANE_SUPERVISOR_BACKOFF_MIN_MS: String(options.backoffMinMs ?? 0),
-      CONTROL_PLANE_SUPERVISOR_BACKOFF_MAX_MS: String(options.backoffMaxMs ?? 0),
-      CONTROL_PLANE_TIMER_DIVISOR: String(options.divisor ?? 1),
-      FAKE_LOG: harness.log,
-      FAKE_MODE: options.mode,
-      FAKE_SLEEP_MS: String(options.sleepMs ?? 0),
-      FAKE_SLEEP_RUNS: String(options.sleepRuns ?? 0),
-      ...(options.recordPid ? { FAKE_PID_FILE: harness.pidFile } : {}),
-    },
+    env: supervisorEnv(harness, options),
     stdout: 'ignore',
     stderr: 'ignore',
+  });
+}
+
+function supervisorEnv(harness: Harness, options: SpawnOptions): Record<string, string> {
+  return {
+    ...(process.env as Record<string, string>),
+    CONTROL_PLANE_WRAPPER_COMMAND: `exec bun ${harness.fake}`,
+    CONTROL_PLANE_SUPERVISOR_BACKOFF_MIN_MS: String(options.backoffMinMs ?? 0),
+    CONTROL_PLANE_SUPERVISOR_BACKOFF_MAX_MS: String(options.backoffMaxMs ?? 0),
+    CONTROL_PLANE_TIMER_DIVISOR: String(options.divisor ?? 1),
+    FAKE_LOG: harness.log,
+    FAKE_MODE: options.mode,
+    FAKE_SLEEP_MS: String(options.sleepMs ?? 0),
+    FAKE_SLEEP_RUNS: String(options.sleepRuns ?? 0),
+    ...(options.recordPid ? { FAKE_PID_FILE: harness.pidFile } : {}),
+  };
+}
+
+function spawnSupervisorCapturingStderr(
+  harness: Harness,
+  options: SpawnOptions,
+  nativeLogs: boolean
+): Bun.Subprocess {
+  return Bun.spawn(['sh', SUPERVISOR_PATH], {
+    env: {
+      ...supervisorEnv(harness, options),
+      CONTROL_PLANE_NATIVE_LOGS: nativeLogs ? '1' : '0',
+    },
+    stdout: 'ignore',
+    stderr: 'pipe',
   });
 }
 
@@ -158,12 +178,16 @@ describe('control-plane-supervisor.sh', () => {
   it('prunes restarts outside the window so it does not give up, and forwards TERM', async () => {
     const harness = await createHarness();
     try {
-      const proc = spawnSupervisor(harness, {
-        mode: 'sleep-every',
-        sleepMs: 1_050,
-        divisor: 600,
-        recordPid: true,
-      });
+      const proc = spawnSupervisorCapturingStderr(
+        harness,
+        {
+          mode: 'sleep-every',
+          sleepMs: 1_050,
+          divisor: 600,
+          recordPid: true,
+        },
+        true
+      );
       await waitForRuns(harness.log, 7);
       expect(proc.exitCode).toBeNull();
       // Let the current child reach its sleep so TERM has a live child to kill.
@@ -173,6 +197,13 @@ describe('control-plane-supervisor.sh', () => {
       process.kill(proc.pid, 'SIGTERM');
       expect(await waitForExit(proc, 5_000)).toBe(0);
       expect(isAlive(childPid)).toBe(false);
+      // TERM arrives while the current child is live in its sleep (not during
+      // backoff); the trap kills that child and exits 0 with one clean line.
+      const stderr = await new Response(
+        proc.stderr as unknown as ReadableStream<Uint8Array>
+      ).text();
+      expect(stderr).toContain('"event":"supervisor_started"');
+      expect(stderr.match(/"event":"supervisor_exit","exitCode":0/g)).toHaveLength(1);
     } finally {
       await harness.cleanup();
     }
@@ -201,6 +232,78 @@ describe('control-plane-supervisor.sh', () => {
       expect(await waitForExit(proc, 5_000)).toBe(0);
     } finally {
       await harness.cleanup();
+    }
+  }, 20_000);
+
+  it('writes supervisor_started and one clean supervisor_exit only when the gate is set', async () => {
+    const gated = await createHarness();
+    const ungated = await createHarness();
+    try {
+      const on = spawnSupervisorCapturingStderr(gated, { mode: 'exit0' }, true);
+      expect(await on.exited).toBe(0);
+      const gatedStderr = await new Response(
+        on.stderr as unknown as ReadableStream<Uint8Array>
+      ).text();
+      expect(gatedStderr).toContain('"event":"supervisor_started"');
+      expect(gatedStderr.match(/"event":"supervisor_exit","exitCode":0/g)).toHaveLength(1);
+      // The start line is written before the first child runs.
+      expect(gatedStderr.indexOf('"event":"supervisor_started"')).toBeLessThan(
+        gatedStderr.indexOf('child-start')
+      );
+
+      const off = spawnSupervisorCapturingStderr(ungated, { mode: 'exit0' }, false);
+      expect(await off.exited).toBe(0);
+      const ungatedStderr = await new Response(
+        off.stderr as unknown as ReadableStream<Uint8Array>
+      ).text();
+      expect(ungatedStderr).not.toContain('"source":"control-plane-supervisor"');
+    } finally {
+      await gated.cleanup();
+      await ungated.cleanup();
+    }
+  });
+
+  it('writes native JSON restart lines only when CONTROL_PLANE_NATIVE_LOGS=1', async () => {
+    const gated = await createHarness();
+    const ungated = await createHarness();
+    try {
+      const on = spawnSupervisorCapturingStderr(
+        gated,
+        { mode: 'fail', backoffMinMs: 0, backoffMaxMs: 0, divisor: 1 },
+        true
+      );
+      expect(await on.exited).toBe(1);
+      const gatedStderr = await new Response(
+        on.stderr as unknown as ReadableStream<Uint8Array>
+      ).text();
+      // Exact counts: five retried failures then one exhausted budget.
+      expect(gatedStderr.match(/"event":"wrapper_restart"/g)).toHaveLength(5);
+      expect(gatedStderr.match(/"event":"restart_budget_exhausted"/g)).toHaveLength(1);
+      expect(
+        [
+          ...gatedStderr.matchAll(/"event":"wrapper_restart","exitCode":1,"restartCount":(\d+)/g),
+        ].map(match => Number(match[1]))
+      ).toEqual([1, 2, 3, 4, 5]);
+      expect(gatedStderr).toContain(
+        '"event":"restart_budget_exhausted","exitCode":1,"restartCount":5'
+      );
+      // The line carries closed numeric fields and never an environment dump.
+      expect(gatedStderr).not.toContain(SUPERVISOR_PATH);
+      expect(gatedStderr).not.toContain('CONTROL_PLANE_WRAPPER_COMMAND');
+
+      const off = spawnSupervisorCapturingStderr(
+        ungated,
+        { mode: 'fail', backoffMinMs: 0, backoffMaxMs: 0, divisor: 1 },
+        false
+      );
+      expect(await off.exited).toBe(1);
+      const ungatedStderr = await new Response(
+        off.stderr as unknown as ReadableStream<Uint8Array>
+      ).text();
+      expect(ungatedStderr).not.toContain('"source":"control-plane-supervisor"');
+    } finally {
+      await gated.cleanup();
+      await ungated.cleanup();
     }
   }, 20_000);
 });

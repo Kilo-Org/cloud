@@ -401,9 +401,18 @@ function sendHeartbeat(
     id: string;
     status: string;
     title: string;
+    gitUrl?: string;
+    gitBranch?: string;
+    parentSessionId?: string;
     platform?: string;
     scheduledAt?: string | null;
-    prLink?: { platform: string; prUrl: string; prNumber: number };
+    prLink?: {
+      platform: string;
+      prUrl: string;
+      prNumber: number;
+      headRef?: string;
+      headSha?: string;
+    };
   }>,
   options: {
     protocolVersion?: string;
@@ -1128,6 +1137,7 @@ describe('UserConnectionDO', () => {
           id: 's1',
           status: 'busy',
           title: 'PR session',
+          gitUrl: 'https://github.com/o/r',
           prLink: { platform: 'github', prUrl: 'https://github.com/o/r/pull/42', prNumber: 42 },
         },
       ]);
@@ -1149,6 +1159,49 @@ describe('UserConnectionDO', () => {
           ],
         },
       });
+    });
+
+    it('drops a heartbeat prLink whose URL names another repo', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      const webWs = addWebSocket(mockCtx, 'web-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          id: 's1',
+          status: 'busy',
+          title: 'Wrong PR session',
+          gitUrl: 'https://github.com/acme/widgets',
+          prLink: {
+            platform: 'github',
+            prUrl: 'https://github.com/someone-else/widgets/pull/7',
+            prNumber: 7,
+          },
+        },
+      ]);
+      await flushAsync();
+
+      const heartbeat = allSent(webWs).find(
+        (msg: { event?: string }) => msg.event === 'sessions.heartbeat'
+      ) as { data: { sessions: Array<Record<string, unknown>> } };
+      expect(heartbeat.data.sessions[0]).not.toHaveProperty('prLink');
+      expect(doInstance.getActiveSessions()[0]).not.toHaveProperty('prLink');
+    });
+
+    it('drops a heartbeat prLink when the session reports no repository', async () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        {
+          id: 's1',
+          status: 'busy',
+          title: 'Legacy PR session',
+          prLink: { platform: 'github', prUrl: 'https://github.com/o/r/pull/42', prNumber: 42 },
+        },
+      ]);
+
+      expect(doInstance.getActiveSessions()[0]).not.toHaveProperty('prLink');
     });
 
     it('projects capabilities.attachments=true on every aggregateSessions row when the owning CLI advertises it', async () => {

@@ -2047,6 +2047,7 @@
       "idCopied": "د ناستې ID کاپي شو",
       "couldNotCopyId": "د ناستې ID کاپي نه شو.",
       "untitled": "بې نومه ناسته",
+      "actions": "د ناستې کړنې",
       "sessionDeleted": "ناسته ړنګه شوه",
       "needsInput": "ځواب ته اړتیا لري",
       "fromPlatform": "له {{platform}} څخه",
@@ -2099,6 +2100,7 @@
       "readOnly": "دا ناسته یوازې لوستلی شئ.",
       "continueInNewSession": "په نوي ناسته کې دوام ورکړئ",
       "emptyDescription": "د پیل لپاره لاندې یو پیغام واستوئ.",
+      "emptyTranscriptDescription": "په دې ناسته کې تر اوسه پیغامونه نشته.",
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
       "renameAccessibility": "د ناستې نوم بدل کړئ: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "تر لېږلو مخکې یو ماډل غوره کړئ.",
       "preparingPlaceholder": "چاپېریال چمتو کېږي...",
       "finalizingPlaceholder": "بشپړېږي...",
+      "sessionLoadFailed": "غونډه پورته نه شوه. لومړی بیا هڅه وکړئ.",
       "cannotReceiveFiles": "دا ناسته فایلونه نه شي ترلاسه کولی. د خپل پیغام د لېږلو لپاره ضمیمې لرې کړئ.",
       "couldNotAttachFiles": "فایلونه ضمیمه نه شول. د بیا هڅې لپاره د لېږلو تڼۍ ووهئ.",
       "discardAttachmentsMessage": "هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
@@ -2634,6 +2637,7 @@
       "provider": "چمتو کوونکی",
       "totalCost": "ټول لګښت",
       "usageReflectsLatest": "د کارونې شمېرې د مرستیال د وروستي بشپړ شوي ځواب پر بنسټ دي.",
+      "usageUnavailable": "د شرایطو کارول نه شته",
       "tokenUsage": "د ټوکنونو کارونه",
       "cacheRate": "د کېش کچه",
       "modelsCount": "ماډلونه ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "بار کړئ",
       "loadWithHost": "{{host}} بار کړئ",
-      "httpsOnly": "یوازې د HTTPS انځورونه منل کېږي."
+      "httpsOnly": "یوازې د HTTPS انځورونه منل کېږي.",
+      "trustTitle": "له {{host}} څخه انځور بار کړو؟",
+      "trustMessage": "له {{host}} سره باور کول به د هغې انځورونه هربار پرته له پوښتنې بار کړي. تاسو کولی شئ وروسته د باوري کوربه‌ګانو له لیست څخه یې لرې کړئ.",
+      "loadOnce": "یو ځل بار کړه"
     },
     "markdownLink": {
       "invalidLink": "دا لینک نه شي پرانیستل کېدای.",
@@ -3181,8 +3188,12 @@
     "subtitle": "هغه کوربه‌ګان چې لینکونه یې ستاسو په اجازه بې له پوښتنې پرانیستل کېږي",
     "emptyTitle": "هېڅ باوري کوربه نشته",
     "emptyDescription": "که د لینک پر کوربه باور وکړئ، د هغه لینکونه به بیا له پوښتنې پرته پرانیستل کېږي.",
+    "imagesSectionTitle": "باوري انځور کوربه‌ګان",
+    "imagesSectionDescription": "د دې کوربه‌ګانو انځورونه بیا پرته له پوښتنې بار کېږي.",
+    "imagesSectionEmpty": "هېڅ باوري انځور کوربه نشته",
     "revoke": "پر {{host}} باور لغوه کړئ",
     "revokeMessage": "د دې کوربه لینکونه به بیا د تایید غوښتنه وکړي.",
+    "revokeImageMessage": "د دې کوربه انځورونه به بیا د تایید غوښتنه وکړي.",
     "backToPreferences": "بېرته تنظیماتو ته ورشئ"
   },
   "quickChat": {

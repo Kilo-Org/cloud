@@ -24,6 +24,7 @@ import type {
 } from '@kilocode/container-usage';
 import type { Env } from '../types.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
+import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import {
   ContainersAllocationConflictError,
   SandboxContainers,
@@ -197,22 +198,39 @@ class FakeContainer {
   destroyBehavior: 'ok' | 'reject' = 'ok';
   startBehavior: StartBehavior = 'ok';
   execHandler: (cmd: string[]) => ExecProcess = () => execProcess(0);
+  // PID 1 identity through `/proc/1/cmdline`. A manual `running = true` models the
+  // deployed `sleep infinity` main process; a native `start()` leaves the supervisor.
+  mainProcess: 'sleep' | 'supervisor' | 'ambiguous' = 'sleep';
+  identityAfterStart: 'sleep' | 'supervisor' | 'ambiguous' = 'supervisor';
+  stopAfterStart = false;
+
+  setInactivityTimeout(_ms: number | bigint): Promise<void> {
+    return Promise.resolve();
+  }
 
   start(options?: ContainerStartupOptions): void {
     this.startCalls.push(options as ContainerStartupOptions);
     if (this.startBehavior === 'reject') throw new Error('container start failed');
     this.running = true;
+    if (options?.entrypoint?.includes(CONTROL_SUPERVISOR_PATH)) {
+      this.mainProcess = this.identityAfterStart;
+    }
+    if (this.stopAfterStart) this.running = false;
     if (this.startBehavior === 'effect-then-reject') {
       throw new Error('container start failed after taking effect');
     }
   }
 
   async exec(cmd: string[]): Promise<ExecProcess> {
+    if (cmd[0] === 'cat' && cmd[1] === '/proc/1/cmdline') {
+      if (this.mainProcess === 'ambiguous') return cmdlineProcess('');
+      return cmdlineProcess(
+        this.mainProcess === 'supervisor'
+          ? `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
+          : 'sleep\0infinity'
+      );
+    }
     return this.execHandler(cmd);
-  }
-
-  async snapshotContainer(_options: ContainerSnapshotOptions): Promise<ContainerSnapshot> {
-    return { id: 'snap-1', size: 1 };
   }
 
   async destroy(): Promise<void> {
@@ -224,6 +242,17 @@ class FakeContainer {
 
 function execProcess(exitCode: number): ExecProcess {
   return { pid: 1, exitCode: Promise.resolve(exitCode) } as unknown as ExecProcess;
+}
+
+function cmdlineProcess(text: string): ExecProcess {
+  const bytes = new TextEncoder().encode(text);
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return {
+    pid: 1,
+    exitCode: Promise.resolve(0),
+    output: () => Promise.resolve({ stdout: buffer, stderr: new ArrayBuffer(0) }),
+  } as unknown as ExecProcess;
 }
 
 function setup(
@@ -412,24 +441,32 @@ describe('ContainersBilling identity and admission', () => {
 });
 
 describe('ContainersBilling physical lifecycle', () => {
-  it('activates metering when the container starts even if execWrapper throws', async () => {
-    const { instance, container, storage, meter, pendingTasks } = setup();
-    await admit(instance, 'standard-4');
-    container.execHandler = () => {
+  it('activates metering when a resumed sleep container execs and the wrapper exec throws', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup({
+      record: {
+        state: 'launching',
+        allocationRef: REF_A,
+        stopOpId: null,
+        lastSnapshot: null,
+        instance: 'standard-4',
+        wrapperAttempt: 'not_started',
+      },
+    });
+    container.running = true;
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') return execProcess(1);
       throw new Error('spawn failed');
     };
+    await admit(instance, 'standard-4');
 
-    await expect(
-      instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' })
-    ).rejects.toThrow('spawn failed');
+    await expect(launch(instance, REF_A, 'standard-4')).rejects.toThrow('spawn failed');
     await flushPending(pendingTasks);
 
     const generation = readGeneration(storage);
     expect(generation).toEqual(expect.any(String));
     expect(readMeasurementStarted(storage)).toBe(true);
     expect(readSchedules(storage)?.billingHeartbeatTick).toMatchObject({ payload: generation });
-    expect(container.startCalls).toHaveLength(1);
-    expect(container.startCalls[0]).toMatchObject({ instance: 'standard-4' });
+    expect(container.startCalls).toHaveLength(0);
     expect(meter.recordStartInputs).toHaveLength(1);
     expect((await instance.getState()).status).toBe('running');
   });
@@ -992,7 +1029,7 @@ describe('ContainersBilling launch instance persistence', () => {
     expect(readRecord(first.storage).billingConfigured).toBeUndefined();
   });
 
-  it('persists the supplied instance when a resumed launch start succeeds then the wrapper exec fails', async () => {
+  it('persists the supplied instance when a resumed sleep wrapper exec fails', async () => {
     const first = setup({
       record: {
         state: 'launching',
@@ -1002,6 +1039,7 @@ describe('ContainersBilling launch instance persistence', () => {
         wrapperAttempt: 'not_started',
       },
     });
+    first.container.running = true;
     first.container.execHandler = cmd => {
       if (cmd[0] === 'pgrep') return execProcess(1);
       throw new Error('spawn failed');

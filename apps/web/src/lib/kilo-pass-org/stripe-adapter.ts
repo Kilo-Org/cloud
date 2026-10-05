@@ -1230,7 +1230,7 @@ export async function createOrganizationKiloPassCheckout(input: {
   });
   const invoice = typeof updated.latest_invoice === 'object' ? updated.latest_invoice : null;
   if (input.attempt && invoice) {
-    reportChargeAttempted({
+    await reportChargeAttempted({
       flow: 'kilo_pass',
       userId: input.actorUserId,
       orgId: input.organizationId,
@@ -1238,6 +1238,7 @@ export async function createOrganizationKiloPassCheckout(input: {
       accountCreatedAt: input.attempt.accountCreatedAt,
       ip: input.attempt.ip,
       ipCountry: input.attempt.ipCountry,
+      ja4: input.attempt.ja4,
     });
   }
   let feeResult: Awaited<ReturnType<typeof attachPreparedOrganizationKiloPassServiceFee>> | null =

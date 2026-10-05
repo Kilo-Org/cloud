@@ -2047,6 +2047,7 @@
       "idCopied": "Seansi ID on kopeeritud",
       "couldNotCopyId": "Seansi ID-d ei õnnestunud kopeerida.",
       "untitled": "Pealkirjata seanss",
+      "actions": "Seansi toimingud",
       "sessionDeleted": "Seanss on kustutatud",
       "needsInput": "vajab sisendit",
       "fromPlatform": "{{platform}} kaudu",
@@ -2099,6 +2100,7 @@
       "readOnly": "Seda seanssi saab ainult lugeda.",
       "continueInNewSession": "Jätka uues seansis",
       "emptyDescription": "Alustamiseks kirjuta allolevale väljale sõnum ja saada see.",
+      "emptyTranscriptDescription": "Selles seansis pole veel sõnumeid.",
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "Enne saatmist vali mudel.",
       "preparingPlaceholder": "Keskkonna seadistamine...",
       "finalizingPlaceholder": "Lõpetamine...",
+      "sessionLoadFailed": "Seanssi ei saanud laadida. Proovi esmalt uuesti.",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemalda manused.",
       "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puuduta saatmisnuppu.",
       "discardAttachmentsMessage": "Üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
@@ -2634,6 +2637,7 @@
       "provider": "Pakkuja",
       "totalCost": "Kogukulu",
       "usageReflectsLatest": "Kasutusandmed kajastavad assistendi viimast valmis vastust.",
+      "usageUnavailable": "Konteksti kasutamine pole saadaval",
       "tokenUsage": "Tokenite kasutus",
       "cacheRate": "Vahemälu osakaal",
       "modelsCount": "Mudelid ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "Laadi",
       "loadWithHost": "Laadi {{host}}",
-      "httpsOnly": "Laadida saab ainult HTTPS-ühendusega pilte."
+      "httpsOnly": "Laadida saab ainult HTTPS-ühendusega pilte.",
+      "trustTitle": "Laadi pilt saidilt {{host}}?",
+      "trustMessage": "Kui usaldad hosti {{host}}, laaditakse selle pildid ilma iga kord küsimata. Saad selle hiljem jaotises Usaldatud hostid tühistada.",
+      "loadOnce": "Laadi üks kord"
     },
     "markdownLink": {
       "invalidLink": "Seda linki ei saa avada.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Hostid, mille lingid avatakse kinnitust küsimata",
     "emptyTitle": "Usaldatud hoste pole",
     "emptyDescription": "Kui usaldad lingi hosti, avatakse selle hosti lingid edaspidi kinnitust küsimata.",
+    "imagesSectionTitle": "Usaldatud pildihostid",
+    "imagesSectionDescription": "Nende hostide pilte laaditakse ilma uuesti küsimata.",
+    "imagesSectionEmpty": "Usaldatud pildihoste pole",
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "revokeMessage": "Selle hosti lingid küsivad taas kinnitust.",
+    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust.",
     "backToPreferences": "Tagasi eelistuste juurde"
   },
   "quickChat": {

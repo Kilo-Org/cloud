@@ -2047,6 +2047,7 @@
       "idCopied": "ID sesi disalin",
       "couldNotCopyId": "Tidak dapat menyalin ID sesi.",
       "untitled": "Sesi tanpa tajuk",
+      "actions": "Tindakan sesi",
       "sessionDeleted": "Sesi dipadam",
       "needsInput": "perlu input",
       "fromPlatform": "daripada {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Sesi ini untuk bacaan sahaja.",
       "continueInNewSession": "Teruskan dalam sesi baharu",
       "emptyDescription": "Hantar mesej di bawah untuk bermula.",
+      "emptyTranscriptDescription": "Sesi ini belum mempunyai mesej.",
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
       "renameAccessibility": "Namakan semula sesi: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "Pilih model sebelum menghantar mesej.",
       "preparingPlaceholder": "Menyediakan persekitaran...",
       "finalizingPlaceholder": "Menyelesaikan tugasan...",
+      "sessionLoadFailed": "Sesi tidak dapat dimuatkan. Cuba lagi dahulu.",
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
       "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
       "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
@@ -2634,6 +2637,7 @@
       "provider": "Penyedia",
       "totalCost": "Jumlah kos",
       "usageReflectsLatest": "Penggunaan ini berdasarkan respons pembantu terkini yang telah selesai dijana.",
+      "usageUnavailable": "Penggunaan konteks tidak tersedia",
       "tokenUsage": "Penggunaan token",
       "cacheRate": "Kadar cache",
       "modelsCount": "Model ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "Muatkan",
       "loadWithHost": "Muatkan {{host}}",
-      "httpsOnly": "Hanya imej HTTPS dibenarkan."
+      "httpsOnly": "Hanya imej HTTPS dibenarkan.",
+      "trustTitle": "Muatkan imej daripada {{host}}?",
+      "trustMessage": "Mempercayai {{host}} akan memuatkan imejnya tanpa bertanya setiap kali. Anda boleh menarik baliknya kemudian dalam Hos yang dipercayai.",
+      "loadOnce": "Muatkan sekali"
     },
     "markdownLink": {
       "invalidLink": "Pautan ini tidak boleh dibuka.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Hos yang anda benarkan untuk dibuka tanpa pengesahan",
     "emptyTitle": "Tiada hos yang dipercayai",
     "emptyDescription": "Jika anda mempercayai hos sesuatu pautan, pautan ke hos itu akan dibuka tanpa meminta pengesahan lagi.",
+    "imagesSectionTitle": "Hos imej yang dipercayai",
+    "imagesSectionDescription": "Imej daripada hos ini dimuatkan tanpa bertanya lagi.",
+    "imagesSectionEmpty": "Tiada hos imej yang dipercayai",
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
     "revokeMessage": "Pautan ke hos ini akan meminta pengesahan lagi.",
+    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi.",
     "backToPreferences": "Kembali ke keutamaan"
   },
   "quickChat": {

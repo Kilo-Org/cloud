@@ -4,6 +4,12 @@ import { ChatMarkdownText } from './chat-markdown-text';
 type TextPartRendererProps = {
   text: string;
   /**
+   * Render-cache scope for this text's markdown, so identical text in another
+   * message never reuses the cached elements whose handlers close over a
+   * specific message. Omitted outside a message bubble.
+   */
+  renderScope?: string;
+  /**
    * Long-press handler forwarded into rendered code fences' copy trigger so a
    * press-and-hold on a fence still opens message details. Omitted outside a
    * message bubble.
@@ -11,7 +17,11 @@ type TextPartRendererProps = {
   onLongPressCode?: () => void;
 };
 
-export function TextPartRenderer({ text, onLongPressCode }: Readonly<TextPartRendererProps>) {
+export function TextPartRenderer({
+  text,
+  renderScope,
+  onLongPressCode,
+}: Readonly<TextPartRendererProps>) {
   if (!hasNonWhitespaceText(text)) {
     return null;
   }
@@ -23,6 +33,7 @@ export function TextPartRenderer({ text, onLongPressCode }: Readonly<TextPartRen
       value={text}
       variant="assistant"
       selectable={false}
+      renderScope={renderScope}
       onLongPressCode={onLongPressCode}
     />
   );

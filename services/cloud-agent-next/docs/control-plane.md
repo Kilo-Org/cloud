@@ -111,7 +111,7 @@ terminal. Nothing else.
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
 | Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
 | Cancel one queued message | That message → `cancelled`. |
-| Backstop alarm | `queued` older than 20 minutes → `failed` (`preparation_timeout`). `accepted` older than 65 minutes → `failed` (`no_outcome`). |
+| Backstop alarm | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 65 minutes → `failed` (`no_outcome`). |
 
 Stop still forwards a best-effort abort to an existing ready Kilo route when no
 message is queued or accepted and the wrapper has no active turn. It does not
@@ -120,7 +120,7 @@ rewrite terminal message outcomes or prepare/wake a stopped sandbox.
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
 are derived from the owners' timers so the backstop never ends work that its owner still runs:
-queued = reconnect window (5 min) + one preparation attempt (12 min) + 3 min, which covers the
+queued = reconnect window (90 s) + one preparation attempt (12 min) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
 sandbox); accepted = turn hard cap (60 min) + 5 min. After every message change the Session DO sets
 the alarm to the earliest backstop, transport-recovery, report or callback obligation, and clears it
@@ -196,7 +196,7 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 | `connected` | `disconnected` | Socket closed, or no heartbeat for 45 s | — |
 | `connected` | `stopping` | No activity for 10 min, or explicit stop or delete | Idle 10 min |
 | `disconnected` | `connected` | Wrapper `hello`, same or new `wrapperId` | — |
-| `disconnected` | `stopping` | No activity for 10 min, or 5 min after the last heartbeat, or explicit stop or delete | Idle 10 min, or reconnect 5 min, whichever is earlier |
+| `disconnected` | `stopping` | No activity for 10 min, or 90 s after the last frame received, or explicit stop or delete | Idle 10 min, or reconnect 90 s, whichever is earlier |
 | `stopping` | `stopped` | Provider confirms stop, or the existing stop ladder ends | Existing ladder |
 | any | `stopped` | Provider reports the sandbox gone | — |
 
@@ -300,7 +300,7 @@ notification, so a lost notification never leaves it waiting.
 
 ### Activity, idle stop and provider lease
 
-The wrapper heartbeat (every 15 s) carries `active`. The sandbox is active while a route prepares,
+The wrapper heartbeat (every 5 s) carries `active`. The sandbox is active while a route prepares,
 a Kilo session is busy or finalizing and not waiting for the user, a terminal has input, or a message
 was delivered in the last minute. After 10 minutes without activity the Sandbox DO stops the
 sandbox. Waiting on a question or permission is not activity. While the sandbox is active, the
@@ -365,6 +365,20 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 
 ### Connection
 
+- A new wrapper advertises optional `heartbeatAck: true` in `hello`; the Sandbox DO echoes it
+  in `welcome` only when offered. It sends `{ type: 'heartbeat_ack' }` after applying each valid
+  heartbeat from the current bound allocation/connection. Invalid, unbound, stale and terminal
+  allocation frames are not acknowledged. Negotiation lives in the socket attachment across hibernation.
+- Only a negotiated welcome starts the wrapper's 15 s acknowledgement deadline. Each acknowledgement
+  resets it; other frames do not. Expiry detaches/fences the socket and schedules the existing
+  reconnect backoff independently of close delivery. Old socket messages and callbacks cannot affect
+  the replacement. Explicit recycle clears timers, detaches the old socket and reconnects immediately
+  without waiting for close. Shutdown cancels all timers permanently. This does not restart Kilo or change billing.
+- Older v2 DOs strictly reject the capability-bearing hello. If still awaiting welcome after 1 s,
+  the wrapper sends the original hello on the same socket. A legacy welcome enables periodic
+  heartbeats without an acknowledgement deadline; old wrappers receive neither the optional field
+  nor acknowledgement frames. Duplicate hello on a bound socket is ignored.
+
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the
   rejection arrives before `welcome`. Terminal admission rejection must not become an HTTP 401
@@ -393,6 +407,15 @@ text, not route state. A route already prepared in this process (checkout presen
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
 including a new Kilo restart budget.
 
+Eligible managed GitHub HTTPS preparation clone and fetch, and only those invocations, pass two
+invocation-scoped options together: `proactiveAuth=basic` so the first request carries the existing
+URL-bound control alias, and `followRedirects=false` so every redirect fails instead of letting Git
+reattach the alias to a redirected request. The credential remains the existing control alias; the
+only credential flow is contained resolution, repository-authorized redemption, and the bounded
+Retry-After handler. Every redirect fails the operation, including a same-origin redirect from a
+renamed or transferred repository, so the caller must use the current direct repository URL. The
+options are command arguments, not Git config.
+
 ### Prompts and turn outcome
 
 - `session.prompt` is submitted to Kilo with `messageID` = `messageId`, in arrival order, also while
@@ -419,8 +442,10 @@ including a new Kilo restart budget.
     completion signals. The wrapper does not keep a copy of Kilo's native prompt queue.
   - `failed`: Kilo reports a final error; 7 minutes without real progress; the 60-minute hard cap;
     Kilo restarted during the turn after real progress, or a second time; prompt submission failed.
-    For no progress and the cap, the wrapper aborts the Kilo session first. Real progress is text, reasoning or tool events from that
-    session; busy, retry and heartbeat events are not, and waiting on the user pauses the clock.
+    For no progress and the cap, the wrapper aborts the Kilo session first. Real progress is text,
+    reasoning or tool events from the routed root session or any session resolved into its
+    descendant tree; busy, retry and heartbeat events are not, and waiting on the user pauses the
+    clock.
   - `cancelled`: the turn was aborted.
 - Finalization (auto-commit, condense) runs after Kilo's completed turn-close. The wrapper sends a `finalizing`
   event when it starts. Its failures are warning events; the outcome stays `completed`. A prompt
@@ -476,6 +501,21 @@ exit it restarts the wrapper with 1 s to 30 s backoff, at most 5 times in 10 min
 ends the loop. If the loop gives up, the Sandbox DO `starting` or `disconnected` timer stops the
 sandbox.
 
+The provider launch command is not the only starter. On the native Cloudflare Containers runtime the
+container main process is the supervisor: `start()` is issued with `['/bin/sh', supervisor-path]` as
+its entrypoint, and PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation, bounded by the
+wrapper readiness deadline. PID 1 identity is not wrapper readiness: the wrapper socket and the
+Sandbox DO `starting` timer stay the readiness owner, and no provider poll or wrapper-child probe is
+added for that path. Sandbox SDK and Vercel still exec the supervisor against a living PID 1.
+
+A native attempt that already issued the main process does not start another supervisor when that
+process is gone; the persisted `exec_pending` fence is not reset, and the next allocation may start a
+new one. Native supervisor exit stops the container, and the Sandbox DO timer still owns stop.
+Operational stderr (including the supervisor script's native-gated JSON lines) is native-only and is
+not a substitute for the R2 file archive or the diagnostic upload. It also carries the wrapper's
+periodic 60 s status line and its normal prepare/outcome/start/exit transitions; those are
+native-only and are not an upload substitute either.
+
 ## 8. Timers
 
 Each timer has one owner. All values live in one constants module per side. Local E2E may shorten
@@ -483,7 +523,7 @@ them through one development-only override.
 
 | Owner | Timer | Value | On expiry |
 |---|---|---|---|
-| Session DO | Queued backstop | 20 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
+| Session DO | Queued backstop | 16.5 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
 | Session DO | Accepted backstop | 65 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
@@ -492,7 +532,7 @@ them through one development-only override.
 | Sandbox DO | Wrapper first connect | 5 min from launch | Stop the sandbox |
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
-| Sandbox DO | Reconnect | 5 min from the last frame received | Stop the sandbox |
+| Sandbox DO | Reconnect | 90 s from the last frame received | Stop the sandbox |
 | Sandbox DO | Route preparation | 12 min per preparation attempt | Route `failed` (`preparation_timeout`) |
 | Sandbox DO | Session notification | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop |
 | Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
@@ -520,7 +560,7 @@ them through one development-only override.
 | Clone network error | Wrapper | 3 attempts | Queued fail (`workspace_setup_failed`) |
 | Setup command fails | Wrapper | None | Queued fail with the command output visible |
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
-| Socket down 5 min | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
+| Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
 | Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
 | Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_restarted`) |
 | Kilo crash or dead event stream | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang |
@@ -530,7 +570,7 @@ them through one development-only override.
 | Turn over 60 min | Wrapper | Abort the turn | Accepted fail (`execution_limit`) |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
-| Notification lost | Session DO backstop | — | Fail at 20 or 65 min |
+| Notification lost | Session DO backstop | — | Fail at 16.5 or 65 min |
 | User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
@@ -571,7 +611,7 @@ requires containment. Unsupported modes and invalid modern facade configuration 
 before queuing work. Contained SCM resolution and Vercel policy remain enforced, and MCP still
 requires independent per-session runtimes.
 
-Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`,
+Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `session.credentials`,
 `session.prompt`, `session.abort`, `session.answer`, `session.release`, `session.events`,
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
@@ -643,7 +683,10 @@ counts.
     lookup, not only with direct credentials. Compatible legacy siblings can both publish/export
     native history through the installed shared alias. Busy renewal and a new preparation attempt
     leave that alias usable with fresh backing material. Policy failure never publishes rejected
-    credentials; physical replacement rejects old aliases and preserves attempt deadlines.
+    credentials; physical replacement rejects old aliases and preserves attempt deadlines. Eligible
+    managed GitHub HTTPS clone and fetch carry the control alias on the first request and reject
+    every redirect, while the credential flow stays contained resolution, repository-authorized
+    redemption, and the bounded Retry-After handler.
 8. **Stop during a turn.** Messages `cancelled` at once; Kilo aborted; the sandbox and the other
    routes keep running; the next message works on the warm route.
 9. **Setup command fails.** Queued message fails with a visible reason; after fixing the setup the
@@ -654,8 +697,8 @@ counts.
    settle B's work. Reconstruction retains recovery/backstop deadlines; Stop, cancellation and deletion
    clear queued recovery without dispatch or duplicate reports/callbacks. Persistent transport loss
    exhausts the one pass without polling preparation or replaying accepted work.
-10. **Socket drop, wrapper returns within 5 minutes.** The turn completes; no message fails.
-11. **Socket down for 5 minutes.** The sandbox stops; accepted messages fail (`connection_lost`);
+10. **Socket drop, wrapper returns within 90 seconds.** The turn completes; no message fails.
+11. **Socket down for 90 seconds.** The sandbox stops; accepted messages fail (`connection_lost`);
     the next message creates a new sandbox in the same chat with restored history.
 12. **Kilo killed after the turn made progress.** The wrapper restarts Kilo; accepted messages fail
     (`agent_restarted`); the next message works without a new sandbox.
@@ -695,7 +738,7 @@ counts.
     overflow drops newest, loss diagnostics stay bounded/internal and expired queue heads make no RPC.
     Heartbeats, alarms, stop and reconnect continue while notifications are held. Release retires
     references; reconstruction replays no notification backlog. Public events, reports, callbacks
-     and the 20/65-minute lost-notification backstops are unchanged.
+     and the 16.5/65-minute lost-notification backstops are unchanged.
 22. **Permanent versus transient creation failure.** Balance lost after send preflight fails queued
     work promptly with `billing_blocked`, not preparation timeout. Proven local invalid configuration
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,
@@ -721,5 +764,9 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
 - An unconfirmed provider stop is logged; the container may run until the provider stops it.
 - A killed container is not found by polling the provider. It is a wrapper connection that does not
   return. The user waits at most the reconnect window, then the message fails `connection_lost`.
+- The reconnect window is short so a queued message does not wait long on a wrapper that is gone. A
+  live wrapper reconnects within seconds (backoff 1 s to 30 s; supervisor restart 1 s to 16 s), but
+  one cut off from the Sandbox DO for longer than 90 s, for example during a platform outage, loses
+  its accepted turn (`connection_lost`).
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
   the legacy plane.

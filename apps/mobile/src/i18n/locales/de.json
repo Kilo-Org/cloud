@@ -1534,6 +1534,7 @@
       "idCopied": "Sitzungs-ID kopiert",
       "couldNotCopyId": "Die Sitzungs-ID konnte nicht kopiert werden.",
       "untitled": "Sitzung ohne Titel",
+      "actions": "Sitzungsaktionen",
       "sessionDeleted": "Sitzung gelöscht",
       "needsInput": "eingabe erforderlich",
       "fromPlatform": "von {{platform}}",
@@ -1586,6 +1587,7 @@
       "readOnly": "Diese Sitzung ist schreibgeschützt.",
       "continueInNewSession": "In einer neuen Sitzung fortsetzen",
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
+      "emptyTranscriptDescription": "Diese Sitzung hat noch keine Nachrichten.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
       "renameAccessibility": "Sitzung umbenennen: {{title}}",
@@ -2052,6 +2054,7 @@
       "selectModelBeforeSending": "Wähle vor dem Senden ein Modell aus.",
       "preparingPlaceholder": "Umgebung wird eingerichtet…",
       "finalizingPlaceholder": "Wird abgeschlossen…",
+      "sessionLoadFailed": "Die Sitzung konnte nicht geladen werden. Versuchen Sie es zuerst erneut.",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
       "couldNotAttachFiles": "Die Dateien konnten nicht angehängt werden. Tippe auf „Senden“, um es erneut zu versuchen.",
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
@@ -2121,6 +2124,7 @@
       "provider": "Anbieter",
       "totalCost": "Gesamtkosten",
       "usageReflectsLatest": "Die Nutzungswerte beziehen sich auf die zuletzt fertiggestellte Antwort des Assistenten.",
+      "usageUnavailable": "Kontextnutzung nicht verfügbar",
       "tokenUsage": "Token-Nutzung",
       "cacheRate": "Cache-Rate",
       "modelsCount": "Modelle ({{displayCount}})",
@@ -2155,7 +2159,10 @@
     "markdownImage": {
       "load": "Laden",
       "loadWithHost": "Von {{host}} laden",
-      "httpsOnly": "Bilder können nur über HTTPS geladen werden."
+      "httpsOnly": "Bilder können nur über HTTPS geladen werden.",
+      "trustTitle": "Bild von {{host}} laden?",
+      "trustMessage": "Wenn du {{host}} vertraust, werden seine Bilder geladen, ohne jedes Mal zu fragen. Du kannst das später unter Vertrauenswürdige Hosts widerrufen.",
+      "loadOnce": "Einmal laden"
     },
     "markdownLink": {
       "invalidLink": "Dieser Link kann nicht geöffnet werden.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Vertrauenswürdige Hosts, deren Links sich ohne Rückfrage öffnen",
     "emptyTitle": "Keine vertrauenswürdigen Hosts",
     "emptyDescription": "Wenn du dem Host eines Links vertraust, öffnen sich seine Links ohne erneute Rückfrage.",
+    "imagesSectionTitle": "Vertrauenswürdige Bild-Hosts",
+    "imagesSectionDescription": "Bilder von diesen Hosts werden geladen, ohne erneut zu fragen.",
+    "imagesSectionEmpty": "Keine vertrauenswürdigen Bild-Hosts",
     "revoke": "Vertrauen in {{host}} widerrufen",
     "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
+    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung.",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
   "quickChat": {

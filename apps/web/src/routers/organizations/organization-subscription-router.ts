@@ -36,7 +36,7 @@ import * as z from 'zod';
 import type Stripe from 'stripe';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { BillingCycleSchema } from '@/lib/organizations/organization-types';
-import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import { ipCountryFromHeaders, ja4FromHeaders } from '@/lib/bouncer/credit-events';
 import { successResult } from '@/lib/maybe-result';
 import { client } from '@/lib/stripe-client';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
@@ -288,6 +288,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           accountCreatedAt: org.created_at,
           ip: ctx.ip,
           ipCountry: ipCountryFromHeaders(ctx.headersList),
+          ja4: ja4FromHeaders(ctx.headersList),
         },
       });
       return { url: result };
@@ -376,6 +377,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
             userId: ctx.user.id,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
           }
         );
       } catch (error) {

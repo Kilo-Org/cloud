@@ -29,9 +29,9 @@ import {
 import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { APP_URL } from '@/lib/constants';
 import {
-  reportChargeAttempted,
+  enqueueChargeAttempted,
   ipCountryFromHeaders,
-  type ChargeAttemptContext,
+  ja4FromHeaders,
 } from '@/lib/bouncer/credit-events';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
@@ -1303,9 +1303,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
-  /** Bouncer context; omitted by tests that only exercise the checkout shape. */
-  attempt?: ChargeAttemptContext;
-}): Promise<CheckoutSessionLike> {
+}): Promise<CheckoutSessionLike & { amountCents: number }> {
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
     ...params.deps,
@@ -1315,17 +1313,6 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     stripe: requireTopUpPriceReader(deps.stripe),
     priceId: params.priceId,
   });
-
-  if (params.attempt) {
-    reportChargeAttempted({
-      flow: 'kilo_pass',
-      userId: params.kiloUserId,
-      amountCents: principalMinor,
-      accountCreatedAt: params.attempt.accountCreatedAt,
-      ip: params.attempt.ip,
-      ipCountry: params.attempt.ipCountry,
-    });
-  }
 
   const prepared = await prepareTopUpCheckoutFee({
     flow: PERSONAL_KILO_PASS_CHECKOUT_FLOW,
@@ -1350,7 +1337,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   const createSession =
     deps.createSession ?? (sessionParams => stripe.checkout.sessions.create(sessionParams));
 
-  return createTopUpCheckoutSession({
+  const session = await createTopUpCheckoutSession({
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'subscription',
@@ -1379,6 +1366,8 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     createSession,
     deps,
   });
+  // Report the resolved principal explicitly; the caller enqueues it inside its transaction.
+  return { ...session, amountCents: principalMinor };
 }
 
 export type CreatePersonalKiloPassCheckoutSession = typeof createPersonalKiloPassCheckoutSession;
@@ -2947,11 +2936,19 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
-            attempt: {
-              accountCreatedAt: ctx.user.created_at,
-              ip: ctx.ip,
-              ipCountry: ipCountryFromHeaders(ctx.headersList),
-            },
+          }),
+        // Enqueue inside the checkout transaction for the charged session, created or reused. The
+        // stable id derived from the session id makes a retry or reuse idempotent.
+        onSession: (tx, session) =>
+          enqueueChargeAttempted(tx, {
+            eventId: `kilo-pass-checkout:${session.id}`,
+            flow: 'kilo_pass',
+            userId: ctx.user.id,
+            amountCents: session.amountCents ?? session.amount_total ?? 0,
+            accountCreatedAt: ctx.user.created_at,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
           }),
       });
     }),

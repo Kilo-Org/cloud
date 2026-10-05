@@ -2047,6 +2047,7 @@
       "idCopied": "Kitambulisho cha kikao kimenakiliwa",
       "couldNotCopyId": "Imeshindikana kunakili kitambulisho cha kikao.",
       "untitled": "Kikao kisicho na jina",
+      "actions": "Hatua za kikao",
       "sessionDeleted": "Kikao kimefutwa",
       "needsInput": "inasubiri jibu",
       "fromPlatform": "kutoka kwenye {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Kikao hiki ni cha kusoma tu.",
       "continueInNewSession": "Endelea katika kikao kipya",
       "emptyDescription": "Tuma ujumbe hapa chini ili uanze.",
+      "emptyTranscriptDescription": "Kikao hiki hakina ujumbe bado.",
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
@@ -2565,6 +2567,7 @@
       "selectModelBeforeSending": "Chagua modeli kabla ya kutuma.",
       "preparingPlaceholder": "Inatayarisha mazingira...",
       "finalizingPlaceholder": "Inahitimisha...",
+      "sessionLoadFailed": "Kipindi hakikuweza kupakiwa. Jaribu tena kwanza.",
       "cannotReceiveFiles": "Kikao hiki hakiwezi kupokea faili. Ondoa viambatisho ili utume ujumbe wako.",
       "couldNotAttachFiles": "Imeshindikana kuambatisha faili. Gusa Tuma ili ujaribu tena.",
       "discardAttachmentsMessage": "Faili zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
@@ -2634,6 +2637,7 @@
       "provider": "Mtoa huduma",
       "totalCost": "Gharama ya jumla",
       "usageReflectsLatest": "Matumizi yanatokana na jibu la mwisho la msaidizi lililokamilika.",
+      "usageUnavailable": "Matumizi ya muktadha hayapatikani",
       "tokenUsage": "Matumizi ya tokeni",
       "cacheRate": "Kiwango cha hifadhi ya muda",
       "modelsCount": "Modeli ({{displayCount}})",
@@ -2668,7 +2672,10 @@
     "markdownImage": {
       "load": "Pakia",
       "loadWithHost": "Pakia {{host}}",
-      "httpsOnly": "Ni picha za HTTPS pekee zinazoruhusiwa."
+      "httpsOnly": "Ni picha za HTTPS pekee zinazoruhusiwa.",
+      "trustTitle": "Pakia picha kutoka {{host}}?",
+      "trustMessage": "Kumuamini {{host}} kutapakia picha zake bila kuuliza kila mara. Unaweza kuondoa hii baadaye kwenye Tovuti zinazoaminika.",
+      "loadOnce": "Pakia mara moja"
     },
     "markdownLink": {
       "invalidLink": "Kiungo hiki hakiwezi kufunguliwa.",
@@ -3181,8 +3188,12 @@
     "subtitle": "Tovuti unazoamini zifunguke bila kuomba ruhusa",
     "emptyTitle": "Hakuna tovuti zinazoaminika",
     "emptyDescription": "Ukiamini tovuti ya kiungo, viungo vyake hufunguka bila kuomba ruhusa tena.",
+    "imagesSectionTitle": "Tovuti za picha zinazoaminika",
+    "imagesSectionDescription": "Picha kutoka tovuti hizi hupakiwa bila kuuliza tena.",
+    "imagesSectionEmpty": "Hakuna tovuti za picha zinazoaminika",
     "revoke": "Ondoa uaminifu kwa {{host}}",
     "revokeMessage": "Viungo vya tovuti hii vitaomba uthibitisho tena.",
+    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena.",
     "backToPreferences": "Rudi kwenye mapendeleo"
   },
   "quickChat": {

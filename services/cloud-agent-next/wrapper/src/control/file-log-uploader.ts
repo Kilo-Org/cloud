@@ -4,8 +4,11 @@ import path from 'node:path';
 import {
   CONTROL_LOG_ARCHIVE_NAME,
   CONTROL_LOG_MAX_ARCHIVE_BYTES,
+  controlUploadFailureStartsEpisode,
+  type ControlDiagnosticProjector,
   type ControlDiagnosticReporter,
   type ControlLogUploadResult,
+  type ControlUploadFailureSample,
 } from '../../../src/shared/control-diagnostics.js';
 import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
@@ -24,6 +27,7 @@ type Options = {
   homeRoot?: string;
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   onDiagnostic?: ControlDiagnosticReporter;
+  projector?: ControlDiagnosticProjector;
   intervalMs?: number;
   uploadTimeoutMs?: number;
 };
@@ -142,17 +146,35 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
   let queuedUpload: Upload | undefined;
   let finalUpload: Promise<void> | undefined;
   let stopped = false;
+  let lastFailureSample: ControlUploadFailureSample | undefined;
 
   function reportFailure(category: ControlLogUploadResult, statusCode?: number): void {
     try {
+      const safeStatusCode =
+        statusCode !== undefined && statusCode >= 100 && statusCode <= 599 ? statusCode : undefined;
+      // The archive owner still buffers one R2 record per failure while the
+      // uploader accepts; the native stderr line is a separate episode latch so
+      // a repeated same-category failure does not repeat the line.
       options.onDiagnostic?.('control.upload', {
         phase: 'failed',
         category,
-        statusCode:
-          statusCode !== undefined && statusCode >= 100 && statusCode <= 599
-            ? statusCode
-            : undefined,
+        statusCode: safeStatusCode,
       });
+      const sample: ControlUploadFailureSample = {
+        category,
+        ...(safeStatusCode === undefined ? {} : { statusCode: safeStatusCode }),
+      };
+      if (
+        options.projector?.enabled &&
+        controlUploadFailureStartsEpisode(lastFailureSample, sample)
+      ) {
+        options.projector('control.upload', {
+          phase: 'failed',
+          category,
+          statusCode: safeStatusCode,
+        });
+      }
+      lastFailureSample = sample;
     } catch {
       return;
     }
@@ -215,6 +237,9 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
             if (!abort.signal.aborted && response.status !== 204) {
               logToFile(`Control file log upload failed: ${response.status}`);
               reportFailure('http_rejection', response.status);
+            } else if (!abort.signal.aborted) {
+              // A 204 accepts the archive: the next failure starts a new episode.
+              lastFailureSample = undefined;
             }
             void response.body?.cancel().catch(() => undefined);
           })(),

@@ -51,8 +51,10 @@ const mockedLogMicrodollarUsage = jest.fn(
 );
 jest.mock('@/lib/ai-gateway/processUsage', () => ({
   ...(jest.requireActual('@/lib/ai-gateway/processUsage') as Record<string, unknown>),
-  logMicrodollarUsage: (stats: MicrodollarUsageStats, ctx: MicrodollarUsageContext) =>
-    mockedLogMicrodollarUsage(stats, ctx),
+  logMicrodollarUsageAndReportToBouncer: (
+    stats: MicrodollarUsageStats,
+    ctx: MicrodollarUsageContext
+  ) => mockedLogMicrodollarUsage(stats, ctx),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);

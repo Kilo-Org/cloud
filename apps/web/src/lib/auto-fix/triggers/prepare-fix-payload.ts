@@ -1,10 +1,3 @@
-/**
- * Prepare Fix Payload
- *
- * Extracts all preparation logic (DB lookups, token generation)
- * Returns complete payload ready for cloud agent
- */
-
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
@@ -26,21 +19,15 @@ export interface PreparePayloadParams {
   };
 }
 
-/**
- * Prepare complete payload for auto fix
- * Does all the heavy lifting: DB queries, token generation
- */
 export async function prepareFixPayload(params: PreparePayloadParams): Promise<DispatchFixRequest> {
   const { ticketId, owner, agentConfig } = params;
 
   try {
-    // 1. Get the ticket from DB
     const ticket = await getFixTicketById(ticketId);
     if (!ticket) {
       throw new Error(`Ticket ${ticketId} not found`);
     }
 
-    // 2. Get the user by userId
     const [user] = await db
       .select()
       .from(kilocode_users)
@@ -51,7 +38,6 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
       throw new Error(`User ${owner.userId} not found`);
     }
 
-    // 3. Generate auth token for cloud agent with bot identifier
     const authToken = generateCloudAgentWorkflowToken(await prepareCloudAgentWorkflowUser(user), {
       organizationId: owner.type === 'org' ? owner.id : undefined,
       tokenSource: 'auto-fix',
@@ -59,7 +45,6 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
       expiresIn: TOKEN_EXPIRY.default,
     });
 
-    // 4. Parse and validate config
     const configResult = AutoFixAgentConfigSchema.safeParse(agentConfig.config);
     if (!configResult.success) {
       throw new Error(
@@ -68,7 +53,6 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
     }
     const config = configResult.data;
 
-    // 5. Determine trigger source
     const triggerSource = ticket.trigger_source || 'label';
 
     // 6. Prepare session input
@@ -91,7 +75,6 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
         AUTO_FIX_CONSTANTS.DEFAULT_MAX_PR_CREATION_TIME_MINUTES,
     };
 
-    // For review comment triggers, add scoped context and set upstreamBranch
     if (triggerSource === 'review_comment') {
       sessionInput.upstreamBranch = ticket.pr_head_ref ?? undefined;
       sessionInput.reviewCommentId = ticket.review_comment_id ?? undefined;
@@ -101,7 +84,6 @@ export async function prepareFixPayload(params: PreparePayloadParams): Promise<D
       sessionInput.diffHunk = ticket.diff_hunk ?? undefined;
     }
 
-    // 7. Build complete payload
     const payload: DispatchFixRequest = {
       ticketId,
       authToken,

@@ -1,11 +1,3 @@
-/**
- * Shared handler for posting review-comment replies (success / failure).
- *
- * Extracted so both the dedicated `/api/internal/auto-fix/comment-reply`
- * endpoint and the `pr-callback` route can call it directly without an
- * extra HTTP round-trip.
- */
-
 import { getFixTicketById, updateFixTicketStatus } from '@/lib/auto-fix/db/fix-tickets';
 import {
   formatAutoFixErrorMessage,
@@ -65,11 +57,8 @@ const PUBLIC_ERROR_MAX_LENGTH = 500;
 export function sanitizePublicErrorMessage(raw: string): string {
   return (
     raw
-      // collapse multi-line stack traces to a single "(stack trace omitted)" note
       .replace(/(\n\s+at\s.+)+/g, '\n(stack trace omitted)')
-      // strip URLs that aren't github.com
       .replace(/https?:\/\/(?!github\.com)[^\s)]+/g, '[internal-url]')
-      // redact absolute file paths that may leak infra layout
       .replace(/\/(?:home|var|tmp|usr|opt|etc|root|srv)\/[^\s)]+/g, '[internal-path]')
       .slice(0, PUBLIC_ERROR_MAX_LENGTH)
   );
@@ -130,10 +119,6 @@ function getFriendlyFailure(rawError: string): FriendlyFailure {
   };
 }
 
-/**
- * Core logic for handling a review-comment reply (success or failure).
- * Returns a result object; callers decide how to serialise the response.
- */
 export async function handleCommentReply(
   payload: CommentReplyPayload
 ): Promise<CommentReplyResult> {
@@ -172,7 +157,6 @@ export async function handleCommentReply(
     return { ok: true, action: 'skipped_terminal' };
   }
 
-  // Resolve GitHub installation ID
   let installationId: string | undefined;
   if (ticket.platform_integration_id) {
     try {
@@ -196,7 +180,6 @@ export async function handleCommentReply(
 
   try {
     if (outcome === 'success') {
-      // +1 reaction on the review comment
       try {
         await addReactionToPRReviewComment(
           installationId,
@@ -271,8 +254,7 @@ export async function handleCommentReply(
       return { ok: true, action: 'reaction_and_reply' };
     }
 
-    // Failure path
-    const failureReason = payload.errorMessage?.trim() || 'Unknown error';
+  const failureReason = payload.errorMessage?.trim() || 'Unknown error';
     const friendlyFailure = getFriendlyFailure(failureReason);
     const traceLine = sessionId ? `- Session ID: \`${sessionId}\`` : '- Session ID: unavailable';
     const sanitizedReason = sanitizePublicErrorMessage(failureReason);
@@ -309,7 +291,6 @@ export async function handleCommentReply(
       commentId: ticket.review_comment_id,
     });
 
-    // confused reaction on failure (best effort)
     try {
       await addReactionToPRReviewComment(
         installationId,
@@ -338,7 +319,6 @@ export async function handleCommentReply(
 
     // Try to add failure reaction
     try {
-      await addReactionToPRReviewComment(
         installationId,
         repoOwner,
         repoName,

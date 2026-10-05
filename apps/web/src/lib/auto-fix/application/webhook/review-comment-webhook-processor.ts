@@ -1,14 +1,3 @@
-/**
- * Review Comment Webhook Processor
- *
- * Processes GitHub PR review comment events to trigger scoped Auto Fix.
- * When a review comment contains "@kilo" and a fix keyword, this processor:
- * 1. Validates the mention and author permissions
- * 2. Checks Auto Fix configuration
- * 3. Creates a fix ticket scoped to the specific file/line
- * 4. Dispatches to Auto Fix worker
- */
-
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
@@ -64,8 +53,7 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
-    // 0. Ignore comments authored by Kilo itself.
-    //    Every inline review comment Kilo posts ends with the advertised
+    // Every inline review comment Kilo posts ends with the advertised
     //    "Reply with `@kilocode-bot fix it` …" footer, which parseFixCommand
     //    (below) admits as a fix request. Without this guard the bot processes
     //    its own comment, fails the author write-access check (a GitHub App
@@ -86,12 +74,11 @@ export class ReviewCommentWebhookProcessor {
       commentId: comment.id,
     });
 
-    // 1. Check if comment body contains @kilo and a fix keyword.
-    //    Admission is delegated to the shared parseFixCommand so the
-    //    product-advertised "@kilocode-bot fix it" footer command and
-    //    the existing "@kilo … fix" shorthand both admit (and a
-    //    mention-only or fix-only body still rejects). See
-    //    @kilocode/app-shared/code-review/mention-command.ts.
+    // Admission is delegated to the shared parseFixCommand so the
+    // product-advertised "@kilocode-bot fix it" footer command and
+    // the existing "@kilo … fix" shorthand both admit (and a
+    // mention-only or fix-only body still rejects). See
+    // @kilocode/app-shared/code-review/mention-command.ts.
     if (!parseFixCommand(comment.body)) {
       logExceptInTest('[ReviewCommentWebhookProcessor] No @kilo fix mention found', {
         commentId: comment.id,
@@ -99,10 +86,6 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
-    // 2. Check author permissions for write access
-    //    author_association from the webhook payload is checked first, but it is
-    //    unreliable (e.g. org members may appear as CONTRIBUTOR). When the fast
-    //    check fails we fall back to the collaborator permission API.
     if (!WRITE_ACCESS_ASSOCIATIONS.has(comment.author_association)) {
       const permission = await getCollaboratorPermissionLevel(
         installationId,
@@ -118,7 +101,6 @@ export class ReviewCommentWebhookProcessor {
           apiPermission: permission,
           author: comment.user.login,
         });
-        // Add thumbs-down reaction to indicate permission denied
         try {
           await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, '-1');
         } catch {
@@ -138,9 +120,8 @@ export class ReviewCommentWebhookProcessor {
       );
     }
 
-    // 3. Build owner object
     // For org owners, userId is temporarily set to the org ID; it gets resolved
-    // to the bot user ID before dispatch (see step 8 below).
+    // to the bot user ID before dispatch.
     let owner: Owner;
     if (integration.owned_by_organization_id) {
       owner = {
@@ -162,7 +143,6 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
-    // 4. Get Auto Fix agent config
     const agentConfig = await getAgentConfigForOwner(owner, 'auto_fix', 'github');
 
     if (!agentConfig || !agentConfig.is_enabled) {
@@ -184,7 +164,6 @@ export class ReviewCommentWebhookProcessor {
     }
     const config = configResult.data;
 
-    // 5. Check if review comments are enabled
     if (!config.enabled_for_review_comments) {
       logExceptInTest('[ReviewCommentWebhookProcessor] Auto Fix not enabled for review comments', {
         owner,
@@ -192,7 +171,6 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
-    // 6. Check repository selection
     if (config.repository_selection_mode === 'selected') {
       if (!config.selected_repository_ids.includes(repository.id)) {
         logExceptInTest('[ReviewCommentWebhookProcessor] Repository not in selected list', {
@@ -203,13 +181,11 @@ export class ReviewCommentWebhookProcessor {
       }
     }
 
-    // 7. Check for existing fix ticket (dedup by comment ID)
     const existingTicket = await findExistingReviewCommentFixTicket(
       repository.full_name,
       comment.id
     );
 
-    // 8. Resolve dispatch owner (org bot user or personal owner)
     let dispatchOwner: Owner;
     if (owner.type === 'org') {
       const botUserId = await getBotUserId(owner.id, 'auto-fix');
@@ -217,7 +193,6 @@ export class ReviewCommentWebhookProcessor {
         errorExceptInTest('[ReviewCommentWebhookProcessor] Bot user not found for organization', {
           organizationId: owner.id,
         });
-        // Add confused reaction to indicate configuration problem
         try {
           await addReactionToPRReviewComment(
             installationId,
@@ -240,7 +215,6 @@ export class ReviewCommentWebhookProcessor {
       dispatchOwner = owner;
     }
 
-    // 9. Handle existing ticket before creating a new one
     if (existingTicket) {
       if (existingTicket.status === 'pending' || existingTicket.status === 'running') {
         logExceptInTest(
@@ -312,7 +286,6 @@ export class ReviewCommentWebhookProcessor {
       return;
     }
 
-    // 10. Add eyes reaction to acknowledge the mention
     try {
       await addReactionToPRReviewComment(installationId, repoOwner, repoName, comment.id, 'eyes');
     } catch (reactionError) {
@@ -323,7 +296,6 @@ export class ReviewCommentWebhookProcessor {
       // Continue — reaction failure is not critical
     }
 
-    // 11. Create fix ticket with review comment context
     // Populate issue fields with PR-level data to satisfy NOT NULL constraints
     try {
       const ticketId = await createFixTicket({
@@ -352,7 +324,6 @@ export class ReviewCommentWebhookProcessor {
         commentId: comment.id,
       });
 
-      // 12. Dispatch to Auto Fix worker
       await tryDispatchPendingFixes(dispatchOwner);
     } catch (error) {
       errorExceptInTest('[ReviewCommentWebhookProcessor] Error creating fix ticket:', error);
@@ -365,7 +336,6 @@ export class ReviewCommentWebhookProcessor {
         },
       });
 
-      // Add confused reaction to indicate failure
       try {
         await addReactionToPRReviewComment(
           installationId,

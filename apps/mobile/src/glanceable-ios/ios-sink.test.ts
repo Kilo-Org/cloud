@@ -1344,6 +1344,7 @@ describe('buildGlanceableViewProps', () => {
 
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actionLine',
       'actions',
       'countLines',
       'needsInputSince',

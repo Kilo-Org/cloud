@@ -45,6 +45,13 @@ export type GlanceableViewProps = {
    * surface-extras), and the props builder owns the translated copy.
    */
   newestTitle: string | null;
+  /**
+   * The in-flight action's progress or failure line alone (the same copy
+   * `newestTitle` carries while an Approve is answered), or null. The large
+   * card has no reserved slot — its footer already names the newest result —
+   * so it draws only this line, under its header.
+   */
+  actionLine: string | null;
   /** The two in-place actions the state offers. Disabled actions draw no button. */
   actions: { approve: boolean; newAgent: boolean };
   /**
@@ -153,13 +160,15 @@ export function buildGlanceableViewProps(
   const copy = (key: string): string =>
     key === 'glanceable.empty' ? translate('glanceable.noneWaiting') : translate(key);
 
+  const newestTitle = newestTitleFor(getSurfaceExtras(), status, translate);
   return {
     statusLine: statusKey === null ? null : copy(statusKey),
     countLines,
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
-    newestTitle: newestTitleFor(getSurfaceExtras(), status, translate),
+    newestTitle,
+    actionLine: getSurfaceExtras().actionFeedback === null ? null : newestTitle,
     actions: {
       // Only a permission wait can be answered from the widget, so the button
       // gates on `needsApproval` (the count the Live Activity's own Approve

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive suite: the ask selection and its durable store share the fixtures */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

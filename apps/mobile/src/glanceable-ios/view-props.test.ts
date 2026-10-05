@@ -209,6 +209,7 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actionLine',
       'actions',
       'countLines',
       'needsInputSince',

@@ -120,6 +120,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   lineLimit: mockModifier('lineLimit'),
   minimumScaleFactor: mockModifier('minimumScaleFactor'),
   monospacedDigit: mockModifier('monospacedDigit'),
+  multilineTextAlignment: mockModifier('multilineTextAlignment'),
   resizable: mockModifier('resizable'),
   widgetURL: mockModifier('widgetURL'),
 }));
@@ -920,5 +921,131 @@ describe('activeAgentsWidgetLayout', () => {
     expect(collect(smallRow?.props.children).some(element => element.kind === 'Spacer')).toBe(
       false
     );
+  });
+
+  it('never scales a count-row label in any family', () => {
+    // In the widget renderer a scaling label always drew at its minimum scale,
+    // far smaller than its count.
+    const families: WidgetFamily[] = [
+      'systemSmall',
+      'systemMedium',
+      'systemLarge',
+      'accessoryRectangular',
+    ];
+    for (const family of families) {
+      const row = countRowFor(renderWidget(HAPPY_WAITING_PROPS, family), 'Needs input');
+      const label = collectOfKind(row?.props.children, 'Text').find(
+        text => text.props.children === 'Needs input'
+      );
+      expect(label).toBeDefined();
+      expect(mockModifiers(label).map(modifier => modifier.$type)).not.toContain(
+        'minimumScaleFactor'
+      );
+    }
+  });
+
+  it('offers the action in the large card', () => {
+    const approve = pressButton(renderWidget(HAPPY_WAITING_PROPS, 'systemLarge'), {
+      pendingAction: 'approve',
+    });
+    expect(approve).toBeDefined();
+
+    const empty = renderWidget(EMPTY_WIDGET_PROPS, 'systemLarge');
+    expect(pressButton(empty, { pendingAction: 'new-agent' })?.props.openAppWhenRun).toBe(true);
+    expect(collectText(empty)).toContain('No agents waiting');
+  });
+
+  it('names an Approve in flight on the large card, which has no reserved slot', () => {
+    const failed = renderWidget(
+      { ...HAPPY_WAITING_PROPS, actionLine: 'Could not approve' },
+      'systemLarge'
+    );
+    expect(collectText(failed)).toContain('Could not approve');
+    expect(collectText(renderWidget(HAPPY_WAITING_PROPS, 'systemLarge'))).not.toContain(
+      'Could not approve'
+    );
+  });
+
+  it('drops a row time whole when its label is too long for the large card', () => {
+    const props: GlanceableWidgetProps = {
+      ...SCHEDULED_PROPS,
+      countLines: [
+        { label: 'Needs input', kind: 'needsInput', count: 0 },
+        { label: 'Working', kind: 'running', count: 0 },
+        { label: 'En espera de respuesta', kind: 'scheduled', count: 1 },
+        { label: 'Idle', kind: 'idle', count: 0 },
+      ],
+    };
+    expect(wakeTexts(renderWidget(props, 'systemLarge'))).toEqual([]);
+    expect(wakeTexts(renderWidget(props, 'systemMedium'))).toHaveLength(1);
+  });
+
+  it('leads with the rows that have work and mutes the zero rows', () => {
+    const labels = (tree: unknown): unknown[] =>
+      collectOfKind(tree, 'Text')
+        .map(text => text.props.children)
+        .filter(copy => ['Needs input', 'Working', 'Scheduled', 'Idle'].includes(copy as string));
+    for (const family of [
+      'systemLarge',
+      'systemMedium',
+      'accessoryRectangular',
+    ] as WidgetFamily[]) {
+      const tree = renderWidget(SCHEDULED_PROPS, family);
+
+      // Scheduled is the one row with work: it leads, the zeros keep their
+      // grid order after it.
+      expect(labels(tree)).toEqual(['Scheduled', 'Needs input', 'Working', 'Idle']);
+
+      // A zero row draws fully muted: the label and the number in the
+      // secondary colour, the number without its emphasis.
+      const muted = countRowFor(tree, 'Working');
+      const mutedLabel = collectOfKind(muted?.props.children, 'Text').find(
+        text => text.props.children === 'Working'
+      );
+      expect(mockModifiers(mutedLabel).map(modifier => modifier.args)).toContain('secondaryLabel');
+      const mutedNumber = collectOfKind(muted?.props.children, 'Text').find(
+        text => text.props.children === '0'
+      );
+      expect(mockModifiers(mutedNumber).find(m => m.$type === 'font')?.args).toMatchObject({
+        weight: 'regular',
+      });
+    }
+  });
+
+  it('sits the wait and the wake in one trailing column on the medium and large cards', () => {
+    const props: GlanceableWidgetProps = {
+      ...SCHEDULED_PROPS,
+      needsInputSince: '2026-09-24T08:00:00.000Z',
+      countLines: [
+        { label: 'Needs input', kind: 'needsInput', count: 2 },
+        { label: 'Scheduled', kind: 'scheduled', count: 1 },
+      ],
+    };
+    for (const family of ['systemMedium', 'systemLarge'] as WidgetFamily[]) {
+      const tree = renderWidget(props, family);
+      for (const label of ['Needs input', 'Scheduled']) {
+        const row = countRowFor(tree, label);
+        // The row fills the card's width, so its time lands in the same
+        // trailing column as every other row's.
+        expect(mockModifiers(row).map(modifier => modifier.$type)).toContain('frame');
+      }
+    }
+  });
+
+  it('scales the count-less large card up', () => {
+    const tree = renderWidget(EMPTY_WIDGET_PROPS, 'systemLarge');
+
+    // The mark, the status line and the control all grow with the card, or the
+    // composition reads as a stamp in a big card.
+    const mark = collectOfKind(tree, 'Image')[0];
+    expect(mockModifiers(mark).find(m => m.$type === 'frame')?.args).toMatchObject({ width: 56 });
+    const status = collectOfKind(tree, 'Text').find(
+      text => text.props.children === 'No agents waiting'
+    );
+    expect(mockModifiers(status).find(m => m.$type === 'font')?.args).toMatchObject({
+      textStyle: 'title3',
+    });
+    const button = pressButton(tree, { pendingAction: 'new-agent' });
+    expect(mockModifiers(button).find(m => m.$type === 'controlSize')?.args).toBe('regular');
   });
 });

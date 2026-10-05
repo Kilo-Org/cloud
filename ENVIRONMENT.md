@@ -11,7 +11,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `PATH` - System executable search path; modified by tooling (OpenClaw, tsx, etc.) to locate CLIs. [SYSTEM]
 - `TMUX` - Set when running inside a tmux session; used by `dev/local/tmux.ts` to detect tmux environment. [SYSTEM]
 - `GITHUB_ACTIONS` - Set to `true` by GitHub Actions CI; detected by tooling (Rye log groups, Playwright, Vitest) to enable GitHub Actions-specific output/reporting. [SERVER]
-- `NEXT_RUNTIME` - Set by Next.js to `'node'`, `'edge'`, or `'browser'`; used in `apps/web/src/instrumentation.ts` to select appropriate Sentry instrumentation. [SERVER]
+- `NEXT_RUNTIME` - Set by Next.js to `'node'`, `'edge'`, or `'browser'`; used in `apps/web/src/instrumentation.ts` and `apps/ai-gateway/src/instrumentation.ts` to select appropriate Sentry instrumentation. [SERVER]
 - `DOTENV_CONFIG_QUIET` - Set by dotenv to suppress load output; set to `'true'` in `dev/seed/lib/preflight.ts:9` during seeding. [SERVER]
 
 ## App (apps/web)
@@ -47,10 +47,10 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `SUBSTACK_PUBLICATION_URL` - Substack publication origin used by user-deletion subscriber cleanup; defaults to `https://blog.kilo.ai`. Must be `blog.kilo.ai` or a `*.substack.com` host. The Substack admin search URL is hardcoded to `https://kilocode.substack.com/publish/subscribers`, not this publication. [SERVER]
 - `CSA_APP_BASE_URL` - CSA origin used by the Cloud deletion worker to call `POST /api/internal/cloud/users/gdpr-scrub`. Example: the production CSA app URL. [SERVER]
 - `CSA_VERCEL_PROTECTION_BYPASS` - CSA Vercel Deployment Protection automation bypass. Cloud sends it as the `x-vercel-protection-bypass` header on Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`, never as a query parameter. Required when CSA has Vercel Authentication enabled; without it Vercel returns 401 before the CSA route. Distinct from `SUPPORT_API_SECRET`. `[SECRET]`
-- `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
-- `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
-- `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
-- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `apps/web/sentry.server.config.ts`. `[PUBLIC]`
+- `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
+- `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
+- `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
+- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `packages/web-shared/src/lib/observability/sentry-server.ts`. `[PUBLIC]`
 
 ### Marketing Tags
 

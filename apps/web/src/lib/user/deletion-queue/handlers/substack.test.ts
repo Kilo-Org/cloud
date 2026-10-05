@@ -11,12 +11,13 @@ import {
   resolvePublicationBaseUrl,
 } from '@/lib/user/deletion-queue/handlers/substack';
 
+const mockCredentials = jest.fn();
 jest.mock('@/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [{ encrypted_material: 'test-material' }],
+          limit: () => mockCredentials(),
         }),
       }),
     }),
@@ -70,6 +71,7 @@ describe('handleSubstack', () => {
 
   beforeEach(() => {
     process.env.SUBSTACK_PUBLICATION_URL = 'https://blog.kilo.ai';
+    mockCredentials.mockResolvedValue([{ encrypted_material: 'test-material' }]);
   });
 
   afterEach(() => {
@@ -89,6 +91,19 @@ describe('handleSubstack', () => {
       kind: 'succeeded',
     });
 
+    expect(fetchSpy).toHaveBeenCalledWith(
+      `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber-stats`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          filters: { search: email, order_by_desc_nulls_last: 'subscription_created_at' },
+          limit: 50,
+          offset: 0,
+          includeTags: true,
+        }),
+      })
+    );
     expect(fetchSpy).toHaveBeenCalledWith(
       `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber/${encodeURIComponent(email)}?disable_email=true`,
       expect.objectContaining({
@@ -190,8 +205,8 @@ describe('handleSubstack', () => {
     });
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy).toHaveBeenCalledWith(
-      `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber?offset=0&limit=50`,
-      expect.objectContaining({ method: 'GET', redirect: 'error' })
+      `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber-stats`,
+      expect.objectContaining({ method: 'POST', redirect: 'error' })
     );
   });
 
@@ -214,8 +229,14 @@ describe('handleSubstack', () => {
     {},
     { subscribers: null },
     { subscribers: [{}] },
-    { subscribers: [{ id: 1, email: '' }] },
-    { subscribers: [{ email: 'other@example.com' }] },
+    { subscribers: [{ user_email_address: '' }], count: 1 },
+    { subscribers: [{ email: 'other@example.com' }], count: 1 },
+    { subscribers: [], count: -1 },
+    { subscribers: [], count: 0.5 },
+    { subscribers: [], count: '0' },
+    { subscribers: [], count: 1 },
+    { subscribers: [{ user_email_address: 'other@example.com' }], count: 0 },
+    { subscribers: [{ user_email_address: 'other@example.com' }], count: 51 },
     { subscribers: [], has_more: true },
     { subscribers: [], pagination: { has_next_page: true } },
     { data: [] },
@@ -258,22 +279,21 @@ describe('handleSubstack', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
         subscriberPage(
-          Array.from({ length: USER_DELETION_SUBSTACK_PAGE_SIZE }, (_, i) => `decoy-${i}-${email}`)
+          Array.from({ length: USER_DELETION_SUBSTACK_PAGE_SIZE }, (_, i) => `decoy-${i}-${email}`),
+          51
         )
       )
-      .mockResolvedValueOnce(subscriberPage([email]))
+      .mockResolvedValueOnce(subscriberPage([email], 51))
       .mockResolvedValueOnce(new Response('', { status: 200 }));
     await expect(handleSubstack({ request, step, context })).resolves.toMatchObject({
       kind: 'succeeded',
     });
     expect(fetchSpy).toHaveBeenCalledTimes(3);
-    expect(fetchSpy.mock.calls[1]?.[0]).toBe(
-      `${USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL}/api/v1/subscriber?offset=50&limit=50`
-    );
+    expect(JSON.parse(String(fetchSpy.mock.calls[1]?.[1]?.body)).offset).toBe(50);
     expect(fetchSpy.mock.calls[2]?.[1]?.method).toBe('DELETE');
   });
 
-  it('requires a terminal page before confirming absence', async () => {
+  it('confirms absence at count without an extra empty page', async () => {
     const { request, step, context } = await setupSubstackRequest();
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
@@ -284,12 +304,11 @@ describe('handleSubstack', () => {
             (_, i) => `other-${i}@example.com`
           )
         )
-      )
-      .mockResolvedValueOnce(subscriberPage([]));
+      );
     await expect(handleSubstack({ request, step, context })).resolves.toEqual({
       kind: 'not_applicable',
     });
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('blocks repeated pages rather than confirming absence', async () => {
@@ -300,7 +319,7 @@ describe('handleSubstack', () => {
     );
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(async () => subscriberPage(emails));
+      .mockImplementation(async () => subscriberPage(emails, 100));
     await expect(handleSubstack({ request, step, context })).resolves.toEqual({
       kind: 'manual_action_required',
       errorCode: 'substack_lookup_incomplete',
@@ -308,16 +327,42 @@ describe('handleSubstack', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
-  it('allows envelope metadata when an exact match proves presence', async () => {
+  it('skips count zero with actual metadata and no tagAssignments', async () => {
+    const { request, step, context } = await setupSubstackRequest();
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValueOnce(subscriberPage([]));
+    await expect(handleSubstack({ request, step, context })).resolves.toEqual({
+      kind: 'not_applicable',
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks missing credentials without lookup or DELETE', async () => {
+    const { request, step, context } = await setupSubstackRequest();
+    mockCredentials.mockResolvedValueOnce([]);
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    await expect(handleSubstack({ request, step, context })).resolves.toEqual({
+      kind: 'manual_action_required',
+      errorCode: 'credential_missing',
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([0, 50, 52])('blocks a changing count of %s even after finding a match', async count => {
     const { request, step, context, email } = await setupSubstackRequest();
     const fetchSpy = jest
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(Response.json({ subscribers: [{ id: 1, email }], total: 5000 }))
-      .mockResolvedValueOnce(new Response('', { status: 200 }));
-    await expect(handleSubstack({ request, step, context })).resolves.toMatchObject({
-      kind: 'succeeded',
+      .mockResolvedValueOnce(
+        subscriberPage(
+          [email, ...Array.from({ length: 49 }, (_, i) => `decoy-${i}@example.com`)],
+          51
+        )
+      )
+      .mockResolvedValueOnce(subscriberPage(['other@example.com'], count));
+    await expect(handleSubstack({ request, step, context })).resolves.toEqual({
+      kind: 'manual_action_required',
+      errorCode: 'substack_lookup_incomplete',
     });
-    expect(fetchSpy.mock.calls[1]?.[1]?.method).toBe('DELETE');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it('blocks absence when the scan reaches its page cap', async () => {
@@ -329,7 +374,8 @@ describe('handleSubstack', () => {
         Array.from(
           { length: USER_DELETION_SUBSTACK_PAGE_SIZE },
           (_, i) => `other-${offset + i}@example.com`
-        )
+        ),
+        5001
       );
     });
     await expect(handleSubstack({ request, step, context })).resolves.toEqual({
@@ -340,8 +386,23 @@ describe('handleSubstack', () => {
   });
 });
 
-function subscriberPage(emails: string[]) {
-  return Response.json({ subscribers: emails.map((email, id) => ({ id, email })) });
+function subscriberPage(emails: string[], count = emails.length) {
+  return Response.json({
+    subscribers: emails.map((email, id) => ({
+      user_id: id,
+      subscription_id: id,
+      user_email_address: email,
+      is_subscribed: false,
+    })),
+    count,
+    pendingImports: [],
+    pendingCRMImportsCount: 0,
+    order: { by: 'subscription_created_at', direction: 'desc' },
+    chartCounts: {},
+    batchSubscriberActions: [],
+    lastSync: '2026-10-05T00:00:00Z',
+    ...(count > 0 ? { tagAssignments: {} } : {}),
+  });
 }
 
 async function setupSubstackRequest() {

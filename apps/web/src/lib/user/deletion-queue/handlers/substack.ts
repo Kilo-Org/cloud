@@ -153,16 +153,23 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
     'User-Agent': USER_DELETION_SUBSTACK_USER_AGENT,
   };
   let found = false;
+  let count: number | undefined;
+  let complete = false;
   const seenEmails = new Set<string>();
   for (let page = 0; page < 100; page += 1) {
     if (continueIfLowTime(context, step.progress_json)) {
       return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
     }
-    const lookup = await substackFetch(
-      context,
-      `${publication}/api/v1/subscriber?offset=${page * USER_DELETION_SUBSTACK_PAGE_SIZE}&limit=${USER_DELETION_SUBSTACK_PAGE_SIZE}`,
-      { method: 'GET', headers }
-    );
+    const lookup = await substackFetch(context, `${publication}/api/v1/subscriber-stats`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filters: { search: targetEmail, order_by_desc_nulls_last: 'subscription_created_at' },
+        limit: USER_DELETION_SUBSTACK_PAGE_SIZE,
+        offset: page * USER_DELETION_SUBSTACK_PAGE_SIZE,
+        includeTags: true,
+      }),
+    });
     if ('outcome' in lookup) return lookup.outcome;
     if (lookup.response.status === 401 || lookup.response.status === 403) {
       return { kind: 'manual_action_required', errorCode: 'credential_expired' };
@@ -173,31 +180,32 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
     if (
       !isRecord(payload) ||
       !Array.isArray(payload.subscribers) ||
-      payload.subscribers.length > USER_DELETION_SUBSTACK_PAGE_SIZE
+      typeof payload.count !== 'number' ||
+      !Number.isSafeInteger(payload.count) ||
+      payload.count < 0 ||
+      (count !== undefined && payload.count !== count) ||
+      payload.subscribers.length !==
+        Math.min(
+          USER_DELETION_SUBSTACK_PAGE_SIZE,
+          payload.count - page * USER_DELETION_SUBSTACK_PAGE_SIZE
+        )
     ) {
       return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
     }
+    count = payload.count;
     const emails: string[] = [];
     for (const subscriber of payload.subscribers) {
       if (
         !isRecord(subscriber) ||
-        typeof subscriber.email !== 'string' ||
-        !subscriber.email.trim() ||
-        !(
-          (typeof subscriber.id === 'string' && subscriber.id.trim()) ||
-          (typeof subscriber.id === 'number' && Number.isFinite(subscriber.id))
-        )
+        typeof subscriber.user_email_address !== 'string' ||
+        !subscriber.user_email_address.trim()
       ) {
         return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
       }
-      emails.push(subscriber.email.trim().toLowerCase());
+      emails.push(subscriber.user_email_address.trim().toLowerCase());
     }
     if (emails.includes(targetEmail)) {
       found = true;
-      break;
-    }
-    if (Object.keys(payload).some(key => key !== 'subscribers')) {
-      return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
     }
     for (const email of emails) {
       if (seenEmails.has(email)) {
@@ -205,14 +213,18 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
       }
       seenEmails.add(email);
     }
-    if (emails.length < USER_DELETION_SUBSTACK_PAGE_SIZE) {
-      return (step.progress_json.processed_count ?? 0) === 0
-        ? { kind: 'not_applicable' }
-        : { kind: 'succeeded', progress: incrementProcessed(step.progress_json, 0) };
+    if ((page + 1) * USER_DELETION_SUBSTACK_PAGE_SIZE >= count) {
+      complete = true;
+      break;
     }
   }
-  if (!found) {
+  if (!complete) {
     return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
+  }
+  if (!found) {
+    return (step.progress_json.processed_count ?? 0) === 0
+      ? { kind: 'not_applicable' }
+      : { kind: 'succeeded', progress: incrementProcessed(step.progress_json, 0) };
   }
   const reserve = continueIfLowTime(context, step.progress_json);
   if (reserve) return reserve;

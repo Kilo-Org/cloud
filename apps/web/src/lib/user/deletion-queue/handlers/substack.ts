@@ -157,9 +157,8 @@ export const handleSubstack: DeletionHandler = async ({ request, step, context }
   let complete = false;
   const seenEmails = new Set<string>();
   for (let page = 0; page < 100; page += 1) {
-    if (continueIfLowTime(context, step.progress_json)) {
-      return { kind: 'manual_action_required', errorCode: 'substack_lookup_incomplete' };
-    }
+    const reserve = continueIfLowTime(context, step.progress_json);
+    if (reserve) return reserve;
     const lookup = await substackFetch(context, `${publication}/api/v1/subscriber-stats`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },

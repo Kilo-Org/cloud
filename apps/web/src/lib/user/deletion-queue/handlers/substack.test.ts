@@ -293,6 +293,45 @@ describe('handleSubstack', () => {
     expect(fetchSpy.mock.calls[2]?.[1]?.method).toBe('DELETE');
   });
 
+  it.each([false, true])(
+    'reschedules a low-time scan with match=%s and retries safely',
+    async found => {
+      const { request, step, context, email } = await setupSubstackRequest();
+      step.progress_json = { processed_count: 2 };
+      const firstPage = [
+        found ? email : `decoy-${email}`,
+        ...Array.from({ length: 49 }, (_, i) => `other-${i}@example.com`),
+      ];
+      let remainingMs = 60_000;
+      context.remainingMs = () => remainingMs;
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementationOnce(async () => {
+        remainingMs = 0;
+        return subscriberPage(firstPage, 51);
+      });
+
+      await expect(handleSubstack({ request, step, context })).resolves.toEqual({
+        kind: 'continue',
+        progress: step.progress_json,
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy.mock.calls[0]?.[1]?.method).toBe('POST');
+
+      remainingMs = 60_000;
+      fetchSpy
+        .mockResolvedValueOnce(subscriberPage(firstPage, 51))
+        .mockResolvedValueOnce(subscriberPage([found ? 'last@example.com' : email], 51))
+        .mockResolvedValueOnce(new Response('', { status: 200 }));
+      await expect(handleSubstack({ request, step, context })).resolves.toMatchObject({
+        kind: 'succeeded',
+        progress: { processed_count: 3 },
+      });
+      expect(fetchSpy).toHaveBeenCalledTimes(4);
+      expect(JSON.parse(String(fetchSpy.mock.calls[1]?.[1]?.body)).offset).toBe(0);
+      expect(JSON.parse(String(fetchSpy.mock.calls[2]?.[1]?.body)).offset).toBe(50);
+      expect(fetchSpy.mock.calls[3]?.[1]?.method).toBe('DELETE');
+    }
+  );
+
   it('confirms absence at count without an extra empty page', async () => {
     const { request, step, context } = await setupSubstackRequest();
     const fetchSpy = jest

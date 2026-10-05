@@ -212,7 +212,7 @@ test('missing@local.test is empty or 404 across providers', async () => {
     });
     assert.equal(cio.status, 404);
 
-    const substack = await searchSubscribers(origin, 'missing@example.com');
+    const substack = await searchSubscribers(origin, 'missing@local.test');
     assert.deepEqual((substack.body as { subscribers: unknown[] }).subscribers, []);
     assert.equal((substack.body as { count: number }).count, 0);
   });
@@ -403,7 +403,7 @@ test('fail-pylon contact search is 500 and no-substack is absent from Substack',
       '/api/projects/proj/persons?email=no-substack%40local.test'
     );
     assert.equal((posthog.body as { results: unknown[] }).results.length, 1);
-    const listed = await searchSubscribers(origin, 'no-substack@example.com');
+    const listed = await searchSubscribers(origin, 'no-substack@local.test');
     assert.equal((listed.body as { count: number }).count, 0);
   });
 });

@@ -1,5 +1,5 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
-import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
+import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { NewSessionPanel } from '@/components/cloud-agent-next/NewSessionPanel';
 
 export default async function PersonalCloudPage() {

@@ -1571,7 +1571,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     // No usable grant and no frame: the route leaves `ready` so the Session DO
     // fails its queued messages with the real reason instead of waiting for the
-    // 20-minute backstop.
+    // queued backstop.
     expect(result).toBe('not_ready');
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,

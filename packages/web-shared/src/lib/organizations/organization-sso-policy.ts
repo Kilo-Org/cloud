@@ -2,8 +2,8 @@ import { organizations } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { isValidDomain } from '@/lib/organizations/company-domain';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { isValidDomain } from '@kilocode/web-shared/lib/organizations/company-domain';
 
 export type SsoPolicyMisconfigurationReason =
   | 'organization_not_found'

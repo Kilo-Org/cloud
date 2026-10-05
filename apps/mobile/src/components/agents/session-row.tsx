@@ -15,6 +15,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
 import { useTRPC } from '@/lib/trpc';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
@@ -42,6 +43,23 @@ import {
  * `subtitle`, `meta`, `metaWhileLive`) are passed identically in both. */
 export type RowVariant = 'list' | 'card';
 
+/**
+ * Opens a session's associated PR through the provider-aware, flag-aware route.
+ * The native router and browser imports are lazy: they cannot load under the
+ * mounted row tests' node environment, and only the long-press entry reaches
+ * them.
+ */
+async function openSessionPr(url: string | null | undefined, label: string): Promise<void> {
+  const target = await resolveSessionPrPressTarget({ url });
+  if (target.kind === 'in-app') {
+    const { router } = await import('expo-router');
+    router.push(target.href);
+    return;
+  }
+  const { openExternalUrl } = await import('@/lib/external-link');
+  await openExternalUrl(target.url, { label });
+}
+
 type StoredSessionRowProps = {
   session: {
     session_id: string;
@@ -61,7 +79,7 @@ type StoredSessionRowProps = {
      */
     scheduledAt?: string | null;
     total_cost_microdollars: number | null;
-    associatedPr?: { number: number } | null;
+    associatedPr?: { number: number; url?: string | null } | null;
   };
   /**
    * Which timestamp drives the row's relative meta label. The list
@@ -153,6 +171,19 @@ export function StoredSessionRow({
       statusKind,
       needsInput,
       totalCostMicrodollars: session.total_cost_microdollars,
+      onCopySessionId: () => {
+        // Load the clipboard/action module at press time: the mounted row test
+        // runs in a node environment that cannot load `expo-clipboard`.
+        void (async () => {
+          const { copySessionId } = await import('./session-row-actions');
+          await copySessionId(session.session_id);
+        })();
+      },
+      onViewPr: session.associatedPr
+        ? () => {
+            void openSessionPr(session.associatedPr?.url, t('common.pullRequest'));
+          }
+        : undefined,
       onRename,
       onDelete,
     });

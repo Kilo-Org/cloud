@@ -1,6 +1,6 @@
-import { db, readDb } from '@/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { transaction: jest.fn() },
   readDb: { transaction: jest.fn() },
 }));

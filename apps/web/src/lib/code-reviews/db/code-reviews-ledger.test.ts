@@ -21,7 +21,7 @@ jest.mock('@kilocode/db/operation-ledger', () => {
 });
 
 import { codeReviewTerminalOutcome } from '../code-review-ledger';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   cloud_agent_code_reviews,
@@ -30,7 +30,7 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
   cancelActiveCodeReviewsById,

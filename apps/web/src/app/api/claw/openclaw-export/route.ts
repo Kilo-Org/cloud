@@ -2,7 +2,7 @@ import { connection, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KiloClawApiError, KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   getActiveInstance,
@@ -10,9 +10,9 @@ import {
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
-import type { TRPCContext } from '@/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
 // Large workspaces can take a while to archive; raise the function timeout so
 // the streamed download isn't killed mid-flight (mirrors the api-request-log

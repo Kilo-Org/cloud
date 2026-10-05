@@ -8,7 +8,7 @@ import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { createChatState } from '@/lib/bot/state';
 import { githubAdapter } from '@/lib/bot/github-adapter';

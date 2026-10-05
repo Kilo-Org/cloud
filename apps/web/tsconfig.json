@@ -9,7 +9,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./src/*", "../../packages/web-shared/src/*"],
+      "@/*": ["./src/*"],
+      "@kilocode/web-shared/*": ["../../packages/web-shared/src/*"],
       "@kilocode/db": ["../../packages/db/src/index.ts"],
       "@kilocode/db/*": ["../../packages/db/src/*"],
       "@kilocode/cloud-agent-profile": ["../../packages/cloud-agent-profile/src/index.ts"],
@@ -47,7 +48,6 @@
     "jest.config.ts",
     "knip.ts",
     "sentry.edge.config.ts",
-    "sentry.server.config.ts",
     ".next/dev/types/**/*.ts",
     "dev/discord-gateway-cron.ts"
   ],

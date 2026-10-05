@@ -33,3 +33,21 @@ export function resolveSessionPrTapTarget(
   }
   return { kind: 'browser', url: url ?? '' };
 }
+
+/**
+ * Press-time variant of `resolveSessionPrTapTarget` that also honors the
+ * PR-review kill switch, so a session long-press or a context-sheet tap lands
+ * in the same place as the PR badge and chat links. The flag module is imported
+ * lazily so hosts that never press a PR (and the mounted tests' node
+ * environment) never load the native analytics client, and the flag is read
+ * once at press time rather than subscribed to.
+ */
+export async function resolveSessionPrPressTarget(
+  input: SessionPrNavigationInput
+): Promise<SessionPrNavigationResult> {
+  const { FEATURE_FLAG_PR_REVIEW, isFeatureFlagEnabled } = await import('@/lib/analytics/posthog');
+  if (!isFeatureFlagEnabled(FEATURE_FLAG_PR_REVIEW, true)) {
+    return { kind: 'browser', url: input.url ?? '' };
+  }
+  return resolveSessionPrTapTarget(input);
+}

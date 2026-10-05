@@ -1,13 +1,13 @@
-import { KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   isKiloExclusiveFreeModel,
   kiloExclusiveModels,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
   isLocalFakeTranscriptionModel,
-} from '@/lib/ai-gateway/local-fake-llm';
+} from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 
 export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';

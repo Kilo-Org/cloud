@@ -35,6 +35,8 @@ export type ControlPlaneTimers = {
   };
   wrapper: {
     heartbeatIntervalMs: number;
+    heartbeatAckTimeoutMs: number;
+    heartbeatNegotiationMs: number;
     cloneMs: number;
     kiloRuntimeStartMs: number;
     kiloSessionMs: number;
@@ -56,7 +58,7 @@ export type ControlPlaneTimers = {
 };
 
 // The divisor shortens only internal deadlines whose partner also scales, so
-// their orderings hold (the 5-min reconnect window stays longer than the 30-s
+// their orderings hold (the 90-s reconnect window stays longer than the 30-s
 // max backoff). Timers that bound external work stay real: provider create and
 // container boot, the 12-min prep attempt that must outlast clone+runtime+
 // session, the pause before a failed create is retried, clone/runtime/session
@@ -70,7 +72,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     wrapperFirstConnectMs: 5 * MINUTE_MS,
     wrapperHelloMs: 30_000,
     heartbeatMs: ms(45_000),
-    reconnectMs: ms(5 * MINUTE_MS),
+    reconnectMs: ms(90_000),
     routePreparationMs: 12 * MINUTE_MS,
     idleMs: ms(10 * MINUTE_MS),
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
@@ -82,7 +84,9 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };
   const wrapper = {
-    heartbeatIntervalMs: ms(15_000),
+    heartbeatIntervalMs: ms(5_000),
+    heartbeatAckTimeoutMs: ms(15_000),
+    heartbeatNegotiationMs: ms(1_000),
     cloneMs: 6 * MINUTE_MS,
     kiloRuntimeStartMs: 2 * MINUTE_MS,
     kiloSessionMs: 2 * MINUTE_MS,

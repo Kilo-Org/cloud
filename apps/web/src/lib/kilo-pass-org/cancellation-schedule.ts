@@ -2,8 +2,8 @@ import 'server-only';
 
 import type Stripe from 'stripe';
 import { captureMessage } from '@sentry/nextjs';
-import { client as stripe } from '@/lib/stripe-client';
-import { warnExceptInTest } from '@/lib/utils.server';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN = 'kilo-pass-org-cancellation';
 export const SCHEDULE_REWRITE_UNSAFE = 'SCHEDULE_REWRITE_UNSAFE';

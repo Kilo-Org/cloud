@@ -8,7 +8,7 @@ import {
   organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc, and, count, gt, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
@@ -17,25 +17,33 @@ import {
   getOrganizationMembers,
   getOrganizationById,
   isOrganizationMember,
-} from '@/lib/organizations/organizations';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
-import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
+import {
+  errorExceptInTest,
+  logExceptInTest,
+  sentryLogger,
+} from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { after } from 'next/server';
-import { sendOrgCancelledEmail, sendOrgRenewedEmail, sendOrgSubscriptionEmail } from '@/lib/email';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import {
+  sendOrgCancelledEmail,
+  sendOrgRenewedEmail,
+  sendOrgSubscriptionEmail,
+} from '@kilocode/web-shared/lib/email';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   OrganizationPlanSchema,
   billingCycleFromStripeInterval,
   billingCycleToDb,
-} from '@/lib/organizations/organization-types';
-import { client as stripeClient } from '@/lib/stripe-client';
-import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 
 const sentryError = sentryLogger('organization_seats', 'error');
 

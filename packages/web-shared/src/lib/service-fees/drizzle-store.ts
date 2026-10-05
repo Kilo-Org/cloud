@@ -5,15 +5,15 @@ import {
   toServiceFeeTimestamp,
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   acquireOrganizationServiceFeeExemptionLock,
   normalizeOrganizationExemptionTimestamp,
   type ActiveOrganizationRef,
   type OrganizationServiceFeeExemptionRecord,
   type OrganizationServiceFeeExemptionStore,
-} from '@/lib/service-fees/organization-exemptions';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   organization_service_fee_exemptions,
   organizations,

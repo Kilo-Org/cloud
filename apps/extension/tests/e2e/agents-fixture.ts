@@ -1008,6 +1008,7 @@ export const buildQuestionCloudAgentStream = (
         type: 'text',
       },
     }),
+    { ...ev('connected', {}), eventId: 0, executionId: null },
     ev('question.asked', {
       callID: 'call-q-1',
       id: 'q-1',
@@ -1064,6 +1065,7 @@ export const buildPermissionCloudAgentStream = (
         type: 'text',
       },
     }),
+    { ...ev('connected', {}), eventId: 0, executionId: null },
     ev('permission.asked', {
       always: [],
       callID: 'call-p-1',

@@ -3,11 +3,11 @@ import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter
 import {
   modelRetainsPrompts,
   modelTrains,
-} from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import type {
   OpenRouterModel,
   OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 
 const MODEL_SLUG = 'nvidia/nemotron-3-super-120b-a12b';

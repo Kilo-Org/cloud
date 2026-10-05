@@ -1,9 +1,9 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from '@/lib/stripe-client';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
-import { db, auto_deleted_at } from '@/lib/drizzle';
+import { db, auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
 import {
   kilo_pass_org_agreements,
@@ -17,28 +17,36 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { toNonNullish } from '@/lib/utils';
-import { logExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
-import { APP_URL } from '@/lib/constants';
+import {
+  logExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
-} from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
-import { findOrganizationByStripeCustomerId } from '@/lib/organizations/organizations';
-import { reportCreditEvent, type CreditEvent, type StoreCreditEvent } from '@/lib/bouncer/client';
-import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
+import { findOrganizationByStripeCustomerId } from '@kilocode/web-shared/lib/organizations/organizations';
+import type { CreditEvent, StoreCreditEvent } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  enqueueCreditEvent,
+  reportChargeAttempted,
+  type ChargeAttemptContext,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 import type { UnifiedInvoice } from '@/types/billing';
-import type { StripeConfig } from '@/lib/credits';
-import { processTopUp } from '@/lib/credits';
+import type { StripeConfig } from '@kilocode/web-shared/lib/credits';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
   TOPUP_CANCELED_QUERY_STRING_KEY,
-} from '@/lib/organizations/constants';
+} from '@kilocode/web-shared/lib/organizations/constants';
 import type { SubscriptionMetadata } from '@/lib/organizations/organization-seats';
 import { handleSubscriptionEvent } from '@/lib/organizations/organization-seats';
 import {
@@ -49,8 +57,8 @@ import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
-} from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   KILO_PASS_TERMINAL_SCHEDULE_STATUSES,
   maybeMapStripeScheduleStatusToDb,
@@ -75,7 +83,7 @@ import {
   releaseCancellationSchedule,
   scheduleToReleaseBeforeSeatUpdate,
 } from '@/lib/kilo-pass-org/cancellation-schedule';
-import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
+import { getKiloPassMetadataFromStripeMetadata } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
   handleKiloClawSubscriptionUpdated,
@@ -97,11 +105,14 @@ import {
   STRIPE_TEAMS_ANNUAL_PRICE_ID,
   STRIPE_ENTERPRISE_MONTHLY_PRICE_ID,
   STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
-} from '@/lib/config.server';
-import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
-import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
-import { annualTotal, seatPrice } from '@/lib/organizations/constants';
-import { successResult } from '@/lib/maybe-result';
+} from '@kilocode/web-shared/lib/config.server';
+import type {
+  OrganizationPlan,
+  BillingCycle,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { annualTotal, seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
 import {
@@ -113,11 +124,11 @@ import {
   settleTrustedAutoTopUpInvoice,
   settleTrustedTopUpCharge,
   type ServiceFeeCheckoutDependencies,
-} from '@/lib/service-fees/checkout';
-import type { ServiceFeeAssessmentStore } from '@/lib/service-fees/assessments';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import type { ServiceFeeAssessmentStore } from '@kilocode/web-shared/lib/service-fees/assessments';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 import { handleKiloPassInvoiceCreated } from '@/lib/service-fees/invoice-created';
-import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 import {
   observeServiceFeeChargeRefunded,
   observeServiceFeeCreditNote,
@@ -254,31 +265,41 @@ type WebhookCreditEvent =
     : never;
 
 /**
- * Resolves the payer and reports one webhook outcome to bouncer. It never throws: the owner
- * lookup reads the database, and a bouncer failure must not fail the Stripe webhook, which would
- * make Stripe retry and skip the entitlement work later in the same delivery. When the event has
- * no card fingerprint, `fingerprintChargeId` names a charge to read it from, inside the guard.
+ * Resolves the payer and durably enqueues one webhook outcome to bouncer. The enqueue is a database
+ * write, so a bouncer HTTP outage never fails the webhook; the cron drainer delivers later. A
+ * database error propagates — the webhook route returns non-2xx and Stripe redelivers — so a
+ * missing enqueue is never silently accepted. A payer that cannot be resolved at all is skipped
+ * with a visible log: retrying would re-read the same absent owner forever. `fingerprintChargeId`
+ * names a charge to read a missing card fingerprint from, best-effort.
  */
 async function reportWebhookCreditEvent(
   owner: Parameters<typeof resolveBouncerCreditOwner>[0],
   event: WebhookCreditEvent,
   fingerprintChargeId?: string | null
 ): Promise<void> {
-  try {
-    const payer = await resolveBouncerCreditOwner(owner);
-    if (!payer) return;
-    const cardFingerprint =
-      event.cardFingerprint ??
-      (fingerprintChargeId ? await bouncerCardFingerprintForChargeId(fingerprintChargeId) : null);
-    await reportCreditEvent({
+  const payer = await resolveBouncerCreditOwner(owner).catch(error => {
+    captureException(error, { tags: { source: 'bouncer_webhook_credit_event' } });
+    throw error;
+  });
+  if (!payer) {
+    warnExceptInTest('Bouncer webhook credit event has no resolvable payer; skipping', {
+      eventType: event.type,
+      eventId: event.eventId,
+    });
+    return;
+  }
+  const cardFingerprint =
+    event.cardFingerprint ??
+    (fingerprintChargeId ? await bouncerCardFingerprintForChargeId(fingerprintChargeId) : null);
+  // The transaction holds the user-row lock the enqueue's soft-delete check takes.
+  await db.transaction(tx =>
+    enqueueCreditEvent(tx, {
       ...event,
       cardFingerprint,
       userId: payer.userId,
       orgId: payer.orgId,
-    });
-  } catch (error) {
-    captureException(error, { tags: { source: 'bouncer_webhook_credit_event' } });
-  }
+    })
+  );
 }
 
 /** The card fingerprint of a charge, or null when the charge cannot be read. */
@@ -301,6 +322,7 @@ async function reportSeatChangeAttempt(params: {
   userId: string;
   ip?: string | null;
   ipCountry?: string | null;
+  ja4?: string | null;
 }): Promise<void> {
   const organizationId = params.subscription.metadata?.organizationId;
   if (!organizationId) {
@@ -314,7 +336,7 @@ async function reportSeatChangeAttempt(params: {
   if (!organization) {
     return;
   }
-  reportChargeAttempted({
+  await reportChargeAttempted({
     flow: 'seats',
     userId: params.userId,
     orgId: organizationId,
@@ -322,6 +344,7 @@ async function reportSeatChangeAttempt(params: {
     accountCreatedAt: organization.createdAt,
     ip: params.ip,
     ipCountry: params.ipCountry,
+    ja4: params.ja4,
   });
 }
 
@@ -1970,7 +1993,7 @@ export async function getStripeTopUpCheckoutUrl(
   });
 
   if (attempt) {
-    reportChargeAttempted({
+    await reportChargeAttempted({
       flow: 'topup',
       userId: kiloUserId,
       orgId: organizationId,
@@ -1980,6 +2003,7 @@ export async function getStripeTopUpCheckoutUrl(
       ipCountry: attempt.ipCountry,
       cardFingerprint: attempt.cardFingerprint,
       cardCountry: attempt.cardCountry,
+      ja4: attempt.ja4,
     });
   }
 
@@ -2130,7 +2154,7 @@ export async function getStripeSeatsCheckoutUrl(
     const successUrl = `${process.env.NEXTAUTH_URL}/payments/subscriptions/success?organizationId=${organizationId}&${STRIPE_SUB_QUERY_STRING_KEY}={CHECKOUT_SESSION_ID}`;
 
     if (props.attempt) {
-      reportChargeAttempted({
+      await reportChargeAttempted({
         flow: 'seats',
         userId: kiloUserId,
         orgId: organizationId,
@@ -2142,6 +2166,7 @@ export async function getStripeSeatsCheckoutUrl(
         accountCreatedAt: props.attempt.accountCreatedAt,
         ip: props.attempt.ip,
         ipCountry: props.attempt.ipCountry,
+        ja4: props.attempt.ja4,
       });
     }
 
@@ -2307,6 +2332,7 @@ export async function handleUpdateSeatCount(
     userId: string;
     ip?: string | null;
     ipCountry?: string | null;
+    ja4?: string | null;
   }
 ): Promise<UpdateSeatCountResult> {
   const isIncreasingSeats = currentSeatCount < newSeatCount;
@@ -2481,15 +2507,18 @@ export async function handleUpdateSeatCount(
       }
 
       if (attempt) {
-        // Not awaited: bouncer's org lookup must not delay the charge, and its failure must not
-        // look like a payment failure to the catch below.
-        void reportSeatChangeAttempt({
+        // Best-effort pre-charge report: a failed enqueue is reported, but must not look like a
+        // payment failure to the catch below.
+        await reportSeatChangeAttempt({
           subscription: updatedSubscription,
           amountCents: invoiceObj.amount_due,
           userId: attempt.userId,
           ip: attempt.ip,
           ipCountry: attempt.ipCountry,
-        }).catch(() => undefined);
+          ja4: attempt.ja4,
+        }).catch(error => {
+          captureException(error, { tags: { source: 'bouncer_charge_attempted' } });
+        });
       }
 
       // Attempt to pay the invoice - this will create a PaymentIntent and attempt charge

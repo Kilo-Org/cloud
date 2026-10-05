@@ -1,12 +1,12 @@
-import { createStripeCustomer, deleteStripeCustomer } from '@/lib/stripe-client';
+import { createStripeCustomer, deleteStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { randomUUID } from 'crypto';
-import { createTimer } from '@/lib/timer';
-import PostHogClient from '@/lib/posthog';
+import { createTimer } from '@kilocode/web-shared/lib/timer';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { WORKOS_API_KEY } from '@/lib/config.server';
-import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -119,6 +119,7 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  bouncer_credit_event_outbox,
   external_side_effect_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -143,24 +144,24 @@ import {
   ne,
   notExists,
 } from 'drizzle-orm';
-import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
-import type { AuthErrorType } from '@/lib/auth/constants';
+import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
+import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { strict as assert } from 'node:assert';
-import type { OptionalError, Result } from '@/lib/maybe-result';
-import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
+import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
+import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
 import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import * as z from 'zod';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
-} from '@/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@/lib/email-address';
+} from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
   deleteAllOwnedByUserIdPages,
@@ -186,7 +187,7 @@ import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -995,6 +996,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
+ * - bouncer_credit_event_outbox (every row for the user; its payload carries the
+ *   user id, client ip, and card fingerprint)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1067,6 +1070,13 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(analytics_event_outbox)
     .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
+  // Bouncer credit-event payloads carry the user id, client ip, and card
+  // fingerprint, so every row for the user is deleted rather than retained.
+  // `enqueueCreditEvent` also refuses to store new rows for a soft-deleted
+  // account, so a late webhook cannot reintroduce the PII.
+  await tx
+    .delete(bouncer_credit_event_outbox)
+    .where(eq(bouncer_credit_event_outbox.user_id, userId));
 
   // ── 1. Anonymize the user row ────────────────────────────────────────
   await tx

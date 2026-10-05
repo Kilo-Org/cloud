@@ -108,6 +108,17 @@ const RECONNECT_RESYNC_DELAY_MS = 5000;
 const REMOTE_SESSION_EXIT_UNAVAILABLE =
   'Remote session exit is unavailable for the current session';
 
+// Bounded self-healing for remote model discovery. A CLI can answer
+// `list_models` with a valid-but-empty v1 catalog (e.g. while its provider
+// registry is still warming up) or fail transiently. Neither may be published
+// as a terminal result: re-issue `list_models` under a capped attempt budget
+// with exponential backoff so a slow, late, or briefly-failing CLI still
+// converges on the full catalog. The budget resets on an owner change, on a
+// non-empty catalog, and when the consumer calls `retryRemoteModels`.
+export const REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS = 4;
+export const REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS = 1000;
+const EMPTY_REMOTE_MODEL_CATALOG_ERROR = 'Remote model catalog is empty';
+
 /**
  * Deep-copy a list of validated remote slash commands.
  *
@@ -164,6 +175,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       protocol: 'unknown',
       refresh: 'idle',
     };
+    // Attempts consumed from the current owner's model-discovery budget, and
+    // the pending backoff retry timer. Both are owner-scoped: an owner change
+    // or an explicit retry resets the budget, and losing the owner / tearing
+    // down the transport clears the timer.
+    let modelDiscoveryAttempts = 0;
+    let modelRetryTimer: ReturnType<typeof setTimeout> | null = null;
     let remoteCommandState: RemoteCommandState = {
       ownerConnectionId: null,
       refresh: 'idle',
@@ -177,6 +194,37 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     function publishRemoteModelState(next: RemoteModelState): void {
       remoteModelState = next;
       config.onRemoteModelStateChange?.(next);
+    }
+
+    function clearModelRetryTimer(): void {
+      if (modelRetryTimer) {
+        clearTimeout(modelRetryTimer);
+        modelRetryTimer = null;
+      }
+    }
+
+    function resetModelDiscoveryBudget(): void {
+      modelDiscoveryAttempts = 0;
+      clearModelRetryTimer();
+    }
+
+    /**
+     * Schedule one backoff retry of `list_models` for the current owner when
+     * the attempt budget still allows it. A pending timer is never doubled up:
+     * a retry already in flight means the next failure's schedule is a no-op.
+     */
+    function scheduleModelRetry(expectedOwnerConnectionId: string): void {
+      if (ownerConnectionId !== expectedOwnerConnectionId) return;
+      if (modelDiscoveryAttempts >= REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS) return;
+      if (modelRetryTimer) return;
+
+      const delay =
+        REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS * 2 ** Math.max(0, modelDiscoveryAttempts - 1);
+      modelRetryTimer = setTimeout(() => {
+        modelRetryTimer = null;
+        if (ownerConnectionId !== expectedOwnerConnectionId) return;
+        discoverModels(expectedOwnerConnectionId);
+      }, delay);
     }
 
     function publishRemoteCommandState(next: RemoteCommandState): void {
@@ -214,6 +262,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
       const previousOwnerConnectionId = ownerConnectionId;
       ownerConnectionId = nextOwnerConnectionId;
+      // A new (or absent) owner gets a fresh self-healing budget.
+      resetModelDiscoveryBudget();
       catalogRequestGeneration += 1;
       catalogRequestInFlight = null;
       commandCatalogRequestGeneration += 1;
@@ -290,11 +340,15 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         refresh: 'error',
         error: error instanceof Error ? error.message : 'Failed to discover remote models',
       });
+      // Transient failures must not be terminal: keep retrying under the
+      // bounded budget so a late/slow CLI still produces the full catalog.
+      scheduleModelRetry(expectedOwnerConnectionId);
     }
 
     function discoverModels(expectedOwnerConnectionId: string): void {
       if (catalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
 
+      modelDiscoveryAttempts += 1;
       catalogRequestGeneration += 1;
       const expectedRequestGeneration = catalogRequestGeneration;
       const expectedGeneration = generation;
@@ -337,6 +391,29 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
               return;
             }
 
+            // Count models, not providers: the wire schema allows a connected
+            // provider with an empty `models` record, and that catalog projects
+            // to zero picker options. Such a shape is not a successful load
+            // either, so it must self-heal under the budget instead of
+            // publishing an empty `idle` catalog that would stick.
+            const hasModel = parsed.data.providers.some(provider => provider.models.length > 0);
+            if (!hasModel) {
+              // The CLI may still be warming up its provider registry.
+              // Surface it as an error and self-heal under the budget instead
+              // of publishing an empty `idle` catalog that would stick.
+              publishRemoteModelState({
+                ownerConnectionId: expectedOwnerConnectionId,
+                protocol: 'v1',
+                refresh: 'error',
+                error: EMPTY_REMOTE_MODEL_CATALOG_ERROR,
+              });
+              scheduleModelRetry(expectedOwnerConnectionId);
+              return;
+            }
+
+            // Non-empty catalog: the discovery budget has paid off. Reset it
+            // so a later owner-scoped refresh (reconnect, retry) starts fresh.
+            resetModelDiscoveryBudget();
             publishRemoteModelState({
               ownerConnectionId: expectedOwnerConnectionId,
               protocol: 'v1',
@@ -694,6 +771,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     }
 
     function releaseConnection(): void {
+      clearModelRetryTimer();
       cleanup?.();
       cleanup = null;
     }
@@ -703,6 +781,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         generation += 1;
         const expectedGeneration = generation;
         releaseConnection();
+        resetModelDiscoveryBudget();
         sessionStopped = false;
         ownerConnectionId = null;
         lastForwardedHeartbeatStatus = null;
@@ -882,6 +961,9 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
       canSend: () => ownerConnectionId !== null,
       retryRemoteModels: () => {
+        // An explicit retry grants a fresh bounded budget and cancels any
+        // pending backoff timer before re-issuing immediately.
+        resetModelDiscoveryBudget();
         if (ownerConnectionId) discoverModels(ownerConnectionId);
       },
       retryRemoteCommands: () => {

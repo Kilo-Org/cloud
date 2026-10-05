@@ -3,8 +3,8 @@ import 'server-only';
 import type { KiloClawAdminAuditLog } from '@kilocode/db/schema';
 import { kiloclaw_admin_audit_logs } from '@kilocode/db/schema';
 import type { KiloClawAdminAuditAction } from '@kilocode/db/schema-types';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc, and } from 'drizzle-orm';
 
 export async function createKiloClawAdminAuditLog({

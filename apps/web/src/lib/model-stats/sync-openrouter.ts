@@ -1,8 +1,8 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import type { OpenRouterModel as OpenRouterApiModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OpenRouterModel as OpenRouterApiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { deriveModelStatsIdentity } from '@kilocode/worker-utils/kilo-model-id';
 
 /**

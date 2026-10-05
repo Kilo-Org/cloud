@@ -1,6 +1,6 @@
-import { getEnvVariable } from '@/lib/dotenvx';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
-import { applyVercelSettings } from '@/lib/ai-gateway/providers/vercel';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 
 export const VERCEL_AI_GATEWAY = {
   id: 'vercel',

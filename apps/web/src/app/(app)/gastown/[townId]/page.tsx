@@ -1,7 +1,7 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { notFound } from 'next/navigation';
 import { isGastownEnabled } from '@/lib/gastown/feature-flags';
-import { GASTOWN_BILLING_ANNOUNCEMENT_ENABLED } from '@/lib/config.server';
+import { GASTOWN_BILLING_ANNOUNCEMENT_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import { TownOverviewPageClient } from './TownOverviewPageClient';
 
 export default async function TownOverviewPage({

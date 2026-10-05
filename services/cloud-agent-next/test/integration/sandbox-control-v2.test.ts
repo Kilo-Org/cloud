@@ -22,6 +22,7 @@ import {
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
+  SandboxProviderConfiguration,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
@@ -136,8 +137,8 @@ type StartOptions = {
   allocationName?: string;
   billing?: unknown;
   containment?: { kilocode?: boolean; github?: boolean };
-  provider?: 'cloudflare' | 'vercel';
-  configuration?: { provider: 'vercel'; resources: { vcpus: number; memory: number } };
+  provider?: 'cloudflare' | 'vercel' | 'cloudflare-containers';
+  configuration?: SandboxProviderConfiguration;
   meter?: ContainerUsageRpcMethods;
   preparingRoute?: string;
   admissionError?: string;
@@ -793,6 +794,131 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.stopCalls).toEqual([]);
   });
 
+  it('acknowledges negotiated current heartbeats but not invalid or unbound frames', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    wrapper.heartbeat(true);
+    wrapper.send({
+      type: 'hello',
+      wrapperId: 'wr_ack',
+      allocationId,
+      protocolVersion: 2,
+      heartbeatAck: true,
+    });
+    expect(await wrapper.next()).toEqual({
+      type: 'welcome',
+      protocolVersion: 2,
+      heartbeatAck: true,
+    });
+    const before = await readState(stub);
+    wrapper.send({ type: 'hello', wrapperId: 'wr_ack', allocationId, protocolVersion: 2 });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.send({ type: 'heartbeat', active: 'invalid', degraded: false });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.heartbeat(false);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect((await readState(stub)).lastActivityAt).toBe(before.lastActivityAt);
+    wrapper.heartbeat(true);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect(provider.leaseCalls).toHaveLength(1);
+    const legacy = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await legacy.hello({ wrapperId: 'wr_legacy', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: 2,
+    });
+    legacy.heartbeat(false);
+    expect(await legacy.next(20)).toBeNull();
+    const current = await readState(stub);
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const stale = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: before.connectionId,
+          wrapperId: 'wr_ack',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        stale,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect(await readState(stub)).toEqual(current);
+    await stub.reportProviderGone();
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const terminal = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: current.connectionId,
+          wrapperId: 'wr_legacy',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        terminal,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect((await readState(stub)).kind).toBe('stopped');
+  });
+
+  it.each(['socket', 'allocation'] as const)(
+    'rechecks %s identity after applying a negotiated heartbeat',
+    async identity => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider);
+      await awaitStarting(provider, stub);
+      await connectAndHello(provider, stub);
+      const current = await readState(stub);
+      await runInDurableObject(stub, async instance => {
+        const attachment = {
+          credential: null,
+          allocationId: current.allocationId,
+          connectionId: current.connectionId,
+          wrapperId: current.wrapperId,
+          heartbeatAck: true,
+        };
+        const send = vi.fn();
+        const socket = {
+          readyState: WebSocket.OPEN,
+          deserializeAttachment: () => attachment,
+          send,
+        } as unknown as WebSocket;
+        const target = instance as unknown as { applyEvent(event: unknown): Promise<void> };
+        const apply = target.applyEvent.bind(instance);
+        const spy = vi.spyOn(target, 'applyEvent').mockImplementation(async event => {
+          await apply(event);
+          if (identity === 'socket') attachment.connectionId = 'superseded';
+          else await apply({ type: 'provider-gone', at: Date.now() });
+        });
+        try {
+          await instance.webSocketMessage(
+            socket,
+            JSON.stringify({ type: 'heartbeat', active: false, degraded: false })
+          );
+          expect(send).not.toHaveBeenCalled();
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    }
+  );
+
   it('creates, launches and accepts a hello as connected', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
@@ -889,7 +1015,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await runAlarm(stub);
     await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
 
-    await setDeadline(stub, { last_frame_at: Date.now() - (5 * MINUTE + 1_000) });
+    await setDeadline(stub, { last_frame_at: Date.now() - (TIMERS.reconnectMs + 1_000) });
     await runAlarm(stub);
 
     await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
@@ -1023,6 +1149,39 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     expect(provider.leaseCalls).toHaveLength(1);
     expect((await readState(stub)).lastActivityAt).toBe(activityBefore);
+  });
+
+  it('logs a failed lease renewal without disconnecting the allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await connectAndHello(provider, stub);
+
+    await runInDurableObject(stub, async instance => {
+      const renewal = vi
+        .spyOn(provider.adapter, 'ensureLeaseAtLeast')
+        .mockRejectedValue(new Error('provider lease failed'));
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await (instance as unknown as { runLease(): Promise<void> }).runLease();
+
+        expect(withFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'lease_renewal_failed',
+            allocationName: SANDBOX_ID,
+            errorName: 'Error',
+            cause: 'provider_lease_failed',
+          })
+        );
+        expect(warn).toHaveBeenCalledWith('Sandbox control diagnostic');
+        expect((await instance.getAllocationState()).kind).toBe('connected');
+      } finally {
+        renewal.mockRestore();
+        withFields.mockRestore();
+        warn.mockRestore();
+      }
+    });
   });
 
   it('persists liveness on the heartbeat, not on every event frame', async () => {
@@ -1217,6 +1376,56 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await runAlarm(stub);
     await waitFor(() => expect(provider.stopCalls).toContain(provider.refs[0]));
   });
+
+  it.each(['standard-3', 'standard-4', undefined] as const)(
+    'reports the pinned Containers instance %s without provider calls and after eviction',
+    async instance => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider, {
+        provider: 'cloudflare-containers',
+        ...(instance === undefined
+          ? {}
+          : { configuration: { provider: 'cloudflare-containers', instance } }),
+      });
+      await awaitStarting(provider, stub);
+      expect((await stub.getStatusSnapshot()).runtime).toBeUndefined();
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.put('control_plane_owner', 'owner-1')
+      );
+      const providerCalls = [
+        vi.spyOn(provider.adapter, 'create'),
+        vi.spyOn(provider.adapter, 'launch'),
+        vi.spyOn(provider.adapter, 'observe'),
+        vi.spyOn(provider.adapter, 'stop'),
+        vi.spyOn(provider.adapter, 'ensureLeaseAtLeast'),
+        vi.spyOn(provider.adapter, 'ensureBillingAdmission'),
+      ];
+      const expectedRuntime = {
+        sandboxType: instance === 'standard-3' ? 'containers-standard-3' : 'containers-standard-4',
+        kiloCliVersion: null,
+        wrapperVersion: null,
+        startedAt: null,
+        stoppedAt: null,
+      };
+      const before = await readState(stub);
+      const alarm = await readAlarm(stub);
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        status: 'starting',
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readAlarm(stub)).toEqual(alarm);
+      for (const call of providerCalls) expect(call).not.toHaveBeenCalled();
+
+      await evictAllDurableObjects();
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect((await readState(stub)).allocationId).toBe(before.allocationId);
+    }
+  );
 
   it('rebuilds its provider adapter from the stored pin after eviction', async () => {
     const provider = createFakeProvider();

@@ -4,10 +4,10 @@ import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
 import { api_request_log } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { getUserFromAuth } from '@/lib/user/server';
-import type { FakeR2ClientModule } from '@/tests/helpers/fake-r2.helper';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { GET } from './route';
 
 jest.mock('next/server', () => {
@@ -15,19 +15,19 @@ jest.mock('next/server', () => {
   return { ...actual, connection: jest.fn() };
 });
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
-jest.mock('@/lib/r2/client', () =>
+jest.mock('@kilocode/web-shared/lib/r2/client', () =>
   jest
     .requireActual<{
       createFakeR2ClientModule: () => FakeR2ClientModule;
-    }>('@/tests/helpers/fake-r2.helper')
+    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
     .createFakeR2ClientModule()
 );
 
-const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@/lib/r2/client');
+const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@kilocode/web-shared/lib/r2/client');
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const TEST_USER_ID = 'api-request-log-download-test-user';
 const TEST_MODEL = 'poolside/laguna-s-2.1:free';
@@ -182,6 +182,76 @@ describe('GET /admin/api/api-request-log/download', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: 'Start must be before end.' });
+  });
+
+  describe('when the export reaches its time budget', () => {
+    const ROUTE_BATCH_SIZE = 10;
+    const INCOMPLETE_NOTICE_NAME = 'INCOMPLETE_EXPORT_README.txt';
+
+    async function insertRows(length: number) {
+      return db
+        .insert(api_request_log)
+        .values(
+          Array.from({ length }, (_, index) => {
+            const request_r2_key = `2026-08-01/budget-${index}/request.json`;
+            fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ index }));
+            return { ...baseRow, request_r2_key };
+          })
+        )
+        .returning({ id: api_request_log.id });
+    }
+
+    function exceedBudgetDuringFirstBatch() {
+      const realNow = Date.now.bind(Date);
+      let offsetMs = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => realNow() + offsetMs);
+      const send = fakeR2.send.bind(fakeR2);
+      jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
+        if (
+          command instanceof GetObjectCommand &&
+          command.input.Key === '2026-08-01/budget-0/request.json'
+        ) {
+          offsetMs = 800_000;
+        }
+        return send(command);
+      });
+    }
+
+    function exportedIds(entries: Record<string, Uint8Array>) {
+      return Object.keys(entries)
+        .map(name => name.match(/_(\d+)_request\.json$/)?.[1])
+        .filter(id => id !== undefined);
+    }
+
+    it('stops after the current batch and explains that the ZIP is incomplete', async () => {
+      const rows = await insertRows(ROUTE_BATCH_SIZE + 5);
+      exceedBudgetDuringFirstBatch();
+
+      const entries = await downloadEntries();
+
+      expect(exportedIds(entries).sort()).toEqual(
+        rows
+          .slice(0, ROUTE_BATCH_SIZE)
+          .map(row => String(row.id))
+          .sort()
+      );
+      const notice = strFromU8(entries[INCOMPLETE_NOTICE_NAME]);
+      expect(notice).toContain('This export is incomplete.');
+      expect(notice).toContain(
+        `It contains ${ROUTE_BATCH_SIZE} matching records. 5 more matching records were not exported.`
+      );
+      expect(notice).toContain(`The last exported record has id ${rows[ROUTE_BATCH_SIZE - 1].id}`);
+    });
+
+    it('omits the notice when no matching records remain', async () => {
+      const rows = await insertRows(ROUTE_BATCH_SIZE);
+      exceedBudgetDuringFirstBatch();
+
+      const entries = await downloadEntries();
+
+      expect(exportedIds(entries)).toHaveLength(rows.length);
+      expect(entries[INCOMPLETE_NOTICE_NAME]).toBeUndefined();
+    });
   });
 
   it('skips missing R2 objects and records R2 read failures without aborting the export', async () => {

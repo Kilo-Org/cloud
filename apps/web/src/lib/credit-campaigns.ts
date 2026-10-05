@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { credit_campaigns, credit_transactions, type CreditCampaign } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
@@ -8,8 +8,8 @@ import {
   GRANT_MSG_ALREADY_APPLIED,
   GRANT_MSG_CAP_REACHED,
   grantCreditForCategoryConfig,
-} from '@/lib/promotionalCredits';
-import type { NonSelfServicePromoCreditCategoryConfig } from '@/lib/PromoCreditCategoryConfig';
+} from '@kilocode/web-shared/lib/promotionalCredits';
+import type { NonSelfServicePromoCreditCategoryConfig } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 import { CREDIT_CAMPAIGN_SLUG_FORMAT, isCampaignEligible } from '@/lib/credit-campaigns-shared';
 
 /**
@@ -144,7 +144,8 @@ export async function grantCreditCampaignBonus(
  * TS category map load.
  */
 export async function isCreditCategoryCollision(credit_category: string): Promise<boolean> {
-  const { promoCreditCategoriesByKey } = await import('@/lib/promoCreditCategories');
+  const { promoCreditCategoriesByKey } =
+    await import('@kilocode/web-shared/lib/promoCreditCategories');
   return promoCreditCategoriesByKey.has(credit_category);
 }
 

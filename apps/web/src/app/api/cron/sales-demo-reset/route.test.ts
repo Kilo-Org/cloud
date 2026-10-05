@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
@@ -10,7 +10,7 @@ jest.mock('@/lib/config.server', () => ({
 // needs more than the default 5s budget.
 jest.setTimeout(30_000);
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
   credit_transactions,
@@ -26,7 +26,7 @@ import {
   sales_demo_spend_ledger,
 } from '@kilocode/db/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createSalesDemoOrganization, salesDemoMemberId } from '@/lib/organizations/sales-demo';
 import type { User } from '@kilocode/db/schema';
 import { GET } from './route';

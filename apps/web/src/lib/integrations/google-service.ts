@@ -5,8 +5,8 @@ import {
   GOOGLE_WORKSPACE_OAUTH_CLIENT_SECRET,
   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID,
   GOOGLE_WORKSPACE_OAUTH_REDIRECT_URI,
-} from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
+} from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { GoogleCapability } from '@/lib/integrations/google/capabilities';
 import {
   GOOGLE_IDENTITY_SCOPES,

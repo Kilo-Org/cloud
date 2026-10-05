@@ -7,7 +7,7 @@ import {
   GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
   buildGitLabOAuthCredentialAad,
 } from '@kilocode/worker-utils/gitlab-credential';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   platform_access_token_credentials,
@@ -15,7 +15,7 @@ import {
   platform_oauth_credentials,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { storeGitLabOAuthIntegration } from './oauth-integration-writer';
 
 const testKeyPair = generateKeyPairSync('rsa', {
@@ -32,7 +32,7 @@ const mockCredentialEncryptionConfig: {
   publicKey: Buffer.from(testKeyPair.publicKey).toString('base64'),
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID() {
     return mockCredentialEncryptionConfig.keyId;
   },

@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
-import { CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   bot_requests,
   type BotRequestCloudAgentSession,
@@ -30,7 +30,7 @@ import {
   PlatformIntegrationNotFoundError,
   PlatformIntegrationUnavailableError,
 } from '@/lib/bot/platform-helpers';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { Thread } from 'chat';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 

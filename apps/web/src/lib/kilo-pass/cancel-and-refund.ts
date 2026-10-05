@@ -9,11 +9,11 @@ import {
   kilocode_users,
   user_admin_notes,
 } from '@kilocode/db/schema';
-import type { db as defaultDb } from '@/lib/drizzle';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
 

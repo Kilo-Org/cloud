@@ -9,6 +9,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 
 import {
+  bouncer_credit_event_outbox,
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
@@ -19,21 +20,21 @@ import {
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import type * as StoreRefund from '@/lib/credits/store-refund';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
-import { toMicrodollars } from '@/lib/microdollars';
+import type * as CreditEventsModule from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 
@@ -46,23 +47,28 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
   trackKiloPassPurchaseCompleted: jest.fn(),
 }));
 
-// Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+// The real enqueue writes a real `bouncer_credit_event_outbox` row, so the bouncer tests assert
+// that durable row. One test overrides the enqueue to reject, proving it shares the notification's
+// transaction: a failed enqueue must roll back `processed_at`.
+jest.mock('@kilocode/web-shared/lib/bouncer/credit-events', () => {
+  const actual = jest.requireActual<typeof CreditEventsModule>(
+    '@kilocode/web-shared/lib/bouncer/credit-events'
+  );
   return {
     __esModule: true,
     ...actual,
-    reportCreditEvent: jest.fn(),
+    enqueueCreditEvent: jest.fn(actual.enqueueCreditEvent),
   };
 });
 
-// The mock is registered above; a static import would bind the real module instead.
-type BouncerClientMock = {
-  reportCreditEvent: jest.Mock;
-};
-
-function getBouncerClientMock(): jest.Mock {
-  return (jest.requireMock('@/lib/bouncer/client') as BouncerClientMock).reportCreditEvent;
+function getEnqueueCreditEventMock() {
+  return jest.mocked(
+    (
+      jest.requireMock(
+        '@kilocode/web-shared/lib/bouncer/credit-events'
+      ) as typeof CreditEventsModule
+    ).enqueueCreditEvent
+  );
 }
 
 type PosthogTrackingMock = {
@@ -2876,12 +2882,22 @@ describe('processAppStoreKiloPassNotification', () => {
 
 describe('App Store bouncer store events', () => {
   const SIGNED_DATE_MS = 1_777_700_000_000;
-  let reportCreditEvent: jest.Mock;
 
-  beforeEach(() => {
-    reportCreditEvent = getBouncerClientMock();
-    reportCreditEvent.mockClear();
-  });
+  /** The durable outbox row a notification enqueued, keyed by its source event id. */
+  async function findOutboxRow(eventId: string) {
+    return db.query.bouncer_credit_event_outbox.findFirst({
+      where: eq(bouncer_credit_event_outbox.event_id, eventId),
+    });
+  }
+
+  /** The processed_at of a store event row, for asserting the enqueue shares its transaction. */
+  async function processedAtFor(eventId: string): Promise<string | null | undefined> {
+    const row = await db.query.kilo_pass_store_events.findFirst({
+      columns: { processed_at: true },
+      where: eq(kilo_pass_store_events.event_id, eventId),
+    });
+    return row?.processed_at ?? null;
+  }
 
   /**
    * Completes an initial buy for `decodedTransaction`, then adds the bonus and promo credits an
@@ -3034,22 +3050,23 @@ describe('App Store bouncer store events', () => {
         refund(notificationUUID, decodedTransaction, 'Production')
       );
 
-      expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-      expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-        type: 'store.refund',
-        reason,
-        provider: 'apple',
+      const row = await findOutboxRow(notificationUUID);
+      expect(row?.event_type).toBe('store.refund');
+      expect(row?.payload).toEqual({
         eventId: notificationUUID,
-        occurredAt: new Date(SIGNED_DATE_MS),
+        occurredAt: new Date(SIGNED_DATE_MS).toISOString(),
         userId: user.id,
-        storeAccountKey: decodedTransaction.originalTransactionId,
+        provider: 'apple',
+        originalTransactionId: decodedTransaction.originalTransactionId,
         referenceId: decodedTransaction.transactionId,
         environment: 'production',
+        type: 'store.refund',
+        reason,
       });
     }
   );
 
-  it('reports a consumption request as a requested refund', async () => {
+  it('reports a consumption request as a store.refund_requested event', async () => {
     const user = await insertTestUser();
     const notificationUUID = `bouncer-consumption-${crypto.randomUUID()}`;
     const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
@@ -3069,17 +3086,48 @@ describe('App Store bouncer store events', () => {
     });
 
     expect(sendConsumptionInformation).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-      type: 'store.refund',
-      reason: 'requested',
-      provider: 'apple',
+    const row = await findOutboxRow(notificationUUID);
+    expect(row?.event_type).toBe('store.refund_requested');
+    expect(row?.payload).toEqual({
       eventId: notificationUUID,
-      occurredAt: new Date(SIGNED_DATE_MS),
+      occurredAt: new Date(SIGNED_DATE_MS).toISOString(),
       userId: user.id,
-      storeAccountKey: decodedTransaction.originalTransactionId,
+      provider: 'apple',
+      originalTransactionId: decodedTransaction.originalTransactionId,
       referenceId: decodedTransaction.transactionId,
       environment: 'production',
+      type: 'store.refund_requested',
+    });
+  });
+
+  it('reports a declined refund as a store.refund_declined event', async () => {
+    const user = await insertTestUser();
+    const notificationUUID = `bouncer-refund-declined-${crypto.randomUUID()}`;
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: notificationUUID,
+      decodeNotification: async () =>
+        notification({
+          notificationUUID,
+          notificationType: NotificationTypeV2.REFUND_DECLINED,
+          environment: 'Production',
+          signedDate: SIGNED_DATE_MS,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    const row = await findOutboxRow(notificationUUID);
+    expect(row?.event_type).toBe('store.refund_declined');
+    expect(row?.payload).toEqual({
+      eventId: notificationUUID,
+      occurredAt: new Date(SIGNED_DATE_MS).toISOString(),
+      userId: user.id,
+      provider: 'apple',
+      originalTransactionId: decodedTransaction.originalTransactionId,
+      referenceId: decodedTransaction.transactionId,
+      environment: 'production',
+      type: 'store.refund_declined',
     });
   });
 
@@ -3105,17 +3153,18 @@ describe('App Store bouncer store events', () => {
       decodeTransaction: async () => decodedTransaction,
     });
 
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-      type: 'store.purchase',
-      amountCents: 2470,
-      provider: 'apple',
+    const row = await findOutboxRow(notificationUUID);
+    expect(row?.event_type).toBe('store.purchase');
+    expect(row?.payload).toEqual({
       eventId: notificationUUID,
-      occurredAt: new Date(SIGNED_DATE_MS),
+      occurredAt: new Date(SIGNED_DATE_MS).toISOString(),
       userId: user.id,
-      storeAccountKey: decodedTransaction.originalTransactionId,
+      provider: 'apple',
+      originalTransactionId: decodedTransaction.originalTransactionId,
       referenceId: decodedTransaction.transactionId,
       environment: 'production',
+      type: 'store.purchase',
+      amountCents: 2470,
     });
   });
 
@@ -3128,41 +3177,90 @@ describe('App Store bouncer store events', () => {
       refundReversed(notificationUUID, decodedTransaction, 'Production')
     );
 
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
-      type: 'store.refund_reversed',
-      provider: 'apple',
+    const row = await findOutboxRow(notificationUUID);
+    expect(row?.event_type).toBe('store.refund_reversed');
+    expect(row?.payload).toEqual({
       eventId: notificationUUID,
-      occurredAt: new Date(SIGNED_DATE_MS),
+      occurredAt: new Date(SIGNED_DATE_MS).toISOString(),
       userId: user.id,
-      storeAccountKey: decodedTransaction.originalTransactionId,
+      provider: 'apple',
+      originalTransactionId: decodedTransaction.originalTransactionId,
       referenceId: decodedTransaction.transactionId,
       environment: 'production',
+      type: 'store.refund_reversed',
     });
+  });
+
+  it('does not report a family-sharing revoke', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user } = await subscribeWithIssuedCredits(decodedTransaction);
+    const notificationUUID = `bouncer-revoke-${crypto.randomUUID()}`;
+    const revokeTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+      revocationType: RevocationType.FAMILY_REVOKE,
+      revocationPercentage: undefined,
+    });
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: notificationUUID,
+      decodeNotification: async () =>
+        notification({
+          notificationUUID,
+          notificationType: NotificationTypeV2.REVOKE,
+          environment: 'Production',
+          signedDate: SIGNED_DATE_MS,
+        }),
+      decodeTransaction: async () => revokeTransaction,
+    });
+
+    expect(await findOutboxRow(notificationUUID)).toBeUndefined();
+    expect(await processedAtFor(notificationUUID)).not.toBeNull();
+  });
+
+  it('rolls back processed_at when the enqueue fails, so the notification is retried', async () => {
+    const user = await insertTestUser();
+    const notificationUUID = `bouncer-enqueue-failure-${crypto.randomUUID()}`;
+    const decodedTransaction = transaction({
+      appAccountToken: user.app_store_account_token,
+      revocationReason: 1,
+    });
+    const enqueueMock = getEnqueueCreditEventMock();
+    enqueueMock.mockRejectedValueOnce(new Error('outbox insert failed'));
+
+    await expect(
+      processAppStoreKiloPassNotification(
+        refund(notificationUUID, decodedTransaction, 'Production')
+      )
+    ).rejects.toThrow('outbox insert failed');
+
+    expect(await findOutboxRow(notificationUUID)).toBeUndefined();
+    expect(await processedAtFor(notificationUUID)).toBeNull();
   });
 
   it('skips a sandbox notification', async () => {
     const user = await insertTestUser();
+    const notificationUUID = `bouncer-sandbox-${crypto.randomUUID()}`;
     const decodedTransaction = transaction({
       appAccountToken: user.app_store_account_token,
       revocationReason: 1,
     });
 
     await processAppStoreKiloPassNotification(
-      refund(`bouncer-sandbox-${crypto.randomUUID()}`, decodedTransaction, 'Sandbox')
+      refund(notificationUUID, decodedTransaction, 'Sandbox')
     );
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    expect(await findOutboxRow(notificationUUID)).toBeUndefined();
   });
 
   it('skips a production notification that resolves no Kilo user', async () => {
+    const notificationUUID = `bouncer-orphan-${crypto.randomUUID()}`;
     const decodedTransaction = transaction({ revocationReason: 1 });
 
     await processAppStoreKiloPassNotification(
-      refund(`bouncer-orphan-${crypto.randomUUID()}`, decodedTransaction, 'Production')
+      refund(notificationUUID, decodedTransaction, 'Production')
     );
 
-    expect(reportCreditEvent).not.toHaveBeenCalled();
+    expect(await findOutboxRow(notificationUUID)).toBeUndefined();
   });
 
   it('reports a production credit-pack refund for the pack owner', async () => {
@@ -3205,15 +3303,17 @@ describe('App Store bouncer store events', () => {
       ),
     });
     expect(clawback?.amount_microdollars).toBe(-toMicrodollars(10));
-    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(reportCreditEvent.mock.calls[0][0]).toMatchObject({
-      type: 'store.refund',
-      reason: 'other',
-      provider: 'apple',
-      eventId: notificationUUID,
-      userId: user.id,
-      referenceId: transactionId,
-      environment: 'production',
+    expect(await findOutboxRow(notificationUUID)).toMatchObject({
+      event_type: 'store.refund',
+      payload: {
+        type: 'store.refund',
+        reason: 'other',
+        provider: 'apple',
+        eventId: notificationUUID,
+        userId: user.id,
+        referenceId: transactionId,
+        environment: 'production',
+      },
     });
   });
 

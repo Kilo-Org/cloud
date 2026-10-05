@@ -2,8 +2,14 @@ import { TRPCError } from '@trpc/server';
 import type { ProcedureType } from '@trpc/server';
 
 import { RequestDeadlineError, withDeadline } from '@kilocode/event-service';
-import { isMobileClient, type MinimumVersionHeaders } from '@/lib/trpc/min-version';
-import { buildTimingLine, readClientDimensions } from '@/lib/observability/request-timing';
+import {
+  isMobileClient,
+  type MinimumVersionHeaders,
+} from '@kilocode/web-shared/lib/trpc/min-version';
+import {
+  buildTimingLine,
+  readClientDimensions,
+} from '@kilocode/web-shared/lib/observability/request-timing';
 
 /**
  * Server-side budget for one mobile control-plane tRPC request.

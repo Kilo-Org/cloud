@@ -1,7 +1,12 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'tsconfig-paths/register';
 
-import { cleanupDbForTest, closeAllDrizzleConnections, Pool, Client } from '@/lib/drizzle';
+import {
+  cleanupDbForTest,
+  closeAllDrizzleConnections,
+  Pool,
+  Client,
+} from '@kilocode/web-shared/lib/drizzle';
 import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -12,7 +17,7 @@ import {
 } from '@/lib/usage-partitions';
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { shutdownPosthog } from '@/lib/posthog';
+import { shutdownPosthog } from '@kilocode/web-shared/lib/posthog';
 
 // Use a file-system flag to ensure this setup runs only once per worker across all test files
 const getSetupFlagPath = (workerId: string) =>

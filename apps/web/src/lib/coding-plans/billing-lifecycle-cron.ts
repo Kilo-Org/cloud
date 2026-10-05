@@ -4,10 +4,10 @@ import { addDays, addHours } from 'date-fns';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { sentryLogger } from '@/lib/utils.server';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   byok_api_keys,
   coding_plan_key_inventory,

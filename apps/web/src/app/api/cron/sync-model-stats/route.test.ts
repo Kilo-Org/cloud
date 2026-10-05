@@ -2,7 +2,7 @@ let mockEnabled = false;
 let mockCronSecret: string | undefined = 'cron-secret';
 let mockMonitoredModels = ['fixture/monitored'];
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get CRON_SECRET() {
     return mockCronSecret;
   },
@@ -18,7 +18,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getRawOpenRouterModels: jest.fn(),
   getEnhancedOpenRouterModels: jest.fn(),
 }));
@@ -27,11 +27,11 @@ jest.mock('@/lib/model-stats/sync-artificial-analysis', () => ({
 }));
 jest.mock('@/lib/model-stats/sync-openrouter', () => ({ syncOpenRouterModels: jest.fn() }));
 jest.mock('@/lib/model-stats/sync-internal-data', () => ({ syncInternalUsageStats: jest.fn() }));
-jest.mock('@/lib/model-stats/model-stats-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/model-stats/model-stats-cache', () => ({
   invalidateModelStatsCache: jest.fn(),
 }));
 jest.mock('@/lib/model-stats/sync-enkrypt', () => ({ syncEnkryptBenchmarks: jest.fn() }));
-jest.mock('@/lib/ai-gateway/preferred-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
   getMonitoredModels: async () => mockMonitoredModels,
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -41,15 +41,15 @@ import { captureException } from '@sentry/nextjs';
 import {
   getEnhancedOpenRouterModels,
   getRawOpenRouterModels,
-} from '@/lib/ai-gateway/providers/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import type { SyncOpenRouterResult } from '@/lib/model-stats/sync-openrouter';
-import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { syncEnkryptBenchmarks } from '@/lib/model-stats/sync-enkrypt';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   buildScheduledJobFailureEvent,
   createScheduledJobRun,

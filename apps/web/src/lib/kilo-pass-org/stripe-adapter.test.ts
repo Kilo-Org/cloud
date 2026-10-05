@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type Stripe from 'stripe';
-import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
+import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import {
   markServiceFeeAssessmentCharged,
   markServiceFeeAssessmentMissed,
@@ -8,20 +8,20 @@ import {
   upsertServiceFeeAssessment,
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_DESCRIPTION,
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   createInvoiceServiceFeeAssessmentKey,
   SERVICE_FEE_FAILURE_APPLICATION,
-} from '@/lib/service-fees/checkout';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
 import type { KiloPassInvoiceCreatedDependencies } from '@/lib/service-fees/invoice-created';
-import { buildServiceFeeLineMetadata } from '@/lib/service-fees/stripe-lines';
+import { buildServiceFeeLineMetadata } from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 import type { KiloPassServiceFeeSettlementStripe } from '@/lib/service-fees/settlement';
 import type { OrganizationKiloPassSeatCapacityStripe } from '@/lib/kilo-pass-org/stripe-adapter';
 
@@ -79,7 +79,7 @@ const createPendingAgreement =
 const bindProviderSeatAddOnItem = jest.fn();
 const endAgreementAfterPassItemRemoved = jest.fn();
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: { retrieve, update },
     invoicePayments: { list: invoicePaymentsList },
@@ -93,8 +93,8 @@ jest.mock('@/lib/stripe-client', () => ({
     },
   },
 }));
-jest.mock('@/lib/utils.server', () => {
-  const actual = jest.requireActual('@/lib/utils.server');
+jest.mock('@kilocode/web-shared/lib/utils.server', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/utils.server');
   return {
     ...(actual as object),
     warnExceptInTest: (...args: unknown[]) => warnExceptInTest(...args),
@@ -104,7 +104,7 @@ jest.mock('@sentry/nextjs', () => {
   const actual = jest.requireActual('@sentry/nextjs');
   return { ...(actual as object), captureMessage: (...args: unknown[]) => captureMessage(...args) };
 });
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: (...args: unknown[]) => select(...args),
     update: (...args: unknown[]) => updateDb(...args),
@@ -118,12 +118,14 @@ jest.mock('./service', () => ({
   endAgreementAfterPassItemRemoved,
   suspendAgreementForPaymentReview: jest.fn(),
 }));
-jest.mock('@/lib/kilo-pass/stripe-price-ids.server', () => ({
+jest.mock('@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server', () => ({
   getKnownStripePriceIdsForKiloPass: () => ['price_pass'],
   getStripePriceIdForKiloPass: () => 'price_pass',
 }));
-jest.mock('@/lib/organizations/stripe-seat-line-items', () => {
-  const actual = jest.requireActual('@/lib/organizations/stripe-seat-line-items') as {
+jest.mock('@kilocode/web-shared/lib/organizations/stripe-seat-line-items', () => {
+  const actual = jest.requireActual(
+    '@kilocode/web-shared/lib/organizations/stripe-seat-line-items'
+  ) as {
     isSeatLineItem: (item: { id: string }) => boolean;
     SEAT_PRODUCT_IDS: Set<string>;
   };

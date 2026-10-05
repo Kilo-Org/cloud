@@ -11,11 +11,11 @@ jest.mock('mailgun.js', () =>
   }))
 );
 jest.mock('form-data', () => jest.fn());
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   MAILGUN_API_KEY: 'test-mailgun-key',
   MAILGUN_DOMAIN: 'mail.example.test',
 }));
-jest.mock('@/lib/email-local-outbox', () => ({
+jest.mock('@kilocode/web-shared/lib/email-local-outbox', () => ({
   writeEmailToLocalOutbox: (params: unknown) => writeEmailToLocalOutboxMock(params),
 }));
 jest.mock('@sentry/nextjs', () => ({
@@ -23,7 +23,10 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import Mailgun from 'mailgun.js';
-import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
+import {
+  getEmailVerificationRecipient,
+  sendViaMailgun,
+} from '@kilocode/web-shared/lib/email-mailgun';
 
 const mailgunConstructorMock = jest.mocked(Mailgun);
 const mailgunInstance = mailgunConstructorMock.mock.results[0]?.value as {

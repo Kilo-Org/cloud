@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { ORGANIZATION_ROLES } from '@kilocode/app-shared/organizations';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
-import type { Result } from '@/lib/maybe-result';
+import type { Result } from '@kilocode/web-shared/lib/maybe-result';
 import { CompanyDomainSchema, isValidDomain } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts

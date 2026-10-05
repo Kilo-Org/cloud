@@ -18,6 +18,7 @@ export const FEATURE_VALUES = [
   'parallel-agent',
   'managed-indexing',
   'cli',
+  'desktop',
   'daemon',
   'cloud-agent',
   'cloud-agent-web',

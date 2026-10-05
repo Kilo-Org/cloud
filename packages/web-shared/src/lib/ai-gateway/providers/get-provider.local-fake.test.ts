@@ -1,35 +1,44 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { getProvider, getTranscriptionProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
-import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
-import { getBYOKforUser, getModelUserByokProviders } from '@/lib/ai-gateway/byok';
-import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
-import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { OpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/types';
+import {
+  getProvider,
+  getTranscriptionProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import {
+  getBYOKforUser,
+  getModelUserByokProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
+import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
 
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
 }));
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   getModelUserByokProviders: jest.fn().mockResolvedValue([]),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/vercel', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   shouldRouteToVercel: jest.fn().mockResolvedValue(false),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn().mockResolvedValue(null),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn().mockResolvedValue({ kind: 'no_connection' }),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
@@ -378,5 +387,66 @@ describe('getProvider ChatGPT connection routing order', () => {
       bypassAccessCheck: false,
     });
     env.restore();
+  });
+});
+
+describe('getProvider direct BYOK routing', () => {
+  afterEach(() => {
+    jest.mocked(getDirectByokModel).mockReset().mockResolvedValue({ provider: null, model: null });
+    jest.mocked(getBYOKforUser).mockReset();
+  });
+
+  test('removes the OpenRouter provider config before the provider transform runs', async () => {
+    const directByokTransform = jest.fn((context: TransformRequestContext) => {
+      expect(context.request.body.provider).toBeUndefined();
+    });
+    jest.mocked(getDirectByokModel).mockResolvedValue({
+      provider: {
+        id: 'nvidia-byok',
+        base_url: 'https://direct-byok.example/v1',
+        base_url_overrides: {},
+        supported_chat_apis: ['chat_completions', 'responses', 'messages'],
+        default_ai_sdk_provider: 'openai-compatible',
+        transformRequest: directByokTransform,
+        models: async () => [],
+      },
+      model: {
+        id: 'upstream-model',
+        name: 'Upstream Model',
+        context_length: 1000,
+        max_completion_tokens: 1000,
+      },
+    });
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([{ decryptedAPIKey: 'user-direct-key', providerId: 'nvidia-byok' }]);
+
+    const result = await getProvider(providerInput('nvidia-byok/upstream-model'));
+    if (result.kind !== 'provider') throw new Error('expected provider result');
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: {
+        model: 'nvidia-byok/upstream-model',
+        messages: [],
+        provider: { only: ['openai'], data_collection: 'deny' },
+      },
+    };
+    await result.provider.transformRequest({
+      provider: result.provider,
+      model: 'nvidia-byok/upstream-model',
+      request,
+      originalHeaders: getFraudDetectionHeaders(new Headers()),
+      extraHeaders: {},
+      userByok: result.userByok,
+      kilo_user_id: user.id,
+      organization_id: null,
+      session_id: null,
+    });
+
+    expect(result.provider.id).toBe('direct-byok');
+    expect(directByokTransform).toHaveBeenCalledTimes(1);
+    expect(request.body).not.toHaveProperty('provider');
+    expect(request.body.model).toBe('upstream-model');
   });
 });

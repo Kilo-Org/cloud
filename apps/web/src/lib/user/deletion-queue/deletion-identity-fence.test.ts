@@ -3,13 +3,13 @@ import {
   UserDeletionRequestStatus,
 } from '@kilocode/db/schema-types';
 import { user_deletion_requests } from '@kilocode/db/schema';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   authPassesDeletionFence,
   assertNoActiveDeletionFence,
 } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),

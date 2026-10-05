@@ -6,8 +6,8 @@ import {
 import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 
-import { db } from '@/lib/drizzle';
-import { APP_URL } from '@/lib/constants';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { settleCodeReviewLedgerRowOn } from '@/lib/code-reviews/code-review-ledger';
 import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
 import { NON_TERMINAL_CODE_REVIEW_STATUSES } from '@/lib/code-reviews/dispatch/dispatch-constants';
@@ -20,7 +20,7 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { setCommitStatus } from '@/lib/integrations/platforms/gitlab/adapter';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * How long a review may sit in a non-terminal state before the reaper closes it.

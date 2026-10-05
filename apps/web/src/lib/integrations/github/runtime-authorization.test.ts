@@ -4,9 +4,9 @@ import {
   GitHubRuntimeAuthorizationError,
   isGitHubRuntimeAssociationAuthorized,
 } from './runtime-authorization';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
-jest.mock('@/lib/drizzle', () => ({ db: { select: jest.fn() } }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: { select: jest.fn() } }));
 
 const association = {
   integration: {

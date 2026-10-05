@@ -3,7 +3,7 @@ import {
   deleteTriageCollectionIfExists,
 } from '@/lib/auto-triage/milvus/setup-collection';
 import { MilvusRestClient } from '@/lib/code-indexing/milvus-rest-client';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 export async function run() {
   const args = process.argv.slice(2);

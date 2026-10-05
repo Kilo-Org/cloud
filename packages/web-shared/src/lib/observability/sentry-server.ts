@@ -1,12 +1,11 @@
-// This file configures the initialization of Sentry on the server.
-// The config you add here will be used whenever the server handles a request.
+// Sentry initialization for the Node.js server runtime of apps/web and apps/ai-gateway.
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 // But note tricky corner cases using vercel otel with sentry:
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/opentelemetry/custom-setup/
 
 import type { Event } from '@sentry/nextjs';
 import { consoleLoggingIntegration, httpIntegration, init } from '@sentry/nextjs';
-import { sanitizeAnalyticsPathname } from './src/lib/sanitize-analytics-url';
+import { sanitizeAnalyticsPathname } from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
 type DrizzleQueryError = Error & {
   query: string;
@@ -175,7 +174,11 @@ export function sanitizeSentryRequestData(event: Event): Event {
   return event;
 }
 
-if (process.env.NODE_ENV !== 'development') {
+export function initServerSentry(): void {
+  if (process.env.NODE_ENV === 'development') {
+    return;
+  }
+
   init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 

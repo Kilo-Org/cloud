@@ -7,14 +7,14 @@ import {
   upsertServiceFeeAssessment,
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_DESCRIPTION,
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   attachPreparedAutoTopUpInvoiceFee,
   buildTopUpServiceFeeCheckoutLineItem,
@@ -34,8 +34,8 @@ import {
   SERVICE_FEE_FAILURE_ACTIVATION_BOUNDARY,
   SERVICE_FEE_FAILURE_APPLICATION,
   type ServiceFeeCheckoutDependencies,
-} from '@/lib/service-fees/checkout';
-import { buildInheritedInlineServiceFeeTaxInput } from '@/lib/service-fees/tax';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import { buildInheritedInlineServiceFeeTaxInput } from '@kilocode/web-shared/lib/service-fees/tax';
 
 function createMemoryAssessmentStore(): ServiceFeeAssessmentStore {
   const rows = new Map<string, ServiceFeeAssessmentRecord>();

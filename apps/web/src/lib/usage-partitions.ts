@@ -1,4 +1,4 @@
-import type { db as defaultDb } from '@/lib/drizzle';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { sql } from 'drizzle-orm';
 import { format } from 'date-fns';
 

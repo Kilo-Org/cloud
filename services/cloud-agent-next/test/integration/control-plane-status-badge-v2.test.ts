@@ -229,6 +229,10 @@ describe('sandbox status badge projection (B10)', () => {
       detailCode: 'sandbox_stopped',
       provider: 'Cloudflare',
     });
+    await waitFor(async () =>
+      expect(await session.getSession()).toMatchObject({ route: { state: 'unknown' } })
+    );
+    wrapper.close();
   });
 
   it('projects starting, stopping, unreachable and the sleep estimate from the allocation', async () => {

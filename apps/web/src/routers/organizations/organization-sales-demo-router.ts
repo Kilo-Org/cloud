@@ -1,5 +1,5 @@
-import { createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -7,7 +7,7 @@ import { NOT_LIVE_SALES_DEMO, restoreSalesDemoOrganization } from '@/lib/organiz
 import {
   ensureOrganizationAccess,
   organizationMemberMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 
 export const organizationSalesDemoRouter = createTRPCRouter({
   reset: organizationMemberMutationProcedure.mutation(async ({ input, ctx }) => {

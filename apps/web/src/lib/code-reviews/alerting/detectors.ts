@@ -1,5 +1,5 @@
-import type { db as defaultDb } from '@/lib/drizzle';
-import { sql } from '@/lib/drizzle';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import { sql } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { CODE_REVIEW_BENIGN_TERMINAL_REASONS } from '@kilocode/db/schema-types';
 import {

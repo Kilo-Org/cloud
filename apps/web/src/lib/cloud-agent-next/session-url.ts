@@ -1,5 +1,5 @@
-import { APP_URL } from '@/lib/constants';
-import { db } from '@/lib/drizzle';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

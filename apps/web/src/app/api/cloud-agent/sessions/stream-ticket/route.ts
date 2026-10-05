@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   verifyUserOwnsSessionByCloudAgentId,
   verifyOrgOwnsSessionByCloudAgentId,

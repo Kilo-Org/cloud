@@ -1,10 +1,10 @@
 // admin-router.ts
 import { sessionViewerProcedure, superadminProcedure } from '@/lib/trpc/admin-procedures';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { insertKiloClawSubscriptionChangeLog, type KiloClawSubscription } from '@kilocode/db';
 import {
   user_admin_notes,
@@ -92,7 +92,7 @@ import {
   min,
 } from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   findUsersByIds,
   getCrossAccountEmailConflicts,
@@ -100,30 +100,30 @@ import {
 } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
-import { assertNoError, successResult } from '@/lib/maybe-result';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { assertNoError, successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
   microdollar_usage,
 } from '@kilocode/db/schema';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { sum } from 'drizzle-orm';
-import { CRON_SECRET } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { revalidatePath } from 'next/cache';
-import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
-import { client as stripeClient } from '@/lib/stripe-client';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {

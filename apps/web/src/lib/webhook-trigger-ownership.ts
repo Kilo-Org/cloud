@@ -1,9 +1,9 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_webhook_triggers } from '@kilocode/db/schema';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { TRPCContext } from '@/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
 /**
  * Verify the caller has access to the given webhook trigger.

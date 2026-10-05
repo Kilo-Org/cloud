@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { randomBytes, randomUUID } from 'node:crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner, PlatformRepository } from '@/lib/integrations/core/types';
 import {

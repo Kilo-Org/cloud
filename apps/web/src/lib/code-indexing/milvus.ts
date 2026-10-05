@@ -1,4 +1,4 @@
-import { MILVUS_ADDRESS, MILVUS_TOKEN } from '@/lib/config.server';
+import { MILVUS_ADDRESS, MILVUS_TOKEN } from '@kilocode/web-shared/lib/config.server';
 import { MilvusRestClient } from './milvus-rest-client';
 
 export type { DataType } from './milvus-rest-client';

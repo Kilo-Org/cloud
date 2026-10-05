@@ -105,6 +105,7 @@ export function ChildSessionDrawer({
     lastScrollTopRef,
     resetKey: selectedSessionId,
     overflowCheckKey: messages.length,
+    ready: hydrationState.status === 'ready',
   });
   const autoScrollFrameRef = useRef(0);
   const followUpAutoScrollFrameRef = useRef(0);

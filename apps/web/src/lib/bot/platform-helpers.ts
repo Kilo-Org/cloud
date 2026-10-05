@@ -1,8 +1,8 @@
 import { type PlatformIdentity } from '@/lib/bot-identity';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 function isAvailableForBot(integration: PlatformIntegration): boolean {

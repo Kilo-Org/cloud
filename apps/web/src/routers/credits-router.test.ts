@@ -13,9 +13,9 @@ import {
   StorePurchasePendingError,
   StoreVerificationError,
 } from '@/lib/credits/store-purchase-errors';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE } from '@/lib/credits/store-account-token';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
 // @swc/jest does not hoist `jest.mock` when `jest` comes from '@jest/globals',
 // so the router is imported lazily in `beforeAll`: the registration below must
@@ -46,7 +46,6 @@ jest.mock('@/lib/credits/store-verifier', () => ({
 
 jest.mock('@/lib/credits/store-completion', () => ({
   completeStoreCreditPurchase: (...args: unknown[]) => mockCompleteStoreCreditPurchase(...args),
-  reportStoreCreditPurchaseToBouncer: async () => {},
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -75,7 +74,7 @@ let createCaller: Awaited<ReturnType<typeof buildCallerFactory>>;
 async function buildCallerFactory() {
   const [{ creditsRouter }, { createCallerFactory }] = await Promise.all([
     import('@/routers/credits-router'),
-    import('@/lib/trpc/init'),
+    import('@kilocode/web-shared/lib/trpc/init'),
   ]);
   return createCallerFactory(creditsRouter);
 }

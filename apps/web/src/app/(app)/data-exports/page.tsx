@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { isCloudDataExportUIEnabled } from '@/lib/user-data-export-ui';
 import { PageLayout } from '@/components/PageLayout';
 import { DataExportsClient } from './DataExportsClient';

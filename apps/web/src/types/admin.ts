@@ -6,10 +6,10 @@ import type {
   OrganizationMembership,
   AutoTopUpConfig,
 } from '@kilocode/db/schema';
-import type { describePaymentMethods } from '@/lib/admin-utils-serverside';
-import { OrganizationSchema } from '@/lib/organizations/organization-types';
-import { type BalanceForUser } from '@/lib/user/balance';
-import type { PaginationMetadata } from '@/types/pagination';
+import type { describePaymentMethods } from '@kilocode/web-shared/lib/admin-utils-serverside';
+import { OrganizationSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { type BalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import type { PaginationMetadata } from '@kilocode/web-shared/types/pagination';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
 export type PaymentMethodStatus = Awaited<ReturnType<typeof describePaymentMethods>>;

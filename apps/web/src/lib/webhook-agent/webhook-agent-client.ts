@@ -1,5 +1,5 @@
 import 'server-only';
-import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, WEBHOOK_AGENT_URL } from '@kilocode/web-shared/lib/config.server';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import * as z from 'zod';
 

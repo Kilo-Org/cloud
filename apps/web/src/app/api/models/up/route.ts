@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
-import { getEnvVariable } from '@/lib/dotenvx';
-import { getMonitoredModels } from '@/lib/ai-gateway/preferred-models';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 // Simple hardcoded key for authentication
 const HEALTH_CHECK_KEY = 'kilo-models-health-check';

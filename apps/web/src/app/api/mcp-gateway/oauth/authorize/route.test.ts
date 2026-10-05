@@ -32,7 +32,7 @@ const mockAuthorize =
 const mockRouteAuthorize = jest.fn();
 const mockAuditRecord = jest.fn();
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: mockGetUserFromAuth,
 }));
 

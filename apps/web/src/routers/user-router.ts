@@ -1,4 +1,4 @@
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   assertUserCanBeSoftDeleted,
   getUserAuthProviders,
@@ -9,14 +9,14 @@ import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
   sendSignInCodeEmail,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import {
   consumeSignInCode,
   createSignInCode,
   deleteSignInCode,
   releaseSignInCode,
   reserveSignInCode,
-} from '@/lib/auth/magic-link-tokens';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import {
   deletePasskey as deleteOwnedPasskey,
   listPasskeysForUser,
@@ -27,8 +27,8 @@ import { createAccountLinkingSession } from '@/lib/account-linking-session';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
-import { assertNoTrpcError, successResult } from '@/lib/maybe-result';
-import { db, readDb } from '@/lib/drizzle';
+import { assertNoTrpcError, successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   kilocode_users,
@@ -49,23 +49,27 @@ import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
-import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
-import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
-import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
+import type { AutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
   AutoTopUpAmountCentsSchema,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
-} from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
-import { resolveStripeReceiptUrl } from '@/lib/credits';
-import { getBalanceForUser } from '@/lib/user/balance';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
-import { refreshGlanceableScope } from '@/lib/notifications-worker-client';
+import { resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
+import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
@@ -960,13 +964,14 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
-          reportChargeAttempted({
+          await reportChargeAttempted({
             flow: 'auto_topup',
             userId: ctx.user.id,
             amountCents,
             accountCreatedAt: ctx.user.created_at,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
           });
           const redirectUrl = await createAutoTopUpSetupCheckoutSession(
             ctx.user.id,
@@ -990,13 +995,14 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
-      reportChargeAttempted({
+      await reportChargeAttempted({
         flow: 'auto_topup',
         userId: ctx.user.id,
         amountCents,
         accountCreatedAt: ctx.user.created_at,
         ip: ctx.ip,
         ipCountry: ipCountryFromHeaders(ctx.headersList),
+        ja4: ja4FromHeaders(ctx.headersList),
       });
       const redirectUrl = await createAutoTopUpSetupCheckoutSession(
         ctx.user.id,

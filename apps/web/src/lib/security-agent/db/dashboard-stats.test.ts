@@ -1,9 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { security_findings } from '@kilocode/db/schema';
 import type { NewSecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingAnalysis } from '@kilocode/db/schema-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getDashboardStats } from './dashboard-stats';
 
 const slaConfig = {

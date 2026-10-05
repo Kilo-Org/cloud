@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { KILOCLAW_API_URL } from '@/lib/config.server';
+import { KILOCLAW_API_URL } from '@kilocode/web-shared/lib/config.server';
 import { KiloClawApiError } from './kiloclaw-internal-client';
 import type { UserConfigResponse, PlatformStatusResponse, RestartMachineResponse } from './types';
 

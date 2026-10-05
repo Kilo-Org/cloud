@@ -8,7 +8,7 @@ import {
   type CloudAgentAttachments,
   type CloudAgentImageAllowedType,
 } from '@/lib/cloud-agent/constants';
-import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
+import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import { captureException } from '@sentry/nextjs';
 import type { Attachment, Message } from 'chat';
 import { randomUUID } from 'crypto';

@@ -1,6 +1,6 @@
-import { client } from '@/lib/stripe-client';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import Stripe from 'stripe';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   auto_top_up_configs,
@@ -11,17 +11,20 @@ import {
 import type { Organization } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
-import { failureResult, successResult, type Result } from '@/lib/maybe-result';
-import type { UserForBalance } from '@/lib/user/balance-types';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
+import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { failureResult, successResult, type Result } from '@kilocode/web-shared/lib/maybe-result';
+import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import {
+  getOrganizationById,
+  getOrganizationMembers,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { randomUUID } from 'crypto';
-import { reportChargeAttempted } from '@/lib/bouncer/credit-events';
-import { sendAutoTopUpFailedEmail } from '@/lib/email';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { reportChargeAttempted } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { sendAutoTopUpFailedEmail } from '@kilocode/web-shared/lib/email';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 import {
   AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS,
@@ -29,15 +32,15 @@ import {
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
-} from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
   attachPreparedAutoTopUpInvoiceFee,
   mergeServiceFeeCommercialMetadata,
   prepareAutoTopUpInvoiceFee,
   type ServiceFeeCheckoutDependencies,
-} from '@/lib/service-fees/checkout';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
-import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 
 function createAutoTopUpFeeDeps(): ServiceFeeCheckoutDependencies {
   const stores = createServiceFeeStores();
@@ -353,7 +356,7 @@ async function performAutoTopUpForEntity(
     });
 
     // Pay the invoice. The PaymentIntent is created during payment, not finalization.
-    reportChargeAttempted({
+    await reportChargeAttempted({
       flow: 'auto_topup',
       userId: bouncerUserId,
       orgId: bouncerOrgId,

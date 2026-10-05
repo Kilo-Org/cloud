@@ -3,9 +3,9 @@ import { detectContextOverflow, estimateTokenCount } from './context-overflow';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 
 function chatRequest(body: OpenRouterChatCompletionRequest): GatewayRequest {
   return { kind: 'chat_completions', body };

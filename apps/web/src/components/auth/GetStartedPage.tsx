@@ -1,6 +1,6 @@
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
-import { allow_fake_login, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import { allow_fake_login, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
 import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 import { useMemo } from 'react';
 

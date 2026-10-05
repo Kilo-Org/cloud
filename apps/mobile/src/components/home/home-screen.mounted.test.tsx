@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- The mounted Home matrix covers live provenance, admission, and independent recovery actions. */
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -80,6 +80,11 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   LinearTransition: {},
+  FadeIn: { duration: () => ({}) },
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: (_reduced: boolean, crossfade: unknown) => crossfade,
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({
@@ -96,14 +101,23 @@ vi.mock('@/components/home/new-task-button', () => ({ NewTaskButton: 'NewTaskBut
 vi.mock('@/components/home/new-task-from-picture-button', () => ({
   NewTaskFromPictureButton: 'NewTaskFromPictureButton',
 }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+// A host element that still renders the header notice, so its text and Retry
+// stay observable beside the card. The factory is hoisted above the static
+// imports, so it loads React itself.
+vi.mock('@/components/home/section-header', async () => {
+  const { createElement: create } = await import('react');
+  return {
+    SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
+  };
+});
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
-  return { Text: 'Text', TextClassContext: createContext('') };
+  return { Text: 'Text', TextClassContext: createContext(''), EYEBROW_LATIN_DISPLAY: '' };
 });
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
@@ -140,6 +154,10 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000000', mutedForeground: '#777777' }),
+}));
+vi.mock('@/lib/home-live-shape', () => ({
+  readLiveShapeHint: () => 'rows',
+  persistLiveShapeHint: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   useCommittedConnectivityStatus: () => state.internet,
@@ -178,6 +196,7 @@ const row: ActiveSession = {
   status: 'running',
   title: 'Live task',
   connectionId: 'connection-1',
+  statusUpdatedAt: new Date().toISOString(),
 };
 const failure = { kind: 'retryable', error: new Error('temporary') } as const;
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
@@ -207,6 +226,19 @@ function action(label: string) {
 }
 function press(label: string) {
   (action(label).props.onPress as () => void)();
+}
+/** The one glanceable card's frame; absent while no card is shown. */
+const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
+function cardFrame() {
+  return nodes('View').find(node => node.props.className === CARD_FRAME);
+}
+/** The card's newest-session title line, the card's stable identity. */
+function newestTitleNode() {
+  return nodes('Text').find(node => node.children.includes(row.title));
+}
+/** True only for the loaded rows card, not the pending skeleton. */
+function hasLoadedCard() {
+  return newestTitleNode() !== undefined;
 }
 async function renderHome() {
   await act(async () => {
@@ -290,7 +322,7 @@ describe('HomeScreen composition', () => {
       expect(text()).not.toContain('Home organization');
       expect(text()).not.toContain('Personal');
       expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId, enabled: true });
-      expect(nodes('RemoteSessionRow')[0]?.props.session).toBe(row);
+      expect(text()).toContain('Live task');
       expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe(organizationId);
     }
   );
@@ -305,12 +337,12 @@ describe('HomeScreen composition', () => {
     state.boundary.org = state.boundary.orgs[0];
     state.live.activeSessions = [row];
     await renderHome();
-    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+    expect(hasLoadedCard()).toBe(true);
     expect(nodes('NewTaskButton')).toHaveLength(1);
     Object.assign(state.auth, patch);
     await renderHome();
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: false });
-    expect(nodes('RemoteSessionRow')).toHaveLength(0);
+    expect(hasLoadedCard()).toBe(false);
     expect(nodes('NewTaskButton')).toHaveLength(0);
     for (const label of ['Code Reviewer', 'Security Agent', 'PR Review']) {
       expect(text()).not.toContain(label);
@@ -341,9 +373,9 @@ describe('HomeScreen composition', () => {
     state.live.hasAcceptedSuccess = true;
     await renderHome();
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: loaded });
-    expect(nodes('RemoteSessionRow')).toHaveLength(loaded ? 1 : 0);
+    expect(hasLoadedCard()).toBe(loaded);
     expect(nodes('NewTaskButton')).toHaveLength(loaded ? 1 : 0);
-    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 3);
+    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 15);
   });
 
   it.each([false, true])(
@@ -359,7 +391,7 @@ describe('HomeScreen composition', () => {
       expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
       expect(text()).toContain("Couldn't load active sessions");
       expect(typeof action('Retry').props.onPress).toBe('function');
-      expect(nodes('RemoteSessionRow')).toHaveLength(retained ? 1 : 0);
+      expect(hasLoadedCard()).toBe(retained);
       expect(nodes('NewTaskButton')).toHaveLength(1);
       for (const label of ['Code Reviewer', 'Security Agent', 'PR Review']) {
         expect(typeof action(label).props.onPress).toBe('function');
@@ -411,16 +443,11 @@ describe('Home live presentation', () => {
   ])('keeps valid actions and truthful content during $name', async test => {
     Object.assign(state.live, test.patch);
     await renderHome();
-    expect(nodes('Skeleton')).toHaveLength(test.skeleton ? 3 : 0);
+    expect(nodes('Skeleton')).toHaveLength(test.skeleton ? 15 : 0);
     if (test.skeleton) {
-      // The placeholder keeps the row frame: a reserved min-height card, and
-      // no full-width skeleton block standing in for the whole surface.
-      expect(
-        nodes('View').some(view => {
-          const className = String(view.props.className ?? '');
-          return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
-        })
-      ).toBe(true);
+      // The placeholder keeps the card frame: the reserved glanceable card,
+      // and no full-width skeleton block standing in for the whole surface.
+      expect(cardFrame()).toBeDefined();
       expect(
         nodes('Skeleton').some(skeleton =>
           String(skeleton.props.className ?? '').includes('w-full')
@@ -431,7 +458,7 @@ describe('Home live presentation', () => {
     expect(text().includes("Couldn't load active sessions")).toBe(Boolean(test.error));
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
-    expect(nodes('RemoteSessionRow')).toHaveLength(test.rows ? 1 : 0);
+    expect(hasLoadedCard()).toBe(Boolean(test.rows));
     expect(nodes('NewTaskButton')).toHaveLength(1);
     expect(text()).toContain('Code Reviewer');
     expect(text()).toContain('Security Agent');
@@ -445,14 +472,14 @@ describe('Home live presentation', () => {
     async mode => {
       state.live.activeSessions = [row];
       await renderHome();
-      const original = nodes('RemoteSessionRow')[0];
+      const original = newestTitleNode();
       state.connection.isConnected = false;
       state.connection.reconnectExhausted = mode === 'exhausted';
       state.internet = mode === 'offline' || mode === 'unknown' ? mode : 'online';
       await renderHome();
-      expect(nodes('RemoteSessionRow')[0]).toBe(original);
-      expect(nodes('RemoteSessionRow')[0]?.props.session).toBe(row);
-      expect(nodes('RemoteSessionRow')[0]?.props.session).toMatchObject({ status: 'running' });
+      expect(newestTitleNode()).toBe(original);
+      expect(text()).toContain('Live task');
+      expect(text()).toContain('Working');
       expect(text().includes('No internet connection')).toBe(mode === 'offline');
       expect(text().includes('Connection lost')).toBe(mode === 'exhausted');
       expect(text().includes('Reconnecting…')).toBe(mode === 'reconnecting' || mode === 'unknown');
@@ -473,7 +500,7 @@ describe('Home live presentation', () => {
     state.connection.isConnected = false;
     state.live.isPaused = true;
     await renderHome();
-    expect(nodes('Skeleton')).toHaveLength(3);
+    expect(nodes('Skeleton')).toHaveLength(15);
     expect(text()).not.toContain('Nothing running right now');
     expect(text()).not.toContain('Connecting…');
     expect(text()).not.toContain('No internet connection');
@@ -491,7 +518,7 @@ describe('Home live presentation', () => {
     state.live.hasAcceptedSuccess = true;
     state.live.terminalError = { kind: 'non-retryable', error: { data: { code } } };
     await renderHome();
-    expect(nodes('RemoteSessionRow')).toHaveLength(0);
+    expect(hasLoadedCard()).toBe(false);
     expect(text()).toContain(title);
     expect(text()).not.toContain('Nothing running right now');
     expect(nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry')).toBe(false);
@@ -499,7 +526,7 @@ describe('Home live presentation', () => {
     expect(state.destination).toBe('/(app)/(tabs)/(3_profile)');
   });
 
-  it('keeps query and socket Retry separate, busy, and recoverable after failed Retry', async () => {
+  it('offers one header Retry at a time: the failed load, then the lost connection', async () => {
     state.live.activeSessions = [row];
     state.live.terminalError = failure;
     state.connection.isConnected = false;
@@ -507,14 +534,17 @@ describe('Home live presentation', () => {
     const pending = Promise.withResolvers<boolean>();
     state.refetch.mockReturnValue(pending.promise);
     await renderHome();
-    const original = nodes('RemoteSessionRow')[0];
+    const original = newestTitleNode();
+    // The failed load outranks the lost connection in the one header line.
+    expect(
+      nodes('Pressable').some(node => node.props.accessibilityLabel === 'Retry connection')
+    ).toBe(false);
     act(() => {
       press('Retry');
       press('Retry');
     });
     expect(action('Retry').props.disabled).toBe(true);
     expect(action('Retry').props.accessibilityState).toMatchObject({ busy: true, disabled: true });
-    expect(action('Retry connection').props.disabled).toBe(false);
     expect(state.refetch).toHaveBeenCalledTimes(1);
     expect(text()).toContain("Couldn't load active sessions");
     await act(async () => {
@@ -523,21 +553,12 @@ describe('Home live presentation', () => {
     });
     expect(action('Retry').props.disabled).toBe(false);
     expect(text()).toContain("Couldn't load active sessions");
-    expect(nodes('RemoteSessionRow')[0]).toBe(original);
+    expect(newestTitleNode()).toBe(original);
     expect(
       state.announcements.filter(message => message === "Couldn't load active sessions")
     ).toHaveLength(1);
     expect(state.announcements.filter(message => message === 'Connection lost')).toHaveLength(1);
-    state.socketRetry.mockImplementation(() => {
-      state.connection.reconnectExhausted = false;
-    });
-    act(() => {
-      press('Retry connection');
-    });
-    await renderHome();
-    expect(text()).toContain('Connecting…');
-    expect(text()).not.toContain('Connection lost');
-    expect(state.refetch).toHaveBeenCalledTimes(1);
+
     state.refetch.mockImplementation(async () => {
       await Promise.resolve();
       state.live.terminalError = null;
@@ -550,26 +571,35 @@ describe('Home live presentation', () => {
     });
     await renderHome();
     expect(text()).not.toContain("Couldn't load active sessions");
-    expect(nodes('RemoteSessionRow')[0]).toBe(original);
+    expect(text()).toContain('Connection lost');
+
+    state.socketRetry.mockImplementation(() => {
+      state.connection.reconnectExhausted = false;
+    });
+    act(() => {
+      press('Retry connection');
+    });
+    await renderHome();
+    expect(text()).toContain('Connecting…');
+    expect(text()).not.toContain('Connection lost');
+    expect(state.refetch).toHaveBeenCalledTimes(2);
+    expect(newestTitleNode()).toBe(original);
   });
 
-  it('keeps the retained error and Retry mounted as socket rows appear and disappear', async () => {
+  it('keeps the load failure and its Retry visible as socket rows appear and disappear', async () => {
     state.live.terminalError = failure;
     await renderHome();
     const message = "Couldn't load active sessions";
-    const retry = action('Retry');
-    const status = nodes('Text').find(node => node.children.includes(message));
-    expect(status).toBeDefined();
     expect(nodes('AlertCircle')).toHaveLength(1);
 
     async function updateSocketRows(activeSessions: ActiveSession[]) {
       state.live.activeSessions = activeSessions;
       await renderHome();
-      expect(nodes('RemoteSessionRow')).toHaveLength(activeSessions.length);
-      expect.soft(action('Retry') === retry).toBe(true);
-      expect
-        .soft(nodes('Text').find(node => node.children.includes(message)) === status)
-        .toBe(true);
+      expect(hasLoadedCard()).toBe(activeSessions.length > 0);
+      // Beside readable rows the failure moves into the header line; without
+      // rows it is the whole surface. It is announced once either way.
+      expect(typeof action('Retry').props.onPress).toBe('function');
+      expect(text()).toContain(message);
       expect.soft(state.announcements).toEqual([message]);
       expect(nodes('AlertCircle')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
     }
@@ -665,12 +695,7 @@ describe('Home live presentation', () => {
     // indicator while the live content is pending, so the platform pull
     // control must not also hold the scroll inset open for a second one.
     expect(refresh().props.refreshing).toBe(false);
-    expect(
-      nodes('View').some(view => {
-        const className = String(view.props.className ?? '');
-        return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
-      })
-    ).toBe(true);
+    expect(cardFrame()).toBeDefined();
     await act(async () => {
       pending.resolve(true);
       await pending.promise;
@@ -704,12 +729,12 @@ describe('Home admission', () => {
     state.live.activeSessions = [row];
     await renderHome();
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: false });
-    expect(nodes('RemoteSessionRow')).toHaveLength(0);
+    expect(hasLoadedCard()).toBe(false);
     expect(nodes('NewTaskButton')).toHaveLength(0);
     state.boundary.isResolving = false;
     await renderHome();
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
-    expect(nodes('RemoteSessionRow')[0]?.props.session).toBe(row);
+    expect(text()).toContain('Live task');
     expect(nodes('NewTaskButton')[0]?.props.organizationId).toBe('org-1');
   });
 
@@ -794,7 +819,7 @@ describe('Home admission', () => {
       organizationId: 'org-1',
       enabled: mode === 'permission denied',
     });
-    expect(nodes('RemoteSessionRow')).toHaveLength(0);
+    expect(hasLoadedCard()).toBe(false);
     expect(text()).not.toContain('Nothing running right now');
     expect(text()).not.toContain('Old organization');
     expect(text().includes('PR Review')).toBe(
@@ -807,7 +832,7 @@ describe('Home admission', () => {
       expect(text()).not.toContain('Engineering');
     }
     if (mode === 'membership paused') {
-      expect(nodes('Skeleton')).toHaveLength(3);
+      expect(nodes('Skeleton')).toHaveLength(15);
       expect(text()).not.toContain('Organization unavailable');
     }
     if (
@@ -926,7 +951,7 @@ describe('Home admission', () => {
     state.live.activeSessions = [row];
     await renderHome();
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-2', enabled: false });
-    expect(nodes('RemoteSessionRow')).toHaveLength(0);
+    expect(hasLoadedCard()).toBe(false);
     expect(nodes('NewTaskButton')).toHaveLength(0);
     expect(text()).not.toContain('Nothing running right now');
   });

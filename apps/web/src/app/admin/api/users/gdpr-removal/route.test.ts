@@ -2,17 +2,17 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import type { UserDeletionRequest, UserDeletionStep } from '@kilocode/db/schema';
-import { getUserFromAuth } from '@/lib/user/server';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { getUserDeletionRequestById, getUserDeletionRequestForUser } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';
 import { captureException } from '@sentry/nextjs';
 import { GET, POST } from './route';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/user');
-jest.mock('@/lib/user/find-user-by-id');
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id');
 jest.mock('@/lib/user/deletion', () => ({
   getUserDeletionRequestById: jest.fn(),
   getUserDeletionRequestForUser: jest.fn(),

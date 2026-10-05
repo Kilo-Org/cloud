@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { exchangeGitLabOAuthCode } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
-jest.mock('@/lib/user/server');
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   instanceUrlChanged: jest.fn(),
 }));
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/agent-config/db/agent-configs', () => ({

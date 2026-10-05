@@ -20,21 +20,21 @@ import {
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import type * as StoreRefund from '@/lib/credits/store-refund';
-import type * as CreditEventsModule from '@/lib/bouncer/credit-events';
-import { toMicrodollars } from '@/lib/microdollars';
+import type * as CreditEventsModule from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 
@@ -50,8 +50,10 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
 // The real enqueue writes a real `bouncer_credit_event_outbox` row, so the bouncer tests assert
 // that durable row. One test overrides the enqueue to reject, proving it shares the notification's
 // transaction: a failed enqueue must roll back `processed_at`.
-jest.mock('@/lib/bouncer/credit-events', () => {
-  const actual = jest.requireActual<typeof CreditEventsModule>('@/lib/bouncer/credit-events');
+jest.mock('@kilocode/web-shared/lib/bouncer/credit-events', () => {
+  const actual = jest.requireActual<typeof CreditEventsModule>(
+    '@kilocode/web-shared/lib/bouncer/credit-events'
+  );
   return {
     __esModule: true,
     ...actual,
@@ -61,8 +63,11 @@ jest.mock('@/lib/bouncer/credit-events', () => {
 
 function getEnqueueCreditEventMock() {
   return jest.mocked(
-    (jest.requireMock('@/lib/bouncer/credit-events') as typeof CreditEventsModule)
-      .enqueueCreditEvent
+    (
+      jest.requireMock(
+        '@kilocode/web-shared/lib/bouncer/credit-events'
+      ) as typeof CreditEventsModule
+    ).enqueueCreditEvent
   );
 }
 

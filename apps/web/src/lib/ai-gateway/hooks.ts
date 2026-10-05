@@ -3,15 +3,15 @@ import { useMemo } from 'react';
 import type {
   OpenRouterModelsResponse,
   OpenRouterProvidersResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   OpenRouterProvidersResponseSchema,
   OpenRouterModelsResponseSchema,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   NormalizedOpenRouterResponse,
   type OpenRouterModel,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
 
 interface OpenRouterProvider {

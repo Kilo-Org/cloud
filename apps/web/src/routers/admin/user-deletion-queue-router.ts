@@ -16,10 +16,10 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { readDb } from '@/lib/drizzle';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_STALE_REQUEST_MS } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_STALE_REQUEST_MS } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   cancelPendingDeletionRequest,
   enqueueUserDeletionTargets,

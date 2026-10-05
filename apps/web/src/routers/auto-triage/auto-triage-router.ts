@@ -5,15 +5,19 @@
  * Supports both organization and personal user auto-triage.
  */
 
-import { createTRPCRouter, baseProcedure, adminProcedure } from '@/lib/trpc/init';
+import {
+  createTRPCRouter,
+  baseProcedure,
+  adminProcedure,
+} from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationMemberProcedure,
   organizationBillingProcedure,
   ensureOrganizationAccess,
-} from '@/routers/organizations/utils';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { TRPCError } from '@trpc/server';
-import { successResult, failureResult } from '@/lib/maybe-result';
+import { successResult, failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import * as z from 'zod';
 import {
   ListTriageTicketsInputSchema,

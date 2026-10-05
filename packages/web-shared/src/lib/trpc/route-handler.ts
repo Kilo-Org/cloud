@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { createTRPCContext, type TRPCContext } from '@/lib/trpc/init';
+import { createTRPCContext, type TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
-import { logTRPCError } from '@/lib/trpc/error-utils';
+import { logTRPCError } from '@kilocode/web-shared/lib/trpc/error-utils';
 
 type ErrorResponse = { error: string; message?: string };
 

@@ -10,13 +10,13 @@ import {
   security_finding_notifications,
 } from '@kilocode/db/schema';
 import type { SecurityFindingNotificationKind } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
-import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
-import { send as sendEmail, type TemplateName } from '@/lib/email';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { send as sendEmail, type TemplateName } from '@kilocode/web-shared/lib/email';
 import {
   dispatchSecurityFindingPush,
   dispatchSecurityLifecyclePush,
-} from '@/lib/notifications-worker-client';
+} from '@kilocode/web-shared/lib/notifications-worker-client';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
 import { securityLifecycleEventSchema } from '@kilocode/notifications';
 import {

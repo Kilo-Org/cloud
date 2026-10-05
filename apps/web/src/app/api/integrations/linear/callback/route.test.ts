@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyOAuthState, createOAuthState } from '@/lib/integrations/oauth-state';
 import { bot } from '@/lib/bot';
 import {
@@ -32,7 +32,7 @@ jest.mock('@linear/sdk', () => ({
     },
   })),
 }));
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => undefined),
@@ -70,7 +70,7 @@ jest.mock('@/lib/bot/platforms', () => ({
     require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
   },
 }));
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({

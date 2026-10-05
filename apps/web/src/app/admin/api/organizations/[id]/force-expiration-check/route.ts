@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { recomputeOrganizationBalances } from '@/lib/recomputeOrganizationBalances';
 
 export async function POST(

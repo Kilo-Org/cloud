@@ -33,8 +33,8 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
-import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { cn } from '@/lib/utils';
 
 // ---------------------------------------------------------------------------

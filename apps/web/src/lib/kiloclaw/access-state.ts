@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import { kiloclaw_subscriptions, type KiloClawSubscription } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';

@@ -1,4 +1,4 @@
-import { requireEnv } from '@/lib/dotenvx';
+import { requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 
 export const FIRST_TOPUP_BONUS_AMOUNT: number = 0;
 

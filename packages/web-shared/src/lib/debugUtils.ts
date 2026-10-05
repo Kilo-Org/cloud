@@ -1,4 +1,4 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import { Writable } from 'stream';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { simHash64 } from '@/lib/bouncer/simhash';
+import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 
 /** Hamming distance between two 16-hex hashes. */
 function distance(a: string, b: string): number {

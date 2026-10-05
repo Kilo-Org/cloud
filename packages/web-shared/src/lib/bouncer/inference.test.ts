@@ -1,6 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { bareIpLiteral, bouncerDecideTier, payerSharingIp } from '@/lib/bouncer/inference';
+import {
+  bareIpLiteral,
+  bouncerDecideTier,
+  payerSharingIp,
+} from '@kilocode/web-shared/lib/bouncer/inference';
 
 describe('bareIpLiteral', () => {
   it('keeps a bare IPv4 or IPv6 literal', () => {

@@ -12,7 +12,7 @@ import {
   user_notification_preferences,
 } from '@kilocode/db/schema';
 import { ORGANIZATION_SPEND_ALERT_RECIPIENT_ROLES } from '@kilocode/app-shared/organizations';
-import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
+import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * Storage unit of every money column in this feature: one US dollar is one

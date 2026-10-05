@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest } from '@jest/globals';
-import { fixOpenCodeDuplicateReasoning } from '@/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
-import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
-import type { OpenRouterChatCompletionRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { fixOpenCodeDuplicateReasoning } from '@kilocode/web-shared/lib/ai-gateway/providers/fixOpenCodeDuplicateReasoning';
+import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import type { OpenRouterChatCompletionRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 function makeRequest(reasoningDetails: unknown[]): OpenRouterChatCompletionRequest {
   return {

@@ -6,7 +6,7 @@ import {
   JWT_TOKEN_VERSION,
   isRejectedCredentialReason,
 } from './tokens';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 describe('TOKEN_EXPIRY', () => {
   test('default is five years in seconds', () => {

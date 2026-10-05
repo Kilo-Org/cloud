@@ -1,6 +1,6 @@
-import { db } from '@/lib/drizzle';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { asc, inArray } from 'drizzle-orm';
 import { findGitHubOrganizationInstallationRecords } from './github-installation-lookup';

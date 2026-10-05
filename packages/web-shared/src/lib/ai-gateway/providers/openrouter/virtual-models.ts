@@ -1,10 +1,10 @@
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import type {
   OpenRouterModel,
   OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
-import type { OpenRouterModel as CatalogModel } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 
 /**

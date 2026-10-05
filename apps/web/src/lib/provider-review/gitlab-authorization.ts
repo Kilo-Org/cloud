@@ -22,7 +22,7 @@ import {
   GitLabInstanceUrlError,
   normalizeGitLabInstanceUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * The account that owns the GitLab integration. `userId` is the acting user

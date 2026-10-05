@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { findUsersByIds } from '@/lib/user';
 import { getReferralCodeForUser, getReferralCodeUsages } from '@/lib/referral';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { referral_code_usages } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { toNonNullish } from '@/lib/utils';

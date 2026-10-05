@@ -2,7 +2,7 @@ import type Stripe from 'stripe';
 import {
   STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID,
   STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 
 export const SEAT_PRODUCT_IDS = new Set(
   [STRIPE_TEAMS_SUBSCRIPTION_PRODUCT_ID, STRIPE_ENTERPRISE_SUBSCRIPTION_PRODUCT_ID].filter(

@@ -1,9 +1,9 @@
 import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
 import { desc } from 'drizzle-orm';
 import * as z from 'zod';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { readDb } from '@/lib/drizzle';
-import { warnExceptInTest } from '@/lib/utils.server';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type StoredModelMap = Record<string, StoredModel>;
 

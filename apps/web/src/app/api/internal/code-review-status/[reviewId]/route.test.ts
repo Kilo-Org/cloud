@@ -15,7 +15,7 @@ import {
   COUNCIL_VERDICT_BLOCK_START,
 } from '@kilocode/worker-utils/code-review-council';
 import { sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
 import { admitOperation } from '@kilocode/db/operation-ledger';
 
@@ -123,7 +123,7 @@ jest.mock('next/server', () => {
   };
 });
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
@@ -217,7 +217,7 @@ jest.mock('@/lib/code-reviews/action-required', () => {
   };
 });
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'https://test.kilo.ai',
 }));
 

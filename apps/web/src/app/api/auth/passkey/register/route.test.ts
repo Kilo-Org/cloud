@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 // Keep the real PasskeyVerificationError (the route uses `instanceof` on it) and
 // only mock the ceremony functions.
 jest.mock('@/lib/auth/passkey', () => ({
@@ -9,7 +9,7 @@ jest.mock('@/lib/auth/passkey', () => ({
   verifyRegistration: jest.fn(),
 }));
 
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import {
   createRegistrationOptions,
   verifyRegistration,

@@ -1,8 +1,8 @@
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { app_min_versions } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 export const GET = withRestTiming('/api/app/min-version', async (_request: Request) => {
   try {

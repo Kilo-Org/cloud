@@ -1,8 +1,8 @@
 import { eq, or, sql } from 'drizzle-orm';
 import { kilocode_users } from '@kilocode/db/schema';
 import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
-import { db } from '@/lib/drizzle';
-import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { writeDeletionActivity } from '@/lib/user/deletion-queue/deletion-audit';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import {

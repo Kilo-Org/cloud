@@ -10,7 +10,7 @@ import {
 import { EnkryptFailureCategorySchema, EnkryptSyncCountsSchema } from '@kilocode/db/schema-types';
 import type { EnkryptSyncCounts } from '@kilocode/db/schema-types';
 import * as z from 'zod';
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { EnkryptSyncError } from '@/lib/model-stats/enkrypt-errors';
 import { syncEnkryptBenchmarks } from '@/lib/model-stats/sync-enkrypt';
 

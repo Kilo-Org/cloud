@@ -1,11 +1,14 @@
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   computeMonthlyCadenceBonusPercent,
   computeYearlyCadenceMonthlyBonusUsd,
   getMonthlyPriceUsd,
-} from '@/lib/kilo-pass/bonus';
-import { KiloPassCadence, KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import type { KiloPassTier } from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import {
+  KiloPassCadence,
+  KiloPassIssuanceItemKind,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { getTierName } from './utils';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';

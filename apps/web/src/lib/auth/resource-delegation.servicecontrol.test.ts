@@ -6,15 +6,20 @@ beforeEach(() => {
   shared.enabled = true;
   shared.family = '';
 });
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'service-control-test-secret',
   isResourceTokenIssuanceEnabled: (family: string) =>
     shared.enabled && (!shared.family || shared.family === family),
 }));
-jest.mock('@/lib/user/server', () => ({ getUserFromSessionForCredentialIssuance: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
+  getUserFromSessionForCredentialIssuance: jest.fn(),
+}));
 
-import { generateCloudAgentWorkflowToken, generateWorkflowGatewayToken } from '@/lib/tokens';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import {
+  generateCloudAgentWorkflowToken,
+  generateWorkflowGatewayToken,
+} from '@kilocode/web-shared/lib/tokens';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('workflow service control tokens', () => {
   test('uses bounded modern gateway workflow owner claims', () => {

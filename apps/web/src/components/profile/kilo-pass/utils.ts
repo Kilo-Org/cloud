@@ -1,6 +1,9 @@
-import { computeYearlyCadenceMonthlyBonusUsd, getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import {
+  computeYearlyCadenceMonthlyBonusUsd,
+  getMonthlyPriceUsd,
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 export function getTierName(tier: KiloPassTier): string {
   if (tier === KiloPassTier.Tier19) return 'Starter';

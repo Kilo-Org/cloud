@@ -1,6 +1,9 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
-import { validateAuthorizationHeader, isRejectedCredentialReason } from '@/lib/tokens';
+import {
+  validateAuthorizationHeader,
+  isRejectedCredentialReason,
+} from '@kilocode/web-shared/lib/tokens';
 import {
   CloudAgentNextRuntimeAuthorizationClaimSchema,
   RuntimeProxyAttestationAudienceSchema,
@@ -9,28 +12,28 @@ import {
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { db, readDb } from '@/lib/drizzle';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
 import { getServerSession } from 'next-auth';
-import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@/lib/constants';
+import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
-import type { FailureResult } from '@/lib/maybe-result';
-import { failureResult } from '@/lib/maybe-result';
-import { NEXTAUTH_SECRET, BLACKLIST_TLDS } from '@/lib/config.server';
+import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
+import { NEXTAUTH_SECRET, BLACKLIST_TLDS } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
-import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
+import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
   emitAdminAccessEvent,
   routeFromHeaders,
-} from '@/lib/admin/admin-access-log';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
-import { isWebSessionCurrent } from '@/lib/web-session-revocation';
+import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
@@ -39,7 +42,7 @@ import {
   type KiloCredentialExchangeEligibilityPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 
-import { getBlacklistedDomains } from '@/lib/blacklist-domains-config';
+import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 const blacklistDomainsEnv = getEnvVariable('BLACKLIST_DOMAINS');
 const BLACKLIST_DOMAINS_FROM_ENV = blacklistDomainsEnv

@@ -1,7 +1,7 @@
 import 'server-only';
 import type { User } from '@kilocode/db/schema';
 
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
 import type { KiloChatTokenResponse } from './token-schema';
 

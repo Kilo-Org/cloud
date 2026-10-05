@@ -1,4 +1,4 @@
-import { DISCORD_OAUTH_BOT_TOKEN, DISCORD_SERVER_ID } from '@/lib/config.server';
+import { DISCORD_OAUTH_BOT_TOKEN, DISCORD_SERVER_ID } from '@kilocode/web-shared/lib/config.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
 /**

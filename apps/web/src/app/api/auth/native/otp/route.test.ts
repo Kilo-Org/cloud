@@ -1,10 +1,13 @@
-import { createSignInCode, deleteSignInCode } from '@/lib/auth/magic-link-tokens';
-import { sendSignInCodeEmail } from '@/lib/email';
+import {
+  createSignInCode,
+  deleteSignInCode,
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/auth/magic-link-tokens');
-jest.mock('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens');
+jest.mock('@kilocode/web-shared/lib/email');
 jest.mock('@/lib/auth/email-signin-eligibility');
 
 import { POST } from './route';

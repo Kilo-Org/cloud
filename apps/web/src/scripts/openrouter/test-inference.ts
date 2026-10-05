@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { getAuthToken } from '@/scripts/lib/auth';
-import { generateApiToken } from '@/lib/tokens';
-import { db } from '@/lib/drizzle';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 
 // Types

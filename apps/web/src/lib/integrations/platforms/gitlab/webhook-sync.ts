@@ -1,5 +1,5 @@
-import { APP_URL } from '@/lib/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   createProjectWebhook,
   deleteProjectWebhook,

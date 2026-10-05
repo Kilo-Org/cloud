@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { app_reported_messages } from '@kilocode/db/schema';
 import { generateMessageSignature } from '@/lib/app-reported-messages/messageSignature';
 import * as z from 'zod';

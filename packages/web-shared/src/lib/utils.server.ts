@@ -1,4 +1,4 @@
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 import type { SeverityLevel } from '@sentry/nextjs';
 

@@ -1,15 +1,18 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getStripeTopUpCheckoutUrl } from '@/lib/stripe';
-import { MAXIMUM_TOP_UP_AMOUNT, MINIMUM_TOP_UP_AMOUNT } from '@/lib/constants';
+import { MAXIMUM_TOP_UP_AMOUNT, MINIMUM_TOP_UP_AMOUNT } from '@kilocode/web-shared/lib/constants';
 import { isValidReturnUrl } from '@/lib/payment-return-url';
 import { captureException } from '@sentry/nextjs';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { clientIpFromHeaders } from '@/lib/admin/admin-access-log';
-import { ipCountryFromHeaders, ja4FromHeaders } from '@/lib/bouncer/credit-events';
+import { clientIpFromHeaders } from '@kilocode/web-shared/lib/admin/admin-access-log';
+import {
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.

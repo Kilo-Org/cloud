@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { DeviceAuthClient } from './DeviceAuthClient';
 import { buildDeviceAuthPath, isDeviceAuthAppMode } from './device-auth-url';
 import { createDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';

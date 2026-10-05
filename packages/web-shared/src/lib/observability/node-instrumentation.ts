@@ -1,7 +1,7 @@
 import { getClient, SentryContextManager, validateOpenTelemetrySetup } from '@sentry/nextjs';
 import { SentryPropagator, SentrySampler, SentrySpanProcessor } from '@sentry/opentelemetry';
 import { registerOTel } from '@vercel/otel';
-import { initServerSentry } from '@/lib/observability/sentry-server';
+import { initServerSentry } from '@kilocode/web-shared/lib/observability/sentry-server';
 
 // Import this module only when NEXT_RUNTIME is 'nodejs'.
 //

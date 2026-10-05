@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { sessionAuthOptions } from '@/lib/user/server';
+import { sessionAuthOptions } from '@kilocode/web-shared/lib/user/server';
 import {
   parseLinkedInProfileName,
   parseAnacondaProfile,
@@ -8,7 +8,7 @@ import {
   authOptions,
   parseSignInRedirectContext,
 } from '@/lib/user/next-auth-options';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
 import {
   openai_chatgpt_connections,
@@ -16,20 +16,20 @@ import {
   passkey_sign_in_tickets,
   user_auth_provider,
 } from '@kilocode/db/schema';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Account, Profile } from 'next-auth';
 import type { JWT } from 'next-auth/jwt';
-import { OPENAI_CLIENT_ID } from '@/lib/config.server';
+import { OPENAI_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import {
   OPENAI_IDENTITY_SCOPE,
   OPENAI_ISSUER,
   OPENAI_REDIRECT_URI,
   OPENAI_TOKEN_SHARING_SCOPE,
-} from '@/lib/auth/openai/config';
-import { hosted_domain_specials } from '@/lib/auth/constants';
-import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+} from '@kilocode/web-shared/lib/auth/openai/config';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 
 /**
  * This test verifies the LinkedIn profile name parsing logic

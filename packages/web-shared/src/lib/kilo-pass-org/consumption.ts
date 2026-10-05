@@ -11,12 +11,12 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { KiloPassOrgBonusMode, KiloPassOrgIssuanceKind } from '@kilocode/db/schema-types';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, gt, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 import {
   mutateOrganizationUsage,
   type OrganizationUsageMutationResult,
-} from '@/lib/organizations/organization-usage';
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 
 export type OrganizationConsumptionSource = 'ai-gateway' | 'exa';
 

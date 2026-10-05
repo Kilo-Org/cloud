@@ -7,12 +7,12 @@ import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
-import type { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
-} from '@/lib/kilo-pass/constants';
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { cn } from '@/lib/utils';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 

@@ -28,7 +28,7 @@ import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
   type AutoTopUpAmountCents,
-} from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 
 export function AutoTopUpToggle() {

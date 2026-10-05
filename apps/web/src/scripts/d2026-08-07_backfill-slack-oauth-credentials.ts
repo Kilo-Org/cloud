@@ -24,7 +24,7 @@
 import '../lib/load-env';
 
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations, slack_oauth_credentials } from '@kilocode/db/schema';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { SlackCredentialOwner } from '@kilocode/worker-utils/slack-credential';

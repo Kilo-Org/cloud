@@ -4,16 +4,16 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { useTRPC } from '@/lib/trpc/utils';
 import { KiloPassActiveSubscriptionCard } from '@/components/profile/kilo-pass/KiloPassActiveSubscriptionCard';
 import { KiloPassLoadingCard } from '@/components/profile/kilo-pass/KiloPassLoadingCard';
 import { KiloPassSubscribeCard } from '@/components/profile/kilo-pass/KiloPassSubscribeCard';
 import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 function getShowKiloPassTwoMonthPromo(showFirstMonthPromo: boolean): boolean {
   return (

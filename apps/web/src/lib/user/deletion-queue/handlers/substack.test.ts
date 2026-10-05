@@ -4,7 +4,7 @@ import {
   USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL,
   USER_DELETION_SUBSTACK_PAGE_SIZE,
   USER_DELETION_SUBSTACK_USER_AGENT,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import {
   handleSubstack,
@@ -12,7 +12,7 @@ import {
 } from '@/lib/user/deletion-queue/handlers/substack';
 
 const mockCredentials = jest.fn();
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({
@@ -23,7 +23,7 @@ jest.mock('@/lib/drizzle', () => ({
     }),
   },
 }));
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: (name: string) => process.env[name] ?? '',
 }));
 jest.mock('@/lib/user/deletion-queue/deletion-crypto', () => ({

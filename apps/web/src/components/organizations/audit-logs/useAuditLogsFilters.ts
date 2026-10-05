@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { AuditLogAction } from '@/lib/organizations/organization-audit-logs';
+import type { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
 export type AuditLogsFilters = {
   action?: AuditLogAction[];

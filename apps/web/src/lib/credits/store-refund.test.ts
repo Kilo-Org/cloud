@@ -3,10 +3,10 @@ import { describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { credit_transactions, kilo_pass_store_events, kilocode_users } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { toMicrodollars } from '@/lib/microdollars';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import {
   findEffectiveStoreCreditRefundEvent,

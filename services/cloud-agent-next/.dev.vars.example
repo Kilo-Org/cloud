@@ -46,6 +46,9 @@ PER_SESSION_SANDBOX_ORG_IDS=
 # Local wrangler `dev` also defaults these to `*` in wrangler.jsonc.
 CONTROL_PLANE_IDS=*
 WORKTREE_CREATION_ENABLED_IDS=*
+# Code Reviewer sessions for these owners run on the control plane instead of
+# the legacy plane. Comma-separated user or org IDs, or `*` for all.
+CODE_REVIEW_CONTROL_PLANE_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 

@@ -103,7 +103,14 @@ const serviceMeta: Record<string, ServiceMeta> = {
   // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
   nextjs: {
     group: 'core',
-    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'cloudflare-session-ingest'],
+    dependsOn: [
+      'postgres',
+      'redis',
+      'redis-http',
+      'stripe',
+      'cloudflare-session-ingest',
+      'ai-gateway',
+    ],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
@@ -114,8 +121,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['postgres', 'nextjs'],
     dir: 'services/user-data-export',
   },
-  // The standalone AI gateway app (apps/ai-gateway). It serves the gateway
-  // routes the web app also serves, from the same database and Redis.
   'ai-gateway': {
     group: 'ai-gateway',
     dependsOn: ['postgres', 'redis', 'redis-http'],
@@ -699,7 +704,13 @@ function buildServiceDefs(): ServiceDef[] {
         dir: 'apps/web',
         port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'run', 'dev'],
+        command: [
+          'env',
+          `AI_GATEWAY_PORT=${AI_GATEWAY_BASE_PORT + portOffset}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
         group: meta.group,
       });
       continue;

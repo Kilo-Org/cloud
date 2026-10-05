@@ -90,7 +90,8 @@ test('rebuildChangelog returns null when the base already holds every section', 
 });
 
 test('land creates the branch, then carries its sections after the PR merged', () => {
-  const { root, clone } = remoteWithChangelog(HEADER);
+  // The committed file ends with one newline; the first section still gets a blank line.
+  const { root, clone } = remoteWithChangelog(HEADER.replace(/\n+$/, '\n'));
   try {
     const first = land(clone, '## 2026-10-01 (aaaaaaa)', '- one');
     assert.equal(first.status, 0, first.stderr);
@@ -121,10 +122,10 @@ test('land creates the branch, then carries its sections after the PR merged', (
       branchChangelog(clone),
       `${HEADER}## 2026-10-03 (ccccccc)\n\n- three\n\n${both.slice(HEADER.length)}`
     );
-    // A rerun of a landed release keeps one copy of its section.
+    // A rerun of a landed release pushes nothing and keeps one copy of its section.
     const rerun = land(clone, '## 2026-10-03 (ccccccc)', '- three');
     assert.equal(rerun.status, 0, rerun.stderr);
-    assert.match(rerun.stdout, /landed .* on kilo-mcp-changelog as /);
+    assert.match(rerun.stdout, /landed .* \(already present\)/);
     assert.equal(branchChangelog(clone).split('## 2026-10-03').length, 2);
   } finally {
     rmSync(root, { recursive: true, force: true });

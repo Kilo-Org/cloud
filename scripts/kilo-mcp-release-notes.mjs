@@ -86,14 +86,19 @@ export function bodyLines(subjects) {
 /**
  * The changelog text for `base` plus the new section and every section the
  * branch carries that `base` does not. Returns null when `base` already holds
- * all of them.
+ * all of them. The first section gets a blank line after the header.
  */
 export function rebuildChangelog(baseContent, branchContent, heading, section) {
   const carried = splitSections(branchContent).filter(
     item => headingOf(item) !== heading && !hasSectionHeading(baseContent, headingOf(item))
   );
   const block = (hasSectionHeading(baseContent, heading) ? '' : section) + carried.join('');
-  return block === '' ? null : insertSection(baseContent, block);
+  if (block === '') {
+    return null;
+  }
+  const hasSection = /(?:^|\n)## /.test(baseContent);
+  const base = hasSection ? baseContent : `${baseContent.replace(/\n*$/, '')}\n\n`;
+  return insertSection(base, block);
 }
 
 function remoteSha(remote, ref) {
@@ -202,8 +207,8 @@ function runLand(args) {
       const branchSha = remoteSha(remote, `refs/heads/${branch}`);
       const branchContent = branchSha === '' ? '' : treeFile(fetchSha(remote, branch), CHANGELOG);
       const content = rebuildChangelog(baseContent, branchContent, heading, section);
-      if (content === null) {
-        console.log(`changelog: landed ${heading} on ${branch} (already present on ${base})`);
+      if (content === null || content === branchContent) {
+        console.log(`changelog: landed ${heading} on ${branch} (already present)`);
         return 0;
       }
       const sha = commitOn(

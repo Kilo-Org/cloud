@@ -92,10 +92,23 @@ export function renderNonAutolinkedText(str: string): RawHtml {
   return new RawHtml(escapeHtml(str).replace(/[/.]/g, '$&&#8203;'));
 }
 
+// Both Next.js apps live at apps/<name> and run with their app directory as the
+// working directory, locally and on Vercel. Each app's next.config.mjs traces
+// these templates into its functions with outputFileTracingIncludes.
+const EMAIL_TEMPLATES_DIR = path.join(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'web-shared',
+  'src',
+  'emails'
+);
+
 // Report an unreadable template before any caller can swallow the error; the
 // low-balance alert, for one, only logs send failures from after().
 function readTemplate(name: string): string {
-  const templatePath = path.join(process.cwd(), 'src', 'emails', `${name}.html`);
+  const templatePath = path.join(EMAIL_TEMPLATES_DIR, `${name}.html`);
   try {
     return fs.readFileSync(templatePath, 'utf-8');
   } catch (error) {

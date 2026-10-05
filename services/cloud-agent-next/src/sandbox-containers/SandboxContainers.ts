@@ -2,6 +2,7 @@ import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
+import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import {
   CONTAINERS_INTERCEPT_CA_PATH,
   SANDBOX_INTERCEPT_HTTPS_ENABLED,
@@ -189,6 +190,19 @@ export class SandboxContainers extends DurableObject<Env> {
   private queue: Promise<unknown> = Promise.resolve();
   private billing: ContainersBilling | undefined;
   private schedules: ContainersBillingScheduler | undefined;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    const container = this.ctx.container;
+    if (container?.running) {
+      void this.ctx.blockConcurrencyWhile(() =>
+        container.setInactivityTimeout(
+          resolveControlPlaneTimers(this.env as { CONTROL_PLANE_TIMER_DIVISOR?: string }).sandbox
+            .providerLeaseMs
+        )
+      );
+    }
+  }
 
   private runExclusive<T>(task: () => Promise<T>): Promise<T> {
     const result = this.queue.then(task, task);

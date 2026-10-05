@@ -196,8 +196,16 @@ class FakeContainer {
 
 type PutDecision = 'pass' | 'hold' | 'fail';
 
-function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {}) {
+function setup(
+  options: {
+    record?: StoredRecord;
+    attachContainer?: boolean;
+    running?: boolean;
+    env?: Partial<Env> & { CONTROL_PLANE_TIMER_DIVISOR?: string };
+  } = {}
+) {
   const container = new FakeContainer();
+  container.running = options.running ?? false;
   let alarm: number | undefined;
   const pendingTasks: Promise<unknown>[] = [];
   let putGate: ((value: unknown) => PutDecision) | undefined;
@@ -239,16 +247,17 @@ function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {
     },
   };
   storage.map.set(RECORD_KEY, options.record ?? idleRecord);
+  const blockConcurrencyWhile = vi.fn(async (fn: () => Promise<unknown>) => fn());
   const ctx = {
     storage,
     id: { toString: () => 'do-id' },
     container: options.attachContainer === false ? undefined : container,
-    blockConcurrencyWhile: async (fn: () => Promise<unknown>) => fn(),
+    blockConcurrencyWhile,
     waitUntil: (promise: Promise<unknown>) => {
       pendingTasks.push(promise);
     },
   } as unknown as DurableObjectState;
-  const instance = new SandboxContainers(ctx, {} as Env);
+  const instance = new SandboxContainers(ctx, (options.env ?? {}) as Env);
   const readRecord = () => storage.map.get(RECORD_KEY) as StoredRecord;
   return {
     storage,
@@ -256,6 +265,7 @@ function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {
     instance,
     readRecord,
     pendingTasks,
+    blockConcurrencyWhile,
     getAlarm: () => alarm,
     setPutGate: (gate: (value: unknown) => PutDecision) => {
       putGate = gate;
@@ -1750,6 +1760,40 @@ describe('SandboxContainers force destroy', () => {
 });
 
 describe('SandboxContainers lease and log', () => {
+  it('restores the native lease on a new DO instance while the container is running', async () => {
+    const { container, blockConcurrencyWhile, readRecord } = setup({ running: true });
+
+    await blockConcurrencyWhile.mock.results[0]?.value;
+
+    expect(blockConcurrencyWhile).toHaveBeenCalledOnce();
+    expect(container.leaseCalls).toEqual([11 * 60_000]);
+    expect(container.startCalls).toEqual([]);
+    expect(container.execCalls).toEqual([]);
+    expect(readRecord()).toEqual(idleRecord);
+  });
+
+  it('restores the native lease using the development timer scaling', async () => {
+    const { container, blockConcurrencyWhile } = setup({
+      running: true,
+      env: { CONTROL_PLANE_TIMER_DIVISOR: '10' },
+    });
+
+    await blockConcurrencyWhile.mock.results[0]?.value;
+
+    expect(container.leaseCalls).toEqual([2 * 60_000]);
+  });
+
+  it.each([true, false])(
+    'does not restore a lease for a stopped or missing container (attached: %s)',
+    attachContainer => {
+      const { container, blockConcurrencyWhile } = setup({ attachContainer });
+
+      expect(blockConcurrencyWhile).not.toHaveBeenCalled();
+      expect(container.leaseCalls).toEqual([]);
+      expect(container.startCalls).toEqual([]);
+    }
+  );
+
   it('ensures the container lease only for the current allocation', async () => {
     const { instance, container } = setup({
       record: { ...idleRecord, state: 'running', allocationRef: REF_A },

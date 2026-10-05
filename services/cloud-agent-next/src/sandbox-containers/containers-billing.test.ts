@@ -204,6 +204,10 @@ class FakeContainer {
   identityAfterStart: 'sleep' | 'supervisor' | 'ambiguous' = 'supervisor';
   stopAfterStart = false;
 
+  setInactivityTimeout(_ms: number | bigint): Promise<void> {
+    return Promise.resolve();
+  }
+
   start(options?: ContainerStartupOptions): void {
     this.startCalls.push(options as ContainerStartupOptions);
     if (this.startBehavior === 'reject') throw new Error('container start failed');

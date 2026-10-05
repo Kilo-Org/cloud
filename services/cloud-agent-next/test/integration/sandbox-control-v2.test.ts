@@ -1151,6 +1151,39 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect((await readState(stub)).lastActivityAt).toBe(activityBefore);
   });
 
+  it('logs a failed lease renewal without disconnecting the allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await connectAndHello(provider, stub);
+
+    await runInDurableObject(stub, async instance => {
+      const renewal = vi
+        .spyOn(provider.adapter, 'ensureLeaseAtLeast')
+        .mockRejectedValue(new Error('provider lease failed'));
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await (instance as unknown as { runLease(): Promise<void> }).runLease();
+
+        expect(withFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'lease_renewal_failed',
+            allocationName: SANDBOX_ID,
+            errorName: 'Error',
+            cause: 'provider_lease_failed',
+          })
+        );
+        expect(warn).toHaveBeenCalledWith('Sandbox control diagnostic');
+        expect((await instance.getAllocationState()).kind).toBe('connected');
+      } finally {
+        renewal.mockRestore();
+        withFields.mockRestore();
+        warn.mockRestore();
+      }
+    });
+  });
+
   it('persists liveness on the heartbeat, not on every event frame', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);

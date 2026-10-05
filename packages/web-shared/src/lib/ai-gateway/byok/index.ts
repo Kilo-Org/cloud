@@ -56,7 +56,7 @@ async function deriveModelInferenceUserByokProviders(
  * take them over. Custom LLMs are never in the gateway catalogs, so the
  * built-in free rules suffice.
  */
-async function getModelGatewayUserByokProviders(
+export async function getModelGatewayUserByokProviders(
   modelId: string
 ): Promise<GatewayUserByokProviderId[]> {
   if (isKiloExclusiveModel(modelId) || isFreeModelExcludingCustomLlms(modelId)) {

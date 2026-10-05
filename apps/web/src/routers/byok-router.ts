@@ -28,7 +28,6 @@ import {
   VercelUserByokInferenceProviderIdSchema,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
-  getLanguageModelIds,
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -37,9 +36,11 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import { decryptByokRow } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  decryptByokRow,
+  getModelGatewayUserByokProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -126,21 +127,14 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
     result[providerId].push(model.name + ' (' + model.id + ')');
   };
 
-  const openRouterLanguageModelIds = new Set(getLanguageModelIds(openRouterModelMetadata));
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
-    const isGatewayByokModel =
-      openRouterLanguageModelIds.has(openRouterModel.id) &&
-      !isFreeModelExcludingCustomLlms(openRouterModel.id);
-    if (isGatewayByokModel) {
-      addSupportedModel(GatewayUserByokProviderIdSchema.enum.openrouter, openRouterModel);
+    for (const providerId of await getModelGatewayUserByokProviders(openRouterModel.id)) {
+      addSupportedModel(providerId, openRouterModel);
     }
     const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
     if (!vercelModel) continue;
     if (vercelModel.type !== 'language') continue;
-    if (isGatewayByokModel) {
-      addSupportedModel(GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway'], openRouterModel);
-    }
     for (const endpoint of vercelModel.endpoints) {
       const providerId = getVercelUserByokProviderIdForEndpoint(
         endpoint.provider_name ?? endpoint.tag

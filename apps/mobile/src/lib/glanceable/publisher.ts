@@ -173,6 +173,11 @@ export class GlanceablePublisher {
     sessions: readonly (NewestSessionRow & WaitingAskRow)[],
     ctx: GlanceablePublisherContext
   ): void {
+    // A dev fixture owns the surfaces and the ask it recorded: stay silent
+    // without clearing that ask.
+    if (isGlanceableFixtureHeld()) {
+      return;
+    }
     if (this.isGated()) {
       // Nothing is asking while the publisher is gated: a terminal blank must
       // not leave an approvable ask behind for the action buttons.
@@ -311,6 +316,9 @@ export class GlanceablePublisher {
 
   /** Cache update failed: keep the last counts only until their original deadline. */
   handleFetchError(ctx: GlanceablePublisherContext): void {
+    if (isGlanceableFixtureHeld()) {
+      return;
+    }
     // A failed refetch supersedes the ask: the surface now shows stale counts,
     // so a still-recorded waiting session must not stay approvable from it.
     this.noteWaitingAsk(null);

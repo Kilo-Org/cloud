@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
@@ -657,6 +657,17 @@ type UseSidebarSessionsReturn = {
   renameSessionLocally: (sessionId: string, newTitle: string) => void;
 };
 
+export function nextPrLinkVerification(
+  sessions: readonly { session_id: string; prLinkVerificationKey?: string }[],
+  attempted: ReadonlyMap<string, string>
+) {
+  return sessions.find(
+    session =>
+      session.prLinkVerificationKey !== undefined &&
+      attempted.get(session.session_id) !== session.prLinkVerificationKey
+  );
+}
+
 export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSidebarSessionsReturn {
   const { organizationId, searchQuery = '', createdOnPlatform, gitUrl } = options ?? {};
   const trpc = useTRPC();
@@ -729,6 +740,23 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     staleTime: 5000,
     enabled: isSearchActive,
   });
+
+  const attemptedPrLinks = useRef(new Map<string, string>());
+  const { mutate: verifyPrLink, isPending: isVerifyingPrLink } = useMutation({
+    ...trpc.cliSessionsV2.refreshAssociatedPullRequest.mutationOptions(),
+    retry: 1,
+    onSuccess: result => {
+      if (result.associatedPr !== null) reconcileSidebarQueries();
+    },
+  });
+  const verificationSessions = isSearchActive ? searchData?.results : listData?.cliSessions;
+  useEffect(() => {
+    if (isVerifyingPrLink || !verificationSessions) return;
+    const session = nextPrLinkVerification(verificationSessions, attemptedPrLinks.current);
+    if (!session?.prLinkVerificationKey) return;
+    attemptedPrLinks.current.set(session.session_id, session.prLinkVerificationKey);
+    verifyPrLink({ sessionId: session.session_id });
+  }, [verificationSessions, isVerifyingPrLink, verifyPrLink]);
 
   // Track last processed data key to avoid unnecessary atom updates
   const lastDataKeyRef = useRef<string | null>(null);

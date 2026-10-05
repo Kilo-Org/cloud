@@ -22,6 +22,7 @@ import {
   groupSidebarSessions,
   groupSidebarSessionsByDate,
   mergeWorktreeChatSessions,
+  nextPrLinkVerification,
   patchSidebarWorktreeSessionStatus,
   removeSidebarDbSession,
   sessionCacheKey,
@@ -31,6 +32,33 @@ import {
   type SidebarSortPins,
   type SidebarWorktreeDetails,
 } from './useSidebarSessions';
+
+describe('nextPrLinkVerification', () => {
+  it('verifies stored links even when there is no visible PR badge', () => {
+    const session = { session_id: 'ses_unverified', prLinkVerificationKey: 'link-1' };
+    expect(nextPrLinkVerification([session], new Map())).toBe(session);
+  });
+
+  it('skips sessions without a verification candidate', () => {
+    expect(nextPrLinkVerification([{ session_id: 'ses_no_link' }], new Map())).toBeUndefined();
+  });
+
+  it('attempts each session link once and proceeds to the next candidate', () => {
+    const first = { session_id: 'ses_first', prLinkVerificationKey: 'link-1' };
+    const second = { session_id: 'ses_second', prLinkVerificationKey: 'link-1' };
+    const attempted = new Map([[first.session_id, first.prLinkVerificationKey]]);
+    expect(nextPrLinkVerification([first, second], attempted)).toBe(second);
+    attempted.set(second.session_id, second.prLinkVerificationKey);
+    expect(nextPrLinkVerification([first, second], attempted)).toBeUndefined();
+  });
+
+  it('verifies again when the stored link or head evidence changes', () => {
+    const session = { session_id: 'ses_changed', prLinkVerificationKey: 'new-evidence' };
+    expect(nextPrLinkVerification([session], new Map([[session.session_id, 'old-evidence']]))).toBe(
+      session
+    );
+  });
+});
 
 Object.assign(globalThis, { React });
 

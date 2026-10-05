@@ -17,7 +17,11 @@ import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
-import { parseGitHubOwnerRepo, parseGitHubPrUrl } from '@/routers/cli-sessions-v2-router';
+import {
+  getPrLinkVerificationKey,
+  parseGitHubOwnerRepo,
+  parseGitHubPrUrl,
+} from '@/routers/cli-sessions-v2-router';
 import type { fetchSessionMessagesPage as FetchSessionMessagesPageType } from '@/lib/session-ingest-client';
 import { notifyCliSessionRenamed } from '@/lib/cloud-agent/session-events';
 import { captureException } from '@sentry/nextjs';
@@ -133,6 +137,71 @@ let regularUser: User;
 let otherUser: User;
 let adminUser: User;
 let testOrganization: Organization;
+
+describe('getPrLinkVerificationKey', () => {
+  const candidate = {
+    platform: 'github',
+    pr_url: 'https://github.com/kilo/repo/pull/77',
+    pr_number: 77,
+    pr_link_verified_at: null,
+    git_url: 'https://github.com/kilo/repo',
+    pr_head_ref: 'feature/list-x',
+    pr_head_sha: 'cafef00d',
+  };
+
+  it.each([
+    'https://github.com/Kilo/Repo.git',
+    'git@github.com:Kilo/Repo.git',
+    'ssh://git@github.com/Kilo/Repo.git',
+  ])('detects an unverified GitHub link matching repository %s', git_url => {
+    expect(getPrLinkVerificationKey({ ...candidate, git_url })).toEqual(expect.any(String));
+  });
+
+  it('accepts a PR URL subpath without requiring head evidence', () => {
+    expect(
+      getPrLinkVerificationKey({
+        ...candidate,
+        pr_url: `${candidate.pr_url}/files?diff=split#top`,
+        pr_head_ref: null,
+        pr_head_sha: null,
+      })
+    ).toEqual(expect.any(String));
+  });
+
+  it.each([
+    { platform: null },
+    { platform: 'gitlab' },
+    { pr_link_verified_at: '2026-01-01 00:00:00+00' },
+    { pr_url: null },
+    { pr_url: 'not a URL' },
+    { pr_url: 'https://gitlab.com/kilo/repo/pull/77' },
+    { pr_url: 'https://github.com/kilo/other/pull/77' },
+    { pr_url: 'https://github.com/kilo/repo/pull/78' },
+    { pr_number: null },
+    { pr_number: 0 },
+    { pr_number: -1 },
+    { pr_number: 77.5 },
+    { pr_number: 2_147_483_648 },
+    { git_url: null },
+    { git_url: 'not a repository' },
+    { git_url: 'https://github.com/kilo/repo/nested' },
+  ])('rejects non-candidate evidence %j', overrides => {
+    expect(getPrLinkVerificationKey({ ...candidate, ...overrides })).toBeUndefined();
+  });
+
+  it.each([
+    { pr_url: `${candidate.pr_url}/files` },
+    { pr_url: 'https://github.com/kilo/repo/pull/78', pr_number: 78 },
+    { git_url: 'git@github.com:kilo/repo.git' },
+    { pr_head_ref: 'feature/new-head' },
+    { pr_head_sha: 'new-sha' },
+  ])('changes the opaque key when stored link or head evidence changes: %j', overrides => {
+    const key = getPrLinkVerificationKey(candidate);
+    expect(key).toMatch(/^[a-f0-9]{64}$/);
+    expect(getPrLinkVerificationKey({ ...candidate, ...overrides })).not.toBe(key);
+    expect(getPrLinkVerificationKey({ ...candidate })).toBe(key);
+  });
+});
 
 describe('cli-sessions-v2-router', () => {
   beforeEach(() => {
@@ -2370,6 +2439,29 @@ describe('cli-sessions-v2-router', () => {
       // An unverified stored link must not render a badge or an Open-on-GitHub
       // link, even when the branch cache row exists.
       expect(unverified?.associatedPr).toBeNull();
+      expect(unverified?.prLinkVerificationKey).toEqual(expect.any(String));
+      expect(withPr?.prLinkVerificationKey).toBeUndefined();
+      expect(withoutPr?.prLinkVerificationKey).toBeUndefined();
+      expect(branchOnly?.prLinkVerificationKey).toBeUndefined();
+      expect(unverified).not.toHaveProperty('session_pr_url');
+      expect(unverified).not.toHaveProperty('session_pr_head_ref');
+      expect(unverified).not.toHaveProperty('session_pr_head_sha');
+    });
+
+    it('search and get emit the same candidate key as list without displaying an unverified PR', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const list = await caller.cliSessionsV2.list({});
+      const search = await caller.cliSessionsV2.search({
+        search_string: 'session unverified link',
+      });
+      const session = await caller.cliSessionsV2.get({ session_id: sessionUnverified });
+      const listRow = list.cliSessions.find(row => row.session_id === sessionUnverified);
+      const searchRow = search.results.find(row => row.session_id === sessionUnverified);
+
+      expect(listRow?.prLinkVerificationKey).toEqual(expect.any(String));
+      expect(searchRow?.prLinkVerificationKey).toBe(listRow?.prLinkVerificationKey);
+      expect(session.prLinkVerificationKey).toBe(listRow?.prLinkVerificationKey);
+      expect(searchRow?.associatedPr).toBeNull();
     });
 
     it('list returns live cache fields when the stored link has a trailing subpath', async () => {

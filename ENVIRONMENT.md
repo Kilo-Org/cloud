@@ -16,7 +16,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ## App (apps/web)
 
-Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-global-app` Vercel deployments, and 1Password storage for sensitive Production values. See `DEVELOPMENT.md` for the full workflow.
+Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app`, `kilocode-global-app`, and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
 
 ### Configuration & Constant URLs
 

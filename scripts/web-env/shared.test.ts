@@ -4,6 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  decryptedEnvValues,
+  listEnvRecords,
+  readVaultValues,
   redeployLatest,
   resolveVault,
   resolveVercelContexts,
@@ -444,3 +447,178 @@ void test(
     }
   }
 );
+
+const FAKE_PNPM_VERCEL_API = `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.FAKE_VERCEL_LOG, JSON.stringify(args) + '\\n');
+const command = args[2];
+const endpoint = args[3] ?? '';
+const respond = body => process.stdout.write(JSON.stringify(body));
+if (command === 'whoami') {
+  respond({ username: 'tester', team: { id: 'team-id', slug: 'kilocode' } });
+} else if (command === 'api' && endpoint.startsWith('/v9/projects/kilocode-ai-gateway?')) {
+  process.stderr.write('Error: Project not found. (404)\\n');
+  process.exitCode = 1;
+} else if (command === 'api' && /^\\/v9\\/projects\\/[a-z-]+\\?/.test(endpoint)) {
+  respond({ id: 'project-id' });
+} else if (command === 'api' && endpoint.startsWith('/v10/projects/kilocode-global-app/env?')) {
+  respond({
+    envs: [
+      { id: 'env-1', key: 'PLAIN_VALUE', type: 'plain', value: 'visible', target: ['production'] },
+      {
+        id: 'env-2',
+        key: 'SECRET_TOKEN',
+        type: 'sensitive',
+        target: ['production'],
+        customEnvironmentIds: ['staging-id'],
+        gitBranch: null
+      }
+    ],
+    pagination: { count: 2, next: null, prev: null }
+  });
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-global-app/env/env-1?')) {
+  respond({ id: 'env-1', type: 'encrypted', decrypted: true, value: 'decrypted-value' });
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-global-app/env/env-2?')) {
+  respond({ id: 'env-2', type: 'sensitive', decrypted: false });
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-global-app/env/env-3?')) {
+  respond({ id: 'env-3', type: 'encrypted', decrypted: true, value: '' });
+} else if (command === 'list') {
+  respond({ deployments: [] });
+} else {
+  process.exitCode = 1;
+}
+`;
+
+async function withFakeVercel<T>(
+  run: (directory: string, logFile: string) => T | Promise<T>
+): Promise<T> {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-api-test-'));
+  const logFile = path.join(directory, 'vercel.jsonl');
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_VERCEL_API, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLog = process.env.FAKE_VERCEL_LOG;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+  process.env.FAKE_VERCEL_LOG = logFile;
+  try {
+    return await run(directory, logFile);
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalLog === undefined) delete process.env.FAKE_VERCEL_LOG;
+    else process.env.FAKE_VERCEL_LOG = originalLog;
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+void test('resolveVercelContexts skips projects that do not exist in Vercel yet', async () => {
+  await withFakeVercel((directory, logFile) => {
+    const { contexts, missingProjects } = resolveVercelContexts(directory);
+    assert.deepEqual(
+      contexts.map(context => context.project),
+      ['kilocode-app', 'kilocode-global-app']
+    );
+    assert.deepEqual(missingProjects, ['kilocode-ai-gateway']);
+    const apiCalls = readFileSync(logFile, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as string[])
+      .filter(args => args[2] === 'api');
+    assert.deepEqual(
+      apiCalls.map(args => args[3]),
+      [
+        '/v9/projects/kilocode-app?teamId=team-id',
+        '/v9/projects/kilocode-global-app?teamId=team-id',
+        '/v9/projects/kilocode-ai-gateway?teamId=team-id',
+      ]
+    );
+  });
+});
+
+void test('listEnvRecords keeps only plain values and normalizes targets', async () => {
+  await withFakeVercel(directory => {
+    assert.deepEqual(
+      listEnvRecords({ project: 'kilocode-global-app', orgId: 'team-id', cwd: directory }),
+      [
+        {
+          id: 'env-1',
+          key: 'PLAIN_VALUE',
+          type: 'plain',
+          target: ['production'],
+          customEnvironmentIds: [],
+          gitBranch: undefined,
+          value: 'visible',
+        },
+        {
+          id: 'env-2',
+          key: 'SECRET_TOKEN',
+          type: 'sensitive',
+          target: ['production'],
+          customEnvironmentIds: ['staging-id'],
+          gitBranch: undefined,
+          value: undefined,
+        },
+      ]
+    );
+  });
+});
+
+void test('decryptedEnvValues returns only values Vercel decrypted', async () => {
+  await withFakeVercel(async directory => {
+    assert.deepEqual(
+      await decryptedEnvValues(
+        { project: 'kilocode-global-app', orgId: 'team-id', cwd: directory },
+        ['env-1', 'env-2', 'env-3', 'env-1']
+      ),
+      new Map([
+        ['env-1', 'decrypted-value'],
+        ['env-3', ''],
+      ])
+    );
+  });
+});
+
+void test('redeployLatest skips a project without a ready deployment', async () => {
+  await withFakeVercel(async directory => {
+    assert.equal(
+      await redeployLatest(
+        { project: 'kilocode-ai-gateway', orgId: 'team-id', cwd: directory },
+        'production'
+      ),
+      undefined
+    );
+  });
+});
+
+void test('readVaultValues reads the production and staging fields of each item', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-op-test-'));
+  writeFileSync(path.join(directory, 'op'), FAKE_OP, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLog = process.env.FAKE_OP_LOG;
+  const originalExisting = process.env.FAKE_OP_EXISTING;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+  process.env.FAKE_OP_LOG = path.join(directory, 'op.jsonl');
+  const context = { accountId: 'account-id', vaultId: 'vault-id' };
+
+  try {
+    process.env.FAKE_OP_EXISTING = 'production';
+    assert.deepEqual(
+      readVaultValues(context, ['TEST_SECRET', 'NOT_IN_VAULT']),
+      new Map([['TEST_SECRET', { production: 'old-production-value' }]])
+    );
+
+    process.env.FAKE_OP_EXISTING = 'staging';
+    assert.deepEqual(
+      readVaultValues(context, ['TEST_SECRET']),
+      new Map([['TEST_SECRET', { staging: 'old-staging-value' }]])
+    );
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalLog === undefined) delete process.env.FAKE_OP_LOG;
+    else process.env.FAKE_OP_LOG = originalLog;
+    if (originalExisting === undefined) delete process.env.FAKE_OP_EXISTING;
+    else process.env.FAKE_OP_EXISTING = originalExisting;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

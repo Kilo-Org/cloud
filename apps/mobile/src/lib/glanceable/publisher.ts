@@ -10,6 +10,7 @@ import {
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { isGlanceableFixtureHeld } from './fixture-hold';
 import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import { hasSameGlanceableContent, withStatus } from './snapshot-transforms';
 import {
@@ -375,7 +376,12 @@ export class GlanceablePublisher {
   }
 
   private isGated(): boolean {
-    return this.terminalBlankEpoch() !== this.blankEpochAtStart || this.orgLost();
+    // The fixture hold is dev-only: only the `__DEV__` fixture harness sets it.
+    return (
+      this.terminalBlankEpoch() !== this.blankEpochAtStart ||
+      this.orgLost() ||
+      isGlanceableFixtureHeld()
+    );
   }
 
   /** Hand the current ask to the consumer, when one is wired. */
@@ -468,6 +474,10 @@ export class GlanceablePublisher {
     }
     this.terminalTimer = setTimeout(() => {
       this.terminalTimer = null;
+      // A fixture applied inside the window owns the surfaces now.
+      if (isGlanceableFixtureHeld()) {
+        return;
+      }
       this.activityStarted = false;
       for (const sink of this.sinks) {
         guardSink('terminal_end', () => {

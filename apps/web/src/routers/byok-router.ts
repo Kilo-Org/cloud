@@ -281,7 +281,8 @@ export const byokRouter = createTRPCRouter({
       }
 
       // Validate non-Vercel BYOK providers (skip validation for Vercel providers, handled elsewhere)
-      const isVercelProvider = VercelUserByokInferenceProviderIdSchema.safeParse(provider_id).success;
+      const isVercelProvider =
+        VercelUserByokInferenceProviderIdSchema.safeParse(provider_id).success;
       if (!isVercelProvider) {
         validateVercelUserByokCredential(provider_id, api_key);
       }
@@ -513,10 +514,7 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
-      const [existingKey] = await db
-        .select()
-        .from(byok_api_keys)
-        .where(eq(byok_api_keys.id, id));
+      const [existingKey] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, id));
 
       if (!existingKey) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });

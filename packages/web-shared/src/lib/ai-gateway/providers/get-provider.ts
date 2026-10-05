@@ -133,8 +133,10 @@ async function checkCustomBYOK(
     'zai-coding',
   ] as const;
 
-  const customByok = userByok.find(byok =>
-    byok.baseUrl !== null && !directByokIds.includes(byok.providerId as typeof directByokIds[number])
+  const customByok = userByok.find(
+    byok =>
+      byok.baseUrl !== null &&
+      !directByokIds.includes(byok.providerId as (typeof directByokIds)[number])
   );
   if (!customByok) {
     return null;
@@ -158,6 +160,44 @@ async function checkCustomBYOK(
       },
     } satisfies Provider,
     userByok: [customByok],
+    bypassAccessCheck: true,
+  };
+}
+
+async function checkDirectBYOK(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  organizationId: string | undefined
+): Promise<GetProviderProviderResult | null> {
+  if (isAnonymousContext(user)) return null;
+
+  // Get the direct BYOK provider that matches the requested model
+  const { provider: directProvider, model } = await getDirectByokModel(requestedModel);
+  if (!directProvider || !model) return null;
+
+  const userByok = organizationId
+    ? await getBYOKforOrganization(readDb, organizationId, [directProvider.id])
+    : await getBYOKforUser(readDb, user.id, [directProvider.id]);
+  if (!userByok || userByok.length === 0) return null;
+
+  return {
+    kind: 'provider',
+    provider: {
+      id: directProvider.id as ProviderId,
+      apiUrl: directProvider.base_url ?? 'https://openrouter.ai/api/v1',
+      apiUrlOverrides: {},
+      disableUrlSuffix: false,
+      apiKey: userByok[0].decryptedAPIKey,
+      apiKeyHeader: null,
+      supportedChatApis: ['chat_completions', 'messages', 'responses'],
+      responseTransforms: null,
+      async transformRequest(context) {
+        if (directProvider.base_url) {
+          context.provider.apiUrl = directProvider.base_url;
+        }
+      },
+    } satisfies Provider,
+    userByok: [userByok[0]],
     bypassAccessCheck: true,
   };
 }

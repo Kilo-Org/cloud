@@ -4,7 +4,10 @@ import * as z from 'zod';
 // Schema for custom provider IDs (user-defined, lowercase with hyphens/underscores)
 export const CustomByokProviderIdSchema = z
   .string()
-  .regex(/^[a-z0-9][a-z0-9_-]*$/, 'Provider ID must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, or underscores');
+  .regex(
+    /^[a-z0-9][a-z0-9_-]*$/,
+    'Provider ID must start with a lowercase letter or number and contain only lowercase letters, numbers, hyphens, or underscores'
+  );
 
 // API response type (never includes decrypted key)
 export type BYOKApiKeyResponse = {

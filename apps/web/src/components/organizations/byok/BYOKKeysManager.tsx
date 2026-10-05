@@ -50,7 +50,6 @@ import {
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
   VertexCredentialsSchema,
-  type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
@@ -100,9 +99,11 @@ const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).ma
   name,
 }));
 
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS, CUSTOM_PROVIDER_OPTION].toSorted((a, b) =>
-  a.name.localeCompare(b.name)
-);
+const BYOK_PROVIDERS = [
+  ...DIRECT_BYOK_PROVIDERS_LIST,
+  ...VERCEL_BYOK_PROVIDERS,
+  CUSTOM_PROVIDER_OPTION,
+].toSorted((a, b) => a.name.localeCompare(b.name));
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
@@ -228,9 +229,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setCredentialError = (credentialError: string | null) =>
     updateDialogState({ credentialError });
   const setCustomProviderId = (customProviderId: string) => updateDialogState({ customProviderId });
-  const setCustomDisplayName = (customDisplayName: string) => updateDialogState({ customDisplayName });
+  const setCustomDisplayName = (customDisplayName: string) =>
+    updateDialogState({ customDisplayName });
   const setCustomBaseUrl = (customBaseUrl: string) => updateDialogState({ customBaseUrl });
-  const setCustomProviderApi = (customProviderApi: string) => updateDialogState({ customProviderApi });
+  const setCustomProviderApi = (customProviderApi: string) =>
+    updateDialogState({ customProviderApi });
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const confirm = useConfirm();

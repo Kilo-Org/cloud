@@ -2111,6 +2111,30 @@ describe('runBackgroundNotificationTask', () => {
     expect(optionsFor('agent-progress')).toMatchObject({ name: 'Agentenfortschritt' });
     expect(optionsFor('needs-input')).toMatchObject({ name: 'Eingabe erforderlich' });
   });
+
+  it('reads a granted notification permission before the sinks see a headless push', async () => {
+    // A headless start never runs the root layout's permission gate. Without
+    // this read, a granted install would keep its Live Activity unstarted.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    const { getNotificationPermissionGranted } = await import('./glanceable/live-activity-switch');
+    expect(getNotificationPermissionGranted()).toBe(false);
+
+    await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+      },
+      error: null,
+      executionInfo: {
+        eventId: 'e-permission',
+        taskName: 'active-agents-glanceable-background-task',
+      },
+    });
+
+    expect(getNotificationPermissionGranted()).toBe(true);
+  });
 });
 
 describe('foreground attention-push suppression', () => {

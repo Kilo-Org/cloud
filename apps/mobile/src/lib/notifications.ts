@@ -486,6 +486,14 @@ export async function runBackgroundNotificationTask(
   // to a channel the app never created, and FirebaseMessaging logs the miss on
   // every message. Idempotent and never rejecting.
   await ensureAndroidNotificationChannels();
+  // A headless start never runs `setupNotificationPermissionGate`, so the Live
+  // Activity gate would read "not granted" on an install that granted it. Read
+  // the permission before the sinks see the push.
+  try {
+    await getNotificationPermissionStatus();
+  } catch {
+    // An unknown answer stays "not granted": the next foreground reads again.
+  }
   return handleBackgroundNotificationTask(body);
 }
 

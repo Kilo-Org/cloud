@@ -13,7 +13,7 @@
 > ids defined by Part 1. Production traffic and non-experimented model ids are
 > never exported to partners.
 
-> Prerequisite: [Part 1 — Core A/B Experiment System](./experimental-models-1.md)
+> Prerequisite: Part 1 — Core A/B Experiment System, now implemented; see [the model experiments spec](../.specs/model-experiments.md)
 
 This plan covers trace export for model provider partnerships and the future replay evaluation roadmap. It depends on the core experiment infrastructure built in Part 1.
 

@@ -129,9 +129,24 @@ export type DirectUserByokInferenceProviderId = z.infer<
   typeof DirectUserByokInferenceProviderIdSchema
 >;
 
+/**
+ * Keys for a whole gateway rather than one inference provider. They serve the
+ * regular catalog models under their regular ids, ordered by preference: when a
+ * user has both, the Vercel AI Gateway key wins for models Vercel can serve.
+ */
+export const GatewayUserByokProviderIdSchema = z.enum(['vercel-ai-gateway', 'openrouter']);
+
+export type GatewayUserByokProviderId = z.infer<typeof GatewayUserByokProviderIdSchema>;
+
+export function isGatewayUserByokProviderId(
+  providerId: string
+): providerId is GatewayUserByokProviderId {
+  return GatewayUserByokProviderIdSchema.safeParse(providerId).success;
+}
+
 export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   DirectUserByokInferenceProviderIdSchema
-);
+).or(GatewayUserByokProviderIdSchema);
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
@@ -173,6 +188,8 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-ams']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-sgp']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
+  [GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway']]: 'openai/gpt-5-nano',
+  [GatewayUserByokProviderIdSchema.enum.openrouter]: 'openai/gpt-5-nano',
 } satisfies Record<UserByokProviderId, string>;
 
 // This is a registry of provider IDs referenced explicitly in our mappings, not

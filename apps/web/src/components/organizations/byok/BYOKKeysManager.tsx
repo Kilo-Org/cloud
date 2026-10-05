@@ -46,6 +46,8 @@ import {
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
   VertexCredentialsSchema,
+  isGatewayUserByokProviderId,
+  type GatewayUserByokProviderId,
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
@@ -91,9 +93,20 @@ const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).ma
   name,
 }));
 
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
-  a.name.localeCompare(b.name)
+const GATEWAY_BYOK_PROVIDER_NAMES = {
+  'vercel-ai-gateway': 'Vercel AI Gateway',
+  openrouter: 'OpenRouter',
+} satisfies Record<GatewayUserByokProviderId, string>;
+
+const GATEWAY_BYOK_PROVIDERS_LIST = Object.entries(GATEWAY_BYOK_PROVIDER_NAMES).map(
+  ([id, name]) => ({ id, name })
 );
+
+const BYOK_PROVIDERS = [
+  ...DIRECT_BYOK_PROVIDERS_LIST,
+  ...VERCEL_BYOK_PROVIDERS,
+  ...GATEWAY_BYOK_PROVIDERS_LIST,
+].toSorted((a, b) => a.name.localeCompare(b.name));
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
@@ -826,6 +839,26 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             <p className="mt-2">
                               This provider is considered trusted in the context of organization
                               restrictions.
+                            </p>
+                          ) : null}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
+                  if (isGatewayUserByokProviderId(selectedProvider)) {
+                    return (
+                      <Alert>
+                        <Info className="size-4" />
+                        <AlertDescription>
+                          <p>
+                            Once saved, this key is used for the supported models above that none of
+                            your provider keys cover. If you add both a Vercel AI Gateway key and an
+                            OpenRouter key, the Vercel AI Gateway key is used for models it serves.
+                          </p>
+                          {organizationId ? (
+                            <p className="mt-2">
+                              Organization model and provider restrictions apply to requests that
+                              use this key.
                             </p>
                           ) : null}
                         </AlertDescription>

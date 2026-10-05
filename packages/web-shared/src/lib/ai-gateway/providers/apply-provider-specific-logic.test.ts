@@ -12,6 +12,7 @@ import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
+  type BYOKResult,
   type Provider,
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
@@ -369,6 +370,45 @@ describe('applyGatewayModelsFallback', () => {
       expect(request.body.models).toBeUndefined();
     }
   );
+});
+
+describe('applyProviderSpecificLogic with a user gateway key', () => {
+  async function apply(userByok: BYOKResult[] | null) {
+    const requestedModel = 'anthropic/claude-opus-5';
+    const request = makeRequest(requestedModel, ['caller/fallback']);
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      requestedModel,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null
+    );
+    return request;
+  }
+
+  it.each(['openrouter', 'vercel-ai-gateway'] as const)(
+    'skips Kilo provider order and fallback models for a %s key',
+    async providerId => {
+      const request = await apply([{ providerId, decryptedAPIKey: 'user-key' }]);
+
+      expect(request.body.models).toBeUndefined();
+      expect(request.body.provider).toBeUndefined();
+    }
+  );
+
+  it('keeps Kilo provider order and fallback models on Kilo keys', async () => {
+    const request = await apply(null);
+
+    expect(request.body.models).toEqual(['anthropic/claude-opus-5', CLAUDE_OPUS_FALLBACK_MODEL_ID]);
+    expect(request.body.provider).toEqual({
+      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+    });
+  });
 });
 
 describe('applyPreferredProvider', () => {

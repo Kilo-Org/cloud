@@ -92,6 +92,18 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  return await canRouteToVercel(requestedModel, getRoutingProviderConfig);
+}
+
+/**
+ * Whether Vercel serves the model and can honor the provider routing settings.
+ * Returns false when provider ignore lists cannot be checked because Vercel's
+ * inference provider data is unavailable.
+ */
+export async function canRouteToVercel(
+  requestedModel: string,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+) {
   const vercelModels = await getVercelModelsFromDatabase();
   const vercelModelId = await mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {

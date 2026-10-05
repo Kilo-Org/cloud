@@ -2,7 +2,8 @@ import type {
   GatewayRequest,
   OpenRouterProviderConfig,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
+import { canRouteToVercel, shouldRouteToVercel } from '@/lib/ai-gateway/providers/vercel';
+import { isGatewayUserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   findKiloExclusiveModel,
   isKiloExclusiveModel,
@@ -19,8 +20,14 @@ import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@/lib/anonymous';
 import { isAnonymousContext } from '@/lib/anonymous';
 import type { BYOKResult, Provider } from '@/lib/ai-gateway/providers/types';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
+import {
+  createUserOpenRouterProvider,
+  OPENROUTER,
+} from '@/lib/ai-gateway/providers/definitions/openrouter';
+import {
+  createUserVercelAiGatewayProvider,
+  VERCEL_AI_GATEWAY,
+} from '@/lib/ai-gateway/providers/definitions/vercel';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { checkOpenAiChatGptByok } from '@/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
@@ -157,24 +164,66 @@ async function checkCustomLlm(
   };
 }
 
-async function checkVercelBYOK(
+type ModelUserByok = {
+  /** Inference provider keys, sent through Kilo's Vercel AI Gateway account. */
+  inference: BYOKResult[];
+  /** Whole-gateway keys that replace Kilo's own gateway key. */
+  gateway: BYOKResult[];
+};
+
+async function getModelUserByok(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
-): Promise<BYOKResult[] | null> {
-  if (isAnonymousContext(user)) return null;
+): Promise<ModelUserByok> {
+  const none: ModelUserByok = { inference: [], gateway: [] };
+  if (isAnonymousContext(user)) return none;
   // Kilo-exclusive models are not routable through Vercel BYOK. Reasoning in particular
   // breaks: the Vercel AI Gateway normalizes reasoning to each provider's upstream-native
   // shape, whereas our Kilo-exclusive models are served through generic OpenAI-compatible
   // endpoints (Martian, direct Alibaba, etc.) where that normalization doesn't apply and the
-  // response ends up corrupted. Skip the Vercel BYOK lookup entirely and let the caller fall
+  // response ends up corrupted. Skip the BYOK lookup entirely and let the caller fall
   // through to the model's declared gateway.
-  if (isKiloExclusiveModel(requestedModel)) return null;
+  if (isKiloExclusiveModel(requestedModel)) return none;
   const modelProviders = await getModelUserByokProviders(requestedModel);
-  if (modelProviders.length === 0) return null;
-  return organizationId
-    ? getBYOKforOrganization(readDb, organizationId, modelProviders)
-    : getBYOKforUser(readDb, user.id, modelProviders);
+  if (modelProviders.length === 0) return none;
+  const userByok = organizationId
+    ? await getBYOKforOrganization(readDb, organizationId, modelProviders)
+    : await getBYOKforUser(readDb, user.id, modelProviders);
+  return {
+    inference: userByok?.filter(byok => !isGatewayUserByokProviderId(byok.providerId)) ?? [],
+    gateway: userByok?.filter(byok => isGatewayUserByokProviderId(byok.providerId)) ?? [],
+  };
+}
+
+/**
+ * Prefers the Vercel AI Gateway key when Vercel can serve the model under the
+ * provider routing settings, and the OpenRouter key otherwise.
+ */
+async function checkGatewayBYOK(
+  gatewayByok: BYOKResult[],
+  requestedModel: string,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+): Promise<GetProviderProviderResult | null> {
+  const vercelKey = gatewayByok.find(byok => byok.providerId === 'vercel-ai-gateway');
+  if (vercelKey && (await canRouteToVercel(requestedModel, getRoutingProviderConfig))) {
+    return {
+      kind: 'provider',
+      provider: createUserVercelAiGatewayProvider(vercelKey.decryptedAPIKey),
+      userByok: [vercelKey],
+      bypassAccessCheck: false,
+    };
+  }
+  const openRouterKey = gatewayByok.find(byok => byok.providerId === 'openrouter');
+  if (openRouterKey) {
+    return {
+      kind: 'provider',
+      provider: createUserOpenRouterProvider(openRouterKey.decryptedAPIKey),
+      userByok: [openRouterKey],
+      bypassAccessCheck: false,
+    };
+  }
+  return null;
 }
 
 export type GetProviderInput = {
@@ -230,14 +279,26 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return openAiChatGptByok;
   }
 
-  const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
-  if (vercelByok) {
+  const modelUserByok = await getModelUserByok(user, requestedModel, organizationId);
+  if (modelUserByok.inference.length > 0) {
     return {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
-      userByok: vercelByok,
+      userByok: modelUserByok.inference,
       bypassAccessCheck: false,
     };
+  }
+
+  const resolveRoutingProviderConfig = async () =>
+    (await getRoutingProviderConfig?.()) ?? request.body.provider;
+
+  const gatewayByok = await checkGatewayBYOK(
+    modelUserByok.gateway,
+    requestedModel,
+    resolveRoutingProviderConfig
+  );
+  if (gatewayByok) {
+    return gatewayByok;
   }
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
@@ -251,8 +312,6 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const eligibleForVercelRouting =
     !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
-  const resolveRoutingProviderConfig = async () =>
-    (await getRoutingProviderConfig?.()) ?? request.body.provider;
 
   if (
     eligibleForVercelRouting &&
@@ -285,9 +344,9 @@ export async function getEmbeddingProvider(
   organizationId: string | undefined
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null }> {
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
-  const userByok = await checkVercelBYOK(user, requestedModel, organizationId);
-  if (userByok) {
-    return { provider: VERCEL_AI_GATEWAY, userByok };
+  const { inference } = await getModelUserByok(user, requestedModel, organizationId);
+  if (inference.length > 0) {
+    return { provider: VERCEL_AI_GATEWAY, userByok: inference };
   }
 
   // 2. All non-BYOK embedding requests go through OpenRouter

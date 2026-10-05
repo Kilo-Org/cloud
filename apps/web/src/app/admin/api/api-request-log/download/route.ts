@@ -13,7 +13,37 @@ import { getApiRequestLogBlob } from '@/lib/r2/api-request-log';
 // extract it ("Error 79 - Inappropriate file type or format").
 export const maxDuration = 800;
 
+// Stop early enough to write the incomplete-export notice and the ZIP central
+// directory before Vercel kills the function at maxDuration.
+const EXPORT_TIME_BUDGET_MS = (maxDuration - 60) * 1000;
+const INCOMPLETE_NOTICE_NAME = 'INCOMPLETE_EXPORT_README.txt';
+
 const BATCH_SIZE = 10;
+
+type IncompleteExport = {
+  elapsedMs: number;
+  exportedRows: number;
+  remainingRows: number;
+  lastRow: { id: bigint; created_at: string };
+};
+
+function formatIncompleteNotice({
+  elapsedMs,
+  exportedRows,
+  remainingRows,
+  lastRow,
+}: IncompleteExport): string {
+  return [
+    'This export is incomplete.',
+    '',
+    `The download stopped after ${Math.round(elapsedMs / 1000)} seconds so the ZIP could be finished before the ${maxDuration}-second server time limit.`,
+    `It contains ${exportedRows} matching records. ${remainingRows} more matching records were not exported.`,
+    `Records are exported in id order. The last exported record has id ${lastRow.id} and was created at ${lastRow.created_at} (UTC).`,
+    '',
+    'To download the remaining records, start a new download with a later start date and time, or narrow the filters.',
+    '',
+  ].join('\n');
+}
 
 function formatTimestamp(isoString: string): string {
   return isoString.replaceAll(':', '-').replaceAll(' ', '_');
@@ -139,6 +169,7 @@ function buildFilter(
 }
 
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   await connection();
 
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
@@ -226,8 +257,32 @@ export async function GET(request: NextRequest) {
   // Fetch and archive rows in batches using cursor-based pagination to
   // avoid loading the entire result set into memory at once.
   const appendRows = async () => {
-    let cursor: bigint | null = null;
+    let exportedRows = 0;
+    let lastRow: IncompleteExport['lastRow'] | null = null;
     for (;;) {
+      const afterCursor: SQL | undefined = lastRow
+        ? and(filter, gt(api_request_log.id, lastRow.id))
+        : filter;
+      const elapsedMs = Date.now() - startedAt;
+      if (lastRow && elapsedMs >= EXPORT_TIME_BUDGET_MS) {
+        const [remaining] = await db
+          .select({ total: count() })
+          .from(api_request_log)
+          .where(afterCursor);
+        if (remaining.total > 0) {
+          archive.append(
+            formatIncompleteNotice({
+              elapsedMs,
+              exportedRows,
+              remainingRows: remaining.total,
+              lastRow,
+            }),
+            { name: INCOMPLETE_NOTICE_NAME }
+          );
+        }
+        break;
+      }
+
       const rows = await db
         .select({
           id: api_request_log.id,
@@ -237,7 +292,7 @@ export async function GET(request: NextRequest) {
           response_r2_key: api_request_log.response_r2_key,
         })
         .from(api_request_log)
-        .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
+        .where(afterCursor)
         .orderBy(asc(api_request_log.id))
         .limit(BATCH_SIZE);
 
@@ -280,7 +335,8 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      cursor = rows[rows.length - 1].id;
+      lastRow = rows[rows.length - 1];
+      exportedRows += rows.length;
 
       // Archiver maintains its own input queue, which is not reflected by the
       // readable stream's high-water mark. Wait until this batch is emitted so

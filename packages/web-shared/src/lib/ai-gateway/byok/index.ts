@@ -22,6 +22,7 @@ import {
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { hasEnabledUserByokForModel } from '@/lib/ai-gateway/byok/availability';
 
 /**
  * Returns every user BYOK provider whose key can serve `modelId`: first the
@@ -64,7 +65,7 @@ async function getModelInferenceUserByokProviders(modelId: string): Promise<User
  * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
  * take them over.
  */
-async function getModelGatewayUserByokProviders(
+export async function getModelGatewayUserByokProviders(
   modelId: string
 ): Promise<GatewayUserByokProviderId[]> {
   if (isKiloExclusiveModel(modelId) || isFreeModel(modelId)) {
@@ -113,18 +114,26 @@ function parseUserByokProviderIds(rows: { provider_id: string }[]): UserByokProv
   });
 }
 
+/**
+ * `getAllowedProviders` returns the organization's allowed providers for a
+ * model, or undefined when every provider is allowed.
+ */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
-  enabledProviderIds: UserByokProviderId[]
+  enabledProviderIds: UserByokProviderId[],
+  getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
   return Promise.all(
     models.map(async model => {
       const hasUserByokAvailable =
         !isKiloExclusiveModel(model.id) &&
-        (await getModelUserByokProviders(model.id)).some(provider =>
-          enabledProviders.has(provider)
-        );
+        (await hasEnabledUserByokForModel({
+          modelId: model.id,
+          modelProviders: await getModelUserByokProviders(model.id),
+          enabledProviderIds: enabledProviders,
+          allowedProviders: getAllowedProviders(model.id),
+        }));
       return { ...model, hasUserByokAvailable };
     })
   );

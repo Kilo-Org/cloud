@@ -33,15 +33,21 @@ export async function getAvailableModelsForOrganization(
   const restrictionCandidates = [...responseData.data];
 
   const filteredModels = [];
+  const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
   for (const model of restrictionCandidates) {
-    if ((await getEffectiveModelDecision(policy, model.id)).allowed) {
+    const decision = await getEffectiveModelDecision(policy, model.id);
+    if (decision.allowed) {
       filteredModels.push(model);
+      if (decision.eligibleProviderRoutes) {
+        allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
+      }
     }
   }
 
   let availableModels = await addUserByokAvailability(
     filteredModels,
-    await getOrganizationByokProviderIds(readDb, organizationId)
+    await getOrganizationByokProviderIds(readDb, organizationId),
+    modelId => allowedProvidersByModel.get(modelId)
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {

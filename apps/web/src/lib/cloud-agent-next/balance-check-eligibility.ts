@@ -7,6 +7,8 @@ import {
   getOrganizationByokProviderIds,
   getUserByokProviderIds,
 } from '@/lib/ai-gateway/byok';
+import { hasEnabledUserByokForModel } from '@/lib/ai-gateway/byok/availability';
+import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {
@@ -61,6 +63,21 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     : await getUserByokProviderIds(params.fromDb, params.user.id);
 
   const enabled = new Set(enabledProviderIds);
-  const hasUserByokAvailable = modelProviders.some(provider => enabled.has(provider));
+  const allowedProviders =
+    params.organizationId && enabled.has('vercel-ai-gateway')
+      ? (
+          await resolveOrganizationMemberModelDecision({
+            organizationId: params.organizationId,
+            kiloUserId: params.user.id,
+            modelId: params.modelId,
+          })
+        ).decision.eligibleProviderRoutes
+      : undefined;
+  const hasUserByokAvailable = await hasEnabledUserByokForModel({
+    modelId: params.modelId,
+    modelProviders,
+    enabledProviderIds: enabled,
+    allowedProviders,
+  });
   return { isFree: false, hasUserByokAvailable };
 }

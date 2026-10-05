@@ -24,14 +24,20 @@ const mockGetContext = jest.fn(
 );
 const mockPolicy = { policyRevision: 7 };
 const mockEvaluatePolicy = jest.fn((_context: OrganizationGroupPolicyContext) => mockPolicy);
+const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
 const mockDecision = jest.fn(async (_policy: unknown, id: string) => ({
   allowed: id !== 'provider/blocked',
+  ...(id === 'provider/allowed' && { eligibleProviderRoutes: ALLOWED_MODEL_ROUTES }),
 }));
 const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
 const mockCustom = jest.fn<Promise<OpenRouterModel[]>, [string, readonly string[]]>();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
-const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: string[]) =>
-  models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
+const mockAvailability = jest.fn(
+  async (
+    models: OpenRouterModel[],
+    _providers: string[],
+    _getAllowedProviders?: (modelId: string) => ReadonlySet<string> | undefined
+  ) => models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
 const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
 
@@ -329,8 +335,12 @@ describe('organization model producer publication', () => {
     expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
-      ['openai']
+      ['openai'],
+      expect.any(Function)
     );
+    const getAllowedProviders = mockAvailability.mock.calls[0][2];
+    expect(getAllowedProviders?.('provider/allowed')).toEqual(ALLOWED_MODEL_ROUTES);
+    expect(getAllowedProviders?.('provider/training')).toBeUndefined();
     expect(mockDecision.mock.calls.map(([policy, id]) => ({ policy, id }))).toEqual(
       expect.arrayContaining(mockCatalog.data.map(model => ({ policy: mockPolicy, id: model.id })))
     );

@@ -142,7 +142,9 @@ export type { MarkdownRendererHandlers };
 
 export class MarkdownRenderer extends Renderer {
   private readonly palette: MarkdownPalette;
-  private readonly selectable: boolean;
+  // The base Renderer keeps its own private `selectable` for the nodes it
+  // builds; this copy serves the nodes this subclass builds.
+  private readonly isSelectable: boolean;
   // The handlers are mutable because a render can be cached and reused by a
   // later mount, after the host has recomputed its message-bound closures (a
   // reaction or delivery failure updates the message without changing its
@@ -181,9 +183,9 @@ export class MarkdownRenderer extends Renderer {
   private imageIndex = 0;
 
   constructor(palette: MarkdownPalette, selectable: boolean, handlers: MarkdownRendererHandlers) {
-    super();
+    super({ selectable });
     this.palette = palette;
-    this.selectable = selectable;
+    this.isSelectable = selectable;
     this.onLongPressLink = handlers.onLongPressLink;
     this.onPressLink = handlers.onPressLink;
     this.onCopyCode = handlers.onCopyCode;
@@ -211,7 +213,7 @@ export class MarkdownRenderer extends Renderer {
     return createElement(
       Text,
       {
-        selectable: this.selectable,
+        selectable: this.isSelectable,
         key: this.getKey(),
         style: withRtlWritingDirection(styles),
         ...extraProps,
@@ -254,7 +256,7 @@ export class MarkdownRenderer extends Renderer {
       createElement(CodeBlock, {
         code: text,
         language: normalizeFenceLanguage(language),
-        selectable: this.selectable,
+        selectable: this.isSelectable,
         baseColor: this.palette.textColor,
         tokenScheme: this.palette.codeTokenScheme,
         maxLength: MARKDOWN_CODE_CHARACTER_CAP,
@@ -345,7 +347,7 @@ export class MarkdownRenderer extends Renderer {
       Text,
       {
         ...interactionProps,
-        selectable: this.selectable,
+        selectable: this.isSelectable,
         key: this.getKey(),
         style: withRtlWritingDirection(styles),
       },
@@ -473,7 +475,7 @@ export class MarkdownRenderer extends Renderer {
     return createElement(MarkdownTable, {
       key,
       palette: this.palette,
-      selectable: this.selectable,
+      selectable: this.isSelectable,
       tableKey: key,
       columnCount,
       rowCount,

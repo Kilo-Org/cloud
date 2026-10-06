@@ -105,28 +105,19 @@ export type BouncerDecideParams = {
   };
 };
 
-export type BouncerDecision = {
-  /**
-   * The verdict; await it immediately before the upstream call. Null on a timeout, any error, a
-   * rejected `params` promise, or an unknown verdict shape. Never rejects.
-   */
-  verdict: Promise<DecideResponse | null>;
-  /**
-   * Call where the request is handed to usage accounting. From then on the usage event releases
-   * bouncer's concurrency lease; before it, every terminal path ends without one.
-   */
-  handOffToUsage(): void;
-};
-
 /**
- * Starts the one `decide` for this request. An `after()` callback keeps it alive across an early
- * return and, once the response has ended, releases the concurrency lease of a spend-watched
- * account when the request never reached usage accounting (any rejection after decide started, an
- * upstream failure, a bouncer rejection).
+ * Starts the one `decide` for this request and returns its verdict; await it immediately before
+ * the upstream call. The verdict is null on a timeout, any error, a rejected `params` promise, or
+ * an unknown verdict shape, and never rejects.
+ *
+ * An `after()` callback keeps the decide alive across an early return. Next runs it once the
+ * response has closed, including a streamed body, so the request is no longer in flight; it then
+ * releases a spend-watched account's concurrency lease on every path. A usage event for the same
+ * request releases it too; release is idempotent, so either order is harmless.
  */
 export function startBouncerDecide(
   params: BouncerDecideParams | Promise<BouncerDecideParams>
-): BouncerDecision {
+): Promise<DecideResponse | null> {
   const resolvedParams = Promise.resolve(params);
   const verdict = resolvedParams
     .then(({ requestId, ip, ja4, account }) => {
@@ -153,11 +144,9 @@ export function startBouncerDecide(
       );
     })
     .catch(() => null);
-  let handedOffToUsage = false;
-  // A callback, not a promise: Next runs it after the response ends, when the hand-off is final.
+  // A callback, not a promise: Next runs it after the response closes.
   after(async () => {
-    const resolved = await verdict;
-    if (handedOffToUsage || resolved?.spendWatch !== true) return;
+    if ((await verdict)?.spendWatch !== true) return;
     const decided = await resolvedParams.catch(() => null);
     if (!decided?.account) return;
     await releaseDecideLease({
@@ -165,12 +154,7 @@ export function startBouncerDecide(
       accountId: decided.account.accountId,
     });
   });
-  return {
-    verdict,
-    handOffToUsage: () => {
-      handedOffToUsage = true;
-    },
-  };
+  return verdict;
 }
 
 /**

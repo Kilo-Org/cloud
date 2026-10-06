@@ -189,13 +189,8 @@ async function runAfter() {
   await callbacks[0]();
 }
 
-const handOffToUsage = jest.fn();
-
 function mockVerdict(verdict: DecideResponse | null) {
-  jest.mocked(startBouncerDecide).mockReturnValue({
-    verdict: Promise.resolve(verdict),
-    handOffToUsage,
-  });
+  jest.mocked(startBouncerDecide).mockResolvedValue(verdict);
 }
 
 describe('handleSystemOneRequest', () => {
@@ -828,17 +823,15 @@ describe('handleSystemOneRequest', () => {
     expect(response.headers.get('retry-after-ms')).toBe('500');
     expect(startBouncerDecide).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
-    expect(handOffToUsage).not.toHaveBeenCalled();
   });
 
-  it('hands a spend-watched request to usage with the decide request id', async () => {
+  it('passes a spend-watched verdict to usage with the decide request id', async () => {
     mockVerdict({ enforced: false, spendWatch: true, flags: [] });
 
     const response = await handleSystemOneRequest(makeRequest());
     await runAfter();
 
     expect(response.status).toBe(200);
-    expect(handOffToUsage).toHaveBeenCalledTimes(1);
     const decideParams = jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
     if (!decideParams || decideParams instanceof Promise) throw new Error('Expected decide params');
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(

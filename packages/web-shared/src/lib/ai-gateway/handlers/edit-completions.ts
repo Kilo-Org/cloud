@@ -278,7 +278,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // The one decide for this request, awaited before the upstream call within its 500 ms budget.
   // Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerDecision = startBouncerDecide({
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
@@ -288,7 +288,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
       payer,
     },
   });
-  const bouncerVerdict = await bouncerDecision.verdict;
+  const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
@@ -360,7 +360,6 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone();
 
-  bouncerDecision.handOffToUsage();
   countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
 
   return wrapInSafeNextResponse(proxyRes);

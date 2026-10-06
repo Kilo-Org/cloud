@@ -322,7 +322,7 @@ export async function handleEmbeddingsRequest(
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerDecision = startBouncerDecide({
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
@@ -380,7 +380,7 @@ export async function handleEmbeddingsRequest(
     };
   }
 
-  const bouncerVerdict = await bouncerDecision.verdict;
+  const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
@@ -442,7 +442,6 @@ export async function handleEmbeddingsRequest(
   }
 
   const clonedResponse = response.clone();
-  bouncerDecision.handOffToUsage();
   countAndStoreEmbeddingUsage(clonedResponse, usageContext, embeddingRequestSpan);
 
   return wrapInSafeNextResponse(response);

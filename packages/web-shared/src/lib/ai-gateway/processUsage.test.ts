@@ -18,7 +18,6 @@ import {
 } from './processUsage';
 import {
   deliverUsageEventWireBody,
-  releaseDecideLease,
   reportUsageEvent,
 } from '@kilocode/web-shared/lib/bouncer/client';
 import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -56,18 +55,16 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-// Mock the bouncer transport so the usage-event payload, the outbox delivery, and the lease
-// release can be asserted without a network call.
+// Mock the bouncer transport so the usage-event payload and the outbox delivery can be asserted
+// without a network call.
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
   reportUsageEvent: jest.fn(async () => undefined),
   deliverUsageEventWireBody: jest.fn(async () => ({ delivered: true, status: 204 })),
-  releaseDecideLease: jest.fn(async () => undefined),
 }));
 
 const mockedReportUsageEvent = jest.mocked(reportUsageEvent);
 const mockedDeliverUsageEventWireBody = jest.mocked(deliverUsageEventWireBody);
-const mockedReleaseDecideLease = jest.mocked(releaseDecideLease);
 
 describe('processOpenRouterUsage', () => {
   const coreProps = {
@@ -1420,7 +1417,6 @@ describe('logMicrodollarUsage', () => {
     beforeEach(() => {
       mockedReportUsageEvent.mockClear();
       mockedDeliverUsageEventWireBody.mockClear();
-      mockedReleaseDecideLease.mockClear();
     });
 
     test('enqueues a spend-watched usage event with the billing row and delivers it', async () => {
@@ -1476,22 +1472,6 @@ describe('logMicrodollarUsage', () => {
       expect(mockedReportUsageEvent).toHaveBeenCalledWith(
         expect.objectContaining({ requestId, costMicrodollars: BASE_USAGE_STATS.cost_mUsd })
       );
-    });
-
-    test('releases the lease of a spend-watched request that has no usage stats', async () => {
-      const user = await insertTestUser({
-        id: 'test-bouncer-outbox-no-stats-user',
-        microdollars_used: 0,
-        google_user_email: 'bouncer-outbox-no-stats@example.com',
-      });
-
-      await processTokenData(null, spendWatchContext(user, 'req-bouncer-no-stats', true));
-
-      expect(mockedReleaseDecideLease).toHaveBeenCalledWith({
-        requestId: 'req-bouncer-no-stats',
-        accountId: `user:${user.id}`,
-      });
-      expect(mockedReportUsageEvent).not.toHaveBeenCalled();
     });
   });
 });

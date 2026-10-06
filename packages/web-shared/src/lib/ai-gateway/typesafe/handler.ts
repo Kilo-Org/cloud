@@ -135,7 +135,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerDecision = startBouncerDecide({
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
@@ -168,7 +168,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     });
   }
 
-  const bouncerVerdict = await bouncerDecision.verdict;
+  const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
 
@@ -216,7 +216,6 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   const { id, model, provider, usage } = result.data;
   const cost = toMicrodollars(usage.cost);
-  bouncerDecision.handOffToUsage();
   after(async () => {
     await logMicrodollarUsageAndReportToBouncer(
       {

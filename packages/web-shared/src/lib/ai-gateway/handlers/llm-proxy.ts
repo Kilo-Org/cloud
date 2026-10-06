@@ -600,7 +600,7 @@ export async function handleLlmProxyRequest(
   // upstream call. The event id is generated server-side so decide and usage share one identity
   // for this request.
   const bouncerRequestId = randomUUID();
-  const bouncerDecision = startBouncerDecide(
+  const bouncerVerdictPromise = startBouncerDecide(
     isAnonymousContext(user)
       ? {
           requestId: bouncerRequestId,
@@ -951,7 +951,7 @@ export async function handleLlmProxyRequest(
 
   // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
   // rejects; every other outcome sends the request.
-  const bouncerVerdict = await bouncerDecision.verdict;
+  const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
@@ -1030,7 +1030,6 @@ export async function handleLlmProxyRequest(
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
-  bouncerDecision.handOffToUsage();
   accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
 
   const requestLogging = {

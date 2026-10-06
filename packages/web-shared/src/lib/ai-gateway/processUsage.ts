@@ -95,7 +95,6 @@ import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
   normalizeJa4,
-  releaseDecideLease,
   reportUsageEvent,
   usageEventWireBody,
   type UsageEvent,
@@ -1265,7 +1264,6 @@ export async function processTokenData(
       tags: { source: 'usage_processing' },
       extra: { usageContext },
     });
-    await releaseBouncerLeaseWithoutUsageEvent(usageContext);
     return null;
   }
 
@@ -1416,18 +1414,6 @@ function bouncerUsageEvent(
     return { ...fields, tier: 'anonymous', ip: bouncer.clientIp };
   }
   return { ...fields, accountId: bouncer.accountId, ip: bouncer.clientIp };
-}
-
-/**
- * For a usage path that ends without a usage event (no usage stats), releases the concurrency
- * lease a spend-watched decide took, since no usage event will release it. Best-effort.
- */
-export async function releaseBouncerLeaseWithoutUsageEvent(
-  usageContext: MicrodollarUsageContext
-): Promise<void> {
-  const bouncer = usageContext.bouncer;
-  if (bouncer?.spendWatch !== true || bouncer.accountId === null) return;
-  await releaseDecideLease({ requestId: bouncer.requestId, accountId: bouncer.accountId });
 }
 
 async function getGenerationLookupProvider(

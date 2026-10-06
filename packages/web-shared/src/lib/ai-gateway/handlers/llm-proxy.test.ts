@@ -894,16 +894,22 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
-  it('marks a spend-watched request on the usage context and keeps its lease for usage', async () => {
+  it('marks a spend-watched request on the usage context and releases its lease after the response', async () => {
     mockedDecide.mockResolvedValueOnce(verdict({ spendWatch: true }));
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    expect(releaseDecideLease).not.toHaveBeenCalled();
     await runAfterCallbacks();
 
     expect(response.status).toBe(200);
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer?.spendWatch).toBe(true);
-    // Usage accounting owns the request now; its usage event releases the lease.
-    expect(releaseDecideLease).not.toHaveBeenCalled();
+    // The after() callback runs once the response has closed, so the request is no longer in
+    // flight; release is idempotent with the usage event's own release.
+    expect(releaseDecideLease).toHaveBeenCalledTimes(1);
+    expect(releaseDecideLease).toHaveBeenCalledWith({
+      requestId: mockedDecide.mock.calls[0]?.[0].requestId,
+      accountId: 'user:user-123',
+    });
   });
 
   it('releases a spend-watched lease when the request ends before usage accounting', async () => {

@@ -14,7 +14,10 @@ import {
   GlanceableActiveCard,
   GlanceableActiveCardSkeleton,
 } from '@/components/home/glanceable-active-card';
-import { LiveSessionHeaderNotice } from '@/components/home/live-session-header-notice';
+import {
+  LiveSessionHeaderNotice,
+  useLiveSessionHeaderNotice,
+} from '@/components/home/live-session-header-notice';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -308,6 +311,8 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const { reducedMotion } = useMotionPolicy();
   const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
+  const failureLabel = t('home.couldNotLoadActiveSessions');
+  const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
 
   return (
     <View>
@@ -323,19 +328,13 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
           router.navigate(AGENTS_INDEX_HREF as Href);
           router.dismissTo(AGENTS_INDEX_HREF as Href);
         }}
-        notice={
-          <LiveSessionHeaderNotice
-            context={context}
-            sessions={sessions}
-            failureLabel={t('home.couldNotLoadActiveSessions')}
-          />
-        }
+        notice={notice && <LiveSessionHeaderNotice notice={notice} />}
       />
       <View className="mx-4 gap-2">
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
-          failureLabel={t('home.couldNotLoadActiveSessions')}
+          failureLabel={failureLabel}
           inlineNotices={false}
         />
         {/* One card, not a row per session: the skeleton, the zero state and

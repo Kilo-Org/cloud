@@ -316,13 +316,22 @@ describe('Home live section', () => {
       ...settled,
       activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
     };
+    // The header's own views (the notice's status dot) are not the section body.
+    const bodyClasses = () => {
+      const header = new Set(
+        node('SectionHeader').findAll(candidate => Object.is(candidate.type, 'View'))
+      );
+      return nodes('View')
+        .filter(candidate => !header.has(candidate))
+        .map(candidate => String(candidate.props.className ?? ''));
+    };
     await render(sessions);
-    const before = classes('View');
+    const before = bodyClasses();
     const newest = newestButton();
     connectivity.offline = true;
     await render(sessions);
     // No view joins the section body: the notice lives in the header row.
-    expect(classes('View')).toEqual(before);
+    expect(bodyClasses()).toEqual(before);
     expect(newestButton()).toBe(newest);
     // The notice renders inside the header row, not in the section body.
     expect(text()).toContain('No internet connection');

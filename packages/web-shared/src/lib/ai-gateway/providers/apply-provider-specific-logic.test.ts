@@ -6,12 +6,15 @@ import {
   applyPreferredProvider,
   applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
+  getIgnoredProviders,
   removeUnsupportedRequestServiceTier,
+  withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
+  type BYOKResult,
   type Provider,
   type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -156,7 +159,8 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
       'user-1',
       null,
       null,
-      null
+      null,
+      false
     );
 
     return request.body.messages.find(message => message.role === 'tool')?.content;
@@ -377,7 +381,7 @@ describe('applyPreferredProvider', () => {
     model => {
       const request = makeRequest(model);
 
-      applyPreferredProvider(model, request.body);
+      applyPreferredProvider(model, request.body, false);
 
       expect(request.body.provider).toEqual({ order: ['openai'] });
     }
@@ -387,37 +391,67 @@ describe('applyPreferredProvider', () => {
     const model = 'openai/gpt-oss-120b';
     const request = makeRequest(model);
 
-    applyPreferredProvider(model, request.body);
+    applyPreferredProvider(model, request.body, false);
 
     expect(request.body.provider).toBeUndefined();
   });
 
-  it('applies the Claude provider order to Fable', () => {
+  it('prefers Bedrock then Vertex and ignores Anthropic for Fable', () => {
     const request = makeRequest('anthropic/claude-fable-5');
 
-    applyPreferredProvider('anthropic/claude-fable-5', request.body);
+    applyPreferredProvider('anthropic/claude-fable-5', request.body, false);
 
     expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+      order: ['amazon-bedrock', 'google-vertex'],
+      ignore: ['anthropic'],
     });
+  });
+
+  it('does not ignore Anthropic for Claude when Anthropic is allowed', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body, true);
+
+    expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'google-vertex'] });
+  });
+
+  it('ignores Anthropic for Claude even when the caller set an order', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    request.body.provider = { order: ['anthropic'], ignore: ['azure', 'anthropic'] };
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body, false);
+
+    expect(request.body.provider).toEqual({
+      order: ['anthropic'],
+      ignore: ['azure', 'anthropic'],
+    });
+  });
+
+  it('does not ignore Anthropic for non-Claude models', () => {
+    const request = makeRequest('openai/gpt-5.5');
+
+    applyPreferredProvider('openai/gpt-5.5', request.body, false);
+
+    expect(request.body.provider).toEqual({ order: ['openai'] });
   });
 
   it('preserves valid provider options when adding order', () => {
     const request = makeRequest('anthropic/claude-sonnet-4.5');
     request.body.provider = { zdr: true };
 
-    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body, false);
 
     expect(request.body.provider).toEqual({
       zdr: true,
-      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+      order: ['amazon-bedrock', 'google-vertex'],
+      ignore: ['anthropic'],
     });
   });
 
   it('prefers Novita for DeepSeek models', () => {
     const request = makeRequest('deepseek/deepseek-v4-pro');
 
-    applyPreferredProvider('deepseek/deepseek-v4-pro', request.body);
+    applyPreferredProvider('deepseek/deepseek-v4-pro', request.body, false);
 
     expect(request.body.provider).toEqual({ order: ['novita'] });
   });
@@ -427,7 +461,7 @@ describe('applyPreferredProvider', () => {
     model => {
       const request = makeRequest(model);
 
-      applyPreferredProvider(model, request.body);
+      applyPreferredProvider(model, request.body, false);
 
       expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'alibaba'] });
     }
@@ -437,7 +471,7 @@ describe('applyPreferredProvider', () => {
     const request = makeRequest('moonshotai/kimi-k3');
     request.body.provider = { only: ['alibaba'], order: ['alibaba'] };
 
-    applyPreferredProvider('moonshotai/kimi-k3', request.body);
+    applyPreferredProvider('moonshotai/kimi-k3', request.body, false);
 
     expect(request.body.provider).toEqual({ only: ['alibaba'], order: ['alibaba'] });
   });
@@ -445,7 +479,7 @@ describe('applyPreferredProvider', () => {
   it('prefers Friendli then Novita for GLM models', () => {
     const request = makeRequest('z-ai/glm-5.2');
 
-    applyPreferredProvider('z-ai/glm-5.2', request.body);
+    applyPreferredProvider('z-ai/glm-5.2', request.body, false);
 
     expect(request.body.provider).toEqual({ order: ['friendli', 'novita'] });
   });
@@ -454,10 +488,75 @@ describe('applyPreferredProvider', () => {
     const request = makeRequest('anthropic/claude-sonnet-4.5');
     Object.assign(request.body, { provider: 'lmstudio' });
 
-    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body, false);
 
     expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+      order: ['amazon-bedrock', 'google-vertex'],
+      ignore: ['anthropic'],
     });
+  });
+});
+
+describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
+  async function applyToClaude(isNonTrialEnterprise: boolean, userByok: BYOKResult[] | null) {
+    const model = 'anthropic/claude-sonnet-4.5';
+    const request = makeRequest(model);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      'org-1',
+      null,
+      null,
+      isNonTrialEnterprise
+    );
+
+    return request.body.provider;
+  }
+
+  it('ignores Anthropic outside non-trial enterprise organizations', async () => {
+    expect((await applyToClaude(false, null))?.ignore).toEqual(['anthropic']);
+  });
+
+  it('does not ignore Anthropic for non-trial enterprise organizations', async () => {
+    expect((await applyToClaude(true, null))?.ignore).toBeUndefined();
+  });
+
+  it('does not ignore Anthropic for BYOK requests', async () => {
+    expect(
+      (await applyToClaude(false, [{ providerId: 'anthropic', decryptedAPIKey: 'key' }]))?.ignore
+    ).toBeUndefined();
+  });
+});
+
+describe('withIgnoredProviders', () => {
+  it('returns the provider unchanged when nothing is ignored', () => {
+    const provider = { order: ['openai'] };
+
+    expect(withIgnoredProviders(provider, [])).toBe(provider);
+    expect(withIgnoredProviders(undefined, [])).toBeUndefined();
+  });
+
+  it('merges ignored providers without duplicates', () => {
+    expect(withIgnoredProviders({ zdr: true, ignore: ['anthropic'] }, ['anthropic'])).toEqual({
+      zdr: true,
+      ignore: ['anthropic'],
+    });
+    expect(withIgnoredProviders(undefined, ['anthropic'])).toEqual({ ignore: ['anthropic'] });
+  });
+});
+
+describe('getIgnoredProviders', () => {
+  it.each([
+    ['anthropic/claude-opus-5', false, ['anthropic']],
+    ['anthropic/claude-opus-5', true, []],
+    ['openai/gpt-5.5', false, []],
+  ] as const)('for %s with Anthropic allowed=%s returns %j', (model, allowed, expected) => {
+    expect(getIgnoredProviders(model, allowed)).toEqual(expected);
   });
 });

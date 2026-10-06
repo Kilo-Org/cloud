@@ -21,6 +21,11 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import {
+  getIgnoredProviders,
+  withIgnoredProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
@@ -755,6 +760,16 @@ export async function handleLlmProxyRequest(
 
   const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
 
+  async function resolveIsNonTrialEnterprise(): Promise<boolean> {
+    if (!organizationId) return false;
+    const { plan } = await balanceAndSettingsPromise;
+    if (plan !== 'enterprise') return false;
+    return await isNonTrialEnterpriseOrganization(organizationId, readDb);
+  }
+
+  const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();
+  const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
+
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
     request: requestBodyParsed,
@@ -762,7 +777,11 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     taskId,
-    getRoutingProviderConfig: accessCheckResolver.getRoutingProviderConfig,
+    getRoutingProviderConfig: async () =>
+      withIgnoredProviders(
+        (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
+        ignoredProviders
+      ),
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -927,6 +946,7 @@ export async function handleLlmProxyRequest(
     organizationId: organizationId ?? null,
     sessionId: usageContext.session_id,
     taskId: taskId ?? null,
+    isNonTrialEnterprise,
     search: url.search,
     method: request.method,
     signal: request.signal,

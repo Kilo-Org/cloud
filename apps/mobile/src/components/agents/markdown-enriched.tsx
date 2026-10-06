@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Platform } from 'react-native';
 import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-markdown';
 
 import { TOKEN_DARK_LIGHT } from '@/lib/pr-review/diff/syntax-colors';
@@ -20,7 +21,7 @@ type MarkdownEnrichedProps = {
   onCopyCode?: MarkdownCopyCodeHandler;
 };
 
-const CODE_FONT = 'Menlo';
+const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;

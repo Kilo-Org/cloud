@@ -249,7 +249,9 @@ patchedDependencies:
   expo-widgets@57.0.22: patches/expo-widgets@57.0.22.patch
   # PurchaseConnector.create returns the native promise, so a create failure
   # is observable. Android: compile against the project's Kotlin stdlib, not
-  # the 2.4.10 default that RN 0.86's Kotlin 2.1 compiler cannot read.
+  # the 2.4.10 default that RN 0.86's Kotlin 2.1 compiler cannot read. The
+  # package ships TypeScript source, so its `typeof jest` guard (TS2708 here)
+  # gets a ts-ignore.
   react-native-appsflyer@7.0.2-v2: patches/react-native-appsflyer@7.0.2-v2.patch
   # Fabric mounting race: RCTComponentViewFactory registers component views from
   # the JS thread without the class-map mutex, so a mounting transaction can

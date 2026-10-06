@@ -180,7 +180,7 @@ patchedDependencies:
   expo-server-sdk: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
   expo-task-manager@57.0.21: 7b144f9d84c386dfc1bc93db75d62887c20db3f652bad1f5c01b01ebb531315c
   expo-widgets@57.0.22: 5a6e60ab9f2d3bfcfc13524f4a0afe427f44d403c903bbfd303216233b025a0f
-  react-native-appsflyer@7.0.2-v2: f0070bc8d342414b49301b4d7d3ccc23edc0367b4d8d2c9c1667a60a9183a739
+  react-native-appsflyer@7.0.2-v2: 390902fe7a6476a9911a4f2c41e89c8b9035104468c266647d4498d5a913ab73
   react-native@0.86.3: 39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788
 
 importers:
@@ -485,7 +485,7 @@ importers:
         version: 1.5.2(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       '@sentry/react-native':
         specifier: ~8.29.0
-        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5)(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
+        version: 8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))
       '@shopify/flash-list':
         specifier: 2.3.3
         version: 2.3.3(@babel/runtime@7.29.7)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -686,7 +686,7 @@ importers:
         version: 0.22.1(expo@57.0.26)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       react-native-appsflyer:
         specifier: 7.0.2-v2
-        version: 7.0.2-v2(patch_hash=f0070bc8d342414b49301b4d7d3ccc23edc0367b4d8d2c9c1667a60a9183a739)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(typescript@7.0.2)
+        version: 7.0.2-v2(patch_hash=390902fe7a6476a9911a4f2c41e89c8b9035104468c266647d4498d5a913ab73)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(typescript@7.0.2)
       react-native-css:
         specifier: 3.1.0-rc.0
         version: 3.1.0-rc.0(@expo/metro-config@57.0.12(bufferutil@4.1.0)(expo@57.0.26)(typescript@7.0.2)(utf-8-validate@6.0.6))(lightningcss@1.30.1)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
@@ -27229,7 +27229,7 @@ snapshots:
       '@sentry/conventions': 0.16.0
       '@sentry/core': 10.69.0
 
-  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5)(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
+  '@sentry/react-native@8.29.0(@babel/core@7.29.7)(@expo/config-types@57.0.2)(@expo/config@57.0.9(typescript@7.0.2))(@expo/env@2.4.3)(bufferutil@4.1.0)(dotenv@17.4.2)(expo-router@57.0.24)(expo@57.0.26)(metro-config@0.84.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(metro-resolver@0.84.5)(open@11.0.0)(promise@8.3.0)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(rollup@4.62.3)(typescript@7.0.2)(utf-8-validate@6.0.6)(webpack@5.105.4(esbuild@0.28.2))':
     dependencies:
       '@expo/config-plugins': 57.0.9(typescript@7.0.2)
       '@sentry/browser': 10.75.2
@@ -37727,7 +37727,7 @@ snapshots:
     optionalDependencies:
       expo: 57.0.26(@babel/core@7.29.7)(@expo/metro-runtime@57.0.16)(bufferutil@4.1.0)(expo-router@57.0.24)(expo-widgets@57.0.22)(react-dom@19.2.6(react@19.2.3))(react-native-webview@13.16.1(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3))(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)(typescript@7.0.2)(utf-8-validate@6.0.6)
 
-  react-native-appsflyer@7.0.2-v2(patch_hash=f0070bc8d342414b49301b4d7d3ccc23edc0367b4d8d2c9c1667a60a9183a739)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(typescript@7.0.2):
+  react-native-appsflyer@7.0.2-v2(patch_hash=390902fe7a6476a9911a4f2c41e89c8b9035104468c266647d4498d5a913ab73)(react-native@0.86.3(patch_hash=39257eff5fcaf7a40e26d5d93b96cd3b30b86d26d7628e99e6568aee1680a788)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(typescript@7.0.2):
     dependencies:
       '@appsflyer-sdk/js-core-plugin': 7.1.0
       '@expo/config-plugins': 57.0.9(typescript@7.0.2)

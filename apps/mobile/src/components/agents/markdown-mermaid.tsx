@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useColorScheme, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { z } from 'zod';
 
 import { CodeBlock } from './code-block';
 import { type MarkdownPalette } from './markdown-palette';
@@ -14,10 +15,15 @@ type MarkdownMermaidProps = {
   palette: MarkdownPalette;
 };
 
-type DiagramMessage = { kind: 'height'; height: number } | { kind: 'error' };
+const DiagramMessageSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('height'), height: z.number() }),
+  z.object({ kind: z.literal('error') }),
+]);
 
 function diagramPage(source: string, dark: boolean, background: string): string {
-  // The source travels as a JSON string literal, so diagram text never becomes markup.
+  // The source travels as a JSON string literal with `<` escaped, so diagram
+  // text never becomes markup and a `</script>` in it cannot close the script.
+  const sourceLiteral = JSON.stringify(source).replaceAll('<', String.raw`\u003C`);
   return `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <style>html,body{margin:0;padding:0;background:${background};}#d{display:flex;justify-content:center;}</style>
@@ -25,7 +31,7 @@ function diagramPage(source: string, dark: boolean, background: string): string 
 const post = m => window.ReactNativeWebView.postMessage(JSON.stringify(m));
 try {
   mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: ${dark ? "'dark'" : "'default'"} });
-  mermaid.render('g', ${JSON.stringify(source)}).then(({ svg }) => {
+  mermaid.render('g', ${sourceLiteral}).then(({ svg }) => {
     const host = document.getElementById('d');
     host.innerHTML = svg;
     // The SVG scales to the page width, which can still be settling when it
@@ -36,6 +42,15 @@ try {
   }).catch(() => post({ kind: 'error' }));
 } catch (e) { post({ kind: 'error' }); }
 </script></body></html>`;
+}
+
+/** The page's message, or undefined when it is not one the page sends. */
+function parseDiagramMessage(data: string) {
+  try {
+    return DiagramMessageSchema.safeParse(JSON.parse(data)).data;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -78,10 +93,11 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
         // The page only loads the pinned script; every tap stays in the app.
         onShouldStartLoadWithRequest={request => request.url === 'about:blank'}
         onMessage={(event: WebViewMessageEvent) => {
-          const message = JSON.parse(event.nativeEvent.data) as DiagramMessage;
-          if (message.kind === 'height') {
+          const message = parseDiagramMessage(event.nativeEvent.data);
+          if (message?.kind === 'height') {
             setHeight(Math.max(MIN_HEIGHT, message.height));
           } else {
+            // An error or a malformed message keeps the source as a code block.
             setFailed(true);
           }
         }}

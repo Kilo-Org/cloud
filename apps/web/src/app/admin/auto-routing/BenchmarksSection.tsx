@@ -54,6 +54,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
+import { useSystemOneModelOptions } from './system-one-models';
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit tests)
@@ -369,12 +370,18 @@ function BenchmarkConfigEditor({
   modelOptions,
   modelsLoading,
   modelsError,
+  classifierModelOptions,
+  classifierModelsLoading,
+  classifierModelsError,
 }: {
   config: BenchmarkConfig | null;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
   modelOptions: ModelOption[];
   modelsLoading: boolean;
   modelsError?: string;
+  classifierModelOptions: ModelOption[];
+  classifierModelsLoading: boolean;
+  classifierModelsError?: string;
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
   // Tracks unsaved local edits. A background config refetch (the runs list
@@ -522,16 +529,16 @@ function BenchmarkConfigEditor({
                     <TableCell className="py-2">
                       <ModelCombobox
                         variant="compact"
-                        models={modelOptions}
+                        models={classifierModelOptions}
                         value={modelId}
                         onValueChange={value => handleClassifierModelChange(index, value)}
                         pinnedModel={
-                          modelId && !modelOptions.some(option => option.id === modelId)
+                          modelId && !classifierModelOptions.some(option => option.id === modelId)
                             ? pinnedModelFor(modelId)
                             : undefined
                         }
-                        isLoading={modelsLoading}
-                        error={modelsError}
+                        isLoading={classifierModelsLoading}
+                        error={classifierModelsError}
                         className="w-full"
                         triggerAriaLabel={`Classifier model ${index + 1}`}
                       />
@@ -1013,6 +1020,9 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
                   <TableHead className="text-xs">Model</TableHead>
                   {isDecider ? <TableHead className="text-xs">Route</TableHead> : null}
                   <TableHead className="text-right text-xs">Accuracy</TableHead>
+                  {isDecider ? null : (
+                    <TableHead className="text-right text-xs">Route accuracy</TableHead>
+                  )}
                   <TableHead className="text-right text-xs">Avg cost</TableHead>
                   <TableHead className="text-right text-xs">Avg latency</TableHead>
                   <TableHead className="text-right text-xs">p50 latency</TableHead>
@@ -1032,6 +1042,11 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
                     <TableCell className="text-right tabular-nums text-xs">
                       {formatAccuracy(s.accuracy)}
                     </TableCell>
+                    {isDecider ? null : (
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right tabular-nums text-xs">
                       {formatUsd(s.avgCostUsd)}
                     </TableCell>
@@ -1300,6 +1315,9 @@ export function BenchmarksSection() {
     [modelsQuery.data?.data]
   );
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
+  const systemOneModelsQuery = useSystemOneModelOptions();
+  const systemOneModelsError =
+    systemOneModelsQuery.error instanceof Error ? systemOneModelsQuery.error.message : undefined;
 
   const configQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-config'],
@@ -1441,6 +1459,9 @@ export function BenchmarksSection() {
           modelOptions={modelOptions}
           modelsLoading={modelsQuery.isLoading}
           modelsError={modelsError}
+          classifierModelOptions={systemOneModelsQuery.data ?? []}
+          classifierModelsLoading={systemOneModelsQuery.isLoading}
+          classifierModelsError={systemOneModelsError}
         />
       ) : null}
 

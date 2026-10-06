@@ -396,13 +396,13 @@ describe('applyPreferredProvider', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
-  it('prefers Bedrock then Vertex and ignores Anthropic for Fable', () => {
+  it('prefers Vertex then Bedrock and ignores Anthropic for Fable', () => {
     const request = makeRequest('anthropic/claude-fable-5');
 
     applyPreferredProvider('anthropic/claude-fable-5', request.body, false);
 
     expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'google-vertex'],
+      order: ['google-vertex', 'amazon-bedrock'],
       ignore: ['anthropic'],
     });
   });
@@ -412,7 +412,7 @@ describe('applyPreferredProvider', () => {
 
     applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body, true);
 
-    expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'google-vertex'] });
+    expect(request.body.provider).toEqual({ order: ['google-vertex', 'amazon-bedrock'] });
   });
 
   it('ignores Anthropic for Claude even when the caller set an order', () => {
@@ -443,7 +443,7 @@ describe('applyPreferredProvider', () => {
 
     expect(request.body.provider).toEqual({
       zdr: true,
-      order: ['amazon-bedrock', 'google-vertex'],
+      order: ['google-vertex', 'amazon-bedrock'],
       ignore: ['anthropic'],
     });
   });
@@ -491,7 +491,7 @@ describe('applyPreferredProvider', () => {
     applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body, false);
 
     expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'google-vertex'],
+      order: ['google-vertex', 'amazon-bedrock'],
       ignore: ['anthropic'],
     });
   });

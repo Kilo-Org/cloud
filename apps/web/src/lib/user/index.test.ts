@@ -123,6 +123,7 @@ import {
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  bouncer_usage_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
   user_data_export_parts,
@@ -3907,6 +3908,38 @@ describe('User', () => {
         .select()
         .from(bouncer_credit_event_outbox)
         .where(eq(bouncer_credit_event_outbox.user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
+    });
+
+    it('deletes the bouncer usage-event outbox rows for the deleted user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(bouncer_usage_event_outbox).values([
+        {
+          request_id: randomUUID(),
+          user_id: user1.id,
+          payload: { requestId: 'r1', accountId: `user:${user1.id}`, ip: '203.0.113.9' },
+        },
+        {
+          request_id: randomUUID(),
+          user_id: user2.id,
+          payload: { requestId: 'r2', accountId: `user:${user2.id}` },
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select()
+        .from(bouncer_usage_event_outbox)
+        .where(eq(bouncer_usage_event_outbox.user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+
+      const remainingForOtherUser = await db
+        .select()
+        .from(bouncer_usage_event_outbox)
+        .where(eq(bouncer_usage_event_outbox.user_id, user2.id));
       expect(remainingForOtherUser).toHaveLength(1);
     });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   pushDataSchema,
@@ -267,7 +267,9 @@ describe('dispatchInternalPushCore', () => {
       deps
     );
 
-    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed', reason: 'preference_read_failed' },
+    ]);
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
@@ -275,7 +277,9 @@ describe('dispatchInternalPushCore', () => {
     const { deps, calls } = fakeDeps({ preferencesThrows: true });
     const result = await dispatchInternalPushCore(securityFinding(), deps);
 
-    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed', reason: 'preference_read_failed' },
+    ]);
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });
 
@@ -400,9 +404,43 @@ describe('dispatchInternalPushCore', () => {
     });
     const result = await dispatchInternalPushCore(securityFinding(), deps);
 
-    expect(result.perRecipient).toEqual([{ userId: 'user-a', outcome: 'failed' }]);
+    expect(result.perRecipient).toEqual([
+      { userId: 'user-a', outcome: 'failed', reason: 'dispatch_rejected' },
+    ]);
     expect(calls.dispatchPushInputs).toHaveLength(1);
   });
+
+  it.each([
+    { error: 'Expo rejected 1 push ticket', expectedReason: 'expo_ticket_rejected' },
+    {
+      error: 'Accepted push bookkeeping failed: connection reset',
+      expectedReason: 'delivery_bookkeeping_failed',
+    },
+    {
+      error: 'Expo returned no classified push ticket outcomes',
+      expectedReason: 'unclassified_ticket_outcome',
+    },
+    { error: 'fetch failed', expectedReason: 'send_failed' },
+  ])(
+    'DO failure "$error" is reported with stable reason $expectedReason',
+    async ({ error, expectedReason }) => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { deps } = fakeDeps({
+        dispatchPush: async () => ({ kind: 'failed' as const, error }),
+      });
+      const result = await dispatchInternalPushCore(securityFinding(), deps);
+
+      expect(result.perRecipient).toEqual([
+        { userId: 'user-a', outcome: 'failed', reason: expectedReason },
+      ]);
+      // The raw DO error stays in worker logs only; the client sees the token.
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Internal dispatch push delivery failed',
+        expect.objectContaining({ kind: 'security_finding', reason: expectedReason, error })
+      );
+      warnSpy.mockRestore();
+    }
+  );
 
   it('passes through DO outcomes duplicate and no_tokens', async () => {
     const outcomes: Record<string, DispatchPushOutcome> = {
@@ -695,8 +733,8 @@ describe('dispatchInternalPushCore', () => {
     const result = await dispatchInternalPushCore(spendAlert(), deps);
 
     expect(result.perRecipient).toEqual([
-      { userId: 'user-a', outcome: 'failed' },
-      { userId: 'user-b', outcome: 'failed' },
+      { userId: 'user-a', outcome: 'failed', reason: 'preference_read_failed' },
+      { userId: 'user-b', outcome: 'failed', reason: 'preference_read_failed' },
     ]);
     expect(calls.dispatchPushInputs).toHaveLength(0);
   });

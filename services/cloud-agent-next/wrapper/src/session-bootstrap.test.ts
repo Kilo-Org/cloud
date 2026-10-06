@@ -11,8 +11,6 @@ import type { WrapperKiloClient } from './kilo-api';
 import {
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
-  RestoredWorkspaceReconciliationError,
-  workspaceBootstrapErrorCode,
   type WrapperBootstrapDeps,
 } from './session-bootstrap';
 import type {
@@ -1110,20 +1108,11 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
-  it.each([
-    { stage: 'cold', uploadResult: 'success' },
-    { stage: 'cold', uploadResult: 'failure' },
-    { stage: 'cold', uploadResult: 'timeout' },
-    { stage: 'restored', uploadResult: 'success' },
-    { stage: 'restored', uploadResult: 'failure' },
-    { stage: 'restored', uploadResult: 'timeout' },
-  ])(
-    'retains CLI evidence before $stage cleanup with a $uploadResult final upload',
-    async ({ stage, uploadResult }) => {
+  it.each([{ uploadResult: 'success' }, { uploadResult: 'failure' }, { uploadResult: 'timeout' }])(
+    'retains CLI evidence before cold cleanup with a $uploadResult final upload',
+    async ({ uploadResult }) => {
       const request = makeRequest(tmpDir);
       request.workspace.upstreamBranch = 'main';
-      request.workspace.restoredFromBackup = stage === 'restored';
-      if (stage === 'restored') await createCompleteGitWorkspace(request.workspace.workspacePath);
       const cliLogDir = path.join(request.workspace.sessionHome, '.local/share/kilo/log');
       const cliLogPath = path.join(cliLogDir, 'kilo.log');
       const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
@@ -1208,7 +1197,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
             return {
               status: 'error',
               error: {
-                code: workspaceBootstrapErrorCode(error),
+                code: 'WORKSPACE_SETUP_FAILED',
                 message: 'Workspace preparation failed',
               },
             };
@@ -1232,9 +1221,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       await uploader.uploadNow();
 
       expect(response.status).toBe(503);
-      expect(workspaceBootstrapErrorCode(bootstrapError)).toBe(
-        stage === 'restored' ? 'WORKSPACE_RECONCILIATION_FAILED' : 'WORKSPACE_SETUP_FAILED'
-      );
+      expect(bootstrapError).toBeDefined();
       expect(retainedArchive?.includes('earlier CLI evidence')).toBe(true);
       expect(beforeCleanupCalls).toBe(1);
       expect(cliPresentDuringFinalUpload).toBe(true);
@@ -1247,12 +1234,8 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       expect(archives.get(archivePath)).toBe(retainedArchive);
       if (uploadResult === 'success') {
         expect(retainedArchive).toContain('final CLI failure evidence');
-        expect(retainedArchive).toContain(`code=${workspaceBootstrapErrorCode(bootstrapError)}`);
-        expect(retainedArchive).toContain(
-          stage === 'restored'
-            ? 'error=Failed to fetch authoritative remote state'
-            : 'error=Repository checkout failed'
-        );
+        expect(retainedArchive).toContain('code=WORKSPACE_SETUP_FAILED');
+        expect(retainedArchive).toContain('error=Repository checkout failed');
       } else {
         expect(retainedArchive).not.toContain('final CLI failure evidence');
       }
@@ -1266,42 +1249,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       expect(retainedArchive).not.toContain(request.materialized.env.KILOCODE_TOKEN);
     }
   );
-
-  it('redacts reconciliation diagnostics before cleanup while preserving the error type', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.upstreamBranch = 'main';
-    request.workspace.restoredFromBackup = true;
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
-    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
-    const fetchError = new Error(
-      '\u001b[31mFetch failed\u001b[0m Authorization: Bearer fetch-secret'
-    );
-    let logsBeforeCleanup = '';
-    let bootstrapError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args => {
-          if (args[0] === 'fetch') throw fetchError;
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-        beforeFailureCleanup: async () => {
-          logsBeforeCleanup = await fsp.readFile(wrapperLogPath, 'utf8');
-        },
-      });
-    } catch (error) {
-      bootstrapError = error;
-    }
-
-    expect(bootstrapError).toBeInstanceOf(RestoredWorkspaceReconciliationError);
-    expect(bootstrapError).toMatchObject({ cause: fetchError });
-    expect(logsBeforeCleanup).toContain('code=WORKSPACE_RECONCILIATION_FAILED');
-    expect(logsBeforeCleanup).toContain('error=Fetch failed Authorization: Bearer [REDACTED]');
-    expect(logsBeforeCleanup).not.toContain('fetch-secret');
-    expect(logsBeforeCleanup).not.toContain('\u001b');
-    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
-    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
-  });
 
   it('preserves the recorded failure when finalization crosses the workspace deadline', async () => {
     const request = makeRequest(tmpDir);
@@ -2234,69 +2181,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ).toBe(true);
   });
 
-  it('reports an incomplete backup restore without calling it cold', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.preferSnapshot = true;
-    request.workspace.restoredFromBackup = true;
-    request.materialized.setupCommands = [];
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    const wrapperLogPath = path.join(tmpDir, 'wrapper.log');
-    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
-    const progress = mock((..._args: unknown[]) => {});
-
-    const result = await prepareWrapperBootstrapWorkspace(request, progress, {
-      git: async args => {
-        if (args.join(' ') === 'ls-remote --symref origin HEAD') {
-          return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
-        }
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      restoreSession: async () => ({
-        ok: true,
-        downloaded: true,
-        imported: true,
-        diffs: {
-          applied: 1,
-          skipped: 1,
-          total: 2,
-          skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
-        },
-      }),
-    });
-
-    // (a) The named skipped-diff report carries the restore path and the files.
-    expect(result.restore).toEqual({
-      path: 'backup',
-      diffs: {
-        applied: 1,
-        skipped: 1,
-        total: 2,
-        skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
-      },
-    });
-    // (b) The named step is emitted.
-    expect(progress).toHaveBeenCalledWith({
-      type: 'failed',
-      step: 'restore_incomplete',
-      stepId: 'phase:restore_incomplete',
-      safeError: expect.stringContaining('1 of 2 files'),
-    });
-    const wrapperLog = await fsp.readFile(wrapperLogPath, 'utf8');
-    expect(wrapperLog).toContain('bootstrap restore incomplete');
-    expect(wrapperLog).toContain('skipped=1 total=2');
-    expect(wrapperLog).toContain('paths=src/index.ts');
-    expect(wrapperLog).toContain('wrapperRunId=wr_test wrapperGeneration=1');
-    // (d) Neither old progress line is emitted.
-    expect(progress).not.toHaveBeenCalledWith(
-      'kilo_session',
-      'Resume restore incomplete, 1/2 files restored'
-    );
-    expect(progress).not.toHaveBeenCalledWith(
-      'kilo_session',
-      'Cold restore incomplete, 1/2 files restored'
-    );
-  });
-
   it('throws when a required snapshot restore returns 404', async () => {
     const request = makeRequest(tmpDir);
     request.workspace.preferSnapshot = true;
@@ -2770,253 +2654,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       ['config', 'user.name', 'octocat'],
       ['config', 'user.email', '1+octocat@users.noreply.github.com'],
     ]);
-  });
-
-  it('reconciles a same-commit restored workspace before running every setup command', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.branchName = 'session/new';
-    request.workspace.upstreamBranch = 'feature/source';
-    request.workspace.restoredFromBackup = true;
-    request.materialized.setupCommands = ['prepare one', 'prepare two'];
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    const events: string[] = [];
-
-    await prepareWrapperBootstrapWorkspace(request, undefined, {
-      git: async args => {
-        events.push(`git:${args.join(' ')}`);
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      runProcess: async (command, args) => {
-        events.push(`process:${command} ${args.join(' ')}`);
-        expect(process.env.HOME).toBe(request.workspace.sessionHome);
-        expect(process.env.KILOCODE_TOKEN).toBe('kilo-capability');
-        expect(process.env[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
-        expect(
-          fs.existsSync(path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json'))
-        ).toBe(true);
-        expect(
-          fs.existsSync(path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md'))
-        ).toBe(true);
-        expect(
-          fs.existsSync(
-            path.join(request.workspace.sessionHome, '.kilocode/skills/test-skill/SKILL.md')
-          )
-        ).toBe(true);
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      restoreSession: async () => ({
-        ok: true,
-        downloaded: false,
-        imported: true,
-        diffs: { applied: 0, skipped: 0, total: 0 },
-      }),
-    });
-
-    expect(events).toContain('git:remote set-url origin https://github.com/acme/repo.git');
-    const fetchIndex = events.indexOf('git:fetch origin feature/source');
-    const checkoutIndex = events.indexOf('git:checkout -B session/new FETCH_HEAD');
-    const firstSetupIndex = events.indexOf('process:sh -lc prepare one');
-    expect(fetchIndex).toBeGreaterThan(-1);
-    expect(checkoutIndex).toBeGreaterThan(fetchIndex);
-    expect(firstSetupIndex).toBeGreaterThan(checkoutIndex);
-    expect(events.filter(event => event.startsWith('process:'))).toEqual([
-      'process:sh -lc prepare one',
-      'process:sh -lc prepare two',
-    ]);
-  });
-
-  it('reconciles restored generic repositories using credentials without a clone fallback', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.branchName = 'session/restored';
-    request.workspace.preferSnapshot = true;
-    request.workspace.restoredFromBackup = true;
-    request.materialized.setupCommands = [];
-    request.repo = {
-      kind: 'git',
-      url: 'https://git.example.com:8443/acme/repo.git',
-      token: 'restored-generic-token',
-    };
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    const gitCalls: string[][] = [];
-
-    const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
-      git: async args => {
-        expect(await fsp.readFile(gitCredentialsPath(request.workspace.sessionHome), 'utf8')).toBe(
-          'protocol=https\nhost=git.example.com:8443\nusername=x-access-token\npassword=restored-generic-token\n'
-        );
-        gitCalls.push(args);
-        if (args[0] === 'ls-remote') {
-          return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
-        }
-        return { stdout: '', stderr: '', exitCode: 0 };
-      },
-      restoreSession: async () => ({
-        ok: true,
-        downloaded: true,
-        imported: true,
-        diffs: { applied: 0, skipped: 0, total: 0 },
-      }),
-    });
-
-    expect(result.workspaceWasWarm).toBe(true);
-    expect(result.restoredFromBackup).toBe(true);
-    expect(result.restore).toEqual({
-      path: 'backup',
-      diffs: { applied: 0, skipped: 0, total: 0 },
-    });
-    expect(gitCalls).toEqual([
-      ['remote', 'set-url', 'origin', 'https://git.example.com:8443/acme/repo.git'],
-      ['ls-remote', '--symref', 'origin', 'HEAD'],
-      ['fetch', 'origin', 'main'],
-      ['checkout', '-B', 'session/restored', 'FETCH_HEAD'],
-    ]);
-    expect(gitCalls.flat().join(' ')).not.toContain('restored-generic-token');
-  });
-
-  it('keeps restored workspace setup failures as ordinary setup failures', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.restoredFromBackup = true;
-    await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
-
-    let setupError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args => {
-          if (args.join(' ') === 'ls-remote --symref origin HEAD') {
-            return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
-          }
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-        runProcess: async () => ({ stdout: '', stderr: 'install failed', exitCode: 17 }),
-        restoreSession: async () => ({
-          ok: true,
-          downloaded: false,
-          imported: true,
-          diffs: { applied: 0, skipped: 0, total: 0 },
-        }),
-      });
-    } catch (error) {
-      setupError = error;
-    }
-
-    expect(setupError).toBeInstanceOf(Error);
-    expect(setupError).not.toBeInstanceOf(RestoredWorkspaceReconciliationError);
-    expect(workspaceBootstrapErrorCode(setupError)).toBe('WORKSPACE_SETUP_FAILED');
-    expect((setupError as Error).message).toContain('Setup command 1 failed');
-  });
-
-  it('classifies restored workspace reconciliation failures before setup', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.restoredFromBackup = true;
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-    let setupRan = false;
-
-    let reconciliationError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args => {
-          if (args.join(' ') === 'ls-remote --symref origin HEAD') {
-            return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
-          }
-          if (args.join(' ') === 'fetch origin main') {
-            return { stdout: '', stderr: 'remote unavailable', exitCode: 1 };
-          }
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-        runProcess: async () => {
-          setupRan = true;
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-      });
-    } catch (error) {
-      reconciliationError = error;
-    }
-
-    expect(reconciliationError).toBeInstanceOf(RestoredWorkspaceReconciliationError);
-    expect(workspaceBootstrapErrorCode(reconciliationError)).toBe(
-      'WORKSPACE_RECONCILIATION_FAILED'
-    );
-    expect((reconciliationError as Error).message).toBe(
-      'Failed to fetch authoritative remote state'
-    );
-    expect(setupRan).toBe(false);
-    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
-    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
-  });
-
-  it('wraps retryable synthetic-ref checkout conflicts as restored reconciliation failures', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.branchName = 'refs/pull/123/head';
-    request.workspace.strictBranch = true;
-    request.workspace.restoredFromBackup = true;
-    request.materialized.setupCommands = [];
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-
-    let reconciliationError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args => {
-          if (args[0] === 'checkout') {
-            return {
-              stdout: '',
-              stderr: 'error: local changes would be overwritten by checkout',
-              exitCode: 1,
-            };
-          }
-          return { stdout: '', stderr: '', exitCode: 0 };
-        },
-      });
-    } catch (error) {
-      reconciliationError = error;
-    }
-
-    expect(reconciliationError).toBeInstanceOf(RestoredWorkspaceReconciliationError);
-    expect(workspaceBootstrapErrorCode(reconciliationError)).toBe(
-      'WORKSPACE_RECONCILIATION_FAILED'
-    );
-    expect(reconciliationError).toMatchObject({
-      cause: {
-        subtype: 'git_checkout_conflict',
-        retryable: true,
-      },
-    });
-    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
-    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
-  });
-
-  it('keeps an explicit missing synthetic ref non-retryable without reconciliation wrapping', async () => {
-    const request = makeRequest(tmpDir);
-    request.workspace.branchName = 'refs/pull/404/head';
-    request.workspace.strictBranch = true;
-    request.workspace.restoredFromBackup = true;
-    request.materialized.setupCommands = [];
-    await createCompleteGitWorkspace(request.workspace.workspacePath);
-
-    let missingRefError: unknown;
-    try {
-      await prepareWrapperBootstrapWorkspace(request, undefined, {
-        git: async args =>
-          args[0] === 'fetch'
-            ? {
-                stdout: '',
-                stderr: "fatal: couldn't find remote ref refs/pull/404/head",
-                exitCode: 128,
-              }
-            : { stdout: '', stderr: '', exitCode: 0 },
-      });
-    } catch (error) {
-      missingRefError = error;
-    }
-
-    expect(missingRefError).not.toBeInstanceOf(RestoredWorkspaceReconciliationError);
-    expect(missingRefError).toMatchObject({
-      code: 'WORKSPACE_SETUP_FAILED',
-      subtype: 'git_branch_missing',
-      retryable: false,
-    });
-    expect(workspaceBootstrapErrorCode(missingRefError)).toBe('WORKSPACE_SETUP_FAILED');
-    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
-    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
   it('appends downloaded attachments to existing prompt parts', async () => {

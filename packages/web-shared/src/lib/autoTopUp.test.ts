@@ -747,6 +747,7 @@ describe('invoice metadata includes traceId', () => {
         userId: user.id,
         amountCents: 5000,
         accountCreatedAt: new Date(user.created_at).toISOString(),
+        accountUsedMicrodollars: toMicrodollars(10),
       })
     );
   });

@@ -270,8 +270,12 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
-- `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Inference reports remain report-only and never gate the provider request. [SERVER]
-  - Usage and decide requests have 30-second transport budgets. Every inference endpoint reports its API kind.
+- `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Every inference endpoint awaits one decide immediately before its provider request. [SERVER]
+  - Decide has a 500 ms budget. Only a verdict with `enforced: true` rejects: `rate_limited` and `spend_limited` return 429 `rate_limit_exceeded` with `retry-after` and `retry-after-ms`, `restricted` returns 403 `account_restricted`. A timeout, error, non-2xx, unknown shape, or any other verdict sends the request. Verdict flags are logged server-side and never returned to the client.
+  - Signed-in decide requests carry the payer's `created_at`, `microdollars_used`, and `total_microdollars_acquired` (the organization's for an org request); `charge.attempted` carries the payer's `microdollars_used`.
+  - Usage reports have a 30-second transport budget and carry the request's charged `costMicrodollars`. Every inference endpoint reports its API kind, with the same request id as its decide.
+  - When the decide verdict says `spendWatch`, the usage event enters the durable `bouncer_usage_event_outbox` in the usage-write transaction, is delivered immediately after commit, and is retried by the cron drainer (eight attempts; delivered rows kept 1 day, failed rows 7 days).
+  - For a spend-watched signed-in request, the gateway calls `/api/v1/release` with the request id and account once the response has closed, on every path, so Bouncer frees the request's concurrency lease. Release is best-effort and idempotent.
   - Anonymous usage uses the client IP, without a payer. Signed-in usage excludes shared infrastructure addresses for server-side Kilo features.
   - Usage, decide, and request-initiated `charge.attempted` events carry the Vercel `x-vercel-ja4-digest` client fingerprint when the request has a valid one, lowercased and bounded to `^[a-z0-9_]{1,128}$`; a missing or invalid header is omitted whole, never truncated. It describes the client TLS/HTTP characteristics of the peer that reached Kilo's edge (often shared proxy infrastructure), not a person or device, and is correlation evidence only — see https://vercel.com/docs/vercel-firewall/firewall-concepts.
   - Financial events enter the durable `bouncer_credit_event_outbox` before acknowledgment. The dispatcher sends `/api/v2/credit-event` with a 5-second transport budget.
@@ -281,6 +285,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-credit-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-credit-event-outbox`) that drains the Bouncer credit-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
+- `dispatch-bouncer-usage-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-usage-event-outbox`) that retries the Bouncer usage-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
 - `WORKOS_CLIENT_ID` - WorkOS client ID for enterprise SSO. [PUBLIC]
 

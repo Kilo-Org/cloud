@@ -82,16 +82,16 @@ import {
   clearFileTabs,
   closeFileTab,
   closeTerminalTab,
-  createWorkspaceTabsState,
   fileTabId,
   getWorkspaceTabScope,
   openFileTab,
-  resetWorkspaceTabs,
   selectWorkspaceTab,
   setFileTabMode,
   terminalIdFromTabId,
   terminalTabId,
 } from './workspace-tabs';
+import { getWorkspaceTabsStorageKey } from './workspace-tabs-storage';
+import { usePersistedWorkspaceTabs } from './hooks/usePersistedWorkspaceTabs';
 import {
   createRemoteModelOverride,
   useSessionModels,
@@ -346,11 +346,11 @@ export default function CloudChatPage({
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
   const [attachmentMessageUuid] = useState(() => uuidv4());
-  const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
   const [terminalStatuses, setTerminalStatuses] = useState<
     Record<string, TerminalStatusSummary | undefined>
   >({});
   const preserveTerminalSelectionRef = useRef(false);
+  const workspaceTabSelectionInitializedRef = useRef(false);
   const workspaceTabScope = getWorkspaceTabScope(selectedWorktreeId, sessionIdFromParams);
   const workspaceIdentityResolved =
     !sessionIdFromParams ||
@@ -362,6 +362,13 @@ export default function CloudChatPage({
     organizationId,
     scope: workspaceTabScope,
   });
+  const [workspaceTabs, setWorkspaceTabs] = usePersistedWorkspaceTabs(
+    getWorkspaceTabsStorageKey(
+      resolvedWorkspaceScope.currentUserId,
+      resolvedWorkspaceScope.organizationId
+    ),
+    resolvedWorkspaceScope.scope
+  );
   const canOpenChanges =
     sessionIdFromParams !== null &&
     isCurrentSession &&
@@ -418,7 +425,13 @@ export default function CloudChatPage({
 
   if (resolvedFileScope !== fileScope) {
     setResolvedFileScope(fileScope);
-    setWorkspaceTabs(clearFileTabs);
+    if (
+      resolvedWorkspaceScope.currentUserId === currentUserId &&
+      resolvedWorkspaceScope.organizationId === organizationId &&
+      resolvedWorkspaceScope.scope === workspaceTabScope
+    ) {
+      setWorkspaceTabs(clearFileTabs);
+    }
   }
 
   if (
@@ -431,11 +444,14 @@ export default function CloudChatPage({
       organizationId,
       scope: workspaceIdentityResolved ? workspaceTabScope : null,
     });
-    setWorkspaceTabs(resetWorkspaceTabs);
     setTerminalStatuses({});
   }
 
   useEffect(() => {
+    if (!workspaceTabSelectionInitializedRef.current) {
+      workspaceTabSelectionInitializedRef.current = true;
+      return;
+    }
     if (preserveTerminalSelectionRef.current) {
       preserveTerminalSelectionRef.current = false;
       return;

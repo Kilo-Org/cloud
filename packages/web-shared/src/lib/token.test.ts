@@ -271,10 +271,9 @@ describe('Token Functions', () => {
 
       expect(decoded.exp).toBeTruthy();
       expect(decoded.iat).toBeTruthy();
-      // Token should expire in the future (more than 4 years from now)
-      const fourYearsInSeconds = 4 * 365 * 24 * 60 * 60;
+      const oneYearInSeconds = 365 * 24 * 60 * 60;
       const actualDuration = decoded.exp! - decoded.iat!;
-      expect(actualDuration).toBeGreaterThan(fourYearsInSeconds);
+      expect(actualDuration).toBe(oneYearInSeconds);
     });
   });
 

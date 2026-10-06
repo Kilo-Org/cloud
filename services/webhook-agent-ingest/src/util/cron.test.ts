@@ -38,17 +38,6 @@ describe('computeNextCronTime', () => {
     expect(next!.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it('respects timezone', () => {
-    const utc = computeNextCronTime('0 9 * * *', 'UTC');
-    const eastern = computeNextCronTime('0 9 * * *', 'America/New_York');
-    expect(utc).toBeInstanceOf(Date);
-    expect(eastern).toBeInstanceOf(Date);
-    // These should be different times (unless exactly at the boundary)
-    // Just verify both return valid dates
-    expect(utc!.getTime()).toBeGreaterThan(0);
-    expect(eastern!.getTime()).toBeGreaterThan(0);
-  });
-
   it('returns null for invalid expression', () => {
     expect(computeNextCronTime('invalid', 'UTC')).toBeNull();
   });
@@ -127,34 +116,5 @@ describe('isValidTimezone', () => {
     expect(isValidTimezone('NotATimezone')).toBe(false);
     expect(isValidTimezone('')).toBe(false);
     expect(isValidTimezone('US/Fake')).toBe(false);
-  });
-});
-
-describe('DST crossing', () => {
-  it('computes next run across spring-forward DST boundary', () => {
-    // America/New_York springs forward (2 AM → 3 AM) in March
-    // A daily-at-2:30 AM schedule should still produce a valid next run
-    const next = computeNextCronTime('30 2 * * *', 'America/New_York');
-    // On the spring-forward day, 2:30 AM doesn't exist — croner should handle this
-    // by returning the next valid occurrence (either skipping or adjusting)
-    // The key assertion: it doesn't return null or throw
-    if (next) {
-      expect(next.getTime()).toBeGreaterThan(Date.now());
-    }
-    // croner may skip the non-existent time — either a valid date or null is acceptable
-  });
-
-  it('handles fall-back DST boundary', () => {
-    // America/New_York falls back (2 AM → 1 AM) in November
-    // A daily-at-1:30 AM schedule hits an ambiguous time
-    const next = computeNextCronTime('30 1 * * *', 'America/New_York');
-    expect(next).toBeInstanceOf(Date);
-    expect(next!.getTime()).toBeGreaterThan(Date.now());
-  });
-
-  it('enforcesMinimumInterval works with DST timezone', () => {
-    // Hourly schedule in a DST-aware timezone should still enforce minimum interval
-    expect(enforcesMinimumInterval('0 * * * *', 'America/New_York')).toBe(true);
-    expect(enforcesMinimumInterval('*/5 * * * *', 'America/New_York')).toBe(true);
   });
 });

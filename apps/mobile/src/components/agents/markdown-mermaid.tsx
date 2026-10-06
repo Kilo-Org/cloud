@@ -50,6 +50,10 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
     () => diagramPage(source, dark, palette.codeBackground),
     [source, dark, palette.codeBackground]
   );
+  const webViewStyle = useMemo(
+    () => ({ backgroundColor: palette.codeBackground }),
+    [palette.codeBackground]
+  );
 
   if (failed) {
     return (
@@ -81,8 +85,12 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
             setFailed(true);
           }
         }}
-        onError={() => setFailed(true)}
-        style={{ backgroundColor: 'transparent' }}
+        onError={() => {
+          setFailed(true);
+        }}
+        // The page paints the card color itself, so the native view must not
+        // flash its own white background before the diagram loads.
+        style={webViewStyle}
       />
     </View>
   );

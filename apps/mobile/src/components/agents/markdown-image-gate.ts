@@ -33,9 +33,10 @@ export function findMarkdownImages(value: string): MarkdownImageRef[] {
   }
   const linked = new Set<Token>();
   const images: MarkdownImageRef[] = [];
-  marked.walkTokens(lexMarkdown(value), token => {
+  // `walkTokens` returns the async-extension promises; none are registered.
+  void marked.walkTokens(lexMarkdown(value), token => {
     if (token.type === 'link') {
-      marked.walkTokens((token as Tokens.Link).tokens, child => {
+      void marked.walkTokens((token as Tokens.Link).tokens, child => {
         linked.add(child);
       });
     }
@@ -130,13 +131,13 @@ function codeSpanRanges(value: string, start: number, end: number): [number, num
   const runs = [...value.slice(start, end).matchAll(/`+/g)];
   for (let open = 0; open < runs.length; open += 1) {
     const opening = runs[open];
-    for (let close = open + 1; opening && close < runs.length; close += 1) {
-      const closing = runs[close];
-      if (closing?.[0].length === opening[0].length) {
-        ranges.push([start + opening.index, start + closing.index + closing[0].length]);
-        open = close;
-        break;
-      }
+    const closeAt = opening
+      ? runs.findIndex((run, index) => index > open && run[0].length === opening[0].length)
+      : -1;
+    const closing = runs[closeAt];
+    if (opening && closing) {
+      ranges.push([start + opening.index, start + closing.index + closing[0].length]);
+      open = closeAt;
     }
   }
   return ranges;
@@ -182,14 +183,14 @@ export function gateMarkdownImages(
     const all = occurrences(value, raw);
     if (all.length === 0) {
       unfoundHrefs.push(image.href);
-      continue;
-    }
-    const outside = all.filter(
-      at => !code.some(([start, end]) => at < end && at + raw.length > start)
-    );
-    const text = gatedImageMarkdown(image, t);
-    for (const at of outside.length >= count ? outside : all) {
-      edits.push({ start: at, end: at + raw.length, text });
+    } else {
+      const outside = all.filter(
+        at => !code.some(([start, end]) => at < end && at + raw.length > start)
+      );
+      const text = gatedImageMarkdown(image, t);
+      for (const at of outside.length >= count ? outside : all) {
+        edits.push({ start: at, end: at + raw.length, text });
+      }
     }
   }
   edits.sort((a, b) => a.start - b.start);

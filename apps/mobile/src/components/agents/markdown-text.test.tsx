@@ -118,7 +118,6 @@ const EnrichedType = 'EnrichedMarkdownText' as unknown as ComponentType;
 const MermaidType = 'MarkdownMermaid' as unknown as ComponentType;
 const ImageViewerType = 'ImageViewer' as unknown as ComponentType;
 const TextType = 'Text' as unknown as ComponentType;
-const ViewType = 'View' as unknown as ComponentType;
 
 type EnrichedHostProps = {
   markdown: string;

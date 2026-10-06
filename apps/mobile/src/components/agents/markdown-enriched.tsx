@@ -190,7 +190,13 @@ export function MarkdownEnriched({
             });
           }
         }}
-        onCopyPress={onCopyCode ? ({ code }) => onCopyCode(code) : undefined}
+        onCopyPress={
+          onCopyCode
+            ? ({ code }) => {
+                onCopyCode(code);
+              }
+            : undefined
+        }
       />
       {viewer ? (
         <ImageViewer

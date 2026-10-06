@@ -1,5 +1,5 @@
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { Octokit } from '@octokit/rest';
 
 /**

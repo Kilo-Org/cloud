@@ -4,6 +4,7 @@ import {
   mintSandboxLaunchCredential,
   verifySandboxLaunchCredential,
 } from '../../src/sandbox-control/credential.js';
+import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../src/shared/control-plane-protocol.js';
 import type { Env } from '../../src/types.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -22,6 +23,7 @@ import {
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
+  SandboxProviderConfiguration,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
@@ -35,6 +37,7 @@ import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
+import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
 
 const SANDBOX_ID = 'sbx__control_v2_smoke';
 const CUTOVER_SANDBOX_ID = 'sbx__control_v2_cutover';
@@ -109,6 +112,7 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
           provider.launchGates.push(error => (error === undefined ? resolve() : reject(error)));
         });
       }
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -136,8 +140,8 @@ type StartOptions = {
   allocationName?: string;
   billing?: unknown;
   containment?: { kilocode?: boolean; github?: boolean };
-  provider?: 'cloudflare' | 'vercel';
-  configuration?: { provider: 'vercel'; resources: { vcpus: number; memory: number } };
+  provider?: 'cloudflare' | 'vercel' | 'cloudflare-containers';
+  configuration?: SandboxProviderConfiguration;
   meter?: ContainerUsageRpcMethods;
   preparingRoute?: string;
   admissionError?: string;
@@ -303,7 +307,7 @@ async function connectAndHello(
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
   return { wrapper, credential, allocationId };
 }
@@ -338,11 +342,145 @@ async function countAllocationWrites(
   );
 }
 
+/**
+ * Captures `allocation_transition` diagnostics emitted while `action` runs in
+ * the live DO, so a test can assert on the bounded fields of a real transition.
+ */
+async function captureAllocationTransitions(
+  stub: DurableObjectStub<SandboxControlV2>,
+  action: (instance: SandboxControlV2, state: DurableObjectState) => Promise<void>
+): Promise<Record<string, unknown>[]> {
+  return runInDurableObject(stub, async (instance, state) => {
+    const captured: Record<string, unknown>[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'allocation_transition') captured.push(bounded);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    try {
+      await action(instance, state);
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+    }
+    return captured;
+  });
+}
+
 afterEach(async () => {
   await reset();
 });
 
 describe('SandboxControlV2 allocation lifecycle', () => {
+  it('streams the initial allocation, activity, and stopped state without changing idle timing', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const before = await readState(stub);
+    const alarm = await readAlarm(stub);
+    const url = 'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status';
+    const response = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+    expect(response.status).toBe(101);
+    const socket = response.webSocket;
+    if (!socket) throw new Error('Missing status socket');
+    const frames: Array<{ sessionId: string; streamEventType: string; data: unknown }> = [];
+    socket.addEventListener('message', event => {
+      frames.push(JSON.parse(String(event.data)));
+    });
+    socket.accept();
+    await waitFor(() => expect(frames).toHaveLength(1));
+    expect(frames[0]).toMatchObject({
+      sessionId: 'workspace_status',
+      streamEventType: 'cloud.sandbox.status',
+      data: { status: 'starting' },
+    });
+    expect(SandboxStatusSnapshotSchema.safeParse(frames[0]?.data).success).toBe(true);
+    expect(await readState(stub)).toEqual(before);
+    expect(await readAlarm(stub)).toEqual(alarm);
+    socket.send('not-wrapper-activity');
+    const { wrapper } = await connectAndHello(provider, stub);
+    await waitFor(() => expect(frames.at(-1)?.data).toMatchObject({ status: 'active' }));
+    const active = SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data);
+    expect(active.estimatedSleepAt).toBe((await readState(stub)).lastActivityAt! + TIMERS.idleMs);
+    wrapper.heartbeat(true);
+    await waitFor(() =>
+      expect(
+        SandboxStatusSnapshotSchema.parse(frames.at(-1)?.data).estimatedSleepAt
+      ).toBeGreaterThan(active.estimatedSleepAt!)
+    );
+    await evictAllDurableObjects();
+    await stub.reportProviderGone();
+    await waitFor(() =>
+      expect(frames.at(-1)?.data).toMatchObject({ status: 'sleeping', estimatedSleepAt: null })
+    );
+    socket.close();
+    const reconnect = await stub.fetch(new Request(url, { headers: { Upgrade: 'websocket' } }));
+    const reconnected = reconnect.webSocket;
+    if (!reconnected) throw new Error('Missing reconnected socket');
+    const snapshot = new Promise<unknown>(resolve =>
+      reconnected.addEventListener(
+        'message',
+        event => resolve(JSON.parse(String(event.data)).data),
+        { once: true }
+      )
+    );
+    reconnected.accept();
+    expect(await snapshot).toMatchObject({ status: 'sleeping' });
+    reconnected.close();
+    wrapper.close();
+  });
+
+  it('does not accept a status socket when reading allocation state fails', async () => {
+    const stub = sandboxNamespace.getByName('sbx__status_read_failure');
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      await state.storage.put('control_plane_owner', 'owner-1');
+      const allocationReader = instance as unknown as {
+        readAllocation: () => Promise<unknown>;
+      };
+      const read = vi
+        .spyOn(allocationReader, 'readAllocation')
+        .mockRejectedValueOnce(new Error('Allocation unavailable'));
+      try {
+        await expect(
+          instance.fetch(
+            new Request(
+              'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status',
+              { headers: { Upgrade: 'websocket' } }
+            )
+          )
+        ).rejects.toThrow('Allocation unavailable');
+        expect(state.getWebSockets('sandbox-status')).toHaveLength(0);
+      } finally {
+        read.mockRestore();
+      }
+    });
+  });
+
+  it('rejects a status subscription without the registered sandbox owner', async () => {
+    const stub = sandboxNamespace.getByName('sbx__status_authorization');
+    await runInDurableObject(stub, (_instance, state) =>
+      state.storage.put('control_plane_owner', 'owner-1')
+    );
+    const request = (ownerId: string) =>
+      new Request(
+        `https://sandbox.internal/status-stream?ownerId=${ownerId}&sessionId=workspace_status`,
+        { headers: { Upgrade: 'websocket' } }
+      );
+    expect((await stub.fetch(request('other-owner'))).status).toBe(403);
+    expect((await stub.fetch(request(''))).status).toBe(403);
+    expect(
+      await runInDurableObject(
+        stub,
+        (_instance, state) => state.getWebSockets('sandbox-status').length
+      )
+    ).toBe(0);
+  });
+
   it('fails permanent launch configuration promptly while cleanup retains the existing stop ladder and uncertainty', async () => {
     const provider = createFakeProvider({ gateLaunch: true });
     provider.stopResults = Array.from(
@@ -418,12 +556,12 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(await readState(stub)).toEqual(before);
     expect(await first.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     await expect(wrapper.waitForClose()).resolves.toBe(1000);
     expect(await second.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     expect((await readState(stub)).kind).toBe('connected');
     expect(provider.stopCalls).toEqual([]);
@@ -632,6 +770,45 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(current.allocationId).not.toBe(allocationId);
   });
 
+  it('records a peer wrapper close as origin=peer on the disconnect transition', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+    const before = await readState(stub);
+    const records = await captureAllocationTransitions(stub, async (instance, state) => {
+      const [socket] = state.getWebSockets();
+      if (socket === undefined) throw new Error('Missing wrapper socket');
+      await (
+        instance as unknown as { webSocketClose(ws: WebSocket): Promise<void> }
+      ).webSocketClose(socket);
+    });
+    const closed = records.find(record => record.event === 'socket-closed');
+    expect(closed).toMatchObject({ from: 'connected', to: 'disconnected', origin: 'peer' });
+    expect(JSON.stringify(closed)).not.toMatch(/https?:\/\/|Bearer |secret|token/i);
+    expect(await readState(stub)).toMatchObject({
+      kind: 'disconnected',
+      connectionId: before.connectionId,
+    });
+  });
+
+  it('records an owner heartbeat-timeout close as origin=heartbeat_timeout', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+    await setDeadline(stub, { last_frame_at: Date.now() - TIMERS.heartbeatMs - 1_000 });
+    const records = await captureAllocationTransitions(stub, instance => instance.alarm());
+    const closed = records.find(record => record.event === 'socket-closed');
+    expect(closed).toMatchObject({
+      from: 'connected',
+      to: 'disconnected',
+      origin: 'heartbeat_timeout',
+    });
+    expect(JSON.stringify(closed)).not.toMatch(/https?:\/\/|Bearer |secret|token/i);
+    expect(await readState(stub)).toMatchObject({ kind: 'disconnected' });
+  });
+
   it('does not accept a late hello after its deadline or move allocation and route state', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
@@ -728,6 +905,136 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.stopCalls).toEqual([]);
   });
 
+  it('acknowledges negotiated current heartbeats but not invalid or unbound frames', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    wrapper.heartbeat(true);
+    wrapper.send({
+      type: 'hello',
+      wrapperId: 'wr_ack',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      heartbeatAck: true,
+    });
+    expect(await wrapper.next()).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      heartbeatAck: true,
+    });
+    const before = await readState(stub);
+    wrapper.send({
+      type: 'hello',
+      wrapperId: 'wr_ack',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.send({ type: 'heartbeat', active: 'invalid', degraded: false });
+    expect(await wrapper.next(20)).toBeNull();
+    expect(await readState(stub)).toEqual(before);
+    wrapper.heartbeat(false);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect((await readState(stub)).lastActivityAt).toBe(before.lastActivityAt);
+    wrapper.heartbeat(true);
+    expect(await wrapper.next()).toEqual({ type: 'heartbeat_ack' });
+    expect(provider.leaseCalls).toHaveLength(1);
+    const legacy = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await legacy.hello({ wrapperId: 'wr_legacy', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
+    legacy.heartbeat(false);
+    expect(await legacy.next(20)).toBeNull();
+    const current = await readState(stub);
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const stale = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: before.connectionId,
+          wrapperId: 'wr_ack',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        stale,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect(await readState(stub)).toEqual(current);
+    await stub.reportProviderGone();
+    await runInDurableObject(stub, async instance => {
+      const send = vi.fn();
+      const terminal = {
+        readyState: WebSocket.OPEN,
+        deserializeAttachment: () => ({
+          credential: null,
+          allocationId,
+          connectionId: current.connectionId,
+          wrapperId: 'wr_legacy',
+          heartbeatAck: true,
+        }),
+        send,
+      } as unknown as WebSocket;
+      await instance.webSocketMessage(
+        terminal,
+        JSON.stringify({ type: 'heartbeat', active: true, degraded: false })
+      );
+      expect(send).not.toHaveBeenCalled();
+    });
+    expect((await readState(stub)).kind).toBe('stopped');
+  });
+
+  it.each(['socket', 'allocation'] as const)(
+    'rechecks %s identity after applying a negotiated heartbeat',
+    async identity => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider);
+      await awaitStarting(provider, stub);
+      await connectAndHello(provider, stub);
+      const current = await readState(stub);
+      await runInDurableObject(stub, async instance => {
+        const attachment = {
+          credential: null,
+          allocationId: current.allocationId,
+          connectionId: current.connectionId,
+          wrapperId: current.wrapperId,
+          heartbeatAck: true,
+        };
+        const send = vi.fn();
+        const socket = {
+          readyState: WebSocket.OPEN,
+          deserializeAttachment: () => attachment,
+          send,
+        } as unknown as WebSocket;
+        const target = instance as unknown as { applyEvent(event: unknown): Promise<void> };
+        const apply = target.applyEvent.bind(instance);
+        const spy = vi.spyOn(target, 'applyEvent').mockImplementation(async event => {
+          await apply(event);
+          if (identity === 'socket') attachment.connectionId = 'superseded';
+          else await apply({ type: 'provider-gone', at: Date.now() });
+        });
+        try {
+          await instance.webSocketMessage(
+            socket,
+            JSON.stringify({ type: 'heartbeat', active: false, degraded: false })
+          );
+          expect(send).not.toHaveBeenCalled();
+        } finally {
+          spy.mockRestore();
+        }
+      });
+    }
+  );
+
   it('creates, launches and accepts a hello as connected', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
@@ -742,7 +1049,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(credential.length).toBeGreaterThan(0);
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_hello', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
     const state = await readState(stub);
     expect(state.kind).toBe('connected');
@@ -803,7 +1110,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_reconnect', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
     const state = await readState(stub);
     expect(state.kind).toBe('connected');
@@ -824,7 +1131,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await runAlarm(stub);
     await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
 
-    await setDeadline(stub, { last_frame_at: Date.now() - (5 * MINUTE + 1_000) });
+    await setDeadline(stub, { last_frame_at: Date.now() - (TIMERS.reconnectMs + 1_000) });
     await runAlarm(stub);
 
     await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
@@ -852,7 +1159,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const { credential, allocationId } = launchIdentity(provider);
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
-    const reply = await wrapper.hello({ wrapperId: 'wr_old', allocationId, protocolVersion: 1 });
+    const reply = await wrapper.hello({
+      wrapperId: 'wr_old',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION - 1,
+    });
     expect(reply).toEqual({ type: 'shutdown', reason: 'unsupported_protocol_version' });
     await expect(wrapper.waitForClose()).resolves.toBe(1008);
     expect((await readState(stub)).kind).toBe('starting');
@@ -903,7 +1214,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const replacement = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await replacement.hello({ wrapperId: 'wr_second', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     await waitFor(async () => expect((await readState(stub)).wrapperId).toBe('wr_second'));
 
     // Deliver the replaced socket's close directly, with its stale connection id.
@@ -958,6 +1269,39 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     expect(provider.leaseCalls).toHaveLength(1);
     expect((await readState(stub)).lastActivityAt).toBe(activityBefore);
+  });
+
+  it('logs a failed lease renewal without disconnecting the allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitLaunch(provider);
+    await connectAndHello(provider, stub);
+
+    await runInDurableObject(stub, async instance => {
+      const renewal = vi
+        .spyOn(provider.adapter, 'ensureLeaseAtLeast')
+        .mockRejectedValue(new Error('provider lease failed'));
+      const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        await (instance as unknown as { runLease(): Promise<void> }).runLease();
+
+        expect(withFields).toHaveBeenCalledWith(
+          expect.objectContaining({
+            diagnosticEvent: 'lease_renewal_failed',
+            allocationName: SANDBOX_ID,
+            errorName: 'Error',
+            cause: 'provider_lease_failed',
+          })
+        );
+        expect(warn).toHaveBeenCalledWith('Sandbox control diagnostic');
+        expect((await instance.getAllocationState()).kind).toBe('connected');
+      } finally {
+        renewal.mockRestore();
+        withFields.mockRestore();
+        warn.mockRestore();
+      }
+    });
   });
 
   it('persists liveness on the heartbeat, not on every event frame', async () => {
@@ -1140,7 +1484,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_early', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     state = await readState(stub);
     expect(state.kind).toBe('connected');
     expect(state.providerRef).toBe(provider.refs[0]);
@@ -1152,6 +1496,56 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     await runAlarm(stub);
     await waitFor(() => expect(provider.stopCalls).toContain(provider.refs[0]));
   });
+
+  it.each(['standard-3', 'standard-4', undefined] as const)(
+    'reports the pinned Containers instance %s without provider calls and after eviction',
+    async instance => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider, {
+        provider: 'cloudflare-containers',
+        ...(instance === undefined
+          ? {}
+          : { configuration: { provider: 'cloudflare-containers', instance } }),
+      });
+      await awaitStarting(provider, stub);
+      expect((await stub.getStatusSnapshot()).runtime).toBeUndefined();
+      await runInDurableObject(stub, (_instance, state) =>
+        state.storage.put('control_plane_owner', 'owner-1')
+      );
+      const providerCalls = [
+        vi.spyOn(provider.adapter, 'create'),
+        vi.spyOn(provider.adapter, 'launch'),
+        vi.spyOn(provider.adapter, 'observe'),
+        vi.spyOn(provider.adapter, 'stop'),
+        vi.spyOn(provider.adapter, 'ensureLeaseAtLeast'),
+        vi.spyOn(provider.adapter, 'ensureBillingAdmission'),
+      ];
+      const expectedRuntime = {
+        sandboxType: instance === 'standard-3' ? 'containers-standard-3' : 'containers-standard-4',
+        kiloCliVersion: null,
+        wrapperVersion: null,
+        startedAt: null,
+        stoppedAt: null,
+      };
+      const before = await readState(stub);
+      const alarm = await readAlarm(stub);
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        status: 'starting',
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect(await readState(stub)).toEqual(before);
+      expect(await readAlarm(stub)).toEqual(alarm);
+      for (const call of providerCalls) expect(call).not.toHaveBeenCalled();
+
+      await evictAllDurableObjects();
+      expect(await stub.getStatusSnapshot()).toMatchObject({
+        provider: 'Cloudflare Containers',
+        runtime: expectedRuntime,
+      });
+      expect((await readState(stub)).allocationId).toBe(before.allocationId);
+    }
+  );
 
   it('rebuilds its provider adapter from the stored pin after eviction', async () => {
     const provider = createFakeProvider();
@@ -1194,7 +1588,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await reconnected.hello({ wrapperId: 'wr_after_evict', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
 
     reconnected.heartbeat(true);
@@ -1210,7 +1604,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_n5', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     expect((await readState(stub)).kind).toBe('connected');
 
     await releaseGate(stub, () => provider.launchGates[0](new Error('launch failed')));
@@ -1680,6 +2074,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
                 allocationId: string;
                 connectionId: string;
                 wrapperId?: string;
+                origin?: 'peer' | 'heartbeat_timeout';
               }): Promise<void>;
             }
           ).applyEvent.bind(instance);
@@ -1695,6 +2090,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
             at: Date.now(),
             allocationId: state.allocationId,
             connectionId: 'conn-1',
+            origin: 'peer',
           });
         });
       } else {

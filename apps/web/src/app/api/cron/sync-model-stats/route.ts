@@ -10,15 +10,15 @@ import {
 import {
   getRawOpenRouterModels,
   getEnhancedOpenRouterModels,
-} from '@/lib/ai-gateway/providers/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { syncArtificialAnalysisBenchmarks } from '@/lib/model-stats/sync-artificial-analysis';
 import { syncOpenRouterModels } from '@/lib/model-stats/sync-openrouter';
 import { syncInternalUsageStats } from '@/lib/model-stats/sync-internal-data';
-import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
-import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@kilocode/web-shared/lib/config.server';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 
 /**
  * Vercel Cron Job: Sync Model Stats
@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
       return model;
     });
 
+    const monitoredModels = await getMonitoredModels();
     const preferredModelData = allModels.filter(model => monitoredModels.includes(model.id));
 
     console.log(

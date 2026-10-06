@@ -215,7 +215,6 @@
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
     "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na bonus na kredito.",
-    "creditBalanceEmpty": "Wala ka nang kredito. Para sa akawnt na ito, pinamamahalaan ang kredito sa labas ng iOS app.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Nakopya ang ID ng session",
       "couldNotCopyId": "Hindi makopya ang ID ng session.",
       "untitled": "Session na walang pamagat",
+      "actions": "Mga aksiyon sa sesyon",
       "sessionDeleted": "Nabura ang session",
       "needsInput": "naghihintay ng sagot",
       "fromPlatform": "mula sa {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Mababasa lang ang sesyong ito.",
       "continueInNewSession": "Magpatuloy sa bagong sesyon",
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
+      "emptyTranscriptDescription": "Wala pang mensahe ang sesyong ito.",
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
       "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Pumili ng modelo bago magpadala.",
       "preparingPlaceholder": "Inihahanda ang kapaligiran...",
       "finalizingPlaceholder": "Tinatapos na…",
+      "sessionLoadFailed": "Hindi ma-load ang session. Subukan munang muli.",
       "cannotReceiveFiles": "Hindi makakatanggap ng mga file ang sesyong ito. Alisin ang mga kalakip para maipadala ang mensahe mo.",
       "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang Ipadala para subukang muli.",
       "discardAttachmentsMessage": "Buburahin ang mga na-upload na file na hindi pa nagagamit.",
@@ -2635,6 +2637,7 @@
       "provider": "Tagapagbigay ng serbisyo",
       "totalCost": "Kabuuang gastos",
       "usageReflectsLatest": "Batay ang paggamit sa pinakahuling natapos na tugon ng katulong.",
+      "usageUnavailable": "Hindi available ang paggamit ng context",
       "tokenUsage": "Paggamit ng token",
       "cacheRate": "Porsyento mula sa cache",
       "modelsCount": "Mga modelo ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "I-load",
       "loadWithHost": "I-load ang {{host}}",
-      "httpsOnly": "Mga larawang mula sa HTTPS lang ang pinapayagan."
+      "httpsOnly": "Mga larawang mula sa HTTPS lang ang pinapayagan.",
+      "trustTitle": "I-load ang larawan mula sa {{host}}?",
+      "trustMessage": "Kapag pinagkatiwalaan mo ang {{host}}, maglo-load ang mga larawan nito nang hindi na nagtatanong bawat oras. Maaari mong bawiin ito mamaya sa Mga pinagkakatiwalaang host.",
+      "loadOnce": "I-load nang isang beses"
     },
     "markdownLink": {
       "invalidLink": "Hindi mabubuksan ang link na ito.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Mga host na pinapayagan mong buksan nang hindi na nagtatanong",
     "emptyTitle": "Walang pinagkakatiwalaang host",
     "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
+    "imagesSectionTitle": "Mga pinagkakatiwalaang host ng larawan",
+    "imagesSectionDescription": "Naglo-load ang mga larawan mula sa mga host na ito nang hindi na nagtatanong.",
+    "imagesSectionEmpty": "Walang pinagkakatiwalaang host ng larawan",
     "revoke": "Bawiin ang tiwala sa {{host}}",
     "revokeMessage": "Muling hihingi ng kumpirmasyon ang mga link sa host na ito.",
+    "revokeImageMessage": "Muling hihingi ng kumpirmasyon ang mga larawan mula sa host na ito.",
     "backToPreferences": "Bumalik sa mga setting"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Bagong agent",
     "approving": "Inaaprubahan...",
     "couldNotApprove": "Hindi maaprubahan",
-    "couldNotStart": "Hindi masimulan",
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Nakalag ang repo",
       "unbindFailed": "Hindi ma-unbind ang repo"
     }
+  },
+  "credits": {
+    "title": "Bumili ng kredito",
+    "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
+    "packLabel": "Magdagdag ng {{amount}} na kredito",
+    "priceUnavailable": "Hindi available ang presyo",
+    "purchased": "Naidagdag na ang kredito sa iyong balance.",
+    "empty": "Hindi available ang mga credit pack sa ngayon.",
+    "noMatchingProducts": "Walang katugmang credit pack na ibinalik ang App Store.",
+    "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
+    "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
+    "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
   }
 }

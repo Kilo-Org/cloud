@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { desc, eq, sql } from 'drizzle-orm';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { user_feedback } from '@kilocode/db/schema';
 import { FeedbackFor, FeedbackSource } from '@/lib/feedback/enums';
-import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
+import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Shared feedback submission service.

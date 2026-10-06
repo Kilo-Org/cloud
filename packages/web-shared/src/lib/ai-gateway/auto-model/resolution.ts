@@ -1,14 +1,14 @@
-import type { FeatureValue } from '@/lib/feature-detection';
+import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type {
   GatewayRequest,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type OpenAI from 'openai';
 import type { User } from '@kilocode/db';
 import type {
   OrganizationPlan,
   OrganizationSettings,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
   AUTO_SMALL_TARGET_MODELS,
@@ -21,23 +21,28 @@ import {
   FRONTIER_CODE_MODEL,
   type ResolvedAutoModel,
   ORG_AUTO_MODEL,
-} from '@/lib/ai-gateway/auto-model';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
-  autoFreeModels,
+  type AutoFreeModel,
   PRIMARY_DEFAULT_MODEL,
   selectAutoFreeCandidate,
-} from '@/lib/ai-gateway/models';
+} from '@kilocode/web-shared/lib/ai-gateway/models';
+import {
+  AUTO_FREE_FALLBACK_MODEL,
+  getConfiguredAutoFreeModels,
+  isAutoFreeEligibleModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import {
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
   validateOrganizationAutoTarget,
-} from '@/lib/organizations/organization-auto-model';
-import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model';
+import { getModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
 type ResolveAutoModelParams = {
@@ -65,32 +70,41 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
 }
 
 /**
- * Returns the candidate models for kilo-auto/free routing.
+ * Returns the eligible models for kilo-auto/free routing from the admin
+ * configuration, falling back to `openrouter/free` when nothing is
+ * configured, the configuration is invalid, or no configured model is eligible.
  *
- * Non-kilo-exclusive free models are only included when they appear in the
- * supplied `openRouterModels` list (sourced from the Redis OpenRouter models
- * cache). Kilo-exclusive free models are included when their gateway supports
- * the current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
+ * Non-kilo-exclusive free models are only eligible when they appear in the
+ * OpenRouter models cache. Kilo-exclusive free models are eligible when their
+ * gateway supports the current `apiKind`; when `apiKind` is null no API-kind
+ * filtering is applied.
  */
+async function getEligibleAutoFreeModels(
+  apiKind: GatewayRequest['kind'] | null
+): Promise<ReadonlyArray<AutoFreeModel>> {
+  const configuredModels = await getConfiguredAutoFreeModels();
+  if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
+
+  const openRouterModels = await getOpenRouterModelsFromDatabase();
+  const eligibleModels = configuredModels.filter(({ model }) => {
+    if (!isAutoFreeEligibleModelId(model)) return false;
+    if (isKiloExclusiveFreeModel(model)) {
+      const kiloModel = findKiloExclusiveModel(model);
+      return (
+        kiloModel !== null &&
+        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
+      );
+    }
+    return openRouterModels.has(model);
+  });
+  return eligibleModels.length > 0 ? eligibleModels : [AUTO_FREE_FALLBACK_MODEL];
+}
+
 export async function getAutoFreeCandidates(
   apiKind: GatewayRequest['kind'] | null
 ): Promise<ReadonlyArray<string>> {
-  const openRouterModels = await getOpenRouterModelsFromDatabase();
-  const candidates = new Set<string>();
-  for (const { model } of autoFreeModels) {
-    if (isKiloExclusiveFreeModel(model)) {
-      const kiloModel = findKiloExclusiveModel(model);
-      if (
-        kiloModel &&
-        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
-      ) {
-        candidates.add(model);
-      }
-    } else if (openRouterModels.has(model)) {
-      candidates.add(model);
-    }
-  }
-  return [...candidates].toSorted();
+  const models = await getEligibleAutoFreeModels(apiKind);
+  return models.map(({ model }) => model).toSorted();
 }
 
 type OrganizationAutoContext = {
@@ -266,27 +280,31 @@ export async function resolveAutoModel(
     return await resolveOrganizationAutoModel(params, userPromise, balancePromise);
   }
   if (model === KILO_AUTO_FREE_MODEL.id) {
-    let candidates = await getAutoFreeCandidates(apiKind);
+    let candidates = await getEligibleAutoFreeModels(apiKind);
     const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
     if (isCandidateAllowed) {
       const decisions = await Promise.all(
         candidates.map(async candidate => ({
           candidate,
-          allowed: await isCandidateAllowed(candidate),
+          allowed: await isCandidateAllowed(candidate.model),
         }))
       );
       candidates = decisions
         .filter(decision => decision.allowed)
         .map(decision => decision.candidate);
+      if (
+        candidates.length === 0 &&
+        !decisions.some(decision => decision.candidate.model === AUTO_FREE_FALLBACK_MODEL.model) &&
+        (await isCandidateAllowed(AUTO_FREE_FALLBACK_MODEL.model))
+      ) {
+        candidates = [AUTO_FREE_FALLBACK_MODEL];
+      }
     }
     if (candidates.length === 0) {
       return { kind: 'no_free_models_available' };
     }
-    const candidateIds = new Set(candidates);
     const selectedCandidate = selectAutoFreeCandidate(
-      autoFreeModels
-        .filter(candidate => candidateIds.has(candidate.model))
-        .toSorted((a, b) => a.model.localeCompare(b.model)),
+      candidates.toSorted((a, b) => a.model.localeCompare(b.model)),
       'free_routing_' + (sessionId ?? (await userPromise)?.id ?? clientIp)
     );
     return selectedCandidate

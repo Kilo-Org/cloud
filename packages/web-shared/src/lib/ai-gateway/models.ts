@@ -2,46 +2,29 @@
  * Utility functions for working with AI models
  */
 
-import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
-import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
-import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_SOL_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
+import {
+  KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FREE_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
+import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import { KIMI_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
+import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import {
+  GPT_SOL_CURRENT_MODEL_ID,
+  isOpenAiModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { GLM_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
 import type { AutoFreeModelConfig } from '@kilocode/db/schema-types';
-import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
+import { getRandomNumber } from '@kilocode/web-shared/lib/ai-gateway/getRandomNumber';
 
 export const PRIMARY_DEFAULT_MODEL = GLM_FLASH_CURRENT_MODEL_ID;
 
 export type AutoFreeModel = AutoFreeModelConfig;
-
-export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
-  {
-    model: 'stealth/space-bunny-alpha',
-    weight: 7,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'poolside/laguna-s-2.1:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'dots-studio/dots-3-note-preview:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-];
 
 export function selectAutoFreeCandidate(
   candidates: ReadonlyArray<AutoFreeModel>,
@@ -59,12 +42,7 @@ export function selectAutoFreeCandidate(
   return null;
 }
 
-export const preferredModels = [
-  KILO_AUTO_EFFICIENT_MODEL.id,
-  KILO_AUTO_FREE_MODEL.id,
-
-  ...autoFreeModels.map(({ model }) => model),
-
+const PREFERRED_PAID_MODELS = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_SOL_CURRENT_MODEL_ID,
   DEEPSEEK_V4_1_FLASH_MODEL_ID,
@@ -72,6 +50,27 @@ export const preferredModels = [
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
 ];
+
+/**
+ * The concrete models in the preferred list; auto models route elsewhere and are not monitored.
+ * The free section comes from the admin auto-free configuration, which only the server can
+ * read; use `getMonitoredModels` on the server.
+ */
+export function buildMonitoredModels(freeModels: ReadonlyArray<string>): string[] {
+  return [...new Set([...freeModels, ...PREFERRED_PAID_MODELS])];
+}
+
+/**
+ * Builds the preferred model order; use `getPreferredModels` on the server and
+ * `usePreferredModels` in client components.
+ */
+export function buildPreferredModels(freeModels: ReadonlyArray<string>): string[] {
+  return [
+    KILO_AUTO_EFFICIENT_MODEL.id,
+    KILO_AUTO_FREE_MODEL.id,
+    ...buildMonitoredModels(freeModels),
+  ];
+}
 
 export function isPdfSupportingModel(model: string): boolean {
   return (

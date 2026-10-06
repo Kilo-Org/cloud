@@ -1,0 +1,78 @@
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { User } from '@kilocode/db/schema';
+import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+
+export function defineTestUser(userData: Partial<User> = {}): User {
+  const randomUserId = `test-user-${Math.random()}`;
+  const now = new Date().toISOString();
+
+  return {
+    id: randomUserId,
+    google_user_email: `${randomUserId}@example.com`,
+    google_user_name: 'Test User',
+    google_user_image_url: 'https://example.com/avatar.png',
+    stripe_customer_id: `stripe-customer-${randomUserId}`,
+    app_store_account_token: crypto.randomUUID(),
+    hosted_domain: hosted_domain_specials.non_workspace_google_account,
+    created_at: now,
+    updated_at: now,
+    microdollars_used: 0,
+    kilo_pass_threshold: null,
+    total_microdollars_acquired: 0,
+    is_admin: false,
+    is_super_admin: false,
+    can_view_sessions: false,
+    can_manage_credits: false,
+    blocked_reason: null,
+    blocked_at: null,
+    blocked_by_kilo_user_id: null,
+    has_validation_novel_card_with_hold: false,
+    has_validation_stytch: false,
+    api_token_pepper: null,
+    web_session_pepper: null,
+    auto_top_up_enabled: false,
+    default_model: null,
+    is_bot: false,
+    kiloclaw_early_access: false,
+    next_credit_expiration_at: null,
+    cohorts: {},
+    completed_welcome_form: false,
+    linkedin_url: null,
+    github_url: null,
+    discord_server_membership_verified_at: null,
+    openrouter_upstream_safety_identifier: null,
+    openrouter_downstream_safety_identifier: null,
+    vercel_downstream_safety_identifier: null,
+    customer_source: null,
+    signup_ip: null,
+    account_deletion_requested_at: null,
+    normalized_email: null,
+    email_domain: null,
+    personal_account_disabled: false,
+    ...userData,
+  } satisfies User;
+}
+
+export async function insertTestUser(userData: Partial<User> = {}): Promise<User> {
+  const result = await db.insert(kilocode_users).values(defineTestUser(userData)).returning();
+  return result[0];
+}
+
+export async function insertTestUserAndGoogleAuth(userData: Partial<User> = {}): Promise<User> {
+  const insertedUser = await insertTestUser(userData);
+
+  await db.insert(user_auth_provider).values({
+    kilo_user_id: insertedUser.id,
+    provider: 'google',
+    provider_account_id: `google-${insertedUser.id}`,
+    email: insertedUser.google_user_email,
+    avatar_url: insertedUser.google_user_image_url,
+    hosted_domain:
+      insertedUser.hosted_domain === hosted_domain_specials.non_workspace_google_account
+        ? null
+        : insertedUser.hosted_domain,
+  });
+
+  return insertedUser;
+}

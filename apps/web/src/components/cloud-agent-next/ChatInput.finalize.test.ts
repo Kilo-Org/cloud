@@ -206,6 +206,116 @@ describe('ChatInput finalize failure', () => {
     jest.clearAllMocks();
   });
 
+  it('gates Stop on interrupt capability independently of send availability', () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const onStop = jest.fn();
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const render = (canInterrupt: boolean, disabled: boolean, withHandler = true) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend: jest.fn(async () => true),
+            onStop: withHandler ? onStop : undefined,
+            canInterrupt,
+            disabled,
+            isStreaming: true,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    const stopButton = () => {
+      const button = dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Stop response"]'
+      );
+      if (!button) throw new Error('Stop button missing');
+      return button;
+    };
+
+    try {
+      render(true, true);
+      expect(stopButton().hasAttribute('disabled')).toBe(false);
+      act(() => stopButton().click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      render(false, true);
+      expect(stopButton().hasAttribute('disabled')).toBe(true);
+      act(() => stopButton().click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      render(false, false);
+      expect(stopButton().hasAttribute('disabled')).toBe(true);
+
+      render(true, true);
+      expect(stopButton().hasAttribute('disabled')).toBe(false);
+
+      render(true, false, false);
+      expect(stopButton().hasAttribute('disabled')).toBe(true);
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+
+  it('keeps the draft editable without refocusing while submission is temporarily disabled', async () => {
+    const upload = buildMockUpload();
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+    const onSend = jest.fn<
+      (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
+    >(async () => true);
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const render = (disabled: boolean, textareaDisabled = false) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            disabled,
+            textareaDisabled,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    try {
+      render(false);
+      const textarea = dom.container.querySelector('textarea');
+      if (!textarea) throw new Error('textarea missing');
+      const focus = jest.spyOn(textarea, 'focus');
+      textarea.focus();
+      focus.mockClear();
+      act(() => setTextareaValue(dom.container, 'first draft'));
+
+      render(true);
+      expect(dom.container.querySelector('textarea')).toBe(textarea);
+      expect(textarea.hasAttribute('disabled')).toBe(false);
+      act(() => setTextareaValue(dom.container, 'continued draft'));
+      await act(async () => pressEnter(dom.container));
+      expect(textarea.value).toBe('continued draft');
+      expect(onSend).not.toHaveBeenCalled();
+      expect(upload.finalizeAttachments).not.toHaveBeenCalled();
+      expect(
+        dom.container.querySelector('button[aria-label="Send message"]')?.hasAttribute('disabled')
+      ).toBe(true);
+      expect(
+        dom.container.querySelector('button[aria-label="Attach files"]')?.hasAttribute('disabled')
+      ).toBe(true);
+
+      render(false);
+      expect(textarea.value).toBe('continued draft');
+      expect(focus).not.toHaveBeenCalled();
+      await act(async () => pressEnter(dom.container));
+      expect(onSend).toHaveBeenCalledWith('continued draft', undefined);
+
+      render(true, true);
+      expect(textarea.hasAttribute('disabled')).toBe(true);
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+
   it('shows an error toast and keeps the input value when finalizeAttachments rejects', async () => {
     const finalizeAttachments = jest.fn(async () => {
       throw new Error('link failed');

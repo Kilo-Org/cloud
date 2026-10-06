@@ -57,11 +57,14 @@ import {
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
+import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyScopedIngestRoute,
   type RuntimeCredentialProxyRoute,
 } from './kilo/runtime-credential-proxy-routes.js';
+import { forwardCloudAgentSessionScopeRequest } from './cloud-agent-session-scope-proxy.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -366,16 +369,24 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
   ]) {
     headers.delete(name);
   }
+  const attributionHeaders = new Set([
+    'x-kilocode-feature',
+    'x-kilocode-editorname',
+    'x-kilocode-mode',
+    'x-kilocode-machineid',
+    'x-kilocode-taskid',
+    'x-kilocode-projectid',
+    'x-kilocode-version',
+    'x-kilo-session',
+    'x-kilo-request',
+  ]);
   for (const name of [...headers.keys()]) {
     if (
       name.startsWith('proxy-') ||
       name.startsWith('x-forwarded-') ||
       name.startsWith('x-internal-') ||
-      name.startsWith('x-kilo-') ||
-      // Feature is attribution, not a credential: the gateway's
-      // `validateFeatureHeader` owns value validation, so forward the
-      // sandbox-supplied value like any other client instead of restoring it.
-      (name.startsWith('x-kilocode-') && name !== 'x-kilocode-feature') ||
+      ((name.startsWith('x-kilo-') || name.startsWith('x-kilocode-')) &&
+        !attributionHeaders.has(name)) ||
       name === 'forwarded' ||
       name === 'x-real-ip' ||
       name === 'x-kilocode-organizationid'
@@ -480,17 +491,30 @@ async function forwardRuntimeCredentialProxy(
   if (!credential) return c.text('Unauthorized', 401);
   const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
   if (!targets.success) return c.text('Not found', 404);
-  const upstream = runtimeCredentialProxyUpstream(
-    targets.targets,
+  const scopedUpstream = resolveRuntimeCredentialProxyScopedIngestRoute({
+    targets: targets.targets,
     route,
-    c.req.method,
-    path,
-    new URL(c.req.url).search,
-    claims.kiloSessionId,
-    credential.organizationId,
-    c.req.header('content-type'),
-    bodyText
-  );
+    method: c.req.method,
+    pathname: path,
+    search: new URL(c.req.url).search,
+    kiloSessionId: claims.kiloSessionId,
+    organizationId: credential.organizationId,
+    contentType: c.req.header('content-type'),
+    bodyText,
+  });
+  const upstream =
+    scopedUpstream ??
+    runtimeCredentialProxyUpstream(
+      targets.targets,
+      route,
+      c.req.method,
+      path,
+      new URL(c.req.url).search,
+      claims.kiloSessionId,
+      credential.organizationId,
+      c.req.header('content-type'),
+      bodyText
+    );
   if (!upstream) return c.text('Not found', 404);
   try {
     // The route allowlist is resolved above before a proof is issued.
@@ -507,10 +531,25 @@ async function forwardRuntimeCredentialProxy(
     });
     const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
     headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
-    const response = await fetch(
-      createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText),
-      { redirect: 'manual' }
-    );
+    const request = createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText);
+    const response = scopedUpstream
+      ? await forwardCloudAgentSessionScopeRequest(request, c.env, {
+          authorization: `Bearer ${credential.token}`,
+          sessionIngestScope: {
+            cloudAgentSessionId: claims.sessionId,
+            rootKiloSessionId: claims.kiloSessionId,
+          },
+          runtimeProxyAttestation: proof,
+        })
+      : await fetch(request, { redirect: 'manual' });
+    if (!response.ok) {
+      logRuntimeProxyRequestFailed({
+        upstreamAttempted: true,
+        upstreamStatus: response.status,
+        sessionId: claims.sessionId,
+        kiloSessionId: claims.kiloSessionId,
+      });
+    }
     return sanitizeRuntimeProxyResponse(response);
   } catch {
     return c.text('Upstream unavailable', 502);

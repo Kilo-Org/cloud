@@ -2,9 +2,12 @@ import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET, SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import {
+  INTERNAL_API_SECRET,
+  SESSION_INGEST_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 import { ServiceFetchTimeoutError, fetchWithinBudget } from '@/lib/bounded-service-fetch';
-import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import type { User } from '@kilocode/db/schema';
 import {

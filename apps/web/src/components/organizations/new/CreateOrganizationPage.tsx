@@ -21,7 +21,7 @@ import {
   Coins,
   type LucideIcon,
 } from 'lucide-react';
-import { OrganizationNameSchema } from '@/lib/organizations/organization-types';
+import { OrganizationNameSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useCreateOrganization } from '@/app/api/organizations/hooks';
 import { SubscriptionsSeatQuantitySchema } from '@/app/payments/subscriptions/types';

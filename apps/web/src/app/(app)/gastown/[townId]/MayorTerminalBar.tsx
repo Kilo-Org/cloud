@@ -3,7 +3,7 @@
 import { use } from 'react';
 import { TerminalBar } from '@/components/gastown/TerminalBar';
 import { useGastownUiContext } from '@/components/gastown/useGastownUiContext';
-import { GASTOWN_URL } from '@/lib/constants';
+import { GASTOWN_URL } from '@/lib/service-urls';
 
 export function MayorTerminalBar({
   params,

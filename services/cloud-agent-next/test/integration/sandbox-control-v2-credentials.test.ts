@@ -1,5 +1,5 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -22,6 +22,7 @@ import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../../src/sandbox-control/crede
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
   controlPlanePrepareInputSchema,
+  CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneCredentialSource,
   type ControlPlanePrepareInput,
   type ControlPlaneRouteSpec,
@@ -54,6 +55,8 @@ const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNam
 type FakeProvider = {
   adapter: ProviderAdapter;
   refs: string[];
+  /** Create intents, in call order, so tests can assert the resolved containment. */
+  intents: ProviderCreateIntent[];
   launchEnvs: Record<string, string>[];
   policyCalls: unknown[];
   /** Wrapper frames received at the moment each policy update was applied. */
@@ -77,6 +80,7 @@ function createFakeProvider(): FakeProvider {
   const provider: FakeProvider = {
     adapter: null as unknown as ProviderAdapter,
     refs: [],
+    intents: [],
     launchEnvs: [],
     policyCalls: [],
     policyFrameCounts: [],
@@ -91,6 +95,7 @@ function createFakeProvider(): FakeProvider {
     destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
+      provider.intents.push(intent);
       const ref = encodeCloudflareProviderRef({
         sandboxId: intent.allocationName ?? SANDBOX_ID,
         containment: true,
@@ -101,6 +106,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -281,7 +287,7 @@ async function prepareWarmRoute(
   const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
   expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
     type: 'welcome',
-    protocolVersion: 2,
+    protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
   });
   const prepareFrame = await wrapper.next();
   wrapper.send({ type: 'session.ready', sessionId: input.spec.sessionId });
@@ -374,7 +380,14 @@ async function reconstructPreB(
     for (const [key, value] of retained) await state.storage.put(key, value);
     expect(await state.storage.get('control_plane_generation')).toBe(2);
     db.insert(allocationTable).values(allocation).run();
-    db.insert(routesTable).values(snapshots).run();
+    // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
+    for (const snapshot of snapshots) {
+      db.run(
+        sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
+            VALUES (${snapshot.session_id}, ${snapshot.spec}, ${snapshot.grant}, ${snapshot.credential_source},
+                    ${snapshot.state}, ${snapshot.attempt_id}, ${snapshot.attempt_deadline_at}, ${snapshot.reason}, ${snapshot.updated_at})`
+      );
+    }
     const updates: Array<{ sessionId: string; update: ControlPlaneRouteUpdate }> = [];
     const reconstructed = new SandboxControlV2(state, instance.env);
     Object.assign(reconstructed, {
@@ -1144,11 +1157,38 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       containmentEnabled?: boolean;
+      outboundContainerId?: string;
       kilo?: { alias?: string };
     };
     // Uncontained: no alias is minted and the grant opts out of containment.
     expect(grant.containmentEnabled).toBe(false);
     expect(grant.kilo?.alias).toBeUndefined();
+    expect(grant.outboundContainerId).toBeUndefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({ kilocode: false, github: false });
+  });
+
+  it('prepares with a containment-off selection when no containment namespaces are bound', async () => {
+    // Reproduces the deployed e2e Worker: containment is off and the containment
+    // container classes are stripped from the config, so resolving a containment
+    // proxy container would throw during prepare.
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    await runInDurableObject(stub, instance => {
+      const mutableEnv = instance.env as Record<string, unknown>;
+      delete mutableEnv.SandboxContainment;
+      delete mutableEnv.SandboxSmallContainment;
+    });
+    const source = credentialsSource(SESSION, {
+      repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+    });
+
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
   });
 
   it('stays contained when the selection carries containment on', async () => {
@@ -1170,6 +1210,8 @@ describe('SandboxControlV2 credentials (B3)', () => {
     };
     expect(grant.containmentEnabled).toBeUndefined();
     expect(grant.kilo?.alias).toBeDefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({ kilocode: true, github: true });
   });
 
   it('falls back to CREDENTIAL_CONTAINMENT_ENABLED when the selection omits containment', async () => {
@@ -1184,8 +1226,18 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       containmentEnabled?: boolean;
+      outboundContainerId?: string;
     };
     expect(grant.containmentEnabled).toBe(false);
+    // Containment off must not resolve a containment proxy container, which the
+    // e2e Worker does not bind and which would otherwise throw during prepare.
+    expect(grant.outboundContainerId).toBeUndefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({
+      kilocode: false,
+      github: false,
+      worktreeScoped: true,
+    });
   });
 
   it('derives the outbound container id from a custom allocation name while stopped', async () => {
@@ -1216,7 +1268,11 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker);
 
-    const { prepareFrame } = await prepareWarmRoute(stub, provider);
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, { ...credentialsSource(SESSION), createdOnPlatform: 'code-review' })
+    );
 
     expect(prepareFrame?.type).toBe('session.prepare');
     const serialized = JSON.stringify(prepareFrame);
@@ -1227,6 +1283,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(serialized).not.toContain('"userId"');
 
     if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.createdOnPlatform).toBe('code-review');
     expect(prepareFrame.credentials?.kilo.token).toMatch(/^kcp1\./);
     expect(prepareFrame.credentials?.git?.token).toMatch(/^kcp1\./);
     expect(prepareFrame.credentials?.git?.platform).toBe('github');
@@ -1528,7 +1585,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     // No usable grant and no frame: the route leaves `ready` so the Session DO
     // fails its queued messages with the real reason instead of waiting for the
-    // 20-minute backstop.
+    // queued backstop.
     expect(result).toBe('not_ready');
     expect(await stub.status({ sessionId: SESSION })).toEqual({
       sessionId: SESSION,
@@ -1847,7 +1904,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     expect(await wrapper2.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
 
     // The failing route is marked failed; the loop still serves the sibling.

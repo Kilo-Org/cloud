@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getActiveInstance, getActiveOrgInstance } from '@/lib/kiloclaw/instance-registry';
 import {
   clearKiloClawGoogleOAuthConnection,
   getKiloClawGoogleOAuthConnection,
 } from '@/lib/kiloclaw/google-oauth-connections';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { failureResult } from '@/lib/maybe-result';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 const mockedEnsureOrganizationAccess = jest.fn();
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
 }));
 jest.mock('@/lib/kiloclaw/instance-registry');

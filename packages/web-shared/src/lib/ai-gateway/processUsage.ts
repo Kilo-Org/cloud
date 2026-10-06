@@ -8,7 +8,7 @@ import {
 } from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
-import { createTimer } from '@/lib/timer';
+import { createTimer } from '@kilocode/web-shared/lib/timer';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {
@@ -18,35 +18,38 @@ import type {
 import { fetchGeneration } from './providers/upstream-request';
 import { OPENROUTER } from './providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
-import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { hasPaymentMethod } from '@kilocode/web-shared/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
 import { and, eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
   scheduleOrganizationLowBalanceAlert,
-} from '@/lib/organizations/organization-usage';
-import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { sentryLogger } from '@/lib/utils.server';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
 } from './usage-post-commit-work';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type {
   BalanceUpdateResult,
   ChatCompletionChunk,
@@ -65,32 +68,40 @@ import type {
   UsageRecordInsertResult,
   UsageRecordWriteOutcome,
   VercelProviderMetaData,
-} from '@/lib/ai-gateway/processUsage.types';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   parseResponsesMicrodollarUsageFromStream,
   parseResponsesMicrodollarUsageFromString,
-} from '@/lib/ai-gateway/processUsage.responses';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.responses';
 import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
-} from '@/lib/ai-gateway/processUsage.messages';
-import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
-import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
+import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
+import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
   drainSseStream,
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
-} from '@/lib/ai-gateway/processUsage.shared';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
   type KiloExclusiveModel,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
-import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
-import { bouncerAccountId, reportUsageEvent } from '@/lib/bouncer/client';
+import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import {
+  normalizeJa4,
+  reportUsageEvent,
+  usageEventWireBody,
+  type UsageEvent,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
+import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
+import type { BouncerUsageEventEnqueue } from './usage-record-contract';
 
 const posthogClient = PostHogClient();
 
@@ -274,7 +285,8 @@ export async function toInsertableDbUsageRecord(
 
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
-  usageContext: MicrodollarUsageContext
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
 ): Promise<{ usageId: string; createdAt: string } | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
@@ -284,7 +296,8 @@ export async function logMicrodollarUsage(
     core,
     metadata,
     usageContext.prior_microdollar_usage,
-    usageContext.posthog_distinct_id ?? null
+    usageContext.posthog_distinct_id ?? null,
+    bouncerUsageEvent
   );
 
   // `insertUsageRecord` swallows DB errors and returns null; surface that
@@ -316,7 +329,8 @@ async function saveUsageRelatedData(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
-  posthog_distinct_id: string | null
+  posthog_distinct_id: string | null,
+  bouncer_usage_event: BouncerUsageEventEnqueue | null
 ): Promise<UsageRecordInsertResult | null> {
   if (isUSRegion()) {
     const outcome = await recordUsageInPrimaryRegion({
@@ -324,6 +338,7 @@ async function saveUsageRelatedData(
       metadata: metadataFields,
       prior_microdollar_usage,
       posthog_distinct_id,
+      bouncer_usage_event,
     });
     // On `unavailable` fall through to the local write. It is slow from here,
     // but a slow billing record beats a lost one. `recordUsageInPrimaryRegion`
@@ -335,7 +350,8 @@ async function saveUsageRelatedData(
     coreUsageFields,
     metadataFields,
     prior_microdollar_usage,
-    posthog_distinct_id
+    posthog_distinct_id,
+    bouncer_usage_event
   );
 }
 
@@ -347,7 +363,8 @@ export async function saveUsageRelatedDataLocally(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
-  posthog_distinct_id: string | null
+  posthog_distinct_id: string | null,
+  bouncer_usage_event: BouncerUsageEventEnqueue | null = null
 ): Promise<UsageRecordWriteOutcome | null> {
   // `isFirst` must be evaluated before the insert — afterwards this record is
   // itself prior usage — but the event it drives is only emitted once the insert
@@ -355,7 +372,7 @@ export async function saveUsageRelatedDataLocally(
   // transaction is still open cannot see the uncommitted row either, so it also
   // computes `isFirst`; emitting here would double-count `first_usage`.
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
-  const inserted = await insertUsageRecord(coreUsageFields, metadataFields);
+  const inserted = await insertUsageRecord(coreUsageFields, metadataFields, bouncer_usage_event);
   if (!inserted) return null;
   if (posthog_distinct_id && !inserted.wasRedelivery) {
     if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
@@ -502,7 +519,8 @@ export async function setUsageTransactionIdleTimeout(tx: UsageStatementExecutor)
 
 async function insertUsageTransaction(
   coreUsageFields: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  metadataFields: UsageMetaData,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
     await setUsageTransactionIdleTimeout(tx);
@@ -532,6 +550,15 @@ async function insertUsageTransaction(
         kiloUserId: coreUsageFields.kilo_user_id,
         organizationId: coreUsageFields.organization_id,
         createdAt: coreUsageFields.created_at,
+      });
+    }
+    // A spend-watched request's usage event commits with its billing row, so a Bouncer outage
+    // cannot lose the spend it reports. A PK collision rolls this back together with the usage.
+    if (bouncerUsageEvent) {
+      await enqueueBouncerUsageEvent(tx, {
+        requestId: bouncerUsageEvent.request_id,
+        userId: coreUsageFields.kilo_user_id,
+        payload: bouncerUsageEvent.payload,
       });
     }
     return { inserted };
@@ -668,7 +695,8 @@ async function findAlreadyRecordedUsage(
 
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  metadataFields: UsageMetaData,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
 ): Promise<UsageRecordWriteOutcome | null> {
   try {
     const result = await startSpan(
@@ -682,7 +710,7 @@ export async function insertUsageRecord(
           try {
             // This can fail if new deduplicated values are inserted simultaneously.
             // Every retry opens a fresh transaction for the usage and balance write.
-            return await insertUsageTransaction(coreUsageFields, metadataFields);
+            return await insertUsageTransaction(coreUsageFields, metadataFields, bouncerUsageEvent);
           } catch (error) {
             // A collision on this record's own id can never be resolved by
             // retrying — `id` is fixed for the delivery — so stop immediately and
@@ -1317,27 +1345,57 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  const usageRecord = await logMicrodollarUsage(usageStats, usageContext);
-  await reportBouncerUsageEvent(usageStats, usageContext);
-  return usageRecord;
+  return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
 }
 
 /**
- * Reports this request to bouncer's report-only usage ledger, after the billing
- * write so the final token counts are in hand. The client never rejects, and
- * the verdict is not read back. The prompt SimHash is computed here, off the
- * hot path.
+ * Persists a usage row and reports the same request to bouncer's usage ledger, after the billing
+ * cost is final. Chat and transcription reach it through `processTokenData`; FIM, edit,
+ * embeddings, and SystemOne call it directly.
+ *
+ * When the request's decide verdict said `spendWatch`, the usage event is enqueued in the usage
+ * write's transaction and delivered from the outbox right after commit; the cron drainer retries a
+ * failure. If no outbox row exists afterwards (the write failed, or a Frankfurt usage endpoint from
+ * before this change dropped the field), the event falls back to the best-effort send; bouncer
+ * dedupes on `requestId`, so a double send counts once. Every other request keeps the best-effort
+ * send, which never rejects.
  */
-async function reportBouncerUsageEvent(
+export async function logMicrodollarUsageAndReportToBouncer(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
-): Promise<void> {
+): Promise<{ usageId: string; createdAt: string } | null> {
+  const event = bouncerUsageEvent(usageStats, usageContext);
+  if (!event || usageContext.bouncer?.spendWatch !== true) {
+    const record = await logMicrodollarUsage(usageStats, usageContext);
+    if (event) await reportUsageEvent(event);
+    return record;
+  }
+  const record = await logMicrodollarUsage(usageStats, usageContext, {
+    request_id: event.requestId,
+    payload: usageEventWireBody(event),
+  });
+  if (!(await deliverBouncerUsageEventNow(event.requestId))) await reportUsageEvent(event);
+  return record;
+}
+
+/**
+ * This request's bouncer usage event, or null when it has no bouncer context or is an anonymous
+ * request without an IP (a telemetry gap, never a failure to serve the request). The caller
+ * computes the prompt SimHash, so the raw prompt never reaches this context.
+ */
+function bouncerUsageEvent(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): UsageEvent | null {
   const bouncer = usageContext.bouncer;
-  if (!bouncer) return;
-  await reportUsageEvent({
+  if (!bouncer) return null;
+  const fields = {
     requestId: bouncer.requestId,
     occurredAt: bouncer.occurredAt,
-    accountId: bouncerAccountId(usageContext.kiloUserId, usageContext.organizationId),
+    apiKind: usageContext.api_kind,
+    // The client fingerprint comes from the raw fraud headers already carried on
+    // this context; it is bounded here so an invalid header cannot fail the event.
+    ja4: normalizeJa4(usageContext.fraudHeaders.http_x_vercel_ja4_digest),
     inputTokens: usageStats.inputTokens,
     outputTokens: usageStats.outputTokens,
     clientAttributed: bouncer.clientAttributed,
@@ -1346,7 +1404,16 @@ async function reportBouncerUsageEvent(
     requestedLogprobs: bouncer.requestedLogprobs,
     samples: bouncer.samples,
     promptSimHash: bouncer.promptSimHash,
-  });
+    // The charged cost, after free-model and BYOK zeroing.
+    costMicrodollars: usageStats.cost_mUsd,
+  };
+  if (bouncer.accountId === null) {
+    // Anonymous usage is keyed on the IP and carries no payer key, so bouncer
+    // cannot turn it into a payer-sharing row.
+    if (bouncer.clientIp == null) return null;
+    return { ...fields, tier: 'anonymous', ip: bouncer.clientIp };
+  }
+  return { ...fields, accountId: bouncer.accountId, ip: bouncer.clientIp };
 }
 
 async function getGenerationLookupProvider(

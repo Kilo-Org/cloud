@@ -12,17 +12,17 @@ import {
   commitSignInCode,
   releaseSignInCode,
   consumeSignInCode,
-} from '@/lib/auth/magic-link-tokens';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
   findUserByNormalizedEmail,
   findUserIdByAuthProvider,
   type CreateOrUpdateUserArgs,
 } from '@/lib/user';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   checkNativeAdmission,
@@ -40,9 +40,8 @@ import {
   createDeviceSessionWithAttestedKey,
 } from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
-import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const posthogClient = PostHogClient();
 
@@ -129,10 +128,9 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   2. Provider identity verification.
  *   3. Async admission verification (BEFORE user settlement).
  *   4. User settlement (createOrUpdateUser).
- *   5. Verified-domain membership admission.
- *   6. Key persistence (after settlement, binds key to user id).
+ *   5. Key persistence (after settlement, binds key to user id).
  *
- * A passkey ticket skips steps 3, 4 and 6: the ticket is a live proof that a
+ * A passkey ticket skips steps 3, 4 and 5: the ticket is a live proof that a
  * WebAuthn assertion verified server-side, so the user exists already and no
  * account settlement or attested-key binding applies.
  *
@@ -259,7 +257,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     let verified;
     try {
       if (data.serverAuthCode) {
-        const { GOOGLE_CLIENT_ID } = await import('@/lib/config.server');
+        const { GOOGLE_CLIENT_ID } = await import('@kilocode/web-shared/lib/config.server');
         if (!data.googleClientId || data.googleClientId !== GOOGLE_CLIENT_ID) {
           return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
         }
@@ -403,10 +401,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         }
       }
 
-      // ── Step 5: Verified-domain membership admission ─────────────────
-      await ensureVerifiedDomainOrganizationMembership(result.user.id);
-
-      // ── Step 6: Persist attested key after settlement ─────────────────
+      // ── Step 5: Persist attested key after settlement ─────────────────
       // Must run BEFORE code commit so a key collision under enforce does
       // not burn the sign-in code without issuing a credential.
       let sessionId: string | undefined;
@@ -459,7 +454,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         }
       }
 
-      // ── Step 7: Consume the sign-in code AFTER key persistence ─────────
+      // ── Step 6: Consume the sign-in code AFTER key persistence ─────────
       // The code is only committed once all pre-credential gates pass, so
       // a refusal never burns a code without issuing a credential.
       const committed = await commitSignInCode(data.email, data.code, data.challengeId);
@@ -568,6 +563,10 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     return eligibilityResponse(resolvedEligibility);
   }
 
+  // ── Step 6: Persist attested key after settlement ────────────────────────
+  let sessionId: string | undefined;
+  let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
+
   if (admissionVerification) {
     // Cross-user ownership: enforce → refuse, report → log and skip persistence.
     if (
@@ -581,54 +580,47 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       // Report mode: skip key persistence, admit, and issue credentials.
       admissionVerification = undefined;
     }
-  }
 
-  // ── Step 6: Verified-domain membership admission ────────────────────────
-  await ensureVerifiedDomainOrganizationMembership(result.user.id);
-
-  // ── Step 7: Persist attested key after settlement ────────────────────────
-  let sessionId: string | undefined;
-  let refreshCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
-
-  if (admissionVerification) {
-    if (data.supportsRefresh) {
-      // Bind key persistence and session creation in one transaction.
-      try {
-        const combined = await createDeviceSessionWithAttestedKey({
-          userId: result.user.id,
-          userAgent: request.headers.get('user-agent') ?? undefined,
-          user: result.user,
-          verification: admissionVerification,
-        });
-        sessionId = combined.sessionId;
-        refreshCredentials = {
-          token: combined.token,
-          refreshToken: combined.refreshToken,
-          expiresIn: combined.expiresIn,
-        };
-      } catch (err) {
-        if (err instanceof KeyCollisionError) {
-          captureMessage('native_attested_key_cross_user_collision');
-          if (shouldRefuseAsyncFailure()) {
-            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+    if (admissionVerification) {
+      if (data.supportsRefresh) {
+        // Bind key persistence and session creation in one transaction.
+        try {
+          const combined = await createDeviceSessionWithAttestedKey({
+            userId: result.user.id,
+            userAgent: request.headers.get('user-agent') ?? undefined,
+            user: result.user,
+            verification: admissionVerification,
+          });
+          sessionId = combined.sessionId;
+          refreshCredentials = {
+            token: combined.token,
+            refreshToken: combined.refreshToken,
+            expiresIn: combined.expiresIn,
+          };
+        } catch (err) {
+          if (err instanceof KeyCollisionError) {
+            captureMessage('native_attested_key_cross_user_collision');
+            if (shouldRefuseAsyncFailure()) {
+              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+            }
+            // Report mode: log, admit, and issue credentials without binding the key.
+          } else {
+            captureMessage('native_attested_key_persist_failed_after_settlement');
           }
-          // Report mode: log, admit, and issue credentials without binding the key.
-        } else {
-          captureMessage('native_attested_key_persist_failed_after_settlement');
         }
-      }
-    } else {
-      try {
-        await persistAttestedKey(result.user.id, admissionVerification);
-      } catch (err) {
-        if (err instanceof KeyCollisionError) {
-          captureMessage('native_attested_key_cross_user_collision');
-          if (shouldRefuseAsyncFailure()) {
-            return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+      } else {
+        try {
+          await persistAttestedKey(result.user.id, admissionVerification);
+        } catch (err) {
+          if (err instanceof KeyCollisionError) {
+            captureMessage('native_attested_key_cross_user_collision');
+            if (shouldRefuseAsyncFailure()) {
+              return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+            }
+            // Report mode: log, admit, and issue credentials without binding the key.
+          } else {
+            captureMessage('native_attested_key_persist_failed_after_settlement');
           }
-          // Report mode: log, admit, and issue credentials without binding the key.
-        } else {
-          captureMessage('native_attested_key_persist_failed_after_settlement');
         }
       }
     }

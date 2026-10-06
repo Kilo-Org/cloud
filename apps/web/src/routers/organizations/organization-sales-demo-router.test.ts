@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
   credit_transactions,
@@ -16,9 +16,9 @@ import {
   sales_demo_spend_ledger,
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createSalesDemoOrganization, salesDemoMemberId } from '@/lib/organizations/sales-demo';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { User } from '@kilocode/db/schema';
 
 describe('organization sales demo reset router', () => {

@@ -1,13 +1,13 @@
 import 'server-only';
 import { z } from 'zod';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import {
   resolveOwner,
   resolveAuthorizedOwner,
   optionalOrgInput,
 } from '@/lib/integrations/resolve-owner';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import * as dolthubService from '@/lib/integrations/dolthub-service';
 

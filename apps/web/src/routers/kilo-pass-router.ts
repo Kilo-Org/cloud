@@ -1,6 +1,6 @@
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { captureException } from '@sentry/nextjs';
-import { db, readDb } from '@/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   CreditEnrollmentError,
   enrollWithCredits,
@@ -12,9 +12,12 @@ import {
   resolveKiloClawEnrollmentPriceVersion,
   type KiloClawPriceVersion,
 } from '@kilocode/db';
-import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
-import { client as stripe } from '@/lib/stripe-client';
-import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import {
+  getKiloPassStateForUser,
+  type KiloPassSubscriptionState,
+} from '@kilocode/web-shared/lib/kilo-pass/state';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
+import { getStripePriceIdForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import {
   createTopUpCheckoutSession,
@@ -25,14 +28,14 @@ import {
   type CheckoutSessionLike,
   type ServiceFeeCheckoutDependencies,
   type TopUpPriceReader,
-} from '@/lib/service-fees/checkout';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
-import { APP_URL } from '@/lib/constants';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
-  reportChargeAttempted,
+  enqueueChargeAttempted,
   ipCountryFromHeaders,
-  type ChargeAttemptContext,
-} from '@/lib/bouncer/credit-events';
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -58,7 +61,7 @@ import {
   KiloPassTier,
   KiloPassPaymentProvider,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   ImpactReferralBeneficiaryRole,
   ImpactReferralDecisionOutcome,
@@ -66,13 +69,13 @@ import {
   ImpactReferralRewardKind,
   ImpactReferralRewardStatus,
 } from '@kilocode/db/schema-types';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { and, asc, desc, eq, inArray, isNull, ne, sql, sum } from 'drizzle-orm';
 import * as z from 'zod';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { computeKiloPassBonusCreditsUsd } from '@/lib/kilo-pass/bonus-decision';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { computeKiloPassBonusCreditsUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 import { createOrReuseKiloPassCheckoutSession } from '@/lib/kilo-pass/checkout-session';
 import {
   isTerminalKiloPassScheduleStatus,
@@ -80,11 +83,14 @@ import {
   reconcileKiloPassScheduledChangeTerminalStatus,
   releaseScheduledChangeForSubscription,
 } from '@/lib/kilo-pass/scheduled-change-release';
-import { KILO_PASS_BONUS_LIKE_ITEM_KINDS, appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+import {
+  KILO_PASS_BONUS_LIKE_ITEM_KINDS,
+  appendKiloPassAuditLog,
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
-} from '@/lib/kilo-pass/constants';
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -92,9 +98,9 @@ import {
   mapStripeInvoiceToBillingHistoryEntry,
 } from '@/lib/subscriptions/subscription-center';
 import type Stripe from 'stripe';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
-import { closePauseEvent } from '@/lib/kilo-pass/pause-events';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
 import {
   getAllMobileStoreKiloPassProducts,
@@ -120,11 +126,15 @@ import { reconcileGooglePlaySubscriptionState } from '@/lib/kilo-pass/google-pla
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import {
+  assertAppStoreAccountTokenMatchesUser,
+  assertGooglePlayAccountTokenMatchesUser,
+} from '@/lib/credits/store-account-token';
+import {
   getInitialWelcomePromoContextForSubscription,
   getKiloPassWelcomePromoPolicy,
   type KiloPassWelcomePromoPolicy,
-} from '@/lib/kilo-pass/welcome-promo-context';
-import { sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const logHostingActivationInfo = sentryLogger('kilo-pass-hosting-activation', 'info');
 const logHostingActivationWarning = sentryLogger('kilo-pass-hosting-activation', 'warning');
@@ -294,52 +304,6 @@ const KILO_PASS_PENDING_REFERRAL_REWARD_STATUSES = new Set<string>([
   ImpactReferralRewardStatus.Pending,
   ImpactReferralRewardStatus.Earned,
 ]);
-
-const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
-  'App Store purchase account token does not match the signed-in user.';
-const APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
-  "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.";
-
-function assertAppStoreAccountTokenMatchesUser(params: {
-  appAccountToken: string | null;
-  userAppStoreAccountToken: string;
-}): void {
-  if (params.appAccountToken === null) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE,
-    });
-  }
-  if (params.appAccountToken !== params.userAppStoreAccountToken) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE,
-    });
-  }
-}
-
-const GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
-  'Google Play purchase account token does not match the signed-in user.';
-const GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
-  "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again.";
-
-function assertGooglePlayAccountTokenMatchesUser(params: {
-  appAccountToken: string | null;
-  userAppStoreAccountToken: string;
-}): void {
-  if (params.appAccountToken === null) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE,
-    });
-  }
-  if (params.appAccountToken !== params.userAppStoreAccountToken) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE,
-    });
-  }
-}
 
 function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
   if (error instanceof TRPCError) {
@@ -1345,9 +1309,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
-  /** Bouncer context; omitted by tests that only exercise the checkout shape. */
-  attempt?: ChargeAttemptContext;
-}): Promise<CheckoutSessionLike> {
+}): Promise<CheckoutSessionLike & { amountCents: number }> {
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
     ...params.deps,
@@ -1357,17 +1319,6 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     stripe: requireTopUpPriceReader(deps.stripe),
     priceId: params.priceId,
   });
-
-  if (params.attempt) {
-    reportChargeAttempted({
-      flow: 'kilo_pass',
-      userId: params.kiloUserId,
-      amountCents: principalMinor,
-      accountCreatedAt: params.attempt.accountCreatedAt,
-      ip: params.attempt.ip,
-      ipCountry: params.attempt.ipCountry,
-    });
-  }
 
   const prepared = await prepareTopUpCheckoutFee({
     flow: PERSONAL_KILO_PASS_CHECKOUT_FLOW,
@@ -1392,7 +1343,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   const createSession =
     deps.createSession ?? (sessionParams => stripe.checkout.sessions.create(sessionParams));
 
-  return createTopUpCheckoutSession({
+  const session = await createTopUpCheckoutSession({
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'subscription',
@@ -1421,6 +1372,8 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     createSession,
     deps,
   });
+  // Report the resolved principal explicitly; the caller enqueues it inside its transaction.
+  return { ...session, amountCents: principalMinor };
 }
 
 export type CreatePersonalKiloPassCheckoutSession = typeof createPersonalKiloPassCheckoutSession;
@@ -2989,11 +2942,20 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
-            attempt: {
-              accountCreatedAt: ctx.user.created_at,
-              ip: ctx.ip,
-              ipCountry: ipCountryFromHeaders(ctx.headersList),
-            },
+          }),
+        // Enqueue inside the checkout transaction for the charged session, created or reused. The
+        // stable id derived from the session id makes a retry or reuse idempotent.
+        onSession: (tx, session) =>
+          enqueueChargeAttempted(tx, {
+            eventId: `kilo-pass-checkout:${session.id}`,
+            flow: 'kilo_pass',
+            userId: ctx.user.id,
+            amountCents: session.amountCents ?? session.amount_total ?? 0,
+            accountCreatedAt: ctx.user.created_at,
+            accountUsedMicrodollars: ctx.user.microdollars_used,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
           }),
       });
     }),

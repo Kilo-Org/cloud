@@ -3,7 +3,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { GoogleAuth } from 'google-auth-library';
 import type { JWTInput } from 'google-auth-library';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 export const GOOGLE_PLAY_PACKAGE_NAME = 'com.kilocode.kiloapp';
 
@@ -85,6 +85,38 @@ export async function getGooglePlaySubscriptionPurchase(
   return response.data;
 }
 
+export async function getGooglePlayProductPurchase(
+  productId: string,
+  purchaseToken: string
+): Promise<androidpublisher_v3.Schema$ProductPurchase> {
+  const client = createGooglePlayAndroidPublisherClient();
+  const response = await client.purchases.products.get({
+    packageName: GOOGLE_PLAY_PACKAGE_NAME,
+    productId,
+    token: purchaseToken,
+  });
+  return response.data;
+}
+
+export async function consumeGooglePlayProductPurchase(
+  productId: string,
+  purchaseToken: string
+): Promise<void> {
+  const client = createGooglePlayAndroidPublisherClient();
+  try {
+    await client.purchases.products.consume({
+      packageName: GOOGLE_PLAY_PACKAGE_NAME,
+      productId,
+      token: purchaseToken,
+    });
+  } catch (error) {
+    // The app can consume concurrently, or the response can be lost. A purchase
+    // that is already consumed proves the consume took effect, so it is a success.
+    const current = await getGooglePlayProductPurchase(productId, purchaseToken);
+    if (current.consumptionState !== 1) throw error;
+  }
+}
+
 export async function getGooglePlaySubscriptionOrder(
   orderId: string
 ): Promise<androidpublisher_v3.Schema$Order> {
@@ -93,7 +125,7 @@ export async function getGooglePlaySubscriptionOrder(
     packageName: GOOGLE_PLAY_PACKAGE_NAME,
     orderId,
     fields:
-      'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+      'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime),oneTimePurchaseDetails(quantity))',
   });
   return response.data;
 }

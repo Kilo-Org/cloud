@@ -215,7 +215,6 @@
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
     "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} istječu {{date}}.",
-    "creditBalanceEmpty": "Nemaš više kredita. Kreditima za ovaj nalog upravlja se izvan iOS aplikacije.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovo prijaviti.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -2073,6 +2072,7 @@
       "idCopied": "ID sesije kopiran",
       "couldNotCopyId": "Kopiranje ID-a sesije nije uspjelo.",
       "untitled": "Sesija bez naslova",
+      "actions": "Radnje za sesiju",
       "sessionDeleted": "Sesija obrisana",
       "needsInput": "čeka unos",
       "fromPlatform": "sa {{platform}}",
@@ -2128,6 +2128,7 @@
       "readOnly": "Ova sesija je dostupna samo za čitanje.",
       "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Pošalji poruku u nastavku za početak.",
+      "emptyTranscriptDescription": "Ova sesija još nema poruka.",
       "scrollToBottom": "Pomjeri se na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
@@ -2603,6 +2604,7 @@
       "selectModelBeforeSending": "Odaberi model prije slanja.",
       "preparingPlaceholder": "Podešavanje okruženja...",
       "finalizingPlaceholder": "Završavanje...",
+      "sessionLoadFailed": "Sesija se nije mogla učitati. Prvo pokušajte ponovo.",
       "cannotReceiveFiles": "Ova sesija ne može primati datoteke. Ukloni priloge da pošalješ poruku.",
       "couldNotAttachFiles": "Nije moguće priložiti datoteke. Dodirni dugme za slanje da pokušaš ponovo.",
       "discardAttachmentsMessage": "Otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisane.",
@@ -2673,6 +2675,7 @@
       "provider": "Pružalac usluge",
       "totalCost": "Ukupni trošak",
       "usageReflectsLatest": "Podaci o potrošnji odnose se na posljednji dovršeni odgovor asistenta.",
+      "usageUnavailable": "Upotreba konteksta nije dostupna",
       "tokenUsage": "Potrošnja tokena",
       "cacheRate": "Udio iz predmemorije",
       "modelsCount": "Modeli ({{displayCount}})",
@@ -2709,7 +2712,10 @@
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dozvoljene su samo slike dostupne putem HTTPS-a."
+      "httpsOnly": "Dozvoljene su samo slike dostupne putem HTTPS-a.",
+      "trustTitle": "Učitati sliku sa {{host}}?",
+      "trustMessage": "Ako povjeruješ hostu {{host}}, njegove slike učitavat će se bez svakog pitanja. Kasnije to možeš povući u odjeljku Pouzdani hostovi.",
+      "loadOnce": "Učitaj jednom"
     },
     "markdownLink": {
       "invalidLink": "Ovaj link se ne može otvoriti.",
@@ -3225,8 +3231,12 @@
     "subtitle": "Hostovi čije linkove otvaraš bez potvrde",
     "emptyTitle": "Nema pouzdanih hostova",
     "emptyDescription": "Kada označiš host kao pouzdan, njegovi linkovi se otvaraju bez ponovne potvrde.",
+    "imagesSectionTitle": "Pouzdani hostovi za slike",
+    "imagesSectionDescription": "Slike s ovih hostova učitavaju se bez ponovnog pitanja.",
+    "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Povuci povjerenje za {{host}}",
     "revokeMessage": "Linkovi na ovaj host će ponovo tražiti potvrdu.",
+    "revokeImageMessage": "Slike s ovog hosta će ponovo tražiti potvrdu.",
     "backToPreferences": "Nazad na postavke"
   },
   "quickChat": {
@@ -3251,7 +3261,6 @@
     "newAgent": "Novi agent",
     "approving": "Odobrava se...",
     "couldNotApprove": "Odobravanje nije uspjelo",
-    "couldNotStart": "Pokretanje nije uspjelo",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
@@ -3491,5 +3500,17 @@
       "unboundToast": "Repo nevezan",
       "unbindFailed": "Nije moguće poništiti vezivanje repo"
     }
+  },
+  "credits": {
+    "title": "Kupi kredite",
+    "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
+    "packLabel": "Dodaj {{amount}} kredita",
+    "priceUnavailable": "Cijena nije dostupna",
+    "purchased": "Krediti su dodani na tvoj saldo.",
+    "empty": "Paketi kredita trenutno nisu dostupni.",
+    "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
+    "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
+    "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   }
 }

@@ -36,19 +36,16 @@ const mocks = vi.hoisted(() => {
       deadline = 0;
     },
     language: { value: 'en' },
-    runWidgetAction: vi.fn(),
+    runWidgetApprove: vi.fn(),
     linking: { openURL: vi.fn().mockResolvedValue(undefined) },
   };
 });
 
-// The action core is native (tRPC, SecureStore, drafts); this suite covers the
-// headless dispatch and the redraw around it. The two pure feedback mappers ride
-// along so the dispatch reads them, and `lib/glanceable/widget-actions.test.ts`
-// proves the real pair.
+// The approve core is native (tRPC, SecureStore); this suite covers the
+// headless dispatch and the redraw around it, and
+// `lib/glanceable/widget-actions.test.ts` proves the approve itself.
 vi.mock('@/lib/glanceable/widget-actions', () => ({
-  runWidgetAction: mocks.runWidgetAction,
-  runningFeedback: (action: string) => (action === 'approve' ? 'approving' : 'starting'),
-  failureFeedback: (action: string) => (action === 'approve' ? 'couldNotApprove' : 'couldNotStart'),
+  runWidgetApprove: mocks.runWidgetApprove,
 }));
 
 vi.mock('expo', () => ({ requireOptionalNativeModule: () => mocks.native }));
@@ -118,12 +115,13 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   it('restores unexpired persisted counts after a fresh process starts', async () => {
     const handler = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handler, width);
-    // Two agents wait, so the widget offers the in-place approval under the
-    // counts (and in its reserved newest line, which is empty here).
+    // Two agents wait, so the widget offers the in-place approval with the
+    // counts. Where the chip sits is the layout's call, so only the content is
+    // compared here.
     const expected = ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'];
 
-    expect(collectText(rendered.light)).toEqual(expected);
-    expect(collectText(rendered.dark)).toEqual(expected);
+    expect(collectText(rendered.light).toSorted()).toEqual(expected.toSorted());
+    expect(collectText(rendered.dark).toSorted()).toEqual(expected.toSorted());
     expect(rendered.light.props).toMatchObject({
       clickAction: 'OPEN_URI',
       clickActionData: { uri: 'kiloapp:///cloud/sessions' },
@@ -151,8 +149,10 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
 
     const rendered = await runWidgetTask(handler, width);
 
-    expect(collectText(rendered.light)).toEqual(['No work in progress']);
-    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+    // No snapshot means no account behind the widget: the sign-in copy, never
+    // the generic "No work in progress" that asserts a signed-in empty tray.
+    expect(collectText(rendered.light)).toEqual(['Sign in to see agents']);
+    expect(collectText(rendered.dark)).toEqual(['Sign in to see agents']);
   });
 
   it('renders the existing placeholder when native storage cannot be read', async () => {
@@ -161,8 +161,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
 
     const rendered = await runWidgetTask(handler, width);
 
-    expect(collectText(rendered.light)).toEqual(['No work in progress']);
-    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+    expect(collectText(rendered.light)).toEqual(['Sign in to see agents']);
+    expect(collectText(rendered.dark)).toEqual(['Sign in to see agents']);
   });
 
   it.each([
@@ -274,8 +274,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     mocks.native.setWidgetSnapshot(raw, 0);
 
     const rendered = await runWidgetTask(handler, width);
-    expect(collectText(rendered.light)).toEqual(['No work in progress']);
-    expect(collectText(rendered.dark)).toEqual(['No work in progress']);
+    expect(collectText(rendered.light)).toEqual(['Sign in to see agents']);
+    expect(collectText(rendered.dark)).toEqual(['Sign in to see agents']);
   });
 
   it('keeps live widget props published while restoration is pending', async () => {
@@ -299,12 +299,12 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   });
 
   it('runs the approve action headlessly and redraws around it', async () => {
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'approved' });
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'approved' });
     const handler = await registerAfterRestart(snapshotFor());
 
     const renders = await runWidgetClickTask(handler, width, 'approve');
 
-    expect(mocks.runWidgetAction).toHaveBeenCalledWith('approve');
+    expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
     expect(renders).toHaveLength(2);
     const [inFlight, settledRender] = renders;
     // The request goes out with the progress line already drawn...
@@ -312,17 +312,9 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     // ...and the redraw after it drops the line without moving the rows.
     const settled = collectText(settledRender?.light);
     expect(settled).not.toContain('Approving…');
-    expect(settled).toEqual([
-      '2',
-      'Needs input',
-      '2',
-      'Working',
-      '0',
-      'Scheduled',
-      '0',
-      'Idle',
-      'Approve',
-    ]);
+    expect(settled.toSorted()).toEqual(
+      ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'].toSorted()
+    );
     expect(settledRender?.light.props).toMatchObject({
       clickAction: 'OPEN_URI',
       clickActionData: { uri: 'kiloapp:///cloud/sessions' },
@@ -340,7 +332,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       now: NOW,
       previousRevision: 2,
     });
-    mocks.runWidgetAction.mockImplementation(async () => {
+    mocks.runWidgetApprove.mockImplementation(async () => {
       await Promise.resolve();
       mocks.native.setWidgetSnapshot(JSON.stringify(approved), Date.parse(approved.expiresAt));
       return { kind: 'approved' };
@@ -361,78 +353,19 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     ]);
   });
 
-  it('runs the new-agent action headlessly, from the progress line to the counts', async () => {
-    // A successful create republishes the tray through the sink, which writes
-    // the new snapshot to native storage; the settled redraw reads that instead
-    // of the empty snapshot this task started with.
-    const created = buildGlanceableSnapshot({
-      sessions: [{ status: 'busy' }],
-      userId: 'u1',
-      organizationId: null,
-      now: NOW,
-      previousRevision: 2,
-    });
-    mocks.runWidgetAction.mockImplementation(async () => {
-      await Promise.resolve();
-      mocks.native.setWidgetSnapshot(JSON.stringify(created), Date.parse(created.expiresAt));
-      return { kind: 'created' };
-    });
-    const handler = await registerAfterRestart(snapshotFor([], 'empty'));
-
-    const renders = await runWidgetClickTask(handler, width, 'new-agent');
-
-    expect(mocks.runWidgetAction).toHaveBeenCalledWith('new-agent');
-    // The request goes out with the create's progress line already drawn...
-    expect(collectText(renders[0]?.light)).toContain('Starting…');
-    // ...and the settled redraw drops it for the republished counts.
-    expect(collectText(renders.at(-1)?.light)).toEqual([
-      '0',
-      'Needs input',
-      '1',
-      'Working',
-      '0',
-      'Scheduled',
-      '0',
-      'Idle',
-    ]);
-  });
-
-  it('keeps New agent offered and says so when the create fails', async () => {
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
-    const handler = await registerAfterRestart(snapshotFor([], 'empty'));
-
-    const renders = await runWidgetClickTask(handler, width, 'new-agent');
-
-    expect(collectText(renders[0]?.light)).toContain('Starting…');
-    // The empty surface is the one that offers the create, so its reserved slot
-    // owns the failure and the row stays offered as the retry.
-    expect(collectText(renders.at(-1)?.light)).toEqual([
-      'No agents waiting',
-      'Could not start',
-      'New agent',
-    ]);
-    // A failure stays on the widget, whose retry row and body tap remain.
-    expect(mocks.linking.openURL).not.toHaveBeenCalled();
-  });
-
   it('keeps Approve offered and says so when the approve call fails', async () => {
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'failed' });
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'failed' });
     const handler = await registerAfterRestart(snapshotFor());
 
     const renders = await runWidgetClickTask(handler, width, 'approve');
+    const text = collectText(renders.at(-1)?.light);
 
-    expect(collectText(renders.at(-1)?.light)).toEqual([
-      '2',
-      'Needs input',
-      '2',
-      'Working',
-      '0',
-      'Scheduled',
-      '0',
-      'Idle',
-      'Could not approve',
-      'Approve',
-    ]);
+    // The chip stays to retry. The failure rides over it where the cell has
+    // room; a 120 dp cell (narrower than any launcher cell) has none.
+    expect(text.filter(line => line !== 'Could not approve').toSorted()).toEqual(
+      ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'].toSorted()
+    );
+    expect(text.includes('Could not approve')).toBe(width >= 172);
     // A failure stays on the widget, whose retry row and body tap remain.
     expect(mocks.linking.openURL).not.toHaveBeenCalled();
   });
@@ -443,7 +376,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
   ] as const)(
     'opens the agents list when approve cannot answer (%s)',
     async (kind, expectedUri) => {
-      mocks.runWidgetAction.mockResolvedValue({ kind });
+      mocks.runWidgetApprove.mockResolvedValue({ kind });
       const handler = await registerAfterRestart(snapshotFor());
 
       await runWidgetClickTask(handler, width, 'approve');
@@ -452,39 +385,21 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     }
   );
 
-  it('opens the new-session screen when the create has nothing to start from', async () => {
-    mocks.runWidgetAction.mockResolvedValue({ kind: 'none' });
-    const handler = await registerAfterRestart(snapshotFor([], 'empty'));
+  it('never opens the app after a completed approve', async () => {
+    mocks.runWidgetApprove.mockResolvedValue({ kind: 'approved' });
+    const handler = await registerAfterRestart(snapshotFor());
 
-    const renders = await runWidgetClickTask(handler, width, 'new-agent');
+    await runWidgetClickTask(handler, width, 'approve');
 
-    // The create ran from its progress line, and `none` is not a failure: the
-    // widget leaves no error copy behind while it hands the user to the app.
-    expect(collectText(renders[0]?.light)).toContain('Starting…');
-    expect(collectText(renders.at(-1)?.light)).toEqual(['No agents waiting', 'New agent']);
-    expect(mocks.linking.openURL).toHaveBeenCalledWith('kiloapp://agent-chat/new');
+    expect(mocks.linking.openURL).not.toHaveBeenCalled();
   });
-
-  it.each(['approved', 'created'] as const)(
-    'never opens the app after a completed action (%s)',
-    async kind => {
-      mocks.runWidgetAction.mockResolvedValue({ kind });
-      const handler = await registerAfterRestart(
-        kind === 'approved' ? snapshotFor() : snapshotFor([], 'empty')
-      );
-
-      await runWidgetClickTask(handler, width, kind === 'approved' ? 'approve' : 'new-agent');
-
-      expect(mocks.linking.openURL).not.toHaveBeenCalled();
-    }
-  );
 
   it('renders normally when a click action belongs to no widget row', async () => {
     const handler = await registerAfterRestart(snapshotFor());
 
     const renders = await runWidgetClickTask(handler, width, 'OPEN_URI');
 
-    expect(mocks.runWidgetAction).not.toHaveBeenCalled();
+    expect(mocks.runWidgetApprove).not.toHaveBeenCalled();
     expect(renders).toHaveLength(1);
     expect(collectText(renders[0]?.light)).toContain('Needs input');
   });

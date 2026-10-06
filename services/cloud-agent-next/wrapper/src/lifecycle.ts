@@ -3,11 +3,18 @@ import type { WrapperKiloClient } from './kilo-api.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
+import { createMessageId } from '../../src/shared/message-id.js';
+import { decidePublicationRecovery, PUBLICATION_RECOVERY_PROMPT } from './publication-recovery.js';
 
 const DRAIN_DELAY_MS = 250;
 export const STABLE_ROOT_IDLE_MS = 3_000;
 const SSE_TRANSPORT_TIMEOUT_MS = 15_000;
 const AUTO_COMMIT_TIMEOUT_MS = 120_000;
+// The recovery prompt submit is a local async ack. A stalled ack must fail
+// fast instead of holding the batch open until the DO no-output watchdog. This
+// bounds only the submit: once delivered, the recovery turn is sealed through
+// the normal stable-idle path and runs unbounded.
+export const PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS = 15_000;
 
 export type LifecycleConfig = {
   workspacePath: string;
@@ -19,6 +26,8 @@ export type LifecycleDependencies = {
   closeConnections: () => Promise<void>;
   isConnected: () => boolean;
   reconnectEventSubscription: () => void;
+  /** True only when the runtime config hook installed the publication tool. */
+  isGitHubReviewPublicationInstalled: () => boolean;
 };
 
 export type LifecycleManager = {
@@ -33,6 +42,7 @@ export type LifecycleManager = {
   signalCompletion: () => void;
   setAborted: () => void;
   reset: () => void;
+  resetPublicationRecoveryBudget: () => void;
   onSseEvent: () => void;
 };
 
@@ -50,6 +60,24 @@ export function createLifecycleManager(
   let drainPromise: Promise<void> | null = null;
   let lifecycleGeneration = 0;
   let postProcessingCompleted = false;
+  let publicationRecoveryBudgetUsed = false;
+  let publicationRecoveryInFlight = false;
+  let publicationRecoveryArmId = 0;
+  let publicationRecoverySubmitController: AbortController | null = null;
+
+  type PublicationRecoveryPromptOutcome = 'delivered' | 'failed' | 'superseded';
+
+  /**
+   * Invalidates the current recovery arm before aborting its submit, so the
+   * arm's catch can no longer emit an error, abort a session, or finalize on
+   * behalf of a superseded recovery. It does not touch the per-batch budget:
+   * a new admitted batch resets that separately.
+   */
+  function supersedePublicationRecovery(): void {
+    publicationRecoveryArmId += 1;
+    publicationRecoverySubmitController?.abort();
+    publicationRecoverySubmitController = null;
+  }
 
   function clearSseTransportTimer(): void {
     if (!sseTransportTimer) return;
@@ -245,6 +273,106 @@ export function createLifecycleManager(
     void drainAndClose();
   }
 
+  async function abortSessionBounded(sessionId: string): Promise<void> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+    try {
+      await deps.kiloClient.abortSession({
+        sessionId,
+        directory: config.workspacePath,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      logToFile(
+        `publication recovery abort failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  function emitPublicationRecoveryError(message: string): void {
+    state.sendToIngest({
+      streamEventType: 'error',
+      data: { error: message, fatal: false },
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  async function promptForPublication(): Promise<PublicationRecoveryPromptOutcome> {
+    const session = state.currentSession;
+    if (!session) return 'failed';
+    const controller = new AbortController();
+    publicationRecoverySubmitController = controller;
+    const armId = publicationRecoveryArmId + 1;
+    publicationRecoveryArmId = armId;
+    const isCurrentArm = () => publicationRecoveryArmId === armId;
+    const submitTimeout = setTimeout(() => {
+      if (!isCurrentArm()) return;
+      logToFile('publication check: submit timed out');
+      controller.abort();
+    }, PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS);
+    try {
+      await deps.kiloClient.sendPromptAsync({
+        sessionId: session.kiloSessionId,
+        // The synthetic recovery turn is a real Kilo message: mint the same
+        // time-sortable id admissions use so it lands in chronological order
+        // instead of sorting after every `msg_<hex>...` id.
+        messageId: createMessageId(),
+        prompt: PUBLICATION_RECOVERY_PROMPT,
+        directory: config.workspacePath,
+        signal: controller.signal,
+      });
+      logToFile('publication check: prompt sent');
+      return 'delivered';
+    } catch (error) {
+      if (!isCurrentArm()) {
+        // Superseded by reset or a new admitted batch before/while aborting the
+        // submit: never emit or abort a session on a stale arm's behalf.
+        return 'superseded';
+      }
+      logToFile(
+        `publication check: send failed${error instanceof Error ? `: ${error.message}` : ''}`
+      );
+      emitPublicationRecoveryError('Failed to send publication recovery prompt');
+      await abortSessionBounded(session.kiloSessionId);
+      // A reset or new admitted batch can supersede during the bounded abort;
+      // never seal the new batch from a stale arm.
+      return isCurrentArm() ? 'failed' : 'superseded';
+    } finally {
+      clearTimeout(submitTimeout);
+      if (publicationRecoverySubmitController === controller) {
+        publicationRecoverySubmitController = null;
+      }
+    }
+  }
+
+  async function settleIdleBatch(): Promise<void> {
+    if (publicationRecoveryInFlight) return;
+    const decision = decidePublicationRecovery({
+      configured: deps.isGitHubReviewPublicationInstalled(),
+      turnFailed: state.consumeAssistantTurnFailure(),
+      signal: state.consumePublicationSignal(),
+      budgetUsed: publicationRecoveryBudgetUsed,
+    });
+    if (decision === 'prompt' && rootIdleCandidatePresent && deps.isConnected()) {
+      publicationRecoveryBudgetUsed = true;
+      publicationRecoveryInFlight = true;
+      let outcome: PublicationRecoveryPromptOutcome;
+      try {
+        outcome = await promptForPublication();
+      } finally {
+        publicationRecoveryInFlight = false;
+      }
+      // A superseded arm must not finalize here; the new batch owns it.
+      if (outcome === 'superseded') return;
+      if (outcome === 'delivered' && deps.isConnected()) return;
+    }
+    if (state.beginFinalizing()) {
+      triggerDrainAndClose();
+    }
+  }
+
   function trySealIdleBatch(): void {
     stableIdleTimer = null;
     if (!rootIdleCandidatePresent || state.deliveryAcknowledgementsInFlight > 0) {
@@ -254,9 +382,7 @@ export function createLifecycleManager(
       armStableIdleCandidate();
       return;
     }
-    if (state.beginFinalizing()) {
-      triggerDrainAndClose();
-    }
+    void settleIdleBatch();
   }
 
   function armStableIdleCandidate(): void {
@@ -276,6 +402,7 @@ export function createLifecycleManager(
       isAborted = true;
       clearSseTransportTimer();
       clearStableIdleCandidate();
+      supersedePublicationRecovery();
     },
     onSessionIdle: () => {
       rootIdleCandidatePresent = true;
@@ -308,6 +435,7 @@ export function createLifecycleManager(
       isAborted = true;
       state.blockAdmissions();
       clearStableIdleCandidate();
+      supersedePublicationRecovery();
     },
     reset: () => {
       lifecycleGeneration += 1;
@@ -316,7 +444,16 @@ export function createLifecycleManager(
       postProcessingCompleted = false;
       postProcessingResolve = null;
       clearSseTransportTimer();
+      supersedePublicationRecovery();
+      publicationRecoveryBudgetUsed = false;
+      publicationRecoveryInFlight = false;
+      state.clearAssistantTurnFailure();
       drainPromise = null;
+    },
+    resetPublicationRecoveryBudget: () => {
+      supersedePublicationRecovery();
+      publicationRecoveryBudgetUsed = false;
+      state.clearAssistantTurnFailure();
     },
     onSseEvent: resetSseTransportTimer,
   };

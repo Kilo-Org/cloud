@@ -2,6 +2,8 @@ import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 import { billingHeartbeatSeconds } from '../container-usage.js';
+import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
+import { logger } from '../logger.js';
 import {
   CONTAINERS_INTERCEPT_CA_PATH,
   SANDBOX_INTERCEPT_HTTPS_ENABLED,
@@ -12,6 +14,7 @@ import {
   CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
 } from '../sandbox-control/container-paths.js';
+import { CONTROL_PLANE_NATIVE_LOGS_ENV } from '../shared/control-diagnostics.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { diagnosticCause, logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import {
@@ -21,6 +24,11 @@ import {
   unavailableContainersBillingAdmission,
   type ContainersBillingHost,
 } from './containers-billing.js';
+import {
+  createRepoSnapshotIndex,
+  repoSnapshotIndexKey,
+  type RepoSnapshotIndex,
+} from './repo-snapshot-index.js';
 import type { Env } from '../types.js';
 
 export type ContainerInstanceSize =
@@ -32,11 +40,23 @@ export type ContainerInstanceSize =
 
 export type ContainersState = 'idle' | 'launching' | 'running' | 'stopping';
 
+/** What a physical start used: the image, or a repository snapshot of it. */
+export type ContainersStartSource = 'image' | 'repository';
+
 export type ContainersLaunchInput = {
   allocationRef: string;
   env: Record<string, string>;
   instance: ContainerInstanceSize;
   containment?: boolean;
+  /** Keyed hash of the launch's scope, repository and env; absent means no snapshot. */
+  repoKey?: string;
+  /** Start from the image and forget the snapshot stored for `repoKey`. */
+  discardRepository?: true;
+};
+
+export type ContainersLaunchResult = {
+  started: boolean;
+  startSource: ContainersStartSource;
 };
 
 export type ContainersObservation = {
@@ -61,10 +81,20 @@ type ContainersRecord = {
   state: ContainersState;
   allocationRef: string | null;
   stopOpId: string | null;
+  // Legacy per-allocation snapshots are retained but never restored or consumed.
   lastSnapshot: { id: string; sourceAllocation: string } | null;
+  /** How this allocation's container was started; absent on a record that predates it. */
+  startSource?: ContainersStartSource;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: WrapperAttempt;
+};
+
+type ResolvedStart = {
+  source: ContainersStartSource;
+  options: ContainerStartupOptions;
+  /** Set only for a repository start, so a failed one can forget its entry. */
+  indexKey: string | null;
 };
 
 type DelayedSchedule<T> = {
@@ -90,12 +120,64 @@ function containedProcessEnv(env: Record<string, string>): Record<string, string
   };
 }
 
+const MAIN_PROCESS_SLEEP_CMDLINE = new TextEncoder().encode('sleep\0infinity');
+const MAIN_PROCESS_SUPERVISOR_CMDLINE = new TextEncoder().encode(
+  `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
+);
+
+function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+type MainProcessIdentity = 'sleep' | 'supervisor' | 'ambiguous';
+
+/**
+ * Classify PID 1 from its `/proc/1/cmdline` bytes. The two known main processes
+ * are the image default `sleep infinity` and the native supervisor entrypoint;
+ * a trailing NUL is tolerated. Timeout, non-zero, empty, and anything else is
+ * ambiguous and must fail the launch rather than guess.
+ */
+function classifyMainProcess(cmdline: Uint8Array): MainProcessIdentity {
+  const trimmed =
+    cmdline.byteLength > 0 && cmdline[cmdline.byteLength - 1] === 0
+      ? cmdline.subarray(0, cmdline.byteLength - 1)
+      : cmdline;
+  if (bytesEqual(trimmed, MAIN_PROCESS_SLEEP_CMDLINE)) return 'sleep';
+  if (bytesEqual(trimmed, MAIN_PROCESS_SUPERVISOR_CMDLINE)) return 'supervisor';
+  return 'ambiguous';
+}
+
 const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 /** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
 const WRAPPER_READINESS_POLL_MS = 1_000;
-const SNAPSHOT_TIMEOUT_MS = 10_000;
+/** Bounds one repository capture. The wrapper's own wait is a backstop over this. */
+const REPO_CAPTURE_TIMEOUT_MS = 5 * 60_000;
 const DESTROY_TIMEOUT_MS = 30_000;
+
+type RepositoryCaptureOutcome = 'stored' | 'index_unavailable' | 'abandoned' | 'failed';
+
+/**
+ * One line per capture, with how long the platform snapshot took, so the capture
+ * bound can be tuned from real durations. It carries no key, id or credential.
+ */
+function logRepositoryCapture(
+  outcome: RepositoryCaptureOutcome,
+  durationMs: number,
+  error?: unknown
+): void {
+  const fields = logger.withFields({
+    outcome,
+    durationMs,
+    ...(error === undefined ? {} : { error: error instanceof Error ? error.message : 'unknown' }),
+  });
+  if (outcome === 'stored') fields.info('Repository snapshot captured');
+  else fields.warn('Repository snapshot not saved');
+}
 const MAX_LOG_BYTES = 1024 * 1024;
 
 class WrapperExecTimeoutError extends Error {
@@ -110,6 +192,11 @@ class WrapperExecTimeoutError extends Error {
  * fulfilled value is terminal for that handle; a rejection is fenced.
  */
 type ExitState = { kind: 'pending' } | { kind: 'fulfilled' } | { kind: 'rejected'; error: unknown };
+
+/** A record that predates `startSource` was started from the image. */
+function recordedStartSource(record: ContainersRecord): ContainersStartSource {
+  return record.startSource ?? 'image';
+}
 
 function remainingMs(deadlineAt: number): number {
   return Math.max(0, deadlineAt - Date.now());
@@ -156,6 +243,20 @@ export class SandboxContainers extends DurableObject<Env> {
   private queue: Promise<unknown> = Promise.resolve();
   private billing: ContainersBilling | undefined;
   private schedules: ContainersBillingScheduler | undefined;
+  private repoSnapshots: RepoSnapshotIndex | null | undefined;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    const container = this.ctx.container;
+    if (container?.running) {
+      void this.ctx.blockConcurrencyWhile(() =>
+        container.setInactivityTimeout(
+          resolveControlPlaneTimers(this.env as { CONTROL_PLANE_TIMER_DIVISOR?: string }).sandbox
+            .providerLeaseMs
+        )
+      );
+    }
+  }
 
   private runExclusive<T>(task: () => Promise<T>): Promise<T> {
     const result = this.queue.then(task, task);
@@ -166,7 +267,7 @@ export class SandboxContainers extends DurableObject<Env> {
     return result;
   }
 
-  async launchWrapper(input: ContainersLaunchInput): Promise<{ started: boolean }> {
+  async launchWrapper(input: ContainersLaunchInput): Promise<ContainersLaunchResult> {
     return this.runExclusive(async () => {
       const ref = input.allocationRef;
       const stored = await this.readRecord();
@@ -189,26 +290,22 @@ export class SandboxContainers extends DurableObject<Env> {
     stored: ContainersRecord,
     ref: string,
     input: ContainersLaunchInput
-  ): Promise<{ started: boolean }> {
+  ): Promise<ContainersLaunchResult> {
     const sameRef = stored.allocationRef === ref;
     const phase = readWrapperAttempt(stored);
     if (stored.state === 'running' && sameRef) {
       // A pending (or unknown) phase means a bun exec may still be starting; the
       // running record must not be touched or the fence would be lost.
-      if (phase === 'exec_pending' || phase === 'unknown') return { started: false };
+      if (phase === 'exec_pending' || phase === 'unknown') {
+        return { started: false, startSource: recordedStartSource(stored) };
+      }
       await this.installLaunchInstance(stored, input.instance);
-      return { started: false };
+      return { started: false, startSource: recordedStartSource(stored) };
     }
     if (stored.state === 'launching' && sameRef) {
       if (phase === 'not_started') {
         const record = await this.installLaunchInstance(stored, input.instance);
-        return this.resumePreExecLaunch(
-          record,
-          ref,
-          input.env,
-          input.instance,
-          input.containment === true
-        );
+        return this.resumePreExecLaunch(record, ref, input);
       }
       if (phase === 'exec_pending' || phase === 'missing') {
         return this.adoptUncertainWrapper(
@@ -230,28 +327,105 @@ export class SandboxContainers extends DurableObject<Env> {
     stored: ContainersRecord,
     ref: string,
     input: ContainersLaunchInput
-  ): Promise<{ started: boolean }> {
+  ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
+    const containment = input.containment === true;
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     const record = await this.installLaunchInstance(stored, input.instance);
-    if (input.containment) await this.installContainmentProxy(container);
-    // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
+    if (containment) await this.installContainmentProxy(container);
+    const start = await this.resolveStart(input, true);
+    return this.issueNativeSupervisor(record, ref, start);
+  }
+
+  /**
+   * Issue the native supervisor as PID 1: fence, start, confirm identity, mark
+   * running. Containment is installed by the caller, which owns its ordering
+   * before any physical call.
+   */
+  private async issueNativeSupervisor(
+    record: ContainersRecord,
+    ref: string,
+    start: ResolvedStart
+  ): Promise<ContainersLaunchResult> {
+    const container = this.requiredContainer();
+    // Ownership is retained before start: an ambiguous start that takes effect
+    // must not release the allocation. Never leave `not_started` across the start.
     await this.writeRecord({
       ...record,
       state: 'launching',
       allocationRef: ref,
       stopOpId: null,
-      wrapperAttempt: 'not_started',
+      wrapperAttempt: 'exec_pending',
+      startSource: start.source,
     });
-    await this.startContainerAndActivateBilling(
-      container,
-      record,
-      this.startOptions(input.instance, record.lastSnapshot?.id)
-    );
-    await this.startWrapper(container, input.env, input.containment === true);
+    await this.runStart(start, async () => {
+      await this.startContainerAndActivateBilling(container, record, start.options);
+      await this.awaitSupervisorMainProcess(container);
+    });
     await this.writeRunning(ref, 'clear');
-    return { started: true };
+    return { started: true, startSource: start.source };
+  }
+
+  /**
+   * The one start-source rule: a physical start uses the repository snapshot for
+   * the launch's `repoKey` and this image when the index has one, and the image
+   * otherwise. `discard` forgets the stored entry first, so a start that follows a
+   * failed repository start cannot use it again.
+   */
+  private async resolveStart(
+    input: ContainersLaunchInput,
+    allowRepository: boolean
+  ): Promise<ResolvedStart> {
+    const imageStart: ResolvedStart = {
+      source: 'image',
+      options: this.startOptions(
+        input.instance,
+        this.nativeLaunchEnv(input.env, input.containment === true)
+      ),
+      indexKey: null,
+    };
+    const index = this.repoSnapshotIndex();
+    if (index === null || input.repoKey === undefined) return imageStart;
+    const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
+    if (input.discardRepository === true) {
+      await index.remove(indexKey);
+      return imageStart;
+    }
+    if (!allowRepository) return imageStart;
+    const entry = await index.lookup(indexKey);
+    if (entry === null) return imageStart;
+    return {
+      source: 'repository',
+      options: this.startOptions(
+        input.instance,
+        this.nativeLaunchEnv(input.env, input.containment === true),
+        entry.snapshotId
+      ),
+      indexKey,
+    };
+  }
+
+  /**
+   * Run a start and forget the repository snapshot it used when it fails, so a
+   * broken snapshot costs one attempt and the next start is from the image.
+   */
+  private async runStart(start: ResolvedStart, attempt: () => Promise<void>): Promise<void> {
+    try {
+      await attempt();
+    } catch (error) {
+      if (start.source === 'repository' && start.indexKey !== null) {
+        await this.repoSnapshotIndex()?.remove(start.indexKey);
+      }
+      throw error;
+    }
+  }
+
+  private repoSnapshotIndex(): RepoSnapshotIndex | null {
+    if (this.repoSnapshots === undefined) {
+      this.repoSnapshots = createRepoSnapshotIndex(this.env.REPO_SNAPSHOTS);
+    }
+    return this.repoSnapshots;
   }
 
   async observe(_allocationRef: string): Promise<ContainersObservation> {
@@ -395,12 +569,12 @@ export class SandboxContainers extends DurableObject<Env> {
         if (record.stopOpId === null) {
           await this.writeRecord({ ...record, stopOpId });
         }
-        return this.finishStop(record, ref, stopOpId);
+        return this.finishStop(record);
       }
       const stopOpId = crypto.randomUUID();
       const stopping: ContainersRecord = { ...record, state: 'stopping', stopOpId };
       await this.writeRecord(stopping);
-      return this.finishStop(stopping, ref, stopOpId);
+      return this.finishStop(stopping);
     });
   }
 
@@ -444,74 +618,102 @@ export class SandboxContainers extends DurableObject<Env> {
   }
 
   /**
-   * Resume a `not_started` launch: the wrapper exec never ran, so it is safe to
-   * start the container (when stopped) and probe before deciding. Containment is
-   * installed before any start or probe.
+   * Resume a `not_started` launch: the main process was never issued. A stopped
+   * container gets the native supervisor entrypoint; a running container is
+   * settled by PID 1 first — a verified supervisor completes issuance, the image
+   * default `sleep infinity` keeps the existing exec and broad probe.
    */
   private async resumePreExecLaunch(
     record: ContainersRecord,
     ref: string,
-    env: Record<string, string>,
-    instance: ContainerInstanceSize,
-    containment: boolean
-  ): Promise<{ started: boolean }> {
+    input: ContainersLaunchInput
+  ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
+    const containment = input.containment === true;
     if (containment) await this.installContainmentProxy(container);
-    // A stopped container is started and metered before the probe. An already
-    // running container is probed first, and billing is activated by outcome.
     if (!container.running) {
-      await this.startContainerAndActivateBilling(
-        container,
-        record,
-        this.startOptions(instance, record.lastSnapshot?.id)
-      );
+      const start = await this.resolveStart(input, record.startSource === 'repository');
+      return this.issueNativeSupervisor(record, ref, start);
     }
+    if ((await this.settleRunningMainProcess(record, ref)) === 'supervisor') {
+      return { started: true, startSource: recordedStartSource(record) };
+    }
+    // The image default `sleep infinity` still owns the container; the wrapper
+    // exec is the thing being resumed. The broad probe and the exec retry stay.
     const probe = await this.probeWrapper(container);
     if (probe === 'ambiguous') {
-      // A wrapper probe cannot confirm the running container, so activate before
-      // signalling the ambiguity rather than leaving it unmetered.
       await this.activateBillingIfRunning(container, record);
       throw new Error('Wrapper probe was ambiguous');
     }
     if (probe === 'absent') {
-      // Skip physical start when already running, but still activate billing.
-      await this.startContainerAndActivateBilling(
-        container,
-        record,
-        this.startOptions(instance, record.lastSnapshot?.id)
-      );
-      await this.startWrapper(container, env, containment);
+      // Meter the stored generation, then refuse to exec if the container stopped
+      // while the probe was in flight. Starting here would issue a native
+      // supervisor on a stopped container and race a second supervisor exec.
+      await this.activateBillingIfRunning(container, record);
+      if (container.running !== true) {
+        throw new Error('Container stopped before the wrapper exec');
+      }
+      await this.startWrapper(container, input.env, containment);
     } else {
       await this.activateBillingIfRunning(container, record);
     }
     await this.writeRunning(ref, 'clear');
-    return { started: true };
+    return { started: true, startSource: recordedStartSource(record) };
+  }
+
+  /**
+   * Settle the PID 1 identity of an already-running container. A verified
+   * supervisor completes issuance (billing + running); an ambiguous identity
+   * meters the stored generation and throws. The image default `sleep infinity`
+   * returns to the caller, which owns the sleep-path probe/exec.
+   */
+  private async settleRunningMainProcess(
+    record: ContainersRecord,
+    ref: string
+  ): Promise<'supervisor' | 'sleep'> {
+    const container = this.requiredContainer();
+    const identity = await this.readMainProcessIdentity(container);
+    if (identity === 'ambiguous') {
+      await this.activateBillingIfRunning(container, record);
+      throw new Error('Main process identity is ambiguous');
+    }
+    if (identity === 'supervisor') {
+      await this.activateBillingIfRunning(container, record);
+      await this.writeRunning(ref, 'clear');
+      return 'supervisor';
+    }
+    return 'sleep';
   }
 
   /**
    * Adopt a wrapper after a previous `launching` record whose bun exec may still
    * be in flight (pending) or may have started one (legacy). Only a physically
    * running container may be probed, and no start, bun exec or identity change is
-   * allowed. A found wrapper keeps the fence; an absent or ambiguous probe is an
-   * error, but billing is activated for the stored generation either way.
+   * allowed. A verified supervisor PID 1 already completed issuance; the image
+   * default `sleep infinity` keeps the existing broad probe. An absent or
+   * ambiguous probe is an error, but billing is activated for the stored
+   * generation either way.
    */
   private async adoptUncertainWrapper(
     stored: ContainersRecord,
     ref: string,
     containment: boolean,
     stampLegacy: boolean
-  ): Promise<{ started: boolean }> {
+  ): Promise<ContainersLaunchResult> {
     const container = this.requiredContainer();
     if (container.running !== true) {
       throw new Error('Container wrapper start is pending and the container is not running');
     }
     if (containment) await this.installContainmentProxy(container);
+    if ((await this.settleRunningMainProcess(stored, ref)) === 'supervisor') {
+      return { started: true, startSource: recordedStartSource(stored) };
+    }
     const probe = await this.probeWrapper(container);
     await this.activateBillingIfRunning(container, stored);
     if (probe === 'found') {
       // Retain the fence: a different pre-existing exec may still be starting.
       await this.writeRunning(ref, 'retain');
-      return { started: true };
+      return { started: true, startSource: recordedStartSource(stored) };
     }
     if (stampLegacy) await this.markWrapperAttempt('exec_pending');
     if (probe === 'ambiguous') throw new Error('Wrapper probe was ambiguous');
@@ -662,7 +864,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
     return this.awaitContainerCall(
       container.exec(['/bin/sh', CONTROL_SUPERVISOR_PATH], {
-        env: containment ? containedProcessEnv(env) : env,
+        env: this.nativeLaunchEnv(env, containment),
         cwd: '/',
       }),
       deadlineAt
@@ -715,13 +917,75 @@ export class SandboxContainers extends DurableObject<Env> {
 
   private startOptions(
     instance: ContainerInstanceSize,
+    env: Record<string, string>,
     snapshotId?: string
   ): ContainerStartupOptions {
-    // The runtime startup union requires image XOR containerSnapshot.
-    if (snapshotId !== undefined) {
-      return { containerSnapshot: { id: snapshotId }, instance, enableInternet: true };
+    // Native issuance: the main process is the supervisor, not the image default
+    // `sleep infinity`. The supervisor script is already in the image.
+    return {
+      ...(snapshotId === undefined
+        ? { image: this.containerImage() }
+        : { containerSnapshot: { id: snapshotId } }),
+      instance,
+      enableInternet: true,
+      entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
+      env,
+    };
+  }
+
+  /**
+   * The env for a native start and for a sleep-main-process exec. Containment CA
+   * goes on both; the stderr gate is native-only and set here, never in the
+   * shared launch-env builder.
+   */
+  private nativeLaunchEnv(
+    env: Record<string, string>,
+    containment: boolean
+  ): Record<string, string> {
+    return {
+      ...(containment ? containedProcessEnv(env) : env),
+      [CONTROL_PLANE_NATIVE_LOGS_ENV]: '1',
+    };
+  }
+
+  private async readMainProcessIdentity(container: Container): Promise<MainProcessIdentity> {
+    return this.readMainProcessIdentityWithin(container, Date.now() + PROBE_TIMEOUT_MS);
+  }
+
+  private async readMainProcessIdentityWithin(
+    container: Container,
+    deadlineAt: number
+  ): Promise<MainProcessIdentity> {
+    try {
+      const proc = await this.awaitContainerCall(
+        container.exec(['cat', '/proc/1/cmdline']),
+        deadlineAt
+      );
+      const output = await this.awaitContainerCall(proc.output(), deadlineAt);
+      if (output.exitCode !== 0) return 'ambiguous';
+      return classifyMainProcess(new Uint8Array(output.stdout));
+    } catch {
+      return 'ambiguous';
     }
-    return { image: this.containerImage(), instance, enableInternet: true };
+  }
+
+  /**
+   * Confirm the native start issued the supervisor as PID 1, bounded by the
+   * existing wrapper readiness deadline. This is identity, not a wrapper-child
+   * poll: a deadline without a match, or a container that stops first, throws
+   * and does not exec.
+   */
+  private async awaitSupervisorMainProcess(container: Container): Promise<void> {
+    const deadlineAt = Date.now() + DEADLINE_MS.wrapperReadiness;
+    for (;;) {
+      if (container.running !== true) {
+        throw new Error('Container stopped before the supervisor main process was confirmed');
+      }
+      const identity = await this.readMainProcessIdentityWithin(container, deadlineAt);
+      if (identity === 'supervisor') return;
+      if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
+      await this.sleepWithinDeadline(deadlineAt);
+    }
   }
 
   private containerImage(): string {
@@ -737,17 +1001,13 @@ export class SandboxContainers extends DurableObject<Env> {
       state: 'idle',
       allocationRef: null,
       stopOpId: null,
-      lastSnapshot: record.lastSnapshot,
+      lastSnapshot: record.lastSnapshot ?? null,
       ...(record.instance !== undefined ? { instance: record.instance } : {}),
       ...(record.billingConfigured ? { billingConfigured: true } : {}),
     };
   }
 
-  private async finishStop(
-    record: ContainersRecord,
-    ref: string,
-    stopOpId: string
-  ): Promise<'terminal' | 'retryable'> {
+  private async finishStop(record: ContainersRecord): Promise<'terminal' | 'retryable'> {
     const container = this.ctx.container;
     if (!container) {
       // A missing container only proves cleanup for a record that never reached
@@ -762,7 +1022,6 @@ export class SandboxContainers extends DurableObject<Env> {
       await this.settleBillingAtStop(record);
       return stopPath('no_container_not_started', 'terminal');
     }
-    await this.snapshotBeforeDestroy(container, ref, stopOpId);
     const destroyStartedAt = Date.now();
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
@@ -782,42 +1041,50 @@ export class SandboxContainers extends DurableObject<Env> {
     return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
   }
 
-  private async snapshotBeforeDestroy(
-    container: Container,
-    ref: string,
-    stopOpId: string
-  ): Promise<void> {
-    const attempt = container.snapshotContainer({});
+  /**
+   * Snapshot the running container's root filesystem as the repository snapshot
+   * for `repoKey` and this image. It does not take the operation queue: a capture
+   * of unknown duration must not delay a stop or a launch. The snapshot is
+   * published only while `allocationRef` is still the running allocation, and
+   * any failure is a `false` the caller may ignore; a capture never fails a start.
+   */
+  async captureRepository(
+    allocationRef: string,
+    repoKey: string,
+    commit?: string
+  ): Promise<boolean> {
+    const index = this.repoSnapshotIndex();
+    const container = this.ctx.container;
+    if (index === null || !container || container.running !== true) return false;
+    if (!(await this.isRunningAllocation(allocationRef))) return false;
+    const startedAt = Date.now();
     try {
       const snapshot = await withTimeout(
-        attempt,
-        SNAPSHOT_TIMEOUT_MS,
+        container.snapshotContainer({}),
+        REPO_CAPTURE_TIMEOUT_MS,
         'container snapshot timed out'
       );
-      await this.publishSnapshot(snapshot.id, ref, stopOpId);
+      const snapshotMs = Date.now() - startedAt;
+      if (!(await this.isRunningAllocation(allocationRef))) {
+        logRepositoryCapture('abandoned', snapshotMs);
+        return false;
+      }
+      const key = await repoSnapshotIndexKey(repoKey, this.containerImage());
+      const stored = await index.store(key, {
+        snapshotId: snapshot.id,
+        ...(commit === undefined ? {} : { commit }),
+      });
+      logRepositoryCapture(stored ? 'stored' : 'index_unavailable', snapshotMs);
+      return stored;
     } catch (error) {
-      logControlDiagnostic(
-        'container_snapshot',
-        {
-          result: 'failed',
-          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
-          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
-        },
-        'warn'
-      );
-      void attempt.then(
-        snapshot => this.runExclusive(() => this.publishSnapshot(snapshot.id, ref, stopOpId)),
-        () => undefined
-      );
+      logRepositoryCapture('failed', Date.now() - startedAt, error);
+      return false;
     }
   }
 
-  private async publishSnapshot(id: string, ref: string, stopOpId: string): Promise<void> {
+  private async isRunningAllocation(allocationRef: string): Promise<boolean> {
     const record = await this.readRecord();
-    if (record.state !== 'stopping') return;
-    if (record.allocationRef !== ref) return;
-    if (record.stopOpId !== stopOpId) return;
-    await this.writeRecord({ ...record, lastSnapshot: { id, sourceAllocation: ref } });
+    return record.state === 'running' && record.allocationRef === allocationRef;
   }
 
   private billingScheduler(): ContainersBillingScheduler {
@@ -1032,7 +1299,6 @@ export class SandboxContainers extends DurableObject<Env> {
       ...latest,
       state: 'running',
       allocationRef: ref,
-      stopOpId: null,
     };
     if (phase === 'retain') {
       next.wrapperAttempt = 'exec_pending';

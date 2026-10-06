@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   applyKiloExclusiveModelSettings,
   calculateCost_mUsd,
@@ -8,15 +8,15 @@ import {
   getInferenceProvider,
   type KiloExclusiveModel,
   type PricingTiers,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   GatewayMessagesRequest,
   GatewayRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import type { OpenRouterInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { OpenRouterInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 function makeModel(
   overrides: Partial<KiloExclusiveModel> & Pick<KiloExclusiveModel, 'internal_id'>

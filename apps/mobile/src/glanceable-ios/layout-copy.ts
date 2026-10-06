@@ -65,15 +65,10 @@ export function glanceableLayoutCopy() {
     // same copy. Approve answers the recorded ask; Open navigates to the recorded
     // session, under the key the Android notification's Open action reads, so the
     // two surfaces cannot drift. The action copy is baked, not pushed through
-    // props: the press-patch display has to show before any app push can answer
-    // it, and the gallery placeholder has no props at all. The two press lines
-    // are picked by the patch's action marker, so a New agent tap reads
-    // "Starting…" rather than the approving line the approve tap shows.
+    // props: the gallery placeholder has no props at all.
     approve: i18n.t('common.approve'),
     open: i18n.t('glanceable.openSession'),
     newAgent: i18n.t('glanceable.newAgent'),
-    approving: i18n.t('glanceable.approving'),
-    starting: i18n.t('common.starting'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };

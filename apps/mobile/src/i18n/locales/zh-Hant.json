@@ -215,7 +215,6 @@
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
     "bonusCreditsExpiring": "{{amount}} 的加贈點數將於 {{date}} 到期。",
-    "creditBalanceEmpty": "你的點數餘額已用完。此帳戶的點數須在 iOS 應用程式外管理。",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -1535,6 +1534,7 @@
       "idCopied": "工作階段 ID 已複製",
       "couldNotCopyId": "無法複製工作階段 ID。",
       "untitled": "無標題工作階段",
+      "actions": "工作階段操作",
       "sessionDeleted": "工作階段已刪除",
       "needsInput": "等待輸入",
       "fromPlatform": "來自 {{platform}}",
@@ -1587,6 +1587,7 @@
       "readOnly": "這是唯讀工作階段。",
       "continueInNewSession": "在新工作階段中繼續",
       "emptyDescription": "在下方傳送訊息，即可開始。",
+      "emptyTranscriptDescription": "這個工作階段還沒有訊息。",
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
       "renameAccessibility": "重新命名工作階段：{{title}}",
@@ -2053,6 +2054,7 @@
       "selectModelBeforeSending": "傳送前請先選取模型。",
       "preparingPlaceholder": "設定環境中…",
       "finalizingPlaceholder": "收尾中…",
+      "sessionLoadFailed": "無法載入工作階段。請先重試。",
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
       "couldNotAttachFiles": "無法附加檔案。請點一下「傳送」再試一次。",
       "discardAttachmentsMessage": "尚未附加至已傳送訊息的上傳檔案都會刪除。",
@@ -2122,6 +2124,7 @@
       "provider": "供應商",
       "totalCost": "總費用",
       "usageReflectsLatest": "這是最近一次助理回覆完成後的用量。",
+      "usageUnavailable": "上下文用量無法取得",
       "tokenUsage": "詞元用量",
       "cacheRate": "快取命中率",
       "modelsCount": "模型（{{displayCount}}）",
@@ -2156,7 +2159,10 @@
     "markdownImage": {
       "load": "載入",
       "loadWithHost": "載入 {{host}}",
-      "httpsOnly": "僅支援 HTTPS 圖片。"
+      "httpsOnly": "僅支援 HTTPS 圖片。",
+      "trustTitle": "從 {{host}} 載入圖片？",
+      "trustMessage": "信任 {{host}} 後，其圖片將不再每次詢問即可載入。你可以稍後在信任的主機中撤銷。",
+      "loadOnce": "僅載入一次"
     },
     "markdownLink": {
       "invalidLink": "此連結無法開啟。",
@@ -3182,8 +3188,12 @@
     "subtitle": "已信任的主機，開啟連結時不再詢問",
     "emptyTitle": "沒有信任的主機",
     "emptyDescription": "信任連結的主機後，開啟該主機的連結時就不會再詢問。",
+    "imagesSectionTitle": "信任的圖片主機",
+    "imagesSectionDescription": "來自這些主機的圖片將不再詢問即可載入。",
+    "imagesSectionEmpty": "沒有信任的圖片主機",
     "revoke": "撤銷對 {{host}} 的信任",
     "revokeMessage": "前往此主機的連結將再次要求確認。",
+    "revokeImageMessage": "來自此主機的圖片將再次要求確認。",
     "backToPreferences": "返回偏好設定"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "新增代理程式",
     "approving": "正在核准...",
     "couldNotApprove": "無法核准",
-    "couldNotStart": "無法開始",
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
     "openSession": "開啟",
@@ -3448,5 +3457,17 @@
       "unboundToast": "倉庫已解除綁定",
       "unbindFailed": "無法解除倉庫綁定"
     }
+  },
+  "credits": {
+    "title": "購買點數",
+    "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
+    "packLabel": "新增 {{amount}} 點數",
+    "priceUnavailable": "價格無法取得",
+    "purchased": "點數已加入你的餘額。",
+    "empty": "目前無法取得點數包。",
+    "noMatchingProducts": "App Store 未傳回相符的點數包。",
+    "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
+    "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
+    "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   }
 }

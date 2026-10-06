@@ -1435,6 +1435,48 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
     });
 
+    it.each(['preparing', 'finalizing'] as const)(
+      'allows queue sends during %s only for a resolved writable cloud transport',
+      async phase => {
+        mockSession.state.getCloudStatus.mockReturnValue({ type: phase });
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        await mgr.switchSession(kiloId('ses-1'));
+
+        expect(config.store.get(mgr.atoms.canSend)).toBe(true);
+        mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+
+        mockSessionCallbacks.onResolved?.({
+          type: 'cloud-agent',
+          kiloSessionId: kiloId('ses-1'),
+          cloudAgentSessionId: cloudAgentId('agent-1'),
+        });
+        expect(config.store.get(mgr.atoms.canSend)).toBe(true);
+        mockSession.send.mockResolvedValue(undefined);
+        expect(
+          await mgr.send({
+            payload: {
+              type: 'prompt',
+              prompt: 'Queued follow-up',
+              mode: 'code',
+              model: 'test-model',
+            },
+          })
+        ).toBe(true);
+        expect(mockSession.send).toHaveBeenCalledTimes(1);
+
+        mockSession.canSend = false;
+        mockSessionCallbacks.onTransportCapabilityChange?.();
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        mockSession.canSend = true;
+        mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+        expect(config.store.get(mgr.atoms.canSend)).toBe(false);
+        mgr.destroy();
+      }
+    );
+
     it('restores sending after a settled preparation failure without clearing its error', async () => {
       let subscriptionCallback = (): void => {
         throw new Error('Expected service state subscription callback');
@@ -1464,11 +1506,11 @@ describe('createSessionManager', () => {
 
       cloudStatus = { type: 'preparing', message: 'Setting up environment...' };
       subscriptionCallback();
-      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
 
       cloudStatus = { type: 'finalizing', message: 'Wrapping up...' };
       subscriptionCallback();
-      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
 
       cloudStatus = { type: 'error', message: 'Clone failed' };
       subscriptionCallback();
@@ -3128,6 +3170,68 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('refreshes retry details without a type transition and clears the warning on idle', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      for (const [attempt, message] of [
+        [1, 'Overloaded'],
+        [1, 'Rate limited'],
+        [2, 'Rate limited'],
+      ] as const) {
+        mockSession.state.getActivity.mockReturnValue({ type: 'retrying', attempt, message });
+        notifyStateChange?.();
+        expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+          expect.objectContaining({ type: 'warning', message: `Retrying… ${message}` })
+        );
+      }
+      const indicator = config.store.get(mgr.atoms.statusIndicator);
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toBe(indicator);
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+      mgr.destroy();
+    });
+
+    it('keeps an error indicator raised during a retry when activity returns to idle', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.state.getActivity.mockReturnValue({
+        type: 'retrying',
+        attempt: 1,
+        message: 'Overloaded',
+      });
+      notifyStateChange?.();
+      mockSession.state.getStatus.mockReturnValue({ type: 'error', message: 'Provider failed' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Provider failed' })
+      );
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Provider failed' })
+      );
+      mgr.destroy();
+    });
+
     it('clears disconnected error and indicator after the transport reconnects', async () => {
       let notifyStateChange: (() => void) | undefined;
       mockSession.state.subscribe.mockImplementation(callback => {
@@ -3592,13 +3696,264 @@ describe('createSessionManager', () => {
         mgr.atoms.childMessages
       );
 
-      // The atom must emit a new function so subscribers re-render (the
-      // live-sheet freeze path). Without reading `partsRevision`, the cached
-      // function reference is returned and this assertion fails.
+      // A changed child row must emit a new getter so the drawer's
+      // subscription re-renders. Reuse is keyed on the non-root row signature,
+      // so this child part delta forces a new function.
       expect(childMessagesAfter).not.toBe(childMessagesBefore);
       expect((childMessagesAfter('child-1')[0]?.parts[0] as TextPart | undefined)?.text).toBe(
         'hello'
       );
+    });
+
+    it('keeps the childMessages getter and child rows stable across root-row deltas', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const child = createStoredMessage('msg-child', 'child-1', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child',
+        sessionID: 'child-1',
+        messageID: child.info.id,
+        text: 'child text',
+      });
+      const root = createStoredAssistantMessage('msg-root', 'ses-root');
+      const rootPart = stubTextPart({
+        id: 'part-root',
+        sessionID: 'ses-root',
+        messageID: root.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(child.info);
+      latestStorage.upsertPart(child.info.id, childPart);
+      latestStorage.upsertMessage(root.info);
+      latestStorage.upsertPart(root.info.id, rootPart);
+
+      const before = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+
+      latestStorage.applyPartDelta(root.info.id, rootPart.id, 'text', 'lo');
+
+      const afterDelta = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(afterDelta).toBe(before);
+      expect((afterDelta('child-1')[0]?.parts[0] as TextPart | undefined)?.text).toBe('child text');
+
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-root', 'ses-root', {
+          time: { created: 1, completed: 2 },
+        }).info
+      );
+
+      const afterInfo = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(afterInfo).toBe(before);
+
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-root-2', 'ses-root').info);
+
+      const afterInsert = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(afterInsert).toBe(before);
+    });
+
+    it('keeps static rows and the completed row stable while the streaming row moves', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const completed = createStoredAssistantMessage('msg-completed', 'ses-root', {
+        time: { created: 1, completed: 2 },
+      });
+      const streaming = createStoredAssistantMessage('msg-streaming', 'ses-root');
+      const completedPart = stubTextPart({
+        id: 'part-completed',
+        sessionID: 'ses-root',
+        messageID: completed.info.id,
+        text: 'done',
+      });
+      const streamingPart = stubTextPart({
+        id: 'part-streaming',
+        sessionID: 'ses-root',
+        messageID: streaming.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(completed.info);
+      latestStorage.upsertMessage(streaming.info);
+      latestStorage.upsertPart(completed.info.id, completedPart);
+      latestStorage.upsertPart(streaming.info.id, streamingPart);
+
+      const staticBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticBefore.map(message => message.info.id)).toEqual([completed.info.id]);
+      expect(dynamicBefore.map(message => message.info.id)).toEqual([streaming.info.id]);
+
+      latestStorage.applyPartDelta(streaming.info.id, streamingPart.id, 'text', 'lo');
+
+      const staticAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticAfter).toBe(staticBefore);
+      expect(staticAfter[0]).toBe(staticBefore[0]);
+      expect(dynamicAfter).not.toBe(dynamicBefore);
+      expect((dynamicAfter[0]?.parts[0] as TextPart | undefined)?.text).toBe('hello');
+    });
+
+    it('keeps root message arrays stable across a child-only delta', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const root = createStoredAssistantMessage('msg-root', 'ses-root');
+      const rootPart = stubTextPart({
+        id: 'part-root',
+        sessionID: 'ses-root',
+        messageID: root.info.id,
+        text: 'root text',
+      });
+      const child = createStoredMessage('msg-child', 'child-1', 'assistant');
+      const childPart = stubTextPart({
+        id: 'part-child',
+        sessionID: 'child-1',
+        messageID: child.info.id,
+        text: 'hel',
+      });
+
+      latestStorage.upsertMessage(root.info);
+      latestStorage.upsertPart(root.info.id, rootPart);
+      latestStorage.upsertMessage(child.info);
+      latestStorage.upsertPart(child.info.id, childPart);
+
+      const listBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList);
+      const staticBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+
+      latestStorage.applyPartDelta(child.info.id, childPart.id, 'text', 'lo');
+
+      expect(atomValue(config.store, mgr.atoms.messagesList)).toBe(listBefore);
+      expect(atomValue(config.store, mgr.atoms.staticMessages)).toBe(staticBefore);
+      expect(atomValue(config.store, mgr.atoms.dynamicMessages)).toBe(dynamicBefore);
+    });
+
+    it('moves a completed streaming row from the dynamic tail to the static prefix', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const streaming = createStoredAssistantMessage('msg-streaming', 'ses-root');
+      latestStorage.upsertMessage(streaming.info);
+
+      const staticBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicBefore = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticBefore).toEqual([]);
+      expect(dynamicBefore.map(message => message.info.id)).toEqual([streaming.info.id]);
+
+      latestStorage.upsertMessage(
+        createStoredAssistantMessage('msg-streaming', 'ses-root', {
+          time: { created: 1, completed: 2 },
+        }).info
+      );
+
+      const staticAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages);
+      const dynamicAfter = atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages);
+      expect(staticAfter).not.toBe(staticBefore);
+      expect(staticAfter.map(message => message.info.id)).toEqual([streaming.info.id]);
+      expect(dynamicAfter).not.toBe(dynamicBefore);
+      expect(dynamicAfter).toEqual([]);
+    });
+
+    it('returns no rows for the previous root id after switching away from a root-only session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-root', 'ses-root').info);
+      const before = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(before('ses-root')).toEqual([]);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-next' });
+      });
+      await mgr.switchSession(kiloId('ses-next'));
+
+      const after = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(after).not.toBe(before);
+      expect(after('ses-root')).toEqual([]);
+    });
+
+    it('drops cleared child rows and never surfaces a cleared root row through the reused getter', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+      const child = createStoredMessage('msg-child', 'child-1', 'assistant');
+      latestStorage.upsertMessage(createStoredAssistantMessage('msg-root', 'ses-root').info);
+      latestStorage.upsertMessage(child.info);
+
+      const before = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(before('child-1').map(message => message.info.id)).toEqual(['msg-child']);
+      expect(before('ses-root')).toEqual([]);
+
+      latestStorage.clear();
+
+      const after = atomValue<(childSessionId: string) => StoredMessage[]>(
+        config.store,
+        mgr.atoms.childMessages
+      );
+      expect(after).not.toBe(before);
+      expect(after('child-1')).toEqual([]);
+      expect(after('ses-root')).toEqual([]);
     });
   });
 
@@ -4768,6 +5123,36 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
       expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('keeps Stop disabled after an acknowledged interrupt until the turn leaves retrying', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.state.getActivity.mockReturnValue({
+        type: 'retrying',
+        attempt: 1,
+        message: 'Overloaded',
+      });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(true);
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(false);
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(false);
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(true);
+      mgr.destroy();
     });
 
     it('re-enables canSend after interrupt even when session.canSend is briefly false', async () => {

@@ -98,6 +98,162 @@ beforeEach(() => {
 });
 
 describe('CloudAgentTransport event routing', () => {
+  it('suppresses activity replay again on reconnect without dropping missed chat events', async () => {
+    jest.useFakeTimers();
+    const { transport, serviceEvents, chatEvents } = createTransportWithSinks();
+    const flushMicrotasks = async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    };
+    try {
+      transport.connect();
+      await flushMicrotasks();
+      sendRaw(createEvent('connected', { sessionStatus: { type: 'busy' } }));
+      sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+      mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+      jest.advanceTimersByTime(2000);
+      await flushMicrotasks();
+      mockWs.onopen?.(new Event('open'));
+      const beforeReplay = [...serviceEvents];
+      sendRaw(
+        kilocode('session.status', {
+          sessionID: 'ses-1',
+          status: { type: 'retry', attempt: 1, message: 'Old overload', next: 5000 },
+        })
+      );
+      sendRaw(
+        kilocode('message.updated', {
+          info: {
+            id: 'missed-message',
+            sessionID: 'ses-1',
+            role: 'assistant',
+            time: { created: 1 },
+          },
+        })
+      );
+      expect(serviceEvents).toEqual(beforeReplay);
+      expect(chatEvents.at(-1)).toEqual(expect.objectContaining({ type: 'message.updated' }));
+      sendRaw(createEvent('connected', { sessionStatus: { type: 'idle' } }));
+      expect(serviceEvents.at(-1)).toEqual(
+        expect.objectContaining({
+          type: 'connected',
+          sessionStatus: { type: 'idle' },
+        })
+      );
+      sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+      expect(serviceEvents.at(-1)).toEqual({
+        type: 'session.status',
+        sessionId: 'ses-1',
+        status: { type: 'busy' },
+      });
+    } finally {
+      transport.destroy();
+      jest.useRealTimers();
+    }
+  });
+
+  it('suppresses historical activity until the authoritative connected snapshot and keeps live updates', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    const initialEvents = [...serviceEvents];
+    for (const status of [
+      { type: 'busy' },
+      { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
+      { type: 'idle' },
+    ]) {
+      sendRaw(kilocode('session.status', { sessionID: 'ses-1', status }));
+    }
+    expect(serviceEvents).toEqual(initialEvents);
+    sendRaw(
+      createEvent('connected', {
+        sessionStatus: { type: 'retry', attempt: 2, message: 'Current retry', next: 5000 },
+      })
+    );
+    expect(serviceEvents.at(-1)).toEqual(
+      expect.objectContaining({
+        type: 'connected',
+        sessionStatus: { type: 'retry', attempt: 2, message: 'Current retry', next: 5000 },
+      })
+    );
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
+    expect(serviceEvents.at(-1)).toEqual({
+      type: 'session.status',
+      sessionId: 'ses-1',
+      status: { type: 'idle' },
+    });
+    transport.destroy();
+  });
+
+  it('applies only the latest replayed status per session when connected omits sessionStatus', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    const initialEvents = [...serviceEvents];
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    sendRaw(kilocode('session.status', { sessionID: 'child-1', status: { type: 'busy' } }));
+    sendRaw(
+      kilocode('session.status', {
+        sessionID: 'ses-1',
+        status: { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
+      })
+    );
+    expect(serviceEvents).toEqual(initialEvents);
+
+    sendRaw(createEvent('connected', {}));
+    expect(serviceEvents.slice(initialEvents.length)).toEqual([
+      expect.objectContaining({ type: 'connected' }),
+      {
+        type: 'session.status',
+        sessionId: 'ses-1',
+        status: { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
+      },
+      { type: 'session.status', sessionId: 'child-1', status: { type: 'busy' } },
+    ]);
+    transport.destroy();
+  });
+
+  it('prefers the connected root status over replayed root status but keeps child status', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    const initialEvents = [...serviceEvents];
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    sendRaw(kilocode('session.status', { sessionID: 'child-1', status: { type: 'idle' } }));
+
+    sendRaw(createEvent('connected', { sessionStatus: { type: 'idle' } }));
+    expect(serviceEvents.slice(initialEvents.length)).toEqual([
+      expect.objectContaining({ type: 'connected', sessionStatus: { type: 'idle' } }),
+      { type: 'session.status', sessionId: 'child-1', status: { type: 'idle' } },
+    ]);
+    transport.destroy();
+  });
+
+  it.each([
+    ['question.asked', { id: 'request-1' }],
+    ['question.replied', { requestID: 'request-1' }],
+    ['question.rejected', { requestID: 'request-1' }],
+    ['permission.asked', { id: 'request-1', permission: 'bash' }],
+    ['permission.replied', { requestID: 'request-1' }],
+  ])(
+    'suppresses historical %s until connected, then delivers current interactions',
+    async (type, properties) => {
+      const { transport, serviceEvents } = createTransportWithSinks();
+      transport.connect();
+      await flushPromises();
+      const previousEvents = [...serviceEvents];
+
+      sendRaw(kilocode(type, properties));
+      expect(serviceEvents).toEqual(previousEvents);
+
+      sendRaw(createEvent('connected', {}));
+      sendRaw(kilocode(type, properties));
+      expect(serviceEvents.at(-1)).toEqual(
+        expect.objectContaining({ type, requestId: 'request-1' })
+      );
+      transport.destroy();
+    }
+  );
+
   it('routes chat events to onChatEvent', async () => {
     const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
 
@@ -127,6 +283,7 @@ describe('CloudAgentTransport event routing', () => {
 
     transport.connect();
     await flushPromises();
+    sendRaw(createEvent('connected', {}));
     sendRaw(
       kilocode('session.status', {
         sessionID: 'ses-1',
@@ -134,9 +291,9 @@ describe('CloudAgentTransport event routing', () => {
       })
     );
 
-    expect(serviceEvents).toHaveLength(2);
+    expect(serviceEvents).toHaveLength(3);
     expect(serviceEvents[0]).toEqual(expect.objectContaining({ type: 'session.created' }));
-    expect(serviceEvents[1]).toEqual(expect.objectContaining({ type: 'session.status' }));
+    expect(serviceEvents[2]).toEqual(expect.objectContaining({ type: 'session.status' }));
     expect(chatEvents).toHaveLength(0);
 
     transport.destroy();
@@ -211,6 +368,7 @@ describe('CloudAgentTransport event routing', () => {
 
     transport.connect();
     await flushPromises();
+    sendRaw(createEvent('connected', {}));
 
     sendRaw(
       kilocode('message.updated', {
@@ -244,9 +402,9 @@ describe('CloudAgentTransport event routing', () => {
     expect(chatEvents[0]).toEqual(expect.objectContaining({ type: 'message.updated' }));
     expect(chatEvents[1]).toEqual(expect.objectContaining({ type: 'message.part.delta' }));
 
-    expect(serviceEvents).toHaveLength(2);
+    expect(serviceEvents).toHaveLength(3);
     expect(serviceEvents[0]).toEqual(expect.objectContaining({ type: 'session.created' }));
-    expect(serviceEvents[1]).toEqual(expect.objectContaining({ type: 'session.status' }));
+    expect(serviceEvents[2]).toEqual(expect.objectContaining({ type: 'session.status' }));
 
     transport.destroy();
   });
@@ -367,13 +525,14 @@ describe('CloudAgentTransport ticket handling', () => {
 
     expect(webSocketConstructor).toHaveBeenCalled();
 
+    sendRaw(createEvent('connected', {}));
     sendRaw(
       kilocode('session.status', {
         sessionID: 'ses-1',
         status: { type: 'busy' },
       })
     );
-    expect(serviceEvents).toHaveLength(2);
+    expect(serviceEvents).toHaveLength(3);
 
     transport.destroy();
   });
@@ -628,6 +787,36 @@ describe('CloudAgentTransport command delegation', () => {
 });
 
 describe('CloudAgentTransport snapshot refetch on reconnect', () => {
+  it('does not resurrect answered questions during reconnect replay', async () => {
+    jest.useFakeTimers();
+    const { transport, serviceEvents } = createTransportWithSinks();
+    try {
+      transport.connect();
+      await flushMicrotasks();
+      sendRaw(createEvent('connected', {}));
+      sendRaw(kilocode('question.asked', { id: 'answered-question' }));
+      sendRaw(kilocode('question.replied', { requestID: 'answered-question' }));
+
+      const reconnectedWs = await simulateReconnect(
+        kilocode('question.asked', { id: 'answered-question' })
+      );
+      expect(serviceEvents.filter(event => event.type === 'question.asked')).toHaveLength(1);
+      sendRawOn(reconnectedWs, kilocode('question.replied', { requestID: 'answered-question' }));
+      expect(serviceEvents.filter(event => event.type === 'question.replied')).toHaveLength(1);
+
+      sendRawOn(reconnectedWs, createEvent('connected', {}));
+      sendRawOn(reconnectedWs, kilocode('question.asked', { id: 'pending-question' }));
+      expect(serviceEvents.at(-1)).toEqual({
+        type: 'question.asked',
+        requestId: 'pending-question',
+        questions: undefined,
+      });
+    } finally {
+      transport.destroy();
+      jest.useRealTimers();
+    }
+  });
+
   // Microtask-based flush that works under jest.useFakeTimers()
   // (unlike flushPromises which uses setTimeout and hangs with fake timers)
   async function flushMicrotasks(): Promise<void> {
@@ -1321,6 +1510,7 @@ describe('CloudAgentTransport page-seam', () => {
       const wsUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
       expect(wsUrl).toContain('fromId=0');
 
+      sendRaw(createEvent('connected', {}));
       const serviceCountBefore = serviceEvents.length;
 
       // Simulate the DO replaying events 1–10 (fromId=0 replays everything).
@@ -1369,10 +1559,6 @@ describe('CloudAgentTransport page-seam', () => {
 });
 
 describe('CloudAgentTransport event delivery and replay cursor', () => {
-  /**
-   * Create a session.status event with an explicit eventId and a valid
-   * session status shape. Count-based tests verify which IDs were delivered.
-   */
   function eventWithId(eventId: number): CloudAgentEvent {
     return {
       eventId,
@@ -1381,8 +1567,8 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
       streamEventType: 'kilocode',
       timestamp: new Date().toISOString(),
       data: {
-        type: 'session.status',
-        properties: { sessionID: 'ses-1', status: { type: 'busy' } },
+        type: 'session.error',
+        properties: { sessionID: 'ses-1', error: 'test error' },
       },
     };
   }
@@ -1598,6 +1784,7 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
       transport.connect();
       await flushMicrotasks();
 
+      sendRaw(createEvent('connected', {}));
       for (let id = 1; id <= 5; id++) {
         sendRaw(eventWithObservedId(id));
       }
@@ -1615,6 +1802,7 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
       // upserts can reuse older ids with newer payloads.
       const newMockWs = webSocketConstructor.mock.results.at(-1)?.value as MockWebSocket;
       newMockWs.onopen?.(new Event('open'));
+      newMockWs.onmessage?.({ data: JSON.stringify(createEvent('connected', {})) } as MessageEvent);
       for (let id = 3; id <= 8; id++) {
         newMockWs.onmessage?.({
           data: JSON.stringify(eventWithObservedId(id)),

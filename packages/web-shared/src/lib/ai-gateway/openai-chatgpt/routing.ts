@@ -1,14 +1,14 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
   findKiloExclusiveModel,
   isDisabledKiloExclusiveModel,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { isGptOssModel } from '@/lib/ai-gateway/providers/openai';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import type {
   GatewayRequest,
   GatewayResponsesRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
 import {
   getOpenAiChatGptStoredConnection,
@@ -64,7 +64,7 @@ const METADATA_VALUE_LIMIT = 512;
  * and is omitted when absent. When the merge would exceed the entry limit the
  * caller's oldest entries are dropped before the required ones.
  */
-function withTraceabilityMetadata(
+export function withTraceabilityMetadata(
   metadata: Record<string, string> | null | undefined,
   sessionId: string | null
 ): Record<string, string> {

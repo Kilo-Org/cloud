@@ -3,13 +3,13 @@ import 'server-only';
 import { kilo_pass_issuances } from '@kilocode/db/schema';
 import { asc, eq } from 'drizzle-orm';
 
-import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
+import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassPaymentProvider,
   type KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
-import { KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT } from '@/lib/kilo-pass/constants';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;

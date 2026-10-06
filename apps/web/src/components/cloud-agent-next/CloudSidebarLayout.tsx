@@ -68,6 +68,7 @@ import {
   getNextOpenChatSessionId,
   getOpenWorktreeChatSessionIds,
 } from './worktree-chat-tabs';
+import type { ComposerFocusRequest } from './useSessionComposerFocus';
 
 // Context for children to toggle the mobile sidebar sheet
 type WorktreeChatTabs = {
@@ -77,6 +78,7 @@ type WorktreeChatTabs = {
   openWorktreeChats: StoredSession[];
   closedWorktreeChats: StoredSession[];
   openSession: (sessionId: string) => void;
+  composerFocusRequest: ComposerFocusRequest | null;
   closeSession: (sessionId: string) => void;
   renameSession: (sessionId: string, title: string) => Promise<void>;
   deletingSessionIds: string[];
@@ -103,6 +105,7 @@ const SidebarLayoutContext = createContext<SidebarLayoutContextValue>({
   openWorktreeChats: [],
   closedWorktreeChats: [],
   openSession: () => {},
+  composerFocusRequest: null,
   closeSession: () => {},
   renameSession: async () => {},
   deletingSessionIds: [],
@@ -128,6 +131,7 @@ export function useWorktreeChatTabs(): WorktreeChatTabs {
     openWorktreeChats,
     closedWorktreeChats,
     openSession,
+    composerFocusRequest,
     closeSession,
     renameSession,
     deletingSessionIds,
@@ -139,6 +143,7 @@ export function useWorktreeChatTabs(): WorktreeChatTabs {
     openWorktreeChats,
     closedWorktreeChats,
     openSession,
+    composerFocusRequest,
     closeSession,
     renameSession,
     deletingSessionIds,
@@ -196,6 +201,9 @@ export function CloudSidebarLayout({
     initializeWithValue: false,
   });
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [composerFocusRequest, setComposerFocusRequest] = useState<ComposerFocusRequest | null>(
+    null
+  );
   const [sessionPendingDeletion, setSessionPendingDeletion] = useState<string>();
   const [worktreePendingDeletion, setWorktreePendingDeletion] = useState<string>();
   const [deletingWorktreeId, setDeletingWorktreeId] = useState<string>();
@@ -221,13 +229,25 @@ export function CloudSidebarLayout({
     });
   }, [platformFilter]);
 
+  const folderWorktreeIds = useMemo(
+    () => workspaceFolders.folders.flatMap(folder => folder.worktreeIds),
+    [workspaceFolders.folders]
+  );
   const { sessions, cachedSessions, worktreeDetails, refetchSessions, renameSessionLocally } =
     useSidebarSessions({
       organizationId: organizationId ?? null,
       searchQuery,
       createdOnPlatform,
       gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
+      folderWorktreeIds,
     });
+  const sidebarWorkspaceFolders = {
+    ...workspaceFolders,
+    refresh: async () => {
+      refetchSessions();
+      await workspaceFolders.refresh();
+    },
+  };
   const foregroundSessionStatus = useMemo(
     () =>
       deriveForegroundSessionStatus({
@@ -428,6 +448,21 @@ export function CloudSidebarLayout({
       setMobileSheetOpen(false);
     },
     [openChatTab, organizationId, pathname, router]
+  );
+
+  const selectSession = useCallback(
+    (sessionId: string) => {
+      if (sessionId !== currentSessionId) {
+        const request: ComposerFocusRequest = {
+          sessionId,
+          onHandled: () =>
+            setComposerFocusRequest(current => (current === request ? null : current)),
+        };
+        setComposerFocusRequest(request);
+      }
+      openSession(sessionId);
+    },
+    [currentSessionId, openSession]
   );
 
   const openWorktree = useCallback(
@@ -674,7 +709,8 @@ export function CloudSidebarLayout({
         worktreeChats,
         openWorktreeChats,
         closedWorktreeChats,
-        openSession,
+        openSession: selectSession,
+        composerFocusRequest,
         closeSession,
         renameSession: handleRenameSession,
         deletingSessionIds,
@@ -695,11 +731,11 @@ export function CloudSidebarLayout({
             </SheetHeader>
             <ChatSidebar
               key={`mobile:${currentUserId}:${organizationId ?? 'personal'}`}
-              workspaceFolders={workspaceFolders}
+              workspaceFolders={sidebarWorkspaceFolders}
               sessions={sidebarSessions}
               currentSessionId={currentSessionId}
               selectedWorktreeId={selectedWorktreeId}
-              onOpenSession={openSession}
+              onOpenSession={selectSession}
               organizationId={organizationId}
               onDeleteSession={setSessionPendingDeletion}
               onRenameSession={handleRenameSession}
@@ -729,11 +765,11 @@ export function CloudSidebarLayout({
         <div className="hidden w-80 shrink-0 border-r lg:block">
           <ChatSidebar
             key={`desktop:${currentUserId}:${organizationId ?? 'personal'}`}
-            workspaceFolders={workspaceFolders}
+            workspaceFolders={sidebarWorkspaceFolders}
             sessions={sidebarSessions}
             currentSessionId={currentSessionId}
             selectedWorktreeId={selectedWorktreeId}
-            onOpenSession={openSession}
+            onOpenSession={selectSession}
             organizationId={organizationId}
             onDeleteSession={setSessionPendingDeletion}
             onRenameSession={handleRenameSession}

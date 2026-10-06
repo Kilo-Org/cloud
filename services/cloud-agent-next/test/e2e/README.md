@@ -71,8 +71,8 @@ For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
 GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
 is enabled unless this variable is set to `false`. Local `dev` defaults to
 `false`; set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` when using
-proxy-compatible upstreams. Legacy devcontainer sessions remain excluded because
-DIND does not support managed SCM containment.
+proxy-compatible upstreams. Devcontainer support is retired; existing sessions
+can be stopped or deleted but cannot start or resume.
 
 Legacy containment flags are persisted at session creation, so changing the
 variable affects new legacy sessions, not existing ones.

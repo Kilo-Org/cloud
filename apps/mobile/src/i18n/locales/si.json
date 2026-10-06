@@ -215,7 +215,6 @@
     "showBalance": "ශේෂය පෙන්වන්න",
     "balanceHidden": "ශේෂය සඟවා ඇත",
     "bonusCreditsExpiring": "{{amount}} ක ප්‍රසාද ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
-    "creditBalanceEmpty": "ඔබේ ක්‍රෙඩිට් ශේෂය හිස්ය. මෙම ගිණුමේ ක්‍රෙඩිට් කළමනාකරණය කරන්නේ iOS යෙදුමෙන් පිටතදීය.",
     "signOutTitle": "පිටවන්නද?",
     "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "deleteAccountTitle": "ගිණුම මකන්නද?",
@@ -2048,6 +2047,7 @@
       "idCopied": "සැසි හැඳුනුම පිටපත් කර ඇත",
       "couldNotCopyId": "සැසි හැඳුනුම පිටපත් කිරීමට නොහැකි විය.",
       "untitled": "නම නැති සැසිය",
+      "actions": "සැසි ක්‍රියා",
       "sessionDeleted": "සැසිය මකා ඇත",
       "needsInput": "ඔබේ ප්‍රතිචාරය අවශ්‍යයි",
       "fromPlatform": "{{platform}} වෙතින්",
@@ -2100,6 +2100,7 @@
       "readOnly": "මෙම සැසිය කියවීමට පමණි.",
       "continueInNewSession": "නව සැසියක ඉදිරියට යන්න",
       "emptyDescription": "ආරම්භ කිරීමට පහත කොටුවෙන් පණිවිඩයක් යවන්න.",
+      "emptyTranscriptDescription": "මෙම සැසියේ තවම පණිවිඩ නැත.",
       "scrollToBottom": "අවසානය දක්වා පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
       "renameAccessibility": "{{title}} සැසියේ නම වෙනස් කරන්න",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "යැවීමට පෙර මාදිලියක් තෝරන්න.",
       "preparingPlaceholder": "පරිසරය සකසමින්...",
       "finalizingPlaceholder": "අවසන් කරමින්...",
+      "sessionLoadFailed": "සැසිය පූරණය කළ නොහැකි විය. පළමුව නැවත උත්සාහ කරන්න.",
       "cannotReceiveFiles": "මෙම සැසියට ගොනු ලැබිය නොහැක. ඔබේ පණිවිඩය යැවීමට ඇමුණුම් ඉවත් කරන්න.",
       "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීමේ බොත්තම තට්ටු කරන්න.",
       "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
@@ -2635,6 +2637,7 @@
       "provider": "සැපයුම්කරු",
       "totalCost": "මුළු පිරිවැය",
       "usageReflectsLatest": "මෙහි දැක්වෙන භාවිතය අවසන් වරට සම්පූර්ණ වූ සහායක ප්‍රතිචාරයට අදාළයි.",
+      "usageUnavailable": "සන්දර්භ භාවිතය ලබාගත නොහැක",
       "tokenUsage": "ටෝකන භාවිතය",
       "cacheRate": "හැඹිලි අනුපාතය",
       "modelsCount": "මාදිලි ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "පූරණය කරන්න",
       "loadWithHost": "{{host}} පූරණය කරන්න",
-      "httpsOnly": "HTTPS රූප පමණක් පූරණය කළ හැක."
+      "httpsOnly": "HTTPS රූප පමණක් පූරණය කළ හැක.",
+      "trustTitle": "{{host}} වෙතින් රූපය පූරණය කරන්නද?",
+      "trustMessage": "{{host}} විශ්වාස කිරීමෙන් එහි රූප සෑම විටම නොඅසා පූරණය වේ. පසුව විශ්වාස කළ ධාරක තුළ එය ඉවත් කළ හැක.",
+      "loadOnce": "එක් වරක් පූරණය කරන්න"
     },
     "markdownLink": {
       "invalidLink": "මෙම සබැඳිය විවෘත කළ නොහැක.",
@@ -3182,8 +3188,12 @@
     "subtitle": "තහවුරු කිරීමකින් තොරව විවෘත කිරීමට ඔබ අවසර දුන් ධාරක",
     "emptyTitle": "විශ්වාස කළ ධාරක නැත",
     "emptyDescription": "ඔබ සබැඳියක ධාරකය විශ්වාස කළ විට එහි සබැඳි නැවත තහවුරු කිරීමකින් තොරව විවෘත වේ.",
+    "imagesSectionTitle": "විශ්වාස කළ රූප ධාරක",
+    "imagesSectionDescription": "මෙම ධාරකවල රූප නැවත නොඅසා පූරණය වේ.",
+    "imagesSectionEmpty": "විශ්වාස කළ රූප ධාරක නැත",
     "revoke": "{{host}} වෙත දුන් විශ්වාසය ඉවත් කරන්න",
     "revokeMessage": "මෙම ධාරකයට ඇති සබැඳි නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
+    "revokeImageMessage": "මෙම ධාරකයේ රූප නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
     "backToPreferences": "මනාප වෙත ආපසු යන්න"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "නව නියෝජිතයෙක්",
     "approving": "අනුමත කරමින්...",
     "couldNotApprove": "අනුමත කළ නොහැකි විය",
-    "couldNotStart": "ආරම්භ කළ නොහැකි විය",
     "channelName": "සක්‍රීය නියෝජිතයන්",
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
     "openSession": "විවෘත කරන්න",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Repo නොබැඳි",
       "unbindFailed": "repo බැඳීම ඉවත් කළ නොහැකි විය"
     }
+  },
+  "credits": {
+    "title": "ක්‍රෙඩිට් මිලදී ගන්න",
+    "description": "ක්‍රෙඩිට් යනු Kilo App හි AI කේතීකරණ සැසි ක්‍රියාත්මක කිරීම සඳහා ඔබේ Kilo ශේෂයට එක් කරන එක්-වරක් මිලදී ගැනීමකි. ගබඩාව ඔබේ ගිණුමෙන් අය කරන අතර ගබඩාව ගෙවීම තහවුරු කිරීමෙන් පසු ක්‍රෙඩිට් එක් කෙරේ.",
+    "packLabel": "{{amount}} ක් වටිනා ක්‍රෙඩිට් එක් කරන්න",
+    "priceUnavailable": "මිල නොමැත",
+    "purchased": "ඔබේ ශේෂයට ක්‍රෙඩිට් එක් කර ඇත.",
+    "empty": "ක්‍රෙඩිට් පැකේජ දැනට නොමැත.",
+    "noMatchingProducts": "App Store ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
+    "noMatchingProductsPlay": "Google Play ගැළපෙන ක්‍රෙඩිට් පැකේජ ආපසු ලබා දුන්නේ නැත.",
+    "purchaseOwnedByAnotherAccount": "මෙම Apple Account හි ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පිවිසෙන්න.",
+    "purchaseOwnedByAnotherAccountPlay": "මෙම Google Play ගිණුමේ ක්‍රෙඩිට් වෙනත් Kilo ගිණුමකට අයත් වේ. ඒවා භාවිත කිරීමට එම Kilo ගිණුමට පුරනය වන්න."
   }
 }

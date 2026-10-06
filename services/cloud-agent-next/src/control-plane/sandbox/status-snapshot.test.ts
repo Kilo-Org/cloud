@@ -19,6 +19,50 @@ function project(overrides: Partial<AllocationState> | null, provider: 'cloudfla
 }
 
 describe('projectAllocationStatusSnapshot', () => {
+  it.each([
+    ['standard-3', 'containers-standard-3'],
+    ['standard-4', 'containers-standard-4'],
+    [undefined, 'containers-standard-4'],
+    ['PRIVATE_SENTINEL', null],
+  ] as const)(
+    'reports bounded Containers runtime metadata for instance %s',
+    (instance, sandboxType) => {
+      const snapshot = projectAllocationStatusSnapshot({
+        allocation: { ...allocation({ kind: 'connected' }), provider: 'cloudflare-containers' },
+        containersInstance: instance,
+        observedAt: OBSERVED_AT,
+        inactivityTimeoutMs: IDLE_MS,
+      });
+      expect(snapshot).toMatchObject({
+        status: 'active',
+        provider: 'Cloudflare Containers',
+        runtime: {
+          sandboxType,
+          kiloCliVersion: null,
+          wrapperVersion: null,
+          startedAt: null,
+          stoppedAt: null,
+        },
+      });
+      expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+      expect(JSON.stringify(snapshot)).not.toContain('PRIVATE_SENTINEL');
+    }
+  );
+
+  it.each([null, 'cloudflare', 'vercel'] as const)(
+    'omits Containers runtime metadata without a Containers allocation: %s',
+    provider => {
+      const snapshot = projectAllocationStatusSnapshot({
+        allocation: provider === null ? null : { ...allocation({ kind: 'connected' }), provider },
+        containersInstance: 'standard-3',
+        observedAt: OBSERVED_AT,
+        inactivityTimeoutMs: IDLE_MS,
+      });
+      expect(snapshot.runtime).toBeUndefined();
+      expect(SandboxStatusSnapshotSchema.parse(snapshot)).toEqual(snapshot);
+    }
+  );
+
   it('reports unknown with insufficient evidence and no provider', () => {
     const snapshot = project(null, 'cloudflare');
     expect(snapshot).toEqual({

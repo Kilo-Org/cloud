@@ -5,13 +5,13 @@ import {
   calculateCumulativeFeeRefundMinor,
   calculateServiceFeeMinor,
   getNetPretaxLineAmountMinor,
-} from '@/lib/service-fees/calculation';
+} from '@kilocode/web-shared/lib/service-fees/calculation';
 import {
   getServiceFeeOwner,
   isOrganizationServiceFeeFlow,
   isPersonalServiceFeeFlow,
   isSupportedServiceFeeCurrency,
-} from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/types';
 
 function invoiceLine(
   overrides: Partial<Stripe.InvoiceLineItem> &

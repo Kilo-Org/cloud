@@ -11,8 +11,10 @@ const mockBitbucketSigningKeys = JSON.stringify({
   previous: Buffer.alloc(32, 47).toString('base64'),
 });
 
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     BITBUCKET_CODE_REVIEW_WEBHOOK_SIGNING_KEYS: JSON.stringify({
@@ -66,14 +68,14 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import {
   createCodeReview,
   disableBitbucketCodeReviewerForIntegration,
 } from '@/lib/code-reviews/db/code-reviews';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   deriveBitbucketWebhookSecret,
   parseBitbucketWebhookSigningKeyring,

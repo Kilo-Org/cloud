@@ -1,6 +1,6 @@
-import type { FeatureValue } from '@/lib/feature-detection';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { GatewayApiKind, MicrodollarUsage, Organization } from '@kilocode/db';
 import type { OpenAI } from 'openai';
 
@@ -156,23 +156,30 @@ export type MicrodollarUsageContext = {
    */
   clientRequestId?: string | null;
   /**
-   * Report-only bouncer telemetry. Set on gateway inference requests that must
-   * report a usage event; absent where one must not be sent (the classifier
-   * overhead row, anonymous requests, the FIM and edit builders).
+   * Report-only bouncer telemetry. Set on every gateway inference request that
+   * reports a usage event; absent only on the internal classifier overhead row.
    */
   bouncer?: BouncerUsageContext;
 };
 
 /**
- * Report-only bouncer telemetry for the usage event. Bouncer's verdict never
- * changes billing or the response, and the client resolves even when the worker
- * is unreachable.
+ * Bouncer telemetry for the usage event. The decide verdict can reject a request before upstream;
+ * once usage accounting runs, nothing here changes billing or the response, and the client
+ * resolves even when the worker is unreachable.
  */
 export type BouncerUsageContext = {
   /** Per-request id, also sent to bouncer's `decide` for the same request. */
   requestId: string;
   /** Wall-clock time the request started. */
   occurredAt: Date;
+  /**
+   * The payer key bouncer uses: `org:<id>` for an org request, else `user:<id>`.
+   * Null for an anonymous request, which bouncer keys on the IP instead and must
+   * never turn into a payer-sharing row.
+   */
+  accountId: string | null;
+  /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
+  clientIp?: string | null;
   /** A known Kilo feature value or a Kilo client version header was sent. */
   clientAttributed: boolean;
   /** The request set `logprobs`, `top_logprobs`, or a non-empty `logit_bias`. */
@@ -181,6 +188,11 @@ export type BouncerUsageContext = {
   samples: number | null;
   /** SimHash of the last user turn. The context never carries the prompt text itself. */
   promptSimHash: string | null;
+  /**
+   * The decide verdict said `spendWatch`: the usage event goes through the durable usage-event
+   * outbox instead of the best-effort send. Set after decide resolves; absent means false.
+   */
+  spendWatch?: boolean;
 };
 
 export type CoreUsageWithMetaData = {

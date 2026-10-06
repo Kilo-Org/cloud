@@ -1,13 +1,13 @@
 import type { Organization, User } from '@kilocode/db/schema';
 import { organization_membership_removals, organization_memberships } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db, sql } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
-import { lockOrganizationMembershipMutation } from '@/lib/organizations/organizations';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { lockOrganizationMembershipMutation } from '@kilocode/web-shared/lib/organizations/organizations';
 
 export async function removeUserFromOrganization(
   organizationId: Organization['id'],

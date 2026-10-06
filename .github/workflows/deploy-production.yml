@@ -158,6 +158,22 @@ jobs:
       source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 
+  # The kilo-mcp changelog, GitHub Release and SBOM. It runs after every
+  # successful worker deploy and releases only when the kilo-mcp bundle changed.
+  kilo-mcp-release:
+    needs: [check-changes, deploy-workers]
+    if: ${{ !cancelled() && needs.deploy-workers.result == 'success' }}
+    # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
+    # exceed the caller).
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    uses: ./.github/workflows/kilo-mcp-release.yml
+    with:
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+    secrets: inherit
+
   detect-gastown-wasteland-changes:
     needs: check-changes
     if: needs.check-changes.outputs.should_deploy == 'true'

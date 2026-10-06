@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ENKRYPT_REVIEWED_CASES } from '@/tests/fixtures/enkrypt-scores';
 import { insertTestModelStats } from '@/tests/helpers/model-stats.helper';
 import { modelStats } from '@kilocode/db/schema';

@@ -19,7 +19,7 @@ const mockDecryptPromoCode = jest.fn((encrypted: string): string => {
   return `decrypted:${encrypted}`;
 });
 
-jest.mock('@/lib/promoCreditEncryption', () => ({
+jest.mock('@kilocode/web-shared/lib/promoCreditEncryption', () => ({
   decryptPromoCode: (encrypted: string) => mockDecryptPromoCode(encrypted),
 }));
 

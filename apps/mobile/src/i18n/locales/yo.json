@@ -215,7 +215,6 @@
     "showBalance": "Fi owó tó kù hàn",
     "balanceHidden": "Owó tó kù ti pamọ́",
     "bonusCreditsExpiring": "Kirẹ́dítì ẹ̀bùn {{amount}} yóò dópin {{date}}.",
-    "creditBalanceEmpty": "Kò sí kirẹ́dítì tó kù fún ọ. Ìṣàkóso kirẹ́dítì àkọọ́lẹ̀ yìí wà ní òde ohun èlò iOS.",
     "signOutTitle": "Jáde?",
     "signOutMessage": "O máa nílò láti tún wọlé kí o lè lo àyè iṣẹ́ rẹ.",
     "deleteAccountTitle": "Pa àkọọ́lẹ̀ rẹ́?",
@@ -2048,6 +2047,7 @@
       "idCopied": "A ti dákọ ID ìgbà iṣẹ́",
       "couldNotCopyId": "A kò lè dákọ ID ìgbà iṣẹ́.",
       "untitled": "Ìgbà iṣẹ́ láìsí àkọlé",
+      "actions": "Àwọn ìgbésẹ̀ fún ìgbà iṣẹ́",
       "sessionDeleted": "A ti pa ìgbà iṣẹ́ rẹ́",
       "needsInput": "nílò èsì rẹ",
       "fromPlatform": "láti {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Kíkà nìkan ni o lè ṣe nínú ìgbà iṣẹ́ yìí.",
       "continueInNewSession": "Tẹ̀síwájú nínú ìgbà iṣẹ́ tuntun",
       "emptyDescription": "Fi ìfiránṣẹ́ ránṣẹ́ ní ìsàlẹ̀ láti bẹ̀rẹ̀.",
+      "emptyTranscriptDescription": "Ìgbà iṣẹ́ yìí kò tíì ní ìfiránṣẹ́ kankan.",
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
       "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Yan àwòṣe kí o tó fi ránṣẹ́.",
       "preparingPlaceholder": "Ń ṣètò àyíká iṣẹ́...",
       "finalizingPlaceholder": "Ń parí...",
+      "sessionLoadFailed": "A ko le gbe igba naa. Gbiyanju lẹẹkansi ni akọkọ.",
       "cannotReceiveFiles": "Ìgbà iṣẹ́ yìí kò lè gba fáìlì. Yọ àwọn àsomọ́ kúrò láti fi ìfiránṣẹ́ rẹ ránṣẹ́.",
       "couldNotAttachFiles": "A kò lè so àwọn fáìlì mọ́ ìfiránṣẹ́. Tẹ Fíránṣẹ́ láti gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardAttachmentsMessage": "A ó pa àwọn fáìlì tí a ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
@@ -2635,6 +2637,7 @@
       "provider": "Olùpèsè",
       "totalCost": "Àpapọ̀ iye owó",
       "usageReflectsLatest": "Ìwọ̀n lílo yìí dá lórí ìdáhùn olùrànlọ́wọ́ tó parí gbẹ̀yìn.",
+      "usageUnavailable": "Ìlò àkótáyọ̀ kò sí",
       "tokenUsage": "Lílo ìpín ọ̀rọ̀",
       "cacheRate": "Ìwọ̀n lílo ìpamọ́ ìgbà díẹ̀",
       "modelsCount": "Àwọn àwòṣe ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "Gbé wọlé",
       "loadWithHost": "Gbé {{host}} wọlé",
-      "httpsOnly": "Àwọn àwòrán HTTPS nìkan ni a gbà."
+      "httpsOnly": "Àwọn àwòrán HTTPS nìkan ni a gbà.",
+      "trustTitle": "Gbé àwòrán wọlé láti {{host}}?",
+      "trustMessage": "Gbẹ́kẹ̀ lé {{host}} yóò gbé àwọn àwòrán rẹ̀ wọlé láìbéèrè ní gbogbo ìgbà. O lè fagilé rẹ̀ lẹ́yìn náà nínú Àwọn ojúlé tí a gbẹ́kẹ̀ lé.",
+      "loadOnce": "Gbé wọlé lẹ́ẹ̀kan"
     },
     "markdownLink": {
       "invalidLink": "Ọ̀nà àsopọ̀ yìí kò ṣeé ṣí.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Àwọn ojúlé tí o gbẹ́kẹ̀ lé láti ṣí láìbéèrè",
     "emptyTitle": "Kò sí ojúlé tí a gbẹ́kẹ̀ lé",
     "emptyDescription": "Tí o bá gbẹ́kẹ̀ lé ojúlé ọ̀nà àsopọ̀ kan, ó máa ṣí láìbéèrè lọ́wọ́ rẹ mọ́.",
+    "imagesSectionTitle": "Àwọn ojúlé àwòrán tí a gbẹ́kẹ̀ lé",
+    "imagesSectionDescription": "Àwọn àwòrán láti àwọn ojúlé wọ̀nyí ni a gbé wọlé láìbéèrè mọ́.",
+    "imagesSectionEmpty": "Kò sí àwọn ojúlé àwòrán tí a gbẹ́kẹ̀ lé",
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
     "revokeMessage": "Àwọn ọ̀nà àsopọ̀ sí ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
+    "revokeImageMessage": "Àwọn àwòrán láti ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
     "backToPreferences": "Padà sí àwọn ààyò"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Aṣojú tuntun",
     "approving": "Ń fọwọ́ sí...",
     "couldNotApprove": "Kò lè fọwọ́ sí",
-    "couldNotStart": "Kò lè bẹ̀rẹ̀",
     "channelName": "Àwọn aṣojú tó ń ṣiṣẹ́",
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa.",
     "openSession": "Ṣí",
@@ -3448,5 +3457,17 @@
       "unboundToast": "A ti tú repo sílẹ̀",
       "unbindFailed": "Ko le yọkuro repo"
     }
+  },
+  "credits": {
+    "title": "Ra kírẹ́dítì",
+    "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
+    "packLabel": "Fi kírẹ́dítì tó tó {{amount}} kún un",
+    "priceUnavailable": "Owó kò sí",
+    "purchased": "A ti fi kírẹ́dítì kún iwọntunwọnsi rẹ.",
+    "empty": "Àwọn àpò kírẹ́dítì kò sí ní báyìí.",
+    "noMatchingProducts": "App Store kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
+    "noMatchingProductsPlay": "Google Play kò dá àwọn àpò kírẹ́dítì tó báramu padà.",
+    "purchaseOwnedByAnotherAccount": "Kírẹ́dítì lórí Apple Account yìí jẹ́ ti àkọọ́lẹ̀ Kilo mìíràn. Wọlé sí àkọọ́lẹ̀ Kilo yẹn láti lò ó.",
+    "purchaseOwnedByAnotherAccountPlay": "Kírẹ́dítì lori Google Play àkọọ́lẹ̀ yii jẹ ti Kilo àkọọ́lẹ̀ miiran. Wọle si Kilo àkọọ́lẹ̀ yẹn lati lo o."
   }
 }

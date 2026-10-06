@@ -18,6 +18,7 @@ export type RenderProps = {
   onSubmit?: () => void;
   placeholder?: string;
   returnSendsMessage?: boolean;
+  sendDisabledReason?: string | null;
   voiceInputAvailable?: boolean;
 };
 

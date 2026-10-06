@@ -1,4 +1,4 @@
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 export type OpenRouterModelSlugSnapshot = {
   slug: string;

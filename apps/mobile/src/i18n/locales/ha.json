@@ -215,7 +215,6 @@
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
     "bonusCreditsExpiring": "Kuɗin amfani na kyauta {{amount}} za su ƙare {{date}}.",
-    "creditBalanceEmpty": "Ba ka da ragowar kuɗin amfani. Ana sarrafa kuɗin amfani na wannan asusun a wajen manhajar iOS.",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -2048,6 +2047,7 @@
       "idCopied": "An kwafi ID na zaman",
       "couldNotCopyId": "Ba a iya kwafi ID na zaman ba.",
       "untitled": "Zaman maras suna",
+      "actions": "Ayyukan zama",
       "sessionDeleted": "An share zaman",
       "needsInput": "ana buƙatar bayani",
       "fromPlatform": "daga {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Ana iya karanta wannan zaman ne kawai.",
       "continueInNewSession": "Ci gaba a sabon zaman",
       "emptyDescription": "Aika saƙo a ƙasa domin farawa.",
+      "emptyTranscriptDescription": "Wannan zaman ba shi da saƙonni har yanzu.",
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
       "renameAccessibility": "Canza sunan zaman: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Zaɓi samfuri kafin aikawa.",
       "preparingPlaceholder": "Ana shirya muhallin aiki...",
       "finalizingPlaceholder": "Ana gamawa...",
+      "sessionLoadFailed": "Ba a iya loda zaman ba. Sake gwadawa da farko.",
       "cannotReceiveFiles": "Wannan zaman ba zai iya karɓar fayiloli ba. Cire haɗe-haɗen don aika saƙonka.",
       "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna Aika don sake gwadawa.",
       "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
@@ -2635,6 +2637,7 @@
       "provider": "Mai ba da sabis",
       "totalCost": "Jimlar kuɗi",
       "usageReflectsLatest": "Wannan adadin amfani ya shafi amsar mataimaki ta ƙarshe da aka kammala.",
+      "usageUnavailable": "Amfani da mahallin ba ya samuwa",
       "tokenUsage": "Yawan guntayen rubutun da aka yi amfani da su",
       "cacheRate": "Ƙimar amfani da ma'ajiyar wucin gadi",
       "modelsCount": "Samfura ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "Loda",
       "loadWithHost": "Loda {{host}}",
-      "httpsOnly": "Hotunan HTTPS ne kawai ake karɓa."
+      "httpsOnly": "Hotunan HTTPS ne kawai ake karɓa.",
+      "trustTitle": "Loda hoto daga {{host}}?",
+      "trustMessage": "Amincewa da {{host}} na loda hotunansa ba tare da tambaya kowane lokaci ba. Za ka iya soke shi daga baya a cikin Rukunonin yanar gizo da aka amince da su.",
+      "loadOnce": "Loda sau ɗaya"
     },
     "markdownLink": {
       "invalidLink": "Ba za a iya buɗe wannan mahaɗin ba.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Rukunonin yanar gizo da ka amince a buɗe ba tare da tambaya ba",
     "emptyTitle": "Babu rukunin yanar gizo da aka amince da shi",
     "emptyDescription": "Idan ka amince da rukunin yanar gizon mahaɗi, za a buɗe shi ba tare da sake tambaya ba.",
+    "imagesSectionTitle": "Rukunonin yanar gizo na hoto da aka amince da su",
+    "imagesSectionDescription": "Hotuna daga waɗannan rukunoni suna lodawa ba tare da sake tambaya ba.",
+    "imagesSectionEmpty": "Babu rukunin yanar gizo na hoto da aka amince da shi",
     "revoke": "Soke amincewa da {{host}}",
     "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
+    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci.",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Sabon wakili",
     "approving": "Ana amincewa...",
     "couldNotApprove": "Ba a iya amincewa ba",
-    "couldNotStart": "Ba a iya farawa ba",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
     "openSession": "Buɗe",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Repo kwance",
       "unbindFailed": "An kasa kwance repo"
     }
+  },
+  "credits": {
+    "title": "Sayi kuɗin amfani",
+    "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
+    "packLabel": "Ƙara kuɗin amfani na {{amount}}",
+    "priceUnavailable": "Farashi ba ya nan",
+    "purchased": "An ƙara kuɗin amfani a ma'auninka.",
+    "empty": "Fakitin kuɗin amfani ba su nan a yanzu.",
+    "noMatchingProducts": "App Store bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "noMatchingProductsPlay": "Google Play bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "purchaseOwnedByAnotherAccount": "Kuɗin amfani da ke kan wannan Apple Account na wani asusun Kilo ne daban. Shiga wancan asusun Kilo don amfani da shi.",
+    "purchaseOwnedByAnotherAccountPlay": "Kuɗin amfani da ke kan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don amfani da shi."
   }
 }

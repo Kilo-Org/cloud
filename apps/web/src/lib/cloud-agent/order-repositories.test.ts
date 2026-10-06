@@ -1,5 +1,5 @@
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { cli_sessions_v2, organizations, type Organization, type User } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import { orderRepositoriesByUsage } from './order-repositories';

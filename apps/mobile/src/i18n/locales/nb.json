@@ -215,7 +215,6 @@
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
     "bonusCreditsExpiring": "{{amount}} i bonuskreditter utløper {{date}}.",
-    "creditBalanceEmpty": "Du har ingen kreditter igjen. For denne kontoen administreres kreditter utenfor iOS-appen.",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Økt-ID kopiert",
       "couldNotCopyId": "Kunne ikke kopiere økt-ID-en.",
       "untitled": "Økt uten tittel",
+      "actions": "Handlinger for økten",
       "sessionDeleted": "Økt slettet",
       "needsInput": "venter på svar",
       "fromPlatform": "fra {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Denne økten er skrivebeskyttet.",
       "continueInNewSession": "Fortsett i en ny økt",
       "emptyDescription": "Send en melding nedenfor for å komme i gang.",
+      "emptyTranscriptDescription": "Denne økten har ingen meldinger ennå.",
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
       "renameAccessibility": "Gi økten nytt navn: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Velg en modell før du sender.",
       "preparingPlaceholder": "Klargjør miljøet…",
       "finalizingPlaceholder": "Avslutter…",
+      "sessionLoadFailed": "Økten kunne ikke lastes. Prøv igjen først.",
       "cannotReceiveFiles": "Denne økten kan ikke motta filer. Fjern vedleggene for å sende meldingen din.",
       "couldNotAttachFiles": "Kunne ikke legge ved filene. Trykk på sendeknappen for å prøve igjen.",
       "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
@@ -2635,6 +2637,7 @@
       "provider": "Leverandør",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Forbruket gjelder til og med det siste fullførte svaret fra assistenten.",
+      "usageUnavailable": "Kontekstbruk er ikke tilgjengelig",
       "tokenUsage": "Tokenbruk",
       "cacheRate": "Andel fra hurtigbuffer",
       "modelsCount": "Modeller ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "Last inn",
       "loadWithHost": "Last inn {{host}}",
-      "httpsOnly": "Bare bilder via HTTPS er tillatt."
+      "httpsOnly": "Bare bilder via HTTPS er tillatt.",
+      "trustTitle": "Last inn bilde fra {{host}}?",
+      "trustMessage": "Hvis du godkjenner {{host}}, lastes bildene inn uten å spørre hver gang. Du kan trekke det tilbake senere under Godkjente verter.",
+      "loadOnce": "Last inn én gang"
     },
     "markdownLink": {
       "invalidLink": "Denne lenken kan ikke åpnes.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Verter du har godkjent for åpning uten bekreftelse",
     "emptyTitle": "Ingen godkjente verter",
     "emptyDescription": "Når du godkjenner verten til en lenke, åpnes lenker til denne verten uten ny bekreftelse.",
+    "imagesSectionTitle": "Godkjente bildeverter",
+    "imagesSectionDescription": "Bilder fra disse vertene lastes inn uten å spørre igjen.",
+    "imagesSectionEmpty": "Ingen godkjente bildeverter",
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "revokeMessage": "Lenker til denne verten vil igjen be om bekreftelse.",
+    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse.",
     "backToPreferences": "Tilbake til innstillinger"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Ny agent",
     "approving": "Godkjenner...",
     "couldNotApprove": "Kunne ikke godkjenne",
-    "couldNotStart": "Kunne ikke starte",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
     "openSession": "Åpne",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Repo ubundet",
       "unbindFailed": "Kunne ikke løsne repoen"
     }
+  },
+  "credits": {
+    "title": "Kjøp kreditter",
+    "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
+    "packLabel": "Legg til {{amount}} i kreditter",
+    "priceUnavailable": "Prisen er ikke tilgjengelig",
+    "purchased": "Kreditter er lagt til saldoen din.",
+    "empty": "Kredittpakker er ikke tilgjengelige akkurat nå.",
+    "noMatchingProducts": "App Store returnerte ingen samsvarende kredittpakker.",
+    "noMatchingProductsPlay": "Google Play returnerte ingen samsvarende kredittpakker.",
+    "purchaseOwnedByAnotherAccount": "Kredittene på denne Apple-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredittene på denne Google Play-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem."
   }
 }

@@ -215,7 +215,6 @@
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
     "bonusCreditsExpiring": "Ego ojiji mgbakwunye {{amount}} ga-agwụ na {{date}}.",
-    "creditBalanceEmpty": "Ego ojiji gị agwụla. A na-ejikwa ego ojiji maka akaụntụ a na mpụga ngwa iOS.",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Edetuola ID nnọkọ",
       "couldNotCopyId": "Enweghị ike idetuo ID nnọkọ.",
       "untitled": "Nnọkọ na-enweghị aha",
+      "actions": "Ihe a ga-eme na nnọkọ",
       "sessionDeleted": "Ehichapụla nnọkọ",
       "needsInput": "chọrọ nzaghachi",
       "fromPlatform": "site na {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Ị nwere ike ịgụ naanị ihe dị na nnọkọ a.",
       "continueInNewSession": "Gaa n'ihu na nnọkọ ọhụrụ",
       "emptyDescription": "Ziga ozi n'okpuru iji bido.",
+      "emptyTranscriptDescription": "Nnọkọ a enwebeghị ozi ọ bụla.",
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Ozi adịbeghị",
       "renameAccessibility": "Gbanwee aha nnọkọ: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Họrọ ihe nlereanya tupu ị ziga ozi.",
       "preparingPlaceholder": "Na-akwadebe ebe ọrụ...",
       "finalizingPlaceholder": "Na-emecha...",
+      "sessionLoadFailed": "Enweghị ike ibu nnọkọ ahụ. Nwaa ọzọ na mbụ.",
       "cannotReceiveFiles": "Nnọkọ a enweghị ike ịnata faịlụ. Wepụ faịlụ mgbakwunye ka ị nwee ike iziga ozi gị.",
       "couldNotAttachFiles": "Enweghị ike itinye faịlụ mgbakwunye. Pịa Ziga ka ị nwaa ọzọ.",
       "discardAttachmentsMessage": "A ga-ehichapụ faịlụ ebugotere ndị a na-ejikọtaghị na ozi ezigara.",
@@ -2635,6 +2637,7 @@
       "provider": "Onye na-enye ọrụ",
       "totalCost": "Ngụkọta ọnụ ahịa",
       "usageReflectsLatest": "Ojiji a sitere na nzaghachi ikpeazụ onye inyeaka mechara.",
+      "usageUnavailable": "Ojiji nke context adịghị",
       "tokenUsage": "Ojiji tokin",
       "cacheRate": "Pasent sitere na nchekwa nwa oge",
       "modelsCount": "Ihe nlereanya ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "Budata",
       "loadWithHost": "Budata {{host}}",
-      "httpsOnly": "A na-anabata naanị onyonyo HTTPS."
+      "httpsOnly": "A na-anabata naanị onyonyo HTTPS.",
+      "trustTitle": "Budata onyonyo site na {{host}}?",
+      "trustMessage": "Ịtụkwasị {{host}} obi na-ebudata onyonyo ya na-enweghị ịjụ ajụjụ oge ọ bụla. Ị nwere ike ịkagbu ya ma emesịa na Saịtị a tụkwasịrị obi.",
+      "loadOnce": "Budata otu ugboro"
     },
     "markdownLink": {
       "invalidLink": "Enweghị ike imeghe njikọ a.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Saịtị ị tụkwasịrị obi ka ha mepee na-enweghị ịjụ gị",
     "emptyTitle": "Enweghị saịtị a tụkwasịrị obi",
     "emptyDescription": "Mgbe ị tụkwasịrị saịtị njikọ obi, njikọ ya na-emeghe na-enweghị ịjụ gị ọzọ.",
+    "imagesSectionTitle": "Saịtị onyonyo a tụkwasịrị obi",
+    "imagesSectionDescription": "Onyonyo sitere na saịtị ndị a na-ebudata na-enweghị ịjụ ọzọ.",
+    "imagesSectionEmpty": "Enweghị saịtị onyonyo a tụkwasịrị obi",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
     "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
+    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ.",
     "backToPreferences": "Laghachi na nhọrọ"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Onye nnọchi anya ọhụrụ",
     "approving": "Na-akwado...",
     "couldNotApprove": "Enweghị ike ịkwado",
-    "couldNotStart": "Enweghị ike ịmalite",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
     "openSession": "Meghe",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Repo ewepụghị",
       "unbindFailed": "Enweghị ike iwepụ repo"
     }
+  },
+  "credits": {
+    "title": "Zụta ego ojiji",
+    "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
+    "packLabel": "Tinye ego ojiji ruru {{amount}}",
+    "priceUnavailable": "Ọnụ ahịa adịghị",
+    "purchased": "E tinyela ego ojiji na nguzozi gị.",
+    "empty": "Ngwugwu ego ojiji adịghị ugbu a.",
+    "noMatchingProducts": "App Store eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "noMatchingProductsPlay": "Google Play eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "purchaseOwnedByAnotherAccount": "Ego ojiji dị na Apple Account a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya.",
+    "purchaseOwnedByAnotherAccountPlay": "Ego ojiji dị na akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya."
   }
 }

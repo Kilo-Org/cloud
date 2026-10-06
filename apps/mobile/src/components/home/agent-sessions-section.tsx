@@ -1,14 +1,23 @@
+/* eslint-disable max-lines -- the shared live feedback (Home and the Agents tab) and the Home section that places its notices share one state model */
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
+import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 
-import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import {
+  GlanceableActiveCard,
+  GlanceableActiveCardSkeleton,
+} from '@/components/home/glanceable-active-card';
+import {
+  LiveSessionHeaderNotice,
+  useLiveSessionHeaderNotice,
+} from '@/components/home/live-session-header-notice';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -18,8 +27,8 @@ import { SectionHeader } from '@/components/home/section-header';
 import { QueryError, type QueryErrorVariant } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useUserWebConnectionHealth } from '@/lib/hooks/use-user-web-connection-state';
@@ -29,7 +38,6 @@ import { cn } from '@/lib/utils';
 
 // The trailing slash pins the index route.
 const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
-const MAX_ROWS = 3;
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
@@ -57,11 +65,19 @@ export function LiveSessionFeedback({
   centered = false,
   refreshControl,
   refresh,
+  inlineNotices = true,
 }: LiveSessionProps & {
   failureLabel: string;
   centered?: boolean;
   refreshControl?: ScrollViewProps['refreshControl'];
   refresh?: LiveSessionRefreshState;
+  /**
+   * False when the surface draws the one-line notices (offline, connection
+   * lost, a failed load beside readable rows) itself, as Home does in its
+   * section header so a notice cannot push the card down. The screen-reader
+   * announcements stay here either way.
+   */
+  inlineNotices?: boolean;
 }) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -196,6 +212,9 @@ export function LiveSessionFeedback({
         </View>
       </View>
     );
+    if (compact && !inlineNotices) {
+      failure = null;
+    }
   }
   let connectionLabel: string | null = null;
   if (context.isReady && !isConnected && internet !== 'offline') {
@@ -217,29 +236,35 @@ export function LiveSessionFeedback({
       <View className="flex-row items-center gap-2">
         {/* The app-wide OfflineBanner owns the offline announcement. */}
         {internet === 'offline' ? (
-          <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
+          inlineNotices && (
+            <Text className="flex-1 text-xs text-muted-foreground">{t('offline.noInternet')}</Text>
+          )
         ) : (
           <AccessibleStatus
             message={connectionLabel}
             tone="status"
             className={cn(
               'flex-1 text-xs',
-              !reconnectExhausted && 'absolute size-px overflow-hidden'
+              (!reconnectExhausted || !inlineNotices) && 'absolute size-px overflow-hidden'
             )}
           />
         )}
-        {context.isReady && !isConnected && reconnectExhausted && !failureOwnsRetry && (
-          <Button
-            variant="ghost"
-            size="sm"
-            accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
-            onPress={() => {
-              connection.retryConnection();
-            }}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        )}
+        {inlineNotices &&
+          context.isReady &&
+          !isConnected &&
+          reconnectExhausted &&
+          !failureOwnsRetry && (
+            <Button
+              variant="ghost"
+              size="sm"
+              accessibilityLabel={t('agentChat.sessionConnection.retryConnection')}
+              onPress={() => {
+                connection.retryConnection();
+              }}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          )}
       </View>
       {refresh && content === 'rows' ? (
         // The live tab's reserved status line: screen-reader Updating while
@@ -283,70 +308,53 @@ export function LiveSessionFeedback({
 export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { reducedMotion } = useMotionPolicy();
   const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
+  const failureLabel = t('home.couldNotLoadActiveSessions');
+  const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
 
   return (
     <View>
-      {/* An accepted empty live list renders only the `Nothing running right
-          now` card, so the `Live now` / See-all header would advertise the
-          Agents live index for sessions that do not exist. Rows and the
-          loading skeletons keep the header unchanged. */}
-      {content !== 'empty' && (
-        <SectionHeader
-          label={t('home.agentSessions')}
-          actionLabel={t('home.seeAll')}
-          onActionPress={() => {
-            // Switch tabs, then pop a previously pushed history screen to the live index.
-            router.navigate(AGENTS_INDEX_HREF as Href);
-            router.dismissTo(AGENTS_INDEX_HREF as Href);
-          }}
-        />
-      )}
+      {/* The header row stays in every state, so settling never adds or
+          removes it. `See all` keeps its box but hides while nothing runs: it
+          would advertise the Agents live index for sessions that do not exist. */}
+      <SectionHeader
+        label={t('home.agentSessions')}
+        actionLabel={t('home.seeAll')}
+        actionHidden={content === 'empty'}
+        onActionPress={() => {
+          // Switch tabs, then pop a previously pushed history screen to the live index.
+          router.navigate(AGENTS_INDEX_HREF as Href);
+          router.dismissTo(AGENTS_INDEX_HREF as Href);
+        }}
+        notice={notice && <LiveSessionHeaderNotice notice={notice} />}
+      />
       <View className="mx-4 gap-2">
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
-          failureLabel={t('home.couldNotLoadActiveSessions')}
+          failureLabel={failureLabel}
+          inlineNotices={false}
         />
-        {content === 'pending' && (
-          // The placeholder borrows the real row's geometry: the same card,
-          // the same row padding, and a 3px leading strip glued to the card
-          // edge like `SessionRow`'s `stripMode="edge"` in `AgentBadge`. The
-          // title/eyebrow therefore land on the same x-offset the arriving row
-          // draws, and the leading mark keeps its size, so replacing the
-          // placeholder with the row cannot reflow the LIVE NOW card.
-          <View className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card">
-            <View className="relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3">
-              <Skeleton className="absolute left-0 top-0 bottom-0 w-[3px] rounded-[2px]" />
-              <View className="flex-1 gap-2">
-                <Skeleton className="h-3 w-2/3 rounded" />
-                <Skeleton className="h-3 w-1/3 rounded" />
-              </View>
-            </View>
-          </View>
-        )}
-        {content === 'empty' && (
-          <View className="min-h-[72px] items-center justify-center rounded-2xl border border-border bg-card px-4">
-            <Text variant="muted" className="text-sm">
-              {t('home.noLiveSessions')}
-            </Text>
-          </View>
-        )}
-        {content === 'rows' &&
-          sessions.activeSessions.slice(0, MAX_ROWS).map(session => (
-            <View
-              key={`active:${session.id}`}
-              className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card"
+        {/* One card, not a row per session: the skeleton, the zero state and
+            the loaded card share one frame and row heights
+            (`GlanceableActiveCardSkeleton` repeats `GlanceableActiveCard`'s
+            box), so settling cannot move the header, feedback or the
+            agent-create actions below. */}
+        <Animated.View layout={LinearTransition}>
+          {content === 'pending' && <GlanceableActiveCardSkeleton />}
+          {(content === 'empty' || content === 'rows') && (
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
             >
-              <RemoteSessionRow
-                session={session}
-                variant="card"
-                interactive={false}
-                onPress={handleRowPress}
+              <GlanceableActiveCard
+                sessions={sessions.activeSessions}
+                onPressSession={handleRowPress}
               />
-            </View>
-          ))}
+            </Animated.View>
+          )}
+        </Animated.View>
       </View>
     </View>
   );

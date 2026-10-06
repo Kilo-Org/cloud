@@ -27,6 +27,8 @@ import {
   CurrentSessionMetadataSchema,
   parseSessionMetadata,
   serializeSessionMetadata,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import {
@@ -183,8 +185,10 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'sandbox_provision',
   sandbox_start: 'sandbox_boot',
   clone: 'cloning',
+  restore: 'workspace_restore',
   checkout: 'branch',
   setup: 'setup_commands',
+  snapshot: 'workspace_backup',
   kilo_runtime: 'kilo_server',
   kilo_session: 'kilo_session',
 };
@@ -193,8 +197,10 @@ const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
   sandbox_start: 'Starting sandbox',
   clone: 'Cloning repository',
+  restore: 'Using prepared repository',
   checkout: 'Checking out branch',
   setup: 'Running setup commands',
+  snapshot: 'Saving repository for faster starts',
   kilo_runtime: 'Starting Kilo runtime',
   kilo_session: 'Preparing Kilo session',
 };
@@ -313,6 +319,7 @@ export type ControlPlaneSandboxPeer = {
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
   getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  fetch(request: Request): Promise<Response>;
 };
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
@@ -1524,11 +1531,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }): Promise<{
     location: CloudAgentWorktreeLocation | null;
     children: CloudAgentChildSessionLineage[];
+    directory: string | null;
   }> {
     await this.initialized;
     const worktreeId = cloudAgentWorktreeIdSchema.parse(input.worktreeId);
     const metadata = this.metadata;
-    if (metadata === null) return { location: null, children: [] };
+    if (metadata === null) return { location: null, children: [], directory: null };
     if (
       metadata.workspace?.worktreeId !== worktreeId ||
       metadata.auth.kiloSessionId !== input.kiloSessionId ||
@@ -1552,6 +1560,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return {
       location: location === null ? null : cloudAgentWorktreeLocationSchema.parse(location),
       children,
+      directory: registration?.spec.directory ?? null,
     };
   }
 
@@ -1667,6 +1676,28 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (pathname !== '/stream') return new Response('Not found', { status: 404 });
     if (this.registration === null) return new Response('Session not found', { status: 404 });
+    if (new URL(request.url).searchParams.get('sandboxStatus') === 'true') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      const sandboxId = this.registration.sandboxId;
+      if (this.metadata === null) return new Response('Sandbox unavailable', { status: 503 });
+      const url = new URL('https://sandbox.internal/status-stream');
+      url.searchParams.set('sessionId', this.sessionId);
+      url.searchParams.set('ownerId', this.metadata.identity.userId);
+      try {
+        return await withDORetry(
+          () => {
+            const peer = this.sandboxPeerFor(sandboxId);
+            if (peer === null) throw new Error('Sandbox unavailable');
+            return peer;
+          },
+          peer => peer.fetch(new Request(url, { headers: { Upgrade: 'websocket' } })),
+          'sandboxStatusStream'
+        );
+      } catch {
+        return new Response('Sandbox unavailable', { status: 503 });
+      }
+    }
     return this.streamHandler().handleStreamRequest(request);
   }
 
@@ -1831,6 +1862,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async deliverQueued(pass = this.transportPass()): Promise<void> {
+    if (await this.failRetiredQueuedMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
@@ -1892,7 +1924,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.applyView(view, pass);
   }
 
+  private async failRetiredQueuedMessages(): Promise<boolean> {
+    if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
+    await this.settleMessages(
+      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      'failed',
+      DEVCONTAINER_RETIRED_MESSAGE
+    );
+    this.finishWorktreePreparation();
+    return true;
+  }
+
   private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredQueuedMessages()) return null;
     const peer = this.sandboxPeer();
     const registration = this.registration;
     if (registration === null) return null;
@@ -2211,7 +2255,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     // Persist the callback, attempt delivery now, then arm only what remains:
     // a failed send keeps its due time and is retried by the alarm.
-    this.persistBatchCallback(reduction.changed);
+    this.persistBatchCallback(reduction.changed, facts);
     await this.repairOutboxes();
     await this.armAlarm();
   }
@@ -2248,14 +2292,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
-  private persistBatchCallback(changed: readonly SessionMessage[]): void {
+  private persistBatchCallback(
+    changed: readonly SessionMessage[],
+    facts?: ControlPlaneReportFacts
+  ): void {
     try {
       const newlyTerminal = new Set(
         changed
           .filter(message => isTerminalMessage(message.state))
           .map(message => message.messageId)
       );
-      this.messageCallbacks.persistDrainedBatchCallback(this.messages, newlyTerminal);
+      this.messageCallbacks.persistDrainedBatchCallback(
+        this.messages,
+        newlyTerminal,
+        undefined,
+        facts
+      );
     } catch {
       logger.withFields({ sessionId: this.sessionId }).warn('Cloud Agent callback write failed');
     }

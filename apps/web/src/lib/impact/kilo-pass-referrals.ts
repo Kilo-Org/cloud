@@ -3,7 +3,7 @@ import 'server-only';
 import { addMonths } from 'date-fns';
 import { and, asc, count, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { IMPACT_ACTION_TRACKER_IDS, buildSalePayload, hashEmailForImpact } from '@/lib/impact';
 import { resolveWinningAttributionTouch } from '@/lib/impact/referral-attribution';
 import {
@@ -15,7 +15,7 @@ import {
 } from '@/lib/impact/referral-delivery';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   deleted_user_email_tombstones,
   impact_advocate_participants,
@@ -422,6 +422,7 @@ export async function processPersonalKiloPassStripePaidConversion(params: {
 }): Promise<KiloPassPaidConversionDisposition> {
   const paymentProvider = ImpactReferralPaymentProvider.Stripe;
   const referralSaleDedupeKey = `impact-referral-sale:${ImpactReferralProduct.KiloPass}:${paymentProvider}:${params.sourcePaymentId}`;
+  const referralConversionLockKey = `impact-referral-conversion:${ImpactReferralProduct.KiloPass}:${paymentProvider}:${params.sourcePaymentId}`;
 
   logImpactReferralDebug('Processing personal Kilo Pass paid conversion for Impact referrals', {
     userId: params.userId,
@@ -437,6 +438,13 @@ export async function processPersonalKiloPassStripePaidConversion(params: {
 
   let impactReportId: string | null = null;
   const disposition = await db.transaction(async tx => {
+    // Serialize concurrent deliveries of the same payment. Stripe retries
+    // webhooks concurrently, and without this lock two deliveries can both miss
+    // the existence check below and race the conversion insert into a unique
+    // violation on UQ_impact_referral_conversions_product_payment_source. The
+    // lock is transaction-scoped and released on commit/rollback.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${referralConversionLockKey}))`);
+
     const existingConversion = await tx.query.impact_referral_conversions.findFirst({
       where: and(
         eq(impact_referral_conversions.product, ImpactReferralProduct.KiloPass),

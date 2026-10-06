@@ -2,9 +2,9 @@ import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
 import { kilo_pass_pause_events } from '@kilocode/db/schema';
-import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
-import { getPreviousIssueMonth } from '@/lib/kilo-pass/stripe-handlers-utils';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import { getPreviousIssueMonth } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;

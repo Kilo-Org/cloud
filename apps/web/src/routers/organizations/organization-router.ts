@@ -4,9 +4,9 @@ import {
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
-import { db, readDb } from '@/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
-import { successResult } from '@/lib/maybe-result';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { captureMessage } from '@sentry/nextjs';
 import type {
   MemberOrganizationWithMembers,
@@ -14,25 +14,29 @@ import type {
   OrganizationWithMembers,
   OrganizationWithMembersResponse,
   UserOrganizationWithInheritedChildren,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   OrganizationNameSchema,
   UsageStatsSchema,
   TimePeriodSchema,
   OrganizationCreateRequestSchema,
   OrganizationPlanSchema,
-} from '@/lib/organizations/organization-types';
-import { CompanyDomainSchema } from '@/lib/organizations/company-domain';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { CompanyDomainSchema } from '@kilocode/web-shared/lib/organizations/company-domain';
 import {
   createOrganization,
   getOrganizationById,
   getOrganizationMembers,
   getUserOrganizationsWithSeats,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { getStripeInvoices, getStripeInvoicesPage } from '@/lib/stripe';
-import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import {
+  adminProcedure,
+  baseProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
@@ -40,7 +44,7 @@ import {
   organizationAdminMutationProcedure,
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { organizationsMembersRouter } from '@/routers/organizations/organization-members-router';
 import { organizationsSubscriptionRouter } from '@/routers/organizations/organization-subscription-router';
 import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
@@ -51,9 +55,9 @@ import * as z from 'zod';
 import {
   getCreditTransactionsForOrganization,
   getCreditTransactionsForOrganizationPage,
-} from '@/lib/creditTransactions';
+} from '@kilocode/web-shared/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { credit_transactions } from '@kilocode/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import {
@@ -65,9 +69,9 @@ import { organizationSsoRouter } from '@/routers/organizations/organization-sso-
 import { organizationAuditLogRouter } from '@/routers/organizations/organization-audit-log-router';
 import { organizationAdminRouter } from '@/routers/organizations/organization-admin-router';
 import { organizationModesRouter } from '@/routers/organizations/organization-modes-router';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { organizationDeploymentsRouter } from '@/routers/organizations/organization-deployments-router';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
 import { organizationAppBuilderRouter } from '@/routers/organizations/organization-app-builder-router';
@@ -83,8 +87,7 @@ import { organizationKiloPassRouter } from '@/routers/organizations/organization
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
-import { organizationVerifiedDomainsRouter } from '@/routers/organizations/organization-verified-domains-router';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
@@ -163,7 +166,6 @@ export const organizationsRouter = createTRPCRouter({
   groups: organizationGroupsRouter,
   subOrganizations: organizationSubOrganizationsRouter,
   salesDemo: organizationSalesDemoRouter,
-  verifiedDomains: organizationVerifiedDomainsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;

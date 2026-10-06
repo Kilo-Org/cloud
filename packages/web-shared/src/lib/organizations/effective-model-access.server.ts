@@ -1,1 +1,1 @@
-export * from '@/lib/organizations/group-policies/model-access/model-access.server';
+export * from '@kilocode/web-shared/lib/organizations/group-policies/model-access/model-access.server';

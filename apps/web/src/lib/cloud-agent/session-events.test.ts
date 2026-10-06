@@ -1,11 +1,11 @@
-import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { notifyCliSessionRenamed } from './session-events';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: 'https://ingest.test.example.com',
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateBoundedInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
 }));
 

@@ -1,5 +1,5 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
@@ -10,7 +10,7 @@ import {
   baseEnvVarSchema,
   markAsPlaintext,
 } from '@/lib/user-deployments/env-vars-validation';
-import { hasUserEverPaid } from '@/lib/creditTransactions';
+import { hasUserEverPaid } from '@kilocode/web-shared/lib/creditTransactions';
 
 export const deploymentsRouter = createTRPCRouter({
   checkDeploymentEligibility: baseProcedure.query(async ({ ctx }) => {

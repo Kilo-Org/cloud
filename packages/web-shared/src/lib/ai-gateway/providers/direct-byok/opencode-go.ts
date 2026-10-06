@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { generateProviderSpecificSessionHash } from '@/lib/ai-gateway/providerHash';
-import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
+import { generateProviderSpecificSessionHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'opencode-go',

@@ -5,8 +5,8 @@ import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { user_terms_acceptances, type OperationLedgerRow } from '@kilocode/db/schema';
 import { PR_OPERATION_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import { prIntentFingerprint, type PrLedgerIntent } from '@kilocode/app-shared/pr-review';

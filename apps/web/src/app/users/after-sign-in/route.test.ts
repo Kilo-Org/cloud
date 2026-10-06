@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/constants', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
   APP_URL: 'http://localhost:3000',
 }));
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
@@ -32,7 +32,7 @@ jest.mock('@/lib/impact/debug', () => ({
   logImpactReferralDebug: jest.fn(),
 }));
 
-jest.mock('@/lib/posthog', () => jest.fn(() => ({ capture: jest.fn() })));
+jest.mock('@kilocode/web-shared/lib/posthog', () => jest.fn(() => ({ capture: jest.fn() })));
 
 jest.mock('@/lib/survey-redirect', () => ({
   maybeInterceptWithSurvey: jest.fn((_, responsePath: string) => responsePath),
@@ -51,7 +51,7 @@ import {
   recordImpactReferralTouch,
 } from '@/lib/impact/referral';
 import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { GET } from './route';
 
 const mockGetAffiliateAttribution = jest.mocked(getAffiliateAttribution);
@@ -206,18 +206,6 @@ describe('GET /users/after-sign-in', () => {
     const location = new URL(response.headers.get('location') ?? '');
     expect(location.pathname).toBe('/users/continue');
     expect(location.searchParams.get('to')).toBe('/cloud/sessions');
-  });
-
-  it('preserves an explicit permitted callback over the preferred organization', async () => {
-    const response = await GET(
-      new NextRequest('http://localhost:3000/users/after-sign-in?callbackPath=%2Fprofile')
-    );
-
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost:3000/users/continue?to=%2Fprofile'
-    );
-    expect(mockGetProfileRedirectPath).not.toHaveBeenCalled();
   });
 
   it('does not route single-org /organizations/<id> through the interstitial', async () => {

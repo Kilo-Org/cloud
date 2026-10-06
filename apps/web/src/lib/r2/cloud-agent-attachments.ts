@@ -11,7 +11,7 @@ import {
   type CloudAgentImageAllowedType,
 } from '@/lib/cloud-agent/constants';
 import { cloudAgentRelaxedAttachmentFilenameSchema } from '@/routers/cloud-agent-next-schemas';
-import { r2Client, r2CloudAgentAttachmentsBucketName } from '@/lib/r2/client';
+import { r2Client, r2CloudAgentAttachmentsBucketName } from '@kilocode/web-shared/lib/r2/client';
 import { admitPendingUpload } from '@/lib/r2/cloud-agent-pending-uploads';
 
 type Service = 'app-builder' | 'cloud-agent';

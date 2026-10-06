@@ -1,11 +1,11 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sql, type SQL } from 'drizzle-orm';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 const PAGE_SIZE = 10;
 const RECENT_DAYS_LIMIT = 200;

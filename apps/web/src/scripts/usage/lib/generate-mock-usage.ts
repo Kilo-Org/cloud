@@ -15,7 +15,7 @@
  * (DBT_BACKEND_SANDBOX for local dev); no rollup step is needed.
  */
 import { randomUUID } from 'node:crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   microdollar_usage,
   microdollar_usage_metadata,

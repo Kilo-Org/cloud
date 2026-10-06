@@ -4,7 +4,10 @@ import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authori
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { routes as sandboxRoutes } from '../../src/control-plane/sandbox/sqlite-schema.js';
-import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import type {
+  ControlPlaneSessionRegistration,
+  SandboxSessionV2,
+} from '../../src/control-plane/session/session-do.js';
 import { events } from '../../src/db/sqlite-schema.js';
 import type {
   ProviderAdapter,
@@ -13,6 +16,7 @@ import type {
 } from '../../src/sandbox-control/provider.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
 import type { Env } from '../../src/types.js';
 import {
@@ -139,7 +143,9 @@ function createFakeProvider(): { adapter: ProviderAdapter; createCalls: number }
       provider.createCalls += 1;
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch() {},
+    async launch() {
+      return { startSource: 'image' as const };
+    },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
     },
@@ -283,13 +289,14 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const sessionId = newSessionId();
     const siblingId = newSessionId();
     const worktreeId = `worktree_${crypto.randomUUID()}`;
+    const identityPath = getWorktreeWorkspacePath(ORG_ID, USER_ID, worktreeId);
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
     const provider = createFakeProvider();
     const sandboxStub = await installSandbox(sandboxId, provider.adapter);
 
     const startStub = sessions.getByName(sessionId);
     await startStub.createSessionWithInitialAdmission({
-      metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
+      metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId, worktreeId }),
       message: promptPayload(messageId()),
       sandboxSelection: { provider: 'cloudflare' },
     });
@@ -302,7 +309,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         kiloSessionId: kiloSessionId(),
         sandboxId,
         worktreeId,
-        workspacePath: '/workspace/worktrees/wt',
+        workspacePath: identityPath,
       }),
       sandboxSelection: { provider: 'cloudflare' },
     });
@@ -313,7 +320,7 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
     const siblingRegistration = await readRegistration(siblingStub);
     expect(siblingRegistration?.sandboxId).toBe(sandboxId);
-    expect(siblingRegistration?.spec.directory).toBe('/workspace/worktrees/wt');
+    expect(siblingRegistration?.spec.directory).toBe('/workspace/app');
     // scopeId follows the worktree id.
     expect(
       (await readSandboxRouteRow(sandboxStub, siblingId)).spec.kilo as { scopeId?: string }
@@ -323,6 +330,9 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const stored = await siblingStub.getMetadata();
     expect(stored?.identity.sessionId).toBe(siblingId);
     expect(stored?.workspace?.worktreeId).toBe(worktreeId);
+    // The stored metadata keeps the identity worktree path; only the route spec
+    // directory is the isolated checkout.
+    expect(stored?.workspace?.workspacePath).toBe(identityPath);
   });
 
   it('replays a repeated sibling register and rejects a changed intent (N3)', async () => {
@@ -331,11 +341,17 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     const otherSandboxId = await generateSandboxId('*', ORG_ID, USER_ID, `${sessionId}_other`);
     const secret = 'test-nextauth-secret';
     const seal = await sealFor(sessionId, secret);
+    const storedDirectory = getWorktreeWorkspacePath(
+      ORG_ID,
+      USER_ID,
+      `worktree_${crypto.randomUUID()}`
+    );
 
     const sessionStub = sessions.getByName(sessionId);
+    const peer = new FakeSandboxPeer();
     await runInDurableObject(sessionStub, instance => {
       instance.env.NEXTAUTH_SECRET = secret;
-      instance.sandboxPeerFor = () => new FakeSandboxPeer();
+      instance.sandboxPeerFor = () => peer;
     });
 
     const input = (id: string, sbx: string) => ({
@@ -354,9 +370,29 @@ describe('SandboxSessionV2 worker RPC surface', () => {
     await expect(
       sessionStub.registerSessionFromMetadata(input(sessionId, sandboxId))
     ).resolves.toEqual({ success: true });
+
+    // Seed a registration whose directory predates this change; a replay must
+    // keep that stored directory rather than rebuilding the isolated one.
+    await runInDurableObject(sessionStub, async (instance, state) => {
+      const stored =
+        await state.storage.get<ControlPlaneSessionRegistration>('control_plane_session');
+      if (!stored) throw new Error('expected a stored registration');
+      await instance.registerSession({
+        ...stored,
+        spec: { ...stored.spec, directory: storedDirectory },
+      });
+    });
+
     await expect(
       sessionStub.registerSessionFromMetadata(input(sessionId, sandboxId))
     ).resolves.toEqual({ success: true });
+    await expect(readRegistration(sessionStub)).resolves.toMatchObject({
+      spec: { directory: storedDirectory },
+    });
+
+    // A subsequent prepare frame carries the stored old directory.
+    await sessionStub.send(promptPayload(messageId()));
+    expect(peer.prepareCalls[0]?.spec.directory).toBe(storedDirectory);
 
     // A changed sandbox id is a different intent.
     await expect(

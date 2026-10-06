@@ -2,6 +2,8 @@ import { getShareExtensionKey } from 'expo-share-intent';
 
 import { handleAppActionPath } from '@/lib/app-actions/action-url-handler';
 import { redirectSystemPath as mapWebPath } from '@/lib/deep-link-handler';
+import { handleGlanceableFixturePath } from '@/lib/glanceable/fixture-harness';
+import { handleHomeFixturePath } from '@/lib/home-fixture';
 
 // Composes the native-intent concerns in order: the share-extension check
 // returns early before web-path mapping (a share URL is never a web route), then
@@ -18,6 +20,14 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
   if (shareKey && path.includes(`dataUrl=${shareKey}`)) {
     // Cold start: boot the app normally. Warm: stay exactly where the user is.
     return initial ? '/' : null;
+  }
+  // Dev-only glanceable fixture links (`kiloapp:///dev/glanceable-fixture/<name>`).
+  if (__DEV__ && handleGlanceableFixturePath(path)) {
+    return null;
+  }
+  // Dev-only Home fixture links (`kiloapp:///dev/home-fixture/<name>`).
+  if (__DEV__ && handleHomeFixturePath(path)) {
+    return null;
   }
   if (handleAppActionPath({ path, initial })) {
     return null;

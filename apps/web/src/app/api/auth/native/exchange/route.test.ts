@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { failureResult } from '@/lib/maybe-result';
-import { APP_URL } from '@/lib/constants';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromBearerForCredentialExchange: jest.fn(),
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
@@ -12,7 +12,7 @@ import { POST } from './route';
 import {
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
-} from '@/lib/user/server';
+} from '@kilocode/web-shared/lib/user/server';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 import type { User } from '@kilocode/db/schema';
 

@@ -17,7 +17,7 @@ const mockGetIntegrationById = jest.fn();
 const mockHandleCommentReply = jest.fn();
 const mockHandleCreateIssuePR = jest.fn();
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
@@ -55,7 +55,7 @@ jest.mock('@/lib/auto-fix/github/handle-create-issue-pr', () => ({
   handleCreateIssuePR: mockHandleCreateIssuePR,
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   logExceptInTest: jest.fn(),
   errorExceptInTest: jest.fn(),
 }));

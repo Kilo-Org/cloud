@@ -215,7 +215,6 @@
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
     "bonusCreditsExpiring": "Platnosť bonusových kreditov v hodnote {{amount}} sa skončí {{date}}.",
-    "creditBalanceEmpty": "Nemáš žiadne kredity. Pre tento účet sa kredity spravujú mimo aplikácie pre iOS.",
     "signOutTitle": "Odhlásiť sa?",
     "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "deleteAccountTitle": "Odstrániť účet?",
@@ -2098,6 +2097,7 @@
       "idCopied": "ID relácie bolo skopírované",
       "couldNotCopyId": "ID relácie sa nepodarilo skopírovať.",
       "untitled": "Relácia bez názvu",
+      "actions": "Akcie s reláciou",
       "sessionDeleted": "Relácia bola odstránená",
       "needsInput": "čaká na odpoveď",
       "fromPlatform": "z {{platform}}",
@@ -2156,6 +2156,7 @@
       "readOnly": "Táto relácia je iba na čítanie.",
       "continueInNewSession": "Pokračovať v novej relácii",
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
+      "emptyTranscriptDescription": "Táto relácia zatiaľ neobsahuje žiadne správy.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
       "renameAccessibility": "Premenovať reláciu: {{title}}",
@@ -2640,6 +2641,7 @@
       "selectModelBeforeSending": "Pred odoslaním vyber model.",
       "preparingPlaceholder": "Pripravuje sa prostredie…",
       "finalizingPlaceholder": "Dokončuje sa…",
+      "sessionLoadFailed": "Reláciu sa nepodarilo načítať. Najprv to skúste znova.",
       "cannotReceiveFiles": "Táto relácia nemôže prijímať súbory. Ak chceš odoslať správu, odstráň prílohy.",
       "couldNotAttachFiles": "Súbory sa nepodarilo priložiť. Klepnutím na Odoslať to skús znova.",
       "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
@@ -2711,6 +2713,7 @@
       "provider": "Poskytovateľ",
       "totalCost": "Celkové náklady",
       "usageReflectsLatest": "Údaje o využití zodpovedajú poslednej dokončenej odpovedi asistenta.",
+      "usageUnavailable": "Využitie kontextu nie je k dispozícii",
       "tokenUsage": "Využitie tokenov",
       "cacheRate": "Podiel využitia vyrovnávacej pamäte",
       "modelsCount": "Modely ({{displayCount}})",
@@ -2749,7 +2752,10 @@
     "markdownImage": {
       "load": "Načítať",
       "loadWithHost": "Načítať {{host}}",
-      "httpsOnly": "Načítať možno iba obrázky cez HTTPS."
+      "httpsOnly": "Načítať možno iba obrázky cez HTTPS.",
+      "trustTitle": "Načítať obrázok z {{host}}?",
+      "trustMessage": "Ak serveru {{host}} dôveruješ, jeho obrázky sa budú načítavať bez každodenného pýtania. Neskôr to môžeš odobrať v Dôveryhodné servery.",
+      "loadOnce": "Načítať raz"
     },
     "markdownLink": {
       "invalidLink": "Tento odkaz sa nedá otvoriť.",
@@ -3268,8 +3274,12 @@
     "subtitle": "Servery, ktorých odkazy sa otvárajú bez potvrdenia",
     "emptyTitle": "Žiadne dôveryhodné servery",
     "emptyDescription": "Ak označíš server za dôveryhodný, odkazy naň sa budú otvárať bez ďalšieho potvrdenia.",
+    "imagesSectionTitle": "Dôveryhodné servery obrázkov",
+    "imagesSectionDescription": "Obrázky z týchto serverov sa načítavajú bez ďalšieho pýtania.",
+    "imagesSectionEmpty": "Žiadne dôveryhodné servery obrázkov",
     "revoke": "Zrušiť dôveru serveru {{host}}",
     "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
+    "revokeImageMessage": "Obrázky z tohto servera budú opäť vyžadovať potvrdenie.",
     "backToPreferences": "Späť na predvoľby"
   },
   "quickChat": {
@@ -3294,7 +3304,6 @@
     "newAgent": "Nový agent",
     "approving": "Schvaľuje sa...",
     "couldNotApprove": "Schválenie zlyhalo",
-    "couldNotStart": "Spustenie zlyhalo",
     "channelName": "Aktívne agenty",
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
@@ -3534,5 +3543,17 @@
       "unboundToast": "Repo neviazané",
       "unbindFailed": "Nepodarilo sa odpojiť repo"
     }
+  },
+  "credits": {
+    "title": "Kúpiť kredity",
+    "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
+    "packLabel": "Pridať {{amount}} v kreditoch",
+    "priceUnavailable": "Cena nie je k dispozícii",
+    "purchased": "Kredity boli pridané do vášho zostatku.",
+    "empty": "Balíky kreditov teraz nie sú k dispozícii.",
+    "noMatchingProducts": "App Store nevrátil žiadne zodpovedajúce balíky kreditov.",
+    "noMatchingProductsPlay": "Google Play nevrátil žiadne zodpovedajúce balíky kreditov.",
+    "purchaseOwnedByAnotherAccount": "Kredity na tomto účte Apple Account patria inému účtu Kilo. Ak ich chcete použiť, prihláste sa do príslušného účtu Kilo.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účte Google Play patria inému účtu Kilo. Prihláste sa do tohto účtu Kilo, aby ste ich použili."
   }
 }

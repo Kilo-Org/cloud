@@ -215,7 +215,6 @@
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
     "bonusCreditsExpiring": "Rachaidh {{amount}} de chreidmheasanna bónais in éag {{date}}.",
-    "creditBalanceEmpty": "Níl aon chreidmheas fágtha agat. Déantar creidmheasanna an chuntais seo a bhainistiú lasmuigh den aip iOS.",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",
@@ -2123,6 +2122,7 @@
       "idCopied": "Aitheantóir an tseisiúin cóipeáilte",
       "couldNotCopyId": "Níorbh fhéidir aitheantóir an tseisiúin a chóipeáil.",
       "untitled": "Seisiún gan teideal",
+      "actions": "Gníomhartha seisiúin",
       "sessionDeleted": "Scriosadh an seisiún",
       "needsInput": "ionchur de dhíth",
       "fromPlatform": "ó {{platform}}",
@@ -2184,6 +2184,7 @@
       "readOnly": "Is seisiún inléite amháin é seo.",
       "continueInNewSession": "Lean ar aghaidh i seisiún nua",
       "emptyDescription": "Seol teachtaireacht thíos chun tosú.",
+      "emptyTranscriptDescription": "Níl aon teachtaireacht sa seisiún seo fós.",
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
@@ -2677,6 +2678,7 @@
       "selectModelBeforeSending": "Roghnaigh samhail sula seolfaidh tú an teachtaireacht.",
       "preparingPlaceholder": "Ag socrú na timpeallachta...",
       "finalizingPlaceholder": "Ag críochnú...",
+      "sessionLoadFailed": "Níorbh fhéidir an seisiún a lódáil. Bain triail eile as ar dtús.",
       "cannotReceiveFiles": "Ní féidir leis an seisiún seo comhaid a fháil. Bain na ceangaltáin le do theachtaireacht a sheoladh.",
       "couldNotAttachFiles": "Níorbh fhéidir na comhaid a cheangal. Tapáil Seol chun triail eile a bhaint as.",
       "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",
@@ -2749,6 +2751,7 @@
       "provider": "Soláthraí",
       "totalCost": "Costas iomlán",
       "usageReflectsLatest": "Baineann an úsáid leis an bhfreagra is déanaí a chríochnaigh an cúntóir.",
+      "usageUnavailable": "Níl úsáid an chomhthéacs ar fáil",
       "tokenUsage": "Úsáid comharthaí",
       "cacheRate": "Ráta taisce",
       "modelsCount": "Samhlacha ({{displayCount}})",
@@ -2789,7 +2792,10 @@
     "markdownImage": {
       "load": "Lódáil",
       "loadWithHost": "Lódáil {{host}}",
-      "httpsOnly": "Ní cheadaítear ach íomhánna HTTPS."
+      "httpsOnly": "Ní cheadaítear ach íomhánna HTTPS.",
+      "trustTitle": "Lódáil an íomhá ó {{host}}?",
+      "trustMessage": "Má chuireann tú muinín i {{host}}, lódálfar a íomhánna gan a iarraidh gach uair. Is féidir leat é a tharraingt siar níos déanaí faoi Óstaigh iontaofa.",
+      "loadOnce": "Lódáil uair amháin"
     },
     "markdownLink": {
       "invalidLink": "Ní féidir an nasc seo a oscailt.",
@@ -3311,8 +3317,12 @@
     "subtitle": "Óstaigh a cheadaíonn tú a oscailt gan deimhniú",
     "emptyTitle": "Níl aon óstach iontaofa ann",
     "emptyDescription": "Má chuireann tú muinín in óstach naisc, osclófar naisc chuige gan deimhniú a iarraidh arís.",
+    "imagesSectionTitle": "Óstaigh iontaofa íomhá",
+    "imagesSectionDescription": "Lódáiltear íomhánna ó na hóstaigh seo gan a iarraidh arís.",
+    "imagesSectionEmpty": "Níl aon óstach iontaofa íomhá ann",
     "revoke": "Bain {{host}} de na hóstaigh iontaofa",
     "revokeMessage": "Iarrfaidh naisc chuig an óstach seo deimhniú arís.",
+    "revokeImageMessage": "Iarrfaidh íomhánna ón óstach seo deimhniú arís.",
     "backToPreferences": "Ar ais go dtí na roghanna"
   },
   "quickChat": {
@@ -3337,7 +3347,6 @@
     "newAgent": "Gníomhaire nua",
     "approving": "Á cheadú...",
     "couldNotApprove": "Níorbh fhéidir ceadú",
-    "couldNotStart": "Níorbh fhéidir tosú",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
     "openSession": "Oscail",
@@ -3577,5 +3586,17 @@
       "unboundToast": "Repo gan cheangal",
       "unbindFailed": "Níorbh fhéidir repo a dhícheangal"
     }
+  },
+  "credits": {
+    "title": "Ceannaigh creidmheasanna",
+    "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
+    "packLabel": "Cuir {{amount}} i gcreidmheasanna leis",
+    "priceUnavailable": "Praghas gan fáil",
+    "purchased": "Cuireadh creidmheasanna le do chothromas.",
+    "empty": "Níl pacáistí creidmheasa ar fáil faoi láthair.",
+    "noMatchingProducts": "Níor thug an App Store aon phacáistí creidmheasa comhoiriúnacha ar ais.",
+    "noMatchingProductsPlay": "Níor thug Google Play aon phacáistí creidmheasa comhoiriúnacha ar ais.",
+    "purchaseOwnedByAnotherAccount": "Baineann na creidmheasanna ar an Apple Account seo le cuntas Kilo eile. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid.",
+    "purchaseOwnedByAnotherAccountPlay": "Baineann na creidmheasanna ar an gcuntas Google Play seo le cuntas Kilo éagsúil. Sínigh isteach sa chuntas Kilo sin chun iad a úsáid."
   }
 }

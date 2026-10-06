@@ -215,7 +215,6 @@
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
     "bonusCreditsExpiring": "{{amount}} értékű bónuszkredit lejárati ideje: {{date}}.",
-    "creditBalanceEmpty": "Elfogytak a kreditjeid. Ennél a fióknál a krediteket az iOS-alkalmazáson kívül kezelheted.",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Munkamenet-azonosító másolva",
       "couldNotCopyId": "Nem sikerült másolni a munkamenet azonosítóját.",
       "untitled": "Névtelen munkamenet",
+      "actions": "Munkamenet műveletei",
       "sessionDeleted": "Munkamenet törölve",
       "needsInput": "válaszra vár",
       "fromPlatform": "innen: {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Ez a munkamenet csak olvasható.",
       "continueInNewSession": "Folytatás új munkamenetben",
       "emptyDescription": "A kezdéshez küldj egy üzenetet az alábbi mezőből.",
+      "emptyTranscriptDescription": "Ebben a munkamenetben még nincsenek üzenetek.",
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Küldés előtt válassz modellt.",
       "preparingPlaceholder": "Környezet előkészítése…",
       "finalizingPlaceholder": "Befejezés…",
+      "sessionLoadFailed": "A munkamenetet nem sikerült betölteni. Először próbálja újra.",
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
       "couldNotAttachFiles": "Nem sikerült csatolni a fájlokat. Az újrapróbáláshoz koppints a küldés gombjára.",
       "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
@@ -2635,6 +2637,7 @@
       "provider": "Szolgáltató",
       "totalCost": "Teljes költség",
       "usageReflectsLatest": "A használati adatok az asszisztens legutóbbi befejezett válaszát tükrözik.",
+      "usageUnavailable": "A környezethasználat nem érhető el",
       "tokenUsage": "Tokenhasználat",
       "cacheRate": "Gyorsítótár találati aránya",
       "modelsCount": "Modellek ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "Betöltés",
       "loadWithHost": "{{host}} betöltése",
-      "httpsOnly": "Csak HTTPS-kapcsolaton keresztül tölthetők be képek."
+      "httpsOnly": "Csak HTTPS-kapcsolaton keresztül tölthetők be képek.",
+      "trustTitle": "Kép betöltése innen: {{host}}?",
+      "trustMessage": "A(z) {{host}} webhely megbízása esetén a képei minden alkalommal kérdés nélkül betöltődnek. Ezt később a Megbízható webhelyek alatt visszavonhatod.",
+      "loadOnce": "Betöltés egyszer"
     },
     "markdownLink": {
       "invalidLink": "Ez a hivatkozás nem nyitható meg.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Jóváhagyás nélkül megnyitható webhelyek",
     "emptyTitle": "Nincsenek megbízható webhelyek",
     "emptyDescription": "Ha egy webhelyet megbízhatónak jelölsz, a hivatkozásai többé nem kérnek jóváhagyást megnyitáskor.",
+    "imagesSectionTitle": "Megbízható képwebhelyek",
+    "imagesSectionDescription": "Ezen webhelyek képei újabb kérdés nélkül betöltődnek.",
+    "imagesSectionEmpty": "Nincsenek megbízható képwebhelyek",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
+    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd.",
     "backToPreferences": "Vissza a beállításokhoz"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Új ügynök",
     "approving": "Jóváhagyás folyamatban...",
     "couldNotApprove": "Nem sikerült jóváhagyni",
-    "couldNotStart": "Nem sikerült elindítani",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
     "openSession": "Megnyitás",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Repo kötetlen",
       "unbindFailed": "Nem sikerült feloldani a repót"
     }
+  },
+  "credits": {
+    "title": "Kreditek vásárlása",
+    "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
+    "packLabel": "{{amount}} értékű kredit hozzáadása",
+    "priceUnavailable": "Az ár nem érhető el",
+    "purchased": "A kreditek hozzáadva az egyenlegedhez.",
+    "empty": "A kreditcsomagok jelenleg nem érhetők el.",
+    "noMatchingProducts": "Az App Store nem adott vissza megfelelő kreditcsomagot.",
+    "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
+    "purchaseOwnedByAnotherAccount": "Az ehhez az Apple Account-fiókhoz tartozó kreditek egy másik Kilo-fiókhoz kapcsolódnak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
+    "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
   }
 }

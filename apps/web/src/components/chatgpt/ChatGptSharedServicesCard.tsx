@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChatGptUsageLimitDialog } from '@/components/chatgpt/ChatGptUsageLimitDialog';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
 import { openAiChatGptByokPath, startOpenAiChatGptConnect } from '@/lib/auth/openai/connect';
-import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
+import type { OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
 
 /**
  * The organization's shared-services ChatGPT connection. It is one connection

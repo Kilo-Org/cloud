@@ -1,19 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { type UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { type UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   COMPATIBLE_USER_AGENT,
   type DirectByokModel,
   type DirectByokProvider,
-} from '@/lib/ai-gateway/providers/direct-byok/types';
-import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
-import { readDb } from '@/lib/drizzle';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { OpenCodeSettings } from '@kilocode/db';
-import { getAiSdkProvider } from '@/lib/ai-gateway/providers/model-settings';
-import { getFallbackModelVariants } from '@/lib/ai-gateway/providers/variants';
+import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { getFallbackModelVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
@@ -72,7 +72,7 @@ function convertModel(
 }
 
 async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
-  let nextPreferredId = preferredModels.length;
+  let nextPreferredId = (await getPreferredModels()).length;
   return (
     await Promise.all(
       DIRECT_BYOK_PROVIDERS.filter(provider => byokProviders.includes(provider.id)).map(

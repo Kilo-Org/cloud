@@ -1,7 +1,7 @@
 // Every route module loads its own dependency graph. Mock the database, the
 // provider clients, and the service helpers so a route call only exercises the
 // wrapped handler and the timing line it emits.
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {},
   readDb: {
     select: jest.fn(() => ({
@@ -15,11 +15,11 @@ jest.mock('@/lib/auth/native-admission', () => ({
   ...jest.requireActual('@/lib/auth/native-admission'),
   issueAdmissionChallenge: jest.fn(),
 }));
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromBearerForCredentialExchange: jest.fn(),
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
-jest.mock('@/lib/auth/magic-link-tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens', () => ({
   createSignInCode: jest.fn(),
   deleteSignInCode: jest.fn(),
   reserveSignInCode: jest.fn(),
@@ -27,7 +27,7 @@ jest.mock('@/lib/auth/magic-link-tokens', () => ({
   releaseSignInCode: jest.fn(),
   consumeSignInCode: jest.fn(),
 }));
-jest.mock('@/lib/email', () => ({ sendSignInCodeEmail: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/email', () => ({ sendSignInCodeEmail: jest.fn() }));
 jest.mock('@/lib/auth/email-signin-eligibility', () => ({
   checkEmailSignInEligibility: jest.fn(),
   checkDomainSignInEligibility: jest.fn(),
@@ -43,15 +43,12 @@ jest.mock('@/lib/user', () => ({
   findUserByNormalizedEmail: jest.fn(),
   findUserIdByAuthProvider: jest.fn(),
 }));
-jest.mock('@/lib/user/find-user-by-id', () => ({
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateApiToken: jest.fn(),
   TOKEN_EXPIRY: { oneHour: 3600 },
-}));
-jest.mock('@/lib/organizations/verified-domain-membership', () => ({
-  ensureVerifiedDomainOrganizationMembership: jest.fn(),
 }));
 jest.mock('@/lib/auth/native-id-tokens', () => ({
   ...jest.requireActual('@/lib/auth/native-id-tokens'),
@@ -59,12 +56,12 @@ jest.mock('@/lib/auth/native-id-tokens', () => ({
   verifyNativeGoogleIdToken: jest.fn(),
   exchangeNativeGoogleAuthCode: jest.fn(),
 }));
-jest.mock('@/lib/config.server', () => ({ GOOGLE_CLIENT_ID: 'web-client-id' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ GOOGLE_CLIENT_ID: 'web-client-id' }));
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
-jest.mock('@/lib/posthog', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
   default: jest.fn(() => ({ capture: jest.fn() })),
 }));
@@ -78,8 +75,8 @@ import { POST as tokenPost } from '@/app/api/auth/native/token/route';
 
 import { issueAdmissionChallenge } from '@/lib/auth/native-admission';
 import { rotateRefreshToken } from '@/lib/auth/device-sessions';
-import { createSignInCode } from '@/lib/auth/magic-link-tokens';
-import { sendSignInCodeEmail } from '@/lib/email';
+import { createSignInCode } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 
 const mockIssueAdmissionChallenge = jest.mocked(issueAdmissionChallenge);

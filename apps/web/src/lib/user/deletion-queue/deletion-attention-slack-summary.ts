@@ -3,12 +3,12 @@ import 'server-only';
 import { sql } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
 import { UserDeletionRequestStatus, UserDeletionStepStatus } from '@kilocode/db/schema-types';
-import { APP_URL } from '@/lib/constants';
-import { db } from '@/lib/drizzle';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
   ACTIVE_REQUEST_STATUSES,
   DUPLICATE_OF_ACTIVE_REQUEST_ATTENTION_CODE,

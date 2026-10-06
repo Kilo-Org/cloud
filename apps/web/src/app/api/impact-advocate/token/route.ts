@@ -2,8 +2,8 @@ import { headers } from 'next/headers';
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { referral_codes } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { getUserFromAuth } from '@/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import {
   getImpactAdvocateProgramKeyForProduct,
   getImpactAdvocateWidgetId,

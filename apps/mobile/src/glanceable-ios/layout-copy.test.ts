@@ -178,10 +178,9 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().locale).not.toContain('-');
   });
 
-  it('covers every status the layouts render, the in-place actions, and the language tag', () => {
+  it('covers every status the layouts render, the action labels, and the language tag', () => {
     expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
       'approve',
-      'approving',
       'digits',
       'empty',
       'expired',
@@ -197,7 +196,6 @@ describe('withGlanceableCopy', () => {
       'scheduled',
       'signed_out',
       'stale',
-      'starting',
       'waiting',
     ]);
   });

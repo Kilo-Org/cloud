@@ -1,6 +1,9 @@
-import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
+import {
+  isEmailBlacklistedByDomainAsync,
+  isBlockedTLD,
+} from '@kilocode/web-shared/lib/user/server';
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
 }));

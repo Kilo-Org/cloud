@@ -2,9 +2,10 @@ import { Button, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
-  allowsTightening,
+  controlSize,
   cornerRadius,
   environment,
+  fixedSize,
   font,
   foregroundStyle,
   frame,
@@ -185,10 +186,11 @@ const layout: LiveActivityComponent<ContentState> = props => {
         modifiers={[
           font({ textStyle: 'footnote', weight: 'semibold' }),
           // The line stays one row: the banner grows once for the notice and
-          // never reflows again as the copy changes language.
+          // never reflows again as the copy changes language. In the widget
+          // renderer a scaling line always draws at its minimum, so 0.85 is
+          // the size it draws at: one step below footnote, still readable.
           lineLimit(1),
-          minimumScaleFactor(0.6),
-          allowsTightening(true),
+          minimumScaleFactor(0.85),
           foregroundStyle(PlatformColor('systemOrange')),
         ]}
       >
@@ -212,84 +214,85 @@ const layout: LiveActivityComponent<ContentState> = props => {
       />
     );
 
-  // One row per non-zero state: a colored glyph carries the state (readable
-  // without color), a fixed-width count, then the label. Every row shares one
-  // type size so the counts line up on a grid; only the label dims to rank
-  // them, because a second font size in a two-line banner reads as a mistake.
-  // `showWait` is false for the small family, which draws one line and keeps
-  // the relative wait off it; the phone banner and the expanded island keep it.
-  const countRow = (line: (typeof countLines)[number], isPrimary: boolean, showWait = true) => (
-    <HStack key={line.label} alignment="center" spacing={7}>
-      <Image systemName={line.icon} color={line.color} size={13} />
-      <Text
-        modifiers={[
-          font({ textStyle: 'subheadline', weight: 'semibold' }),
-          monospacedDigit(),
-          // The number is the whole point of the row, so it takes its space
-          // first. Without the priority a long label squeezed it to nothing
-          // and the row drew a glyph and a word with no count.
-          layoutPriority(1),
-          primaryForeground,
-        ]}
-      >
-        {count(line.count)}
-      </Text>
-      <Text
-        modifiers={[
-          font({ textStyle: 'subheadline' }),
-          // The label carries the meaning, so it shrinks and tightens rather
-          // than truncating: a German or Albanian label wrapped to two lines
-          // otherwise, which broke the row grid the three counts read on. Do
-          // not add `truncationMode` here — it suppresses the scaling and the
-          // label truncates again. Tail is the default.
-          lineLimit(1),
-          minimumScaleFactor(0.6),
-          allowsTightening(true),
-          isPrimary ? primaryForeground : mutedForeground,
-        ]}
-      >
-        {line.label}
-      </Text>
-      {showWait && line.kind === 'needsInput' && needsInputSince !== null ? (
+  // One row per state: a colored glyph carries the state (readable without
+  // color), a fixed-width count, then the label. Every row shares one type
+  // size so the counts line up on a grid; only the label dims to rank them.
+  // `showTimes` draws the needs-input wait and the scheduled wake beside
+  // their rows. A time that cannot fit is dropped whole, never truncated: the
+  // expanded island and the watch row never draw one, and the banner drops a
+  // row's time when its label is longer than the 13 characters that leave the
+  // time room beside the buttons (a character count is the measure this
+  // process has).
+  const TIME_LABEL_BUDGET = 13;
+  // Past 16 characters a label no longer fits beside the mark and the buttons
+  // even with its time dropped (German "Eingabe erforderlich"), so the mark
+  // gives its width up next: the last thing a narrow surface drops before a
+  // label truncates.
+  const markFits = countLines.every(line => (line.label ?? '').length <= 16);
+  // `elapsed` is the repo-local @expo/ui style (patches/@expo+ui): the wait in
+  // its one largest unit, seconds only under a minute ("31 minutes", "20
+  // seconds"); before iOS 18 it is the relative style.
+  const waitStyle = 'elapsed';
+  const timeModifiers = [
+    font({ textStyle: 'footnote' }),
+    monospacedDigit(),
+    lineLimit(1),
+    mutedForeground,
+  ];
+  // A zero row keeps its place in the grid but sinks below every non-zero one
+  // and draws fully muted: glyph, number and label in the secondary colour,
+  // the number without its emphasis. A stable sort keeps the kind order.
+  const ledgerRows = [
+    ...countLines.filter(line => line.count > 0),
+    ...countLines.filter(line => line.count === 0),
+  ];
+  const mutedColor = PlatformColor('secondaryLabel');
+  const countRow = (line: (typeof countLines)[number], isPrimary: boolean, showTimes: boolean) => {
+    const zero = line.count === 0;
+    const timeFits = showTimes && (line.label ?? '').length <= TIME_LABEL_BUDGET;
+    return (
+      <HStack key={line.label} alignment="center" spacing={7}>
+        <Image systemName={line.icon} color={zero ? mutedColor : line.color} size={13} />
         <Text
-          date={new Date(needsInputSince)}
-          dateStyle="relative"
+          modifiers={[
+            font({ textStyle: 'subheadline', weight: zero ? 'regular' : 'semibold' }),
+            monospacedDigit(),
+            // The number is the whole point of the row, so it takes its space
+            // first: a long label truncates before the count does.
+            layoutPriority(1),
+            zero ? mutedForeground : primaryForeground,
+          ]}
+        >
+          {count(line.count)}
+        </Text>
+        <Text
           modifiers={[
             font({ textStyle: 'subheadline' }),
-            monospacedDigit(),
-            // The relative style picks its own unit count per surface: one
-            // unit in the banner, two in the expanded island. A fixed width
-            // cannot force the short form — it only truncates it — so the
-            // text keeps its natural width.
+            // One line at the row's own size. Do not add `minimumScaleFactor`:
+            // in the widget renderer it always drew the label at its minimum
+            // scale, room or not, far smaller than the count beside it.
             lineLimit(1),
-            mutedForeground,
+            // A live time reserves more width than it draws, so without the
+            // priority it took the label's room and the label truncated
+            // beside a time that fit.
+            layoutPriority(1),
+            isPrimary && !zero ? primaryForeground : mutedForeground,
           ]}
-        />
-      ) : null}
-      {showWait && line.kind === 'scheduled' && scheduledAt !== null ? (
-        <Text
-          date={new Date(scheduledAt)}
-          // The wait row above counts a duration ("28 min"); a wake is the
-          // moment the user asked for, so it reads as an absolute clock time
-          // ("9:00 AM"), the way the session list shows it. One style per row:
-          // a relative style here would say "in 2 hours" where the user picked
-          // the time of day.
-          dateStyle="time"
-          modifiers={[
-            font({ textStyle: 'subheadline' }),
-            monospacedDigit(),
-            lineLimit(1),
-            mutedForeground,
-          ]}
-        />
-      ) : null}
-    </HStack>
-  );
-
-  // The emphasised row is the ranked primary, not the first row: with zeros
-  // drawn the first row is often a 0, and emphasising that would point the
-  // user at the state with nothing in it.
-  const countRows = countLines.map(line => countRow(line, line === primary));
+        >
+          {line.label}
+        </Text>
+        {timeFits && line.kind === 'needsInput' && needsInputSince !== null ? (
+          <Text date={new Date(needsInputSince)} dateStyle={waitStyle} modifiers={timeModifiers} />
+        ) : null}
+        {timeFits && line.kind === 'scheduled' && scheduledAt !== null ? (
+          // A wait counts a duration ("31 minutes"); a wake is the moment the
+          // user asked for, so it reads as a clock time ("9:00 AM"), the way
+          // the session list shows it.
+          <Text date={new Date(scheduledAt)} dateStyle="time" modifiers={timeModifiers} />
+        ) : null}
+      </HStack>
+    );
+  };
 
   // The mark, then the rows. The Lock Screen banner and the expanded Dynamic
   // Island draw the same block, so one glance teaches both surfaces. The spoken
@@ -298,13 +301,13 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // would swallow the two taps into the count label. The Apple Watch and CarPlay
   // draw the `bannerSmall` section instead: their activity family is `.small`,
   // so they get one compact row plus the watch control rather than this block.
-  const markAndRows = (markSize: number) => (
+  const markAndRows = (markSize: number, showTimes: boolean) => (
     <HStack
       alignment="center"
       spacing={12}
       modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
     >
-      {logo(markSize)}
+      {markFits ? logo(markSize) : null}
       {/* The combined label sits on the counts/status block alone, the way the
           watch `bannerSmall` scopes it to its count row, so the action buttons
           after this block stay separate, focusable elements. `combine` on the
@@ -317,8 +320,10 @@ const layout: LiveActivityComponent<ContentState> = props => {
         modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
       >
         {hasCounts ? (
+          // The emphasised row is the ranked primary, not the first row: with
+          // zeros drawn the first row is often a 0.
           <VStack alignment="leading" spacing={5}>
-            {countRows}
+            {ledgerRows.map(line => countRow(line, line === primary, showTimes))}
           </VStack>
         ) : (
           <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
@@ -340,11 +345,13 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // it. The literals must stay equal to the targets in `interaction.ts`, which
   // `active-agents-live-activity.test.ts` holds them to.
   //
-  // A `Button` with `label` + `systemImage`, not an icon child: this process
-  // has no React context and no SVG renderer, so the theme tokens reach it as
-  // `PlatformColor` — the same values the count rows use — and the glyphs are
-  // SF Symbols, the set the count rows already draw. Approve carries the
-  // needs-input orange of the row it answers; Open takes the label color.
+  // A text `Button`, not an icon child: this process has no React context and
+  // no SVG renderer, so the theme tokens reach it as `PlatformColor` — the
+  // same values the count rows use. Approve carries the needs-input orange of
+  // the row it answers; Open takes the label color. The two stack in one
+  // trailing column at the small control size and their natural width
+  // (`fixedSize`): side by side, or with icons, they squeezed the rows until
+  // the labels and the wait truncated and the button titles wrapped.
   //
   // The Open tap has to show the user the session, and a Live Activity button's
   // intent performs in the app's process without foregrounding it: unattended,
@@ -355,23 +362,21 @@ const layout: LiveActivityComponent<ContentState> = props => {
   // plain extra prop the widget process serialises with the rest.
   const openButtonProps = { openAppWhenRun: true };
   const actions = (
-    <HStack alignment="center" spacing={10}>
+    <VStack alignment="trailing" spacing={8}>
       {canApprove ? (
         <Button
           target="approve"
           label={COPY.approve}
-          systemImage="checkmark.circle"
-          modifiers={[tint(PlatformColor('systemOrange'))]}
+          modifiers={[fixedSize(), controlSize('small'), tint(PlatformColor('systemOrange'))]}
         />
       ) : null}
       <Button
         {...openButtonProps}
         target="open"
         label={COPY.open}
-        systemImage="arrow.up.forward.app"
-        modifiers={[tint(PlatformColor('label'))]}
+        modifiers={[fixedSize(), controlSize('small'), tint(PlatformColor('label'))]}
       />
-    </HStack>
+    </VStack>
   );
 
   return {
@@ -389,7 +394,7 @@ const layout: LiveActivityComponent<ContentState> = props => {
         ]}
       >
         <HStack>
-          {markAndRows(26)}
+          {markAndRows(26, true)}
           {actions}
         </HStack>
         {noticeLine}
@@ -490,7 +495,7 @@ const layout: LiveActivityComponent<ContentState> = props => {
         ]}
       >
         <HStack>
-          {markAndRows(24)}
+          {markAndRows(24, false)}
           {actions}
         </HStack>
         {noticeLine}

@@ -11,7 +11,7 @@ import type {
   createWebSocketManager,
   WebSocketManagerConfig,
 } from '@/lib/cloud-agent-next/websocket-manager';
-import type * as Constants from '@/lib/constants';
+import type * as Constants from '@kilocode/web-shared/lib/constants';
 import type { RootRouter } from '@/routers/root-router';
 import type { CodeReviewStreamView as CodeReviewStreamViewComponent } from './CodeReviewStreamView';
 import type { fetchStreamTicket } from './fetch-stream-ticket';
@@ -102,8 +102,8 @@ jest.mock('./fetch-stream-ticket', () => ({
     mockFetchStreamTicket(sessionId, organizationId),
 }));
 
-jest.mock('@/lib/constants', () => ({
-  ...jest.requireActual<typeof Constants>('@/lib/constants'),
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
+  ...jest.requireActual<typeof Constants>('@kilocode/web-shared/lib/constants'),
   CLOUD_AGENT_NEXT_WS_URL: 'http://localhost:8787',
 }));
 

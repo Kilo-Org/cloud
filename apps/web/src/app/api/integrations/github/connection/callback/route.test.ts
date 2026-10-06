@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { consumeGitHubConnectionOAuthState } from '@/lib/integrations/github/connection-state';
 import {
   completeGitHubConnectionAttempt,
@@ -10,14 +10,14 @@ import {
   discoverAuthorizedGitHubInstallations,
   verifyGitHubInstallationAuthorization,
 } from '@/lib/integrations/github/installation-authorization';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/integrations/github/connection-state');
 jest.mock('@/lib/integrations/github/connection-service');
 jest.mock('@/lib/integrations/platforms/github/adapter');
 jest.mock('@/lib/integrations/github/installation-authorization');
-jest.mock('@/routers/organizations/utils');
+jest.mock('@kilocode/web-shared/routers/organizations/utils');
 jest.mock('@/lib/integrations/github/multiple-installations', () => ({
   isGitHubConnectionManagementEnabled: () => true,
 }));
@@ -49,7 +49,7 @@ const attempt = {
   created_at: '2026-09-05T00:00:00.000Z',
 };
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({

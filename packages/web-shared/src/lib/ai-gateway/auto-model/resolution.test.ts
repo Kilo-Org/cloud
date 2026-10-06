@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
-    '@/lib/ai-gateway/providers/gateway-models-cache'
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
   getOpenRouterModelsFromDatabase: jest.fn(),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
+  ...jest.requireActual<typeof AutoFreeConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config'
+  ),
+  getConfiguredAutoFreeModels: jest.fn(),
 }));
 
 import type * as AutoModelResolution from './resolution';
@@ -17,10 +25,10 @@ import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
-} from '@/lib/ai-gateway/auto-model';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 const { resolveAutoModel, applyResolvedAutoModel } =
   jest.requireActual<typeof AutoModelResolution>('./resolution');
@@ -39,7 +47,10 @@ const zeroBalancePromise = Promise.resolve(0);
 const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
 const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
   jest.Mocked<typeof GatewayModelsCache>
->('@/lib/ai-gateway/providers/gateway-models-cache');
+>('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
+const { getConfiguredAutoFreeModels: mockedGetConfiguredAutoFreeModels } = jest.requireMock<
+  jest.Mocked<typeof AutoFreeConfigModule>
+>('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config');
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',
@@ -420,7 +431,22 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
 
 describe('resolveAutoModel — kilo-auto/free branch', () => {
   beforeEach(() => {
-    mockedGetOpenRouterModels.mockResolvedValue(new Set(['poolside/laguna-s-2.1:free']));
+    mockedGetOpenRouterModels.mockResolvedValue(
+      new Set(['poolside/laguna-s-2.1:free', 'nvidia/nemotron-3-ultra-550b-a55b:free'])
+    );
+    mockedGetConfiguredAutoFreeModels.mockResolvedValue([
+      {
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        weight: 1,
+        reasoning: { enabled: true, effort: 'high' },
+      },
+      {
+        model: 'poolside/laguna-s-2.1:free',
+        weight: 1,
+        reasoning: { enabled: true, effort: 'high' },
+      },
+      { model: 'test/absent:free', weight: 1, reasoning: { enabled: true } },
+    ]);
   });
 
   it('excludes candidates denied by the effective organization policy', async () => {
@@ -449,19 +475,78 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
     expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('poolside/laguna-s-2.1:free');
   });
 
-  it('reports no free models when organization policy denies every candidate', async () => {
+  it('reports no free models when organization policy denies every candidate and the fallback', async () => {
+    const isAutoFreeCandidateAllowed = jest.fn(async (_modelId: string) => false);
     const result = await resolveAutoModel(
       {
         ...baseParams,
         model: KILO_AUTO_FREE_MODEL.id,
         apiKind: 'chat_completions',
-        isAutoFreeCandidateAllowed: async () => false,
+        isAutoFreeCandidateAllowed,
       },
       nullUserPromise,
       zeroBalancePromise
     );
 
     expect(result).toEqual({ kind: 'no_free_models_available' });
+    expect(isAutoFreeCandidateAllowed).toHaveBeenCalledWith('openrouter/free');
+  });
+
+  it('falls back to openrouter/free when organization policy denies every configured model', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: KILO_AUTO_FREE_MODEL.id,
+        apiKind: 'chat_completions',
+        isAutoFreeCandidateAllowed: async modelId => modelId === 'openrouter/free',
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'openrouter/free', reasoning: { enabled: true } },
+    });
+  });
+
+  it.each([
+    ['nothing is configured', null],
+    [
+      'no configured model is available',
+      [{ model: 'test/absent:free', weight: 1, reasoning: { enabled: true } }],
+    ],
+  ])('falls back to openrouter/free when %s', async (_, configuredModels) => {
+    mockedGetConfiguredAutoFreeModels.mockResolvedValue(configuredModels);
+
+    const result = await resolveAutoModel(
+      { ...baseParams, model: KILO_AUTO_FREE_MODEL.id, apiKind: 'chat_completions' },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'openrouter/free', reasoning: { enabled: true } },
+    });
+  });
+
+  it('skips configured models that are unavailable', async () => {
+    mockedGetConfiguredAutoFreeModels.mockResolvedValue([
+      { model: 'test/absent:free', weight: 100, reasoning: { enabled: true } },
+      { model: 'poolside/laguna-s-2.1:free', weight: 1, reasoning: { enabled: false } },
+    ]);
+
+    const result = await resolveAutoModel(
+      { ...baseParams, model: KILO_AUTO_FREE_MODEL.id, apiKind: 'chat_completions' },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'poolside/laguna-s-2.1:free', reasoning: { enabled: false } },
+    });
   });
 });
 

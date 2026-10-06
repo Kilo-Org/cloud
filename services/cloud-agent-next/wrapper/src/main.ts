@@ -22,6 +22,7 @@ import {
   type PreparingStep,
 } from '../../src/shared/protocol.js';
 import { WRAPPER_VERSION } from '../../src/shared/wrapper-version.js';
+import { GITHUB_REVIEW_MCP_BINARY } from '../../src/shared/github-review-target.js';
 import { WrapperState } from './state.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
 import { createKiloRuntimeLifecycle, type KiloRuntimeLifecycle } from './kilo-runtime-lifecycle.js';
@@ -45,7 +46,6 @@ import {
   type BootstrapProgressStep,
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
-  RestoredWorkspaceReconciliationError,
 } from './session-bootstrap.js';
 
 /** Grace period before force exit during shutdown (110 seconds) */
@@ -273,6 +273,7 @@ async function main() {
     resetLifecycle: () => lifecycleManager?.reset(),
     onDeliveryAcknowledged: (kind: 'async-prompt' | 'sync-command' | 'failed') =>
       lifecycleManager?.onDeliveryAcknowledged(kind),
+    onMessageAccepted: () => lifecycleManager?.resetPublicationRecoveryBudget(),
     readySession: readySession,
     updateRuntimeEnvironment: (env: Record<string, string>) => runtime.updateEnvironment(env),
     materializePromptAttachments,
@@ -351,6 +352,7 @@ async function main() {
     bindClient: (result, workspacePath) =>
       createWrapperKiloClient(result.client as SDKClient, result.server.url, workspacePath),
     captureEnv: () => process.env,
+    resolveGitHubReviewPublishBinary: () => Bun.which(GITHUB_REVIEW_MCP_BINARY) ?? undefined,
     getPlatform: () => serverConfig.platform,
     log: logToFile,
     chdir: workspacePath => process.chdir(workspacePath),
@@ -484,6 +486,8 @@ async function main() {
           closeConnections: () => connectionManager?.close() ?? Promise.resolve(),
           isConnected: () => connectionManager?.isConnected() ?? false,
           reconnectEventSubscription: () => connectionManager?.reconnectEventSubscription(),
+          isGitHubReviewPublicationInstalled: () =>
+            runtime?.isGitHubReviewPublicationInstalled() ?? false,
         }
       );
       lifecycleManager.start();
@@ -790,11 +794,7 @@ async function main() {
     } catch (error) {
       if (request.preparation) {
         const safeError =
-          error instanceof WrapperBootstrapError
-            ? error.message
-            : error instanceof RestoredWorkspaceReconciliationError
-              ? 'Workspace reconciliation failed'
-              : 'Environment preparation failed';
+          error instanceof WrapperBootstrapError ? error.message : 'Environment preparation failed';
         emitPreparing?.({
           version: 2,
           attemptId: request.preparation.attemptId,
@@ -816,18 +816,12 @@ async function main() {
       const bootstrapError =
         error instanceof WrapperBootstrapError
           ? error
-          : error instanceof RestoredWorkspaceReconciliationError
-            ? new WrapperBootstrapError({
-                code: 'WORKSPACE_RECONCILIATION_FAILED',
-                message: error.message,
-                retryable: true,
-              })
-            : new WrapperBootstrapError({
-                code: 'WORKSPACE_SETUP_FAILED',
-                subtype: 'workspace_setup_unknown',
-                message: 'Workspace setup failed',
-                retryable: true,
-              });
+          : new WrapperBootstrapError({
+              code: 'WORKSPACE_SETUP_FAILED',
+              subtype: 'workspace_setup_unknown',
+              message: 'Workspace setup failed',
+              retryable: true,
+            });
       logToFile(
         `session/ready failed kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
       );

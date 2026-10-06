@@ -1,4 +1,4 @@
-import type { OrganizationGroupPolicyType } from '@/lib/organizations/group-policies/organization-group-policies';
+import type { OrganizationGroupPolicyType } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import type { OrganizationGroupPolicyTarget } from '@/components/organizations/groups/policies/types';
 
 export type OrganizationGroupsDrawerRef =

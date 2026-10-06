@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   createScheduledJobRun: jest.fn(() => ({ runId: 'run-id' })),
@@ -17,7 +17,9 @@ jest.mock('@/lib/kiloclaw/access-codes', () => ({ cleanupExpiredAccessCodes: jes
 jest.mock('@/lib/integrations/github/install-state', () => ({
   cleanupExpiredInstallStates: jest.fn(),
 }));
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => jest.fn()) }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 
 import { cleanupExpiredDeviceAuthRequests } from '@/lib/device-auth/device-auth';
 import { cleanupExpiredAdmissionChallenges } from '@/lib/auth/native-admission';

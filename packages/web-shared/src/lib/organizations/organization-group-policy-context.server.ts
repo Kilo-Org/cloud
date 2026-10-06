@@ -11,11 +11,11 @@ import {
 import {
   OrganizationGroupPoliciesSchema,
   type OrganizationGroupPolicies,
-} from '@/lib/organizations/group-policies/organization-group-policies';
+} from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type OrganizationPolicySubject =
   | {

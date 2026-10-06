@@ -1203,6 +1203,9 @@ export const AuditLogAction = z.enum([
   'organization.domain_claim.verify',
   'organization.domain_claim.lose_verification',
   'organization.domain_claim.remove',
+  'organization.domain_claim.cleanup_started',
+  'organization.domain_claim.cleanup_completed',
+  'organization.domain_claim.cleanup_failed',
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
@@ -2264,7 +2267,13 @@ export const CustomLlmDefinitionSchema = z.object({
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 export const AutoFreeModelSchema = z.object({
-  model: z.string().trim().min(1),
+  model: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9./:~-]+$/,
+      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
+    ),
   weight: z.number().int().positive(),
   reasoning: z.object({
     enabled: z.boolean().optional(),
@@ -2297,10 +2306,30 @@ export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  // The model types listed by Vercel AI Gateway; OpenRouter does not set a type.
+  type: z
+    .enum([
+      'language',
+      'embedding',
+      'image',
+      'video',
+      'speech',
+      'transcription',
+      'reranking',
+      'realtime',
+      'evaluation',
+    ])
+    .optional()
+    .catch(undefined),
   alias_target: z
     .object({
       slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
+  architecture: z
+    .object({
+      output_modalities: z.array(z.string()),
     })
     .optional()
     .catch(undefined),

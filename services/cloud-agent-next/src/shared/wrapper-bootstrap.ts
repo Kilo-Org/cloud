@@ -37,7 +37,6 @@ export type WrapperBootstrapWorkspace = {
   strictBranch?: boolean;
   preferSnapshot?: boolean;
   requireSnapshot?: boolean;
-  restoredFromBackup?: boolean;
 };
 
 export type WrapperBootstrapRuntimeSkill = {
@@ -67,18 +66,6 @@ export type WrapperRuntimeCredentialProxyConfig = {
     providerBaseUrl: string;
     sessionIngestBaseUrl: string;
   };
-};
-
-export type WrapperDevContainerMetadata = {
-  workspacePath: string;
-  innerWorkspaceFolder: string;
-  wrapperPort: number;
-  configPath: string;
-};
-
-export type WrapperBootstrapDevContainer = {
-  requested: true;
-  resolved?: WrapperDevContainerMetadata;
 };
 
 export type WrapperSessionBinding = {
@@ -138,7 +125,6 @@ export type WrapperSessionReadyRequest = {
   kiloSessionId: string;
   workspace: WrapperBootstrapWorkspace;
   repo?: WrapperBootstrapRepoSource;
-  devcontainer?: WrapperBootstrapDevContainer;
   materialized: WrapperBootstrapMaterializedConfig;
   runtimeCredentialProxy?: WrapperRuntimeCredentialProxyConfig;
   session: WrapperSessionBinding;
@@ -159,7 +145,6 @@ export type WrapperWorkspaceReady = {
   gitToken?: string;
   gitlabTokenManaged?: boolean;
   bitbucketTokenManaged?: boolean;
-  devcontainer?: WrapperDevContainerMetadata;
 };
 
 /**
@@ -252,15 +237,6 @@ export function restoreIncompleteLogFields(
  */
 export type WrapperBootstrapTelemetry = {
   workspaceWasWarm: boolean;
-  /**
-   * True when the workspace was populated from an R2 backup rather than
-   * genuinely reused from a prior bootstrap. A restored workspace still
-   * reports `workspaceWasWarm: true` (the bootstrap marker is included in
-   * the backup archive), so this disambiguates "reused as-is" from
-   * "restored over the network," which otherwise inflates apparent
-   * sandbox-reuse rates.
-   */
-  restoredFromBackup: boolean;
   clone?: WrapperCloneTelemetry;
   restore?: WrapperRestoreTelemetry;
 };
@@ -342,20 +318,6 @@ function isRuntimeCredentialProxyConfig(
   });
 }
 
-function isWrapperDevContainerMetadata(value: unknown): value is WrapperDevContainerMetadata {
-  if (!isRecord(value)) return false;
-  if (!hasString(value, 'workspacePath')) return false;
-  if (!hasString(value, 'innerWorkspaceFolder')) return false;
-  if (!hasString(value, 'configPath')) return false;
-  const wrapperPort = value.wrapperPort;
-  return (
-    typeof wrapperPort === 'number' &&
-    Number.isInteger(wrapperPort) &&
-    wrapperPort >= 1 &&
-    wrapperPort <= 65535
-  );
-}
-
 export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSessionReadyRequest {
   if (!isRecord(value)) return false;
   if (!hasString(value, 'agentSessionId')) return false;
@@ -368,26 +330,16 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
   if (!hasString(workspace, 'workspacePath')) return false;
   if (!hasString(workspace, 'sessionHome')) return false;
   if (!hasString(workspace, 'branchName')) return false;
-  if (
-    workspace.restoredFromBackup !== undefined &&
-    typeof workspace.restoredFromBackup !== 'boolean'
-  ) {
-    return false;
-  }
   if (workspace.requireSnapshot !== undefined && typeof workspace.requireSnapshot !== 'boolean') {
     return false;
   }
 
-  const devcontainer = value.devcontainer;
-  if (devcontainer !== undefined) {
-    if (!isRecord(devcontainer) || devcontainer.requested !== true) return false;
-    if (
-      devcontainer.resolved !== undefined &&
-      !isWrapperDevContainerMetadata(devcontainer.resolved)
-    ) {
-      return false;
-    }
-  }
+  if (
+    value.devcontainer !== undefined ||
+    typeof value.sandboxId !== 'string' ||
+    value.sandboxId.startsWith('dind-')
+  )
+    return false;
 
   const materialized = value.materialized;
   if (!isRecord(materialized) || !isRecord(materialized.env)) return false;

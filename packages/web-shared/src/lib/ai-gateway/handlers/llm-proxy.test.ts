@@ -1,50 +1,61 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { simHash64 } from '@/lib/bouncer/simhash';
+import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
-import { getUserFromAuth } from '@/lib/user/server';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   JWT_TOKEN_VERSION,
   validateAuthorizationHeader,
   isRejectedCredentialReason,
-} from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/tokens';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
+import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { accountForMicrodollarUsage, INVALID_TOKEN_CODE } from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ReasoningDetailsTransform, type Provider } from '@/lib/ai-gateway/providers/types';
-import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  accountForMicrodollarUsage,
+  INVALID_TOKEN_CODE,
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import {
+  ReasoningDetailsTransform,
+  type Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
-} from '@/lib/ai-gateway/auto-routing-denied-models';
-import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
-import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { rewriteModelResponse } from '@/lib/ai-gateway/rewriteModelResponse';
-import { readDb } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
+import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   checkFreeModelRateLimit,
   checkFreeModelRateLimitByUser,
   checkPromotionLimit,
   logFreeModelRequest,
-} from '@/lib/free-model-rate-limiter';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
-import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import { decide, type DecideVerdict } from '@/lib/bouncer/client';
+} from '@kilocode/web-shared/lib/free-model-rate-limiter';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { stepfun_37_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
+import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  decide,
+  releaseDecideLease,
+  type DecideResponse,
+} from '@kilocode/web-shared/lib/bouncer/client';
 import { NextRequest } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
@@ -64,39 +75,47 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-jest.mock('@/lib/user/server');
-jest.mock('@/lib/organizations/organization-usage');
-jest.mock('@/lib/autoTopUpInFlight');
-jest.mock('@/lib/creditTransactions', () => ({
-  ...(jest.requireActual('@/lib/creditTransactions') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
+jest.mock('@kilocode/web-shared/lib/autoTopUpInFlight');
+jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/creditTransactions') as Record<string, unknown>),
   summarizeUserPayments: jest.fn(async () => ({
     payments_count: 1,
     payments_total_microdollars: 0,
   })),
 }));
-jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
-jest.mock('@/lib/free-model-rate-limiter');
-jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
-  getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
-}));
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/free-model-rate-limiter');
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
+  () => ({
+    getOrganizationGroupPolicyContext: jest.fn().mockResolvedValue({}),
+  })
+);
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
 }));
-jest.mock('@/lib/ai-gateway/providers/get-provider');
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => ({
+  isNonTrialEnterpriseOrganization: jest.fn(async () => false),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
 }));
-jest.mock('@/lib/ai-gateway/providers/upstream-request');
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache');
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
   getToolsAvailable: jest.fn(() => false),
   getToolsUsed: jest.fn(() => false),
 }));
-jest.mock('@/lib/ai-gateway/rewriteModelResponse', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/rewriteModelResponse');
-  const { wrapInSafeNextResponse } = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse');
+  const { wrapInSafeNextResponse } = jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers'
+  );
   return {
     ...actual,
     // Mirror the production passthrough; these tests exercise the route, not
@@ -106,39 +125,40 @@ jest.mock('@/lib/ai-gateway/rewriteModelResponse', () => {
     ),
   };
 });
-jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/llm-proxy-helpers');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
   return {
     ...actual,
     accountForMicrodollarUsage: jest.fn(),
     captureProxyError: jest.fn(),
   };
 });
-jest.mock('@/lib/ai-gateway/auto-routing-decision');
-jest.mock('@/lib/ai-gateway/auto-routing-denied-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-decision');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () => ({
   collectDeniedAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
   collectDataCollectionRequiredAutoRoutingModelIds: jest.fn().mockResolvedValue([]),
 }));
-jest.mock('@/lib/ai-gateway/processUsage', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/processUsage');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage');
   return {
     ...(actual as Record<string, unknown>),
     logMicrodollarUsage: jest.fn(),
   };
 });
-jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
-  const actual = jest.requireActual('@/lib/ai-gateway/auto-model/resolution');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution');
   return {
     ...(actual as Record<string, unknown>),
     applyResolvedAutoModel: jest.fn(),
   };
 });
-// Bouncer is report-only and never changes the response; mock it so the decide
-// call shape and its failure modes can be asserted.
-jest.mock('@/lib/bouncer/client', () => ({
-  ...(jest.requireActual('@/lib/bouncer/client') as Record<string, unknown>),
+// Mock the bouncer transport so the decide call shape, the verdict mapping, and the lease release
+// can be asserted without a network call.
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
   decide: jest.fn(async () => null),
   reportUsageEvent: jest.fn(async () => undefined),
+  releaseDecideLease: jest.fn(async () => undefined),
 }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -165,6 +185,7 @@ const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
+const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
 
 const provider = {
   id: 'openrouter',
@@ -661,8 +682,13 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
-      { requestId: 'iad1::iad1::request-id', tier: 'paid', accountId: 'user:user-123' },
-      { timeoutMs: 30_000 }
+      {
+        requestId: expect.any(String),
+        tier: 'paid',
+        accountId: 'user:user-123',
+        ip: '127.0.0.1',
+      },
+      { timeoutMs: 500 }
     );
   });
 
@@ -688,7 +714,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledWith(
       expect.objectContaining({ tier: 'team', accountId: 'org:org-1' }),
-      { timeoutMs: 30_000 }
+      { timeoutMs: 500 }
     );
   });
 
@@ -708,10 +734,13 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
       { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
-      { timeoutMs: 30_000 }
+      { timeoutMs: 500 }
     );
-    // Bouncer has no account for an anonymous caller, so no usage event.
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer).toBeUndefined();
+    // Anonymous usage is keyed on the IP with no payer account.
+    const anonymousBouncer = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer;
+    expect(anonymousBouncer?.accountId).toBeNull();
+    expect(anonymousBouncer?.clientIp).toBe('127.0.0.1');
+    expect(anonymousBouncer?.requestId).toEqual(expect.any(String));
   });
 
   it('carries the bouncer usage-event fields into the usage context', async () => {
@@ -737,68 +766,185 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
     expect(usageContext?.bouncer).toEqual({
-      requestId: 'iad1::usage-request-id',
+      requestId: expect.any(String),
       occurredAt: expect.any(Date),
+      accountId: 'user:user-123',
+      clientIp: '127.0.0.1',
       clientAttributed: true,
       requestedLogprobs: true,
       samples: 2,
       promptSimHash: simHash64('explain the failing test'),
+      // A null decide verdict (the mock) is not a spend watch.
+      spendWatch: false,
     });
   });
 
-  it('sends upstream without waiting for a slow decide and keeps the work alive after response', async () => {
-    const pending = Promise.withResolvers<DecideVerdict | null>();
-    mockedDecide.mockReturnValueOnce(pending.promise);
+  it.each(['not-an-address', 'fe80::1%eth0'])(
+    'still reports usage and decides without an ip when the header is %s',
+    async forwardedFor => {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody(), { 'x-forwarded-for': forwardedFor }) as never
+      );
+
+      // A value bouncer's typia check rejects must not reach it: bouncer rejects the
+      // whole event, which would drop the usage ledger row instead of just the field.
+      expect(response.status).toBe(200);
+      const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+      expect(usageContext?.bouncer?.clientIp).toBeUndefined();
+      expect(mockedDecide).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: 'paid', accountId: 'user:user-123' }),
+        { timeoutMs: 500 }
+      );
+      expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();
+    }
+  );
+
+  function verdict(overrides: Partial<DecideResponse> = {}): DecideResponse {
+    return { enforced: false, spendWatch: false, flags: [], ...overrides };
+  }
+
+  /** Runs the `after()` callbacks the handler registered, as Next does once the response ends. */
+  async function runAfterCallbacks() {
     const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+    for (const [work] of mockedAfter.mock.calls) {
+      if (typeof work === 'function') await (work as () => Promise<unknown>)();
+    }
+  }
+
+  it('waits for decide before sending upstream, and sends on a null verdict', async () => {
+    const pending = Promise.withResolvers<DecideResponse | null>();
+    mockedDecide.mockReturnValueOnce(pending.promise);
+
+    const responsePromise = handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    pending.resolve(null);
+    const response = await responsePromise;
+
+    expect(response.status).toBe(200);
+    expect(mockedDecide).toHaveBeenCalledTimes(1);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves the request when decide rejects', async () => {
+    mockedDecide.mockRejectedValueOnce(new Error('bouncer unreachable'));
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    const backgroundWork = mockedAfter.mock.calls[0]?.[0] as Promise<void>;
-    expect(backgroundWork).toBeInstanceOf(Promise);
-    let finished = false;
-    void backgroundWork.then(() => {
-      finished = true;
-    });
-    await Promise.resolve();
-    expect(finished).toBe(false);
-    pending.resolve(null);
-    await expect(backgroundWork).resolves.toBeUndefined();
   });
 
-  it('keeps decide alive when balance rejects a request before upstream', async () => {
-    const pending = Promise.withResolvers<DecideVerdict | null>();
-    mockedDecide.mockReturnValueOnce(pending.promise);
+  it.each(['rate_limited', 'spend_limited'] as const)(
+    'rejects an enforced %s verdict with a 429 and retry headers, without flags',
+    async code => {
+      mockedDecide.mockResolvedValueOnce(
+        verdict({
+          enforced: true,
+          code,
+          retryAfterMs: 1_200.4,
+          flags: [
+            {
+              name: 'spend:watch',
+              decision: 'throttle',
+              enforced: true,
+              until: 1,
+              source: 'payer',
+            },
+          ],
+        })
+      );
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('retry-after')).toBe('2');
+      expect(response.headers.get('retry-after-ms')).toBe('1201');
+      const body = await response.json();
+      expect(body.error_type).toBe('rate_limit_exceeded');
+      expect(JSON.stringify(body)).not.toContain('spend:watch');
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      expect(mockedDecide).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('rejects an enforced restricted verdict with a 403', async () => {
+    mockedDecide.mockResolvedValueOnce(verdict({ enforced: true, code: 'restricted' }));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error_type).toBe('account_restricted');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('sends a throttle verdict that is not enforced', async () => {
+    mockedDecide.mockResolvedValueOnce(
+      verdict({
+        retryAfterMs: 1_000,
+        flags: [{ name: 'rate:limit', decision: 'throttle', enforced: false, until: 1 }],
+      })
+    );
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks a spend-watched request on the usage context and releases its lease after the response', async () => {
+    mockedDecide.mockResolvedValueOnce(verdict({ spendWatch: true }));
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    expect(releaseDecideLease).not.toHaveBeenCalled();
+    await runAfterCallbacks();
+
+    expect(response.status).toBe(200);
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer?.spendWatch).toBe(true);
+    // The after() callback runs once the response has closed, so the request is no longer in
+    // flight; release is idempotent with the usage event's own release.
+    expect(releaseDecideLease).toHaveBeenCalledTimes(1);
+    expect(releaseDecideLease).toHaveBeenCalledWith({
+      requestId: mockedDecide.mock.calls[0]?.[0].requestId,
+      accountId: 'user:user-123',
+    });
+  });
+
+  it('releases a spend-watched lease when the request ends before usage accounting', async () => {
+    mockedDecide.mockResolvedValueOnce(verdict({ spendWatch: true }));
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 0,
       settings: undefined,
       plan: undefined,
     });
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
-    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    await runAfterCallbacks();
 
     expect(response.status).toBe(402);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    const backgroundWork = mockedAfter.mock.calls[0]?.[0] as Promise<void>;
-    expect(backgroundWork).toBeInstanceOf(Promise);
-    pending.resolve(null);
-    await expect(backgroundWork).resolves.toBeUndefined();
+    expect(releaseDecideLease).toHaveBeenCalledWith({
+      requestId: mockedDecide.mock.calls[0]?.[0].requestId,
+      accountId: 'user:user-123',
+    });
   });
 
-  it('serves the request and settles background work when decide rejects', async () => {
-    const pending = Promise.withResolvers<DecideVerdict | null>();
-    mockedDecide.mockReturnValueOnce(pending.promise);
-    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+  it('does not release a lease for a request that was not spend-watched', async () => {
+    mockedDecide.mockResolvedValueOnce(verdict());
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
 
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    await runAfterCallbacks();
 
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    pending.reject(new Error('bouncer unreachable'));
-    await expect(mockedAfter.mock.calls[0]?.[0]).resolves.toBeUndefined();
+    expect(releaseDecideLease).not.toHaveBeenCalled();
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
@@ -858,6 +1004,98 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect(getRoutingProviderConfig).toBeDefined();
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
+  });
+
+  describe('Anthropic provider for Claude', () => {
+    function setOrganizationAuth(plan: 'teams' | 'enterprise') {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: {},
+        plan,
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+    }
+
+    async function sendClaudeRequest() {
+      let routingProvider: OpenRouterProviderConfig | undefined;
+      mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
+        routingProvider = await getRoutingProviderConfig?.();
+        return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+      });
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never
+      );
+      expect(response.status).toBe(200);
+      return {
+        routingProvider,
+        upstreamProvider: mockedUpstreamRequest.mock.calls[0]?.[0].body.provider,
+      };
+    }
+
+    it('ignores Anthropic for personal accounts without an organization lookup', async () => {
+      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+
+      expect(routingProvider).toEqual({ ignore: ['anthropic'] });
+      expect(upstreamProvider).toEqual({
+        order: ['google-vertex', 'amazon-bedrock'],
+        ignore: ['anthropic'],
+      });
+      expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+    });
+
+    it('ignores Anthropic for teams organizations without an organization lookup', async () => {
+      setOrganizationAuth('teams');
+
+      const { upstreamProvider } = await sendClaudeRequest();
+
+      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
+      expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+    });
+
+    it('ignores Anthropic for trial enterprise organizations', async () => {
+      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
+
+      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+
+      expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[0]).toBe('org-1');
+      expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[1]).toBe(readDb);
+      expect(routingProvider?.ignore).toEqual(['anthropic']);
+      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
+    });
+
+    it('allows Anthropic for non-trial enterprise organizations', async () => {
+      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(true);
+
+      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+
+      expect(routingProvider?.ignore).toBeUndefined();
+      expect(upstreamProvider).toEqual({ order: ['google-vertex', 'amazon-bedrock'] });
+    });
+
+    it('does not ignore Anthropic for non-Claude models of trial enterprise organizations', async () => {
+      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+        order: ['openai'],
+      });
+    });
   });
 
   it('routes virtual routers through the allowed real providers only', async () => {
@@ -1805,6 +2043,7 @@ describe('auto-routing shadow classifier', () => {
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
       expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
     );
-    expect(mockedAfter).toHaveBeenCalledWith(expect.any(Promise));
+    // The decide registers its lifetime and lease-release callback with after().
+    expect(mockedAfter).toHaveBeenCalledWith(expect.any(Function));
   });
 });

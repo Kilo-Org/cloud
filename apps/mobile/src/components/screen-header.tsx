@@ -58,10 +58,9 @@ const HEADER_ACTIONS_GAP = 12;
  * `headerRightWidth` is the width the caller's trailing cluster lays out at, in
  * dp — the widths the caller renders, not a worst case it may never show. A
  * cluster wide enough to leave the title below its readable minimum reflows
- * too: at 320 dp with a font scale of 2 the PR review header's Share, Submit
- * review and Merge controls left the title a few characters. Fixed-size
- * children (icon buttons, a label capped at its own max-w) do not grow with the
- * font scale, so this width is taken as laid out and is not scaled.
+ * too. Fixed-size children (icon buttons, a label capped at its own max-w) do
+ * not grow with the font scale, so this width is taken as laid out and is not
+ * scaled.
  */
 export function shouldStackHeaderActions(
   width: number,
@@ -114,6 +113,8 @@ type ScreenHeaderProps = {
    * a cluster no wider than a single icon button.
    */
   headerRightWidth?: number;
+  /** Keep compact fixed-width controls beside the title even on narrow screens. */
+  allowHeaderRightStacking?: boolean;
   /**
    * The `headerRight` cluster shrinks and truncates on its own (the session
    * header's context pill: `min-w-0 shrink`, one-line cost). The slot then
@@ -193,6 +194,7 @@ export function ScreenHeader({
   size = 'default',
   headerRight,
   headerRightWidth,
+  allowHeaderRightStacking = true,
   headerRightShrinks = false,
   inlineActions,
   inlineActionsWidth,
@@ -221,7 +223,9 @@ export function ScreenHeader({
   // that declares its cluster's width reflows before that cluster eats the
   // title's readable minimum (see `headerRightWidth`).
   const stackActions =
-    headerRight != null && shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
+    allowHeaderRightStacking &&
+    headerRight != null &&
+    shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
   // The inline controls row reflows the same way: a caller that declares its
   // width drops it beneath the title before it squeezes the title's own
   // readable minimum, so the 30px Agents title never breaks inside a word.
@@ -400,10 +404,9 @@ export function ScreenHeader({
   // cut off (device capture, session-compose-kbup). Content sizing moves the
   // squeeze to the title: `heading` is `min-w-0 flex-1`, so a long title
   // truncates in place and the controls stay whole inside the screen's own
-  // padding. A window too narrow to hold both drops the actions to their own
-  // row (`stackActions`), and a variable-width button caps itself: PR review's
-  // Submit review (pr-review-screen.tsx) and the Security Agent settings Save
-  // button (settings-save-button.tsx) each carry a 140 dp max-w.
+  // padding. By default, a window too narrow to hold both drops the actions to
+  // their own row (`stackActions`). A variable-width button caps itself, as the
+  // Security Agent settings Save button does with a 140 dp max-w.
   //
   // A cluster that shrinks on its own (`headerRightShrinks`) keeps the
   // half-row cap: its unbounded text truncates inside the cap, and the title

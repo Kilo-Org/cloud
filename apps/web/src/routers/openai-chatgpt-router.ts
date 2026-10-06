@@ -3,19 +3,20 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { User } from '@kilocode/db/schema';
-import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import {
   clearOpenAiChatGptConnection,
   readOpenAiChatGptUsageLimit,
   getOpenAiChatGptConnection,
   openAiChatGptSharedServicesOwner,
   type OpenAiChatGptOwner,
-} from '@/lib/ai-gateway/openai-chatgpt/store';
-import {
-  OpenAiChatGptStatusSchema,
-  type OpenAiChatGptStatus,
-} from '@/lib/ai-gateway/openai-chatgpt/status';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { OpenAiChatGptStatusSchema, type OpenAiChatGptStatus } from '@/lib/openai-chatgpt/status';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 /**
  * The "Sign in with ChatGPT" BYOK connection. It is inherently personal: it is

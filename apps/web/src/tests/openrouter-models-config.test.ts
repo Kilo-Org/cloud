@@ -1,22 +1,42 @@
 import { test, expect, describe } from '@jest/globals';
-import { preferredModels, PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import {
+  buildMonitoredModels,
+  buildPreferredModels,
+  PRIMARY_DEFAULT_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/models';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
-} from '@/lib/ai-gateway/auto-model';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
+  ...jest.requireActual<typeof AutoFreeConfigModule>(
+    '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config'
+  ),
+  getConfiguredAutoFreeModels: jest.fn(async () => [
+    { model: 'poolside/laguna-s-2.1:free', weight: 1, reasoning: { enabled: true } },
+    { model: 'openrouter/free', weight: 1, reasoning: { enabled: true } },
+  ]),
+}));
+
+const preferredModels = buildPreferredModels([]);
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
-import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
+import { GPT_SOL_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { GEMMA_4_26B_A4B_IT_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { QWEN37_PLUS_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+import {
+  GLM_CURRENT_MODEL_ID,
+  GLM_FLASH_CURRENT_MODEL_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
@@ -62,9 +82,15 @@ describe('OpenRouter Models Config', () => {
     );
   });
 
-  test('monitors only concrete preferred models', () => {
-    expect(preferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
-    expect(monitoredModels).toEqual(preferredModels.filter(model => !isKiloAutoModel(model)));
+  test('monitors only concrete preferred models', async () => {
+    const monitoredModels = await getMonitoredModels();
+    const configuredPreferredModels = buildPreferredModels(['poolside/laguna-s-2.1:free']);
+    expect(configuredPreferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
+    expect(monitoredModels).toEqual(buildMonitoredModels(['poolside/laguna-s-2.1:free']));
+    expect(monitoredModels).toEqual(
+      configuredPreferredModels.filter(model => !isKiloAutoModel(model))
+    );
+    expect(monitoredModels).not.toContain('openrouter/free');
     expect(monitoredModels).not.toContain(GEMMA_4_26B_A4B_IT_ID);
     expect(monitoredModels).not.toContain(gemma_4_26b_a4b_it_free_model.public_id);
   });

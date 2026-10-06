@@ -2,8 +2,9 @@ import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 import { OAuth2Client } from 'google-auth-library';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { processGooglePlayKiloPassNotification } from '@/lib/kilo-pass/google-play-notifications';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 
 const GooglePlayNotificationBodySchema = z.object({
   message: z.object({
@@ -73,7 +74,11 @@ export async function POST(request: Request) {
     }
     return Response.json(result);
   } catch (error) {
-    captureException(error, { tags: { source: 'google_play_kilo_pass_notification' } });
+    // The failure may be a database error that quotes the bound parameters of a
+    // purchase-token lookup, so it is sanitized before it is reported.
+    captureException(sanitizeErrorForTelemetry(error), {
+      tags: { source: 'google_play_kilo_pass_notification' },
+    });
     return Response.json({ error: 'Failed to process notification' }, { status: 500 });
   }
 }

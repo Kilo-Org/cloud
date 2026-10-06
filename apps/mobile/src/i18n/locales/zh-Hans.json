@@ -215,7 +215,6 @@
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
     "bonusCreditsExpiring": "{{amount}} 的奖励额度将于 {{date}} 到期。",
-    "creditBalanceEmpty": "你的可用额度已用完。此账户的额度需在 iOS 应用之外管理。",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -1535,6 +1534,7 @@
       "idCopied": "会话 ID 已复制",
       "couldNotCopyId": "无法复制会话 ID。",
       "untitled": "无标题会话",
+      "actions": "会话操作",
       "sessionDeleted": "会话已删除",
       "needsInput": "等待输入",
       "fromPlatform": "来自 {{platform}}",
@@ -1587,6 +1587,7 @@
       "readOnly": "此会话为只读模式。",
       "continueInNewSession": "在新会话中继续",
       "emptyDescription": "在下方发送消息，开始对话。",
+      "emptyTranscriptDescription": "此会话还没有消息。",
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "renameAccessibility": "重命名会话：{{title}}",
@@ -2053,6 +2054,7 @@
       "selectModelBeforeSending": "请先选择模型再发送消息。",
       "preparingPlaceholder": "正在准备环境……",
       "finalizingPlaceholder": "正在收尾……",
+      "sessionLoadFailed": "无法加载会话。请先重试。",
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
       "couldNotAttachFiles": "无法添加附件。请点击“发送”重试。",
       "discardAttachmentsMessage": "已上传但尚未用于发送消息的文件将被删除。",
@@ -2122,6 +2124,7 @@
       "provider": "提供商",
       "totalCost": "总费用",
       "usageReflectsLatest": "此处显示的是助手最近一次完成回复时的用量。",
+      "usageUnavailable": "上下文用量不可用",
       "tokenUsage": "词元用量",
       "cacheRate": "缓存命中率",
       "modelsCount": "模型（{{displayCount}}）",
@@ -2156,7 +2159,10 @@
     "markdownImage": {
       "load": "加载",
       "loadWithHost": "加载 {{host}}",
-      "httpsOnly": "仅支持通过 HTTPS 加载图片。"
+      "httpsOnly": "仅支持通过 HTTPS 加载图片。",
+      "trustTitle": "从 {{host}} 加载图片？",
+      "trustMessage": "信任 {{host}} 后，其图片将不再每次询问即可加载。你可以稍后在受信任的网站中撤销。",
+      "loadOnce": "仅加载一次"
     },
     "markdownLink": {
       "invalidLink": "此链接无法打开。",
@@ -3182,8 +3188,12 @@
     "subtitle": "打开链接时无需再次确认的网站",
     "emptyTitle": "暂无受信任的网站",
     "emptyDescription": "信任某个网站后，打开该网站的链接时将不再询问。",
+    "imagesSectionTitle": "受信任的图片网站",
+    "imagesSectionDescription": "来自这些网站的图片将不再询问即可加载。",
+    "imagesSectionEmpty": "暂无受信任的图片网站",
     "revoke": "撤销对 {{host}} 的信任",
     "revokeMessage": "指向此网站的链接将再次请求确认。",
+    "revokeImageMessage": "来自此网站的图片将再次请求确认。",
     "backToPreferences": "返回偏好设置"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "新建智能体",
     "approving": "正在批准...",
     "couldNotApprove": "无法批准",
-    "couldNotStart": "无法启动",
     "channelName": "运行中的智能体",
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
@@ -3448,5 +3457,17 @@
       "unboundToast": "仓库已解除绑定",
       "unbindFailed": "无法解除仓库绑定"
     }
+  },
+  "credits": {
+    "title": "购买额度",
+    "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
+    "packLabel": "添加 {{amount}} 额度",
+    "priceUnavailable": "价格不可用",
+    "purchased": "额度已添加到你的余额。",
+    "empty": "目前无法获取额度包。",
+    "noMatchingProducts": "App Store 未返回匹配的额度包。",
+    "noMatchingProductsPlay": "Google Play 未返回匹配的额度包。",
+    "purchaseOwnedByAnotherAccount": "此 Apple Account 上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。",
+    "purchaseOwnedByAnotherAccountPlay": "此 Google Play 账户上的额度属于另一个 Kilo 账户。请登录该 Kilo 账户以使用。"
   }
 }

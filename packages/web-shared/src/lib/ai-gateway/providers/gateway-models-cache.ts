@@ -1,9 +1,9 @@
 import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
 import { desc } from 'drizzle-orm';
 import * as z from 'zod';
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { readDb } from '@/lib/drizzle';
-import { warnExceptInTest } from '@/lib/utils.server';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type StoredModelMap = Record<string, StoredModel>;
 
@@ -49,10 +49,28 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
   return models[modelId]?.alias_target?.slug ?? modelId;
 }
 
-/** The ids of language models, including those with no endpoints. */
+/**
+ * The ids of language models, including those with no endpoints. Vercel models
+ * carry a `type`; OpenRouter models are language models when they output text.
+ */
 export function getLanguageModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
-    .filter(model => (model.type ?? 'language') === 'language')
+    .filter(
+      model => model.type === 'language' || model.architecture?.output_modalities.includes('text')
+    )
+    .map(model => model.id);
+}
+
+/**
+ * The ids of System One models, including `:free` variants and `~` aliases.
+ * Vercel types them as `evaluation`; OpenRouter models output `decisions`.
+ */
+export function getSystemOneModelIds(models: StoredModelMap): string[] {
+  return Object.values(models)
+    .filter(
+      model =>
+        model.type === 'evaluation' || model.architecture?.output_modalities.includes('decisions')
+    )
     .map(model => model.id);
 }
 
@@ -102,38 +120,34 @@ export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
   getOpenRouterModelsMetadataFromDatabase
 );
 
+export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<ReadonlySet<string>>(
+  async () => new Set(getSystemOneModelIds(await getOpenRouterModelsMetadataFromDatabase())),
+  TTL_MS,
+  new Set<string>()
+);
+
 // Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.
 const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
   'anthropic/claude-haiku-4-5',
   'anthropic/claude-sonnet-4-5',
   'anthropic/claude-sonnet-4-6',
   'anthropic/claude-sonnet-5-20260630',
-  'claude-sonnet-4',
   'claude-sonnet-4.5',
   'claude-sonnet-5',
   'deepseek-v4-flash',
   'deepseek-v4-flash-0731',
   'deepseek-v4-pro',
   'gemini-2.5-flash-lite',
-  'glm-5.1',
-  'glm-5.2',
-  'gpt-4.1-mini',
   'gpt-4o',
   'gpt-4o-mini',
-  'gpt-5.2',
-  'gpt-5.2-codex',
   'gpt-5.4',
   'gpt-5.4-mini',
   'gpt-5.5',
   'gpt-5.6-luna',
   'gpt-5.6-sol',
   'gpt-5.6-terra',
-  'kimi-k3',
-  'mimo-v2.5',
-  'minimax-m2.5',
   'minimax-m3',
   'minimax/minimax-m2.5-20260211',
-  'step-3.5-flash',
 ]);
 
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {

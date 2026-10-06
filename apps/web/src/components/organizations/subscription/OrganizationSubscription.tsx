@@ -3,7 +3,7 @@ import {
   useOrganizationSubscription,
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';

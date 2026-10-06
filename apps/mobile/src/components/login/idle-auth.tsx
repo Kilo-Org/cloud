@@ -39,11 +39,15 @@ export function IdleAuth({
   initialEmail = '',
   initialSsoRecovery = null,
   onBusyChange,
+  onSignInStart,
 }: Readonly<{
   start: (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
   initialEmail?: string;
   initialSsoRecovery?: SsoRecoveryDraft | null;
   onBusyChange?: (busy: boolean) => void;
+  /** Fires as a user-initiated sign-in attempt begins, before any request, so
+   *  the shell can dismiss a stale error from the previous attempt. */
+  onSignInStart?: () => void;
 }>) {
   const {
     busy,
@@ -122,6 +126,7 @@ export function IdleAuth({
   }, [ssoRecovery]);
 
   const handleSendCode = async () => {
+    onSignInStart?.();
     // Empty input is a field-level error: `useNativeAuth` sets the message and
     // never posts an empty address, and FormField renders it under the field so
     // the landing never looks dead. The same call clears a stale message and
@@ -152,6 +157,7 @@ export function IdleAuth({
     }
     browserAuthStartingRef.current = true;
     setBrowserAuthStarting(true);
+    onSignInStart?.();
     try {
       await start('signin');
     } finally {
@@ -166,6 +172,7 @@ export function IdleAuth({
     }
     browserAuthStartingRef.current = true;
     setBrowserAuthStarting(true);
+    onSignInStart?.();
     try {
       await start('sso', email);
     } finally {
@@ -246,6 +253,7 @@ export function IdleAuth({
           className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
           disabled={authBusy}
           onPress={() => {
+            onSignInStart?.();
             void signInWithApple();
           }}
           accessibilityLabel={t('login.signInWithApple')}
@@ -274,7 +282,10 @@ export function IdleAuth({
           // taller than the Google button above it (2026-09-20 device finding).
           className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
           disabled={authBusy}
-          onPress={() => void signInWithGoogle()}
+          onPress={() => {
+            onSignInStart?.();
+            void signInWithGoogle();
+          }}
           accessibilityLabel={t('login.signInWithGoogle')}
         >
           <View className={PROVIDER_GLYPH_SLOT_CLASS}>
@@ -304,6 +315,7 @@ export function IdleAuth({
             className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
             disabled={authBusy}
             onPress={() => {
+              onSignInStart?.();
               void signInWithPasskey();
             }}
             accessibilityLabel={t('login.signInWithPasskey')}

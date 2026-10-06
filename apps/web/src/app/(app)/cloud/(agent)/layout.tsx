@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { CloudAgentProvider } from '@/components/cloud-agent-next/CloudAgentProvider';
 import { CloudSidebarLayout } from '@/components/cloud-agent-next/CloudSidebarLayout';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export default async function CloudAgentLayout({ children }: { children: React.ReactNode }) {
   const user = await getUserFromAuthOrRedirect();

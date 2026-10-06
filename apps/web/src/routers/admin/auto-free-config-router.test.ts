@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config, type User } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
-import { autoFreeModels } from '@/lib/ai-gateway/models';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { AUTO_FREE_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 
 let admin: User;
@@ -28,13 +28,38 @@ beforeEach(async () => {
 });
 
 describe('AutoFreeConfigSchema', () => {
-  it('accepts the compiled auto-free models', () => {
-    expect(AutoFreeConfigSchema.safeParse({ models: autoFreeModels }).success).toBe(true);
+  it('accepts the fallback config', () => {
+    expect(AutoFreeConfigSchema.safeParse(AUTO_FREE_FALLBACK_CONFIG).success).toBe(true);
+  });
+
+  it.each([
+    'stealth/space-bunny-alpha',
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
+    'dots-studio/dots-3-note-preview:free',
+    '~provider/model-latest',
+  ])('accepts model ID %p', model => {
+    const result = AutoFreeConfigSchema.safeParse({ models: [{ ...config.models[0], model }] });
+    expect(result.success).toBe(true);
   });
 
   it('rejects duplicate models', () => {
     const result = AutoFreeConfigSchema.safeParse({
       models: [config.models[0], config.models[0]],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it.each([
+    "x');--:free",
+    "x\\'--:free",
+    'provider/model :free',
+    'Provider/Model:free',
+    'provider/model_a:free',
+    'provider@model:free',
+    '',
+  ])('rejects model ID %p', model => {
+    const result = AutoFreeConfigSchema.safeParse({
+      models: [{ ...config.models[0], model }],
     });
     expect(result.success).toBe(false);
   });
@@ -56,11 +81,13 @@ describe('adminAutoFreeConfigRouter', () => {
     });
   });
 
-  it('returns no stored config and the compiled defaults when unset', async () => {
+  it('returns no stored config and the openrouter/free fallback when unset', async () => {
     const caller = await createCallerForUser(admin.id);
     await expect(caller.admin.autoFreeConfig.get()).resolves.toEqual({
       config: null,
-      defaults: { models: [...autoFreeModels] },
+      fallback: {
+        models: [{ model: 'openrouter/free', weight: 1, reasoning: { enabled: true } }],
+      },
     });
   });
 
@@ -98,4 +125,17 @@ describe('adminAutoFreeConfigRouter', () => {
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
+
+  it.each(['provider/paid-model', 'anthropic/claude-sonnet-4:free', 'kilo-auto/free'])(
+    'rejects ineligible model %s',
+    async model => {
+      const caller = await createCallerForUser(admin.id);
+      await expect(
+        caller.admin.autoFreeConfig.set({
+          config: { models: [config.models[0], { model, weight: 1, reasoning: {} }] },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(model) });
+      expect(await db.select().from(ai_gateway_config)).toEqual([]);
+    }
+  );
 });

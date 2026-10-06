@@ -3,11 +3,14 @@ import { checkRateLimit } from '@vercel/firewall';
 import { createHmac } from 'node:crypto';
 import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
-import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
-import type { AuthErrorType } from '@/lib/auth/constants';
+import {
+  isEmailBlacklistedByDomainAsync,
+  isBlockedTLD,
+} from '@kilocode/web-shared/lib/user/server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
 

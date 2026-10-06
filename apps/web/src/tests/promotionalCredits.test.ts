@@ -3,14 +3,14 @@ import {
   grantCreditForCategory,
   grantCreditForCategoryConfig,
   redeemSelfServicePromoCode,
-} from '@/lib/promotionalCredits';
-import type { PromoCreditCategoryConfig } from '@/lib/PromoCreditCategoryConfig';
+} from '@kilocode/web-shared/lib/promotionalCredits';
+import type { PromoCreditCategoryConfig } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 import { type User, credit_transactions, kilocode_users } from '@kilocode/db/schema';
-import { defineTestUser, insertTestUser } from './helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc } from 'drizzle-orm';
 import { millisecondsInDay, millisecondsInHour } from 'date-fns/constants';
-import { assertNoError } from '@/lib/maybe-result';
+import { assertNoError } from '@kilocode/web-shared/lib/maybe-result';
 
 describe('grantCreditForCategory', () => {
   const mockUser: User = defineTestUser({});

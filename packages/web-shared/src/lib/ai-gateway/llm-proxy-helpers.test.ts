@@ -13,15 +13,17 @@ jest.mock('next/server', () => ({
 }));
 
 // Capture writes that would otherwise hit the database. The helper passes
-// the final, post-zeroing `usageStats` to `logMicrodollarUsage`, so spying
+// the final, post-zeroing `usageStats` to the billing wrapper, so spying
 // here lets us assert on the persisted billing shape directly.
 const mockedLogMicrodollarUsage = jest.fn(
   async (_stats: MicrodollarUsageStats, _ctx: MicrodollarUsageContext) => null
 );
 jest.mock('./processUsage', () => ({
   ...(jest.requireActual('./processUsage') as Record<string, unknown>),
-  logMicrodollarUsage: (stats: MicrodollarUsageStats, ctx: MicrodollarUsageContext) =>
-    mockedLogMicrodollarUsage(stats, ctx),
+  logMicrodollarUsageAndReportToBouncer: (
+    stats: MicrodollarUsageStats,
+    ctx: MicrodollarUsageContext
+  ) => mockedLogMicrodollarUsage(stats, ctx),
 }));
 
 import {

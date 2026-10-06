@@ -1,8 +1,8 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GITHUB_ADMIN_STATS_TOKEN: 'test-token',
 }));
 
-jest.mock('@/lib/fetchWithBackoff', () => ({
+jest.mock('@kilocode/web-shared/lib/fetchWithBackoff', () => ({
   fetchWithBackoff: (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
     fetch(input, init),
 }));

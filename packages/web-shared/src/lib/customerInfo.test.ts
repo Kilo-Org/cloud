@@ -1,18 +1,20 @@
 const mockGenerateApiToken = jest.fn();
 const mockFindFirst = jest.fn();
 
-jest.mock('@/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
-jest.mock('@/lib/stripe-client', () => ({ hasPaymentMethodInStripe: jest.fn(() => false) }));
-jest.mock('@/lib/creditTransactions', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
+  hasPaymentMethodInStripe: jest.fn(() => false),
+}));
+jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
   summarizeUserPayments: jest.fn(() => ({ payments_count: 0 })),
 }));
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   userHasOrganizations: jest.fn(() => false),
 }));
-jest.mock('@/lib/welcomeCredits', () => ({
+jest.mock('@kilocode/web-shared/lib/welcomeCredits', () => ({
   hasReceivedAnyFreeWelcomeCredits: jest.fn(() => false),
 }));
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { query: { payment_methods: { findFirst: mockFindFirst } } },
 }));
 

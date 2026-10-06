@@ -11,7 +11,10 @@ import {
   type EfficientModelPool,
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import { AUTO_ROUTING_WORKER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
+import {
+  AUTO_ROUTING_WORKER_URL,
+  INTERNAL_API_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
 import {
   createWorkerAdminFetch,
   ErrorBodySchema,

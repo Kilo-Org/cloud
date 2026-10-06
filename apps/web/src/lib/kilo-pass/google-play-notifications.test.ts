@@ -3,6 +3,7 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { and, eq, sql } from 'drizzle-orm';
 
 import {
+  bouncer_credit_event_outbox,
   credit_transactions,
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
@@ -12,8 +13,8 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -21,9 +22,12 @@ import {
   KiloPassTier,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { storeCreditPaymentId } from '@/lib/credits/store-products';
+import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
+import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 
 const mockAcknowledge = jest
   .fn<(...args: unknown[]) => Promise<void>>()
@@ -53,8 +57,13 @@ const mockGetGooglePlaySubscriptionOrder = jest.fn(
   }
 );
 
+const mockGetGooglePlayProductPurchase = jest.fn(
+  async (): Promise<androidpublisher_v3.Schema$ProductPurchase> => ({ purchaseType: undefined })
+);
+
 jest.mock('./google-play-sdk', () => ({
   acknowledgeGooglePlaySubscriptionPurchase: mockAcknowledge,
+  getGooglePlayProductPurchase: mockGetGooglePlayProductPurchase,
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
   getGooglePlaySubscriptionOrder: mockGetGooglePlaySubscriptionOrder,
   revokeGooglePlaySubscriptionPurchase: mockRevoke,
@@ -70,6 +79,9 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
   trackKiloPassPurchaseCompleted: jest.fn(),
 }));
 
+// Bouncer store events are durable: the SUT enqueues them in the outbox table, so tests read the
+// real rows instead of a transport mock.
+
 type PosthogTrackingMock = {
   trackKiloPassPurchaseCompleted: jest.Mock;
   runAfterResponse: (work: () => Promise<void>) => Promise<void>;
@@ -81,7 +93,18 @@ function getPosthogTrackingMock(): PosthogTrackingMock {
 
 let processGooglePlayKiloPassNotification: typeof GooglePlayNotifications.processGooglePlayKiloPassNotification;
 
+// The SUT is imported dynamically after the mocks are registered. Bind it at file scope so every
+// describe (and any --testNamePattern filter, which skips a describe's own beforeAll) sees it.
+beforeAll(async () => {
+  ({ processGooglePlayKiloPassNotification } = await import('./google-play-notifications'));
+});
+
 const GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
+
+// The mobile clients match this exact backend string, so it is pinned here
+// rather than imported from the constant the completion throws it from.
+const STORE_PURCHASE_REFUNDED_MESSAGE =
+  'This store purchase has been refunded, so Kilo cannot credit it.';
 
 function pubsubMessage(
   params: {
@@ -162,7 +185,6 @@ describe('processGooglePlayKiloPassNotification', () => {
 
   beforeAll(async () => {
     dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS);
-    ({ processGooglePlayKiloPassNotification } = await import('./google-play-notifications'));
   });
 
   afterAll(() => {
@@ -1009,7 +1031,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         .set({ microdollars_used: paid!.kilo_pass_threshold! })
         .where(eq(kilocode_users.id, user.id));
       const { maybeIssueKiloPassBonusFromUsageThreshold } =
-        await import('@/lib/kilo-pass/usage-triggered-bonus');
+        await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({
           kiloUserId: user.id,
@@ -1104,6 +1126,417 @@ describe('processGooglePlayKiloPassNotification', () => {
       expect(after!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
     }
   );
+
+  it('reverses a voided one-time credit pack order exactly once', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    const amountMicrodollars = toMicrodollars(50);
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: amountMicrodollars,
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: amountMicrodollars })
+      .where(eq(kilocode_users.id, user.id));
+
+    const order = {
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd50' }],
+    };
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce(order);
+    const message = {
+      messageId: crypto.randomUUID(),
+      data: Buffer.from(
+        JSON.stringify({
+          packageName: 'com.kilocode.kiloapp',
+          eventTimeMillis: String(Date.now()),
+          voidedPurchaseNotification: {
+            purchaseToken,
+            orderId,
+            productType: 2,
+            refundType: 1,
+          },
+        })
+      ).toString('base64'),
+    };
+
+    await expect(
+      processGooglePlayKiloPassNotification({ pubsubMessage: message })
+    ).resolves.toEqual({ processed: true });
+
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired).toBe(0);
+
+    const reversal = await db.query.credit_transactions.findFirst({
+      where: eq(
+        credit_transactions.credit_category,
+        `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${orderId}`
+      ),
+    });
+    expect(reversal).toMatchObject({
+      kilo_user_id: user.id,
+      amount_microdollars: -amountMicrodollars,
+      is_free: false,
+    });
+
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, message.messageId),
+    });
+    expect(event?.processed_at).not.toBeNull();
+
+    // A replayed notification is already_processed and never reverses twice.
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce(order);
+    await expect(
+      processGooglePlayKiloPassNotification({ pubsubMessage: message })
+    ).resolves.toEqual({ processed: true, status: 'already_processed' });
+    const replayed = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(replayed!.total_microdollars_acquired).toBe(0);
+  });
+
+  it('refuses a late completion of a credit pack order refunded before the grant', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+    const message = {
+      messageId: crypto.randomUUID(),
+      data: Buffer.from(
+        JSON.stringify({
+          packageName: 'com.kilocode.kiloapp',
+          eventTimeMillis: String(Date.now()),
+          voidedPurchaseNotification: {
+            purchaseToken,
+            orderId,
+            productType: 2,
+            refundType: 1,
+          },
+        })
+      ).toString('base64'),
+    };
+
+    // The refund arrives before the client finishes the purchase: there is
+    // nothing to claw back, but the voided purchase is recorded as processed.
+    await expect(
+      processGooglePlayKiloPassNotification({ pubsubMessage: message })
+    ).resolves.toEqual({ processed: true });
+
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, message.messageId),
+    });
+    expect(event?.processed_at).not.toBeNull();
+    expect(
+      await db.query.credit_transactions.findFirst({
+        where: eq(
+          credit_transactions.credit_category,
+          `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${orderId}`
+        ),
+      })
+    ).toBeUndefined();
+
+    // A grant keyed by the order id and one keyed by the token digest are both
+    // refused. Play reported no order id when the purchase completed, so the
+    // grant may hold the digest while the voided notification names the order
+    // id; the refund lookup matches the raw token the store-event table stores,
+    // which never becomes the ledger key.
+    const tokenKey = googlePlayCreditProviderTransactionId({ purchaseToken });
+    for (const grant of [
+      { providerTransactionId: orderId, googlePlayPurchaseToken: purchaseToken },
+      { providerTransactionId: tokenKey, googlePlayPurchaseToken: purchaseToken },
+    ]) {
+      await expect(
+        completeStoreCreditPurchase({
+          user,
+          purchase: {
+            paymentProvider: KiloPassPaymentProvider.GooglePlay,
+            productId: 'credits_usd10',
+            appAccountToken: user.app_store_account_token,
+            quantity: 1,
+            amountUsd: 10,
+            amountMicrodollars: toMicrodollars(10),
+            purchasedAtIso: '2026-05-15T00:00:00.000Z',
+            environment: 'Production',
+            rawPayload: {},
+            ...grant,
+          },
+        })
+      ).rejects.toThrow(STORE_PURCHASE_REFUNDED_MESSAGE);
+    }
+
+    expect(
+      await db.query.credit_transactions.findFirst({
+        where: eq(
+          credit_transactions.stripe_payment_id,
+          storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, tokenKey)
+        ),
+      })
+    ).toBeUndefined();
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after?.total_microdollars_acquired).toBe(0);
+  });
+
+  describe('voided credit pack refund types', () => {
+    async function grantGooglePlayCreditPack() {
+      const { user } = await insertGooglePlayUser();
+      const orderId = `GPA.${crypto.randomUUID()}`;
+      const purchaseToken = crypto.randomUUID();
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        amount_microdollars: toMicrodollars(10),
+        is_free: false,
+        description: 'Credit purchase via Google Play',
+        stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+      });
+      await db
+        .update(kilocode_users)
+        .set({ total_microdollars_acquired: toMicrodollars(10), microdollars_used: 0 })
+        .where(eq(kilocode_users.id, user.id));
+      return { user, orderId, purchaseToken };
+    }
+
+    function voidedMessage(params: { orderId: string; purchaseToken: string; refundType: number }) {
+      return {
+        messageId: crypto.randomUUID(),
+        data: Buffer.from(
+          JSON.stringify({
+            packageName: 'com.kilocode.kiloapp',
+            eventTimeMillis: String(Date.now()),
+            voidedPurchaseNotification: {
+              purchaseToken: params.purchaseToken,
+              orderId: params.orderId,
+              productType: 2,
+              refundType: params.refundType,
+            },
+          })
+        ).toString('base64'),
+      };
+    }
+
+    async function reversalAmounts(orderId: string) {
+      const rows = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          eq(
+            credit_transactions.credit_category,
+            `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${orderId}`
+          )
+        );
+      return rows.map(row => row.amount_microdollars);
+    }
+
+    it('reverses the whole pack for a quantity-based refund of a single unit', async () => {
+      const { orderId, purchaseToken } = await grantGooglePlayCreditPack();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken,
+        state: 'REFUNDED',
+        lineItems: [{ productId: 'credits_usd10', oneTimePurchaseDetails: { quantity: 1 } }],
+      });
+
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: voidedMessage({ orderId, purchaseToken, refundType: 2 }),
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await reversalAmounts(orderId)).toEqual([-toMicrodollars(10)]);
+    });
+
+    // Play keeps PARTIALLY_REFUNDED for a quantity-based refund, which is the whole
+    // pack when the line item holds one unit.
+    it('reverses the whole pack when Play reports PARTIALLY_REFUNDED for one unit', async () => {
+      const { orderId, purchaseToken } = await grantGooglePlayCreditPack();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken,
+        state: 'PARTIALLY_REFUNDED',
+        lineItems: [{ productId: 'credits_usd10', oneTimePurchaseDetails: { quantity: 1 } }],
+      });
+
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: voidedMessage({ orderId, purchaseToken, refundType: 2 }),
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await reversalAmounts(orderId)).toEqual([-toMicrodollars(10)]);
+    });
+
+    it('rejects a quantity-based refund of a multi-quantity pack without reversing', async () => {
+      const { user, orderId, purchaseToken } = await grantGooglePlayCreditPack();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken,
+        state: 'PARTIALLY_REFUNDED',
+        lineItems: [{ productId: 'credits_usd10', oneTimePurchaseDetails: { quantity: 3 } }],
+      });
+
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: voidedMessage({ orderId, purchaseToken, refundType: 2 }),
+        })
+      ).rejects.toThrow('Google Play multi-quantity credit pack refund is not supported');
+
+      expect(await reversalAmounts(orderId)).toEqual([]);
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired).toBe(toMicrodollars(10));
+    });
+
+    it('keeps one full reversal when Play resends the refund under a new message after more spend', async () => {
+      const { user, orderId, purchaseToken } = await grantGooglePlayCreditPack();
+      const order = {
+        orderId,
+        purchaseToken,
+        state: 'REFUNDED',
+        lineItems: [{ productId: 'credits_usd10' }],
+      };
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce(order);
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: voidedMessage({ orderId, purchaseToken, refundType: 1 }),
+      });
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: toMicrodollars(4) })
+        .where(eq(kilocode_users.id, user.id));
+
+      // A new message id bypasses the event claim, so only the reversal's own
+      // idempotency key protects the stored amount.
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce(order);
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: voidedMessage({ orderId, purchaseToken, refundType: 1 }),
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await reversalAmounts(orderId)).toEqual([-toMicrodollars(10)]);
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired).toBe(0);
+    });
+  });
+
+  it('reverses a voided one-time credit pack granted under the purchase token', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    const tokenKey = googlePlayCreditProviderTransactionId({ purchaseToken });
+    const amountMicrodollars = toMicrodollars(10);
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: amountMicrodollars,
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      // Play reported no order id when the purchase completed, so the grant is
+      // keyed by a digest of the purchase token — never the token itself —
+      // while the voided notification still carries an order id.
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, tokenKey),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: amountMicrodollars })
+      .where(eq(kilocode_users.id, user.id));
+
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+
+    await expect(
+      processGooglePlayKiloPassNotification({
+        pubsubMessage: {
+          messageId: crypto.randomUUID(),
+          data: Buffer.from(
+            JSON.stringify({
+              packageName: 'com.kilocode.kiloapp',
+              eventTimeMillis: String(Date.now()),
+              voidedPurchaseNotification: {
+                purchaseToken,
+                orderId,
+                productType: 2,
+                refundType: 1,
+              },
+            })
+          ).toString('base64'),
+        },
+      })
+    ).resolves.toEqual({ processed: true });
+
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired).toBe(0);
+
+    const reversal = await db.query.credit_transactions.findFirst({
+      where: eq(
+        credit_transactions.credit_category,
+        `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${tokenKey}`
+      ),
+    });
+    expect(reversal).toMatchObject({
+      kilo_user_id: user.id,
+      amount_microdollars: -amountMicrodollars,
+      is_free: false,
+    });
+  });
+
+  it('rejects a voided one-time credit pack order that is not refunded', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'PROCESSED',
+      lineItems: [{ productId: 'credits_usd50' }],
+    });
+
+    await expect(
+      processGooglePlayKiloPassNotification({
+        pubsubMessage: {
+          messageId: crypto.randomUUID(),
+          data: Buffer.from(
+            JSON.stringify({
+              packageName: 'com.kilocode.kiloapp',
+              voidedPurchaseNotification: {
+                purchaseToken,
+                orderId,
+                productType: 2,
+                refundType: 1,
+              },
+            })
+          ).toString('base64'),
+        },
+      })
+    ).rejects.toThrow('Google Play refund does not match');
+
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
+  });
 
   it.each([false, true])(
     'acknowledges committed credits and retries without another grant (resubscription: %s)',
@@ -1243,7 +1676,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       .set({ microdollars_used: after!.kilo_pass_threshold! })
       .where(eq(kilocode_users.id, user.id));
     const { maybeIssueKiloPassBonusFromUsageThreshold } =
-      await import('@/lib/kilo-pass/usage-triggered-bonus');
+      await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
     const issue = () =>
       maybeIssueKiloPassBonusFromUsageThreshold({
         kiloUserId: user.id,
@@ -1697,7 +2130,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         expect(pendingCancel?.cancel_at_period_end).toBe(true);
       }
       const { maybeIssueKiloPassBonusFromUsageThreshold } =
-        await import('@/lib/kilo-pass/usage-triggered-bonus');
+        await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({ kiloUserId: user.id, nowIso: start });
       await db
@@ -1822,5 +2255,400 @@ describe('processGooglePlayKiloPassNotification', () => {
         where: eq(kilo_pass_store_purchases.kilo_user_id, user.id),
       })
     ).toHaveLength(1);
+  });
+});
+
+describe('Google Play bouncer store events', () => {
+  /** The durable outbox row one event produced, or null when nothing was enqueued. */
+  async function outboxRowFor(eventId: string) {
+    const rows = await db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.event_id, eventId))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Whether a store event is marked processed. Every enqueue commits in the same transaction as
+   * the processed mark, so both are present after one notification.
+   */
+  async function storeEventProcessed(eventId: string): Promise<boolean> {
+    const row = await db.query.kilo_pass_store_events.findFirst({
+      where: and(
+        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+        eq(kilo_pass_store_events.event_id, eventId)
+      ),
+      columns: { processed_at: true },
+    });
+    return Boolean(row?.processed_at);
+  }
+
+  /** Completes one paid purchase so the subscription resolves to `accountId`. */
+  async function subscribe(token: string, orderId: string, accountId: string) {
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(accountId, orderId));
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: token,
+        messageId: `setup-${token}`,
+      }),
+    });
+  }
+
+  function voidedMessage(messageId: string, purchaseToken: string, orderId: string) {
+    return {
+      messageId,
+      data: Buffer.from(
+        JSON.stringify({
+          packageName: 'com.kilocode.kiloapp',
+          eventTimeMillis: String(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+          voidedPurchaseNotification: { purchaseToken, orderId, productType: 1, refundType: 1 },
+        })
+      ).toString('base64'),
+    };
+  }
+
+  it('reports a voided purchase as an other-reason refund', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `void-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    await subscribe(token, orderId, obfsAccountId);
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken: token,
+      state: 'REFUNDED',
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedMessage('void-report', token, orderId),
+    });
+
+    const row = await outboxRowFor('void-report');
+    expect(row).toMatchObject({ event_type: 'store.refund', user_id: user.id, status: 'pending' });
+    expect(row?.payload).toEqual({
+      eventId: 'void-report',
+      occurredAt: '2026-05-15T00:00:00.000Z',
+      userId: user.id,
+      provider: 'google',
+      referenceId: orderId,
+      environment: 'production',
+      type: 'store.refund',
+      reason: 'other',
+    });
+    // The enqueue committed atomically with the processed mark, so both are present.
+    expect(await storeEventProcessed('void-report')).toBe(true);
+  });
+
+  it('grants base credits to a same-month renewal after the refunded order', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `refund-renew-token-${crypto.randomUUID()}`;
+    const refundedOrderId = `GPA.${crypto.randomUUID()}`;
+    await subscribe(token, refundedOrderId, obfsAccountId);
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId: refundedOrderId,
+      purchaseToken: token,
+      state: 'REFUNDED',
+    });
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedMessage('refund-before-renew', token, refundedOrderId),
+    });
+    const afterRefund = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(afterRefund!.total_microdollars_acquired).toBe(0);
+
+    // Play charges a new order on the same subscription in the same month.
+    const renewedOrderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, renewedOrderId)
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 2,
+        purchaseToken: token,
+        messageId: `renew-${renewedOrderId}`,
+      }),
+    });
+
+    const afterRenewal = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(afterRenewal!.total_microdollars_acquired).toBe(toMicrodollars(19));
+  });
+
+  it('reports a production purchase with its USD amount in cents', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `purchase-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId, orderId));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken: token,
+      state: 'PROCESSED',
+      lineItems: [
+        {
+          productId: 'kilopass_tier19',
+          total: { currencyCode: 'USD', units: '19', nanos: 0 },
+          subscriptionDetails: {
+            servicePeriodStartTime: '2026-05-01T09:00:00.000Z',
+            servicePeriodEndTime: '2100-01-01T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: token,
+        messageId: 'purchase-report',
+      }),
+    });
+
+    const row = await outboxRowFor('purchase-report');
+    expect(row).toMatchObject({ event_type: 'store.purchase', user_id: user.id });
+    expect(row?.payload).toEqual({
+      eventId: 'purchase-report',
+      occurredAt: '2026-05-15T00:00:00.000Z',
+      userId: user.id,
+      provider: 'google',
+      referenceId: orderId,
+      environment: 'production',
+      type: 'store.purchase',
+      amountCents: 1900,
+    });
+    expect(await storeEventProcessed('purchase-report')).toBe(true);
+  });
+
+  it('reports a production revoked subscription', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `revoked-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    await subscribe(token, orderId, obfsAccountId);
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'revoked-report',
+      }),
+    });
+
+    const row = await outboxRowFor('revoked-report');
+    expect(row).toMatchObject({ event_type: 'store.revoked', user_id: user.id });
+    expect(row?.payload).toEqual({
+      eventId: 'revoked-report',
+      occurredAt: '2026-05-15T00:00:00.000Z',
+      userId: user.id,
+      provider: 'google',
+      referenceId: orderId,
+      environment: 'production',
+      type: 'store.revoked',
+    });
+    expect(await storeEventProcessed('revoked-report')).toBe(true);
+  });
+
+  it("does not flag the owner when Play revokes an order Kilo never admitted (Kilo's duplicate reversal)", async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    const token = `owned-token-${crypto.randomUUID()}`;
+    await subscribe(token, `GPA.${crypto.randomUUID()}`, obfsAccountId);
+    // The revoked order is not the admitted one: Kilo refunded and revoked a duplicate purchase.
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, `GPA.${crypto.randomUUID()}`)
+    );
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'duplicate-revoked-report',
+      }),
+    });
+
+    expect(await outboxRowFor('duplicate-revoked-report')).toBeNull();
+  });
+
+  it('skips a sandbox notification', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    const token = `sandbox-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, orderId, { testPurchase: {} })
+    );
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'sandbox-report',
+      }),
+    });
+
+    expect(await outboxRowFor('sandbox-report')).toBeNull();
+  });
+
+  it('skips a production notification that resolves no Kilo user', async () => {
+    const token = `orphan-token-${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiData());
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'orphan-report',
+      }),
+    });
+
+    expect(await outboxRowFor('orphan-report')).toBeNull();
+  });
+
+  function voidedCreditPackMessage(messageId: string, purchaseToken: string, orderId: string) {
+    return {
+      messageId,
+      data: Buffer.from(
+        JSON.stringify({
+          packageName: 'com.kilocode.kiloapp',
+          eventTimeMillis: String(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+          voidedPurchaseNotification: { purchaseToken, orderId, productType: 2, refundType: 1 },
+        })
+      ).toString('base64'),
+    };
+  }
+
+  it('reports a refunded credit pack for the pack owner', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: toMicrodollars(10),
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: toMicrodollars(10) })
+      .where(eq(kilocode_users.id, user.id));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage('credit-pack-void', purchaseToken, orderId),
+    });
+
+    const row = await outboxRowFor('credit-pack-void');
+    expect(row).toMatchObject({ event_type: 'store.refund', user_id: user.id });
+    expect(row?.payload).toEqual({
+      eventId: 'credit-pack-void',
+      occurredAt: '2026-05-15T00:00:00.000Z',
+      userId: user.id,
+      provider: 'google',
+      referenceId: orderId,
+      environment: 'production',
+      type: 'store.refund',
+      reason: 'other',
+    });
+    expect(await storeEventProcessed('credit-pack-void')).toBe(true);
+  });
+
+  it('reports nothing for a refunded license-tester credit pack', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: toMicrodollars(10),
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: toMicrodollars(10) })
+      .where(eq(kilocode_users.id, user.id));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce({ purchaseType: 0 });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage('credit-pack-void-tester', purchaseToken, orderId),
+    });
+
+    const clawback = await db.query.credit_transactions.findFirst({
+      where: eq(
+        credit_transactions.credit_category,
+        `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${orderId}`
+      ),
+    });
+    expect(clawback?.amount_microdollars).toBe(-toMicrodollars(10));
+    expect(await outboxRowFor('credit-pack-void-tester')).toBeNull();
+  });
+
+  it('still reports a credit-pack refund when the purchase lookup fails', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: toMicrodollars(10),
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: toMicrodollars(10) })
+      .where(eq(kilocode_users.id, user.id));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+    mockGetGooglePlayProductPurchase.mockRejectedValueOnce(new Error('404 purchase not found'));
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage(
+        'credit-pack-void-lookup-fail',
+        purchaseToken,
+        orderId
+      ),
+    });
+
+    const row = await outboxRowFor('credit-pack-void-lookup-fail');
+    expect(row).toMatchObject({ event_type: 'store.refund', user_id: user.id });
+    expect(row?.payload).toMatchObject({
+      type: 'store.refund',
+      userId: user.id,
+      referenceId: orderId,
+      environment: 'production',
+    });
+  });
+
+  it('reports nothing for a refunded credit pack Kilo never granted', async () => {
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage('credit-pack-void-ungranted', purchaseToken, orderId),
+    });
+
+    expect(await outboxRowFor('credit-pack-void-ungranted')).toBeNull();
   });
 });

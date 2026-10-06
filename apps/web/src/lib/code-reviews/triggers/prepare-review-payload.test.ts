@@ -64,8 +64,8 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
@@ -634,6 +634,8 @@ describe('prepareReviewPayload', () => {
       gitToken: 'gitlab-project-token',
       platform: 'gitlab',
     });
+    // GitLab sessions are reused across reviews, so the publication self-check is GitHub-only.
+    expect(payload.sessionInput).not.toHaveProperty('envVars');
     expect(payload.repositorySize).toBe('100 MB');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
     expect(mockFetchGitLabRepositorySize).toHaveBeenCalledWith(
@@ -1106,7 +1108,9 @@ describe('prepareReviewPayload', () => {
       githubRepo: REPO,
       platform: 'github',
       upstreamBranch: 'refs/pull/1234/head',
+      githubPullRequestNumber: 1234,
     });
+    expect(payload.sessionInput).not.toHaveProperty('envVars');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 

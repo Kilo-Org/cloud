@@ -4,6 +4,7 @@ import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-all
 import {
   CurrentSessionMetadataSchema,
   getEffectiveCredentialContainment,
+  hasCredentialContainment,
   getSandboxProvider,
   parseSessionMetadata,
   requiresContainmentSandbox,
@@ -29,6 +30,25 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it.each(['github', 'gitlab', 'bitbucket', 'kilocode'] as const)(
+    'uses the same containment predicate for computed and persisted %s flags',
+    flag => {
+      const disabled = { github: false, gitlab: false, bitbucket: false, kilocode: false };
+      expect(hasCredentialContainment(disabled)).toBe(false);
+      const enabled = { ...disabled, [flag]: true };
+      expect(hasCredentialContainment(enabled)).toBe(true);
+      expect(
+        requiresContainmentSandbox({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'agent_containment', userId: 'user_containment' },
+          auth: {},
+          workspace: { credentialContainment: enabled },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      ).toBe(true);
+    }
+  );
+
   it('maps legacy managed SCM containment to GitHub and Kilo only', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
@@ -322,6 +342,32 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(serializeSessionMetadata(current)).toEqual(current);
     expect(parseSessionMetadata(current).repository).not.toHaveProperty('githubIntegrationId');
+  });
+
+  it('preserves the GitHub pull request number for a review session', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 17 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+    expect(parseSessionMetadata(current).repository).toMatchObject({ pullRequestNumber: 17 });
+  });
+
+  it('rejects a non-positive GitHub pull request number', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_github_review', userId: 'user_github_review' },
+      auth: {},
+      repository: { type: 'github' as const, repo: 'acme/repo', pullRequestNumber: 0 },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(() => parseSessionMetadata(current)).toThrow();
   });
 
   it('preserves a validated worktree ID and its canonical workspace path', () => {

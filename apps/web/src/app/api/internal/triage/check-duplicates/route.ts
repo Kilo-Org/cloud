@@ -20,10 +20,10 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getTriageTicketById, updateTriageTicketStatus } from '@/lib/auto-triage/db/triage-tickets';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { createEmbeddingService } from '@/lib/ai-gateway/embeddings/embedding-providers';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { createEmbeddingService } from '@/lib/embeddings/embedding-providers';
 import { getMilvusClient } from '@/lib/code-indexing/milvus';
 import { createHash } from 'crypto';
 

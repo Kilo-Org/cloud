@@ -15,7 +15,10 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
@@ -89,6 +92,7 @@ function createFakeProvider(): { adapter: ProviderAdapter; launchEnvs: Record<st
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active' as const, ...(ref === null ? {} : { providerRef: ref }) };
@@ -207,7 +211,7 @@ describe('sandbox status badge projection (B10)', () => {
       wrapperId: WRAPPER_ID,
       allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID!,
     });
-    expect(hello).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(hello).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     wrapper.send({ type: 'session.ready', sessionId });
     await waitFor(async () => {
       const snapshot = await session.getSession();
@@ -229,6 +233,10 @@ describe('sandbox status badge projection (B10)', () => {
       detailCode: 'sandbox_stopped',
       provider: 'Cloudflare',
     });
+    await waitFor(async () =>
+      expect(await session.getSession()).toMatchObject({ route: { state: 'unknown' } })
+    );
+    wrapper.close();
   });
 
   it('projects starting, stopping, unreachable and the sleep estimate from the allocation', async () => {

@@ -1,0 +1,83 @@
+/* eslint-disable drizzle/enforce-delete-with-where */
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { byok_api_keys, kilocode_users } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+
+async function seedMiniMaxKey(managementSource: 'user' | 'coding_plan', isEnabled = true) {
+  const user = await insertTestUser();
+  await db.insert(byok_api_keys).values({
+    kilo_user_id: user.id,
+    provider_id: 'minimax',
+    encrypted_api_key: encryptApiKey(`minimax-${crypto.randomUUID()}`, BYOK_ENCRYPTION_KEY),
+    management_source: managementSource,
+    is_enabled: isEnabled,
+    created_by: user.id,
+  });
+  return user;
+}
+
+async function seedBytePlusKey(managementSource: 'user' | 'coding_plan', isEnabled = true) {
+  const user = await insertTestUser();
+  await db.insert(byok_api_keys).values({
+    kilo_user_id: user.id,
+    provider_id: 'byteplus-coding',
+    encrypted_api_key: encryptApiKey(`byteplus-${crypto.randomUUID()}`, BYOK_ENCRYPTION_KEY),
+    management_source: managementSource,
+    is_enabled: isEnabled,
+    created_by: user.id,
+  });
+  return user;
+}
+
+afterEach(async () => {
+  await db.delete(byok_api_keys);
+  await db.delete(kilocode_users);
+});
+
+describe('Coding Plan MiniMax BYOK routing', () => {
+  it('loads a MiniMax Coding Plan-installed key through ordinary MiniMax routing', async () => {
+    const user = await seedMiniMaxKey('coding_plan');
+
+    const byok = await getBYOKforUser(db, user.id, ['minimax']);
+
+    expect(byok).toHaveLength(1);
+    expect(byok?.[0].providerId).toBe('minimax');
+  });
+
+  it('uses a subscriber replacement as ordinary MiniMax BYOK', async () => {
+    const user = await seedMiniMaxKey('user');
+
+    const byok = await getBYOKforUser(db, user.id, ['minimax']);
+
+    expect(byok).toHaveLength(1);
+    expect(byok?.[0].providerId).toBe('minimax');
+  });
+
+  it('does not route a disabled MiniMax BYOK key', async () => {
+    const user = await seedMiniMaxKey('coding_plan', false);
+
+    expect(await getBYOKforUser(db, user.id, ['minimax'])).toBeNull();
+  });
+
+  it('does not route after the configured MiniMax key is deleted', async () => {
+    const user = await seedMiniMaxKey('coding_plan');
+    await db.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, user.id));
+
+    expect(await getBYOKforUser(db, user.id, ['minimax'])).toBeNull();
+  });
+});
+
+describe('Coding Plan BytePlus BYOK routing', () => {
+  it('loads a BytePlus Coding Plan-installed key through ordinary direct BYOK routing', async () => {
+    const user = await seedBytePlusKey('coding_plan');
+
+    const byok = await getBYOKforUser(db, user.id, ['byteplus-coding']);
+
+    expect(byok).toHaveLength(1);
+    expect(byok?.[0].providerId).toBe('byteplus-coding');
+  });
+});

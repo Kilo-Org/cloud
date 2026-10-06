@@ -66,8 +66,8 @@ repository.
    preparation under the triggering message: the current step, and the running
    setup command's output.
 2. Steps the user MUST be able to see when they run: cloning the repository,
-   checking out the branch, restoring a previous workspace, running setup
-   commands.
+   using a prepared repository, checking out the branch, restoring a previous
+   workspace, running setup commands, saving the repository for faster starts.
 3. Preparation that only acquired and booted an environment -- warm reuse, no
    real provisioning -- MUST NOT leave a completed preparation row.
 4. Running and failed preparation MUST always be visible. Failed preparation,
@@ -78,9 +78,13 @@ repository.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
-8. The composer MUST stay disabled while preparation or finalization runs, and
-   MUST say which state it is waiting on. After preparation failure settles the
-   turn, the composer MUST be restored when the session is writable and its
+8. A writable Cloud Agent chat with a resolved queue-capable transport MUST allow
+   editing and queueing follow-up messages while preparation or finalization
+   runs, and MUST show the current phase. Temporary submission unavailability
+   MUST NOT disable its textarea or discard its draft or focus. Initial loading,
+   unresolved transports, and read-only chats MUST NOT permit submission.
+   After preparation failure settles the turn, the composer MUST be restored
+   when the session is writable and its
    transport permits sending. A later submission MUST use fresh message and
    preparation-attempt identities.
 
@@ -102,10 +106,17 @@ repository.
 9. A turn that makes no real agent progress for seven minutes MUST fail, MUST
    tell the user the turn did not complete, MUST re-enable the composer, and
    MUST leave the session usable for a later message. Retry and offline status
-   are not real progress. A stop during a retry MUST still end the turn
-   immediately (rule 6).
+   are not real progress. A tool or subagent that is still running within its
+   own timeout MUST hold the inactivity check so the turn is not failed while it
+   runs; the seven-minute check restarts when the tool completes or errors.
+   Tool-part updates remain real progress; silent running time adds no new
+   progress events. A stop during a retry MUST still end the turn immediately
+   (rule 6).
    For `workspace_*` sessions, the wrapper owns the seven-minute Kilo-progress
-   check and the 60-minute hard execution cap. If the control plane cannot
+   check and the 120-minute hard execution cap. A tool part that is `running`
+   in the routed root session or a resolved descendant tree (including a
+   subagent `task`) holds the seven-minute check until it ends, and the
+   120-minute cap still fails the turn. If the control plane cannot
    reach the wrapper, missing updates MUST NOT be treated as Kilo inactivity.
    The user MUST still be able to Stop or queue another message while the
    wrapper reconnects. If the connection returns, accepted work MUST
@@ -113,7 +124,7 @@ repository.
    five minutes, the environment MUST stop and every accepted message on it
    MUST fail with a specific connection reason; queued messages MUST wait for a
    new environment in the same chat. Each affected composer MUST become usable;
-   already-terminal messages MUST stay unchanged. Do not wait for the 60-minute
+   already-terminal messages MUST stay unchanged. Do not wait for the 120-minute
    execution cap or physical stop confirmation, and do not claim that Kilo
    stalled or returned an error.
 
@@ -133,6 +144,9 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+3. Open workspace tabs — the workspace terminal and file tabs, their order, and
+   the active tab — MUST survive refresh and navigation between worktrees, and
+   MUST remain scoped to the current user and personal or organization context.
 
 ### Shared Worktrees
 

@@ -1,13 +1,14 @@
-import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@/lib/config.server';
+import { randomUUID } from 'crypto';
+import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { sentryRootSpan } from '@/lib/getRootSpan';
-import { getUserFromAuth } from '@/lib/user/server';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   countAndStoreFimUsage,
@@ -19,17 +20,29 @@ import {
   captureProxyError,
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { readDb } from '@/lib/drizzle';
-import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { sentryLogger } from '@/lib/utils.server';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { findSupportedFimModel, type FimProvider } from '@/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import {
+  findSupportedFimModel,
+  type FimProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  bareIpLiteral,
+  bouncerDecideTier,
+  bouncerRejectionResponse,
+  payerSharingIp,
+  rawClientIp,
+  startBouncerDecide,
+} from '@kilocode/web-shared/lib/bouncer/inference';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -83,6 +96,7 @@ type FIMRequestBody = z.infer<typeof FIMRequestBody>;
 
 export async function handleFimCompletionsRequest(request: NextRequest) {
   const requestStartedAt = performance.now();
+  const requestStartedAtMs = Date.now();
   const requesBodyTextPromise = request.text();
 
   const authSpan = startInactiveSpan({ name: 'auth-check' });
@@ -146,8 +160,14 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   }
 
   // Use new shared helper for fraud & project headers
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
+
+  // Resolve bouncer's identity once for this request. FIM is always signed in, so
+  // its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
+  const bouncerIp = bareIpLiteral(rawClientIp(request));
+  const bouncerRequestId = randomUUID();
 
   // Extract properties for usage context
   const promptInfo = extractFimPromptInfo(requestBody);
@@ -178,17 +198,28 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
     user_byok: !!userByok,
     has_tools: false,
-    feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER)),
+    feature,
     session_id: taskId ?? null,
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    bouncer: {
+      requestId: bouncerRequestId,
+      occurredAt: new Date(requestStartedAtMs),
+      accountId: bouncerAccountId(user.id, organizationId),
+      clientIp: payerSharingIp(bouncerIp, feature),
+      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      requestedLogprobs: false,
+      samples: null,
+      // FIM feeds volume rules only, which do not read a prompt hash.
+      promptSimHash: null,
+    },
   };
 
   setTag('ui.ai_model', requestBody.model);
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users
-  const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
@@ -228,6 +259,23 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // The one decide for this request, awaited before the upstream call within its 500 ms budget.
+  // Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
+    requestId: bouncerRequestId,
+    ip: bouncerIp,
+    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
+    account: {
+      accountId: bouncerAccountId(user.id, organizationId),
+      tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
+    },
+  });
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   sentryRootSpan()?.setAttribute(
     'fim.time_to_request_start_ms',

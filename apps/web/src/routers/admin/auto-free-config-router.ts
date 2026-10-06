@@ -1,8 +1,12 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { autoFreeModels } from '@/lib/ai-gateway/models';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import {
+  AUTO_FREE_FALLBACK_CONFIG,
+  getIneligibleAutoFreeModelIds,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
-import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
+import { AutoFreeConfigSchema } from '@kilocode/db/schema-types';
+import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
 import * as z from 'zod';
 
@@ -17,11 +21,18 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
       .from(ai_gateway_config)
       .where(eq(ai_gateway_config.id, 1))
       .limit(1);
-    const defaults: AutoFreeConfig = { models: [...autoFreeModels] };
-    return { config: row?.auto_free ?? null, defaults };
+    return { config: row?.auto_free ?? null, fallback: AUTO_FREE_FALLBACK_CONFIG };
   }),
 
   set: adminProcedure.input(SetAutoFreeConfigSchema).mutation(async ({ input }) => {
+    const ineligibleModelIds = input.config ? getIneligibleAutoFreeModelIds(input.config) : [];
+    if (ineligibleModelIds.length > 0) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider): ${ineligibleModelIds.join(', ')}`,
+      });
+    }
+
     await db
       .insert(ai_gateway_config)
       .values({ auto_free: input.config })

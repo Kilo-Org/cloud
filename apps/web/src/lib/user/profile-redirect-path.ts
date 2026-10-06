@@ -1,14 +1,12 @@
 import type { User } from '@kilocode/db/schema';
 import {
-  getProfileOrganizations,
   getSingleUserOrganization,
   getUserOrganizationsWithSeats,
-} from '@/lib/organizations/organizations';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 import { findLiveSalesDemoForUser } from '@/lib/organizations/sales-demo';
 import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
-import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
-import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
+import { classifyOrganizationEntitlement } from '@kilocode/web-shared/lib/organizations/trial-utils';
 
 // Resolve where a user whose personal account is disabled should land by default.
 // Prefers a sales demo org, then their oldest organization (stable across
@@ -24,20 +22,10 @@ async function resolvePersonalAccountDisabledLandingPath(userId: User['id']): Pr
   return firstOrg ? `/organizations/${firstOrg.organizationId}` : '/connected-accounts';
 }
 
-// Prefer the user's verified-domain organization, then preserve the existing
-// personal-account and single-organization fallbacks.
+// decides if we want to redirect to /profile or the org page
+// the org page will be redirected to if the user is a member of exactly one organization
+// or if the org is SSO org
 export async function getProfileRedirectPath(user: User) {
-  const profileOrganizations = await getProfileOrganizations(user.id, {
-    excludeAccessBlocked: true,
-  });
-  const preferredOrganizationId = await resolvePreferredVerifiedDomainOrganizationId(
-    user,
-    profileOrganizations
-  );
-  if (preferredOrganizationId) {
-    return `/organizations/${preferredOrganizationId}`;
-  }
-
   // Users whose personal account is disabled have no personal surface;
   // always send them into an organization regardless of org count.
   if (user.personal_account_disabled) {

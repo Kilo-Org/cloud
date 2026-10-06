@@ -19,11 +19,11 @@ import {
   settleOperation,
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
-import { db } from '@/lib/drizzle';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/microdollars';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -32,19 +32,19 @@ import {
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   type KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   appendKiloPassAuditLog,
   computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
-} from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
 } from './subscription-accounting';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;
@@ -251,6 +251,81 @@ function getUpgradeBonusReversalDescription(kind: KiloPassIssuanceItemKind): str
     return 'Kilo Pass upgrade bonus clawback';
   }
   return 'Kilo Pass upgrade promo clawback';
+}
+
+/**
+ * Frees the month's base issuance item when a store refund already took its
+ * credits back. A user refunded in month M who pays again in month M must be
+ * granted base credits for that payment; the issuance keeps one base item per
+ * month, so the refunded one would otherwise make the new grant a no-op.
+ *
+ * A base item counts as refunded only while its clawback is open: a store
+ * refund reversal puts the credits back and the item stands again.
+ */
+async function releaseRefundedBaseIssuanceItem(
+  tx: DrizzleTransaction,
+  params: {
+    issuanceId: string;
+    subscriptionId: string;
+    kiloUserId: string;
+    purchase: ValidatedStoreKiloPassPurchase;
+  }
+): Promise<void> {
+  const [baseItem] = await tx
+    .select({
+      itemId: kilo_pass_issuance_items.id,
+      creditTransactionId: kilo_pass_issuance_items.credit_transaction_id,
+    })
+    .from(kilo_pass_issuance_items)
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      )
+    )
+    .limit(1);
+  if (!baseItem) return;
+
+  // Both stores key a base clawback `kilo-pass-store-refund:<provider>:<tx>:base:<item>`
+  // (Apple adds `:r<n>` per later cycle), where <item> is the base credit row id.
+  // A restoration mirrors it under `kilo-pass-store-refund-reversal:`.
+  const itemSuffix = `:${KiloPassIssuanceItemKind.Base}:${baseItem.creditTransactionId}`;
+  const ledgerRows = await tx
+    .select({ category: credit_transactions.credit_category })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.kilo_user_id, params.kiloUserId),
+        or(
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund:%${itemSuffix}`}`,
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund:%${itemSuffix}:r%`}`,
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund-reversal:%${itemSuffix}`}`,
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund-reversal:%${itemSuffix}:r%`}`
+        )
+      )
+    );
+  const clawbacks = ledgerRows.filter(row =>
+    row.category?.startsWith('kilo-pass-store-refund:')
+  ).length;
+  const restorations = ledgerRows.length - clawbacks;
+  if (clawbacks <= restorations) return;
+
+  await tx.delete(kilo_pass_issuance_items).where(eq(kilo_pass_issuance_items.id, baseItem.itemId));
+  await appendKiloPassAuditLog(tx, {
+    action: KiloPassAuditLogAction.BaseCreditsIssued,
+    result: KiloPassAuditLogResult.Success,
+    kiloUserId: params.kiloUserId,
+    kiloPassSubscriptionId: params.subscriptionId,
+    relatedCreditTransactionId: baseItem.creditTransactionId,
+    relatedMonthlyIssuanceId: params.issuanceId,
+    payload: {
+      kind: 'store_refunded_base_item_released',
+      releasedIssuanceItemId: baseItem.itemId,
+      refundedBaseCreditTransactionId: baseItem.creditTransactionId,
+      providerSubscriptionId: params.purchase.providerSubscriptionId,
+      repurchaseProviderTransactionId: params.purchase.providerTransactionId,
+    },
+  });
 }
 
 async function resetIssuanceItemsForStoreUpgrade(
@@ -854,6 +929,14 @@ export async function completeStoreKiloPassPurchase(params: {
     });
 
     const baseAmountUsd = getMonthlyPriceUsd(purchase.tier);
+    if (!isAppStoreSamePeriodUpgrade) {
+      await releaseRefundedBaseIssuanceItem(tx, {
+        issuanceId: issuanceHeader.issuanceId,
+        subscriptionId,
+        kiloUserId: user.id,
+        purchase,
+      });
+    }
     const baseCreditsResult = isAppStoreSamePeriodUpgrade
       ? {
           wasIssued: false,

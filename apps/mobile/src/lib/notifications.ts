@@ -2,7 +2,7 @@
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { z } from 'zod';
 
 import * as Sentry from '@sentry/react-native';
@@ -27,6 +27,7 @@ import {
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
   getLastGlanceableSnapshot,
@@ -34,6 +35,7 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import { setNotificationPermissionGrantedValue } from '@/lib/glanceable/live-activity-switch';
 import { getActiveUserId, getSelectedOrganizationId } from '@/lib/glanceable/scope';
 import {
   getGlanceableSinks,
@@ -241,6 +243,13 @@ export async function applyGlanceablePushData(
       sink.publish(snapshot);
       sink.startOrUpdate(snapshot, ctx);
     }
+    // A headless background task resolves when this function returns and its
+    // process is torn down shortly after, so hold the task open until each
+    // asynchronous surface submission landed. A native failure rejects here,
+    // which the background path relies on so the OS retries the push.
+    await Promise.all(
+      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeStart?.())
+    );
   } else {
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
@@ -336,6 +345,15 @@ export function setupNotificationHandler() {
         isNeedsInputNotificationPosted(data.cliSessionId) &&
         !isAppOwnedNeedsInputNotification(notification.request.identifier)
       ) {
+        return suppressed;
+      }
+      // A delivered push with no visible title or body has nothing the OS can
+      // present: the notification-library default would show a bare app-name row
+      // (the empty "Kilo" notification in the report). Whitespace-only fields
+      // are just as invisible, so trim before deciding. Never let that surface
+      // on either platform — suppress it unless it carries real content.
+      const { title, body } = notification.request.content;
+      if (!title?.trim() && !body?.trim()) {
         return suppressed;
       }
       return shown;
@@ -449,14 +467,33 @@ async function handleBackgroundNotificationTask(
  * Executor entry for the background notification task, exported for
  * `notification-background-task.ts`, whose task executor lazy-loads this module
  * when a task fires (a headless start evaluates only the app entry, so this
- * graph must not load at entry). Loads the glanceable sinks — a fresh headless
- * process has none registered — then dispatches.
+ * graph must not load at entry). Applies the stored language, loads the
+ * glanceable sinks — a fresh headless process has none registered — creates the
+ * Android channels, then dispatches.
  */
-// eslint-disable-next-line promise-function-async -- passthrough dispatch: the executor is the async boundary
-export function runBackgroundNotificationTask(
+export async function runBackgroundNotificationTask(
   body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
 ): Promise<Notifications.BackgroundNotificationTaskResult> {
+  // A killed process starts on the bundled English catalog, and nothing else on
+  // this path applies the stored language. Apply it before the channels are
+  // written, or the names below revert the user's notification settings to
+  // English until the app is next opened.
+  await applyStoredLanguage();
   ensureGlanceableSinksLoaded();
+  // A headless start never evaluates the root layout, so the Android channels
+  // the server routes pushes to (`agent-progress` among them) do not exist yet.
+  // Create them before the first post: Android drops a notification addressed
+  // to a channel the app never created, and FirebaseMessaging logs the miss on
+  // every message. Idempotent and never rejecting.
+  await ensureAndroidNotificationChannels();
+  // A headless start never runs `setupNotificationPermissionGate`, so the Live
+  // Activity gate would read "not granted" on an install that granted it. Read
+  // the permission before the sinks see the push.
+  try {
+    await getNotificationPermissionStatus();
+  } catch {
+    // An unknown answer stays "not granted": the next foreground reads again.
+  }
   return handleBackgroundNotificationTask(body);
 }
 
@@ -670,13 +707,31 @@ async function writeAndroidNotificationChannel(
   );
 }
 
+const CHANNEL_NAME_KEYS = {
+  'needs-input': 'glanceable.needsInput',
+  'agent-progress': 'notifications.channel.agentProgress',
+  kiloclaw: 'notifications.channel.kiloclaw',
+  balance: 'notifications.channel.balance',
+  security: 'notifications.channel.security',
+} as const satisfies Record<AndroidNotificationChannelId, string>;
+
+/**
+ * The user-visible name for one channel in the active catalog language. Creation
+ * and rename both read this, so a channel the headless executor creates while
+ * the process was killed carries the same translated name a foreground start
+ * installs, never the shared package's static English `channel.name`.
+ */
+function androidChannelName(channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number]): string {
+  return i18n.t(CHANNEL_NAME_KEYS[channel.id]);
+}
+
 async function createAndroidNotificationChannels(): Promise<boolean> {
   const dndAccessGranted = androidDndAccessGranted();
   let allChannelsWritten = true;
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
-      await writeAndroidNotificationChannel(channel, channel.name, dndAccessGranted);
+      await writeAndroidNotificationChannel(channel, androidChannelName(channel), dndAccessGranted);
     } catch (error) {
       allChannelsWritten = false;
       Sentry.captureException(error, {
@@ -729,14 +784,6 @@ export function ensureAndroidNotificationChannels(): Promise<void> {
   return androidChannelsPromise;
 }
 
-const CHANNEL_NAME_KEYS = {
-  'needs-input': 'glanceable.needsInput',
-  'agent-progress': 'notifications.channel.agentProgress',
-  kiloclaw: 'notifications.channel.kiloclaw',
-  balance: 'notifications.channel.balance',
-  security: 'notifications.channel.security',
-} as const satisfies Record<AndroidNotificationChannelId, string>;
-
 /**
  * Re-set every Android channel name with the active catalog translation. Not
  * single-flight and never cached: a language change must always re-write the
@@ -755,11 +802,7 @@ export async function renameAndroidNotificationChannels(): Promise<void> {
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are renamed sequentially so a per-channel failure is isolated
-      await writeAndroidNotificationChannel(
-        channel,
-        i18n.t(CHANNEL_NAME_KEYS[channel.id]),
-        dndAccessGranted
-      );
+      await writeAndroidNotificationChannel(channel, androidChannelName(channel), dndAccessGranted);
     } catch (error) {
       Sentry.captureException(error, {
         tags: {
@@ -785,6 +828,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     // does not. Any non-granted result maps to denied.
     emitNotificationPermissionResponded(finalStatus === Notifications.PermissionStatus.GRANTED);
   }
+  setNotificationPermissionGrantedValue(finalStatus === Notifications.PermissionStatus.GRANTED);
 
   if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
     return null;
@@ -854,7 +898,30 @@ export async function getNotificationPermissionStatus(): Promise<
   'granted' | 'denied' | 'undetermined'
 > {
   const { status } = await Notifications.getPermissionsAsync();
+  setNotificationPermissionGrantedValue(status === Notifications.PermissionStatus.GRANTED);
   return status;
+}
+
+/**
+ * Keep the glanceable permission gate current: read it at launch and on every
+ * foreground, since the user can change it in Settings while the app is away.
+ * The Live Activity and push-to-start wait for a grant (see
+ * `live-activity-switch`).
+ */
+export function setupNotificationPermissionGate(): void {
+  const refresh = async () => {
+    try {
+      await getNotificationPermissionStatus();
+    } catch {
+      // Keep the last answer; the next foreground reads again.
+    }
+  };
+  void refresh();
+  AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      void refresh();
+    }
+  });
 }
 
 export function getPlatform(): 'ios' | 'android' {

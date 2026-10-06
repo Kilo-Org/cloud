@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { pollDeviceAuthRequest, denyDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyDeviceAuthViewerToken } from '@/lib/device-auth/device-auth-viewer-token';
 import { checkRateLimit } from '@vercel/firewall';
 import crypto from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 type RouteContext = {
   params: Promise<{ code: string }>;

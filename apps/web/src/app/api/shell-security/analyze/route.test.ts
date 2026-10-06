@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { failureResult } from '@/lib/maybe-result';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
 import {
   checkShellSecurityRateLimit,
@@ -22,7 +22,7 @@ jest.mock('next/server', () => {
   };
 });
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/shell-security/rate-limiter');
 jest.mock('@/lib/shell-security/posthog-tracking');
 jest.mock('@sentry/nextjs', () => ({

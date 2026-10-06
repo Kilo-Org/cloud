@@ -1,5 +1,9 @@
 import type { IngestEvent } from '../../src/shared/protocol.js';
-import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
+import type {
+  WrapperCommitCoAuthor,
+  WrapperPromptAgent,
+} from '../../src/shared/wrapper-bootstrap.js';
+import type { PublicationRecoverySignal } from './publication-recovery.js';
 import type { LogUploader } from './log-uploader.js';
 export type { LogUploader } from './log-uploader.js';
 
@@ -19,6 +23,8 @@ export type FinalizationConfig = {
   autoCommit: boolean;
   condenseOnComplete: boolean;
   model?: string;
+  /** Agent selection of the admitted prompt, reused by post-completion prompts. */
+  agent?: WrapperPromptAgent;
   upstreamBranch?: string;
   commitCoAuthor?: WrapperCommitCoAuthor;
 };
@@ -50,6 +56,10 @@ export class WrapperState {
   private lastActivityAt = Date.now();
   private _lastError: LastError | null = null;
   private _lastAssistantMessageId: string | null = null;
+  private _publicationSignal: PublicationRecoverySignal | null = null;
+  private _publicationSignalGeneration: number | undefined = undefined;
+  private _publicationSignalConnectionId: string | undefined = undefined;
+  private _assistantTurnFailed = false;
   private _observedGateResult: 'pass' | 'fail' | null = null;
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
   private _logUploader: LogUploader | null = null;
@@ -232,6 +242,45 @@ export class WrapperState {
     this.session = null;
     this.clearAllMessages();
     this._lastAssistantMessageId = null;
+    this._publicationSignal = null;
+    this._publicationSignalGeneration = undefined;
+    this._publicationSignalConnectionId = undefined;
+    this._assistantTurnFailed = false;
+  }
+
+  observePublicationSignal(signal: PublicationRecoverySignal): void {
+    this._publicationSignal = signal;
+    this._publicationSignalGeneration = this.session?.wrapperGeneration;
+    this._publicationSignalConnectionId = this.session?.wrapperConnectionId;
+  }
+
+  consumePublicationSignal(): PublicationRecoverySignal | null {
+    const signal = this._publicationSignal;
+    this._publicationSignal = null;
+    if (!signal || !this.session) return null;
+    if (
+      this._publicationSignalGeneration !== this.session.wrapperGeneration ||
+      this._publicationSignalConnectionId !== this.session.wrapperConnectionId
+    ) {
+      return null;
+    }
+    this._publicationSignalGeneration = undefined;
+    this._publicationSignalConnectionId = undefined;
+    return signal;
+  }
+
+  observeAssistantTurnFailure(): void {
+    this._assistantTurnFailed = true;
+  }
+
+  clearAssistantTurnFailure(): void {
+    this._assistantTurnFailed = false;
+  }
+
+  consumeAssistantTurnFailure(): boolean {
+    const observed = this._assistantTurnFailed;
+    this._assistantTurnFailed = false;
+    return observed;
   }
 
   beginDeliveryAcknowledgement(): boolean {

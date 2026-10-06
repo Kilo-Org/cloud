@@ -13,26 +13,20 @@ import {
 } from './sink-registry';
 import { setSurfaceExtras } from './surface-extras';
 import {
-  failureFeedback,
   oldestPendingPermissionId,
   resolveWaitingSession,
-  runningFeedback,
-  runWidgetAction,
+  runWidgetApprove,
   type WaitingSessionRow,
 } from './widget-actions';
 
 const ORGANIZATION_KEY = 'selected-organization';
 const USER_KEY = 'active-user-id';
-const MODEL_KEY = 'agent-model-preference';
-const DRAFT_KEY = 'agent-composer:new';
 
 const mocks = vi.hoisted(() => {
   const trpc: Record<string, unknown> = {};
   return {
     secure: new Map<string, string>(),
     trpc,
-    loadDraft: vi.fn(),
-    clearDraft: vi.fn(),
     // The raise's app-owned notification, retired by an approve. Mocked because
     // the real module loads expo-notifications, which this pure suite cannot.
     dismissNeedsInputNotification: vi.fn(),
@@ -59,18 +53,7 @@ vi.mock('@/lib/auth/secure-store-value', () => ({
   }),
 }));
 
-vi.mock('expo-crypto', () => ({
-  randomUUID: () => '00000000-0000-4000-8000-000000000000',
-}));
-
 vi.mock('@/lib/trpc', () => ({ trpcClient: mocks.trpc }));
-
-vi.mock('@/lib/persist/drafts', () => ({
-  NEW_SESSION_DRAFT_KEY: 'agent-composer:new',
-  isStringDraft: (value: unknown) => typeof value === 'string',
-  loadDraft: mocks.loadDraft,
-  clearDraft: mocks.clearDraft,
-}));
 
 vi.mock('./persist', () => ({
   getLastGlanceableSnapshot: () => null,
@@ -91,24 +74,16 @@ function wireTrpc(options: {
   sessions?: SessionRow[];
   cloudAgentSessionId?: string | null;
   permissions?: unknown[];
-  listBitbucket?: { status: string; repositories: unknown[] };
 }) {
   const activeSessions = { list: query({ sessions: options.sessions ?? [] }) };
   const cliSessionsV2 = {
     get: query({ cloud_agent_session_id: options.cloudAgentSessionId ?? null }),
-    recentRepositories: query({
-      repositories: [{ gitUrl: 'https://github.com/acme/widgets.git' }],
-    }),
   };
   const getPendingInteractions = query({
     questions: [],
     permissions: options.permissions ?? [],
   });
   const answerPermission = mutate({ success: true });
-  const prepareSession = mutate({ cloudAgentSessionId: 'workspace_1' });
-  const listBitbucketRepositories = query(
-    options.listBitbucket ?? { status: 'unavailable', repositories: [] }
-  );
   // The organization namespace is a distinct surface: the personal
   // `getPendingInteractions` refuses an organization session, so the action must
   // call the organization twin. Separate spies let a case prove which one ran.
@@ -120,8 +95,6 @@ function wireTrpc(options: {
   const cloudAgentNext = {
     getPendingInteractions,
     answerPermission,
-    prepareSession,
-    listBitbucketRepositories,
   };
   mocks.trpc.activeSessions = activeSessions;
   mocks.trpc.cliSessionsV2 = cliSessionsV2;
@@ -130,8 +103,6 @@ function wireTrpc(options: {
     cloudAgentNext: {
       getPendingInteractions: organizationGetPendingInteractions,
       answerPermission: organizationAnswerPermission,
-      prepareSession,
-      listBitbucketRepositories,
     },
   };
   return {
@@ -141,7 +112,6 @@ function wireTrpc(options: {
     answerPermission,
     organizationGetPendingInteractions,
     organizationAnswerPermission,
-    prepareSession,
   };
 }
 
@@ -237,29 +207,11 @@ describe('oldestPendingPermissionId', () => {
   });
 });
 
-describe('runningFeedback', () => {
-  it('names the progress line of each in-place action', () => {
-    expect(runningFeedback('approve')).toBe('approving');
-    expect(runningFeedback('new-agent')).toBe('starting');
-  });
-});
-
-describe('failureFeedback', () => {
-  it('names the retry line of each in-place action', () => {
-    expect(failureFeedback('approve')).toBe('couldNotApprove');
-    expect(failureFeedback('new-agent')).toBe('couldNotStart');
-  });
-});
-
-describe('runWidgetAction', () => {
+describe('runWidgetApprove', () => {
   beforeEach(() => {
     mocks.secure.clear();
     mocks.secure.set(USER_KEY, 'user-1');
-    mocks.loadDraft.mockReset();
-    mocks.clearDraft.mockReset();
     mocks.dismissNeedsInputNotification.mockReset();
-    // A clear that succeeds: the failure cases override it per test.
-    mocks.clearDraft.mockResolvedValue(true);
     mocks.blankEpoch = 0;
     mocks.orgLost = false;
     // An approve records the same session-attention ack the other answer paths
@@ -276,7 +228,7 @@ describe('runWidgetAction', () => {
   it('reports none when the tray holds no waiting session', async () => {
     wireTrpc({ sessions: [{ id: 'busy', status: 'busy' }] });
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'none' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'none' });
   });
 
   it('reports failed, not a rejection, when the stored scope cannot be read', async () => {
@@ -285,7 +237,7 @@ describe('runWidgetAction', () => {
 
     // A rejected read used to escape the container and leave the widget on its
     // progress line, because nothing settled the action's own line.
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'failed' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'failed' });
   });
 
   it('does not republish when a terminal blank lands while the action runs', async () => {
@@ -304,7 +256,7 @@ describe('runWidgetAction', () => {
     });
     const { snapshots, release } = collectSink();
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
     expect(snapshots).toEqual([]);
     release();
   });
@@ -318,7 +270,7 @@ describe('runWidgetAction', () => {
     mocks.orgLost = true;
     const { snapshots, release } = collectSink();
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
     expect(snapshots).toEqual([]);
     release();
   });
@@ -334,7 +286,7 @@ describe('runWidgetAction', () => {
       .mockResolvedValueOnce({ sessions: [{ id: 'waiting', status: 'permission' }] })
       .mockRejectedValueOnce(new Error('tray down'));
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
   });
 
   it('reports none when the waiting session is not a cloud-agent session', async () => {
@@ -343,7 +295,7 @@ describe('runWidgetAction', () => {
       cloudAgentSessionId: null,
     });
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'none' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'none' });
     expect(rpc.getPendingInteractions.query).not.toHaveBeenCalled();
   });
 
@@ -358,7 +310,7 @@ describe('runWidgetAction', () => {
     });
     const { snapshots, started, release } = collectSink();
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
 
     expect(rpc.getPendingInteractions.query).toHaveBeenCalledWith({
       cloudAgentSessionId: 'workspace_agent_1',
@@ -395,7 +347,7 @@ describe('runWidgetAction', () => {
     });
     rpc.answerPermission.mutate.mockRejectedValueOnce(new Error('network'));
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'failed' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'failed' });
     expect(mocks.dismissNeedsInputNotification).not.toHaveBeenCalled();
   });
 
@@ -406,7 +358,7 @@ describe('runWidgetAction', () => {
       permissions: [],
     });
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'no-permission' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'no-permission' });
   });
 
   // The chip is offered on `needsApproval`, which counts `permission` rows, so
@@ -425,7 +377,7 @@ describe('runWidgetAction', () => {
         permissions: [{ id: 'perm-1' }],
       });
 
-      await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+      await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
 
       expect(rpc.cliSessionsV2.get.query).toHaveBeenCalledWith({ session_id: 'waiting' });
       expect(rpc.answerPermission.mutate).toHaveBeenCalledWith({
@@ -445,7 +397,7 @@ describe('runWidgetAction', () => {
     rpc.answerPermission.mutate.mockRejectedValueOnce(new Error('network'));
     const { snapshots, release } = collectSink();
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'failed' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'failed' });
     expect(snapshots).toEqual([]);
     release();
   });
@@ -458,7 +410,7 @@ describe('runWidgetAction', () => {
       permissions: [{ id: 'perm-1' }],
     });
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
 
     expect(rpc.activeSessions.list.query).toHaveBeenCalledWith({
       organizationId: 'org-1',
@@ -487,89 +439,11 @@ describe('runWidgetAction', () => {
       permissions: [{ id: 'perm-1' }],
     });
 
-    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
 
     expect(rpc.getPendingInteractions.query).toHaveBeenCalledWith({
       cloudAgentSessionId: 'workspace_agent_1',
     });
     expect(rpc.organizationGetPendingInteractions.query).not.toHaveBeenCalled();
-  });
-
-  it('reports none when there is no draft to start from', async () => {
-    wireTrpc({});
-    mocks.secure.set(USER_KEY, 'user-1');
-    mocks.loadDraft.mockResolvedValue('   ');
-
-    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'none' });
-  });
-
-  it('reports none when no model is stored for the scope', async () => {
-    wireTrpc({});
-    mocks.secure.set(USER_KEY, 'user-1');
-    mocks.loadDraft.mockResolvedValue('Ship the widget');
-
-    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'none' });
-  });
-
-  it('creates a session from the draft and clears it', async () => {
-    const rpc = wireTrpc({});
-    mocks.secure.set(USER_KEY, 'user-1');
-    mocks.secure.set(MODEL_KEY, JSON.stringify({ personal: { model: 'claude', variant: 'high' } }));
-    mocks.loadDraft.mockResolvedValue('Ship the widget');
-
-    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'created' });
-
-    expect(mocks.loadDraft).toHaveBeenCalledWith('user-1', DRAFT_KEY, expect.any(Function));
-    expect(rpc.prepareSession.mutate).toHaveBeenCalledWith({
-      prompt: 'Ship the widget',
-      initialMessageId: expect.any(String),
-      mode: 'code',
-      model: 'claude',
-      variant: 'high',
-      autoCommit: false,
-      autoInitiate: true,
-      operationKey: '00000000-0000-4000-8000-000000000000',
-      githubRepo: 'acme/widgets',
-    });
-    expect(mocks.clearDraft).toHaveBeenCalledWith('user-1', DRAFT_KEY);
-  });
-
-  it('clears the draft again when the first clear fails', async () => {
-    wireTrpc({});
-    mocks.secure.set(USER_KEY, 'user-1');
-    mocks.secure.set(MODEL_KEY, JSON.stringify({ personal: { model: 'claude', variant: 'high' } }));
-    mocks.loadDraft.mockResolvedValue('Ship the widget');
-    mocks.clearDraft.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
-
-    // A surviving draft would let the next New agent press start the same
-    // prompt a second time, so the false result must not be dropped.
-    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'created' });
-    expect(mocks.clearDraft).toHaveBeenCalledTimes(2);
-  });
-
-  it('still reports created when the draft cannot be cleared', async () => {
-    wireTrpc({});
-    mocks.secure.set(USER_KEY, 'user-1');
-    mocks.secure.set(MODEL_KEY, JSON.stringify({ personal: { model: 'claude', variant: 'high' } }));
-    mocks.loadDraft.mockResolvedValue('Ship the widget');
-    mocks.clearDraft.mockResolvedValue(false);
-
-    // The session exists: the widget must not answer it with the failed-action
-    // copy just because the draft's removal failed.
-    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'created' });
-    expect(mocks.clearDraft).toHaveBeenCalledTimes(2);
-  });
-
-  it('reports none when the only recent repository is not on a known provider', async () => {
-    const rpc = wireTrpc({});
-    mocks.secure.set(USER_KEY, 'user-1');
-    mocks.secure.set(MODEL_KEY, JSON.stringify({ personal: { model: 'claude', variant: '' } }));
-    mocks.loadDraft.mockResolvedValue('Ship the widget');
-    (rpc.cliSessionsV2.recentRepositories.query as ReturnType<typeof vi.fn>).mockResolvedValue({
-      repositories: [{ gitUrl: 'https://example.com/acme/widgets.git' }],
-    });
-
-    await expect(runWidgetAction('new-agent')).resolves.toEqual({ kind: 'none' });
-    expect(rpc.prepareSession.mutate).not.toHaveBeenCalled();
   });
 });

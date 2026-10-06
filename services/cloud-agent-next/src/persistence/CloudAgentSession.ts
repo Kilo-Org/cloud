@@ -24,6 +24,8 @@ import {
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from './session-metadata.js';
 import {
@@ -290,7 +292,7 @@ function isSameAcceptedInitialTurn(
   );
 }
 
-function isSameRegistrationRepository(
+export function isSameRegistrationRepository(
   metadata: SessionMetadata,
   input: CreateSessionWithInitialAdmissionInput
 ): boolean {
@@ -307,6 +309,7 @@ function isSameRegistrationRepository(
         stored.githubIntegrationId === submitted.githubIntegrationId &&
         (stored.githubAccessPurpose ?? 'workflow') ===
           (submitted.githubAccessPurpose ?? 'workflow') &&
+        stored.pullRequestNumber === submitted.pullRequestNumber &&
         stored.upstreamBranch === submitted.branch
       );
     case 'gitlab':
@@ -674,7 +677,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                   this.getAgentSandboxRuntimeContext()
                 ).discoverSessionWrappers(),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
-        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
+        checkBillingAdmission: () => this.runtimeAdmissionFailure(),
       });
     }
 
@@ -692,15 +695,34 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return !(await this.hasDeletionIntent());
   }
 
-  private async containerBillingAdmissionFailure(): Promise<AdmissionFailure | null> {
+  private async runtimeAdmissionFailure(): Promise<AdmissionFailure | null> {
     const metadata = await this.getMetadata();
     if (!metadata) return null;
+    if (hasRetiredDevcontainerRuntime(metadata)) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: DEVCONTAINER_RETIRED_MESSAGE,
+        failureBoundary: 'admission',
+      };
+    }
     if (!isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return null;
     const admission = await createAgentSandbox(this.env, metadata).ensureBillingAdmission();
     if (admission.success) return null;
     const payer = metadata.identity.orgId
       ? { type: 'org' as const, id: metadata.identity.orgId }
       : { type: 'user' as const, id: metadata.identity.userId };
+    if (admission.code === 'meter_unavailable') {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          sandboxId: metadata.workspace?.sandboxId,
+          payerType: payer.type,
+          admissionCode: admission.code,
+          admissionMessage: admission.message,
+        })
+        .warn('Container billing admission failed');
+    }
     const billingFailure =
       admission.code === 'insufficient_credits'
         ? {
@@ -1053,7 +1075,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         deliver: plan => this.executeDirectly(plan),
         isDeliveryHeld: async () =>
           isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
-        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
+        checkBillingAdmission: () => this.runtimeAdmissionFailure(),
         ensureQueuedMessageEvent: event => {
           this.ensureUniqueMessageEvent({
             executionId: '' as EventSourceId,
@@ -2889,7 +2911,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     gitToken?: string;
     gitlabTokenManaged?: boolean;
     bitbucketTokenManaged?: boolean;
-    devcontainer?: SessionMetadata['devcontainer'];
   }): Promise<OperationResult<SessionMetadata>> {
     const metadata = await this.getMetadata();
 
@@ -2944,9 +2965,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         sessionHome: input.sessionHome,
         branchName: input.branchName,
       },
-      ...((input.devcontainer ?? metadata.devcontainer)
-        ? { devcontainer: input.devcontainer ?? metadata.devcontainer }
-        : {}),
       lifecycle: {
         ...metadata.lifecycle,
         preparedAt: metadata.lifecycle.preparedAt ?? now,

@@ -23,6 +23,7 @@ export type SessionRepositoryRequest =
       repo: string;
       githubIntegrationId?: string;
       githubAccessPurpose?: 'workflow' | 'agent';
+      pullRequestNumber?: number;
       branch?: string;
     }
   | {
@@ -47,7 +48,6 @@ export type SessionRepositoryRequest =
 
 export type SessionRuntimeIntent = {
   sandboxAllocation?: SandboxAllocation;
-  devcontainer?: boolean;
 };
 
 export type SessionCreateRequest = {

@@ -7,6 +7,7 @@ import {
   ServiceFetchTimeoutError,
   fetchWithinBudget,
 } from './bounded-service-fetch';
+import { CONTROL_PLANE_PROCEDURE_BUDGET_MS } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 
 const ENDPOINT_WITH_QUERY =
   'https://ingest.example.com/api/sessions/active?session=query-secret&page=1';
@@ -30,6 +31,10 @@ describe('fetchWithinBudget', () => {
   test('the upstream budget is strictly under the client control-plane deadline', () => {
     expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBe(8_000);
     expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+  });
+
+  test('the upstream budget fires before the control-plane procedure backstop', () => {
+    expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBeLessThan(CONTROL_PLANE_PROCEDURE_BUDGET_MS);
   });
 
   test('rejects with ServiceFetchTimeoutError when the upstream never answers', async () => {

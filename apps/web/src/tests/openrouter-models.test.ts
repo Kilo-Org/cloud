@@ -1,5 +1,8 @@
 import { test, expect, describe, afterEach, beforeEach } from '@jest/globals';
-import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-models.helper';
+import {
+  mockOpenRouterModels,
+  createMockResponse,
+} from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import { GET } from '../app/api/openrouter/models/route';
 import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
 import { GET as transcriptionModelsGET } from '../app/api/gateway/transcription-models/route';
@@ -7,34 +10,37 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   getRawOpenRouterModels,
-} from '@/lib/ai-gateway/providers/openrouter';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import type * as FreeModel from '@/lib/ai-gateway/is-free-model';
-import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
-import type * as ModelSettings from '@/lib/ai-gateway/providers/model-settings';
-import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
-import type * as AutoRouting from '@/lib/ai-gateway/auto-routing-models';
-import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
-import type * as DirectByok from '@/lib/ai-gateway/providers/direct-byok';
-import { getEnkryptBenchmarks } from '@/lib/model-stats/enkrypt';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import type * as FreeModel from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import type * as ModelSettings from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
+import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
+import type * as AutoRouting from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
+import {
+  addUserByokAvailability,
+  getUserByokProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type * as DirectByok from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getEnkryptBenchmarks } from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { NextRequest } from 'next/server';
-import { OpenRouterModelsResponseSchema } from '@/lib/organizations/organization-types';
-import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
-import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
+import { OpenRouterModelsResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 import type { ModelStats } from '@kilocode/db/schema';
 import { GET as statsGET } from '@/app/api/models/stats/route';
 import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
-import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
-import type * as Byok from '@/lib/ai-gateway/byok';
-import { getTerminalBenchSummaries } from '@/lib/model-stats/terminal-bench';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as Byok from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getTerminalBenchSummaries } from '@kilocode/web-shared/lib/model-stats/terminal-bench';
 import {
   kiloExclusiveModels,
   qwen36_plus_stealth_model,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { AUTO_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { EnkryptBenchmark, EnkryptPublishedBenchmark } from '@kilocode/db/schema-types';
 import { captureException } from '@sentry/nextjs';
 
@@ -45,12 +51,12 @@ const mockRows = jest.fn<
   []
 >();
 
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: () => '',
   requireEnv: () => 'http://localhost',
 }));
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => {
       const orderBy = async () =>
@@ -73,7 +79,7 @@ jest.mock('@/lib/drizzle', () => ({
   readDb: {},
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
@@ -85,50 +91,56 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: jest.fn(),
 }));
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(async () => mockAuth),
 }));
 
-jest.mock('@/lib/organizations/organization-models', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/is-free-model', () => {
-  const actual = jest.requireActual<typeof FreeModel>('@/lib/ai-gateway/is-free-model');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => {
+  const actual = jest.requireActual<typeof FreeModel>(
+    '@kilocode/web-shared/lib/ai-gateway/is-free-model'
+  );
   return { ...actual, isFreeModel: jest.fn(actual.isFreeModel) };
 });
 
-jest.mock('@/lib/ai-gateway/providers/model-settings', () => {
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/model-settings', () => {
   const actual = jest.requireActual<typeof ModelSettings>(
-    '@/lib/ai-gateway/providers/model-settings'
+    '@kilocode/web-shared/lib/ai-gateway/providers/model-settings'
   );
   return { ...actual, getGatewayOpenCodeSettings: jest.fn(actual.getGatewayOpenCodeSettings) };
 });
 
-jest.mock('@/lib/ai-gateway/auto-routing-models', () => {
-  const actual = jest.requireActual<typeof AutoRouting>('@/lib/ai-gateway/auto-routing-models');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-models', () => {
+  const actual = jest.requireActual<typeof AutoRouting>(
+    '@kilocode/web-shared/lib/ai-gateway/auto-routing-models'
+  );
   return { ...actual, addAutoRoutingModels: jest.fn(actual.addAutoRoutingModels) };
 });
 
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => {
-  const actual = jest.requireActual<typeof DirectByok>('@/lib/ai-gateway/providers/direct-byok');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
+  const actual = jest.requireActual<typeof DirectByok>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+  );
   return { ...actual, getDirectByokModelsForUser: jest.fn(actual.getDirectByokModelsForUser) };
 });
 
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
 }));
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
-    '@/lib/ai-gateway/providers/gateway-models-cache'
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
   getOpenRouterModelsMetadataFromDatabase: jest.fn(async () => ({})),
   getVercelModelsMetadataFromDatabase: jest.fn(async () => ({})),
 }));
 
-jest.mock('@/lib/ai-gateway/byok', () => {
-  const actual = jest.requireActual<typeof Byok>('@/lib/ai-gateway/byok');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => {
+  const actual = jest.requireActual<typeof Byok>('@kilocode/web-shared/lib/ai-gateway/byok');
   return {
     ...actual,
     addUserByokAvailability: jest.fn(actual.addUserByokAvailability),
@@ -137,15 +149,15 @@ jest.mock('@/lib/ai-gateway/byok', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: jest.fn(async (_userId: string, models: unknown[]) => models),
 }));
 
-jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkRoutingTable: jest.fn(async () => ({ status: 200, body: { table: null } })),
 }));
 
-jest.mock('@/lib/model-stats/terminal-bench', () => ({
+jest.mock('@kilocode/web-shared/lib/model-stats/terminal-bench', () => ({
   getTerminalBenchSummaries: jest.fn(
     async () => new Map([['some-other-model', { overallScore: 0.551, avgAttemptCostUsd: 53.37 }]])
   ),
@@ -176,16 +188,18 @@ function createTestRequest(path: string) {
 }
 
 const originalFetch = global.fetch;
-const realFreeModel = jest.requireActual<typeof FreeModel>('@/lib/ai-gateway/is-free-model');
+const realFreeModel = jest.requireActual<typeof FreeModel>(
+  '@kilocode/web-shared/lib/ai-gateway/is-free-model'
+);
 const realModelSettings = jest.requireActual<typeof ModelSettings>(
-  '@/lib/ai-gateway/providers/model-settings'
+  '@kilocode/web-shared/lib/ai-gateway/providers/model-settings'
 );
 const realAutoRouting = jest.requireActual<typeof AutoRouting>(
-  '@/lib/ai-gateway/auto-routing-models'
+  '@kilocode/web-shared/lib/ai-gateway/auto-routing-models'
 );
-const realByok = jest.requireActual<typeof Byok>('@/lib/ai-gateway/byok');
+const realByok = jest.requireActual<typeof Byok>('@kilocode/web-shared/lib/ai-gateway/byok');
 const realDirectByok = jest.requireActual<typeof DirectByok>(
-  '@/lib/ai-gateway/providers/direct-byok'
+  '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
 );
 
 beforeEach(() => {

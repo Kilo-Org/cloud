@@ -7,7 +7,15 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryFunctionContext,
+} from '@tanstack/react-query';
+import { TRPCClientError } from '@trpc/client';
+import pLimit from 'p-limit';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
@@ -170,6 +178,20 @@ export function mergeWorktreeChatSessions(
   });
 }
 
+export function mergeSidebarFolderSessions(
+  recentSessions: StoredSession[],
+  folderSessions: StoredSession[]
+): StoredSession[] {
+  const sessions = new Map(folderSessions.map(session => [session.sessionId, session]));
+  for (const session of recentSessions) {
+    const existing = sessions.get(session.sessionId);
+    if (!existing || new Date(session.updatedAt) >= new Date(existing.updatedAt)) {
+      sessions.set(session.sessionId, session);
+    }
+  }
+  return [...sessions.values()].sort(compareStoredSessionsByUpdatedAtDesc);
+}
+
 type WorktreeDetailsQueryData = inferRouterOutputs<RootRouter>['cliSessionsV2']['worktreeDetails'];
 
 type SidebarSessionActivity = Pick<
@@ -210,8 +232,39 @@ export type SidebarWorktreeActivity = {
   isLive: boolean;
 };
 
-function getSidebarSessionItemUpdatedAt(item: SidebarSessionItem): string {
-  return item.type === 'worktree' ? item.latestSession.updatedAt : item.session.updatedAt;
+export type SidebarSortPins = ReadonlyMap<string, number>;
+
+/**
+ * Sort-time refresh cadence for running sessions. Their `updated_at` changes on
+ * every turn, which would otherwise reshuffle the sidebar continuously, so a
+ * running session only advances once per interval.
+ */
+export const SIDEBAR_RUNNING_BUMP_INTERVAL_MS = 60_000;
+
+export function getRunningSessionSortTime(session: StoredSession, isRunning: boolean): number {
+  const updatedAt = new Date(session.updatedAt).getTime();
+  if (!isRunning) return updatedAt;
+  const createdAt = new Date(session.createdAt).getTime();
+  return (
+    createdAt +
+    Math.floor((updatedAt - createdAt) / SIDEBAR_RUNNING_BUMP_INTERVAL_MS) *
+      SIDEBAR_RUNNING_BUMP_INTERVAL_MS
+  );
+}
+
+function getSidebarSessionItemSortTime(
+  item: SidebarSessionItem,
+  sortPins: SidebarSortPins
+): number {
+  if (item.type === 'session') {
+    return sortPins.get(item.session.sessionId) ?? new Date(item.session.updatedAt).getTime();
+  }
+  let latest = Number.NEGATIVE_INFINITY;
+  for (const session of item.sessions) {
+    const time = sortPins.get(session.sessionId) ?? new Date(session.updatedAt).getTime();
+    if (time > latest) latest = time;
+  }
+  return Number.isFinite(latest) ? latest : new Date(item.latestSession.updatedAt).getTime();
 }
 
 function compareStoredSessionsByUpdatedAtDesc(a: StoredSession, b: StoredSession): number {
@@ -222,7 +275,8 @@ function compareStoredSessionsByUpdatedAtDesc(a: StoredSession, b: StoredSession
 
 export function groupSidebarSessions(
   sessions: StoredSession[],
-  worktreeDetails: Record<string, SidebarWorktreeDetails> = {}
+  worktreeDetails: Record<string, SidebarWorktreeDetails> = {},
+  sortPins: SidebarSortPins = new Map()
 ): SidebarSessionItem[] {
   const worktreeGroups = new Map<string, StoredSession[]>();
   const items: SidebarSessionItem[] = [];
@@ -258,15 +312,15 @@ export function groupSidebarSessions(
 
   return items.sort(
     (a, b) =>
-      new Date(getSidebarSessionItemUpdatedAt(b)).getTime() -
-      new Date(getSidebarSessionItemUpdatedAt(a)).getTime()
+      getSidebarSessionItemSortTime(b, sortPins) - getSidebarSessionItemSortTime(a, sortPins)
   );
 }
 
 export function groupSidebarSessionsByDate(
   sessions: StoredSession[],
   now = new Date(),
-  worktreeDetails: Record<string, SidebarWorktreeDetails> = {}
+  worktreeDetails: Record<string, SidebarWorktreeDetails> = {},
+  sortPins: SidebarSortPins = new Map()
 ): SidebarSessionDateGroup[] {
   const today: SidebarSessionItem[] = [];
   const yesterday: SidebarSessionItem[] = [];
@@ -274,8 +328,8 @@ export function groupSidebarSessionsByDate(
   const older: SidebarSessionItem[] = [];
   const todayStart = startOfDay(now);
 
-  for (const item of groupSidebarSessions(sessions, worktreeDetails)) {
-    const date = new Date(getSidebarSessionItemUpdatedAt(item));
+  for (const item of groupSidebarSessions(sessions, worktreeDetails, sortPins)) {
+    const date = new Date(getSidebarSessionItemSortTime(item, sortPins));
     if (isSameDay(date, now)) {
       today.push(item);
     } else if (isSameDay(date, subDays(now, 1))) {
@@ -308,8 +362,7 @@ export function groupSidebarSessionsByDate(
   if (older.length > 0) {
     older.sort(
       (a, b) =>
-        new Date(getSidebarSessionItemUpdatedAt(b)).getTime() -
-        new Date(getSidebarSessionItemUpdatedAt(a)).getTime()
+        getSidebarSessionItemSortTime(b, sortPins) - getSidebarSessionItemSortTime(a, sortPins)
     );
     groups.push({ label: 'Older', items: older });
   }
@@ -615,6 +668,7 @@ type UseSidebarSessionsOptions = {
   searchQuery?: string;
   createdOnPlatform?: string | string[];
   gitUrl?: string | string[];
+  folderWorktreeIds?: string[];
 };
 
 type UseSidebarSessionsReturn = {
@@ -626,8 +680,53 @@ type UseSidebarSessionsReturn = {
   renameSessionLocally: (sessionId: string, newTitle: string) => void;
 };
 
+export const PR_LINK_ATTEMPT_HISTORY_LIMIT = 1000;
+
+export function recordPrLinkVerificationAttempt(
+  attempted: Map<string, string>,
+  sessionId: string,
+  verificationKey: string
+) {
+  attempted.delete(sessionId);
+  attempted.set(sessionId, verificationKey);
+  if (attempted.size > PR_LINK_ATTEMPT_HISTORY_LIMIT) {
+    const oldestSessionId = attempted.keys().next().value;
+    if (oldestSessionId !== undefined) attempted.delete(oldestSessionId);
+  }
+}
+
+export function shouldRetryPrLinkVerification(failureCount: number, error: unknown): boolean {
+  if (failureCount >= 1 || !(error instanceof TRPCClientError)) return false;
+  const code: unknown = error.data?.code;
+  return (
+    code === 'INTERNAL_SERVER_ERROR' ||
+    code === 'BAD_GATEWAY' ||
+    code === 'SERVICE_UNAVAILABLE' ||
+    code === 'GATEWAY_TIMEOUT' ||
+    code === 'TIMEOUT' ||
+    (code === undefined && error.cause instanceof TypeError)
+  );
+}
+
+export function nextPrLinkVerification(
+  sessions: readonly { session_id: string; prLinkVerificationKey?: string }[],
+  attempted: ReadonlyMap<string, string>
+) {
+  return sessions.find(
+    session =>
+      session.prLinkVerificationKey !== undefined &&
+      attempted.get(session.session_id) !== session.prLinkVerificationKey
+  );
+}
+
 export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSidebarSessionsReturn {
-  const { organizationId, searchQuery = '', createdOnPlatform, gitUrl } = options ?? {};
+  const {
+    organizationId,
+    searchQuery = '',
+    createdOnPlatform,
+    gitUrl,
+    folderWorktreeIds,
+  } = options ?? {};
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const sharedConnection = useUserWebConnection();
@@ -663,11 +762,6 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     }),
     [updatedSince, organizationId, createdOnPlatform, gitUrl]
   );
-  const listQueryKey = useMemo(
-    () => trpc.cliSessionsV2.list.queryKey(listInput),
-    [trpc, listInput]
-  );
-
   const { data: listData, isLoading: isListLoading } = useQuery({
     ...trpc.cliSessionsV2.list.queryOptions(listInput),
     staleTime: 5000,
@@ -697,6 +791,73 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     ...trpc.cliSessionsV2.search.queryOptions(searchInput),
     staleTime: 5000,
     enabled: isSearchActive,
+  });
+
+  const attemptedPrLinks = useRef(new Map<string, string>());
+  const { mutate: verifyPrLink, isPending: isVerifyingPrLink } = useMutation({
+    ...trpc.cliSessionsV2.refreshAssociatedPullRequest.mutationOptions(),
+    retry: shouldRetryPrLinkVerification,
+    onSuccess: result => {
+      if (result.associatedPr !== null) reconcileSidebarQueries();
+    },
+  });
+  const verificationSessions = isSearchActive ? searchData?.results : listData?.cliSessions;
+  useEffect(() => {
+    if (isVerifyingPrLink || !verificationSessions) return;
+    const session = nextPrLinkVerification(verificationSessions, attemptedPrLinks.current);
+    if (!session?.prLinkVerificationKey) return;
+    recordPrLinkVerificationAttempt(
+      attemptedPrLinks.current,
+      session.session_id,
+      session.prLinkVerificationKey
+    );
+    verifyPrLink({ sessionId: session.session_id });
+  }, [verificationSessions, isVerifyingPrLink, verifyPrLink]);
+
+  const limitFolderQueries = useMemo(() => pLimit(4), []);
+  const folderQueries = useQueries({
+    queries: [...new Set(folderWorktreeIds ?? [])].flatMap(id => {
+      const parsed = cloudAgentWorktreeIdSchema.safeParse(id);
+      if (!parsed.success) return [];
+      const queryOptions = trpc.cliSessionsV2.list.queryOptions(
+        {
+          worktreeId: parsed.data,
+          limit: 1,
+          orderBy: 'updated_at',
+          organizationId,
+          createdOnPlatform,
+          gitUrl,
+          fetchReviewDecision: true,
+        },
+        {
+          enabled: !isSearchActive,
+          staleTime: 5000,
+          refetchInterval: query =>
+            query.state.data?.cliSessions.some(
+              session => session.associatedPr?.reviewDecisionPending === true
+            )
+              ? REVIEW_DECISION_POLL_INTERVAL_MS
+              : false,
+        }
+      );
+      const queryFn = queryOptions.queryFn;
+      return [
+        {
+          ...queryOptions,
+          queryFn:
+            typeof queryFn === 'function'
+              ? (context: QueryFunctionContext) =>
+                  limitFolderQueries(() => {
+                    context.signal.throwIfAborted();
+                    return queryFn({ ...context, queryKey: queryOptions.queryKey });
+                  })
+              : queryFn,
+        },
+      ];
+    }),
+    combine: queries => ({
+      sessions: queries.flatMap(query => query.data?.cliSessions ?? []),
+    }),
   });
 
   // Track last processed data key to avoid unnecessary atom updates
@@ -955,7 +1116,18 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
     trpc,
   ]);
 
-  const sessions = isSearchActive ? searchSessions : cachedSessions;
+  const sessions = useMemo(
+    () =>
+      isSearchActive
+        ? searchSessions
+        : mergeSidebarFolderSessions(
+            cachedSessions,
+            folderQueries.sessions.map(session =>
+              dbSessionToStoredSession(apiSessionToDbSession(session))
+            )
+          ),
+    [isSearchActive, searchSessions, cachedSessions, folderQueries.sessions]
+  );
   const isLoading = isSearchActive ? isSearchLoading : isListLoading;
   const worktreeIdBatches = useMemo(() => {
     const ids = [
@@ -1007,9 +1179,9 @@ export function useSidebarSessions(options?: UseSidebarSessionsOptions): UseSide
 
   // Refetch sessions by invalidating the query cache
   const refetchSessions = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: listQueryKey });
+    void queryClient.invalidateQueries(trpc.cliSessionsV2.list.pathFilter());
     void queryClient.invalidateQueries(trpc.cliSessionsV2.worktreeDetails.pathFilter());
-  }, [queryClient, listQueryKey, trpc]);
+  }, [queryClient, trpc]);
 
   // Optimistically update a session's title in the Jotai atom so the UI
   // reflects the change immediately (before the server refetch completes).

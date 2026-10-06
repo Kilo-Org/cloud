@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { user_deletion_provider_credentials } from '@kilocode/db/schema';
 import { UserDeletionProviderScope } from '@kilocode/db/schema-types';
-import { getEnvVariable } from '@/lib/dotenvx';
-import { db } from '@/lib/drizzle';
-import { USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL } from '@/lib/user/deletion-queue/deletion-constants';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   decryptDeletionCredential,
   DeletionCryptoError,

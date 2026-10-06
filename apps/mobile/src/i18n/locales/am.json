@@ -215,7 +215,6 @@
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
     "bonusCreditsExpiring": "{{amount}} የጉርሻ ክሬዲት በ{{date}} ጊዜው ያበቃል።",
-    "creditBalanceEmpty": "የክሬዲት ቀሪ ሂሳብዎ ባዶ ነው። ለዚህ መለያ ክሬዲት የሚተዳደረው ከiOS መተግበሪያው ውጭ ነው።",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -2048,6 +2047,7 @@
       "idCopied": "የክፍለ ጊዜ መለያ ተቀድቷል",
       "couldNotCopyId": "የክፍለ ጊዜውን መለያ መቅዳት አልተቻለም።",
       "untitled": "ርዕስ የሌለው ክፍለ ጊዜ",
+      "actions": "የክፍለ ጊዜ ተግባራት",
       "sessionDeleted": "ክፍለ ጊዜው ተሰርዟል",
       "needsInput": "ምላሽ ይፈልጋል",
       "fromPlatform": "ከ{{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "ይህን ክፍለ ጊዜ ማንበብ ብቻ ይቻላል።",
       "continueInNewSession": "በአዲስ ክፍለ ጊዜ ይቀጥሉ",
       "emptyDescription": "ለመጀመር ከታች መልእክት ይላኩ።",
+      "emptyTranscriptDescription": "ይህ ክፍለ ጊዜ እስካሁን ምንም መልእክቶች የሉትም።",
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "ከመላክዎ በፊት ሞዴል ይምረጡ።",
       "preparingPlaceholder": "የሥራ አካባቢውን በማዘጋጀት ላይ...",
       "finalizingPlaceholder": "በማጠናቀቅ ላይ...",
+      "sessionLoadFailed": "ክፍለ ጊዜው ሊጫን አልቻለም። መጀመሪያ እንደገና ይሞክሩ።",
       "cannotReceiveFiles": "ይህ ክፍለ ጊዜ ፋይሎችን መቀበል አይችልም። መልእክትዎን ለመላክ አባሪዎቹን ያስወግዱ።",
       "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር የመላኪያ አዝራሩን ይንኩ።",
       "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
@@ -2635,6 +2637,7 @@
       "provider": "አቅራቢ",
       "totalCost": "ጠቅላላ ወጪ",
       "usageReflectsLatest": "አጠቃቀሙ በረዳቱ የመጨረሻ የተጠናቀቀ ምላሽ ላይ የተመሠረተ ነው።",
+      "usageUnavailable": "የአውድ አጠቃቀም አይገኝም",
       "tokenUsage": "የቶከን አጠቃቀም",
       "cacheRate": "የመሸጎጫ አጠቃቀም መጠን",
       "modelsCount": "ሞዴሎች ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "ይጫኑ",
       "loadWithHost": "{{host}}ን ይጫኑ",
-      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።"
+      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።",
+      "trustTitle": "ከ{{host}} ምስል ይጫኑ?",
+      "trustMessage": "{{host}}ን ማመን ምስሎቹን በየጊዜው ሳይጠይቅ ይጭናል። በኋላ ከታመኑ አስተናጋጆች ላይ ሊያስወግዱት ይችላሉ።",
+      "loadOnce": "አንድ ጊዜ ጫን"
     },
     "markdownLink": {
       "invalidLink": "ይህ አገናኝ ሊከፈት አይችልም።",
@@ -3182,8 +3188,12 @@
     "subtitle": "እንደገና ሳይጠይቁዎት እንዲከፈቱ የፈቀዱላቸው አስተናጋጆች",
     "emptyTitle": "የታመኑ አስተናጋጆች የሉም",
     "emptyDescription": "የአገናኝ አስተናጋጅን እንደታመነ ካደረጉት፣ አገናኞቹ እንደገና ሳይጠይቁዎት ይከፈታሉ።",
+    "imagesSectionTitle": "የታመኑ የምስል አስተናጋጆች",
+    "imagesSectionDescription": "ከእነዚህ አስተናጋጆች የሚመጡ ምስሎች እንደገና ሳይጠይቁ ይጫናሉ።",
+    "imagesSectionEmpty": "የታመኑ የምስል አስተናጋጆች የሉም",
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
     "revokeMessage": "ወደዚህ አስተናጋጅ የሚወስዱ አገናኞች እንደገና ማረጋገጫ ይጠይባሉ።",
+    "revokeImageMessage": "ከዚህ አስተናጋጅ የሚመጡ ምስሎች እንደገና ማረጋገጫ ይጠይባሉ።",
     "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "አዲስ ወኪል",
     "approving": "በማጽደቅ ላይ...",
     "couldNotApprove": "ማጽደቅ አልተቻለም",
-    "couldNotStart": "መጀመር አልተቻለም",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
     "openSession": "ክፈት",
@@ -3448,5 +3457,17 @@
       "unboundToast": "ሪፖ ያልታሰረ",
       "unbindFailed": "ሪፖን ማላቀቅ አልተቻለም"
     }
+  },
+  "credits": {
+    "title": "ክሬዲት ይግዙ",
+    "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
+    "packLabel": "የ{{amount}} ክሬዲት ያክሉ",
+    "priceUnavailable": "ዋጋ አይገኝም",
+    "purchased": "ክሬዲት ወደ ቀሪ ሂሳብዎ ተጨምሯል።",
+    "empty": "የክሬዲት ጥቅሎች አሁን አይገኙም።",
+    "noMatchingProducts": "ከApp Store ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
+    "noMatchingProductsPlay": "ከGoogle Play ምንም ተመሳሳይ የክሬዲት ጥቅሎች አልተመለሱም።",
+    "purchaseOwnedByAnotherAccount": "በዚህ Apple Account ላይ ያለው ክሬዲት የሌላ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።",
+    "purchaseOwnedByAnotherAccountPlay": "በዚህ Google Play መለያ ላይ ያለው ክሬዲት የተለየ የKilo መለያ ነው። እነሱን ለመጠቀም ወደዚያ የKilo መለያ ይግቡ።"
   }
 }

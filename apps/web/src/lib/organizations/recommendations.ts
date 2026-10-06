@@ -7,7 +7,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import {
   FEATURE_ADOPTION_KEYS,
@@ -15,7 +15,7 @@ import {
   getFeatureAdoptionState,
 } from '@/lib/organizations/feature-adoption';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
+import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
 // Which surface a recommendation ties back to. Per-feature recommendations reuse
 // the feature adoption key so the UI can show the same icon; organization-level

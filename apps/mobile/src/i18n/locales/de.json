@@ -215,7 +215,6 @@
     "showBalance": "Guthaben anzeigen",
     "balanceHidden": "Guthaben ausgeblendet",
     "bonusCreditsExpiring": "Dein Bonusguthaben von {{amount}} verfällt am {{date}}.",
-    "creditBalanceEmpty": "Dein Guthaben ist aufgebraucht. Für dieses Konto wird das Guthaben außerhalb der iOS-App verwaltet.",
     "signOutTitle": "Abmelden?",
     "signOutMessage": "Du musst dich erneut anmelden, um auf deinen Arbeitsbereich zuzugreifen.",
     "deleteAccountTitle": "Konto löschen?",
@@ -1535,6 +1534,7 @@
       "idCopied": "Sitzungs-ID kopiert",
       "couldNotCopyId": "Die Sitzungs-ID konnte nicht kopiert werden.",
       "untitled": "Sitzung ohne Titel",
+      "actions": "Sitzungsaktionen",
       "sessionDeleted": "Sitzung gelöscht",
       "needsInput": "eingabe erforderlich",
       "fromPlatform": "von {{platform}}",
@@ -1587,6 +1587,7 @@
       "readOnly": "Diese Sitzung ist schreibgeschützt.",
       "continueInNewSession": "In einer neuen Sitzung fortsetzen",
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
+      "emptyTranscriptDescription": "Diese Sitzung hat noch keine Nachrichten.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
       "renameAccessibility": "Sitzung umbenennen: {{title}}",
@@ -2053,6 +2054,7 @@
       "selectModelBeforeSending": "Wähle vor dem Senden ein Modell aus.",
       "preparingPlaceholder": "Umgebung wird eingerichtet…",
       "finalizingPlaceholder": "Wird abgeschlossen…",
+      "sessionLoadFailed": "Die Sitzung konnte nicht geladen werden. Versuchen Sie es zuerst erneut.",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
       "couldNotAttachFiles": "Die Dateien konnten nicht angehängt werden. Tippe auf „Senden“, um es erneut zu versuchen.",
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
@@ -2122,6 +2124,7 @@
       "provider": "Anbieter",
       "totalCost": "Gesamtkosten",
       "usageReflectsLatest": "Die Nutzungswerte beziehen sich auf die zuletzt fertiggestellte Antwort des Assistenten.",
+      "usageUnavailable": "Kontextnutzung nicht verfügbar",
       "tokenUsage": "Token-Nutzung",
       "cacheRate": "Cache-Rate",
       "modelsCount": "Modelle ({{displayCount}})",
@@ -2156,7 +2159,10 @@
     "markdownImage": {
       "load": "Laden",
       "loadWithHost": "Von {{host}} laden",
-      "httpsOnly": "Bilder können nur über HTTPS geladen werden."
+      "httpsOnly": "Bilder können nur über HTTPS geladen werden.",
+      "trustTitle": "Bild von {{host}} laden?",
+      "trustMessage": "Wenn du {{host}} vertraust, werden seine Bilder geladen, ohne jedes Mal zu fragen. Du kannst das später unter Vertrauenswürdige Hosts widerrufen.",
+      "loadOnce": "Einmal laden"
     },
     "markdownLink": {
       "invalidLink": "Dieser Link kann nicht geöffnet werden.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Vertrauenswürdige Hosts, deren Links sich ohne Rückfrage öffnen",
     "emptyTitle": "Keine vertrauenswürdigen Hosts",
     "emptyDescription": "Wenn du dem Host eines Links vertraust, öffnen sich seine Links ohne erneute Rückfrage.",
+    "imagesSectionTitle": "Vertrauenswürdige Bild-Hosts",
+    "imagesSectionDescription": "Bilder von diesen Hosts werden geladen, ohne erneut zu fragen.",
+    "imagesSectionEmpty": "Keine vertrauenswürdigen Bild-Hosts",
     "revoke": "Vertrauen in {{host}} widerrufen",
     "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
+    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung.",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Neuer Agent",
     "approving": "Genehmigung läuft...",
     "couldNotApprove": "Genehmigung fehlgeschlagen",
-    "couldNotStart": "Start fehlgeschlagen",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Repo ungebunden",
       "unbindFailed": "Repo konnte nicht entbunden werden"
     }
+  },
+  "credits": {
+    "title": "Guthaben kaufen",
+    "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
+    "packLabel": "{{amount}} Guthaben hinzufügen",
+    "priceUnavailable": "Preis nicht verfügbar",
+    "purchased": "Guthaben wurde deinem Kontostand hinzugefügt.",
+    "empty": "Guthaben-Pakete sind derzeit nicht verfügbar.",
+    "noMatchingProducts": "Der App Store hat keine passenden Guthaben-Pakete zurückgegeben.",
+    "noMatchingProductsPlay": "Google Play hat keine passenden Guthaben-Pakete zurückgegeben.",
+    "purchaseOwnedByAnotherAccount": "Das Guthaben dieses Apple Accounts gehört zu einem anderen Kilo-Konto. Melde dich bei dem zugehörigen Kilo-Konto an, um es zu nutzen.",
+    "purchaseOwnedByAnotherAccountPlay": "Das Guthaben auf diesem Google-Konto gehört zu einem anderen Kilo-Konto. Melde dich bei diesem Kilo-Konto an, um es zu nutzen."
   }
 }

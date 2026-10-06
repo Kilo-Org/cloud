@@ -18,7 +18,12 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { COMPOSER_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import {
+  COMPOSER_CONTROL_HIT_SLOP_DP,
+  COMPOSER_VOICE_SEND_GAP_CLASS,
+  composerFacingHitSlop,
+  VOICE_INPUT_LG_HIT_SLOP_DP,
+} from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
@@ -42,7 +47,9 @@ const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
  * class — the paperclip only ever meets the input, whose own start margin is
  * the gap after it — so the input and each trailing control sit one gap apart
  * and a trailing control added without it cannot sit flush against its
- * neighbour again.
+ * neighbour again. The one exception is the send/stop control after the voice
+ * toggle: that pair sits `COMPOSER_VOICE_SEND_GAP_CLASS` apart and zeroes the
+ * slop on the sides they face each other on.
  */
 export const COMPOSER_CONTROL_GAP_CLASS = 'ms-3';
 
@@ -85,6 +92,13 @@ type ChatComposerInputRowProps = {
   placeholder: string;
   /** Return submits the message instead of inserting a newline. */
   returnSendsMessage: boolean;
+  /**
+   * Why send is unavailable. The fixed footer row above the composer renders
+   * it; this row carries it only as the input's accessibility hint, so the
+   * reader hears the reason at the control that is gated. Null while send can
+   * proceed or when the parent knows no reason.
+   */
+  sendDisabledReason?: string | null;
   textInputStyle: TextStyle;
   voiceDisabled: boolean;
   voiceInputAvailable: boolean;
@@ -125,6 +139,7 @@ export function ChatComposerInputRow({
   paperclipDisabled,
   placeholder,
   returnSendsMessage,
+  sendDisabledReason,
   textInputStyle,
   voiceDisabled,
   voiceInputAvailable,
@@ -149,35 +164,42 @@ export function ChatComposerInputRow({
     includeFontPadding: false,
     lineHeight: textInputStyle.lineHeight,
   };
+  const sendGapClass = voiceInputAvailable
+    ? COMPOSER_VOICE_SEND_GAP_CLASS
+    : COMPOSER_CONTROL_GAP_CLASS;
+  const sendHitSlop = voiceInputAvailable
+    ? composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start')
+    : COMPOSER_CONTROL_HIT_SLOP_DP;
 
   return (
-    <View className="flex-row items-center p-2.5 px-3">
-      {attachmentsEnabled ? (
-        <Pressable
-          onPress={onAddAttachment}
-          disabled={paperclipDisabled}
-          hitSlop={PAPERCLIP_HIT_SLOP}
-          className={cn(
-            'h-8 w-8 items-center justify-center rounded-full active:opacity-70',
-            paperclipDisabled && 'opacity-50'
-          )}
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.composer.addAttachment')}
-          accessibilityState={{ disabled: paperclipDisabled }}
-        >
-          <Paperclip size={18} color={colors.mutedForeground} />
-        </Pressable>
-      ) : null}
+    <View className="p-2.5 px-3">
+      <View className="flex-row items-center">
+        {attachmentsEnabled ? (
+          <Pressable
+            onPress={onAddAttachment}
+            disabled={paperclipDisabled}
+            hitSlop={PAPERCLIP_HIT_SLOP}
+            className={cn(
+              'h-8 w-8 items-center justify-center rounded-full active:opacity-70',
+              paperclipDisabled && 'opacity-50'
+            )}
+            accessibilityRole="button"
+            accessibilityLabel={t('agentChat.composer.addAttachment')}
+            accessibilityState={{ disabled: paperclipDisabled }}
+          >
+            <Paperclip size={18} color={colors.mutedForeground} />
+          </Pressable>
+        ) : null}
 
-      <View
-        className={cn(
-          COMPOSER_CONTROL_GAP_CLASS,
-          'flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
-          !inputEditable && 'opacity-50'
-        )}
-        onLayout={onInputLayout}
-      >
-        {/* The placeholder is a single-line overlay, not the input's own hint:
+        <View
+          className={cn(
+            COMPOSER_CONTROL_GAP_CLASS,
+            'flex-1 overflow-hidden rounded-[20px] border border-border bg-card',
+            !inputEditable && 'opacity-50'
+          )}
+          onLayout={onInputLayout}
+        >
+          {/* The placeholder is a single-line overlay, not the input's own hint:
             Android lays the native hint out at the field's width with no line
             cap, so copy wider than the field wraps onto a second line that the
             field's fixed height clips against its border. A tail-ellipsized
@@ -185,135 +207,138 @@ export function ChatComposerInputRow({
             font metrics (same size, line height, padding and top-aligned text
             rect) so the first typed character lands exactly where it sat, and
             sits under the input so a keystroke paints over it. */}
-        {inputEmpty && placeholder.length > 0 ? (
-          <Text
-            accessible={false}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            allowFontScaling={false}
-            pointerEvents="none"
-            // The design-system Text is `font-medium`; the input's own text is
-            // the platform default weight, so the hint drops to `font-normal`
-            // to keep the metrics it shares with the text it stands in for.
-            className="absolute font-normal"
-            style={placeholderStyle}
-          >
-            {placeholder}
-          </Text>
-        ) : null}
-        <TextInput
-          ref={inputRef}
-          // The hint is drawn by the overlay above, but Android still needs an
-          // accessible name for the field, and the hint used to be it.
-          accessibilityLabel={placeholder}
-          multiline
-          maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
-          onChangeText={onChangeText}
-          onContentSizeChange={event => {
-            onInputContentSizeChange(event.nativeEvent.contentSize.height);
-          }}
-          onFocus={onInputFocus}
-          onBlur={onInputBlur}
-          onSelectionChange={onSelectionChange}
-          style={textInputStyle}
-          scrollEnabled={inputScrollable}
-          editable={inputEditable}
-          contextMenuHidden={!inputEditable}
-          pointerEvents={inputEditable ? 'auto' : 'none'}
-          accessibilityState={{ disabled: inputAccessibilityDisabled }}
-          returnKeyType={returnSendsMessage ? 'send' : 'default'}
-          submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
-          onSubmitEditing={returnSendsMessage ? onSubmit : undefined}
-          maxFontSizeMultiplier={1}
-          autoCapitalize="sentences"
-          autoCorrect
-        />
-      </View>
-
-      {returnSendsMessage ? (
-        <View className={COMPOSER_CONTROL_GAP_CLASS}>
-          <Pressable
-            onPress={onInsertNewline}
-            disabled={!inputEditable}
-            hitSlop={COMPOSER_CONTROL_HIT_SLOP_DP}
-            accessibilityRole="button"
-            accessibilityLabel={t('agentChat.composer.insertNewline')}
-            accessibilityState={{ disabled: !inputEditable }}
-            style={{ minHeight: CONTROL_HIT_TARGET, minWidth: CONTROL_HIT_TARGET }}
-            className={cn(
-              'items-center justify-center rounded-full active:opacity-70',
-              !inputEditable && 'opacity-50'
-            )}
-          >
-            <CornerDownLeft size={18} color={colors.mutedForeground} />
-          </Pressable>
-        </View>
-      ) : null}
-
-      {voiceInputAvailable ? (
-        <View className={COMPOSER_CONTROL_GAP_CLASS}>
-          <VoiceInputButton
-            disabled={voiceDisabled}
-            size="lg"
-            status={voiceInputStatus}
-            onPress={onToggleVoice}
+          {inputEmpty && placeholder.length > 0 ? (
+            <Text
+              accessible={false}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              allowFontScaling={false}
+              pointerEvents="none"
+              // The design-system Text is `font-medium`; the input's own text is
+              // the platform default weight, so the hint drops to `font-normal`
+              // to keep the metrics it shares with the text it stands in for.
+              className="absolute font-normal"
+              style={placeholderStyle}
+            >
+              {placeholder}
+            </Text>
+          ) : null}
+          <TextInput
+            ref={inputRef}
+            // The hint is drawn by the overlay above, but Android still needs an
+            // accessible name for the field, and the hint used to be it.
+            accessibilityLabel={placeholder}
+            multiline
+            maxLength={CLOUD_AGENT_PROMPT_MAX_LENGTH}
+            onChangeText={onChangeText}
+            onContentSizeChange={event => {
+              onInputContentSizeChange(event.nativeEvent.contentSize.height);
+            }}
+            onFocus={onInputFocus}
+            onBlur={onInputBlur}
+            onSelectionChange={onSelectionChange}
+            style={textInputStyle}
+            scrollEnabled={inputScrollable}
+            editable={inputEditable}
+            contextMenuHidden={!inputEditable}
+            pointerEvents={inputEditable ? 'auto' : 'none'}
+            accessibilityState={{ disabled: inputAccessibilityDisabled }}
+            returnKeyType={returnSendsMessage ? 'send' : 'default'}
+            submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
+            onSubmitEditing={returnSendsMessage ? onSubmit : undefined}
+            maxFontSizeMultiplier={1}
+            autoCapitalize="sentences"
+            autoCorrect
           />
         </View>
-      ) : null}
 
-      <View className={COMPOSER_CONTROL_GAP_CLASS}>
-        {isStreaming && !hasSendableContent && !isSending ? (
-          <Animated.View
-            key="stop"
-            entering={reducedMotion ? undefined : FadeIn.duration(150)}
-            exiting={reducedMotion ? undefined : FadeOut.duration(100)}
-          >
+        {returnSendsMessage ? (
+          <View className={COMPOSER_CONTROL_GAP_CLASS}>
             <Pressable
-              onPress={onStop}
-              disabled={disabled}
+              onPress={onInsertNewline}
+              disabled={!inputEditable}
               hitSlop={COMPOSER_CONTROL_HIT_SLOP_DP}
               accessibilityRole="button"
-              accessibilityLabel={t('agentChat.composer.stopGenerating')}
-              accessibilityState={{ disabled }}
-              style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
+              accessibilityLabel={t('agentChat.composer.insertNewline')}
+              accessibilityState={{ disabled: !inputEditable }}
+              style={{ minHeight: CONTROL_HIT_TARGET, minWidth: CONTROL_HIT_TARGET }}
               className={cn(
-                'items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
-                disabled && 'opacity-50'
+                'items-center justify-center rounded-full active:opacity-70',
+                !inputEditable && 'opacity-50'
               )}
             >
-              <Square size={14} color="white" fill="white" />
+              <CornerDownLeft size={18} color={colors.mutedForeground} />
             </Pressable>
-          </Animated.View>
-        ) : (
-          <Animated.View
-            key="send"
-            entering={reducedMotion ? undefined : FadeIn.duration(150)}
-            exiting={reducedMotion ? undefined : FadeOut.duration(100)}
-          >
-            <Pressable
-              onPress={onSubmit}
-              disabled={!canSend}
-              hitSlop={COMPOSER_CONTROL_HIT_SLOP_DP}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.sendMessage')}
-              accessibilityState={{ disabled: !canSend, busy: isSending }}
-              style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
-              className={`items-center justify-center rounded-full active:opacity-70 ${
-                canSend ? 'bg-accent-soft' : 'bg-muted'
-              }`}
+          </View>
+        ) : null}
+
+        {voiceInputAvailable ? (
+          <View className={COMPOSER_CONTROL_GAP_CLASS}>
+            <VoiceInputButton
+              disabled={voiceDisabled}
+              hitSlop={composerFacingHitSlop(VOICE_INPUT_LG_HIT_SLOP_DP, 'end')}
+              size="lg"
+              status={voiceInputStatus}
+              onPress={onToggleVoice}
+            />
+          </View>
+        ) : null}
+
+        <View className={sendGapClass}>
+          {isStreaming && !hasSendableContent && !isSending ? (
+            <Animated.View
+              key="stop"
+              entering={reducedMotion ? undefined : FadeIn.duration(150)}
+              exiting={reducedMotion ? undefined : FadeOut.duration(100)}
             >
-              {isSending ? (
-                <ActivityIndicator size="small" color={colors.mutedForeground} />
-              ) : (
-                <ArrowUp
-                  size={18}
-                  color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
-                  strokeWidth={2.5}
-                />
-              )}
-            </Pressable>
-          </Animated.View>
-        )}
+              <Pressable
+                onPress={onStop}
+                disabled={disabled}
+                hitSlop={sendHitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={t('agentChat.composer.stopGenerating')}
+                accessibilityState={{ disabled }}
+                style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
+                className={cn(
+                  'items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500',
+                  disabled && 'opacity-50'
+                )}
+              >
+                <Square size={14} color="white" fill="white" />
+              </Pressable>
+            </Animated.View>
+          ) : (
+            <Animated.View
+              key="send"
+              entering={reducedMotion ? undefined : FadeIn.duration(150)}
+              exiting={reducedMotion ? undefined : FadeOut.duration(100)}
+            >
+              <Pressable
+                onPress={onSubmit}
+                disabled={!canSend}
+                hitSlop={sendHitSlop}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.sendMessage')}
+                accessibilityHint={sendDisabledReason ?? undefined}
+                accessibilityState={{ disabled: !canSend, busy: isSending }}
+                style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
+                className={`items-center justify-center rounded-full active:opacity-70 ${
+                  canSend ? 'bg-accent-soft' : 'bg-muted'
+                }`}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                ) : (
+                  <ArrowUp
+                    size={18}
+                    color={canSend ? colors.accentSoftForeground : colors.mutedForeground}
+                    strokeWidth={2.5}
+                  />
+                )}
+              </Pressable>
+            </Animated.View>
+          )}
+        </View>
       </View>
     </View>
   );

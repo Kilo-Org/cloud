@@ -5,7 +5,7 @@ import { OrganizationContextProvider } from './OrganizationContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useSession } from 'next-auth/react';
-import type { OrganizationMemberResponse } from '@/lib/organizations/organization-types';
+import type { OrganizationMemberResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type OrganizationContextWrapperProps = {
   organizationId: string;

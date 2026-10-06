@@ -1,5 +1,5 @@
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
-import { readDb } from '@/lib/drizzle';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   AUTO_DECIDER_DEFAULT_MAX_COST_USD,
   AUTO_DECIDER_DEFAULT_MIN_COST_USD,

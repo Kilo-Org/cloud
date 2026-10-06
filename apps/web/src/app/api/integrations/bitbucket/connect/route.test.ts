@@ -1,16 +1,16 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BITBUCKET_CLIENT_ID: 'bitbucket-client-id',
   NEXTAUTH_SECRET: 'test-nextauth-secret',
 }));
-jest.mock('@/lib/user/server');
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({

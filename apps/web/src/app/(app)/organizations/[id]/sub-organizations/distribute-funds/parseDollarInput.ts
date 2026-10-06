@@ -1,4 +1,4 @@
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 
 export type ParsedDollarInput = { microdollars: number; error: string | null };
 

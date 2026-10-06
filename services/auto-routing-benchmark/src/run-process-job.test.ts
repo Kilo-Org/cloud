@@ -521,6 +521,7 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
         cost_usd: 0.001,
         error: null,
         fallback_reason: null,
+        route_hit: null,
         retried: null,
         exit_code: 0,
         output_prefix: 'ok',
@@ -556,6 +557,7 @@ describe('processJob — saved canonical variant reaches the CLI and publish', (
         cases: 5,
         errors: 0,
         timeouts: 0,
+        routeAccuracy: null,
       }))
     );
   }

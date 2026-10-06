@@ -33,6 +33,7 @@ const deviceAuth = vi.hoisted(() => ({
   resumed: false,
 }));
 const push = vi.hoisted(() => vi.fn());
+const clearDeviceError = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 const addAppStateListener = vi.hoisted(() =>
   vi.fn((_event: 'change', _listener: (state: AppStateStatus) => void) => ({ remove: vi.fn() }))
@@ -92,6 +93,7 @@ vi.mock('@/lib/auth/use-device-auth', () => ({
     start: vi.fn(),
     cancel: vi.fn(),
     openBrowser: vi.fn(),
+    clearError: clearDeviceError,
   }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -459,6 +461,69 @@ describe('login-screen device-code actions', () => {
         node => typeof node.type === 'string' && (node.type as string) === 'ExternalLink'
       )
     ).toHaveLength(0);
+
+    renderer.unmount();
+  });
+});
+
+describe('login-screen timeout error dismissal', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'error';
+    deviceAuth.token = undefined;
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = i18n.t('authErrors.signInTimedOut');
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+    clearDeviceError.mockClear();
+  });
+
+  it('shows the timed-out message above the idle form and clears it when a new attempt starts', async () => {
+    const renderer = await mountLoginScreen();
+
+    const timeout = i18n.t('authErrors.signInTimedOut');
+    expect(findByType(renderer.root, 'Text').some(node => node.props.children === timeout)).toBe(
+      true
+    );
+
+    // The retry form carries the shell's error-clear so a new attempt dismisses
+    // the stale timeout banner at the moment it starts.
+    const idleAuth = findByType(renderer.root, 'IdleAuth')[0];
+    if (!idleAuth) {
+      throw new Error('IdleAuth not found');
+    }
+    expect(idleAuth.props.onSignInStart).toBe(clearDeviceError);
+
+    act(() => {
+      (idleAuth.props.onSignInStart as () => void)();
+    });
+    expect(clearDeviceError).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('keeps the idle form on screen while a restarted attempt is pending without a code', async () => {
+    const renderer = await mountLoginScreen();
+    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
+
+    // A new browser attempt clears the terminal error and enters the
+    // start-in-flight state (`pending` with no code yet). The form must stay on
+    // screen instead of being replaced by a starting spinner, so the retry never
+    // reads as a blank screen.
+    deviceAuth.status = 'pending';
+    deviceAuth.code = undefined;
+    deviceAuth.error = undefined;
+    act(() => {
+      renderer.update(createElement(LoginScreen));
+    });
+
+    expect(findByType(renderer.root, 'IdleAuth')).toHaveLength(1);
+    const timeout = i18n.t('authErrors.signInTimedOut');
+    expect(findByType(renderer.root, 'Text').some(node => node.props.children === timeout)).toBe(
+      false
+    );
 
     renderer.unmount();
   });

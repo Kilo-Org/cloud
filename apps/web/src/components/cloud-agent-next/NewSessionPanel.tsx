@@ -56,7 +56,7 @@ import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import {
   selectedProfileIdAtom,
   resetSessionFormAtom,
@@ -101,7 +101,7 @@ import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
 import { billingPayerPresentation } from './billing-payer-presentation';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import {
   buildCloudAgentAttachments,
@@ -113,7 +113,6 @@ import {
   CLOUD_AGENT_PROMPT_MAX_LENGTH,
 } from '@/lib/cloud-agent/constants';
 import {
-  getDevcontainerEnabled,
   getLastUsedModel,
   getLastUsedRepo,
   getLastUsedSandboxAllocationKey,
@@ -121,12 +120,12 @@ import {
   getPreferredInitialModel,
   getPreferredInitialRepo,
   getPreferredInitialVariant,
-  setDevcontainerEnabled,
   setLastUsedModel,
   setLastUsedRepo,
   setLastUsedSandboxAllocationKey,
   setLastUsedVariant,
 } from '@/components/cloud-agent-next/model-preferences';
+import { safeLocalStorage } from '@/lib/localStorage';
 import {
   GITHUB_IDENTITY_HINT_DISMISSED_STORAGE_KEY,
   getGitHubIdentityHint,
@@ -157,7 +156,6 @@ type NewSessionPanelProps = {
   organizationId?: string;
   organizationName?: string;
   organizationRole?: OrganizationRole;
-  isDevcontainerAvailable: boolean;
 };
 
 type ContextualTipProps = {
@@ -172,7 +170,6 @@ export function NewSessionPanel({
   organizationId,
   organizationName,
   organizationRole,
-  isDevcontainerAvailable,
 }: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
@@ -184,7 +181,6 @@ export function NewSessionPanel({
   const [firstChatCreationOperation, setFirstChatCreationOperation] = useState<
     (CloudSessionCreationOperation & { initialMessageId: string }) | null
   >(null);
-  const [devcontainer, setDevcontainer] = useState(false);
   const [isGitHubIdentityHintDismissed, setIsGitHubIdentityHintDismissed] = useState<
     boolean | null
   >(null);
@@ -295,11 +291,11 @@ export function NewSessionPanel({
 
   // Clear any lingering manual overrides whenever the page loads
   useEffect(() => {
+    safeLocalStorage.removeItem('cloud-agent:devcontainer-enabled');
     resetSessionForm();
   }, [resetSessionForm]);
 
   useEffect(() => {
-    setDevcontainer(getDevcontainerEnabled());
     setIsGitHubIdentityHintDismissed(getGitHubIdentityHintDismissed());
 
     const handleGitHubIdentityHintStorage = (event: StorageEvent) => {
@@ -311,12 +307,6 @@ export function NewSessionPanel({
     return () => window.removeEventListener('storage', handleGitHubIdentityHintStorage);
   }, []);
 
-  const handleDevcontainerChange = useCallback((enabled: boolean) => {
-    setDevcontainer(enabled);
-    setDevcontainerEnabled(enabled);
-  }, []);
-
-  const effectiveDevcontainer = isDevcontainerAvailable && devcontainer;
   const availableVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
 
   const [sandboxSelection, setSandboxSelection] = useState<SandboxSelectionDraft>({
@@ -330,11 +320,8 @@ export function NewSessionPanel({
     ...(organizationId
       ? trpc.organizations.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
           organizationId,
-          ...(effectiveDevcontainer ? { devcontainer: true } : {}),
         })
-      : trpc.cloudAgentNext.getSandboxSelectionOptions.queryOptions({
-          ...(effectiveDevcontainer ? { devcontainer: true } : {}),
-        })),
+      : trpc.cloudAgentNext.getSandboxSelectionOptions.queryOptions({})),
     retry: false,
   });
   const sandboxCapabilities = sandboxSelectionQuery.isSuccess
@@ -347,7 +334,6 @@ export function NewSessionPanel({
     organizationId,
     draft: sandboxSelection,
     capabilities: sandboxCapabilities,
-    devcontainer: effectiveDevcontainer,
   });
   const sandboxOptions = getSandboxSelectionOptions(sandboxCapabilities);
   const sandboxGroups = getSandboxSelectionGroups(sandboxOptions);
@@ -1127,7 +1113,6 @@ export function NewSessionPanel({
             },
           }
         : {}),
-      ...(effectiveDevcontainer ? { devcontainer: true } : {}),
     };
   }, [
     prompt,
@@ -1138,7 +1123,6 @@ export function NewSessionPanel({
     selectedProfileId,
     attachmentMessageUuid,
     attachmentUpload.attachments,
-    effectiveDevcontainer,
   ]);
   const creationIntent = JSON.stringify({
     ...creationInput,
@@ -1156,11 +1140,7 @@ export function NewSessionPanel({
     intent: creationIntent,
     pendingOperation: firstChatCreationOperation,
   });
-  const sandboxDescriptionId = sandboxSelectionError
-    ? 'new-session-sandbox-error'
-    : effectiveDevcontainer
-      ? 'new-session-sandbox-devcontainer'
-      : undefined;
+  const sandboxDescriptionId = sandboxSelectionError ? 'new-session-sandbox-error' : undefined;
 
   const isFormValid =
     prompt.trim().length > 0 &&
@@ -1888,11 +1868,6 @@ export function NewSessionPanel({
           </Popover>
 
           <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">
-            {effectiveDevcontainer && (
-              <span className="text-muted-foreground inline-flex shrink-0 items-center rounded-md border border-border/50 bg-muted/30 px-2 py-1 text-xs">
-                Dev container on
-              </span>
-            )}
             {showSandboxSelector && (
               <Select
                 value={sandboxAllocation ? getSandboxAllocationKey(sandboxAllocation) : 'default'}
@@ -1916,7 +1891,7 @@ export function NewSessionPanel({
                     );
                   }
                 }}
-                disabled={isPreparing || effectiveDevcontainer}
+                disabled={isPreparing}
               >
                 <SelectTrigger
                   id="new-session-sandbox"
@@ -1970,25 +1945,10 @@ export function NewSessionPanel({
               onOverrideProfileSelect={setSelectedProfileId}
               repoFullName={selectedRepo || undefined}
               platform={profileBindingPlatform}
-              devcontainerToggle={
-                isDevcontainerAvailable
-                  ? {
-                      checked: effectiveDevcontainer,
-                      disabled: isPreparing,
-                      onCheckedChange: handleDevcontainerChange,
-                    }
-                  : undefined
-              }
             />
           </div>
         </div>
 
-        {showSandboxSelector && effectiveDevcontainer && (
-          <p id="new-session-sandbox-devcontainer" className="text-muted-foreground text-xs">
-            Dev containers use the Default sandbox. Turn off dev containers in Profile to choose a
-            sandbox.
-          </p>
-        )}
         {sandboxSelectionError && (
           <div className="flex flex-wrap items-center gap-2">
             <p id="new-session-sandbox-error" className="text-destructive text-xs" role="alert">

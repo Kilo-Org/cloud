@@ -1,5 +1,5 @@
-import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
-import type { VercelUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { VercelUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   DirectUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
@@ -8,23 +8,23 @@ import {
   openRouterToVercelInferenceProviderId,
   VertexCredentialsSchema,
   VercelUserByokInferenceProviderIdSchema,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   GatewayRequest,
   OpenRouterProviderConfig,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
   getVercelModelsFromDatabase,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
-import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
-import { passesRoutingPercentage } from '@/lib/ai-gateway/providers/routing-percentage';
+import { getRuntimeGatewayRoutingConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-config';
+import { passesRoutingPercentage } from '@kilocode/web-shared/lib/ai-gateway/providers/routing-percentage';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],

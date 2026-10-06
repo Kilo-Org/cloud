@@ -9,7 +9,6 @@ import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard
 import { SeatUsageCard } from './SeatUsageCard';
 import { KiloPassUsageCard } from './KiloPassUsageCard';
 import { SSOSignupCard } from './SSOSignupCard';
-import { VerifiedDomainsCard } from './VerifiedDomainsCard';
 import { LockableContainer } from './LockableContainer';
 import { OrganizationAdminContextProvider } from './OrganizationContextWrapper';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
@@ -20,7 +19,7 @@ import {
   canManageOrganization,
   canManageOrganizationBilling,
 } from '@kilocode/app-shared/organizations';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -192,15 +191,9 @@ export function OrganizationDashboard({
               organizationData?.parent_organization_id === null && (
                 <KiloPassUsageCard organizationId={organizationId} />
               )}
-            {canManageOrganizationBilling(currentRole) &&
-              (activeKiloclawsError || hasActiveKiloclaws) && (
-                <OrgActiveKiloclawsCard organizationId={organizationId} />
-              )}
-            <VerifiedDomainsCard
-              organizationId={organizationId}
-              role={currentRole}
-              isKiloAdmin={isKiloAdmin}
-            />
+            {canBilling && (activeKiloclawsError || hasActiveKiloclaws) && (
+              <OrgActiveKiloclawsCard organizationId={organizationId} />
+            )}
             {organizationData?.plan === 'enterprise' && (
               <LockableContainer>
                 <SSOSignupCard organization={organizationData} role={currentRole} />

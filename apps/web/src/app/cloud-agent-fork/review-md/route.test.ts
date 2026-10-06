@@ -67,7 +67,7 @@ const mockCaller = {
 const mockCreateCaller = jest.fn((_: TrpcContextFixture) => mockCaller);
 const mockCreateCallerFactory = jest.fn(() => mockCreateCaller);
 
-jest.mock('@/lib/trpc/init', () => ({
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => ({
   createTRPCContext: () => mockCreateTRPCContext(),
   createCallerFactory: () => mockCreateCallerFactory(),
 }));
@@ -76,18 +76,18 @@ jest.mock('@/routers/root-router', () => ({
   rootRouter: {},
 }));
 
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: () => Promise.resolve(true),
 }));
 
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     incr: () => Promise.resolve(1),
     expire: () => Promise.resolve(1),
   },
 }));
 
-jest.mock('@/lib/ai-gateway/models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/models', () => ({
   PRIMARY_DEFAULT_MODEL: 'test/primary-default-model',
 }));
 

@@ -1,16 +1,16 @@
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { processTopUp } from './credits';
 
 // Mock firstTopupBonus to avoid side effects (it creates additional transactions)
-jest.mock('@/lib/firstTopupBonus', () => ({
+jest.mock('@kilocode/web-shared/lib/firstTopupBonus', () => ({
   processFirstTopupBonus: jest.fn(),
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendCreditsTopUpEmail: jest.fn(async () => ({ sent: true })),
 }));
 

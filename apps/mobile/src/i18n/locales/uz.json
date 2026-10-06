@@ -215,7 +215,6 @@
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
     "bonusCreditsExpiring": "{{amount}} miqdoridagi bonus kreditlarning muddati {{date}} sanasida tugaydi.",
-    "creditBalanceEmpty": "Hisobingizda kredit qolmagan. Bu hisobning kreditlari iOS ilovasidan tashqarida boshqariladi.",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Sessiya identifikatori nusxalandi",
       "couldNotCopyId": "Sessiya identifikatorini nusxalab bo'lmadi.",
       "untitled": "Nomsiz sessiya",
+      "actions": "Sessiya amallari",
       "sessionDeleted": "Sessiya o'chirildi",
       "needsInput": "javob kutilmoqda",
       "fromPlatform": "{{platform}}dan",
@@ -2100,6 +2100,7 @@
       "readOnly": "Bu sessiyani faqat o'qish mumkin.",
       "continueInNewSession": "Yangi sessiyada davom etish",
       "emptyDescription": "Boshlash uchun quyida xabar yuboring.",
+      "emptyTranscriptDescription": "Bu sessiyada hali xabarlar yo'q.",
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Yuborishdan oldin modelni tanlang.",
       "preparingPlaceholder": "Muhit sozlanmoqda...",
       "finalizingPlaceholder": "Yakunlanmoqda...",
+      "sessionLoadFailed": "Sessiyani yuklab bo'lmadi. Avval qayta urinib ko'ring.",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirilgan fayllarni olib tashlang.",
       "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborish tugmasini bosing.",
       "discardAttachmentsMessage": "Hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
@@ -2635,6 +2637,7 @@
       "provider": "Provayder",
       "totalCost": "Umumiy xarajat",
       "usageReflectsLatest": "Foydalanish ko'rsatkichlari yordamchining oxirgi tugallangan javobiga tegishli.",
+      "usageUnavailable": "Kontekstdan foydalanish mavjud emas",
       "tokenUsage": "Tokenlardan foydalanish",
       "cacheRate": "Keshdan foydalanish ulushi",
       "modelsCount": "Modellar ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "Yuklash",
       "loadWithHost": "{{host}} saytidan yuklash",
-      "httpsOnly": "Faqat HTTPS orqali uzatiladigan rasmlarni yuklash mumkin."
+      "httpsOnly": "Faqat HTTPS orqali uzatiladigan rasmlarni yuklash mumkin.",
+      "trustTitle": "{{host}} saytidan rasm yuklansinmi?",
+      "trustMessage": "{{host}} saytiga ishonch bildirsangiz, rasmlari har safar so'ramasdan yuklanadi. Keyinchalik Ishonchli saytlar bo'limida uni bekor qilishingiz mumkin.",
+      "loadOnce": "Bir marta yuklash"
     },
     "markdownLink": {
       "invalidLink": "Bu havolani ochib bo'lmaydi.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Tasdiq so'ramasdan ochiladigan saytlar",
     "emptyTitle": "Ishonchli saytlar yo'q",
     "emptyDescription": "Saytni ishonchli deb belgilasangiz, uning havolalari qayta tasdiq so'ramasdan ochiladi.",
+    "imagesSectionTitle": "Ishonchli rasm saytlari",
+    "imagesSectionDescription": "Bu saytlarning rasmlari qayta so'ramasdan yuklanadi.",
+    "imagesSectionEmpty": "Ishonchli rasm saytlari yo'q",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
     "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
+    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi.",
     "backToPreferences": "Sozlamalarga qaytish"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "Yangi agent",
     "approving": "Tasdiqlanmoqda...",
     "couldNotApprove": "Tasdiqlab bo'lmadi",
-    "couldNotStart": "Boshlab bo'lmadi",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
@@ -3448,5 +3457,17 @@
       "unboundToast": "Repo cheklanmagan",
       "unbindFailed": "Reponi ajratib boʻlmadi"
     }
+  },
+  "credits": {
+    "title": "Kredit sotib olish",
+    "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
+    "packLabel": "{{amount}} qiymatidagi kredit qo'shish",
+    "priceUnavailable": "Narx mavjud emas",
+    "purchased": "Kreditlar balansingizga qo'shildi.",
+    "empty": "Kredit paketlari hozircha mavjud emas.",
+    "noMatchingProducts": "App Store mos keladigan kredit paketlarini qaytarmadi.",
+    "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   }
 }

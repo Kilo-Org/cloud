@@ -22,7 +22,12 @@ export const CONTROL_WORKLOAD_CGROUP_ENV = 'CONTROL_WORKLOAD_CGROUP';
 export const CONTROL_WORKLOAD_RESERVE_MB_ENV = 'CONTROL_WORKLOAD_RESERVE_MB';
 export const CONTROL_WORKLOAD_LIMIT_MB_ENV = 'CONTROL_WORKLOAD_LIMIT_MB';
 
-export const DEFAULT_CONTROL_RESERVE_BYTES = 2048 * 1024 * 1024;
+export const DEFAULT_CONTROL_RESERVE_BYTES = 1024 * 1024 * 1024;
+/**
+ * Part of the aggregate that tools can never take, so a tool at its cap is reclaimed and
+ * OOM-killed inside the tools group while Kilo keeps this much room under the shared parent.
+ */
+export const KILO_SERVER_HEADROOM_BYTES = 1536 * 1024 * 1024;
 export const MIN_WORKLOAD_CAP_BYTES = 1024 * 1024 * 1024;
 export const WORKLOAD_CPU_WEIGHT = 50;
 export const WORKLOAD_SWEEP_INTERVAL_MS = 1000;
@@ -66,6 +71,7 @@ export type WorkloadPlacement = {
   parentReference: string;
   parentDirectory: string;
   aggregateMaxBytes: number;
+  toolsMaxBytes: number;
   appliedReadbackBytes: number;
   containerLimitBytes: number;
   limitSource: WorkloadLimitSource;
@@ -86,10 +92,17 @@ export type WorkloadProcessEntry = { pid: number; ppid: number; argv: string[] }
 export type WorkloadStats = {
   currentBytes?: number;
   peakBytes?: number;
+  memoryMaxEvents?: number;
+  memoryOomEvents?: number;
   oomKills: number;
   oomGroupKills: number;
   pressureSomeTotal?: number;
   pressureFullTotal?: number;
+  cpuUsageUsec?: number;
+  cpuThrottledUsec?: number;
+  cpuThrottleCount?: number;
+  ioReadBytes?: number;
+  ioWriteBytes?: number;
 };
 
 export class WorkloadUnavailableError extends Error {
@@ -135,10 +148,23 @@ export function createWorkloadReporter(report?: ControlDiagnosticReporter): Work
         fields.workloadFailure ?? '',
         fields.oomKills ?? '',
         fields.oomGroupKills ?? '',
+        fields.toolOomKills ?? '',
+        fields.serverOomKills ?? '',
         fields.currentBytes ?? '',
         fields.peakBytes ?? '',
         fields.pressureSomeTotal ?? '',
         fields.pressureFullTotal ?? '',
+        fields.memoryMaxEvents ?? '',
+        fields.memoryOomEvents ?? '',
+        fields.cpuUsageUsec ?? '',
+        fields.cpuThrottledUsec ?? '',
+        fields.cpuThrottleCount ?? '',
+        fields.ioReadBytes ?? '',
+        fields.ioWriteBytes ?? '',
+        fields.toolCpuUsageUsec ?? '',
+        fields.serverCpuUsageUsec ?? '',
+        fields.toolIoReadBytes ?? '',
+        fields.toolIoWriteBytes ?? '',
         fields.toolCount ?? '',
         fields.serverCount ?? '',
         fields.migratedCount ?? '',
@@ -172,6 +198,7 @@ export function computeWorkloadBudget(input: {
       ok: true;
       containerLimitBytes: number;
       aggregateMaxBytes: number;
+      toolsMaxBytes: number;
       source: WorkloadLimitSource;
     }
   | { ok: false; failure: WorkloadFailure } {
@@ -201,10 +228,11 @@ export function computeWorkloadBudget(input: {
     return { ok: false, failure: 'no_finite_limit' };
   }
   const aggregateMaxBytes = limit - input.reserveBytes;
-  if (aggregateMaxBytes < MIN_WORKLOAD_CAP_BYTES) {
+  const toolsMaxBytes = aggregateMaxBytes - KILO_SERVER_HEADROOM_BYTES;
+  if (toolsMaxBytes < MIN_WORKLOAD_CAP_BYTES) {
     return { ok: false, failure: 'below_minimum' };
   }
-  return { ok: true, containerLimitBytes: limit, aggregateMaxBytes, source };
+  return { ok: true, containerLimitBytes: limit, aggregateMaxBytes, toolsMaxBytes, source };
 }
 
 export function classifyWorkloadMembers(
@@ -259,6 +287,8 @@ export function readWorkloadStats(reference: string): WorkloadStats {
   const peak = readControl(path.join(reference, 'memory.peak'));
   const pressure = readControl(path.join(reference, 'memory.pressure'));
   const events = readControl(path.join(reference, 'memory.events'));
+  const cpu = readControl(path.join(reference, 'cpu.stat'));
+  const io = readControl(path.join(reference, 'io.stat'));
   if (current.ok) {
     const parsed = Number.parseInt(current.text.trim(), 10);
     if (Number.isSafeInteger(parsed) && parsed >= 0) stats.currentBytes = parsed;
@@ -278,7 +308,34 @@ export function readWorkloadStats(reference: string): WorkloadStats {
       if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
       if (key === 'oom_kill') stats.oomKills = parsed;
       if (key === 'oom_group_kill') stats.oomGroupKills = parsed;
+      if (key === 'max') stats.memoryMaxEvents = parsed;
+      if (key === 'oom') stats.memoryOomEvents = parsed;
     }
+  }
+  if (cpu.ok) {
+    for (const line of cpu.text.split('\n')) {
+      const [key, value] = line.trim().split(/\s+/);
+      const parsed = Number(value);
+      if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+      if (key === 'usage_usec') stats.cpuUsageUsec = parsed;
+      if (key === 'throttled_usec') stats.cpuThrottledUsec = parsed;
+      if (key === 'nr_throttled') stats.cpuThrottleCount = parsed;
+    }
+  }
+  if (io.ok) {
+    let readBytes = 0;
+    let writeBytes = 0;
+    for (const line of io.text.split('\n')) {
+      for (const token of line.trim().split(/\s+/).slice(1)) {
+        const [key, value] = token.split('=');
+        const parsed = Number(value);
+        if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+        if (key === 'rbytes') readBytes += parsed;
+        if (key === 'wbytes') writeBytes += parsed;
+      }
+    }
+    if (Number.isSafeInteger(readBytes)) stats.ioReadBytes = readBytes;
+    if (Number.isSafeInteger(writeBytes)) stats.ioWriteBytes = writeBytes;
   }
   return stats;
 }
@@ -510,7 +567,12 @@ function findUsableParent(cgroupRoot: string, membership: string): AncestorLooku
 
 function probeWorkloadParent(input: {
   usable: { relative: string; directory: string };
-  budget: { containerLimitBytes: number; aggregateMaxBytes: number; source: WorkloadLimitSource };
+  budget: {
+    containerLimitBytes: number;
+    aggregateMaxBytes: number;
+    toolsMaxBytes: number;
+    source: WorkloadLimitSource;
+  };
   handlePath: (descriptor: number, directory: string) => string;
   report?: ControlDiagnosticReporter;
 }): ProbeResult {
@@ -612,6 +674,7 @@ function probeWorkloadParent(input: {
       parentReference: reference,
       parentDirectory,
       aggregateMaxBytes: input.budget.aggregateMaxBytes,
+      toolsMaxBytes: input.budget.toolsMaxBytes,
       appliedReadbackBytes,
       containerLimitBytes: input.budget.containerLimitBytes,
       limitSource: input.budget.source,
@@ -842,6 +905,7 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
     workloadPhase: 'applied',
     containerLimitBytes: budget.containerLimitBytes,
     aggregateMaxBytes: budget.aggregateMaxBytes,
+    toolsMaxBytes: budget.toolsMaxBytes,
     reserveBytes: budget.containerLimitBytes - budget.aggregateMaxBytes,
     appliedMaxBytes: budget.aggregateMaxBytes,
     readbackMaxBytes: probe.placement.appliedReadbackBytes,
@@ -856,7 +920,7 @@ export function applyManagedWorkloadLimits(input: {
   parentReference: string;
   serverReference: string;
   toolsReference: string;
-  aggregateMaxBytes: number;
+  toolsMaxBytes: number;
 }): { cpuController: boolean } {
   try {
     writeFileSync(path.join(input.parentReference, 'cgroup.subtree_control'), '+memory +cpu');
@@ -868,18 +932,19 @@ export function applyManagedWorkloadLimits(input: {
     throw new Error('Managed workload memory controller unavailable');
   }
 
-  writeFileSync(path.join(input.toolsReference, 'memory.max'), String(input.aggregateMaxBytes));
-  writeFileSync(path.join(input.toolsReference, 'memory.oom.group'), '1');
+  writeFileSync(path.join(input.toolsReference, 'memory.max'), String(input.toolsMaxBytes));
+  // 0: an OOM kills the largest tool process, not every tool, MCP server and LSP of the runtime.
+  writeFileSync(path.join(input.toolsReference, 'memory.oom.group'), '0');
   writeFileSync(path.join(input.serverReference, 'memory.oom.group'), '0');
   writeControlOptional(path.join(input.toolsReference, 'memory.swap.max'), '0');
   writeControlOptional(path.join(input.toolsReference, 'cpu.weight'), String(WORKLOAD_CPU_WEIGHT));
 
   const toolsMax = readMemoryMax(path.join(input.toolsReference, 'memory.max'));
-  if (toolsMax.kind !== 'limit' || toolsMax.bytes !== input.aggregateMaxBytes) {
+  if (toolsMax.kind !== 'limit' || toolsMax.bytes !== input.toolsMaxBytes) {
     throw new Error('Managed workload tool memory.max readback mismatch');
   }
   const toolsOomGroup = readControl(path.join(input.toolsReference, 'memory.oom.group'));
-  if (!toolsOomGroup.ok || toolsOomGroup.text.trim() !== '1') {
+  if (!toolsOomGroup.ok || toolsOomGroup.text.trim() !== '0') {
     throw new Error('Managed workload tool memory.oom.group readback mismatch');
   }
   const serverOomGroup = readControl(path.join(input.serverReference, 'memory.oom.group'));
@@ -895,6 +960,22 @@ export function applyManagedWorkloadLimits(input: {
     throw new Error('Managed workload tool memory.swap.max readback mismatch');
   }
   return readCpuWeight(input.toolsReference);
+}
+
+/**
+ * Kilo is never an OOM victim, wherever its children's early memory is charged. Its children
+ * inherit this until the sweep moves them into tools and makes them killable again.
+ */
+export const KILO_OOM_SCORE_ADJ = '-1000';
+export const TOOL_OOM_SCORE_ADJ = '0';
+
+export function writeOomScoreAdj(pid: number, value: string): boolean {
+  try {
+    writeFileSync(`/proc/${pid}/oom_score_adj`, value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function readCpuWeight(toolsReference: string): { cpuController: boolean } {

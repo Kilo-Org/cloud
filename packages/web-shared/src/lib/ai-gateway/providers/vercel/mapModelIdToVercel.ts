@@ -1,6 +1,6 @@
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { resolveOpenRouterModelAlias } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { inferVercelFirstPartyInferenceProviderForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
   'mistralai/codestral-2508': 'mistral/codestral',
@@ -28,6 +28,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   'deepseek-v4-flash-0731': 'deepseek/deepseek-v4-flash-0731',
   'deepseek-v4-pro': 'deepseek/deepseek-v4-pro',
   'gemini-2.5-flash-lite': 'google/gemini-2.5-flash-lite',
+  'inclusionai/ling-3.1-flash:free': 'inclusionai/ling-3.1-flash-free',
   'minimax-m2.5': 'minimax/minimax-m2.5',
   'minimax-m3': 'minimax/minimax-m3',
   'minimax/minimax-m2.5-20260211': 'minimax/minimax-m2.5',

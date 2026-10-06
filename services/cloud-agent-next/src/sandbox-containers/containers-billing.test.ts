@@ -24,6 +24,7 @@ import type {
 } from '@kilocode/container-usage';
 import type { Env } from '../types.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
+import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
 import {
   ContainersAllocationConflictError,
   SandboxContainers,
@@ -54,8 +55,8 @@ type MeterRecordStopInput = Parameters<ContainerUsageRpcMethods['recordStop']>[0
 type StoredRecord = {
   state: string;
   allocationRef: string | null;
-  stopOpId: string | null;
-  lastSnapshot: { id: string; sourceAllocation: string } | null;
+  stopOpId?: string | null;
+  lastSnapshot?: { id: string; sourceAllocation: string } | null;
   instance?: string;
   billingConfigured?: true;
   wrapperAttempt?: string;
@@ -197,22 +198,39 @@ class FakeContainer {
   destroyBehavior: 'ok' | 'reject' = 'ok';
   startBehavior: StartBehavior = 'ok';
   execHandler: (cmd: string[]) => ExecProcess = () => execProcess(0);
+  // PID 1 identity through `/proc/1/cmdline`. A manual `running = true` models the
+  // deployed `sleep infinity` main process; a native `start()` leaves the supervisor.
+  mainProcess: 'sleep' | 'supervisor' | 'ambiguous' = 'sleep';
+  identityAfterStart: 'sleep' | 'supervisor' | 'ambiguous' = 'supervisor';
+  stopAfterStart = false;
+
+  setInactivityTimeout(_ms: number | bigint): Promise<void> {
+    return Promise.resolve();
+  }
 
   start(options?: ContainerStartupOptions): void {
     this.startCalls.push(options as ContainerStartupOptions);
     if (this.startBehavior === 'reject') throw new Error('container start failed');
     this.running = true;
+    if (options?.entrypoint?.includes(CONTROL_SUPERVISOR_PATH)) {
+      this.mainProcess = this.identityAfterStart;
+    }
+    if (this.stopAfterStart) this.running = false;
     if (this.startBehavior === 'effect-then-reject') {
       throw new Error('container start failed after taking effect');
     }
   }
 
   async exec(cmd: string[]): Promise<ExecProcess> {
+    if (cmd[0] === 'cat' && cmd[1] === '/proc/1/cmdline') {
+      if (this.mainProcess === 'ambiguous') return cmdlineProcess('');
+      return cmdlineProcess(
+        this.mainProcess === 'supervisor'
+          ? `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
+          : 'sleep\0infinity'
+      );
+    }
     return this.execHandler(cmd);
-  }
-
-  async snapshotContainer(_options: ContainerSnapshotOptions): Promise<ContainerSnapshot> {
-    return { id: 'snap-1', size: 1 };
   }
 
   async destroy(): Promise<void> {
@@ -224,6 +242,17 @@ class FakeContainer {
 
 function execProcess(exitCode: number): ExecProcess {
   return { pid: 1, exitCode: Promise.resolve(exitCode) } as unknown as ExecProcess;
+}
+
+function cmdlineProcess(text: string): ExecProcess {
+  const bytes = new TextEncoder().encode(text);
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return {
+    pid: 1,
+    exitCode: Promise.resolve(0),
+    output: () => Promise.resolve({ stdout: buffer, stderr: new ArrayBuffer(0), exitCode: 0 }),
+  } as unknown as ExecProcess;
 }
 
 function setup(
@@ -244,8 +273,6 @@ function setup(
     storage.map.set(RECORD_KEY, {
       state: 'idle',
       allocationRef: null,
-      stopOpId: null,
-      lastSnapshot: null,
     });
   }
   const ctx = {
@@ -412,24 +439,32 @@ describe('ContainersBilling identity and admission', () => {
 });
 
 describe('ContainersBilling physical lifecycle', () => {
-  it('activates metering when the container starts even if execWrapper throws', async () => {
-    const { instance, container, storage, meter, pendingTasks } = setup();
-    await admit(instance, 'standard-4');
-    container.execHandler = () => {
+  it('activates metering when a resumed sleep container execs and the wrapper exec throws', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup({
+      record: {
+        state: 'launching',
+        allocationRef: REF_A,
+        stopOpId: null,
+        lastSnapshot: null,
+        instance: 'standard-4',
+        wrapperAttempt: 'not_started',
+      },
+    });
+    container.running = true;
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') return execProcess(1);
       throw new Error('spawn failed');
     };
+    await admit(instance, 'standard-4');
 
-    await expect(
-      instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' })
-    ).rejects.toThrow('spawn failed');
+    await expect(launch(instance, REF_A, 'standard-4')).rejects.toThrow('spawn failed');
     await flushPending(pendingTasks);
 
     const generation = readGeneration(storage);
     expect(generation).toEqual(expect.any(String));
     expect(readMeasurementStarted(storage)).toBe(true);
     expect(readSchedules(storage)?.billingHeartbeatTick).toMatchObject({ payload: generation });
-    expect(container.startCalls).toHaveLength(1);
-    expect(container.startCalls[0]).toMatchObject({ instance: 'standard-4' });
+    expect(container.startCalls).toHaveLength(0);
     expect(meter.recordStartInputs).toHaveLength(1);
     expect((await instance.getState()).status).toBe('running');
   });
@@ -662,7 +697,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
       await expect(
         instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: instanceSize })
-      ).resolves.toEqual({ started: true });
+      ).resolves.toEqual({ started: true, startSource: 'image' });
       expect(readRecord(storage).instance).toBe(instanceSize);
       expect(readRecord(storage).billingConfigured).toBeUndefined();
       expect(storage.map.get(SCHEDULES_KEY)).toBeUndefined();
@@ -671,7 +706,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
       await expect(
         instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: instanceSize })
-      ).resolves.toEqual({ started: false });
+      ).resolves.toEqual({ started: false, startSource: 'image' });
       expect(container.startCalls).toHaveLength(1);
 
       await expect(instance.getBillingRuntimeStatus()).resolves.toBeUndefined();
@@ -707,7 +742,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
   it('reconstructs a pre-change record without inventing billing identity', async () => {
     const { instance, storage } = setup({
-      record: { state: 'running', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'running', allocationRef: REF_A },
     });
 
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
@@ -883,6 +918,7 @@ describe('ContainersBilling resumed launch activation', () => {
       if (probeExitCode === 0) {
         await expect(launch(resumed.instance, REF_A, 'standard-4')).resolves.toEqual({
           started: true,
+          startSource: 'image',
         });
         await flushPending(resumed.pendingTasks);
         expect(readRecord(first.storage)).toMatchObject({
@@ -914,8 +950,6 @@ describe('ContainersBilling resumed launch activation', () => {
       record: {
         state: 'launching',
         allocationRef: REF_A,
-        stopOpId: null,
-        lastSnapshot: null,
         wrapperAttempt: 'exec_pending',
       },
     });
@@ -936,6 +970,7 @@ describe('ContainersBilling resumed launch activation', () => {
 
     await expect(launch(reconstructed.instance, REF_A, 'standard-2')).resolves.toEqual({
       started: true,
+      startSource: 'image',
     });
 
     expect(probes).toBe(1);
@@ -977,7 +1012,7 @@ describe('ContainersBilling resumed launch activation', () => {
 describe('ContainersBilling launch instance persistence', () => {
   it('persists the supplied instance when a pre-change running record is reused', async () => {
     const first = setup({
-      record: { state: 'running', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'running', allocationRef: REF_A },
     });
     first.container.running = true;
     const reused = setup({
@@ -986,22 +1021,24 @@ describe('ContainersBilling launch instance persistence', () => {
       meter: first.meter,
     });
 
-    await expect(launch(reused.instance, REF_A, 'standard-4')).resolves.toEqual({ started: false });
+    await expect(launch(reused.instance, REF_A, 'standard-4')).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
 
     expect(readRecord(first.storage)).toMatchObject({ state: 'running', instance: 'standard-4' });
     expect(readRecord(first.storage).billingConfigured).toBeUndefined();
   });
 
-  it('persists the supplied instance when a resumed launch start succeeds then the wrapper exec fails', async () => {
+  it('persists the supplied instance when a resumed sleep wrapper exec fails', async () => {
     const first = setup({
       record: {
         state: 'launching',
         allocationRef: REF_A,
-        stopOpId: null,
-        lastSnapshot: null,
         wrapperAttempt: 'not_started',
       },
     });
+    first.container.running = true;
     first.container.execHandler = cmd => {
       if (cmd[0] === 'pgrep') return execProcess(1);
       throw new Error('spawn failed');
@@ -1026,8 +1063,6 @@ describe('ContainersBilling launch instance persistence', () => {
       record: {
         state: 'idle',
         allocationRef: null,
-        stopOpId: null,
-        lastSnapshot: null,
         instance: 'standard-4',
         billingConfigured: true,
       },
@@ -1044,8 +1079,6 @@ describe('ContainersBilling launch instance persistence', () => {
       record: {
         state: 'idle',
         allocationRef: null,
-        stopOpId: null,
-        lastSnapshot: null,
         instance: 'standard-2',
       },
     });
@@ -1429,21 +1462,27 @@ describe('ContainersBilling schedule cancellation', () => {
 describe('ContainersBilling inert pre-change records', () => {
   it('stays inert for pre-change running reuse and resumed launch records', async () => {
     const reuse = setup({
-      record: { state: 'running', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'running', allocationRef: REF_A },
     });
     reuse.container.running = true;
-    await expect(launch(reuse.instance, REF_A, 'standard-2')).resolves.toEqual({ started: false });
+    await expect(launch(reuse.instance, REF_A, 'standard-2')).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
     expect(readRecord(reuse.storage).billingConfigured).toBeUndefined();
     expect(reuse.storage.map.get(SCHEDULES_KEY)).toBeUndefined();
     expect(reuse.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
     expect(reuse.meter.recordStartInputs).toHaveLength(0);
 
     const resumed = setup({
-      record: { state: 'launching', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'launching', allocationRef: REF_A },
     });
     resumed.container.running = true;
     resumed.container.execHandler = () => execProcess(0);
-    await expect(launch(resumed.instance, REF_A, 'standard-2')).resolves.toEqual({ started: true });
+    await expect(launch(resumed.instance, REF_A, 'standard-2')).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
     expect(readRecord(resumed.storage).state).toBe('running');
     expect(readRecord(resumed.storage).wrapperAttempt).toBe('exec_pending');
     expect(readRecord(resumed.storage).instance).toBeUndefined();

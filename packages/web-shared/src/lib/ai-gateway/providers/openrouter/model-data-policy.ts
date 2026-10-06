@@ -1,4 +1,4 @@
-import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 /**
  * OpenRouter returns one route per model even when a provider offers routes with different data

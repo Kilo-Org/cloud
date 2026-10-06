@@ -26,6 +26,7 @@ jobs:
       # on a transient GitHub API failure (it sets no outputs when it fails).
       kilocode_backend: ${{ steps.filter.outputs.kilocode_backend || steps.filter_retry.outputs.kilocode_backend }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next || steps.filter_retry.outputs.cloud_agent_next }}
+      ai_gateway: ${{ steps.filter.outputs.ai_gateway || steps.filter_retry.outputs.ai_gateway }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -54,6 +55,9 @@ jobs:
 
       - name: Test scheduled deployment wiring
         run: node --test scripts/deployment-workflows.test.mjs
+
+      - name: Test main workflow failure notifications
+        run: node --test scripts/main-workflow-failure.test.mjs
 
       - name: Test meta-janitor approval gates
         run: node --test scripts/meta-janitor-approve.test.mjs
@@ -95,6 +99,14 @@ jobs:
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
+            ai_gateway:
+              - 'apps/ai-gateway/**'
+              - 'apps/web/.env'
+              - 'apps/web/.env.test'
+              - 'packages/**'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
       - name: Detect changes (retry)
         id: filter_retry
         # Keep the filters byte-identical to the attempt above:
@@ -126,6 +138,14 @@ jobs:
               - 'pnpm-lock.yaml'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            ai_gateway:
+              - 'apps/ai-gateway/**'
+              - 'apps/web/.env'
+              - 'apps/web/.env.test'
+              - 'packages/**'
               - '.github/workflows/ci.yml'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -377,6 +397,52 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=8192'
         run: pnpm run build
 
+  build-ai-gateway:
+    needs: [changes, typecheck, lint, format-check, drizzle-check]
+    if: needs.changes.outputs.ai_gateway == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Next.js build
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ${{ github.workspace }}/apps/ai-gateway/.next/cache
+          key: ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-ai-gateway-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      # The app runs with the web app's environment; see apps/ai-gateway/scripts/dev.sh.
+      - name: Setup dummy build env
+        working-directory: apps/ai-gateway
+        run: |
+          cp ../web/.env .env
+          cp ../web/.env.test .env.production.local
+
+      - name: Build ai-gateway
+        env:
+          NODE_ENV: production
+          VERCEL_ENV: production
+          NEXTAUTH_URL: https://ci-build.invalid
+          POSTGRES_URL: postgres://unused:unused@localhost:5432/unused
+          UPSTASH_REDIS_REST_URL: https://redis.test.invalid
+          UPSTASH_REDIS_REST_TOKEN: dummy-test-redis-token
+          SENTRY_AUTH_TOKEN: ''
+        run: pnpm --filter ai-gateway run build
+
   cloud-agent-next:
     needs: [changes, typecheck, lint, format-check, drizzle-check]
     if: needs.changes.outputs.cloud_agent_next == 'true'
@@ -470,51 +536,3 @@ jobs:
       - name: Test native heartbeat attachment compatibility
         if: matrix.workspace.name == 'cloudflare-session-ingest'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts
-
-  notify-main-failure:
-    if: ${{ always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure') }}
-    needs:
-      [typecheck, lint, format-check, drizzle-check, test, build, cloud-agent-next, workspace-tests]
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    steps:
-      - name: Notify Slack
-        continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        with:
-          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": ":red_circle: CI failed on main"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Author:*\n${{ github.actor }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
-                    }
-                  ]
-                }
-              ]
-            }

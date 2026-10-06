@@ -215,7 +215,6 @@
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
     "bonusCreditsExpiring": "{{amount}}ના બોનસ ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
-    "creditBalanceEmpty": "તમારું ક્રેડિટ બેલેન્સ ખાલી છે. આ એકાઉન્ટના ક્રેડિટનું સંચાલન iOS એપની બહાર થાય છે.",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
     "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",
@@ -2048,6 +2047,7 @@
       "idCopied": "સત્રનું ID કૉપિ થયું",
       "couldNotCopyId": "સત્રનું ID કૉપિ કરી શકાયું નહીં.",
       "untitled": "શીર્ષક વિનાનું સત્ર",
+      "actions": "સત્રના વિકલ્પો",
       "sessionDeleted": "સત્ર કાઢી નાખ્યું",
       "needsInput": "જવાબ જરૂરી",
       "fromPlatform": "{{platform}}માંથી",
@@ -2100,6 +2100,7 @@
       "readOnly": "આ સત્ર માત્ર વાંચી શકાય છે.",
       "continueInNewSession": "નવા સત્રમાં ચાલુ રાખો",
       "emptyDescription": "શરૂ કરવા નીચે સંદેશ મોકલો.",
+      "emptyTranscriptDescription": "આ સત્રમાં હજુ કોઈ સંદેશ નથી.",
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "સંદેશ મોકલતા પહેલાં મોડલ પસંદ કરો.",
       "preparingPlaceholder": "કાર્યપરિસર તૈયાર થઈ રહ્યું છે...",
       "finalizingPlaceholder": "પૂર્ણ થઈ રહ્યું છે...",
+      "sessionLoadFailed": "સત્ર લોડ કરી શકાયું નથી. પહેલા ફરી પ્રયાસ કરો.",
       "cannotReceiveFiles": "આ સત્ર ફાઇલો સ્વીકારી શકતું નથી. તમારો સંદેશ મોકલવા માટે જોડેલી ફાઇલો દૂર કરો.",
       "couldNotAttachFiles": "ફાઇલો જોડી શકાઈ નહીં. ફરી પ્રયાસ કરવા “મોકલો” પર ટેપ કરો.",
       "discardAttachmentsMessage": "હજી કોઈ સંદેશમાં જોડાઈ ન હોય તેવી અપલોડ કરેલી ફાઇલો કાઢી નાખવામાં આવશે.",
@@ -2635,6 +2637,7 @@
       "provider": "પ્રદાતા",
       "totalCost": "કુલ ખર્ચ",
       "usageReflectsLatest": "આ વપરાશની વિગતો સહાયકના સૌથી તાજેતરના પૂર્ણ થયેલા જવાબ પર આધારિત છે.",
+      "usageUnavailable": "સંદર્ભ વપરાશ અનુપલબ્ધ છે",
       "tokenUsage": "ટોકનનો વપરાશ",
       "cacheRate": "કેશ દર",
       "modelsCount": "મોડલ ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "લોડ કરો",
       "loadWithHost": "{{host}} લોડ કરો",
-      "httpsOnly": "માત્ર HTTPS છબીઓ જ લોડ કરી શકાય છે."
+      "httpsOnly": "માત્ર HTTPS છબીઓ જ લોડ કરી શકાય છે.",
+      "trustTitle": "{{host}} પરથી છબી લોડ કરવી?",
+      "trustMessage": "{{host}} પર ભરોસો કરવાથી તેની છબીઓ દર વખતે પૂછ્યા વિના લોડ થશે. તમે પછીથી વિશ્વસનીય હોસ્ટમાં તે રદ કરી શકો છો.",
+      "loadOnce": "એક વાર લોડ કરો"
     },
     "markdownLink": {
       "invalidLink": "આ લિંક ખોલી શકાતી નથી.",
@@ -3182,8 +3188,12 @@
     "subtitle": "પૂછ્યા વિના ખોલવા માટે તમે વિશ્વાસ કરો છો તે હોસ્ટ",
     "emptyTitle": "કોઈ વિશ્વસનીય હોસ્ટ નથી",
     "emptyDescription": "જ્યારે તમે લિંકના હોસ્ટ પર ભરોસો રાખો છો, ત્યારે તે ફરીથી પૂછ્યા વિના ખુલે છે.",
+    "imagesSectionTitle": "વિશ્વસનીય છબી હોસ્ટ",
+    "imagesSectionDescription": "આ હોસ્ટની છબીઓ ફરી પૂછ્યા વિના લોડ થાય છે.",
+    "imagesSectionEmpty": "કોઈ વિશ્વસનીય છબી હોસ્ટ નથી",
     "revoke": "{{host}} માટેની મંજૂરી રદ કરો",
     "revokeMessage": "આ હોસ્ટની લિંક ફરીથી પુષ્ટિ માગશે.",
+    "revokeImageMessage": "આ હોસ્ટની છબીઓ ફરીથી પુષ્ટિ માગશે.",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "નવો એજન્ટ",
     "approving": "મંજૂર કરવામાં આવી રહ્યું છે...",
     "couldNotApprove": "મંજૂર કરી શકાયું નથી",
-    "couldNotStart": "શરૂ કરી શકાયું નથી",
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
@@ -3448,5 +3457,17 @@
       "unboundToast": "રેપો અનબાઉન્ડ",
       "unbindFailed": "રેપોને અનબાઇન્ડ કરી શકાયું નથી"
     }
+  },
+  "credits": {
+    "title": "ક્રેડિટ ખરીદો",
+    "description": "ક્રેડિટ એ Kilo એપમાં AI કોડિંગ સત્રો ચલાવવા માટે તમારા Kilo બેલેન્સમાં ઉમેરાતી એકવારની ખરીદી છે. સ્ટોર તમારા ખાતામાંથી ચાર્જ લે છે અને સ્ટોર ચુકવણીની પુષ્ટિ કર્યા પછી ક્રેડિટ ઉમેરાય છે.",
+    "packLabel": "{{amount}} ના ક્રેડિટ ઉમેરો",
+    "priceUnavailable": "કિંમત ઉપલબ્ધ નથી",
+    "purchased": "તમારા બેલેન્સમાં ક્રેડિટ ઉમેરાઈ છે.",
+    "empty": "ક્રેડિટ પેક અત્યારે ઉપલબ્ધ નથી.",
+    "noMatchingProducts": "App Store એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
+    "noMatchingProductsPlay": "Google Play એ કોઈ મેળ ખાતું ક્રેડિટ પેક પરત કર્યું નથી.",
+    "purchaseOwnedByAnotherAccount": "આ Apple Account પરની ક્રેડિટ બીજા Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો.",
+    "purchaseOwnedByAnotherAccountPlay": "આ Google Play ખાતા પરની ક્રેડિટ અલગ Kilo ખાતાની છે. તેનો ઉપયોગ કરવા તે Kilo ખાતામાં સાઇન ઇન કરો."
   }
 }

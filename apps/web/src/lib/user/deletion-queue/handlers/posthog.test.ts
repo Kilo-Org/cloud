@@ -5,8 +5,8 @@ import {
   user_deletion_steps,
 } from '@kilocode/db/schema';
 import { UserDeletionStepKey, UserDeletionStepStatus } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { USER_DELETION_DEFAULT_POSTHOG_HOST } from '@/lib/user/deletion-queue/deletion-constants';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { USER_DELETION_DEFAULT_POSTHOG_HOST } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { encryptDeletionResourceIds } from '@/lib/user/deletion-queue/deletion-crypto';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { hmacResourceRef } from '@/lib/user/deletion-queue/deletion-hmac';
@@ -16,7 +16,7 @@ import {
   getPostHogPersonsSearchUrl,
   handlePosthog,
 } from '@/lib/user/deletion-queue/handlers/posthog';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const PERSON_A = 'person-a';
 const PERSON_B = 'person-b';

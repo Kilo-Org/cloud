@@ -215,7 +215,6 @@
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
     "bonusCreditsExpiring": "Amakhredithi ebhonasi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
-    "creditBalanceEmpty": "Awunawo amakhredithi asele. Amakhredithi ale akhawunti aphathwa ngaphandle kohlelo lokusebenza lwe-iOS.",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",
@@ -2048,6 +2047,7 @@
       "idCopied": "I-ID yeseshini ikopishiwe",
       "couldNotCopyId": "Asikwazanga ukukopisha i-ID yeseshini.",
       "untitled": "Iseshini engenagama",
+      "actions": "Izenzo zeseshini",
       "sessionDeleted": "Iseshini isusiwe",
       "needsInput": "kudinga impendulo",
       "fromPlatform": "kusuka ku-{{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Le seshini ingafundwa kuphela.",
       "continueInNewSession": "Qhubeka kuseshini entsha",
       "emptyDescription": "Thumela umlayezo ngezansi ukuze uqale.",
+      "emptyTranscriptDescription": "Le seshini ayinawo umilayezo okwamanje.",
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
@@ -2566,6 +2567,7 @@
       "selectModelBeforeSending": "Khetha imodeli ngaphambi kokuthumela.",
       "preparingPlaceholder": "Kusethwa indawo yokusebenza...",
       "finalizingPlaceholder": "Kuyaphethwa...",
+      "sessionLoadFailed": "Iseshini ayikwazanga ukulayishwa. Zama futhi kuqala.",
       "cannotReceiveFiles": "Le seshini ayikwazi ukwamukela amafayela. Susa okunamathiselwe ukuze uthumele umlayezo wakho.",
       "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha inkinobho yokuthumela ukuze uzame futhi.",
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
@@ -2635,6 +2637,7 @@
       "provider": "Umhlinzeki",
       "totalCost": "Izindleko zizonke",
       "usageReflectsLatest": "Ukusetshenziswa kubonisa impendulo yakamuva ephelele yomsizi.",
+      "usageUnavailable": "Ukusetshenziswa komongo akutholakali",
       "tokenUsage": "Ukusetshenziswa kwamathokheni",
       "cacheRate": "Izinga lokusebenzisa inqolobane yesikhashana",
       "modelsCount": "Amamodeli ({{displayCount}})",
@@ -2669,7 +2672,10 @@
     "markdownImage": {
       "load": "Layisha",
       "loadWithHost": "Layisha {{host}}",
-      "httpsOnly": "Kuvunyelwe izithombe ze-HTTPS kuphela."
+      "httpsOnly": "Kuvunyelwe izithombe ze-HTTPS kuphela.",
+      "trustTitle": "Layisha isithombe kusuka ku-{{host}}?",
+      "trustMessage": "Ukuthemba u-{{host}} kuzolayisha izithombe zakhe ngaphandle kokubuza njalo. Ungakuhoxisa kamuva ngaphansi kwabasingathi abathenjwayo.",
+      "loadOnce": "Layisha kanye"
     },
     "markdownLink": {
       "invalidLink": "Lesi sixhumanisi asikwazi ukuvulwa.",
@@ -3182,8 +3188,12 @@
     "subtitle": "Abasingathi obathembayo ukuthi bavuleke ngaphandle kokucela imvume",
     "emptyTitle": "Abekho abasingathi abathenjwayo",
     "emptyDescription": "Uma uthemba umsingathi wesixhumanisi, isixhumanisi sivuleka ngaphandle kokucela imvume futhi.",
+    "imagesSectionTitle": "Abasingathi bezithombe abathenjwayo",
+    "imagesSectionDescription": "Izithombe ezivela kulezi zingosi zilayishwa ngaphandle kokubuza futhi.",
+    "imagesSectionEmpty": "Awekho abasingathi bezithombe abathenjwayo",
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
     "revokeMessage": "Izixhumanisi eziya kulo msingathi zizocela imvume futhi.",
+    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi.",
     "backToPreferences": "Buyela ezilungiselelweni"
   },
   "quickChat": {
@@ -3208,7 +3218,6 @@
     "newAgent": "I-ejenti entsha",
     "approving": "Kuyagunyaza...",
     "couldNotApprove": "Akukwazi ukugunyaza",
-    "couldNotStart": "Akukwazi ukuqala",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
     "openSession": "Vula",
@@ -3448,5 +3457,17 @@
       "unboundToast": "I-Repo ikhululiwe",
       "unbindFailed": "Ayikwazanga ukukhulula i-repo"
     }
+  },
+  "credits": {
+    "title": "Thenga amakhredithi",
+    "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
+    "packLabel": "Engeza amakhredithi angu-{{amount}}",
+    "priceUnavailable": "Intengo ayitholakali",
+    "purchased": "Amakhredithi engeziwe kubhalansi yakho.",
+    "empty": "Amaphakethe amakhredithi awatholakali njengamanje.",
+    "noMatchingProducts": "I-App Store ayizange ibuyisele amaphakethe amakhredithi ahambisanayo.",
+    "noMatchingProductsPlay": "I-Google Play ayizange ibuyisele amaphakethe amakhredithi ahambisanayo.",
+    "purchaseOwnedByAnotherAccount": "Amakhredithi kule Apple Account angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise.",
+    "purchaseOwnedByAnotherAccountPlay": "Amakhredithi kule akhawunti ye-Google Play angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise."
   }
 }

@@ -4,8 +4,8 @@ import { z } from 'zod';
 import {
   BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL,
   BITBUCKET_CODE_REVIEW_WEBHOOK_SIGNING_KEYS,
-} from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
+} from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   deleteBitbucketWorkspaceWebhooksFromTokenService,
   ensureBitbucketWorkspaceWebhookFromTokenService,

@@ -7,9 +7,9 @@ import type {
   OrganizationPolicySubject,
 } from './organization-group-policy-context.server';
 import type * as Producer from './organization-models';
-import type * as Cache from '@/lib/model-stats/model-stats-cache';
-import type * as Enkrypt from '@/lib/model-stats/enkrypt';
-import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
+import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
 let mockAutoEnabled = false;
@@ -35,12 +35,12 @@ const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: s
 );
 const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
 }));
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: () => ({ orderBy: mockReadRows, leftJoin: () => ({ orderBy: mockReadRows }) }),
@@ -48,32 +48,37 @@ jest.mock('@/lib/drizzle', () => ({
   },
   readDb: { select: mockReplicaSelect },
 }));
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(async () => mockCatalog),
   buildAutoModelCatalogEntry: jest.fn(() => catalogModel('kilo-auto/org')),
 }));
-jest.mock('@/lib/organizations/organization-group-policy-context.server', () => ({
-  getOrganizationGroupPolicyContext: mockGetContext,
-}));
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+jest.mock(
+  '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server',
+  () => ({
+    getOrganizationGroupPolicyContext: mockGetContext,
+  })
+);
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
   getEffectiveModelDecision: mockDecision,
 }));
-jest.mock('@/lib/ai-gateway/custom-llm/listAvailableCustomLlms', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms', () => ({
   listAvailableCustomLlms: mockCustom,
 }));
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForOrganization: mockByok,
 }));
-jest.mock('@/lib/ai-gateway/auto-model', () => ({ ORG_AUTO_MODEL: { id: 'kilo-auto/org' } }));
-jest.mock('@/lib/organizations/organization-auto-model', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
+  ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
+}));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () => ({
   isOrganizationAutoEnabled: () => mockAutoEnabled,
 }));
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: mockAvailability,
   getOrganizationByokProviderIds: mockProviderIds,
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/routing', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
 }));
 
@@ -198,8 +203,8 @@ beforeEach(async () => {
   mockTagChatGpt.mockReset().mockImplementation(async (_owner, models) => models);
   [producer, cache, enkrypt] = await Promise.all([
     import('./organization-models'),
-    import('@/lib/model-stats/model-stats-cache'),
-    import('@/lib/model-stats/enkrypt'),
+    import('@kilocode/web-shared/lib/model-stats/model-stats-cache'),
+    import('@kilocode/web-shared/lib/model-stats/enkrypt'),
   ]);
 });
 

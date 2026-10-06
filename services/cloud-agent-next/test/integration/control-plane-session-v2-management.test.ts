@@ -5,6 +5,7 @@ import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-q
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CallbackJob } from '../../src/callbacks/types.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import { controlPlaneMessages } from '../../src/control-plane/session/sqlite-schema.js';
 import { events } from '../../src/db/sqlite-schema.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
@@ -166,6 +167,120 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
+  it('forwards a real status websocket through the Session DO to the Sandbox DO', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
+    const sandboxes = (
+      env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> }
+    ).SANDBOX_CONTROL;
+    const sandbox = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandbox, async (instance, state) => {
+      await instance.getAllocationState();
+      await state.storage.put('control_plane_owner', USER_ID);
+    });
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = id => sandboxes.getByName(id);
+    });
+    const response = await stub.fetch(
+      new Request('https://worker.test/stream?sandboxStatus=true', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+    expect(response.status).toBe(101);
+    const socket = response.webSocket;
+    if (!socket) throw new Error('Missing forwarded status websocket');
+    const frame = new Promise<unknown>(resolve =>
+      socket.addEventListener('message', event => resolve(JSON.parse(String(event.data))), {
+        once: true,
+      })
+    );
+    socket.accept();
+    expect(await frame).toMatchObject({
+      sessionId,
+      streamEventType: 'cloud.sandbox.status',
+      data: { status: 'sleeping' },
+    });
+    socket.close();
+  });
+
+  it('routes status subscriptions only to the registered sandbox and stored owner', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
+    const peer = new FakeSandboxPeer();
+    const routed: string[] = [];
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = id => {
+        routed.push(id);
+        return peer;
+      };
+    });
+    const response = await stub.fetch(
+      new Request(
+        'https://worker.test/stream?sandboxStatus=true&ownerId=attacker&sandboxId=other',
+        { headers: { Upgrade: 'websocket' } }
+      )
+    );
+    expect(await response.text()).toBe('status-stream');
+    expect(routed).toEqual([sandboxId]);
+    expect(peer.fetchCalls).toHaveLength(1);
+    const url = new URL(peer.fetchCalls[0].url);
+    expect(url.pathname).toBe('/status-stream');
+    expect(url.searchParams.get('ownerId')).toBe(USER_ID);
+    expect(url.searchParams.get('sessionId')).toBe(sessionId);
+    expect(
+      (await stub.fetch(new Request('https://worker.test/stream?sandboxStatus=true'))).status
+    ).toBe(426);
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => null;
+    });
+    expect(
+      (
+        await stub.fetch(
+          new Request('https://worker.test/stream?sandboxStatus=true', {
+            headers: { Upgrade: 'websocket' },
+          })
+        )
+      ).status
+    ).toBe(503);
+    const missing = sessions.getByName(newSessionId());
+    expect(
+      (
+        await missing.fetch(
+          new Request('https://worker.test/stream?sandboxStatus=true', {
+            headers: { Upgrade: 'websocket' },
+          })
+        )
+      ).status
+    ).toBe(404);
+  });
+
+  it('retries a transient sandbox status upgrade on a fresh peer', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const stub = await registerSession({ sessionId, sandboxId, kiloSessionId: kiloSessionId() });
+    const peer = new FakeSandboxPeer();
+    let attempts = 0;
+    const unavailable = new FakeSandboxPeer();
+    unavailable.fetch = async () => {
+      throw Object.assign(new Error('Transient DO failure'), { retryable: true });
+    };
+    await runInDurableObject(stub, instance => {
+      instance.sandboxPeerFor = () => {
+        attempts += 1;
+        return attempts === 1 ? unavailable : peer;
+      };
+    });
+    const response = await stub.fetch(
+      new Request('https://worker.test/stream?sandboxStatus=true', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+    expect(await response.text()).toBe('status-stream');
+    expect(attempts).toBe(2);
+  });
+
   it('reads the stored runtime location and returns null when unregistered', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
@@ -405,7 +520,11 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         ownerId: USER_ID,
         organizationId: ORG_ID,
       })
-    ).resolves.toEqual({ location: { sandboxId, provider: 'cloudflare' }, children: [] });
+    ).resolves.toEqual({
+      location: { sandboxId, provider: 'cloudflare' },
+      children: [],
+      directory: '/workspace/app',
+    });
 
     await expect(
       runInDurableObject(stub, instance =>
@@ -424,7 +543,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
         kiloSessionId: kilo,
         ownerId: USER_ID,
       })
-    ).resolves.toEqual({ location: null, children: [] });
+    ).resolves.toEqual({ location: null, children: [], directory: null });
   });
 
   it('reads child Kilo sessions from the stored event log', async () => {
@@ -457,7 +576,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
           execution_id: '',
           session_id: sessionId,
           stream_event_type: 'kilocode',
-          payload: created(firstChild, ownKilo, workspacePath),
+          payload: created(firstChild, ownKilo, '/workspace/app'),
           timestamp: 1,
         },
         // A repeat update of the same child must not duplicate the lineage.
@@ -465,7 +584,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
           execution_id: '',
           session_id: sessionId,
           stream_event_type: 'kilocode',
-          payload: created(firstChild, ownKilo, workspacePath),
+          payload: created(firstChild, ownKilo, '/workspace/app'),
           timestamp: 2,
         },
         // A child in another directory is not part of this worktree.
@@ -481,7 +600,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
           execution_id: '',
           session_id: sessionId,
           stream_event_type: 'kilocode',
-          payload: created(ownKilo, firstChild, workspacePath),
+          payload: created(ownKilo, firstChild, '/workspace/app'),
           timestamp: 4,
         },
       ]);

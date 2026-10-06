@@ -1,5 +1,5 @@
 import 'server-only';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 

@@ -27,6 +27,8 @@ import type {
   TransportSink,
 } from './transport';
 
+type SessionStatusEvent = Extract<ServiceEvent, { type: 'session.status' }>;
+
 function normalizeCloudAgentPayload(payload: TransportSendPayload): CloudAgentSendPayload {
   if (payload.type === 'command') return payload;
   if (!payload.mode) throw new Error('Cloud Agent mode is required');
@@ -77,6 +79,10 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     let connection: Connection | null = null;
     let lifecycleGeneration = 0;
     let stoppedReceived = false;
+    let replaying = true;
+    // Latest replayed status per session, applied after connected unless
+    // connected already carries the authoritative root status.
+    const replayedStatuses = new Map<string, SessionStatusEvent>();
     // Last persisted event id seen on the wire (eventId 0 is the synthetic
     // sentinel). Used as a replay cursor on reconnect: the DO replays every
     // stored event after it, so content produced while the socket was dead is
@@ -222,6 +228,23 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           const event = normalize(raw);
           if (!event) return;
 
+          if (event.type === 'connected') replaying = false;
+          if (replaying && event.type === 'session.status') {
+            replayedStatuses.set(event.sessionId, event);
+            return;
+          }
+          // Pending interactions are restored separately after connected.
+          if (
+            replaying &&
+            (event.type === 'question.asked' ||
+              event.type === 'question.replied' ||
+              event.type === 'question.rejected' ||
+              event.type === 'permission.asked' ||
+              event.type === 'permission.replied')
+          ) {
+            return;
+          }
+
           // Cloud Agent sessions have no command path for accepting or
           // dismissing suggestions, so drop these events before they reach the
           // sink — otherwise the UI would render a card whose buttons throw.
@@ -242,10 +265,21 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           } else {
             sink.onServiceEvent(event);
           }
+
+          if (event.type === 'connected') {
+            const statuses = [...replayedStatuses.values()];
+            replayedStatuses.clear();
+            for (const status of statuses) {
+              if (status.sessionId === config.kiloSessionId && event.sessionStatus) continue;
+              sink.onServiceEvent(status);
+            }
+          }
         },
         onConnected: () => {},
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
+          replaying = true;
+          replayedStatuses.clear();
           stoppedReceived = false;
           // With a replay cursor the socket itself re-delivers everything
           // missed while dead — replaying a (possibly stale) snapshot on top
@@ -318,6 +352,8 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         closeConnection('destroy');
         lifecycleGeneration += 1;
         stoppedReceived = false;
+        replaying = true;
+        replayedStatuses.clear();
         const expectedGeneration = lifecycleGeneration;
 
         void fetchAndReplayInitial(expectedGeneration)

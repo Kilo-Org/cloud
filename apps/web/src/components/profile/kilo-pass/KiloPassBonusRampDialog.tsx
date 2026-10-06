@@ -11,15 +11,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { computeMonthlyCadenceBonusPercent } from '@/lib/kilo-pass/bonus';
+import { computeMonthlyCadenceBonusPercent } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_TIER_CONFIG,
-} from '@/lib/kilo-pass/constants';
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { formatDollars } from '@/lib/utils';
 
 import { formatPercent, getTierName } from './utils';
-import type { KiloPassTier } from '@/lib/kilo-pass/enums';
+import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 const clampMonth = (month: number) => Math.min(12, Math.max(1, Math.round(month)));
 

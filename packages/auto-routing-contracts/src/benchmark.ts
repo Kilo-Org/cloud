@@ -236,6 +236,10 @@ export const BenchmarkModelSummarySchema = z.object({
   cases: z.number().int(),
   errors: z.number().int(),
   timeouts: z.number().int().default(0),
+  // Classifier runs only: share of cases whose predicted taskType/subtaskType
+  // equals the golden route key, the only axes the decision engine reads.
+  // Null for decider runs and for classifier runs recorded before it existed.
+  routeAccuracy: z.number().min(0).max(1).nullable().default(null),
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
@@ -323,6 +327,11 @@ export type BenchmarkRoutingTableResponse = z.infer<typeof BenchmarkRoutingTable
 // on read from the latest completed classifier run (served via
 // /admin/classifier-winner and cached in the auto-routing KV namespace).
 export const ClassifierWinnerSchema = z.object({
+  // Marks a winner measured by the System One classifier. A winner from a
+  // benchmark worker that predates the cutover lacks it and fails to parse, so
+  // the auto-routing worker falls back to DEFAULT_CLASSIFIER_MODEL whatever the
+  // deploy order.
+  engine: z.literal('system-one'),
   model: z.string().trim().min(1),
   runId: z.string(),
   accuracy: z.number(),
@@ -331,7 +340,8 @@ export const ClassifierWinnerSchema = z.object({
 });
 export type ClassifierWinner = z.infer<typeof ClassifierWinnerSchema>;
 
-export const CLASSIFIER_WINNER_KV_KEY = 'classifier_benchmark_winner';
+// Renamed at the System One cutover so a cached chat-model winner is never read.
+export const CLASSIFIER_WINNER_KV_KEY = 'classifier_system_one_winner';
 
 export const ClassifierWinnerResponseSchema = z.object({
   winner: ClassifierWinnerSchema.nullable(),

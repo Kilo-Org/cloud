@@ -73,7 +73,10 @@ const INTERNAL_ERROR = -32000;
 const UNAUTHORIZED = -32001;
 
 const PROTOCOL_VERSION = '2025-06-18';
-const SERVER_INFO = { name: 'kilo-mcp', version: '1.0.0' } as const;
+// `title` is the name an MCP client shows to a person; it carries the beta
+// label, and the initialize instructions repeat it for the agent.
+const SERVER_INFO = { name: 'kilo-mcp', title: 'Kilo MCP (beta)', version: '1.0.0' } as const;
+const BETA_NOTICE = 'Kilo MCP is in beta: its tools and behavior can change.';
 
 /**
  * The published tool names. `tools/call` accepts any string as `name`, so the
@@ -708,8 +711,8 @@ async function handleRpcMessage(
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
           instructions: canUseProtectedActions(auth)
-            ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
-            : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
+            ? `${BETA_NOTICE} This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
+            : `${BETA_NOTICE} This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
         });
       }
       case 'ping':

@@ -215,7 +215,6 @@
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",
     "bonusCreditsExpiring": "تنتهي صلاحية رصيد إضافي بقيمة {{amount}} في {{date}}.",
-    "creditBalanceEmpty": "نفد رصيدك. تُدار عمليات الرصيد لهذا الحساب خارج تطبيق iOS.",
     "signOutTitle": "تسجيل الخروج؟",
     "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك.",
     "deleteAccountTitle": "حذف الحساب؟",
@@ -1571,6 +1570,7 @@
       "idCopied": "تم نسخ معرّف الجلسة",
       "couldNotCopyId": "تعذّر نسخ معرّف الجلسة.",
       "untitled": "جلسة بدون عنوان",
+      "actions": "إجراءات الجلسة",
       "sessionDeleted": "تم حذف الجلسة",
       "needsInput": "بانتظار تدخلك",
       "fromPlatform": "من {{platform}}",
@@ -1635,6 +1635,7 @@
       "readOnly": "هذه الجلسة للقراءة فقط.",
       "continueInNewSession": "المتابعة في جلسة جديدة",
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
+      "emptyTranscriptDescription": "لا تحتوي هذه الجلسة على رسائل بعد.",
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
@@ -2137,6 +2138,7 @@
       "selectModelBeforeSending": "اختر نموذجًا قبل الإرسال.",
       "preparingPlaceholder": "جارٍ إعداد البيئة…",
       "finalizingPlaceholder": "جارٍ الإنهاء…",
+      "sessionLoadFailed": "تعذّر تحميل الجلسة. أعد المحاولة أولاً.",
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
       "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
       "discardAttachmentsMessage": "ستُحذف الملفات المرفوعة التي لم تُرفق برسائل مرسلة.",
@@ -2210,6 +2212,7 @@
       "provider": "المزود",
       "totalCost": "التكلفة الإجمالية",
       "usageReflectsLatest": "تعكس بيانات الاستخدام آخر رد مكتمل من المساعد.",
+      "usageUnavailable": "استخدام السياق غير متوفر",
       "tokenUsage": "استخدام الرموز",
       "cacheRate": "نسبة التخزين المؤقت",
       "modelsCount": "النماذج ({{displayCount}})",
@@ -2252,7 +2255,10 @@
     "markdownImage": {
       "load": "تحميل",
       "loadWithHost": "تحميل الصورة من {{host}}",
-      "httpsOnly": "لا تُحمّل إلا الصور عبر HTTPS."
+      "httpsOnly": "لا تُحمّل إلا الصور عبر HTTPS.",
+      "trustTitle": "تحميل الصورة من {{host}}؟",
+      "trustMessage": "الوثوق بـ{{host}} يحمّل صوره دون سؤال في كل مرة. يمكنك إلغاء ذلك لاحقًا من المضيفين الموثوقين.",
+      "loadOnce": "تحميل مرة واحدة"
     },
     "markdownLink": {
       "invalidLink": "لا يمكن فتح هذا الرابط.",
@@ -3354,8 +3360,12 @@
     "subtitle": "مضيفون تسمح بفتح روابطهم دون طلب تأكيد",
     "emptyTitle": "لا يوجد مضيفون موثوقون",
     "emptyDescription": "عندما تعتبر مضيف الرابط موثوقًا، تُفتح روابطه دون طلب تأكيد مجددًا.",
+    "imagesSectionTitle": "مضيفو الصور الموثوقون",
+    "imagesSectionDescription": "تُحمّل الصور من هؤلاء المضيفين دون سؤال مجددًا.",
+    "imagesSectionEmpty": "لا يوجد مضيفو صور موثوقون",
     "revoke": "إلغاء الثقة بالمضيف {{host}}",
     "revokeMessage": "ستطلب الروابط المؤدية إلى هذا المضيف تأكيدًا مرة أخرى.",
+    "revokeImageMessage": "ستطلب الصور من هذا المضيف تأكيدًا مرة أخرى.",
     "backToPreferences": "العودة إلى التفضيلات"
   },
   "quickChat": {
@@ -3380,7 +3390,6 @@
     "newAgent": "وكيل جديد",
     "approving": "جارٍ الموافقة...",
     "couldNotApprove": "تعذّرت الموافقة",
-    "couldNotStart": "تعذّر البدء",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
@@ -3620,5 +3629,17 @@
       "unboundToast": "الريبو غير منضم",
       "unbindFailed": "تعذر إلغاء ربط الريبو"
     }
+  },
+  "credits": {
+    "title": "شراء الرصيد",
+    "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
+    "packLabel": "إضافة {{amount}} من الرصيد",
+    "priceUnavailable": "السعر غير متاح",
+    "purchased": "تمت إضافة الرصيد إلى رصيدك.",
+    "empty": "حزم الرصيد غير متاحة الآن.",
+    "noMatchingProducts": "لم يُرجِع App Store أي حزم رصيد مطابقة.",
+    "noMatchingProductsPlay": "لم يُرجِع Google Play أي حزم رصيد مطابقة.",
+    "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
+    "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
   }
 }

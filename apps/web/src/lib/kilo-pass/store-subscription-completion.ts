@@ -652,11 +652,11 @@ export async function completeStoreKiloPassPurchase(params: {
       if (otherActive && !isStripeSubscriptionEnded(otherActive.status)) {
         throw new Error(ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE);
       }
+      const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
+        where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
+        orderBy: desc(kilo_pass_store_purchases.purchased_at),
+      });
       if (replacement.deferred) {
-        const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
-          where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
-          orderBy: desc(kilo_pass_store_purchases.purchased_at),
-        });
         if (
           !receipt ||
           receipt.kilo_pass_subscription_id !== subscription.id ||
@@ -675,18 +675,35 @@ export async function completeStoreKiloPassPurchase(params: {
         });
         if (refund) throw new Error('Store purchase has been refunded');
       }
+      // Every other replacement mode switches the plan at once, but Play bills the new price at
+      // the old renewal date (WITHOUT_PRORATION) or converts the unused time (WITH_TIME_PRORATION).
+      // Inside the paid period, the new plan has no paid period of its own yet. Keep the paid
+      // tier and its credits until the renewal order of the new plan completes.
+      const isMidPeriodReplacement =
+        !replacement.deferred &&
+        receipt?.expires_at != null &&
+        dayjs(purchase.purchasedAtIso).valueOf() < dayjs(receipt.expires_at).valueOf();
       await tx
         .update(kilo_pass_subscriptions)
         .set({ provider_subscription_id: purchase.providerSubscriptionId })
         .where(eq(kilo_pass_subscriptions.id, subscription.id));
-      return replacement.deferred
-        ? {
-            subscriptionId: subscription.id,
-            tier: purchase.tier,
-            cadence: purchase.cadence,
-            alreadyProcessed: true,
-          }
-        : null;
+      if (replacement.deferred) {
+        return {
+          subscriptionId: subscription.id,
+          tier: purchase.tier,
+          cadence: purchase.cadence,
+          alreadyProcessed: true,
+        };
+      }
+      if (isMidPeriodReplacement) {
+        return {
+          subscriptionId: subscription.id,
+          tier: subscription.tier,
+          cadence: subscription.cadence,
+          alreadyProcessed: true,
+        };
+      }
+      return null;
     };
     const transferred = params.dbOrTx
       ? await transfer(params.dbOrTx)

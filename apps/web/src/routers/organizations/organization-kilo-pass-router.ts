@@ -248,6 +248,7 @@ export const organizationKiloPassRouter = createTRPCRouter({
               attempt: organization
                 ? {
                     accountCreatedAt: organization.created_at,
+                    accountUsedMicrodollars: organization.microdollars_used,
                     ip: ctx.ip,
                     ipCountry: ipCountryFromHeaders(ctx.headersList),
                     ja4: ja4FromHeaders(ctx.headersList),

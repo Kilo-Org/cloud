@@ -163,9 +163,9 @@ export type MicrodollarUsageContext = {
 };
 
 /**
- * Report-only bouncer telemetry for the usage event. Bouncer's verdict never
- * changes billing or the response, and the client resolves even when the worker
- * is unreachable.
+ * Bouncer telemetry for the usage event. The decide verdict can reject a request before upstream;
+ * once usage accounting runs, nothing here changes billing or the response, and the client
+ * resolves even when the worker is unreachable.
  */
 export type BouncerUsageContext = {
   /** Per-request id, also sent to bouncer's `decide` for the same request. */
@@ -188,6 +188,11 @@ export type BouncerUsageContext = {
   samples: number | null;
   /** SimHash of the last user turn. The context never carries the prompt text itself. */
   promptSimHash: string | null;
+  /**
+   * The decide verdict said `spendWatch`: the usage event goes through the durable usage-event
+   * outbox instead of the best-effort send. Set after decide resolves; absent means false.
+   */
+  spendWatch?: boolean;
 };
 
 export type CoreUsageWithMetaData = {

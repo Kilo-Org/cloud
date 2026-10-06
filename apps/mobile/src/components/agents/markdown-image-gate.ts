@@ -89,6 +89,12 @@ function gatedImageMarkdown(image: MarkdownImageRef, t: TFunction): string {
   return `[${escapeMarkdownText(prefix + load)}](${IMAGE_LOAD_SCHEME}${destination})`;
 }
 
+/**
+ * Whole-value lexes one gate pass may spend telling images from literal copies.
+ * Past it every copy is rewritten, so crafted repetition cannot stall a render.
+ */
+const MAX_IMAGE_PROBES = 8;
+
 function occurrences(value: string, raw: string): number[] {
   const found: number[] = [];
   for (let at = value.indexOf(raw); at !== -1; at = value.indexOf(raw, at + raw.length)) {
@@ -101,9 +107,9 @@ function occurrences(value: string, raw: string): number[] {
  * Rewrites every image in `blocked` so the native markdown view never fetches
  * it: HTTPS images become a "Load" link (see `parseImageLoadUrl`), http and
  * data images an "HTTPS images only" note. A copy of the image syntax that
- * `marked` reads as literal text (code, an escaped `\!`) is left alone. If a
- * copy cannot be located, every copy is rewritten and its URL is replaced so
- * it still never loads.
+ * `marked` reads as literal text (code, an escaped `\!`) is left alone while the
+ * probe budget lasts. If a copy cannot be located, every copy is rewritten and
+ * its URL is replaced so it still never loads.
  */
 export function gateMarkdownImages(
   value: string,
@@ -124,21 +130,26 @@ export function gateMarkdownImages(
   }
   const edits: { start: number; end: number; text: string }[] = [];
   const unfoundHrefs: string[] = [];
+  let probesLeft = MAX_IMAGE_PROBES;
   for (const [raw, { image, count }] of byRaw) {
     const all = occurrences(value, raw);
-    // With no more copies than images every copy is an image. Otherwise tell
-    // images from literal text (code, an escaped `\!`) with the lexer: swapping
+    // With no more copies than images every copy is an image. Otherwise, while
+    // the budget lasts, tell images from literal text with the lexer: swapping
     // a copy's `!` for a letter turns a real image into a link and changes
     // nothing else, so the image count drops only for a real copy. The probe
     // lexes uncached so it never evicts real values from the parse cache.
-    const images =
-      all.length > count
-        ? all.filter(at => {
-            const probed = `${value.slice(0, at)}x${value.slice(at + 1)}`;
-            const left = collectImages(marked.lexer(probed, { gfm: true }));
-            return left.filter(other => other.raw === raw).length < count;
-          })
-        : all;
+    // Without budget every copy is rewritten, which is safe.
+    const probe = all.length > count && all.length <= probesLeft;
+    if (probe) {
+      probesLeft -= all.length;
+    }
+    const images = probe
+      ? all.filter(at => {
+          const probed = `${value.slice(0, at)}x${value.slice(at + 1)}`;
+          const left = collectImages(marked.lexer(probed, { gfm: true }));
+          return left.filter(other => other.raw === raw).length < count;
+        })
+      : all;
     const located = images.length >= count;
     if (!located) {
       unfoundHrefs.push(image.href);

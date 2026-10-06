@@ -8,6 +8,7 @@ import {
   messageInfoReportsOutputLimit,
 } from './publication-recovery';
 import type { IngestEvent } from '../../src/shared/protocol';
+import { MESSAGE_ID_PATTERN } from '../../src/shared/message-id';
 import type { WrapperKiloClient } from './kilo-api';
 
 const sessionContext = {
@@ -404,15 +405,14 @@ describe('publication recovery lifecycle', () => {
     }
   });
 
-  it('uses a Kilo-valid msg-prefixed id for the recovery prompt', async () => {
+  it('mints a canonical time-sortable id for the recovery prompt', async () => {
     jest.useFakeTimers();
     try {
       const harness = createRecoveryHarness();
       await triggerRecovery(harness);
 
       expect(harness.messageIds).toHaveLength(1);
-      expect(harness.messageIds[0]?.startsWith('msg')).toBe(true);
-      expect(harness.messageIds[0]?.startsWith('msg_recovery_')).toBe(true);
+      expect(harness.messageIds[0]).toMatch(MESSAGE_ID_PATTERN);
     } finally {
       jest.useRealTimers();
     }

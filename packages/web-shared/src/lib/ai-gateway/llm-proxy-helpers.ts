@@ -5,6 +5,7 @@ import {
   countAndStoreUsage,
   logMicrodollarUsageAndReportToBouncer,
   processTokenData,
+  releaseBouncerLeaseWithoutUsageEvent,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
@@ -909,14 +910,15 @@ export function countAndStoreFimUsage(
           );
 
   after(
-    usageStatsPromise.then(usageStats => {
+    usageStatsPromise.then(async usageStats => {
       if (!usageStats) {
         captureMessage('SUSPICIOUS: No FIM usage information', {
           level: 'error',
           tags: { source: 'fim_usage_processing' },
           extra: { usageContext },
         });
-        return;
+        await releaseBouncerLeaseWithoutUsageEvent(usageContext);
+        return null;
       }
 
       usageStats.market_cost = usageStats.cost_mUsd;
@@ -1045,7 +1047,7 @@ export function countAndStoreEditUsage(
         });
 
   after(
-    usageStatsPromise.then(usageStats => {
+    usageStatsPromise.then(async usageStats => {
       requestSpan?.end();
       if (!usageStats) {
         captureMessage('SUSPICIOUS: No edit usage information', {
@@ -1053,7 +1055,8 @@ export function countAndStoreEditUsage(
           tags: { source: 'edit_usage_processing' },
           extra: { usageContext },
         });
-        return;
+        await releaseBouncerLeaseWithoutUsageEvent(usageContext);
+        return null;
       }
 
       usageStats.market_cost = usageStats.cost_mUsd;
@@ -1204,7 +1207,7 @@ export function countAndStoreEmbeddingUsage(
         .catch(() => null);
 
   after(
-    usageStatsPromise.then(usageStats => {
+    usageStatsPromise.then(async usageStats => {
       requestSpan?.end();
       if (!usageStats) {
         captureMessage('SUSPICIOUS: No embedding usage information', {
@@ -1212,7 +1215,8 @@ export function countAndStoreEmbeddingUsage(
           tags: { source: 'embedding_usage_processing' },
           extra: { usageContext },
         });
-        return;
+        await releaseBouncerLeaseWithoutUsageEvent(usageContext);
+        return null;
       }
 
       // Preserve the real upstream cost for analytics before zeroing for BYOK
@@ -1245,7 +1249,7 @@ export function countAndStoreTranscriptionUsage(
         .catch(() => null);
 
   after(
-    usageStatsPromise.then(usageStats => {
+    usageStatsPromise.then(async usageStats => {
       requestSpan?.end();
       if (!usageStats) {
         captureMessage('SUSPICIOUS: No transcription usage information', {
@@ -1253,7 +1257,8 @@ export function countAndStoreTranscriptionUsage(
           tags: { source: 'transcription_usage_processing' },
           extra: { usageContext },
         });
-        return;
+        await releaseBouncerLeaseWithoutUsageEvent(usageContext);
+        return null;
       }
 
       return processTokenData(usageStats, usageContext);

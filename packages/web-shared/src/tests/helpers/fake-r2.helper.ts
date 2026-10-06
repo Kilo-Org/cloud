@@ -32,9 +32,9 @@ export function createFakeR2Client() {
 export type FakeR2Client = ReturnType<typeof createFakeR2Client>;
 
 /**
- * Replacement for `@kilocode/web-shared/lib/r2/client` whose `createR2Client` always returns the
+ * Replacement for `@kilocode/web-shared/lib/r2/create-client` whose `createR2Client` always returns the
  * same fake and records the credentials it was created with. Retrieve the fake
- * with `jest.requireMock<FakeR2ClientModule>('@kilocode/web-shared/lib/r2/client').fakeR2`.
+ * with `jest.requireMock<FakeR2ClientModule>('@kilocode/web-shared/lib/r2/create-client').fakeR2`.
  */
 export function createFakeR2ClientModule() {
   const fakeR2 = createFakeR2Client();

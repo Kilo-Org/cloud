@@ -16,8 +16,10 @@ jest.mock('next/server', () => ({
   after: (callback: () => Promise<void> | void) => afterCallbacks.push(callback),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  CALLBACK_TOKEN_SECRET: 'callback-secret',
   INTERNAL_API_SECRET: '',
+}));
+jest.mock('@/lib/web-config.server', () => ({
+  CALLBACK_TOKEN_SECRET: 'callback-secret',
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {

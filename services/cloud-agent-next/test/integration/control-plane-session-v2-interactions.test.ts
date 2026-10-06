@@ -198,7 +198,7 @@ async function setupSiblingPair(): Promise<{
 }> {
   const sessionA = newSessionId();
   const sessionB = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionA);
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA);
   const provider = createFakeProvider();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter);
 

@@ -2476,20 +2476,6 @@
       "unavailable": "Àwọn ìfiránṣẹ́ tó ṣáájú kò sí lárọ̀ọ́wọ́tó.",
       "tooLarge": "Àwọn ìfiránṣẹ́ tó ṣáájú tóbi jù láti gbé wọlé."
     },
-    "markdownTable": {
-      "viewTable": "Wo tábìlì",
-      "title": "Tábìlì",
-      "close": "Pa tábìlì dé",
-      "loading": "Ń gbé tábìlì wọlé",
-      "empty": "Tábìlì yìí kò ní ìlà kankan.",
-      "columnCount_one": "òpó",
-      "columnCount": "ìlà ináró",
-      "columnCount_other": "ìlà ináró",
-      "rowCount_one": "ìlà",
-      "rowCount": "ìlà pẹ̀tẹ́lẹ̀",
-      "rowCount_other": "ìlà pẹ̀tẹ́lẹ̀",
-      "opensFullScreen": "ó ṣí láti kún ojú iboju"
-    },
     "sessionFilter": {
       "title": "Ṣàlẹ̀mọ́ àwọn ìgbà iṣẹ́",
       "platformCloud": "Àwọsánmà",
@@ -2583,7 +2569,6 @@
       "linkActions": "Àwọn ìṣe fún ọ̀nà àsopọ̀",
       "couldNotCopyLink": "A kò lè ṣe àdàkọ ọ̀nà àsopọ̀.",
       "couldNotShareLink": "A kò lè pín ọ̀nà àsopọ̀.",
-      "opensInBrowser": "Ó ṣí nínú aṣàwákiri",
       "showLinkActions": "Fi àwọn ìṣe fún ọ̀nà àsopọ̀ hàn"
     },
     "compaction": {

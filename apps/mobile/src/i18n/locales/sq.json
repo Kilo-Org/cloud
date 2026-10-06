@@ -2476,20 +2476,6 @@
       "unavailable": "Mesazhet e mëparshme nuk janë të disponueshme.",
       "tooLarge": "Mesazhet e mëparshme janë shumë të mëdha për t'u ngarkuar."
     },
-    "markdownTable": {
-      "viewTable": "Shiko tabelën",
-      "title": "Tabela",
-      "close": "Mbyll tabelën",
-      "loading": "Duke ngarkuar tabelën",
-      "empty": "Kjo tabelë nuk ka rreshta.",
-      "columnCount_one": "kolonë",
-      "columnCount": "kolona",
-      "columnCount_other": "kolona",
-      "rowCount_one": "rresht",
-      "rowCount": "rreshta",
-      "rowCount_other": "rreshta",
-      "opensFullScreen": "hapet në ekran të plotë"
-    },
     "sessionFilter": {
       "title": "Filtro seancat",
       "platformCloud": "Reja",
@@ -2583,7 +2569,6 @@
       "linkActions": "Veprimet për lidhjen",
       "couldNotCopyLink": "Nuk u kopjua lidhja.",
       "couldNotShareLink": "Nuk u nda lidhja.",
-      "opensInBrowser": "Hapet në shfletues",
       "showLinkActions": "Shfaq veprimet e lidhjes"
     },
     "compaction": {

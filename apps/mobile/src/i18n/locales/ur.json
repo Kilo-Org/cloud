@@ -2476,20 +2476,6 @@
       "unavailable": "پہلے کے پیغامات دستیاب نہیں ہیں۔",
       "tooLarge": "پہلے کے پیغامات کا حجم اتنا زیادہ ہے کہ انہیں لوڈ نہیں کیا جا سکتا۔"
     },
-    "markdownTable": {
-      "viewTable": "جدول دیکھیں",
-      "title": "جدول",
-      "close": "جدول بند کریں",
-      "loading": "جدول لوڈ ہو رہا ہے",
-      "empty": "اس جدول میں کوئی قطار نہیں ہے۔",
-      "columnCount_one": "کالم",
-      "columnCount": "کالم",
-      "columnCount_other": "کالم",
-      "rowCount_one": "قطار",
-      "rowCount": "قطاریں",
-      "rowCount_other": "قطاریں",
-      "opensFullScreen": "پوری اسکرین پر کھلتا ہے"
-    },
     "sessionFilter": {
       "title": "سیشن فلٹر کریں",
       "platformCloud": "کلاؤڈ",
@@ -2583,7 +2569,6 @@
       "linkActions": "لنک کے اختیارات",
       "couldNotCopyLink": "لنک کاپی نہیں ہو سکا۔",
       "couldNotShareLink": "لنک شیئر نہیں ہو سکا۔",
-      "opensInBrowser": "براؤزر میں کھلتا ہے",
       "showLinkActions": "لنک کے اختیارات دکھائیں"
     },
     "compaction": {

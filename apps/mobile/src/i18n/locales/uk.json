@@ -1997,24 +1997,6 @@
       "omitted_few": "Не вдалося відобразити {{displayCount}} попередні елементи цього сеансу.",
       "omitted_many": "Не вдалося відобразити {{displayCount}} попередніх елементів цього сеансу."
     },
-    "markdownTable": {
-      "viewTable": "Переглянути таблицю",
-      "title": "Таблиця",
-      "close": "Закрити таблицю",
-      "loading": "Завантаження таблиці",
-      "empty": "У цій таблиці немає рядків.",
-      "columnCount_one": "стовпець",
-      "columnCount": "стовпця",
-      "columnCount_other": "стовпця",
-      "rowCount_one": "рядок",
-      "rowCount": "рядка",
-      "rowCount_other": "рядка",
-      "opensFullScreen": "відкривається на весь екран",
-      "columnCount_few": "стовпці",
-      "columnCount_many": "стовпців",
-      "rowCount_few": "рядки",
-      "rowCount_many": "рядків"
-    },
     "sessionFilter": {
       "title": "Фільтри сеансів",
       "platformCloud": "Хмара",
@@ -2114,7 +2096,6 @@
       "linkActions": "Дії з посиланням",
       "couldNotCopyLink": "Не вдалося скопіювати посилання.",
       "couldNotShareLink": "Не вдалося поділитися посиланням.",
-      "opensInBrowser": "Відкривається у браузері",
       "showLinkActions": "Показати дії з посиланням"
     },
     "compaction": {

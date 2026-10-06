@@ -2476,20 +2476,6 @@
       "unavailable": "Mesej terdahulu tidak tersedia.",
       "tooLarge": "Mesej terdahulu terlalu besar untuk dimuatkan."
     },
-    "markdownTable": {
-      "viewTable": "Lihat jadual",
-      "title": "Jadual",
-      "close": "Tutup jadual",
-      "loading": "Memuatkan jadual",
-      "empty": "Jadual ini tiada baris.",
-      "columnCount_one": "lajur",
-      "columnCount": "lajur",
-      "columnCount_other": "lajur",
-      "rowCount_one": "baris",
-      "rowCount": "baris",
-      "rowCount_other": "baris",
-      "opensFullScreen": "dibuka dalam skrin penuh"
-    },
     "sessionFilter": {
       "title": "Tapis sesi",
       "platformCloud": "Awan",
@@ -2583,7 +2569,6 @@
       "linkActions": "Tindakan pautan",
       "couldNotCopyLink": "Tidak dapat menyalin pautan.",
       "couldNotShareLink": "Tidak dapat berkongsi pautan.",
-      "opensInBrowser": "Dibuka dalam pelayar",
       "showLinkActions": "Paparkan tindakan pautan"
     },
     "compaction": {

@@ -2476,20 +2476,6 @@
       "unavailable": "Əvvəlki mesajlar mövcud deyil.",
       "tooLarge": "Əvvəlki mesajların həcmi yüklənə bilməyəcək qədər böyükdür."
     },
-    "markdownTable": {
-      "viewTable": "Cədvələ bax",
-      "title": "Cədvəl",
-      "close": "Cədvəli bağla",
-      "loading": "Cədvəl yüklənir",
-      "empty": "Bu cədvəldə sətir yoxdur.",
-      "columnCount_one": "sütun",
-      "columnCount": "sütun",
-      "columnCount_other": "sütun",
-      "rowCount_one": "sətir",
-      "rowCount": "sətir",
-      "rowCount_other": "sətir",
-      "opensFullScreen": "tam ekranda açılır"
-    },
     "sessionFilter": {
       "title": "Sessiyaları filtrlə",
       "platformCloud": "Bulud",
@@ -2583,7 +2569,6 @@
       "linkActions": "Keçidlə əməliyyatlar",
       "couldNotCopyLink": "Keçidi kopyalamaq mümkün olmadı.",
       "couldNotShareLink": "Keçidi paylaşmaq mümkün olmadı.",
-      "opensInBrowser": "Brauzerdə açılır",
       "showLinkActions": "Keçidlə əməliyyatları göstər"
     },
     "compaction": {

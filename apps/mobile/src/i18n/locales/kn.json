@@ -2476,20 +2476,6 @@
       "unavailable": "ಹಿಂದಿನ ಸಂದೇಶಗಳು ಲಭ್ಯವಿಲ್ಲ.",
       "tooLarge": "ಹಿಂದಿನ ಸಂದೇಶಗಳ ಗಾತ್ರ ತುಂಬಾ ದೊಡ್ಡದಿರುವುದರಿಂದ ಅವುಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ."
     },
-    "markdownTable": {
-      "viewTable": "ಕೋಷ್ಟಕ ನೋಡಿ",
-      "title": "ಕೋಷ್ಟಕ",
-      "close": "ಕೋಷ್ಟಕ ಮುಚ್ಚಿ",
-      "loading": "ಕೋಷ್ಟಕ ಲೋಡ್ ಆಗುತ್ತಿದೆ",
-      "empty": "ಈ ಕೋಷ್ಟಕದಲ್ಲಿ ಸಾಲುಗಳಿಲ್ಲ.",
-      "columnCount_one": "ಅಂಕಣ",
-      "columnCount": "ಅಂಕಣಗಳು",
-      "columnCount_other": "ಅಂಕಣಗಳು",
-      "rowCount_one": "ಸಾಲು",
-      "rowCount": "ಸಾಲುಗಳು",
-      "rowCount_other": "ಸಾಲುಗಳು",
-      "opensFullScreen": "ಪೂರ್ಣ ಪರದೆಯಲ್ಲಿ ತೆರೆಯುತ್ತದೆ"
-    },
     "sessionFilter": {
       "title": "ಸೆಶನ್‌ಗಳನ್ನು ಫಿಲ್ಟರ್ ಮಾಡಿ",
       "platformCloud": "ಕ್ಲೌಡ್",
@@ -2583,7 +2569,6 @@
       "linkActions": "ಲಿಂಕ್ ಕ್ರಿಯೆಗಳು",
       "couldNotCopyLink": "ಲಿಂಕ್ ನಕಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotShareLink": "ಲಿಂಕ್ ಹಂಚಿಕೊಳ್ಳಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "opensInBrowser": "ಬ್ರೌಸರ್‌ನಲ್ಲಿ ತೆರೆಯುತ್ತದೆ",
       "showLinkActions": "ಲಿಂಕ್ ಕ್ರಿಯೆಗಳನ್ನು ತೋರಿಸಿ"
     },
     "compaction": {

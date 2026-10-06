@@ -2476,20 +2476,6 @@
       "unavailable": "Tidligere beskeder er ikke tilgængelige.",
       "tooLarge": "Tidligere beskeder er for store til at indlæse."
     },
-    "markdownTable": {
-      "viewTable": "Vis tabel",
-      "title": "Tabel",
-      "close": "Luk tabel",
-      "loading": "Indlæser tabel",
-      "empty": "Denne tabel har ingen rækker.",
-      "columnCount_one": "kolonne",
-      "columnCount": "kolonner",
-      "columnCount_other": "kolonner",
-      "rowCount_one": "række",
-      "rowCount": "rækker",
-      "rowCount_other": "rækker",
-      "opensFullScreen": "åbner i fuld skærm"
-    },
     "sessionFilter": {
       "title": "Filtrér sessioner",
       "platformCloud": "Skyen",
@@ -2583,7 +2569,6 @@
       "linkActions": "Handlinger for link",
       "couldNotCopyLink": "Kunne ikke kopiere linket.",
       "couldNotShareLink": "Kunne ikke dele linket.",
-      "opensInBrowser": "Åbnes i browseren",
       "showLinkActions": "Vis handlinger for linket"
     },
     "compaction": {

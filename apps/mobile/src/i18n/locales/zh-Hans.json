@@ -1963,20 +1963,6 @@
       "unavailable": "无法查看较早的消息。",
       "tooLarge": "较早的消息数据量过大，无法加载。"
     },
-    "markdownTable": {
-      "viewTable": "查看表格",
-      "title": "表格",
-      "close": "关闭表格",
-      "loading": "正在加载表格",
-      "empty": "此表格没有任何行。",
-      "columnCount_one": "列",
-      "columnCount": "列",
-      "columnCount_other": "列",
-      "rowCount_one": "行",
-      "rowCount": "行",
-      "rowCount_other": "行",
-      "opensFullScreen": "全屏打开"
-    },
     "sessionFilter": {
       "title": "筛选会话",
       "platformCloud": "云端",
@@ -2070,7 +2056,6 @@
       "linkActions": "链接操作",
       "couldNotCopyLink": "无法复制链接。",
       "couldNotShareLink": "无法分享链接。",
-      "opensInBrowser": "在浏览器中打开",
       "showLinkActions": "显示链接操作"
     },
     "compaction": {

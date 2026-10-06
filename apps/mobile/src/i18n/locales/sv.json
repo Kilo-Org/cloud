@@ -2476,20 +2476,6 @@
       "unavailable": "Tidigare meddelanden är inte tillgängliga.",
       "tooLarge": "Tidigare meddelanden är för stora för att läsas in."
     },
-    "markdownTable": {
-      "viewTable": "Visa tabell",
-      "title": "Tabell",
-      "close": "Stäng tabell",
-      "loading": "Läser in tabell",
-      "empty": "Den här tabellen har inga rader.",
-      "columnCount_one": "kolumn",
-      "columnCount": "kolumner",
-      "columnCount_other": "kolumner",
-      "rowCount_one": "rad",
-      "rowCount": "rader",
-      "rowCount_other": "rader",
-      "opensFullScreen": "öppnas i helskärm"
-    },
     "sessionFilter": {
       "title": "Filtrera sessioner",
       "platformCloud": "Molnet",
@@ -2583,7 +2569,6 @@
       "linkActions": "Länkåtgärder",
       "couldNotCopyLink": "Det gick inte att kopiera länken.",
       "couldNotShareLink": "Det gick inte att dela länken.",
-      "opensInBrowser": "Öppnas i webbläsaren",
       "showLinkActions": "Visa länkåtgärder"
     },
     "compaction": {

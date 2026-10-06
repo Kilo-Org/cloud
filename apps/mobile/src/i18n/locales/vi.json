@@ -1963,20 +1963,6 @@
       "unavailable": "Không thể truy cập các tin nhắn trước đó.",
       "tooLarge": "Các tin nhắn trước đó có dung lượng quá lớn nên không thể tải."
     },
-    "markdownTable": {
-      "viewTable": "Xem bảng",
-      "title": "Bảng",
-      "close": "Đóng bảng",
-      "loading": "Đang tải bảng",
-      "empty": "Bảng này không có hàng nào.",
-      "columnCount_one": "cột",
-      "columnCount": "cột",
-      "columnCount_other": "cột",
-      "rowCount_one": "hàng",
-      "rowCount": "hàng",
-      "rowCount_other": "hàng",
-      "opensFullScreen": "mở toàn màn hình"
-    },
     "sessionFilter": {
       "title": "Lọc phiên",
       "platformCloud": "Đám mây",
@@ -2070,7 +2056,6 @@
       "linkActions": "Thao tác với liên kết",
       "couldNotCopyLink": "Không thể sao chép liên kết.",
       "couldNotShareLink": "Không thể chia sẻ liên kết.",
-      "opensInBrowser": "Mở trong trình duyệt",
       "showLinkActions": "Hiển thị các thao tác với liên kết"
     },
     "compaction": {

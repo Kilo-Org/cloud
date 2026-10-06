@@ -2608,28 +2608,6 @@
       "omitted_few": "Ni ellid arddangos {{displayCount}} eitem cynharach o'r sesiwn hon.",
       "omitted_many": "Ni ellid arddangos {{displayCount}} eitem cynharach o'r sesiwn hon."
     },
-    "markdownTable": {
-      "viewTable": "Gweld y tabl",
-      "title": "Tabl",
-      "close": "Cau'r tabl",
-      "loading": "Yn llwytho'r tabl",
-      "empty": "Nid oes rhesi yn y tabl hwn.",
-      "columnCount_one": "colofn",
-      "columnCount": "colofnau",
-      "columnCount_other": "colofnau",
-      "rowCount_one": "rhes",
-      "rowCount": "rhesi",
-      "rowCount_other": "rhesi",
-      "opensFullScreen": "yn agor ar sgrin lawn",
-      "columnCount_zero": "colofn",
-      "columnCount_two": "golofn",
-      "columnCount_few": "colofn",
-      "columnCount_many": "cholofn",
-      "rowCount_zero": "rhes",
-      "rowCount_two": "res",
-      "rowCount_few": "rhes",
-      "rowCount_many": "rhes"
-    },
     "sessionFilter": {
       "title": "Hidlo sesiynau",
       "platformCloud": "Cwmwl",
@@ -2735,7 +2713,6 @@
       "linkActions": "Gweithredoedd dolen",
       "couldNotCopyLink": "Methu copïo'r ddolen.",
       "couldNotShareLink": "Methu rhannu'r ddolen.",
-      "opensInBrowser": "Yn agor yn y porwr",
       "showLinkActions": "Dangos gweithredoedd y ddolen"
     },
     "compaction": {

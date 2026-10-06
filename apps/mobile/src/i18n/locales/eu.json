@@ -2476,20 +2476,6 @@
       "unavailable": "Aurreko mezuak ez daude erabilgarri.",
       "tooLarge": "Aurreko mezuak handiegiak dira kargatzeko."
     },
-    "markdownTable": {
-      "viewTable": "Ikusi taula",
-      "title": "Taula",
-      "close": "Itxi taula",
-      "loading": "Taula kargatzen",
-      "empty": "Taula honek ez du errenkadarik.",
-      "columnCount_one": "zutabe",
-      "columnCount": "zutabe",
-      "columnCount_other": "zutabe",
-      "rowCount_one": "errenkada",
-      "rowCount": "errenkada",
-      "rowCount_other": "errenkada",
-      "opensFullScreen": "pantaila osoan irekitzen da"
-    },
     "sessionFilter": {
       "title": "Iragazi saioak",
       "platformCloud": "Hodeia",
@@ -2583,7 +2569,6 @@
       "linkActions": "Estekaren ekintzak",
       "couldNotCopyLink": "Ezin izan da esteka kopiatu.",
       "couldNotShareLink": "Ezin izan da esteka partekatu.",
-      "opensInBrowser": "Nabigatzailean irekitzen da",
       "showLinkActions": "Erakutsi estekaren ekintzak"
     },
     "compaction": {

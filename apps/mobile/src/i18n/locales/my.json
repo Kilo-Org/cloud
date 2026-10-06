@@ -2476,20 +2476,6 @@
       "unavailable": "ယခင်မက်ဆေ့ခ်ျများ မရရှိနိုင်ပါ။",
       "tooLarge": "ယခင်မက်ဆေ့ခ်ျများ၏ ဒေတာပမာဏ ကြီးလွန်းသောကြောင့် ရယူ၍မရပါ။"
     },
-    "markdownTable": {
-      "viewTable": "ဇယားကို ကြည့်ပါ",
-      "title": "ဇယား",
-      "close": "ဇယားကို ပိတ်ပါ",
-      "loading": "ဇယားဖွင့်နေသည်",
-      "empty": "ဤဇယားတွင် အတန်းများမရှိပါ။",
-      "columnCount_one": "ကော်လံ",
-      "columnCount": "ကော်လံ",
-      "columnCount_other": "ကော်လံ",
-      "rowCount_one": "အတန်း",
-      "rowCount": "အတန်း",
-      "rowCount_other": "အတန်း",
-      "opensFullScreen": "မျက်နှာပြင်အပြည့် ဖွင့်သည်"
-    },
     "sessionFilter": {
       "title": "စက်ရှင်စစ်ထုတ်ခြင်း",
       "platformCloud": "ကလောက်",
@@ -2583,7 +2569,6 @@
       "linkActions": "လင့်ခ်ဆိုင်ရာ လုပ်ဆောင်ချက်များ",
       "couldNotCopyLink": "လင့်ခ်ကို ကူးယူ၍မရပါ။",
       "couldNotShareLink": "လင့်ခ်ကို မျှဝေ၍မရပါ။",
-      "opensInBrowser": "ဘရောက်ဆာတွင် ဖွင့်သည်",
       "showLinkActions": "လင့်ခ်ဆိုင်ရာ လုပ်ဆောင်ချက်များကို ပြပါ"
     },
     "compaction": {

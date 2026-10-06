@@ -2476,20 +2476,6 @@
       "unavailable": "Tsy azo alaina ny hafatra taloha.",
       "tooLarge": "Lehibe loatra ny hafatra taloha ka tsy azo alaina."
     },
-    "markdownTable": {
-      "viewTable": "Jereo ny tabilao",
-      "title": "Tabilao",
-      "close": "Akatony ny tabilao",
-      "loading": "Maka ny tabilao",
-      "empty": "Tsy misy andalana ity tabilao ity.",
-      "columnCount_one": "tsanganana",
-      "columnCount": "tsanganana",
-      "columnCount_other": "tsanganana",
-      "rowCount_one": "andalana",
-      "rowCount": "andalana",
-      "rowCount_other": "andalana",
-      "opensFullScreen": "misokatra amin'ny efijery feno"
-    },
     "sessionFilter": {
       "title": "Sivano ny fotoam-piasana",
       "platformCloud": "An-tserasera",
@@ -2583,7 +2569,6 @@
       "linkActions": "Hetsika amin'ny rohy",
       "couldNotCopyLink": "Tsy voadika ny rohy.",
       "couldNotShareLink": "Tsy voazara ny rohy.",
-      "opensInBrowser": "Misokatra ao amin'ny mpitety tranonkala",
       "showLinkActions": "Asehoy ny hetsika amin'ny rohy"
     },
     "compaction": {

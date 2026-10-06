@@ -1997,24 +1997,6 @@
       "omitted_few": "Не удалось отобразить {{displayCount}} предыдущих элемента этого сеанса.",
       "omitted_many": "Не удалось отобразить {{displayCount}} предыдущих элементов этого сеанса."
     },
-    "markdownTable": {
-      "viewTable": "Просмотреть таблицу",
-      "title": "Таблица",
-      "close": "Закрыть таблицу",
-      "loading": "Загрузка таблицы",
-      "empty": "В этой таблице нет строк.",
-      "columnCount_one": "столбец",
-      "columnCount": "столбца",
-      "columnCount_other": "столбца",
-      "rowCount_one": "строка",
-      "rowCount": "строки",
-      "rowCount_other": "строки",
-      "opensFullScreen": "открывается на весь экран",
-      "columnCount_few": "столбца",
-      "columnCount_many": "столбцов",
-      "rowCount_few": "строки",
-      "rowCount_many": "строк"
-    },
     "sessionFilter": {
       "title": "Фильтр сеансов",
       "platformCloud": "Облако",
@@ -2114,7 +2096,6 @@
       "linkActions": "Действия со ссылкой",
       "couldNotCopyLink": "Не удалось скопировать ссылку.",
       "couldNotShareLink": "Не удалось поделиться ссылкой.",
-      "opensInBrowser": "Открывается в браузере",
       "showLinkActions": "Показать действия со ссылкой"
     },
     "compaction": {

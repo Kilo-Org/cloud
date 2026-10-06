@@ -2476,20 +2476,6 @@
       "unavailable": "Tidligere meldinger er ikke tilgjengelige.",
       "tooLarge": "Tidligere meldinger er for store til å lastes inn."
     },
-    "markdownTable": {
-      "viewTable": "Vis tabell",
-      "title": "Tabell",
-      "close": "Lukk tabell",
-      "loading": "Laster inn tabell",
-      "empty": "Denne tabellen har ingen rader.",
-      "columnCount_one": "kolonne",
-      "columnCount": "kolonner",
-      "columnCount_other": "kolonner",
-      "rowCount_one": "rad",
-      "rowCount": "rader",
-      "rowCount_other": "rader",
-      "opensFullScreen": "åpnes i fullskjerm"
-    },
     "sessionFilter": {
       "title": "Filtrer økter",
       "platformCloud": "Sky",
@@ -2583,7 +2569,6 @@
       "linkActions": "Handlinger for lenke",
       "couldNotCopyLink": "Kunne ikke kopiere lenken.",
       "couldNotShareLink": "Kunne ikke dele lenken.",
-      "opensInBrowser": "Åpnes i nettleseren",
       "showLinkActions": "Vis handlinger for lenken"
     },
     "compaction": {

@@ -2476,20 +2476,6 @@
       "unavailable": "Τα προηγούμενα μηνύματα δεν είναι διαθέσιμα.",
       "tooLarge": "Τα προηγούμενα μηνύματα είναι πολύ μεγάλα για φόρτωση."
     },
-    "markdownTable": {
-      "viewTable": "Προβολή πίνακα",
-      "title": "Πίνακας",
-      "close": "Κλείσιμο πίνακα",
-      "loading": "Φόρτωση πίνακα",
-      "empty": "Αυτός ο πίνακας δεν έχει γραμμές.",
-      "columnCount_one": "στήλη",
-      "columnCount": "στήλες",
-      "columnCount_other": "στήλες",
-      "rowCount_one": "γραμμή",
-      "rowCount": "γραμμές",
-      "rowCount_other": "γραμμές",
-      "opensFullScreen": "ανοίγει σε πλήρη οθόνη"
-    },
     "sessionFilter": {
       "title": "Φιλτράρισμα συνεδριών",
       "platformCloud": "Νέφος",
@@ -2583,7 +2569,6 @@
       "linkActions": "Ενέργειες συνδέσμου",
       "couldNotCopyLink": "Δεν ήταν δυνατή η αντιγραφή του συνδέσμου.",
       "couldNotShareLink": "Δεν ήταν δυνατή η κοινή χρήση του συνδέσμου.",
-      "opensInBrowser": "Ανοίγει στο πρόγραμμα περιήγησης",
       "showLinkActions": "Εμφάνιση ενεργειών συνδέσμου"
     },
     "compaction": {

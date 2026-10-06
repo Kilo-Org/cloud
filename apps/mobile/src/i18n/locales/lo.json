@@ -2476,20 +2476,6 @@
       "unavailable": "ຂໍ້ຄວາມກ່ອນໜ້າບໍ່ມີໃຫ້ເບິ່ງແລ້ວ.",
       "tooLarge": "ຂໍ້ຄວາມກ່ອນໜ້າມີຂະໜາດໃຫຍ່ເກີນກວ່າຈະໂຫຼດໄດ້."
     },
-    "markdownTable": {
-      "viewTable": "ເບິ່ງຕາຕະລາງ",
-      "title": "ຕາຕະລາງ",
-      "close": "ປິດຕາຕະລາງ",
-      "loading": "ກຳລັງໂຫຼດຕາຕະລາງ",
-      "empty": "ຕາຕະລາງນີ້ບໍ່ມີແຖວ.",
-      "columnCount_one": "ຖັນ",
-      "columnCount": "ຖັນ",
-      "columnCount_other": "ຖັນ",
-      "rowCount_one": "ແຖວ",
-      "rowCount": "ແຖວ",
-      "rowCount_other": "ແຖວ",
-      "opensFullScreen": "ເປີດແບບເຕັມຈໍ"
-    },
     "sessionFilter": {
       "title": "ກັ່ນຕອງເຊດຊັນ",
       "platformCloud": "ຄລາວ",
@@ -2583,7 +2569,6 @@
       "linkActions": "ການຈັດການລິ້ງ",
       "couldNotCopyLink": "ບໍ່ສາມາດຄັດລອກລິ້ງໄດ້.",
       "couldNotShareLink": "ບໍ່ສາມາດແບ່ງປັນລິ້ງໄດ້.",
-      "opensInBrowser": "ເປີດໃນບຣາວເຊີ",
       "showLinkActions": "ສະແດງຕົວເລືອກສຳລັບລິ້ງ"
     },
     "compaction": {

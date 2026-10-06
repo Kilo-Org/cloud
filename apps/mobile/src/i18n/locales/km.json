@@ -2476,20 +2476,6 @@
       "unavailable": "មិនអាចចូលមើលសារមុនៗបានទេ។",
       "tooLarge": "សារមុនៗមានទំហំធំពេក មិនអាចផ្ទុកបានទេ។"
     },
-    "markdownTable": {
-      "viewTable": "មើលតារាង",
-      "title": "តារាង",
-      "close": "បិទតារាង",
-      "loading": "កំពុងផ្ទុកតារាង",
-      "empty": "តារាងនេះគ្មានជួរដេកទេ។",
-      "columnCount_one": "ជួរឈរ",
-      "columnCount": "ជួរឈរ",
-      "columnCount_other": "ជួរឈរ",
-      "rowCount_one": "ជួរដេក",
-      "rowCount": "ជួរដេក",
-      "rowCount_other": "ជួរដេក",
-      "opensFullScreen": "បើកពេញអេក្រង់"
-    },
     "sessionFilter": {
       "title": "ត្រងវគ្គ",
       "platformCloud": "ក្លោដ",
@@ -2583,7 +2569,6 @@
       "linkActions": "សកម្មភាពតំណ",
       "couldNotCopyLink": "មិនអាចចម្លងតំណបានទេ។",
       "couldNotShareLink": "មិនអាចចែករំលែកតំណបានទេ។",
-      "opensInBrowser": "បើកក្នុងកម្មវិធីរុករក",
       "showLinkActions": "បង្ហាញសកម្មភាពតំណ"
     },
     "compaction": {

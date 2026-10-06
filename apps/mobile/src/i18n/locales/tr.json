@@ -1963,20 +1963,6 @@
       "unavailable": "Önceki mesajlar kullanılamıyor.",
       "tooLarge": "Önceki mesajlar yüklenemeyecek kadar büyük."
     },
-    "markdownTable": {
-      "viewTable": "Tabloyu görüntüle",
-      "title": "Tablo",
-      "close": "Tabloyu kapat",
-      "loading": "Tablo yükleniyor",
-      "empty": "Bu tabloda hiç satır yok.",
-      "columnCount_one": "sütun",
-      "columnCount": "sütun",
-      "columnCount_other": "sütun",
-      "rowCount_one": "satır",
-      "rowCount": "satır",
-      "rowCount_other": "satır",
-      "opensFullScreen": "tam ekranda açılır"
-    },
     "sessionFilter": {
       "title": "Oturum filtresi",
       "platformCloud": "Bulut",
@@ -2070,7 +2056,6 @@
       "linkActions": "Bağlantı işlemleri",
       "couldNotCopyLink": "Bağlantı kopyalanamadı.",
       "couldNotShareLink": "Bağlantı paylaşılamadı.",
-      "opensInBrowser": "Tarayıcıda açılır",
       "showLinkActions": "Bağlantı işlemlerini göster"
     },
     "compaction": {

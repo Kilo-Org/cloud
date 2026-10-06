@@ -2476,20 +2476,6 @@
       "unavailable": "पहिलेका सन्देशहरू उपलब्ध छैनन्।",
       "tooLarge": "पहिलेका सन्देशहरू लोड गर्न धेरै ठूला छन्।"
     },
-    "markdownTable": {
-      "viewTable": "तालिका हेर्नुहोस्",
-      "title": "तालिका",
-      "close": "तालिका बन्द गर्नुहोस्",
-      "loading": "तालिका लोड गर्दै",
-      "empty": "यो तालिकामा कुनै पङ्क्ति छैन।",
-      "columnCount_one": "स्तम्भ",
-      "columnCount": "स्तम्भ",
-      "columnCount_other": "स्तम्भ",
-      "rowCount_one": "पङ्क्ति",
-      "rowCount": "पङ्क्ति",
-      "rowCount_other": "पङ्क्ति",
-      "opensFullScreen": "पूर्ण स्क्रिनमा खुल्छ"
-    },
     "sessionFilter": {
       "title": "सत्र फिल्टर",
       "platformCloud": "क्लाउड",
@@ -2583,7 +2569,6 @@
       "linkActions": "लिङ्कका विकल्पहरू",
       "couldNotCopyLink": "लिङ्क प्रतिलिपि गर्न सकिएन।",
       "couldNotShareLink": "लिङ्क साझा गर्न सकिएन।",
-      "opensInBrowser": "ब्राउजरमा खुल्छ",
       "showLinkActions": "लिङ्कका विकल्पहरू देखाउनुहोस्"
     },
     "compaction": {

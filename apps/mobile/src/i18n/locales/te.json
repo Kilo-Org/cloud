@@ -2476,20 +2476,6 @@
       "unavailable": "మునుపటి సందేశాలు అందుబాటులో లేవు.",
       "tooLarge": "మునుపటి సందేశాల పరిమాణం చాలా పెద్దగా ఉండటంతో వాటిని లోడ్ చేయలేము."
     },
-    "markdownTable": {
-      "viewTable": "పట్టికను చూడండి",
-      "title": "పట్టిక",
-      "close": "పట్టికను మూసివేయండి",
-      "loading": "పట్టిక లోడ్ అవుతోంది",
-      "empty": "ఈ పట్టికలో వరుసలు లేవు.",
-      "columnCount_one": "నిలువు వరుస",
-      "columnCount": "నిలువు వరుసలు",
-      "columnCount_other": "నిలువు వరుసలు",
-      "rowCount_one": "వరుస",
-      "rowCount": "వరుసలు",
-      "rowCount_other": "వరుసలు",
-      "opensFullScreen": "పూర్తి స్క్రీన్‌లో తెరుచుకుంటుంది"
-    },
     "sessionFilter": {
       "title": "సెషన్‌లను ఫిల్టర్ చేయండి",
       "platformCloud": "క్లౌడ్",
@@ -2583,7 +2569,6 @@
       "linkActions": "లింక్ చర్యలు",
       "couldNotCopyLink": "లింక్‌ను కాపీ చేయలేకపోయాము.",
       "couldNotShareLink": "లింక్‌ను పంచుకోలేకపోయాము.",
-      "opensInBrowser": "బ్రౌజర్‌లో తెరుచుకుంటుంది",
       "showLinkActions": "లింక్ చర్యలను చూపించండి"
     },
     "compaction": {

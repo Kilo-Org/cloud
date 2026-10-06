@@ -2476,20 +2476,6 @@
       "unavailable": "Vroeëre boodskappe is nie beskikbaar nie.",
       "tooLarge": "Vroeëre boodskappe is te groot om te laai."
     },
-    "markdownTable": {
-      "viewTable": "Bekyk tabel",
-      "title": "Tabel",
-      "close": "Maak tabel toe",
-      "loading": "Laai tabel",
-      "empty": "Hierdie tabel het geen rye nie.",
-      "columnCount_one": "kolom",
-      "columnCount": "kolomme",
-      "columnCount_other": "kolomme",
-      "rowCount_one": "ry",
-      "rowCount": "rye",
-      "rowCount_other": "rye",
-      "opensFullScreen": "maak in volskerm oop"
-    },
     "sessionFilter": {
       "title": "Filtreer sessies",
       "platformCloud": "Wolk",
@@ -2583,7 +2569,6 @@
       "linkActions": "Skakelaksies",
       "couldNotCopyLink": "Die skakel kon nie gekopieer word nie.",
       "couldNotShareLink": "Die skakel kon nie gedeel word nie.",
-      "opensInBrowser": "Maak in die blaaier oop",
       "showLinkActions": "Wys skakelaksies"
     },
     "compaction": {

@@ -2542,24 +2542,6 @@
       "omitted_few": "Не ўдалося паказаць {{displayCount}} ранейшыя элементы гэтага сеанса.",
       "omitted_many": "Не ўдалося паказаць {{displayCount}} ранейшых элементаў гэтага сеанса."
     },
-    "markdownTable": {
-      "viewTable": "Праглядзець табліцу",
-      "title": "Табліца",
-      "close": "Закрыць табліцу",
-      "loading": "Загрузка табліцы",
-      "empty": "У гэтай табліцы няма радкоў.",
-      "columnCount_one": "слупок",
-      "columnCount": "слупка",
-      "columnCount_other": "слупка",
-      "rowCount_one": "радок",
-      "rowCount": "радка",
-      "rowCount_other": "радка",
-      "opensFullScreen": "адкрываецца на ўвесь экран",
-      "columnCount_few": "слупкі",
-      "columnCount_many": "слупкоў",
-      "rowCount_few": "радкі",
-      "rowCount_many": "радкоў"
-    },
     "sessionFilter": {
       "title": "Фільтр сеансаў",
       "platformCloud": "Воблака",
@@ -2659,7 +2641,6 @@
       "linkActions": "Дзеянні са спасылкай",
       "couldNotCopyLink": "Не ўдалося скапіяваць спасылку.",
       "couldNotShareLink": "Не ўдалося падзяліцца спасылкай.",
-      "opensInBrowser": "Адкрываецца ў браўзеры",
       "showLinkActions": "Паказаць дзеянні са спасылкай"
     },
     "compaction": {

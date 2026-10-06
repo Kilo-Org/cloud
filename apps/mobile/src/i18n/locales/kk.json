@@ -2476,20 +2476,6 @@
       "unavailable": "Алдыңғы хабарламалар қолжетімсіз.",
       "tooLarge": "Алдыңғы хабарламалардың көлемі тым үлкен болғандықтан, оларды жүктеу мүмкін емес."
     },
-    "markdownTable": {
-      "viewTable": "Кестені қарау",
-      "title": "Кесте",
-      "close": "Кестені жабу",
-      "loading": "Кесте жүктелуде",
-      "empty": "Бұл кестеде жолдар жоқ.",
-      "columnCount_one": "баған",
-      "columnCount": "баған",
-      "columnCount_other": "баған",
-      "rowCount_one": "жол",
-      "rowCount": "жол",
-      "rowCount_other": "жол",
-      "opensFullScreen": "толық экранда ашылады"
-    },
     "sessionFilter": {
       "title": "Сессияларды сүзу",
       "platformCloud": "Бұлт",
@@ -2583,7 +2569,6 @@
       "linkActions": "Сілтемемен орындалатын әрекеттер",
       "couldNotCopyLink": "Сілтемені көшіру мүмкін болмады.",
       "couldNotShareLink": "Сілтемемен бөлісу мүмкін болмады.",
-      "opensInBrowser": "Браузерде ашылады",
       "showLinkActions": "Сілтемемен орындалатын әрекеттерді көрсету"
     },
     "compaction": {

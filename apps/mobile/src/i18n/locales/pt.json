@@ -2509,22 +2509,6 @@
       "tooLarge": "As mensagens anteriores são demasiado grandes para serem carregadas.",
       "omitted_many": "{{displayCount}} itens anteriores desta sessão não puderam ser apresentados."
     },
-    "markdownTable": {
-      "viewTable": "Ver tabela",
-      "title": "Tabela",
-      "close": "Fechar tabela",
-      "loading": "A carregar a tabela",
-      "empty": "Esta tabela não tem linhas.",
-      "columnCount_one": "coluna",
-      "columnCount": "colunas",
-      "columnCount_other": "colunas",
-      "rowCount_one": "linha",
-      "rowCount": "linhas",
-      "rowCount_other": "linhas",
-      "opensFullScreen": "abre em ecrã inteiro",
-      "columnCount_many": "colunas",
-      "rowCount_many": "linhas"
-    },
     "sessionFilter": {
       "title": "Filtrar sessões",
       "platformCloud": "Nuvem",
@@ -2621,7 +2605,6 @@
       "linkActions": "Ações da ligação",
       "couldNotCopyLink": "Não foi possível copiar a ligação.",
       "couldNotShareLink": "Não foi possível partilhar a ligação.",
-      "opensInBrowser": "Abre no navegador",
       "showLinkActions": "Mostrar ações da ligação"
     },
     "compaction": {

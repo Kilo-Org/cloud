@@ -2476,20 +2476,6 @@
       "unavailable": "По-ранните съобщения не са налични.",
       "tooLarge": "По-ранните съобщения са твърде големи, за да се заредят."
     },
-    "markdownTable": {
-      "viewTable": "Прегледай таблицата",
-      "title": "Таблица",
-      "close": "Затвори таблицата",
-      "loading": "Зареждане на таблицата",
-      "empty": "Тази таблица няма редове.",
-      "columnCount_one": "колона",
-      "columnCount": "колони",
-      "columnCount_other": "колони",
-      "rowCount_one": "ред",
-      "rowCount": "реда",
-      "rowCount_other": "реда",
-      "opensFullScreen": "отваря се на цял екран"
-    },
     "sessionFilter": {
       "title": "Филтриране на сесии",
       "platformCloud": "Облак",
@@ -2583,7 +2569,6 @@
       "linkActions": "Действия с връзката",
       "couldNotCopyLink": "Не успяхме да копираме връзката.",
       "couldNotShareLink": "Не успяхме да споделим връзката.",
-      "opensInBrowser": "Отваря се в браузъра",
       "showLinkActions": "Покажи действията с връзката"
     },
     "compaction": {

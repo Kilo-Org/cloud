@@ -2476,20 +2476,6 @@
       "unavailable": "Ba a samun saƙonnin da suka gabata.",
       "tooLarge": "Saƙonnin da suka gabata sun yi girma fiye da yadda za a iya loda su."
     },
-    "markdownTable": {
-      "viewTable": "Duba jadawali",
-      "title": "Jadawali",
-      "close": "Rufe jadawali",
-      "loading": "Ana loda jadawali",
-      "empty": "Wannan jadawalin ba shi da layuka.",
-      "columnCount_one": "shafi",
-      "columnCount": "ginshiƙai",
-      "columnCount_other": "ginshiƙai",
-      "rowCount_one": "layi",
-      "rowCount": "layuka",
-      "rowCount_other": "layuka",
-      "opensFullScreen": "yana buɗewa a cikakken allo"
-    },
     "sessionFilter": {
       "title": "Tace zamanni",
       "platformCloud": "Gajimare",
@@ -2583,7 +2569,6 @@
       "linkActions": "Ayyukan mahaɗi",
       "couldNotCopyLink": "An kasa yin kwafin mahaɗin.",
       "couldNotShareLink": "An kasa raba mahaɗin.",
-      "opensInBrowser": "Yana buɗewa a burauza",
       "showLinkActions": "Nuna ayyukan mahaɗi"
     },
     "compaction": {

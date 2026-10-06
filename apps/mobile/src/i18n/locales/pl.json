@@ -1997,24 +1997,6 @@
       "omitted_few": "Nie udało się wyświetlić {{displayCount}} wcześniejszych elementów tej sesji.",
       "omitted_many": "Nie udało się wyświetlić {{displayCount}} wcześniejszych elementów tej sesji."
     },
-    "markdownTable": {
-      "viewTable": "Wyświetl tabelę",
-      "title": "Tabela",
-      "close": "Zamknij tabelę",
-      "loading": "Wczytywanie tabeli",
-      "empty": "Ta tabela nie ma wierszy.",
-      "columnCount_one": "kolumna",
-      "columnCount": "kolumny",
-      "columnCount_other": "kolumny",
-      "rowCount_one": "wiersz",
-      "rowCount": "wiersza",
-      "rowCount_other": "wiersza",
-      "opensFullScreen": "otwiera na pełnym ekranie",
-      "columnCount_few": "kolumny",
-      "columnCount_many": "kolumn",
-      "rowCount_few": "wiersze",
-      "rowCount_many": "wierszy"
-    },
     "sessionFilter": {
       "title": "Filtrowanie sesji",
       "platformCloud": "Chmura",
@@ -2114,7 +2096,6 @@
       "linkActions": "Opcje linku",
       "couldNotCopyLink": "Nie udało się skopiować linku.",
       "couldNotShareLink": "Nie udało się udostępnić linku.",
-      "opensInBrowser": "Otwiera w przeglądarce",
       "showLinkActions": "Pokaż opcje linku"
     },
     "compaction": {

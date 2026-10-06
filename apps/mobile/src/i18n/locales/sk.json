@@ -2542,24 +2542,6 @@
       "omitted_few": "{{displayCount}} staršie položky z tejto relácie sa nepodarilo zobraziť.",
       "omitted_many": "{{displayCount}} staršej položky z tejto relácie sa nepodarilo zobraziť."
     },
-    "markdownTable": {
-      "viewTable": "Zobraziť tabuľku",
-      "title": "Tabuľka",
-      "close": "Zavrieť tabuľku",
-      "loading": "Načítava sa tabuľka",
-      "empty": "Táto tabuľka nemá žiadne riadky.",
-      "columnCount_one": "stĺpec",
-      "columnCount": "stĺpcov",
-      "columnCount_other": "stĺpcov",
-      "rowCount_one": "riadok",
-      "rowCount": "riadkov",
-      "rowCount_other": "riadkov",
-      "opensFullScreen": "otvorí sa na celú obrazovku",
-      "columnCount_few": "stĺpce",
-      "columnCount_many": "stĺpca",
-      "rowCount_few": "riadky",
-      "rowCount_many": "riadka"
-    },
     "sessionFilter": {
       "title": "Filtrovať relácie",
       "platformCloud": "Cloudové prostredie",
@@ -2659,7 +2641,6 @@
       "linkActions": "Akcie s odkazom",
       "couldNotCopyLink": "Odkaz sa nepodarilo skopírovať.",
       "couldNotShareLink": "Odkaz sa nepodarilo zdieľať.",
-      "opensInBrowser": "Otvorí sa v prehliadači",
       "showLinkActions": "Zobraziť akcie s odkazom"
     },
     "compaction": {

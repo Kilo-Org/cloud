@@ -2542,24 +2542,6 @@
       "omitted_two": "{{displayCount}} prejšnjih elementov te seje ni bilo mogoče prikazati.",
       "omitted_few": "{{displayCount}} prejšnjih elementov te seje ni bilo mogoče prikazati."
     },
-    "markdownTable": {
-      "viewTable": "Prikaži tabelo",
-      "title": "Tabela",
-      "close": "Zapri tabelo",
-      "loading": "Nalaganje tabele",
-      "empty": "Ta tabela nima vrstic.",
-      "columnCount_one": "stolpec",
-      "columnCount": "stolpcev",
-      "columnCount_other": "stolpcev",
-      "rowCount_one": "vrstica",
-      "rowCount": "vrstic",
-      "rowCount_other": "vrstic",
-      "opensFullScreen": "odpre celozaslonski prikaz",
-      "columnCount_two": "stolpca",
-      "columnCount_few": "stolpci",
-      "rowCount_two": "vrstici",
-      "rowCount_few": "vrstice"
-    },
     "sessionFilter": {
       "title": "Filtriranje sej",
       "platformCloud": "Oblak",
@@ -2659,7 +2641,6 @@
       "linkActions": "Dejanja za povezavo",
       "couldNotCopyLink": "Povezave ni bilo mogoče kopirati.",
       "couldNotShareLink": "Povezave ni bilo mogoče deliti.",
-      "opensInBrowser": "Odpre se v brskalniku",
       "showLinkActions": "Prikaži dejanja za povezavo"
     },
     "compaction": {

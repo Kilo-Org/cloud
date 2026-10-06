@@ -2476,20 +2476,6 @@
       "unavailable": "અગાઉના સંદેશાઓ ઉપલબ્ધ નથી.",
       "tooLarge": "અગાઉના સંદેશાઓ લોડ કરવા માટે ખૂબ મોટા છે."
     },
-    "markdownTable": {
-      "viewTable": "કોષ્ટક જુઓ",
-      "title": "કોષ્ટક",
-      "close": "કોષ્ટક બંધ કરો",
-      "loading": "કોષ્ટક લોડ થઈ રહ્યું છે",
-      "empty": "આ કોષ્ટકમાં કોઈ પંક્તિઓ નથી.",
-      "columnCount_one": "કૉલમ",
-      "columnCount": "કૉલમ",
-      "columnCount_other": "કૉલમ",
-      "rowCount_one": "પંક્તિ",
-      "rowCount": "પંક્તિઓ",
-      "rowCount_other": "પંક્તિઓ",
-      "opensFullScreen": "આખી સ્ક્રીન પર ખુલે છે"
-    },
     "sessionFilter": {
       "title": "સત્રો ફિલ્ટર કરો",
       "platformCloud": "ક્લાઉડ",
@@ -2583,7 +2569,6 @@
       "linkActions": "લિંક માટેના વિકલ્પો",
       "couldNotCopyLink": "લિંકની નકલ કરી શકાઈ નહીં.",
       "couldNotShareLink": "લિંક શેર કરી શકાઈ નહીં.",
-      "opensInBrowser": "બ્રાઉઝરમાં ખુલે છે",
       "showLinkActions": "લિંક માટેના વિકલ્પો બતાવો"
     },
     "compaction": {

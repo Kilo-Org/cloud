@@ -1963,20 +1963,6 @@
       "unavailable": "이전 메시지를 확인할 수 없습니다.",
       "tooLarge": "이전 메시지의 용량이 너무 커서 불러올 수 없습니다."
     },
-    "markdownTable": {
-      "viewTable": "표 보기",
-      "title": "표",
-      "close": "표 닫기",
-      "loading": "표 불러오는 중",
-      "empty": "이 표에는 행이 없습니다.",
-      "columnCount_one": "열",
-      "columnCount": "열",
-      "columnCount_other": "열",
-      "rowCount_one": "행",
-      "rowCount": "행",
-      "rowCount_other": "행",
-      "opensFullScreen": "전체 화면으로 열림"
-    },
     "sessionFilter": {
       "title": "세션 필터링",
       "platformCloud": "클라우드",
@@ -2070,7 +2056,6 @@
       "linkActions": "링크 작업",
       "couldNotCopyLink": "링크를 복사할 수 없습니다.",
       "couldNotShareLink": "링크를 공유할 수 없습니다.",
-      "opensInBrowser": "브라우저에서 열림",
       "showLinkActions": "링크 작업 표시"
     },
     "compaction": {

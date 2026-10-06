@@ -2476,20 +2476,6 @@
       "unavailable": "A korábbi üzenetek nem érhetők el.",
       "tooLarge": "A korábbi üzenetek túl nagyok a betöltéshez."
     },
-    "markdownTable": {
-      "viewTable": "Táblázat megtekintése",
-      "title": "Táblázat",
-      "close": "Táblázat bezárása",
-      "loading": "Táblázat betöltése",
-      "empty": "A táblázat nem tartalmaz sorokat.",
-      "columnCount_one": "oszlop",
-      "columnCount": "oszlop",
-      "columnCount_other": "oszlop",
-      "rowCount_one": "sor",
-      "rowCount": "sor",
-      "rowCount_other": "sor",
-      "opensFullScreen": "teljes képernyőn nyílik meg"
-    },
     "sessionFilter": {
       "title": "Munkamenetek szűrése",
       "platformCloud": "Felhő",
@@ -2583,7 +2569,6 @@
       "linkActions": "A hivatkozás műveletei",
       "couldNotCopyLink": "Nem sikerült másolni a hivatkozást.",
       "couldNotShareLink": "Nem sikerült megosztani a hivatkozást.",
-      "opensInBrowser": "Böngészőben nyílik meg",
       "showLinkActions": "A hivatkozás műveleteinek megjelenítése"
     },
     "compaction": {

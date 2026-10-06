@@ -2476,20 +2476,6 @@
       "unavailable": "پەیامە پێشووەکان بەردەست نین.",
       "tooLarge": "قەبارەی پەیامە پێشووەکان زۆر گەورەیە و ناتوانرێت بار بکرێن."
     },
-    "markdownTable": {
-      "viewTable": "بینینی خشتەکە",
-      "title": "خشتە",
-      "close": "داخستنی خشتەکە",
-      "loading": "بارکردنی خشتەکە",
-      "empty": "ئەم خشتەیە هیچ ڕیزێکی نییە.",
-      "columnCount_one": "ئەستوون",
-      "columnCount": "ستوون",
-      "columnCount_other": "ستوون",
-      "rowCount_one": "ڕیز",
-      "rowCount": "ڕیز",
-      "rowCount_other": "ڕیز",
-      "opensFullScreen": "بە شاشەی تەواو دەکرێتەوە"
-    },
     "sessionFilter": {
       "title": "پاڵاوتنی سێشنەکان",
       "platformCloud": "هەور",
@@ -2583,7 +2569,6 @@
       "linkActions": "کردارەکانی بەستەر",
       "couldNotCopyLink": "نەتوانرا بەستەرەکە کۆپی بکرێت.",
       "couldNotShareLink": "نەتوانرا بەستەرەکە هاوبەش بکرێت.",
-      "opensInBrowser": "لە وێبگەڕدا دەکرێتەوە",
       "showLinkActions": "نیشاندانی کردارەکانی بەستەر"
     },
     "compaction": {

@@ -2476,20 +2476,6 @@
       "unavailable": "മുൻപത്തെ സന്ദേശങ്ങൾ ലഭ്യമല്ല.",
       "tooLarge": "മുമ്പത്തെ സന്ദേശങ്ങളുടെ വലുപ്പം കൂടുതലായതിനാൽ അവ ലോഡ് ചെയ്യാൻ കഴിയില്ല."
     },
-    "markdownTable": {
-      "viewTable": "പട്ടിക കാണുക",
-      "title": "പട്ടിക",
-      "close": "പട്ടിക അടയ്ക്കുക",
-      "loading": "പട്ടിക ലോഡ് ചെയ്യുന്നു",
-      "empty": "ഈ പട്ടികയിൽ വരികളൊന്നുമില്ല.",
-      "columnCount_one": "നിര",
-      "columnCount": "നിരകൾ",
-      "columnCount_other": "നിരകൾ",
-      "rowCount_one": "വരി",
-      "rowCount": "വരികൾ",
-      "rowCount_other": "വരികൾ",
-      "opensFullScreen": "പൂർണ്ണ സ്ക്രീനിൽ തുറക്കുന്നു"
-    },
     "sessionFilter": {
       "title": "സെഷനുകൾ ഫിൽട്ടർ ചെയ്യുക",
       "platformCloud": "ക്ലൗഡ്",
@@ -2583,7 +2569,6 @@
       "linkActions": "ലിങ്ക് പ്രവർത്തനങ്ങൾ",
       "couldNotCopyLink": "ലിങ്ക് പകർത്താൻ കഴിഞ്ഞില്ല.",
       "couldNotShareLink": "ലിങ്ക് പങ്കിടാൻ കഴിഞ്ഞില്ല.",
-      "opensInBrowser": "ബ്രൗസറിൽ തുറക്കുന്നു",
       "showLinkActions": "ലിങ്ക് പ്രവർത്തനങ്ങൾ കാണിക്കുക"
     },
     "compaction": {

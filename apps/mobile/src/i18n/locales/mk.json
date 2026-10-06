@@ -2476,20 +2476,6 @@
       "unavailable": "Постарите пораки не се достапни.",
       "tooLarge": "Постарите пораки се преголеми за да се вчитаат."
     },
-    "markdownTable": {
-      "viewTable": "Прикажи табела",
-      "title": "Табела",
-      "close": "Затвори табела",
-      "loading": "Вчитување табела",
-      "empty": "Оваа табела нема редови.",
-      "columnCount_one": "колона",
-      "columnCount": "колони",
-      "columnCount_other": "колони",
-      "rowCount_one": "ред",
-      "rowCount": "редови",
-      "rowCount_other": "редови",
-      "opensFullScreen": "се отвора на цел екран"
-    },
     "sessionFilter": {
       "title": "Филтри за сесии",
       "platformCloud": "Облак",
@@ -2583,7 +2569,6 @@
       "linkActions": "Дејства за линк",
       "couldNotCopyLink": "Не успеа копирањето на линкот.",
       "couldNotShareLink": "Не успеа споделувањето на линкот.",
-      "opensInBrowser": "Се отвора во прелистувач",
       "showLinkActions": "Прикажи дејства за линк"
     },
     "compaction": {

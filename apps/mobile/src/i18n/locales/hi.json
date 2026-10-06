@@ -1937,20 +1937,6 @@
       "unavailable": "पुराने संदेश उपलब्ध नहीं हैं।",
       "tooLarge": "पुराने संदेश इतने बड़े हैं कि उन्हें लोड नहीं किया जा सकता।"
     },
-    "markdownTable": {
-      "viewTable": "तालिका देखें",
-      "title": "तालिका",
-      "close": "तालिका बंद करें",
-      "loading": "तालिका लोड हो रही है",
-      "empty": "इस तालिका में कोई पंक्ति नहीं है।",
-      "columnCount_one": "कॉलम",
-      "columnCount": "कॉलम",
-      "columnCount_other": "कॉलम",
-      "rowCount_one": "पंक्ति",
-      "rowCount": "पंक्तियाँ",
-      "rowCount_other": "पंक्तियाँ",
-      "opensFullScreen": "पूरी स्क्रीन पर खुलता है"
-    },
     "sessionFilter": {
       "title": "सत्र फ़िल्टर करें",
       "platformCloud": "क्लाउड",
@@ -2037,7 +2023,6 @@
       "linkActions": "लिंक के विकल्प",
       "couldNotCopyLink": "लिंक कॉपी नहीं हो सका।",
       "couldNotShareLink": "लिंक साझा नहीं हो सका।",
-      "opensInBrowser": "ब्राउज़र में खुलता है",
       "showLinkActions": "लिंक के विकल्प दिखाएँ"
     },
     "compaction": {

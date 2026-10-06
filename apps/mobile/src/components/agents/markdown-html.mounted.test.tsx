@@ -86,16 +86,6 @@ const rnStub = vi.hoisted(() => {
 });
 
 vi.mock('react-native', () => rnStub);
-// The library's index pulls react-native-svg; its lexer export is literally
-// marked.lexer (see dist/commonjs/index.js), so this mock is behavior-identical.
-vi.mock('react-native-marked', async () => {
-  const { marked } = await import('marked');
-  return {
-    MarkedLexer: (value: string) => marked.lexer(value, { gfm: true }),
-    useMarkdown: () => [],
-    Renderer: class {},
-  };
-});
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
 vi.mock('./markdown-link-confirm', () => ({
   confirmAndOpenMarkdownLink: vi.fn(),
@@ -110,7 +100,6 @@ const palette: MarkdownPalette = {
   mutedTextColor: '#666666',
   codeBackground: '#eeeeee',
   borderColor: '#cccccc',
-  surfaceColor: '#ffffff',
 };
 
 function flattenStyle(style: unknown): Record<string, unknown>[] {

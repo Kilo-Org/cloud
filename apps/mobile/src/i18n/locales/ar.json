@@ -2031,28 +2031,6 @@
       "omitted_few": "تعذّر عرض {{displayCount}} من العناصر السابقة في هذه الجلسة.",
       "omitted_many": "تعذّر عرض {{displayCount}} عنصرًا سابقًا من هذه الجلسة."
     },
-    "markdownTable": {
-      "viewTable": "عرض الجدول",
-      "title": "الجدول",
-      "close": "إغلاق الجدول",
-      "loading": "جارٍ تحميل الجدول",
-      "empty": "لا يحتوي هذا الجدول على صفوف.",
-      "columnCount_one": "عمود",
-      "columnCount": "عمود",
-      "columnCount_other": "عمود",
-      "rowCount_one": "صف",
-      "rowCount": "صف",
-      "rowCount_other": "صف",
-      "opensFullScreen": "يُفتح بملء الشاشة",
-      "columnCount_zero": "عمود",
-      "columnCount_two": "عمودان",
-      "columnCount_few": "أعمدة",
-      "columnCount_many": "عمودًا",
-      "rowCount_zero": "صف",
-      "rowCount_two": "صفّان",
-      "rowCount_few": "صفوف",
-      "rowCount_many": "صفًّا"
-    },
     "sessionFilter": {
       "title": "تصفية الجلسات",
       "platformCloud": "السحابة",
@@ -2158,7 +2136,6 @@
       "linkActions": "إجراءات الرابط",
       "couldNotCopyLink": "تعذّر نسخ الرابط.",
       "couldNotShareLink": "تعذّرت مشاركة الرابط.",
-      "opensInBrowser": "يُفتح في المتصفح",
       "showLinkActions": "عرض إجراءات الرابط"
     },
     "compaction": {

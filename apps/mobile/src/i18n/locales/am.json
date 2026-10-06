@@ -2476,20 +2476,6 @@
       "unavailable": "የቀደሙ መልእክቶች አይገኙም።",
       "tooLarge": "የቀደሙ መልእክቶች ለመጫን በጣም ትልቅ ናቸው።"
     },
-    "markdownTable": {
-      "viewTable": "ሰንጠረዡን ይመልከቱ",
-      "title": "ሰንጠረዥ",
-      "close": "ሰንጠረዡን ይዝጉ",
-      "loading": "ሰንጠረዡን በመጫን ላይ",
-      "empty": "ይህ ሰንጠረዥ ምንም ረድፍ የለውም።",
-      "columnCount_one": "ዓምድ",
-      "columnCount": "ዓምዶች",
-      "columnCount_other": "ዓምዶች",
-      "rowCount_one": "ረድፍ",
-      "rowCount": "ረድፎች",
-      "rowCount_other": "ረድፎች",
-      "opensFullScreen": "በሙሉ ማያ ገጽ ይከፈታል"
-    },
     "sessionFilter": {
       "title": "የክፍለ ጊዜ ማጣሪያ",
       "platformCloud": "ክላውድ",
@@ -2583,7 +2569,6 @@
       "linkActions": "የአገናኝ ተግባራት",
       "couldNotCopyLink": "አገናኙን መቅዳት አልተቻለም።",
       "couldNotShareLink": "አገናኙን ማጋራት አልተቻለም።",
-      "opensInBrowser": "በአሳሽ ውስጥ ይከፈታል",
       "showLinkActions": "የአገናኝ ተግባራትን ያሳዩ"
     },
     "compaction": {

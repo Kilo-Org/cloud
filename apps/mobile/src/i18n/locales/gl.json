@@ -2476,20 +2476,6 @@
       "unavailable": "As mensaxes anteriores non están dispoñibles.",
       "tooLarge": "As mensaxes anteriores son demasiado grandes para cargalas."
     },
-    "markdownTable": {
-      "viewTable": "Ver a táboa",
-      "title": "Táboa",
-      "close": "Pechar a táboa",
-      "loading": "Cargando a táboa",
-      "empty": "Esta táboa non ten filas.",
-      "columnCount_one": "columna",
-      "columnCount": "columnas",
-      "columnCount_other": "columnas",
-      "rowCount_one": "fila",
-      "rowCount": "filas",
-      "rowCount_other": "filas",
-      "opensFullScreen": "ábrese a pantalla completa"
-    },
     "sessionFilter": {
       "title": "Filtrar sesións",
       "platformCloud": "Nube",
@@ -2583,7 +2569,6 @@
       "linkActions": "Accións da ligazón",
       "couldNotCopyLink": "Non se puido copiar a ligazón.",
       "couldNotShareLink": "Non se puido compartir a ligazón.",
-      "opensInBrowser": "Ábrese no navegador",
       "showLinkActions": "Mostrar accións da ligazón"
     },
     "compaction": {

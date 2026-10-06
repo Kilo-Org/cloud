@@ -2476,20 +2476,6 @@
       "unavailable": "Eldri skilaboð eru ekki tiltæk.",
       "tooLarge": "Eldri skilaboðin eru of stór til að hægt sé að hlaða þeim."
     },
-    "markdownTable": {
-      "viewTable": "Skoða töflu",
-      "title": "Tafla",
-      "close": "Loka töflu",
-      "loading": "Hleður töflunni",
-      "empty": "Engar línur eru í þessari töflu.",
-      "columnCount_one": "dálkur",
-      "columnCount": "dálkar",
-      "columnCount_other": "dálkar",
-      "rowCount_one": "lína",
-      "rowCount": "línur",
-      "rowCount_other": "línur",
-      "opensFullScreen": "opnast á öllum skjánum"
-    },
     "sessionFilter": {
       "title": "Sía lotur",
       "platformCloud": "Ský",
@@ -2583,7 +2569,6 @@
       "linkActions": "Aðgerðir fyrir tengil",
       "couldNotCopyLink": "Ekki tókst að afrita tengilinn.",
       "couldNotShareLink": "Ekki tókst að deila tenglinum.",
-      "opensInBrowser": "Opnast í vafra",
       "showLinkActions": "Sýna aðgerðir fyrir tengil"
     },
     "compaction": {

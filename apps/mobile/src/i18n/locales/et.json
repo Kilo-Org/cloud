@@ -2476,20 +2476,6 @@
       "unavailable": "Varasemad sõnumid pole saadaval.",
       "tooLarge": "Varasemad sõnumid on liiga suured, et neid laadida."
     },
-    "markdownTable": {
-      "viewTable": "Vaata tabelit",
-      "title": "Tabel",
-      "close": "Sulge tabel",
-      "loading": "Tabeli laadimine",
-      "empty": "Selles tabelis ei ole ridu.",
-      "columnCount_one": "veerg",
-      "columnCount": "veergu",
-      "columnCount_other": "veergu",
-      "rowCount_one": "rida",
-      "rowCount": "rida",
-      "rowCount_other": "rida",
-      "opensFullScreen": "avatakse täisekraanil"
-    },
     "sessionFilter": {
       "title": "Filtreeri seansse",
       "platformCloud": "Pilv",
@@ -2583,7 +2569,6 @@
       "linkActions": "Lingi toimingud",
       "couldNotCopyLink": "Linki ei õnnestunud kopeerida.",
       "couldNotShareLink": "Linki ei õnnestunud jagada.",
-      "opensInBrowser": "Avaneb brauseris",
       "showLinkActions": "Näita lingi toiminguid"
     },
     "compaction": {

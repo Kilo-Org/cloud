@@ -2575,26 +2575,6 @@
       "omitted_few": "Níorbh fhéidir {{displayCount}} mhír níos luaithe ón seisiún seo a thaispeáint.",
       "omitted_many": "Níorbh fhéidir {{displayCount}} mír níos luaithe ón seisiún seo a thaispeáint."
     },
-    "markdownTable": {
-      "viewTable": "Féach ar an tábla",
-      "title": "Tábla",
-      "close": "Dún an tábla",
-      "loading": "Ag lódáil an tábla",
-      "empty": "Níl aon ró sa tábla seo.",
-      "columnCount_one": "cholún",
-      "columnCount": "colún",
-      "columnCount_other": "colún",
-      "rowCount_one": "ró",
-      "rowCount": "ró",
-      "rowCount_other": "ró",
-      "opensFullScreen": "osclaítear ar lánscáileán",
-      "columnCount_two": "cholún",
-      "columnCount_few": "cholún",
-      "columnCount_many": "gcolún",
-      "rowCount_two": "ró",
-      "rowCount_few": "ró",
-      "rowCount_many": "ró"
-    },
     "sessionFilter": {
       "title": "Scag seisiúin",
       "platformCloud": "Scamall",
@@ -2697,7 +2677,6 @@
       "linkActions": "Gníomhartha don nasc",
       "couldNotCopyLink": "Níorbh fhéidir an nasc a chóipeáil.",
       "couldNotShareLink": "Níorbh fhéidir an nasc a roinnt.",
-      "opensInBrowser": "Osclaítear sa bhrabhsálaí",
       "showLinkActions": "Taispeáin gníomhartha don nasc"
     },
     "compaction": {

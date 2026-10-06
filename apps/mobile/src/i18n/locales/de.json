@@ -1963,20 +1963,6 @@
       "unavailable": "Frühere Nachrichten sind nicht verfügbar.",
       "tooLarge": "Die früheren Nachrichten sind zu groß, um geladen zu werden."
     },
-    "markdownTable": {
-      "viewTable": "Tabelle ansehen",
-      "title": "Tabelle",
-      "close": "Tabelle schließen",
-      "loading": "Tabelle wird geladen",
-      "empty": "Diese Tabelle hat keine Zeilen.",
-      "columnCount_one": "spalte",
-      "columnCount": "spalten",
-      "columnCount_other": "spalten",
-      "rowCount_one": "zeile",
-      "rowCount": "zeilen",
-      "rowCount_other": "zeilen",
-      "opensFullScreen": "wird im Vollbild geöffnet"
-    },
     "sessionFilter": {
       "title": "Sitzungen filtern",
       "platformCloud": "Cloud-Umgebung",
@@ -2070,7 +2056,6 @@
       "linkActions": "Aktionen für den Link",
       "couldNotCopyLink": "Der Link konnte nicht kopiert werden.",
       "couldNotShareLink": "Der Link konnte nicht geteilt werden.",
-      "opensInBrowser": "Wird im Browser geöffnet",
       "showLinkActions": "Aktionen für den Link anzeigen"
     },
     "compaction": {

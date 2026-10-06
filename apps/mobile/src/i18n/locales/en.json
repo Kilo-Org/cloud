@@ -2503,20 +2503,6 @@
       "unavailable": "Earlier messages aren't available.",
       "tooLarge": "Earlier messages are too large to load."
     },
-    "markdownTable": {
-      "viewTable": "View table",
-      "title": "Table",
-      "close": "Close table",
-      "loading": "Loading table",
-      "empty": "This table has no rows.",
-      "columnCount_one": "column",
-      "columnCount": "columns",
-      "columnCount_other": "columns",
-      "rowCount_one": "row",
-      "rowCount": "rows",
-      "rowCount_other": "rows",
-      "opensFullScreen": "opens full screen"
-    },
     "sessionFilter": {
       "title": "Filter sessions",
       "platformCloud": "Cloud",
@@ -2610,7 +2596,6 @@
       "linkActions": "Link actions",
       "couldNotCopyLink": "Could not copy link",
       "couldNotShareLink": "Could not share link",
-      "opensInBrowser": "Opens in browser",
       "showLinkActions": "Show link actions"
     },
     "markdownLink": {

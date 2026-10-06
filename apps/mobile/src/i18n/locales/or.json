@@ -2476,20 +2476,6 @@
       "unavailable": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଉପଲବ୍ଧ ନାହିଁ।",
       "tooLarge": "ପୁରୁଣା ବାର୍ତ୍ତାଗୁଡ଼ିକ ଏତେ ବଡ଼ ଯେ ଲୋଡ୍ କରିହେଉନାହିଁ।"
     },
-    "markdownTable": {
-      "viewTable": "ଟେବୁଲ ଦେଖନ୍ତୁ",
-      "title": "ଟେବୁଲ",
-      "close": "ଟେବୁଲ ବନ୍ଦ କରନ୍ତୁ",
-      "loading": "ଟେବୁଲ ଲୋଡ୍ ହେଉଛି",
-      "empty": "ଏହି ଟେବୁଲରେ କୌଣସି ଧାଡ଼ି ନାହିଁ।",
-      "columnCount_one": "ସ୍ତମ୍ଭ",
-      "columnCount": "ସ୍ତମ୍ଭ",
-      "columnCount_other": "ସ୍ତମ୍ଭ",
-      "rowCount_one": "ଧାଡ଼ି",
-      "rowCount": "ଧାଡ଼ି",
-      "rowCount_other": "ଧାଡ଼ି",
-      "opensFullScreen": "ପୂରା ସ୍କ୍ରିନରେ ଖୋଲେ"
-    },
     "sessionFilter": {
       "title": "ସେସନ୍ ଫିଲ୍ଟର କରନ୍ତୁ",
       "platformCloud": "କ୍ଲାଉଡ୍",
@@ -2583,7 +2569,6 @@
       "linkActions": "ଲିଙ୍କ ପାଇଁ ବିକଳ୍ପ",
       "couldNotCopyLink": "ଲିଙ୍କ କପି ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotShareLink": "ଲିଙ୍କ ସେୟାର କରି ହେଲା ନାହିଁ।",
-      "opensInBrowser": "ବ୍ରାଉଜରରେ ଖୋଲେ",
       "showLinkActions": "ଲିଙ୍କ ପାଇଁ ବିକଳ୍ପ ଦେଖାନ୍ତୁ"
     },
     "compaction": {

@@ -2476,20 +2476,6 @@
       "unavailable": "Hindi makuha ang mga naunang mensahe.",
       "tooLarge": "Masyadong malaki para i-load ang mga naunang mensahe."
     },
-    "markdownTable": {
-      "viewTable": "Tingnan ang talahanayan",
-      "title": "Talahanayan",
-      "close": "Isara ang talahanayan",
-      "loading": "Nilo-load ang talahanayan",
-      "empty": "Walang hanay ang talahanayang ito.",
-      "columnCount_one": "kolum",
-      "columnCount": "na kolum",
-      "columnCount_other": "na kolum",
-      "rowCount_one": "hanay",
-      "rowCount": "na hanay",
-      "rowCount_other": "na hanay",
-      "opensFullScreen": "bubukas sa buong screen"
-    },
     "sessionFilter": {
       "title": "Salain ang mga sesyon",
       "platformCloud": "Serbisyo sa cloud",
@@ -2583,7 +2569,6 @@
       "linkActions": "Mga aksyon sa link",
       "couldNotCopyLink": "Hindi makopya ang link.",
       "couldNotShareLink": "Hindi maibahagi ang link.",
-      "opensInBrowser": "Bubuksan sa browser",
       "showLinkActions": "Ipakita ang mga aksyon sa link"
     },
     "compaction": {

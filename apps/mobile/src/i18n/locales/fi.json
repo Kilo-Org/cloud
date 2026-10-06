@@ -2476,20 +2476,6 @@
       "unavailable": "Aiemmat viestit eivät ole saatavilla.",
       "tooLarge": "Aiemmat viestit ovat liian suuria ladattaviksi."
     },
-    "markdownTable": {
-      "viewTable": "Näytä taulukko",
-      "title": "Taulukko",
-      "close": "Sulje taulukko",
-      "loading": "Ladataan taulukkoa",
-      "empty": "Tässä taulukossa ei ole rivejä.",
-      "columnCount_one": "sarake",
-      "columnCount": "saraketta",
-      "columnCount_other": "saraketta",
-      "rowCount_one": "rivi",
-      "rowCount": "riviä",
-      "rowCount_other": "riviä",
-      "opensFullScreen": "avautuu koko näytössä"
-    },
     "sessionFilter": {
       "title": "Suodata istuntoja",
       "platformCloud": "Pilvi",
@@ -2583,7 +2569,6 @@
       "linkActions": "Linkin toiminnot",
       "couldNotCopyLink": "Linkkiä ei voitu kopioida.",
       "couldNotShareLink": "Linkkiä ei voitu jakaa.",
-      "opensInBrowser": "Avautuu selaimessa",
       "showLinkActions": "Näytä linkin toiminnot"
     },
     "compaction": {

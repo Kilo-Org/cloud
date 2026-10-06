@@ -2509,22 +2509,6 @@
       "tooLarge": "Mesajele anterioare sunt prea mari pentru a fi încărcate.",
       "omitted_few": "{{displayCount}} elemente anterioare din această sesiune nu au putut fi afișate."
     },
-    "markdownTable": {
-      "viewTable": "Vezi tabelul",
-      "title": "Tabel",
-      "close": "Închide tabelul",
-      "loading": "Se încarcă tabelul",
-      "empty": "Acest tabel nu are rânduri.",
-      "columnCount_one": "coloană",
-      "columnCount": "de coloane",
-      "columnCount_other": "de coloane",
-      "rowCount_one": "rând",
-      "rowCount": "de rânduri",
-      "rowCount_other": "de rânduri",
-      "opensFullScreen": "se deschide pe ecran complet",
-      "columnCount_few": "coloane",
-      "rowCount_few": "rânduri"
-    },
     "sessionFilter": {
       "title": "Filtre pentru sesiuni",
       "platformCloud": "În cloud",
@@ -2621,7 +2605,6 @@
       "linkActions": "Acțiuni pentru link",
       "couldNotCopyLink": "Nu s-a putut copia linkul.",
       "couldNotShareLink": "Nu s-a putut partaja linkul.",
-      "opensInBrowser": "Se deschide în browser",
       "showLinkActions": "Afișează acțiunile pentru link"
     },
     "compaction": {

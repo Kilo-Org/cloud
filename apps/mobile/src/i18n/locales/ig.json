@@ -2476,20 +2476,6 @@
       "unavailable": "Ozi gara aga adịghị.",
       "tooLarge": "Ozi gara aga buru ibu nke ukwuu nke na a pụghị ibudata ha."
     },
-    "markdownTable": {
-      "viewTable": "Lelee tebụl",
-      "title": "Tebụl",
-      "close": "Mechie tebụl",
-      "loading": "Na-ebudata tebụl",
-      "empty": "Tebụl a enweghị ahịrị.",
-      "columnCount_one": "ogidi",
-      "columnCount": "ogidi",
-      "columnCount_other": "ogidi",
-      "rowCount_one": "ahịrị",
-      "rowCount": "ahịrị",
-      "rowCount_other": "ahịrị",
-      "opensFullScreen": "na-emeghe n'ihuenyo zuru ezu"
-    },
     "sessionFilter": {
       "title": "Yọchaa nnọkọ",
       "platformCloud": "Igwe ojii",
@@ -2583,7 +2569,6 @@
       "linkActions": "Ihe a ga-eme na njikọ",
       "couldNotCopyLink": "Enweghị ike ịdetuo njikọ.",
       "couldNotShareLink": "Enweghị ike ịkekọrịta njikọ.",
-      "opensInBrowser": "Na-emeghe na ihe nchọgharị",
       "showLinkActions": "Gosi ihe a ga-eme na njikọ"
     },
     "compaction": {

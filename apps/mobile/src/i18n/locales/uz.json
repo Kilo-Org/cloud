@@ -2476,20 +2476,6 @@
       "unavailable": "Oldingi xabarlar mavjud emas.",
       "tooLarge": "Oldingi xabarlarning hajmi yuklash uchun juda katta."
     },
-    "markdownTable": {
-      "viewTable": "Jadvalni ko'rish",
-      "title": "Jadval",
-      "close": "Jadvalni yopish",
-      "loading": "Jadval yuklanmoqda",
-      "empty": "Bu jadvalda qatorlar yo'q.",
-      "columnCount_one": "ustun",
-      "columnCount": "ustun",
-      "columnCount_other": "ustun",
-      "rowCount_one": "qator",
-      "rowCount": "qator",
-      "rowCount_other": "qator",
-      "opensFullScreen": "to'liq ekranda ochiladi"
-    },
     "sessionFilter": {
       "title": "Sessiyalarni filtrlash",
       "platformCloud": "Bulut",
@@ -2583,7 +2569,6 @@
       "linkActions": "Havola bilan amallar",
       "couldNotCopyLink": "Havolani nusxalab bo'lmadi.",
       "couldNotShareLink": "Havolani ulashib bo'lmadi.",
-      "opensInBrowser": "Brauzerda ochiladi",
       "showLinkActions": "Havola bilan amallarni ko'rsatish"
     },
     "compaction": {

@@ -2476,20 +2476,6 @@
       "unavailable": "ადრინდელი შეტყობინებები ხელმისაწვდომი არ არის.",
       "tooLarge": "ადრინდელი შეტყობინებები ძალიან დიდია ჩასატვირთად."
     },
-    "markdownTable": {
-      "viewTable": "ცხრილის ნახვა",
-      "title": "ცხრილი",
-      "close": "ცხრილის დახურვა",
-      "loading": "ცხრილის ჩატვირთვა",
-      "empty": "ამ ცხრილს სტრიქონები არ აქვს.",
-      "columnCount_one": "სვეტი",
-      "columnCount": "სვეტი",
-      "columnCount_other": "სვეტი",
-      "rowCount_one": "სტრიქონი",
-      "rowCount": "სტრიქონი",
-      "rowCount_other": "სტრიქონი",
-      "opensFullScreen": "იხსნება სრულ ეკრანზე"
-    },
     "sessionFilter": {
       "title": "სესიების გაფილტვრა",
       "platformCloud": "ღრუბელი",
@@ -2583,7 +2569,6 @@
       "linkActions": "ბმულის მოქმედებები",
       "couldNotCopyLink": "ბმულის კოპირება ვერ მოხერხდა.",
       "couldNotShareLink": "ბმულის გაზიარება ვერ მოხერხდა.",
-      "opensInBrowser": "იხსნება ბრაუზერში",
       "showLinkActions": "ბმულის მოქმედებების ჩვენება"
     },
     "compaction": {

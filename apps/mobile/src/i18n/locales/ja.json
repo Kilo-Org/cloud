@@ -1963,20 +1963,6 @@
       "unavailable": "以前のメッセージは利用できません。",
       "tooLarge": "以前のメッセージはデータ量が多すぎて読み込めません。"
     },
-    "markdownTable": {
-      "viewTable": "表を表示",
-      "title": "表",
-      "close": "表を閉じる",
-      "loading": "表を読み込み中",
-      "empty": "この表には行がありません。",
-      "columnCount_one": "列",
-      "columnCount": "列",
-      "columnCount_other": "列",
-      "rowCount_one": "行",
-      "rowCount": "行",
-      "rowCount_other": "行",
-      "opensFullScreen": "全画面で開きます"
-    },
     "sessionFilter": {
       "title": "セッションの絞り込み",
       "platformCloud": "クラウド",
@@ -2070,7 +2056,6 @@
       "linkActions": "リンクの操作",
       "couldNotCopyLink": "リンクをコピーできませんでした。",
       "couldNotShareLink": "リンクを共有できませんでした。",
-      "opensInBrowser": "ブラウザーで開きます",
       "showLinkActions": "リンクの操作を表示"
     },
     "compaction": {

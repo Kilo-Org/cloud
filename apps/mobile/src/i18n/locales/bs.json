@@ -2509,22 +2509,6 @@
       "tooLarge": "Ranije poruke su prevelike za učitavanje.",
       "omitted_few": "Nije moguće prikazati {{displayCount}} ranije stavke iz ove sesije."
     },
-    "markdownTable": {
-      "viewTable": "Pogledaj tabelu",
-      "title": "Tabela",
-      "close": "Zatvori tabelu",
-      "loading": "Učitavanje tabele",
-      "empty": "Ova tabela nema redova.",
-      "columnCount_one": "kolona",
-      "columnCount": "kolona",
-      "columnCount_other": "kolona",
-      "rowCount_one": "red",
-      "rowCount": "redova",
-      "rowCount_other": "redova",
-      "opensFullScreen": "otvara se preko cijelog ekrana",
-      "columnCount_few": "kolone",
-      "rowCount_few": "reda"
-    },
     "sessionFilter": {
       "title": "Filteri sesija",
       "platformCloud": "Oblak",
@@ -2621,7 +2605,6 @@
       "linkActions": "Radnje za link",
       "couldNotCopyLink": "Nije moguće kopirati link.",
       "couldNotShareLink": "Nije moguće podijeliti link.",
-      "opensInBrowser": "Otvara se u pregledniku",
       "showLinkActions": "Prikaži radnje za link"
     },
     "compaction": {

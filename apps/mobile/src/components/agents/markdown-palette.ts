@@ -1,5 +1,3 @@
-import { type MarkedStyles } from 'react-native-marked';
-
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   compositeOver,
@@ -14,9 +12,6 @@ export type MarkdownPalette = {
   mutedTextColor: string;
   codeBackground: string;
   borderColor: string;
-  // The bubble surface this palette's ink is designed to sit on. Needed when
-  // palette-colored content renders outside its bubble (e.g. the table modal).
-  surfaceColor: string;
   // The syntax token scheme for code fences in this variant, derived from the
   // real code-card surface — the bubble tinted by `codeBackground`
   // (`compositeOver`), classified by `tokenSchemeForSurface` — rather than the
@@ -56,7 +51,6 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
       mutedTextColor: withAlpha(ink, 0.7),
       codeBackground,
       borderColor: withAlpha(ink, 0.2),
-      surfaceColor: colors.primary,
       // Classify the real code card, not the bare bubble: the 10% ink tint is
       // enough to move the card (the light-theme white tint lifts the olive
       // primary #4F5A10 to #616B28, where the `dark` token values must clear
@@ -73,7 +67,6 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
       mutedTextColor: withAlpha(ink, 0.7),
       codeBackground,
       borderColor: withAlpha(ink, 0.2),
-      surfaceColor: colors.accentSoft,
       codeTokenScheme: tokenSchemeForSurface(compositeOver(codeBackground, colors.accentSoft)),
     };
   }
@@ -82,7 +75,6 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
     mutedTextColor: colors.mutedForeground,
     codeBackground: colors.muted,
     borderColor: colors.border,
-    surfaceColor: colors.card,
     codeTokenScheme: tokenSchemeForSurface(colors.muted),
   };
 }
@@ -158,51 +150,5 @@ export function getMarkdownHtmlTagStyles(palette: MarkdownPalette) {
     },
     p: { marginVertical: 2, paddingVertical: 0 },
     strong: { color: textColor, fontWeight: '700' as const },
-  };
-}
-
-// `react-native-marked`'s `useMarkdown` takes an inline styles map rather than
-// `className`, so we cannot use NativeWind here. Centralizing style creation
-// keeps both variants in sync and makes the color choices reviewable.
-export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
-  const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
-  const htmlTagStyles = getMarkdownHtmlTagStyles(palette);
-
-  return {
-    text: { color: textColor, fontSize: 16, lineHeight: 24 },
-    paragraph: htmlTagStyles.p,
-    strong: htmlTagStyles.strong,
-    em: { color: textColor, fontStyle: 'italic' },
-    link: htmlTagStyles.a,
-    ...getMarkdownHeadingStyles(palette),
-    // Override the library defaults that set italic + light weight on codespan.
-    codespan: {
-      color: textColor,
-      backgroundColor: codeBackground,
-      fontFamily: 'Menlo',
-      fontSize: 14,
-      fontStyle: 'normal',
-      fontWeight: '400',
-    },
-    code: {
-      backgroundColor: codeBackground,
-      borderRadius: 8,
-      padding: 12,
-      marginVertical: 4,
-    },
-    blockquote: htmlTagStyles.blockquote,
-    // react-native-marked maps `list` onto each item's marker box, not a list
-    // container. A top margin misaligns the marker; keep this bottom-only.
-    list: { marginBottom: 4 },
-    li: { color: textColor, fontSize: 16, lineHeight: 24 },
-    hr: {
-      borderBottomWidth: 1,
-      borderBottomColor: borderColor,
-      marginVertical: 8,
-    },
-    table: { borderColor, borderWidth: 1, borderRadius: 6, marginVertical: 4 },
-    tableRow: { borderColor },
-    tableCell: { borderColor },
-    strikethrough: { color: mutedTextColor, textDecorationLine: 'line-through' },
   };
 }

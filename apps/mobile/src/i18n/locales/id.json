@@ -1963,20 +1963,6 @@
       "unavailable": "Pesan sebelumnya tidak tersedia.",
       "tooLarge": "Pesan sebelumnya terlalu besar untuk dimuat."
     },
-    "markdownTable": {
-      "viewTable": "Lihat tabel",
-      "title": "Tabel",
-      "close": "Tutup tabel",
-      "loading": "Memuat tabel",
-      "empty": "Tabel ini tidak memiliki baris.",
-      "columnCount_one": "kolom",
-      "columnCount": "kolom",
-      "columnCount_other": "kolom",
-      "rowCount_one": "baris",
-      "rowCount": "baris",
-      "rowCount_other": "baris",
-      "opensFullScreen": "terbuka dalam layar penuh"
-    },
     "sessionFilter": {
       "title": "Saring sesi",
       "platformCloud": "Komputasi awan",
@@ -2070,7 +2056,6 @@
       "linkActions": "Tindakan untuk tautan",
       "couldNotCopyLink": "Tidak dapat menyalin tautan.",
       "couldNotShareLink": "Tidak dapat membagikan tautan.",
-      "opensInBrowser": "Terbuka di peramban",
       "showLinkActions": "Tampilkan tindakan untuk tautan"
     },
     "compaction": {

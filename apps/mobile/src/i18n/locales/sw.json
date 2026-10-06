@@ -2476,20 +2476,6 @@
       "unavailable": "Ujumbe wa awali haupatikani.",
       "tooLarge": "Ujumbe wa awali una ukubwa unaozidi kiwango kinachoweza kupakiwa."
     },
-    "markdownTable": {
-      "viewTable": "Tazama jedwali",
-      "title": "Jedwali",
-      "close": "Funga jedwali",
-      "loading": "Inapakia jedwali",
-      "empty": "Jedwali hili halina safu mlalo.",
-      "columnCount_one": "safu wima",
-      "columnCount": "safu wima",
-      "columnCount_other": "safu wima",
-      "rowCount_one": "safu mlalo",
-      "rowCount": "safu mlalo",
-      "rowCount_other": "safu mlalo",
-      "opensFullScreen": "hufunguka kwenye skrini nzima"
-    },
     "sessionFilter": {
       "title": "Chuja vikao",
       "platformCloud": "Wingu",
@@ -2583,7 +2569,6 @@
       "linkActions": "Vitendo vya kiungo",
       "couldNotCopyLink": "Imeshindikana kunakili kiungo.",
       "couldNotShareLink": "Imeshindikana kushiriki kiungo.",
-      "opensInBrowser": "Hufunguka kwenye kivinjari",
       "showLinkActions": "Onyesha vitendo vya kiungo"
     },
     "compaction": {

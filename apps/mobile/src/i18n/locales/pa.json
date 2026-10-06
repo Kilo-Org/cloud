@@ -2476,20 +2476,6 @@
       "unavailable": "ਪੁਰਾਣੇ ਸੁਨੇਹੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
       "tooLarge": "ਪੁਰਾਣੇ ਸੁਨੇਹਿਆਂ ਦਾ ਆਕਾਰ ਇੰਨਾ ਵੱਡਾ ਹੈ ਕਿ ਉਨ੍ਹਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।"
     },
-    "markdownTable": {
-      "viewTable": "ਸਾਰਣੀ ਵੇਖੋ",
-      "title": "ਸਾਰਣੀ",
-      "close": "ਸਾਰਣੀ ਬੰਦ ਕਰੋ",
-      "loading": "ਸਾਰਣੀ ਲੋਡ ਹੋ ਰਹੀ ਹੈ",
-      "empty": "ਇਸ ਸਾਰਣੀ ਵਿੱਚ ਕੋਈ ਕਤਾਰ ਨਹੀਂ ਹੈ।",
-      "columnCount_one": "ਕਾਲਮ",
-      "columnCount": "ਕਾਲਮ",
-      "columnCount_other": "ਕਾਲਮ",
-      "rowCount_one": "ਕਤਾਰ",
-      "rowCount": "ਕਤਾਰਾਂ",
-      "rowCount_other": "ਕਤਾਰਾਂ",
-      "opensFullScreen": "ਪੂਰੀ ਸਕ੍ਰੀਨ 'ਤੇ ਖੁੱਲ੍ਹਦੀ ਹੈ"
-    },
     "sessionFilter": {
       "title": "ਸੈਸ਼ਨ ਫਿਲਟਰ ਕਰੋ",
       "platformCloud": "ਕਲਾਉਡ",
@@ -2583,7 +2569,6 @@
       "linkActions": "ਲਿੰਕ ਲਈ ਕਾਰਵਾਈਆਂ",
       "couldNotCopyLink": "ਲਿੰਕ ਕਾਪੀ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "couldNotShareLink": "ਲਿੰਕ ਸਾਂਝਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "opensInBrowser": "ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਖੁੱਲ੍ਹਦਾ ਹੈ",
       "showLinkActions": "ਲਿੰਕ ਲਈ ਕਾਰਵਾਈਆਂ ਦਿਖਾਓ"
     },
     "compaction": {

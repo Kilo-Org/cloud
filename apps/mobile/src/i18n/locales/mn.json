@@ -2476,20 +2476,6 @@
       "unavailable": "Өмнөх мессежүүдийг харах боломжгүй.",
       "tooLarge": "Өмнөх мессежүүдийн хэмжээ хэт том тул ачаалах боломжгүй."
     },
-    "markdownTable": {
-      "viewTable": "Хүснэгт үзэх",
-      "title": "Хүснэгт",
-      "close": "Хүснэгтийг хаах",
-      "loading": "Хүснэгт ачаалж байна",
-      "empty": "Энэ хүснэгтэд мөр байхгүй байна.",
-      "columnCount_one": "багана",
-      "columnCount": "багана",
-      "columnCount_other": "багана",
-      "rowCount_one": "мөр",
-      "rowCount": "мөр",
-      "rowCount_other": "мөр",
-      "opensFullScreen": "бүтэн дэлгэцээр нээгдэнэ"
-    },
     "sessionFilter": {
       "title": "Сессийг шүүх",
       "platformCloud": "Үүлэн орчин",
@@ -2583,7 +2569,6 @@
       "linkActions": "Холбоосын үйлдлүүд",
       "couldNotCopyLink": "Холбоосыг хуулж чадсангүй.",
       "couldNotShareLink": "Холбоосыг хуваалцаж чадсангүй.",
-      "opensInBrowser": "Хөтөч дээр нээгдэнэ",
       "showLinkActions": "Холбоосын үйлдлүүдийг харуулах"
     },
     "compaction": {

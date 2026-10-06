@@ -2476,20 +2476,6 @@
       "unavailable": "Farriimihii hore lama heli karo.",
       "tooLarge": "Farriimihii hore aad bay u waaweyn yihiin, sidaas darteed lama soo shubi karo."
     },
-    "markdownTable": {
-      "viewTable": "Eeg shaxda",
-      "title": "Shax",
-      "close": "Xir shaxda",
-      "loading": "Shaxda waa la soo shubayaa",
-      "empty": "Shaxdani ma laha safaf.",
-      "columnCount_one": "tiir",
-      "columnCount": "tiirar",
-      "columnCount_other": "tiirar",
-      "rowCount_one": "saf",
-      "rowCount": "safaf",
-      "rowCount_other": "safaf",
-      "opensFullScreen": "wuxuu ku furmaa shaashadda oo dhan"
-    },
     "sessionFilter": {
       "title": "Shaandhee kalfadhiyada",
       "platformCloud": "Daruurta",
@@ -2583,7 +2569,6 @@
       "linkActions": "Ficillada xiriiriyaha",
       "couldNotCopyLink": "Xiriiriyaha nuqul lagama samayn karin.",
       "couldNotShareLink": "Xiriiriyaha lama wadaagi karin.",
-      "opensInBrowser": "Wuxuu ku furmaa biraawsarka",
       "showLinkActions": "Muuji ficillada xiriiriyaha"
     },
     "compaction": {

@@ -2476,20 +2476,6 @@
       "unavailable": "پخواني پیغامونه شتون نه لري.",
       "tooLarge": "پخواني پیغامونه دومره لوی دي چې نه شي بارېدای."
     },
-    "markdownTable": {
-      "viewTable": "جدول وګورئ",
-      "title": "جدول",
-      "close": "جدول وتړئ",
-      "loading": "جدول بارېږي",
-      "empty": "دا جدول هېڅ قطار نه لري.",
-      "columnCount_one": "ستن",
-      "columnCount": "ستنې",
-      "columnCount_other": "ستنې",
-      "rowCount_one": "قطار",
-      "rowCount": "قطارونه",
-      "rowCount_other": "قطارونه",
-      "opensFullScreen": "په بشپړ سکرین کې پرانیستل کېږي"
-    },
     "sessionFilter": {
       "title": "د ناستو چاڼ",
       "platformCloud": "کلاوډ",
@@ -2583,7 +2569,6 @@
       "linkActions": "د لینک کړنې",
       "couldNotCopyLink": "لینک کاپي نه شو.",
       "couldNotShareLink": "لینک شریک نه شو.",
-      "opensInBrowser": "په براوزر کې پرانیستل کېږي",
       "showLinkActions": "د لینک کړنې وښیئ"
     },
     "compaction": {

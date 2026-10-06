@@ -2509,22 +2509,6 @@
       "tooLarge": "Els missatges anteriors són massa grans per carregar-los.",
       "omitted_many": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar."
     },
-    "markdownTable": {
-      "viewTable": "Mostra la taula",
-      "title": "Taula",
-      "close": "Tanca la taula",
-      "loading": "Carregant la taula",
-      "empty": "Aquesta taula no té cap fila.",
-      "columnCount_one": "columna",
-      "columnCount": "columnes",
-      "columnCount_other": "columnes",
-      "rowCount_one": "fila",
-      "rowCount": "files",
-      "rowCount_other": "files",
-      "opensFullScreen": "s'obre a pantalla completa",
-      "columnCount_many": "columnes",
-      "rowCount_many": "files"
-    },
     "sessionFilter": {
       "title": "Filtre de sessions",
       "platformCloud": "Núvol",
@@ -2621,7 +2605,6 @@
       "linkActions": "Accions de l'enllaç",
       "couldNotCopyLink": "No s'ha pogut copiar l'enllaç.",
       "couldNotShareLink": "No s'ha pogut compartir l'enllaç.",
-      "opensInBrowser": "S'obre al navegador",
       "showLinkActions": "Mostra les accions de l'enllaç"
     },
     "compaction": {

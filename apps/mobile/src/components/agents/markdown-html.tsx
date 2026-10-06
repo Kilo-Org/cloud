@@ -18,6 +18,10 @@ import RenderHTML, {
 
 import { withRtlWritingDirection } from '@/lib/rtl-text';
 
+import {
+  type MarkdownLinkLongPressHandler,
+  type MarkdownLinkPressHandler,
+} from './markdown-handlers';
 import { isSupportedScheme, resolveHtmlImageAspectRatio } from './markdown-html-image';
 import { REMOVED_HTML_TAGS } from './markdown-html-sanitization';
 import { MarkdownImage } from './markdown-image';
@@ -29,10 +33,6 @@ import {
   type MarkdownPalette,
 } from './markdown-palette';
 import { lexMarkdown } from './markdown-parse-cache';
-import {
-  type MarkdownLinkLongPressHandler,
-  type MarkdownLinkPressHandler,
-} from './markdown-renderer';
 
 const REMOVED_HTML_TAG_SET = new Set<string>(REMOVED_HTML_TAGS);
 
@@ -112,9 +112,9 @@ function hasDirectHtml(token: Token): boolean {
   return (token.tokens ?? []).some(inlineToken => inlineToken.type === 'html');
 }
 
-// react-native-marked renders inline HTML tokens through `MarkdownRenderer.html`,
-// which shows them as plain text: a link, heading, or emphasis tag nested inside
-// a list item or blockquote loses the styling its Markdown equivalent keeps.
+// The Markdown renderer does not style inline HTML tokens: a link, heading, or
+// emphasis tag nested inside a list item or blockquote loses the styling its
+// Markdown equivalent keeps.
 // Those tags are the ones the HTML engine styles; containers holding only
 // unstyled tags (div, span, …) stay on the Markdown path by design.
 const STYLED_HTML_TAGS = new Set([
@@ -145,9 +145,9 @@ const STYLED_HTML_TAGS = new Set([
   'hr',
 ]);
 
-// Containers whose nested HTML the Markdown lexer cannot style. Code and table
-// descendants are excluded from routing so fenced code keeps the CodeBlock and
-// tables keep the MarkdownTable chip.
+// Containers whose nested HTML the Markdown renderer cannot style. Code and
+// table descendants are excluded from routing so fenced code and tables stay on
+// the Markdown renderer's native blocks.
 const NESTED_HTML_CONTAINERS = new Set(['list', 'blockquote']);
 
 function tokenChildren(token: Token): Token[] {

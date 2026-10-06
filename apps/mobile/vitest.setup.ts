@@ -51,6 +51,12 @@ vi.mock('react-native-keyboard-controller', () => ({
   },
 }));
 
+// `react-native-enriched-markdown` and `react-native-webview` are native views.
+// Tests assert the markdown and diagram elements through their host props
+// (`markdown`, `onLinkPress`, `source`, …).
+vi.mock('react-native-enriched-markdown', () => ({ EnrichedMarkdownText: 'EnrichedMarkdownText' }));
+vi.mock('react-native-webview', () => ({ WebView: 'WebView' }));
+
 // `@rn-primitives/dialog@1.5.2` ships untranspiled JSX inside `dist/*.mjs` and
 // `dist/*.js`, and its ESM entry re-exports `./dialog` with no extension.
 // Metro's Babel transform parses both for the app; no Node-side test transformer

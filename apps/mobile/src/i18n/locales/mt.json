@@ -2575,26 +2575,6 @@
       "omitted_few": "Ma setgħux jintwerew {{displayCount}} elementi ta' qabel f'din is-sessjoni.",
       "omitted_many": "Ma setax jintwera {{displayCount}}-il element ta' qabel f'din is-sessjoni."
     },
-    "markdownTable": {
-      "viewTable": "Ara t-tabella",
-      "title": "Tabella",
-      "close": "Agħlaq it-tabella",
-      "loading": "Qed titgħabba t-tabella",
-      "empty": "Din it-tabella m'għandhiex ringieli.",
-      "columnCount_one": "kolonna",
-      "columnCount": "kolonni",
-      "columnCount_other": "kolonni",
-      "rowCount_one": "ringiela",
-      "rowCount": "ringieli",
-      "rowCount_other": "ringieli",
-      "opensFullScreen": "jiftaħ fuq l-iskrin kollu",
-      "columnCount_two": "kolonni",
-      "columnCount_few": "kolonni",
-      "columnCount_many": "kolonna",
-      "rowCount_two": "ringieli",
-      "rowCount_few": "ringieli",
-      "rowCount_many": "ringiela"
-    },
     "sessionFilter": {
       "title": "Iffiltra s-sessjonijiet",
       "platformCloud": "Sħaba",
@@ -2697,7 +2677,6 @@
       "linkActions": "Azzjonijiet tar-rabta",
       "couldNotCopyLink": "Ma setgħetx tiġi kkupjata r-rabta.",
       "couldNotShareLink": "Ma setgħetx tinqasam ir-rabta.",
-      "opensInBrowser": "Jiftaħ fil-brawżer",
       "showLinkActions": "Uri l-azzjonijiet tar-rabta"
     },
     "compaction": {

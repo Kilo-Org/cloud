@@ -2476,20 +2476,6 @@
       "unavailable": "आधीचे संदेश उपलब्ध नाहीत.",
       "tooLarge": "आधीचे संदेश लोड करण्यासाठी खूप मोठे आहेत."
     },
-    "markdownTable": {
-      "viewTable": "तक्ता पहा",
-      "title": "तक्ता",
-      "close": "तक्ता बंद करा",
-      "loading": "तक्ता लोड होत आहे",
-      "empty": "या तक्त्यात कोणत्याही ओळी नाहीत.",
-      "columnCount_one": "स्तंभ",
-      "columnCount": "स्तंभ",
-      "columnCount_other": "स्तंभ",
-      "rowCount_one": "ओळ",
-      "rowCount": "ओळी",
-      "rowCount_other": "ओळी",
-      "opensFullScreen": "पूर्ण स्क्रीनवर उघडते"
-    },
     "sessionFilter": {
       "title": "सत्रे फिल्टर करा",
       "platformCloud": "क्लाउड",
@@ -2583,7 +2569,6 @@
       "linkActions": "लिंकसाठी पर्याय",
       "couldNotCopyLink": "लिंक कॉपी करता आली नाही.",
       "couldNotShareLink": "लिंक शेअर करता आली नाही.",
-      "opensInBrowser": "ब्राउझरमध्ये उघडते",
       "showLinkActions": "लिंकसाठी पर्याय दाखवा"
     },
     "compaction": {

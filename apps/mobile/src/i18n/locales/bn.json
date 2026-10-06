@@ -2476,20 +2476,6 @@
       "unavailable": "আগের বার্তাগুলো পাওয়া যাচ্ছে না।",
       "tooLarge": "আগের বার্তাগুলো এত বড় যে লোড করা যাচ্ছে না।"
     },
-    "markdownTable": {
-      "viewTable": "টেবিল দেখুন",
-      "title": "টেবিল",
-      "close": "টেবিল বন্ধ করুন",
-      "loading": "টেবিল লোড হচ্ছে",
-      "empty": "এই টেবিলে কোনো সারি নেই।",
-      "columnCount_one": "কলাম",
-      "columnCount": "কলাম",
-      "columnCount_other": "কলাম",
-      "rowCount_one": "সারি",
-      "rowCount": "সারি",
-      "rowCount_other": "সারি",
-      "opensFullScreen": "পুরো স্ক্রিনে খোলে"
-    },
     "sessionFilter": {
       "title": "সেশন ফিল্টার",
       "platformCloud": "ক্লাউড",
@@ -2583,7 +2569,6 @@
       "linkActions": "লিঙ্কের বিকল্প",
       "couldNotCopyLink": "লিঙ্ক কপি করা যায়নি।",
       "couldNotShareLink": "লিঙ্ক শেয়ার করা যায়নি।",
-      "opensInBrowser": "ব্রাউজারে খোলে",
       "showLinkActions": "লিঙ্কের বিকল্প দেখান"
     },
     "compaction": {

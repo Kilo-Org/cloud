@@ -2476,20 +2476,6 @@
       "unavailable": "முந்தைய செய்திகள் கிடைக்கவில்லை.",
       "tooLarge": "முந்தைய செய்திகள் ஏற்றுவதற்கு மிகப் பெரியவை."
     },
-    "markdownTable": {
-      "viewTable": "அட்டவணையைப் பார்க்கவும்",
-      "title": "அட்டவணை",
-      "close": "அட்டவணையை மூடவும்",
-      "loading": "அட்டவணை ஏற்றப்படுகிறது",
-      "empty": "இந்த அட்டவணையில் வரிசைகள் இல்லை.",
-      "columnCount_one": "நெடுவரிசை",
-      "columnCount": "நெடுவரிசைகள்",
-      "columnCount_other": "நெடுவரிசைகள்",
-      "rowCount_one": "வரிசை",
-      "rowCount": "வரிசைகள்",
-      "rowCount_other": "வரிசைகள்",
-      "opensFullScreen": "முழுத் திரையில் திறக்கிறது"
-    },
     "sessionFilter": {
       "title": "அமர்வுகளை வடிகட்டவும்",
       "platformCloud": "மேகக் கணினி",
@@ -2583,7 +2569,6 @@
       "linkActions": "இணைப்புக்கான செயல்கள்",
       "couldNotCopyLink": "இணைப்பை நகலெடுக்க முடியவில்லை.",
       "couldNotShareLink": "இணைப்பைப் பகிர முடியவில்லை.",
-      "opensInBrowser": "உலாவியில் திறக்கிறது",
       "showLinkActions": "இணைப்புக்கான செயல்களைக் காட்டவும்"
     },
     "compaction": {

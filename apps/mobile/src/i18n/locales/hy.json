@@ -2476,20 +2476,6 @@
       "unavailable": "Նախորդ հաղորդագրությունները հասանելի չեն։",
       "tooLarge": "Նախորդ հաղորդագրությունների ծավալը չափազանց մեծ է դրանք բեռնելու համար։"
     },
-    "markdownTable": {
-      "viewTable": "Դիտել աղյուսակը",
-      "title": "Աղյուսակ",
-      "close": "Փակել աղյուսակը",
-      "loading": "Բեռնվում է աղյուսակը",
-      "empty": "Այս աղյուսակում տողեր չկան։",
-      "columnCount_one": "սյունակ",
-      "columnCount": "սյունակ",
-      "columnCount_other": "սյունակ",
-      "rowCount_one": "տող",
-      "rowCount": "տող",
-      "rowCount_other": "տող",
-      "opensFullScreen": "բացվում է լիաէկրան ռեժիմում"
-    },
     "sessionFilter": {
       "title": "Նիստերի զտում",
       "platformCloud": "Ամպային",
@@ -2583,7 +2569,6 @@
       "linkActions": "Հղման գործողություններ",
       "couldNotCopyLink": "Չհաջողվեց պատճենել հղումը։",
       "couldNotShareLink": "Չհաջողվեց տարածել հղումը։",
-      "opensInBrowser": "Բացվում է զննարկչում",
       "showLinkActions": "Ցուցադրել հղման գործողությունները"
     },
     "compaction": {

@@ -1963,20 +1963,6 @@
       "unavailable": "Eerdere berichten zijn niet beschikbaar.",
       "tooLarge": "Eerdere berichten zijn te groot om te laden."
     },
-    "markdownTable": {
-      "viewTable": "Tabel bekijken",
-      "title": "Tabel",
-      "close": "Tabel sluiten",
-      "loading": "Tabel laden",
-      "empty": "Deze tabel bevat geen rijen.",
-      "columnCount_one": "kolom",
-      "columnCount": "kolommen",
-      "columnCount_other": "kolommen",
-      "rowCount_one": "rij",
-      "rowCount": "rijen",
-      "rowCount_other": "rijen",
-      "opensFullScreen": "opent op volledig scherm"
-    },
     "sessionFilter": {
       "title": "Sessies filteren",
       "platformCloud": "In de cloud",
@@ -2070,7 +2056,6 @@
       "linkActions": "Acties voor de link",
       "couldNotCopyLink": "De link kon niet worden gekopieerd.",
       "couldNotShareLink": "De link kon niet worden gedeeld.",
-      "opensInBrowser": "Opent in de browser",
       "showLinkActions": "Acties voor de link tonen"
     },
     "compaction": {

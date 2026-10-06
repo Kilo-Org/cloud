@@ -1963,20 +1963,6 @@
       "unavailable": "無法取得較早的訊息。",
       "tooLarge": "較早的訊息資料量過大，無法載入。"
     },
-    "markdownTable": {
-      "viewTable": "檢視表格",
-      "title": "表格",
-      "close": "關閉表格",
-      "loading": "載入表格中",
-      "empty": "此表格沒有任何列。",
-      "columnCount_one": "欄",
-      "columnCount": "欄",
-      "columnCount_other": "欄",
-      "rowCount_one": "列",
-      "rowCount": "列",
-      "rowCount_other": "列",
-      "opensFullScreen": "以全螢幕開啟"
-    },
     "sessionFilter": {
       "title": "篩選工作階段",
       "platformCloud": "雲端",
@@ -2070,7 +2056,6 @@
       "linkActions": "連結操作",
       "couldNotCopyLink": "無法複製連結。",
       "couldNotShareLink": "無法分享連結。",
-      "opensInBrowser": "在瀏覽器中開啟",
       "showLinkActions": "顯示連結操作"
     },
     "compaction": {

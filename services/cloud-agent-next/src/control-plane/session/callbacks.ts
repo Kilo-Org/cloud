@@ -12,6 +12,7 @@ import {
   type ControlPlaneFailureReason,
 } from '../../shared/control-plane-protocol.js';
 import type { SessionMessage } from './messages.js';
+import { projectSettledMessageFailure, type ControlPlaneReportFacts } from './reports.js';
 
 export const CALLBACK_OUTBOX_PREFIX = 'callback_outbox:';
 export const CALLBACK_ENQUEUE_MAX_ATTEMPTS = 5;
@@ -47,7 +48,8 @@ export type MessageCallbacks = {
   persistDrainedBatchCallback(
     messages: readonly SessionMessage[],
     newlyTerminalMessageIds: ReadonlySet<string>,
-    metadata?: SessionMetadata | null
+    metadata?: SessionMetadata | null,
+    facts?: ControlPlaneReportFacts
   ): boolean;
   pendingCallbackCount(): number;
   nextCallbackDueAt(): number | undefined;
@@ -187,7 +189,8 @@ export function createMessageCallbacks(
   function buildJob(
     message: SessionMessage,
     metadata: SessionMetadata,
-    target: CallbackTarget
+    target: CallbackTarget,
+    facts?: ControlPlaneReportFacts
   ): CallbackJob | undefined {
     const status = callbackStatus(message);
     if (!status) return undefined;
@@ -212,7 +215,14 @@ export function createMessageCallbacks(
           .warn('Unable to include the assistant answer in the callback snapshot');
       }
     }
-    const errorMessage = callbackErrorMessage(message);
+    const failure = facts ? projectSettledMessageFailure(message, facts) : undefined;
+    // A workspace subtype carries a specific cause ("Repository clone timed
+    // out"); the generic control reason would hide it from receivers that match
+    // on error text. Non-workspace failures keep the friendlier control copy.
+    const errorMessage =
+      facts?.workspaceSubtype !== undefined && failure?.message
+        ? failure.message
+        : callbackErrorMessage(message);
 
     return {
       target: structuredClone(target),
@@ -223,6 +233,7 @@ export function createMessageCallbacks(
         messageId: message.messageId,
         status,
         ...(errorMessage ? { errorMessage } : {}),
+        ...(failure === undefined ? {} : { failure, failureStage: failure.stage }),
         ...(status === 'completed'
           ? {}
           : {
@@ -236,7 +247,11 @@ export function createMessageCallbacks(
     };
   }
 
-  function persistTerminalCallback(message: SessionMessage, metadata = getMetadata()): boolean {
+  function persistTerminalCallback(
+    message: SessionMessage,
+    metadata = getMetadata(),
+    facts?: ControlPlaneReportFacts
+  ): boolean {
     const target = metadata?.callback?.target;
     if (!target || callbackStatus(message) === undefined) return false;
 
@@ -245,7 +260,7 @@ export function createMessageCallbacks(
 
     let fittedJob: CallbackJobQueueFitResult;
     try {
-      const job = buildJob(message, metadata, target);
+      const job = buildJob(message, metadata, target, facts);
       if (!job) return false;
       fittedJob = fitCallbackJobToQueueLimit(job);
       if (fittedJob.status === 'too-large') {
@@ -277,7 +292,8 @@ export function createMessageCallbacks(
   function persistDrainedBatchCallback(
     messages: readonly SessionMessage[],
     newlyTerminalMessageIds: ReadonlySet<string>,
-    metadata = getMetadata()
+    metadata = getMetadata(),
+    facts?: ControlPlaneReportFacts
   ): boolean {
     if (newlyTerminalMessageIds.size === 0) return false;
     if (messages.some(message => message.state === 'queued' || message.state === 'accepted')) {
@@ -288,7 +304,13 @@ export function createMessageCallbacks(
       if (callbackStatus(message) !== undefined) representative = message;
     }
     if (!representative) return false;
-    return persistTerminalCallback(representative, metadata);
+    // The facts belong to this settlement; only apply them when the
+    // representative is the message that settlement terminalized.
+    const representativeFacts =
+      facts !== undefined && newlyTerminalMessageIds.has(representative.messageId)
+        ? facts
+        : undefined;
+    return persistTerminalCallback(representative, metadata, representativeFacts);
   }
 
   function pendingEntries(): Array<[string, PendingCallbackJob | undefined]> {

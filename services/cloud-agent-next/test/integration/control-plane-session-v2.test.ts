@@ -1660,7 +1660,14 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         expect(callbacks.filter(job => job.payload.messageId === 'retry-B')).toHaveLength(1);
         expect(callbacks.find(job => job.payload.messageId === 'retry-B')?.payload).toMatchObject({
           status: 'failed',
-          errorMessage: 'Workspace setup failed',
+          errorMessage: 'Repository authentication failed',
+          failureStage: 'pre_dispatch',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            subtype: 'git_authentication_failed',
+            message: 'Repository authentication failed',
+          },
         });
         await sessionStub.onRoute({ state: 'ready', attemptId: attemptA.attemptId });
         await sessionStub.onRoute({

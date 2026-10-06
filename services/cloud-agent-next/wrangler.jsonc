@@ -184,7 +184,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 20,
+      "max_instances": 40,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -198,7 +198,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 150,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -226,7 +226,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 500,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {

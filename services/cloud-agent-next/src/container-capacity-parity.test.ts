@@ -65,10 +65,10 @@ describe('production container capacity parity', () => {
     ) as WranglerConfig;
     expect(
       config.containers.find(container => container.class_name === 'Sandbox')?.max_instances
-    ).toBe(20);
+    ).toBe(40);
     for (const [className, productionCap, devCap] of [
-      ['SandboxSmall', 150, 6],
-      ['SandboxCodeReview', 500, 2],
+      ['SandboxSmall', 5, 6],
+      ['SandboxCodeReview', 5, 2],
       ['SandboxDIND', 20, 2],
     ] as const) {
       expect(

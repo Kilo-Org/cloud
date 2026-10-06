@@ -4,7 +4,6 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start --dev-client",
-    "start:rozenite": "WITH_ROZENITE=true expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "build": "pnpx eas-cli@24.8.0 build --profile development",

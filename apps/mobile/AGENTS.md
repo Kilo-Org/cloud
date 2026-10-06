@@ -28,6 +28,7 @@ git diff --check
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
+- Rozenite adds plugin panels to React Native DevTools: TanStack Query, network, navigation, file system, overlay, Expo Atlas and require profiler. To turn them on, put `WITH_ROZENITE=true` in `apps/mobile/.env.local` and restart the mobile service. A release bundle never contains them.
 
 ## Dependencies
 

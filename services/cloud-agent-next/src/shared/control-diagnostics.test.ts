@@ -42,6 +42,8 @@ describe('control diagnostic schema compatibility', () => {
         toolCpuUsageUsec: 800,
         serverCpuUsageUsec: 100,
         toolIoReadBytes: 120,
+        toolOomKills: 3,
+        serverOomKills: 0,
       },
       21
     );
@@ -58,6 +60,8 @@ describe('control diagnostic schema compatibility', () => {
       toolCpuUsageUsec: 800,
       serverCpuUsageUsec: 100,
       toolIoReadBytes: 120,
+      toolOomKills: 3,
+      serverOomKills: 0,
     });
     expect(JSON.stringify(records)).not.toContain('secret');
   });
@@ -397,6 +401,7 @@ describe('native diagnostic projector', () => {
       workloadPhase: 'applied',
       containerLimitBytes: 4_000,
       aggregateMaxBytes: 3_000,
+      toolsMaxBytes: 1_500,
       reserveBytes: 1_000,
       appliedMaxBytes: 3_000,
       readbackMaxBytes: 3_000,
@@ -427,6 +432,7 @@ describe('native diagnostic projector', () => {
     });
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain('"workloadPhase":"applied"');
+    expect(lines[0]).toContain('"toolsMaxBytes":1500');
     expect(lines[1]).toContain('"workloadFailure":"flag_off"');
     expect(lines.join('\n')).not.toContain('oomKills');
   });

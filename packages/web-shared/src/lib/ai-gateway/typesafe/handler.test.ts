@@ -35,6 +35,9 @@ import {
   TYPESAFE_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { startBouncerDecide } from '@kilocode/web-shared/lib/bouncer/inference';
+import type * as BouncerInference from '@kilocode/web-shared/lib/bouncer/inference';
+import type { DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 import { handleSystemOneRequest } from './handler';
 
 jest.mock('next/server', () => ({
@@ -44,6 +47,11 @@ jest.mock('next/server', () => ({
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: jest.fn(),
   warnExceptInTest: jest.fn(),
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
+jest.mock('@kilocode/web-shared/lib/bouncer/inference', () => ({
+  ...jest.requireActual<typeof BouncerInference>('@kilocode/web-shared/lib/bouncer/inference'),
+  startBouncerDecide: jest.fn(),
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
@@ -175,11 +183,19 @@ function deferredUsageCallbacks(): Array<() => Promise<unknown>> {
 }
 
 async function runAfter() {
-  // `after()` also carries the report-only bouncer decide promise; the deferred
-  // usage write is the function callback.
+  // The decide is mocked, so the only `after()` callback is the deferred usage write.
   const callbacks = deferredUsageCallbacks();
   expect(callbacks).toHaveLength(1);
   await callbacks[0]();
+}
+
+const handOffToUsage = jest.fn();
+
+function mockVerdict(verdict: DecideResponse | null) {
+  jest.mocked(startBouncerDecide).mockReturnValue({
+    verdict: Promise.resolve(verdict),
+    handOffToUsage,
+  });
 }
 
 describe('handleSystemOneRequest', () => {
@@ -187,6 +203,7 @@ describe('handleSystemOneRequest', () => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
     setAuth();
+    mockVerdict(null);
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
@@ -793,5 +810,42 @@ describe('handleSystemOneRequest', () => {
     );
     expect(deferredUsageCallbacks()).toHaveLength(0);
     expect(logMicrodollarUsageAndReportToBouncer).not.toHaveBeenCalled();
+  });
+
+  it('starts one decide and rejects an enforced throttle before upstream', async () => {
+    mockVerdict({
+      enforced: true,
+      code: 'rate_limited',
+      retryAfterMs: 500,
+      spendWatch: false,
+      flags: [],
+    });
+
+    const response = await handleSystemOneRequest(makeRequest());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get('retry-after')).toBe('1');
+    expect(response.headers.get('retry-after-ms')).toBe('500');
+    expect(startBouncerDecide).toHaveBeenCalledTimes(1);
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(handOffToUsage).not.toHaveBeenCalled();
+  });
+
+  it('hands a spend-watched request to usage with the decide request id', async () => {
+    mockVerdict({ enforced: false, spendWatch: true, flags: [] });
+
+    const response = await handleSystemOneRequest(makeRequest());
+    await runAfter();
+
+    expect(response.status).toBe(200);
+    expect(handOffToUsage).toHaveBeenCalledTimes(1);
+    const decideParams = jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
+    if (!decideParams || decideParams instanceof Promise) throw new Error('Expected decide params');
+    expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        bouncer: expect.objectContaining({ spendWatch: true, requestId: decideParams.requestId }),
+      })
+    );
   });
 });

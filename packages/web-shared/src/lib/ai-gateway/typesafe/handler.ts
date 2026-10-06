@@ -42,9 +42,10 @@ import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
+  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
@@ -94,10 +95,8 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
-    organizationId,
-    user
-  );
+  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
+    await getBalanceAndOrgSettings(organizationId, user);
   if (balance <= 0) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }
@@ -134,15 +133,16 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerIp = bareIpLiteral(ipAddress);
   const bouncerRequestId = randomUUID();
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited just before the upstream call within its 500 ms
+  // budget. Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerDecision = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
       tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
     },
   });
 
@@ -167,6 +167,10 @@ export async function handleSystemOneRequest(request: NextRequest) {
       statusCode,
     });
   }
+
+  const bouncerVerdict = await bouncerDecision.verdict;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
 
   let response: Response;
   let responseBody: unknown;
@@ -212,6 +216,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
 
   const { id, model, provider, usage } = result.data;
   const cost = toMicrodollars(usage.cost);
+  bouncerDecision.handOffToUsage();
   after(async () => {
     await logMicrodollarUsageAndReportToBouncer(
       {
@@ -273,6 +278,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
           // System One input is a typed classification payload, not a conversation,
           // so there is no prompt text to hash (and no raw state leaves the gateway).
           promptSimHash: null,
+          spendWatch: bouncerVerdict?.spendWatch === true,
         },
       }
     );

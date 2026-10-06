@@ -2,7 +2,7 @@ import 'server-only';
 
 import { isIP } from 'net';
 
-import { after, type NextRequest } from 'next/server';
+import { after, NextResponse, type NextRequest } from 'next/server';
 
 import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
@@ -11,13 +11,22 @@ import {
 } from '@kilocode/web-shared/lib/feature-detection';
 import {
   decide,
+  releaseDecideLease,
+  type DecideResponse,
   type DecideTier,
-  type DecideVerdict,
 } from '@kilocode/web-shared/lib/bouncer/client';
 import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { BalancePayer } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
-/** Report-only decide runs in `after()` and never holds up the upstream request. */
-export const BOUNCER_DECIDE_TIMEOUT_MS = 30_000;
+/**
+ * The gateway awaits decide immediately before the upstream call, so this bounds the latency it
+ * can add. A slower verdict resolves to null and the request is sent.
+ */
+export const BOUNCER_DECIDE_TIMEOUT_MS = 500;
+
+const logBouncerVerdict = sentryLogger('bouncer', 'info');
 
 /**
  * The request's client address, read once from the platform's trusted boundary.
@@ -83,48 +92,131 @@ export function bouncerDecideTier(
       : 'free';
 }
 
-/**
- * One report-only `decide`. Resolves to `null` on a timeout or any error (the
- * client never rejects), so callers never need to catch it.
- */
-export function bouncerDecide(params: {
+export type BouncerDecideParams = {
   requestId: string;
   ip: string | undefined;
   /** Normalized client-fingerprint digest, when the request carried a valid header. */
   ja4?: string | undefined;
-  account?: { accountId: string; tier: Exclude<DecideTier, 'anonymous'> };
-}): Promise<DecideVerdict | null> {
-  const { requestId, ip, ja4, account } = params;
-  if (account) {
-    return decide(
-      { requestId, tier: account.tier, accountId: account.accountId, ip, ja4 },
-      { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
-    );
-  }
-  // Anonymous verdicts are keyed on the IP; without one there is nothing to ask.
-  if (ip === undefined) return Promise.resolve(null);
-  return decide(
-    { requestId, tier: 'anonymous', ip, ja4 },
-    { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
-  );
+  account?: {
+    accountId: string;
+    tier: Exclude<DecideTier, 'anonymous'>;
+    /** The paying user's or organization's row, as the balance check read it. */
+    payer?: BalancePayer;
+  };
+};
+
+export type BouncerDecision = {
+  /**
+   * The verdict; await it immediately before the upstream call. Null on a timeout, any error, a
+   * rejected `params` promise, or an unknown verdict shape. Never rejects.
+   */
+  verdict: Promise<DecideResponse | null>;
+  /**
+   * Call where the request is handed to usage accounting. From then on the usage event releases
+   * bouncer's concurrency lease; before it, every terminal path ends without one.
+   */
+  handOffToUsage(): void;
+};
+
+/**
+ * Starts the one `decide` for this request. An `after()` callback keeps it alive across an early
+ * return and, once the response has ended, releases the concurrency lease of a spend-watched
+ * account when the request never reached usage accounting (any rejection after decide started, an
+ * upstream failure, a bouncer rejection).
+ */
+export function startBouncerDecide(
+  params: BouncerDecideParams | Promise<BouncerDecideParams>
+): BouncerDecision {
+  const resolvedParams = Promise.resolve(params);
+  const verdict = resolvedParams
+    .then(({ requestId, ip, ja4, account }) => {
+      if (account) {
+        return decide(
+          {
+            requestId,
+            tier: account.tier,
+            accountId: account.accountId,
+            ip,
+            ja4,
+            accountCreatedAt: account.payer?.createdAt,
+            usedMicrodollars: account.payer?.microdollarsUsed,
+            acquiredMicrodollars: account.payer?.totalMicrodollarsAcquired,
+          },
+          { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
+        );
+      }
+      // Anonymous verdicts are keyed on the IP; without one there is nothing to ask.
+      if (ip === undefined) return null;
+      return decide(
+        { requestId, tier: 'anonymous', ip, ja4 },
+        { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
+      );
+    })
+    .catch(() => null);
+  let handedOffToUsage = false;
+  // A callback, not a promise: Next runs it after the response ends, when the hand-off is final.
+  after(async () => {
+    const resolved = await verdict;
+    if (handedOffToUsage || resolved?.spendWatch !== true) return;
+    const decided = await resolvedParams.catch(() => null);
+    if (!decided?.account) return;
+    await releaseDecideLease({
+      requestId: decided.requestId,
+      accountId: decided.account.accountId,
+    });
+  });
+  return {
+    verdict,
+    handOffToUsage: () => {
+      handedOffToUsage = true;
+    },
+  };
 }
 
 /**
- * Starts the report-only decide and registers it with `after()`, so an early
- * return does not end its lifetime and the caller never awaits it. The promise
- * never rejects.
+ * Maps a verdict to the gateway's rejection, or null to send the request upstream. Only
+ * `enforced === true` rejects: a throttle code becomes a 429 with `retry-after` (ceil seconds) and
+ * `retry-after-ms`, and `restricted` becomes a 403. Flags are internal: they are logged here and
+ * never reach the client response.
  */
-export function scheduleBouncerDecide(params: {
-  requestId: string;
-  ip: string | undefined;
-  /** Normalized client-fingerprint digest, when the request carried a valid header. */
-  ja4?: string | undefined;
-  account?: { accountId: string; tier: Exclude<DecideTier, 'anonymous'> };
-}): void {
-  after(
-    bouncerDecide(params).then(
-      () => undefined,
-      () => undefined
-    )
+export function bouncerRejectionResponse(
+  verdict: DecideResponse | null,
+  requestId: string
+): NextResponse | null {
+  if (!verdict) return null;
+  const rejects = verdict.enforced === true && verdict.code !== undefined;
+  if (verdict.flags.length > 0 || rejects) {
+    logBouncerVerdict('[bouncer] decide verdict', {
+      requestId,
+      enforced: verdict.enforced,
+      code: verdict.code,
+      retryAfterMs: verdict.retryAfterMs,
+      flags: verdict.flags,
+    });
+  }
+  if (!rejects) return null;
+  if (verdict.code === 'restricted') {
+    return NextResponse.json(
+      {
+        error: 'Request not allowed',
+        error_type: ProxyErrorType.account_restricted,
+        message: 'This account cannot make requests right now. Contact support.',
+      },
+      { status: 403 }
+    );
+  }
+  const headers = new Headers();
+  if (verdict.retryAfterMs !== undefined) {
+    const retryAfterMs = Math.ceil(verdict.retryAfterMs);
+    headers.set('retry-after', String(Math.ceil(retryAfterMs / 1000)));
+    headers.set('retry-after-ms', String(retryAfterMs));
+  }
+  return NextResponse.json(
+    {
+      error: 'Rate limit exceeded',
+      error_type: ProxyErrorType.rate_limit_exceeded,
+      message: 'Too many requests. Please try again later.',
+    },
+    { status: 429, headers }
   );
 }

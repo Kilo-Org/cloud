@@ -36,9 +36,10 @@ import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
+  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
@@ -213,7 +214,11 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
-  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, settings, plan, payer } = await getBalanceAndOrgSettings(
+    organizationId,
+    user,
+    readDb
+  );
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
@@ -271,17 +276,22 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     );
   }
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited before the upstream call within its 500 ms budget.
+  // Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerDecision = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
       tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
     },
   });
+  const bouncerVerdict = await bouncerDecision.verdict;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   sentryRootSpan()?.setAttribute(
     'edit.time_to_request_start_ms',
@@ -350,6 +360,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   const clonedResponse = proxyRes.clone();
 
+  bouncerDecision.handOffToUsage();
   countAndStoreEditUsage(clonedResponse, usageContext, requestSpan);
 
   return wrapInSafeNextResponse(proxyRes);

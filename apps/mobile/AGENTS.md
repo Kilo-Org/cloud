@@ -194,3 +194,14 @@ The app follows https://github.com/Kilo-Org/kilo-design/ in general, except wher
 ## Debugging
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+## Fixtures for End-to-End Testing
+
+Make a fixture when you test your work end to end (E2E) and the state you need is hard to reach by hand.
+
+- Fixtures must be reachable only in development builds. Gate an in-app fixture behind `__DEV__`, and enter it only through `src/app/+native-intent.tsx`, as `src/lib/home-fixture.ts` does.
+- A fixture must be faithful to actual usage. Produce the same data shapes, the same code paths, and the same timing that real use produces. Do not add a code path that only the fixture takes.
+- If a fixture cannot mimic actual usage correctly, use actual backend state. Seed the local backend with a `pnpm dev:seed` topic, or create the state through the real API.
+- Put backend fixtures in `dev/seed/<scope>/<topic>.ts`, and follow the contract in `dev/seed/AGENTS.md`.
+- Commit every fixture you make, so that the next agent can use it again. Do not keep a fixture only in a scratch directory.
+- Write in the fixture what it represents and how to open it, for example the deep link that the seed topic returns.

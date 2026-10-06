@@ -107,6 +107,11 @@ minimumReleaseAgeExclude:
   - react-native-keyboard-controller@1.22.6
   # react-native-enriched-markdown 1.1.0 adds onImagePress/onCodeBlockPress, which the transcript markdown cutover wires.
   - react-native-enriched-markdown@1.1.0
+  # react-native-reanimated 4.7.1 carries the stability fixes the app needs
+  # (synchronously updated props reset, Android crashes, layout animations).
+  # Approved early exception; worklets 0.13.0 is its required pair and is old
+  # enough on its own.
+  - react-native-reanimated@4.7.1
 overrides:
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)

@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
 import type { inferRouterOutputs } from '@trpc/server';
 import type { WrappedWastelandRouter } from '@/lib/wasteland/types/router';
-import { WASTELAND_URL } from '@kilocode/web-shared/lib/constants';
+import { WASTELAND_URL } from '@/lib/service-urls';
 
 // ── Type exports ──────────────────────────────────────────────────────────
 // Re-export the router type so frontend components can extract output types

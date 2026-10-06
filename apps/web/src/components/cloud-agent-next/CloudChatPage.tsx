@@ -1782,7 +1782,9 @@ export default function CloudChatPage({
                                   activeSessionType === null
                                 }
                                 textareaDisabled={composerTextareaDisabled}
-                                isStreaming={isStreaming && !activeSuggestion}
+                                isStreaming={
+                                  (isStreaming || activity.type === 'retrying') && !activeSuggestion
+                                }
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}
                                 mode={modeControlValue(sessionConfig?.mode ?? null)}

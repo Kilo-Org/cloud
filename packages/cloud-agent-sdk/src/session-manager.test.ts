@@ -3170,6 +3170,37 @@ describe('createSessionManager', () => {
       );
     });
 
+    it('refreshes retry details without a type transition and clears the warning on idle', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      for (const [attempt, message] of [
+        [1, 'Overloaded'],
+        [1, 'Rate limited'],
+        [2, 'Rate limited'],
+      ] as const) {
+        mockSession.state.getActivity.mockReturnValue({ type: 'retrying', attempt, message });
+        notifyStateChange?.();
+        expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+          expect.objectContaining({ type: 'warning', message: `Retrying… ${message}` })
+        );
+      }
+      const indicator = config.store.get(mgr.atoms.statusIndicator);
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toBe(indicator);
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+      mgr.destroy();
+    });
+
     it('clears disconnected error and indicator after the transport reconnects', async () => {
       let notifyStateChange: (() => void) | undefined;
       mockSession.state.subscribe.mockImplementation(callback => {

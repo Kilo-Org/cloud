@@ -1823,6 +1823,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   ): void {
     let firstActivityFired = false;
     let prevAct = '';
+    let prevRetry: Extract<SessionActivity, { type: 'retrying' }> | null = null;
     let prevSk = '';
     let prevCsk = '';
     let prevCloudStatusHadIndicator = false;
@@ -1890,7 +1891,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         setIndicator(null);
       }
 
-      if (act.type !== prevAct) {
+      if (
+        act.type !== prevAct ||
+        (act.type === 'retrying' &&
+          (act.attempt !== prevRetry?.attempt || act.message !== prevRetry?.message))
+      ) {
         if (act.type === 'busy') {
           setIndicator(null);
         } else if (act.type === 'retrying') {
@@ -1900,9 +1905,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
             timestamp: Date.now(),
           });
         } else if (act.type === 'idle') {
+          if (prevAct === 'retrying') setIndicator(null);
           config.onComplete?.();
         }
         prevAct = act.type;
+        prevRetry = act.type === 'retrying' ? act : null;
       }
 
       // Cloud status takes priority over agent status when active

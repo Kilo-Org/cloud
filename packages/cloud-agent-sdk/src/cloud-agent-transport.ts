@@ -224,11 +224,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           if (!event) return;
 
           if (event.type === 'connected') replaying = false;
-          // The server restores pending interactions after connected; replayed
-          // interaction events describe history, not actionable requests.
+          // Connected carries authoritative activity; earlier statuses are history.
+          // Pending interactions are restored separately after connected.
           if (
             replaying &&
-            (event.type === 'question.asked' ||
+            (event.type === 'session.status' ||
+              event.type === 'question.asked' ||
               event.type === 'question.replied' ||
               event.type === 'question.rejected' ||
               event.type === 'permission.asked' ||

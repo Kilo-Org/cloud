@@ -973,11 +973,10 @@ export class WrapperClient {
     // called on every dispatch to a sandbox that isn't already `session-ready`,
     // including ordinary warm follow-up turns. Skip logging those to keep the
     // "bootstrap" metric scoped to calls that actually did bootstrap work (a cold
-    // clone, or a backup restore even when the marker makes the workspace look
-    // warm). Only the wrapper's `telemetry` object is logged: `workspaceReady`
+    // clone). Only the wrapper's `telemetry` object is logged: `workspaceReady`
     // carries `gitToken`. Older wrappers omit `telemetry` entirely, hence the guard.
     const telemetry = response.telemetry;
-    if (telemetry && (!telemetry.workspaceWasWarm || telemetry.restoredFromBackup)) {
+    if (telemetry && !telemetry.workspaceWasWarm) {
       logger.info('Cloud agent workspace bootstrap', {
         metric: 'cloud_agent_workspace_bootstrap',
         count: 1,
@@ -987,7 +986,6 @@ export class WrapperClient {
         // code-review sessions impossible to isolate without trace-row guesswork.
         platform: request.materialized.env.KILO_PLATFORM ?? '(none)',
         workspaceWasWarm: telemetry.workspaceWasWarm,
-        restoredFromBackup: telemetry.restoredFromBackup,
         // Nested rather than spread: `clone` comes from the wrapper's response
         // body, which is parsed without runtime schema validation, so an
         // unexpected key must not be able to overwrite the trusted fields above.
@@ -997,9 +995,9 @@ export class WrapperClient {
     }
     // Requirement 1: an incomplete restore must be a named, observable outcome,
     // not a wrapper progress line the worker never reads. Read independently of
-    // the bootstrap metric above: a warm workspace restored from a backup still
-    // logs the bootstrap metric, but a genuinely warm reuse does not, and a
-    // skipped diff can only happen on a restore path. Do not retry the restore.
+    // the bootstrap metric above: a genuinely warm reuse does not log the
+    // bootstrap metric, and a skipped diff can only happen on a restore path. Do
+    // not retry the restore.
     // The response body is only generically typed, so validate the optional
     // telemetry against the shared runtime schema first: a malformed value must
     // not throw here and turn the already-successful ready response into a

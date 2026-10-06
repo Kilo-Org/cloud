@@ -183,7 +183,7 @@ describe('notifications-worker-client internal dispatch', () => {
     // The warning context carries the same counts and reasons, and no
     // recipient ids.
     expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('partially failed'),
+      expect.stringContaining('retrying'),
       expect.objectContaining({
         kind: 'spend_alert',
         dispatchId: dispatchIds[0],

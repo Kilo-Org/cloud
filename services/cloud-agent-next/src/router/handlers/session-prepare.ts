@@ -122,13 +122,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       variant: input.variant,
     },
     repository,
-    runtime:
-      input.devcontainer || input.sandboxAllocation
-        ? {
-            ...(input.devcontainer ? { devcontainer: true } : {}),
-            ...(input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : {}),
-          }
-        : undefined,
+    runtime: input.sandboxAllocation ? { sandboxAllocation: input.sandboxAllocation } : undefined,
     clone: input.cloneFromKiloSessionId
       ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
       : undefined,
@@ -194,13 +188,6 @@ const prepareSessionHandler = internalApiProtectedProcedure
             throw new TRPCError({
               code: 'BAD_REQUEST',
               message: 'Attachments cannot be attached to slash commands',
-            });
-          }
-
-          if (input.devcontainer && !input.autoInitiate) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'devcontainer sessions must use autoInitiate',
             });
           }
         }

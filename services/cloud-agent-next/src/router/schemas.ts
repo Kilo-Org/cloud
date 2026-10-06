@@ -591,11 +591,10 @@ const PrepareSessionSharedFields = {
     ),
   devcontainer: z
     .boolean()
+    .refine(value => !value, { message: 'Devcontainer support has been retired' })
     .optional()
     .default(false)
-    .describe(
-      'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
-    ),
+    .describe('Deprecated; devcontainer requests are no longer supported'),
   sandboxAllocation: ManagedSandboxAllocationInput.optional().describe(
     'Select a provider account and instance type instead of default routing'
   ),

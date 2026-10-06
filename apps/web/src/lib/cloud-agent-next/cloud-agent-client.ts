@@ -174,7 +174,7 @@ type PrepareSessionSharedFields = {
   clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-  /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
+  /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
 };

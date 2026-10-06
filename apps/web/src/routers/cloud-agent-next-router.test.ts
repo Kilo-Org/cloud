@@ -1032,19 +1032,16 @@ describe('cloudAgentNextRouter.getSandboxSelectionOptions', () => {
     expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({});
   });
 
-  it.each([false, true])(
-    'forwards explicit personal devcontainer context %s',
-    async devcontainer => {
-      mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: false, options: [] });
-      const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
+  it.each([false, true])('ignores retired personal devcontainer context %s', async devcontainer => {
+    mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: false, options: [] });
+    const caller = createCaller({ user: { id: 'oauth/user', is_admin: false } as User });
 
-      await expect(caller.getSandboxSelectionOptions({ devcontainer })).resolves.toEqual({
-        enabled: false,
-        options: [],
-      });
-      expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({ devcontainer });
-    }
-  );
+    await expect(caller.getSandboxSelectionOptions({ devcontainer })).resolves.toEqual({
+      enabled: false,
+      options: [],
+    });
+    expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({});
+  });
 
   it('propagates Worker-disabled selection without granting a capability', async () => {
     mockGetSandboxSelectionOptions.mockResolvedValueOnce({ enabled: false, options: [] });
@@ -1128,11 +1125,8 @@ describe('cloudAgentNextRouter.prepareSession', () => {
         autoInitiate: true,
         devcontainer: true,
       })
-    ).rejects.toThrow('Dev container sessions are not available');
-    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
-      'cloud-agent-devcontainer',
-      'user-1'
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
@@ -1259,7 +1253,7 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
   });
 
-  it('forwards devcontainer sessions when the feature flag is enabled', async () => {
+  it('rejects retired devcontainer sessions even when the feature flag is enabled', async () => {
     mockIsFeatureFlagEnabledOrDevelopment.mockResolvedValue(true);
     const caller = createCaller({
       user: { id: 'user-2', is_admin: false } as User,
@@ -1274,20 +1268,9 @@ describe('cloudAgentNextRouter.prepareSession', () => {
         autoInitiate: true,
         devcontainer: true,
       })
-    ).resolves.toEqual({
-      cloudAgentSessionId: 'agent_123',
-      kiloSessionId: 'ses_12345678901234567890123456',
-    });
-    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
-      'cloud-agent-devcontainer',
-      'user-2'
-    );
-    expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        githubRepo: 'acme/repo',
-        devcontainer: true,
-      })
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('routes free models through the AppBuilder client so the worker skips the balance minimum', async () => {

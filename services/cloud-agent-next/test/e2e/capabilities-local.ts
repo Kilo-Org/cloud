@@ -41,7 +41,6 @@ import {
   evaluateAttachWindow,
   type AttachWindowResult,
 } from './attach-window-evidence.js';
-import { deriveSandboxAllocationId } from '../../src/sandbox-id.js';
 import {
   collectReapEvidence,
   emptyReapEvidence,
@@ -486,18 +485,7 @@ function createLocalSandboxFaults(): SandboxFaultObservation {
               record.diagnosticEvent === 'accepted_reconciliation' &&
               record.messageId === input.messageId),
         });
-        const stop = records.find(
-          record =>
-            record.diagnosticEvent === 'allocation_transition' &&
-            record.sandboxId === input.sandboxId &&
-            typeof record.allocationId === 'string'
-        );
-        const allocationName =
-          stop && typeof stop.allocationId === 'string'
-            ? await deriveSandboxAllocationId(input.sandboxId, stop.allocationId)
-            : input.controlPlane
-              ? input.sandboxId
-              : undefined;
+        const allocationName = input.controlPlane ? input.sandboxId : undefined;
         evidence = collectReapEvidence(records, {
           reapedAllocationRef: input.reapedAllocationRef,
           sandboxId: input.sandboxId,

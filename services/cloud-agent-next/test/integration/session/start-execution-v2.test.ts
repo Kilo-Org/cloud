@@ -55,6 +55,49 @@ afterEach(async () => {
 });
 
 describe('CloudAgentSession message admission', () => {
+  it('rejects persisted DIND admission while keeping metadata and Stop accessible', async () => {
+    const userId = 'user_retired_dind';
+    const sessionId = 'agent_retired_dind';
+    const stub = sessionStub(userId, sessionId);
+    await runInDurableObject(stub, async (_instance, state) => {
+      await state.storage.put('metadata', {
+        metadataSchemaVersion: 2,
+        identity: { userId, sessionId },
+        auth: { kilocodeToken: 'test-token', kiloSessionId: 'kilo_retired' },
+        agent: { mode: 'code', model: 'test-model' },
+        workspace: {
+          sandboxId: 'dind-abcdef',
+          credentialContainment: {
+            github: false,
+            gitlab: false,
+            bitbucket: false,
+            kilocode: false,
+          },
+        },
+        lifecycle: { version: 1, timestamp: 1, preparedAt: 1 },
+      });
+    });
+    const result = await stub.admitSubmittedMessage(
+      queueUserMessageInput({
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+        prompt: 'resume old session',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'test-token',
+      })
+    );
+    expect(result).toMatchObject({
+      success: false,
+      code: 'BAD_REQUEST',
+      error: expect.stringContaining('Devcontainer support has been retired'),
+    });
+    await expect(stub.interruptExecution()).resolves.toBeDefined();
+    expect((await stub.getMetadata())?.workspace?.sandboxId).toBe('dind-abcdef');
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await listPendingSessionMessages(state.storage)).toEqual([]);
+    });
+  });
+
   it('persists a readable default branch before preparation and retains it on registration retry', async () => {
     const userId = 'user_readable_branch';
     const sessionId = 'agent_readable_branch';
@@ -1013,100 +1056,6 @@ describe('CloudAgentSession message admission', () => {
     expect(result).toMatchObject({
       success: false,
       error: expect.stringContaining('does not match its route suffix'),
-    });
-  });
-
-  it('persists repaired DIND devcontainer workspace readiness metadata', async () => {
-    const userId = 'user_devcontainer_ready' as const;
-    const sessionId = 'agent_devcontainer_ready' as const;
-    const stub = sessionStub(userId, sessionId);
-    const devcontainer = {
-      workspacePath: '/workspace/user/sessions/agent_devcontainer_ready',
-      innerWorkspaceFolder: '/workspaces/repo',
-      wrapperPort: 4173,
-      configPath: '.devcontainer/devcontainer.json',
-    };
-
-    const result = await runInDurableObject(stub, async instance => {
-      await instance.registerSession(
-        groupedRegisterSessionInput({
-          sessionId,
-          userId,
-          prompt: 'prepare devcontainer',
-          mode: 'code',
-          model: 'test-model',
-          kiloSessionId: '19191919-1919-4919-9919-191919191919',
-          kilocodeToken: 'token-devcontainer',
-        })
-      );
-
-      const ready = await instance.recordSessionReady({
-        workspacePath: devcontainer.workspacePath,
-        sandboxId: 'dind-abcdef',
-        sessionHome: '/home/agent_devcontainer_ready',
-        branchName: 'session/agent_devcontainer_ready',
-        kiloSessionId: '19191919-1919-4919-9919-191919191919',
-        devcontainer,
-      });
-      const metadata = await instance.getMetadata();
-      return { ready, metadata };
-    });
-
-    expect(result.ready.success).toBe(true);
-    expect(result.metadata?.workspace?.sandboxId).toBe('dind-abcdef');
-    expect(result.metadata?.devcontainer).toEqual(devcontainer);
-  });
-
-  it('drains prepared devcontainer sessions with their persisted DIND workspace plan', async () => {
-    const userId = 'user_devcontainer_plan' as const;
-    const sessionId = 'agent_devcontainer_plan' as const;
-    const stub = sessionStub(userId, sessionId);
-
-    const result = await runInDurableObject(stub, async instance => {
-      let capturedPlan: any = null;
-      (instance as any).orchestrator = {
-        execute: async (plan: any) => {
-          capturedPlan = plan;
-          return { messageId: plan.turn.messageId, kiloSessionId: 'kilo_test' };
-        },
-      };
-
-      await instance.registerSession({
-        ...groupedRegisterSessionInput({
-          sessionId,
-          userId,
-          prompt: 'prepare devcontainer execution',
-          mode: 'code',
-          model: 'test-model',
-          kiloSessionId: '20202020-2020-4020-9020-202020202020',
-          kilocodeToken: 'token-devcontainer',
-        }),
-        workspace: {
-          sandboxId: 'dind-abcdef',
-          devcontainerRequested: true,
-        },
-      });
-      await instance.admitSubmittedMessage(
-        queueUserMessageInput({
-          userId,
-          prompt: 'prepare devcontainer execution',
-          messageId: 'msg_018f1e2d3c4bDevPlanAbCdEFG',
-        })
-      );
-      await instance.alarm();
-      return { capturedPlan };
-    });
-
-    expect(result.capturedPlan).toMatchObject({
-      workspace: {
-        sandboxId: 'dind-abcdef',
-        metadata: {
-          workspace: {
-            sandboxId: 'dind-abcdef',
-            devcontainerRequested: true,
-          },
-        },
-      },
     });
   });
 

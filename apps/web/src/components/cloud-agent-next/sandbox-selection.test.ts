@@ -38,7 +38,6 @@ const input = {
   organizationId: 'organization-a',
   draft,
   capabilities,
-  devcontainer: false,
 };
 
 describe('formatSandboxDestination', () => {
@@ -70,7 +69,7 @@ describe('formatSandboxDestination', () => {
     [{ ...byocLarge, instanceType: 'small' }, 'BYOC · Vercel · 2 vCPU / 4 GiB · Small'],
     [
       { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
-      'Kilo · Cloudflare · 2 vCPU / 6 GiB · Dev container',
+      'Kilo · Cloudflare · 2 vCPU / 6 GiB · Retired devcontainer',
     ],
     [
       { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
@@ -252,7 +251,6 @@ describe('resolveSandboxSelection', () => {
         organizationId: undefined,
         draft: { organizationId: undefined, allocation: vercelLarge },
         capabilities,
-        devcontainer: false,
       })
     ).toEqual({ sandboxAllocation: vercelLarge });
   });
@@ -265,7 +263,6 @@ describe('resolveSandboxSelection', () => {
   );
 
   it('uses Default with dev containers without changing the draft', () => {
-    expect(resolveSandboxSelection({ ...input, devcontainer: true })).toEqual({});
     expect(draft.allocation).toEqual(vercelLarge);
     expect(resolveSandboxSelection(input)).toEqual({
       sandboxAllocation: vercelLarge,
@@ -483,7 +480,6 @@ describe('resolveSandboxSelectionSubmissionError', () => {
     },
     { sandboxAllocation: getSandboxAllocationKey(byocLarge) },
     { sandboxAllocation: undefined },
-    { devcontainer: true },
     { attachments: { path: 'upload', files: ['other-notes.md'] } },
   ])('does not bypass validation for a changed creation intent: %j', change => {
     const { error } = resolveSandboxSelection({

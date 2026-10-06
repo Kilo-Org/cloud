@@ -71,7 +71,7 @@ const sandboxTypes = {
   'isolated-small': 'Small',
   'isolated-standard': 'Large',
   'code-review': 'Code review',
-  devcontainer: 'Custom environment',
+  devcontainer: 'Retired devcontainer',
   'containers-standard-3': 'Medium',
   'containers-standard-4': 'Large',
   unknown: 'Unknown',

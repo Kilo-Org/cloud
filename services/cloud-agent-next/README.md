@@ -851,7 +851,7 @@ This enables:
 
 ### GitHub Integration
 
-- Repository preparation/cloning occurs during wrapper readiness or `SessionService.prepareWorkspace` for prepared devcontainer flows, using the session service/workspace helpers.
+- Repository preparation/cloning occurs during wrapper readiness using the session service/workspace helpers. Devcontainer support is retired; stored devcontainer sessions can be stopped or deleted but cannot start or resume.
 - Branch handling:
   - **Default**: Creates isolated `session/<sessionId>` branches for each session
   - **Upstream branches**: Use `upstreamBranch` to work on existing branches (e.g., `main`, `develop`)

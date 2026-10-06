@@ -5,7 +5,7 @@ import path from 'node:path';
 import * as readline from 'node:readline';
 import { Writable } from 'node:stream';
 
-export const PROJECTS = ['kilocode-app', 'kilocode-global-app'] as const;
+export const PROJECTS = ['kilocode-app', 'kilocode-global-app', 'kilocode-ai-gateway'] as const;
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 export const VAULT = 'Kilo Web ENV Production';
 const ONE_PASSWORD_ACCOUNT_URL = 'kilocode.1password.com';
@@ -256,7 +256,69 @@ function onePasswordAccessError(error: unknown): Error {
   );
 }
 
-export function resolveVercelContexts(tempDirectory: string): VercelContext[] {
+export type VercelContexts = {
+  contexts: VercelContext[];
+  missingProjects: Project[];
+};
+
+class VercelApiError extends Error {
+  constructor(
+    operation: string,
+    readonly code: string | undefined,
+    message: string | undefined
+  ) {
+    super(`${operation} failed: ${code ?? 'unknown_error'}${message ? ` (${message})` : ''}.`);
+  }
+}
+
+function apiArgs(context: VercelContext, endpoint: string): string[] {
+  const separator = endpoint.includes('?') ? '&' : '?';
+  return ['api', `${endpoint}${separator}teamId=${context.orgId}`, '--raw'];
+}
+
+// `vercel api` can also exit 0 with a JSON error body, so check both.
+function apiResponse(output: string, operation: string): JsonRecord {
+  const response = parseJson(output, operation);
+  if (isRecord(response.error)) {
+    throw new VercelApiError(
+      operation,
+      stringValue(response.error, 'code'),
+      stringValue(response.error, 'message')
+    );
+  }
+  return response;
+}
+
+function vercelApi(context: VercelContext, endpoint: string, operation: string): JsonRecord {
+  let output: string;
+  try {
+    output = vercel(context, apiArgs(context, endpoint), undefined, {
+      includeFailureOutput: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && /\(404\)/.test(error.message)) {
+      throw new VercelApiError(operation, 'not_found', undefined);
+    }
+    throw error;
+  }
+  return apiResponse(output, operation);
+}
+
+function projectExists(context: VercelContext): boolean {
+  try {
+    vercelApi(
+      context,
+      `/v9/projects/${encodeURIComponent(context.project)}`,
+      `Read ${context.project}`
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof VercelApiError && error.code === 'not_found') return false;
+    throw error;
+  }
+}
+
+export function resolveVercelContexts(tempDirectory: string): VercelContexts {
   let whoami: JsonRecord;
   try {
     whoami = parseJson(
@@ -275,7 +337,126 @@ export function resolveVercelContexts(tempDirectory: string): VercelContext[] {
     );
   }
 
-  return PROJECTS.map(project => ({ project, orgId, cwd: tempDirectory }));
+  const contexts: VercelContext[] = [];
+  const missingProjects: Project[] = [];
+  for (const project of PROJECTS) {
+    const context = { project, orgId, cwd: tempDirectory };
+    if (projectExists(context)) contexts.push(context);
+    else missingProjects.push(project);
+  }
+  return { contexts, missingProjects };
+}
+
+export type EnvRecord = {
+  id: string;
+  key: string;
+  type: string;
+  target: string[];
+  customEnvironmentIds: string[];
+  gitBranch?: string;
+  configurationId?: string;
+  value?: string;
+};
+
+// Vercel returns `target` as either one string or an array of strings.
+function stringArray(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+export function listEnvRecords(context: VercelContext): EnvRecord[] {
+  const operation = `List ${context.project} environment variables`;
+  const response = vercelApi(
+    context,
+    `/v10/projects/${encodeURIComponent(context.project)}/env`,
+    operation
+  );
+  if (isRecord(response.pagination) && response.pagination.next != null) {
+    throw new Error(`${operation} returned more than one page.`);
+  }
+  const hidden = response.hiddenProductionEnvCount;
+  if (typeof hidden === 'number' && hidden > 0) {
+    throw new Error(
+      `${operation}: ${hidden} production variables are hidden from your Vercel account. Ask for access to them first.`
+    );
+  }
+  return records(response.envs).map(record => {
+    const id = stringValue(record, 'id');
+    const key = stringValue(record, 'key');
+    const type = stringValue(record, 'type');
+    if (!id || !key || !type) throw new Error(`${operation} returned an unexpected response.`);
+    return {
+      id,
+      key,
+      type,
+      target: stringArray(record.target),
+      customEnvironmentIds: stringArray(record.customEnvironmentIds),
+      gitBranch: stringValue(record, 'gitBranch'),
+      configurationId: stringValue(record, 'configurationId'),
+      value: type === 'plain' ? stringValue(record, 'value') : undefined,
+    };
+  });
+}
+
+// Maps integration configuration IDs to integration slugs such as `sentry`.
+// A configuration that no longer exists keeps its ID as the name.
+export function integrationSlugs(
+  context: VercelContext,
+  configurationIds: readonly string[]
+): Map<string, string> {
+  const slugs = new Map<string, string>();
+  for (const id of new Set(configurationIds)) {
+    try {
+      const response = vercelApi(
+        context,
+        `/v1/integrations/configuration/${encodeURIComponent(id)}`,
+        'Read an integration configuration'
+      );
+      slugs.set(id, stringValue(response, 'slug') ?? id);
+    } catch (error) {
+      if (!(error instanceof VercelApiError && error.code === 'not_found')) throw error;
+      slugs.set(id, id);
+    }
+  }
+  return slugs;
+}
+
+export function customEnvironmentId(context: VercelContext, slug: string): string | undefined {
+  const response = vercelApi(
+    context,
+    `/v9/projects/${encodeURIComponent(context.project)}/custom-environments`,
+    `List ${context.project} custom environments`
+  );
+  const match = records(response.environments).find(
+    environment => stringValue(environment, 'slug') === slug
+  );
+  return match ? stringValue(match, 'id') : undefined;
+}
+
+// Vercel decrypts encrypted values one record at a time (the list endpoint does
+// not), and never returns sensitive values.
+export async function decryptedEnvValues(
+  context: VercelContext,
+  recordIds: readonly string[]
+): Promise<Map<string, string>> {
+  const values = new Map<string, string>();
+  const pending = [...new Set(recordIds)];
+  const operation = `Read a ${context.project} environment variable`;
+  const worker = async () => {
+    for (let id = pending.pop(); id !== undefined; id = pending.pop()) {
+      const endpoint = `/v1/projects/${encodeURIComponent(context.project)}/env/${encodeURIComponent(id)}`;
+      const response = apiResponse(
+        await vercelAsync(context, apiArgs(context, endpoint)),
+        operation
+      );
+      const value = stringValue(response, 'value');
+      if (response.decrypted === true && value !== undefined) values.set(id, value);
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  return values;
 }
 
 export function setVariable(
@@ -304,7 +485,7 @@ export function setVariable(
 export async function redeployLatest(
   context: VercelContext,
   environment: Exclude<Environment, 'development'>
-): Promise<string> {
+): Promise<string | undefined> {
   const response = parseJson(
     await vercelAsync(context, [
       'list',
@@ -319,9 +500,7 @@ export async function redeployLatest(
   );
   const deployment = records(response.deployments)[0];
   const url = deployment ? stringValue(deployment, 'url') : undefined;
-  if (!url) {
-    throw new Error(`No ready deployment found for ${context.project}/${environment}.`);
-  }
+  if (!url) return undefined;
 
   return (await vercelAsync(context, ['redeploy', url, '--target', environment])).trim();
 }
@@ -508,6 +687,57 @@ function findVaultPasswordField(
     throw new Error(`1Password item has more than one ${environment} password field.`);
   }
   return matches[0];
+}
+
+export type VaultValues = Partial<Record<VaultEnvironment, string>>;
+
+export function readVaultValues(
+  context: OnePasswordContext,
+  names: readonly string[]
+): Map<string, VaultValues> {
+  const items = records(
+    JSON.parse(
+      run('op', [
+        'item',
+        'list',
+        '--vault',
+        context.vaultId,
+        '--account',
+        context.accountId,
+        '--format=json',
+      ])
+    ) as unknown
+  );
+  const values = new Map<string, VaultValues>();
+  for (const name of new Set(names)) {
+    const matches = items.filter(item => item.title === name);
+    if (matches.length > 1) throw new Error(`More than one 1Password item is named ${name}.`);
+    const id = matches[0] ? stringValue(matches[0], 'id') : undefined;
+    if (!id) continue;
+    const fields = records(
+      parseJson(
+        run('op', [
+          'item',
+          'get',
+          id,
+          '--vault',
+          context.vaultId,
+          '--account',
+          context.accountId,
+          '--format=json',
+        ]),
+        `Read ${name}`
+      ).fields
+    );
+    const itemValues: VaultValues = {};
+    for (const environment of ['production', 'staging'] as const) {
+      const field = findVaultPasswordField(fields, environment);
+      const value = field?.type === 'CONCEALED' ? stringValue(field, 'value') : undefined;
+      if (value) itemValues[environment] = value;
+    }
+    values.set(name, itemValues);
+  }
+  return values;
 }
 
 export async function setVaultValue(

@@ -1881,7 +1881,10 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     const helloReply = await wrapper.hello({ wrapperId: 'wr_1', allocationId });
-    expect(helloReply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    expect(helloReply).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
 
     const prepareFrame = await wrapper.next();
     expect(prepareFrame?.type).toBe('session.prepare');

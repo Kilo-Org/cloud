@@ -58,6 +58,7 @@ function createFakeProvider(
     startSource?: ProviderStartSource;
     holdLaunch?: boolean;
     holdStop?: boolean;
+    launchError?: Error;
   } = {}
 ): FakeProvider {
   let release: () => void = () => undefined;
@@ -86,6 +87,7 @@ function createFakeProvider(
     async launch(_ref, launchEnv, launchOptions) {
       provider.launchEnvs.push({ ...launchEnv });
       provider.launchOptions.push(launchOptions);
+      if (options.launchError !== undefined) throw options.launchError;
       if (provider.launchHold) {
         await new Promise<void>(resolve => {
           releaseLaunch = resolve;
@@ -454,6 +456,31 @@ describe('repository snapshot launch', () => {
     await connect('sbx__repo_launch_keep', provider);
 
     expect(provider.launchOptions).toEqual([{ repoKey: key }]);
+  });
+
+  it('keeps the broken-snapshot discard when a launch fails before it completes', async () => {
+    const provider = createFakeProvider({
+      startSource: 'repository',
+      launchError: new Error('launch failed'),
+    });
+    const stub = await setup('sbx__repo_launch_fail', provider);
+    await putLaunchRecord(stub, {
+      allocationId: 'previous-allocation',
+      startSource: 'repository',
+      confirmed: false,
+    });
+    await stub.prepare(prepareInput());
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+
+    // The launch never completed, so the placeholder must keep the previous
+    // broken-snapshot signal. Otherwise the next start reads no `startSource`,
+    // skips the discard, and reuses the snapshot that just failed.
+    await waitFor(async () =>
+      expect(await readLaunchRecord(stub)).toMatchObject({
+        startSource: 'repository',
+        confirmed: false,
+      })
+    );
   });
 
   it('keeps a launch confirmed when its slow start stops before it returns', async () => {

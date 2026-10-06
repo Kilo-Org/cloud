@@ -816,7 +816,12 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       heartbeatAck: true,
     });
     const before = await readState(stub);
-    wrapper.send({ type: 'hello', wrapperId: 'wr_ack', allocationId, protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    wrapper.send({
+      type: 'hello',
+      wrapperId: 'wr_ack',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
     expect(await wrapper.next(20)).toBeNull();
     expect(await readState(stub)).toEqual(before);
     wrapper.send({ type: 'heartbeat', active: 'invalid', degraded: false });

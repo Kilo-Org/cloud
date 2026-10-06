@@ -37,12 +37,23 @@ export async function recordRepositoryLaunch(
  * can be slow, so a `hello` that arrives while it is still returning confirms
  * this allocation; `recordRepositoryLaunch` later fills in the start source and
  * keeps that confirmation even if the allocation stops first.
+ *
+ * The previous `startSource`/`confirmed` are carried over. If this launch fails
+ * before `recordLaunch` runs, the record must still describe the last completed
+ * start, or a broken snapshot that this launch was asked to discard would be
+ * forgotten and reused.
  */
 export async function beginRepositoryLaunch(
-  storage: Pick<DurableObjectStorage, 'put'>,
+  storage: Pick<DurableObjectStorage, 'get' | 'put'>,
   allocationId: string
 ): Promise<void> {
-  await recordRepositoryLaunch(storage, { allocationId, confirmed: false });
+  const previous = await readRepositoryLaunch(storage);
+  const startSource = previous?.startSource;
+  await recordRepositoryLaunch(storage, {
+    allocationId,
+    ...(startSource === undefined ? {} : { startSource }),
+    confirmed: previous?.confirmed ?? false,
+  });
 }
 
 /** The wrapper of `allocationId` connected, so its start source was sound. */

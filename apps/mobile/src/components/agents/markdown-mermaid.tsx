@@ -19,8 +19,10 @@ import { type MarkdownPalette } from './markdown-palette';
  * The script stays a file. Once per process it is copied next to a static host
  * page in the cache directory, and every diagram WebView loads that page by
  * file URL, so the 2.7 MB never enters the JS heap or crosses the bridge. Each
- * diagram sends only its own source, after the page loads. The file names carry
- * the version, so an app update can never pair a new page with an old script.
+ * diagram sends only its own source, after the page loads. The script's file
+ * name carries the version, so an app update can never pair a new page with an
+ * old script. The page is app code, so it is rewritten once per process and a
+ * page edit ships even when the Mermaid version stays the same.
  */
 const MERMAID_VERSION = '11.12.0';
 const HOST_DIRECTORY_NAME = 'mermaid-host';
@@ -68,9 +70,7 @@ async function prepareMermaidHost(): Promise<MermaidHost> {
     await new File(asset.localUri ?? asset.uri).copy(script);
   }
   const page = new File(directory, PAGE_FILE_NAME);
-  if (!page.exists) {
-    page.write(HOST_PAGE);
-  }
+  page.write(HOST_PAGE);
   return { pageUri: page.uri, directoryUri: directory.uri };
 }
 

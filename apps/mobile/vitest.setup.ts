@@ -36,6 +36,13 @@ vi.mock('expo-video', () => ({ VideoView: 'VideoView', useVideoPlayer: () => ({}
 vi.mock('@bsky.app/react-native-uitextview', () => ({ UITextView: 'UITextView' }));
 vi.mock('react-native-css', () => ({ styled: (component: unknown) => component }));
 
+// `expo-background-task` loads the Expo native runtime at import time. The
+// result values match the library's enum, so an executor's return is real.
+vi.mock('expo-background-task', () => ({
+  BackgroundTaskResult: { Success: 1, Failed: 2 },
+  registerTaskAsync: vi.fn(async () => {}),
+}));
+
 // `react-native-keyboard-controller` is a native module. Tests assert the app's
 // keyboard surfaces through host elements, so the provider and the views are
 // plain hosts and the keyboard read reports a hidden keyboard. `useKeyboardState`

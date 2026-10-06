@@ -24,6 +24,7 @@ import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
+  runGlanceableBackgroundRefresh,
   setupNotificationBackgroundHandler,
 } from './notifications';
 
@@ -55,6 +56,7 @@ const mocks = vi.hoisted(() => ({
   registerActivityToken: vi.fn(),
   unregisterActivityToken: vi.fn(),
   refreshActiveSessionsFromPush: vi.fn(),
+  activeSessionsList: vi.fn(),
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
@@ -180,6 +182,7 @@ vi.mock('@/lib/trpc', () => ({
       registerActivityToken: { mutate: mocks.registerActivityToken },
       unregisterActivityToken: { mutate: mocks.unregisterActivityToken },
     },
+    activeSessions: { list: { query: mocks.activeSessionsList } },
   },
 }));
 vi.mock('@/lib/query-client', () => ({ queryClient: {} }));
@@ -2134,6 +2137,76 @@ describe('runBackgroundNotificationTask', () => {
     });
 
     expect(getNotificationPermissionGranted()).toBe(true);
+  });
+});
+
+describe('runGlanceableBackgroundRefresh', () => {
+  const SUCCESS = 1;
+  const FAILED = 2;
+
+  it('publishes the tray it reads to every sink for the stored scope', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockResolvedValue({
+      sessions: [
+        { id: 'ses_ask', status: 'question' },
+        { id: 'ses_run', status: 'busy' },
+      ],
+    });
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(SUCCESS);
+    expect(mocks.activeSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-9', includeCloudAgentSessions: true })
+    );
+    expect(sink.surface.activity).toMatchObject({ needsInput: 1 });
+    expect(sink.surface.context).toEqual({ userId: 'u1', organizationId: 'org-9' });
+    unregisterGlanceableSink(sink);
+  });
+
+  it('reads nothing and writes nothing while signed out', async () => {
+    mocks.getItemAsync.mockImplementation(() => null);
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(SUCCESS);
+    expect(mocks.activeSessionsList).not.toHaveBeenCalled();
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+    unregisterGlanceableSink(sink);
+  });
+
+  it('keeps the last snapshot and reports a failed run when the tray read fails', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockRejectedValue(new Error('offline'));
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(FAILED);
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+    unregisterGlanceableSink(sink);
+  });
+
+  it('reports a failed run when the native surface rejects the write', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    sink.waitForNativeStart.mockRejectedValue(new Error('native start failed'));
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockResolvedValue({ sessions: [{ id: 'ses_run', status: 'busy' }] });
+
+    expect(await runGlanceableBackgroundRefresh()).toBe(FAILED);
+    unregisterGlanceableSink(sink);
   });
 });
 

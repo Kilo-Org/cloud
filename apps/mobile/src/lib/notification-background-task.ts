@@ -31,7 +31,11 @@ type NotificationsModule = {
   ) => Promise<Notifications.BackgroundNotificationTaskResult>;
 };
 
-async function reportRegistrationFailure(error: unknown): Promise<void> {
+/**
+ * Report a failed background task registration. Shared with
+ * `glanceable-refresh-task.ts`, the other task the entry registers.
+ */
+export async function reportRegistrationFailure(error: unknown, operation: string): Promise<void> {
   try {
     // Dynamic import keeps @sentry/react-native out of the entry graph: it
     // loads only when a registration actually fails.
@@ -39,7 +43,7 @@ async function reportRegistrationFailure(error: unknown): Promise<void> {
     Sentry.captureException(error, {
       tags: {
         'error.subsystem': 'notifications',
-        'error.operation': 'register_background_task',
+        'error.operation': operation,
       },
     });
   } catch {
@@ -66,6 +70,6 @@ export async function registerNotificationBackgroundTask(): Promise<void> {
   try {
     await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
   } catch (error) {
-    void reportRegistrationFailure(error);
+    void reportRegistrationFailure(error, 'register_background_task');
   }
 }

@@ -524,9 +524,11 @@ const HTML_ELEMENT_MODELS = {
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 // Subscript and superscript sit in an inline view, the one way React Native
-// can shift text off the line's baseline.
+// can shift text off the line's baseline. The view's bottom sits on the
+// baseline, which already lifts its glyphs, so the subscript moves down by
+// more than the superscript moves up.
 const HtmlSub: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
-  <View className="translate-y-1.5">
+  <View className="translate-y-[9px]">
     <TDefaultRenderer {...props} />
   </View>
 );
@@ -647,9 +649,11 @@ export function MarkdownHtml({
         />
       );
     };
+    // The inline view's bottom sits on the baseline; move the key down so its
+    // label shares the line's baseline instead of floating above it.
     const HtmlKbd: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
       <View
-        className="rounded border px-1"
+        className="translate-y-1.5 rounded border px-1"
         style={{ backgroundColor: palette.codeBackground, borderColor: palette.borderColor }}
       >
         <TDefaultRenderer {...props} />

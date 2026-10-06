@@ -69,7 +69,7 @@ describe('production container capacity parity', () => {
     for (const [className, productionCap, devCap] of [
       ['SandboxSmall', 5, 6],
       ['SandboxCodeReview', 5, 2],
-      ['SandboxDIND', 20, 2],
+      ['SandboxDIND', 5, 2],
     ] as const) {
       expect(
         config.containers.find(container => container.class_name === className)?.max_instances

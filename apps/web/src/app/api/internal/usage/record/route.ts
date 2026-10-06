@@ -1,8 +1,7 @@
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import {
   UsageRecordRequestSchema,
@@ -35,10 +34,8 @@ import {
 export const maxDuration = 150;
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  const secret = request.headers.get('x-internal-api-key');
-  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(request);
+  if (unauthorized) return unauthorized;
 
   // Phase timings, paired with the in-process pool gauges, are what identified that
   // pool acquisition rather than PostgreSQL or the event loop dominates this

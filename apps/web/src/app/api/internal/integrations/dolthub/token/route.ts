@@ -9,18 +9,17 @@
  *   makes the web app the single source of truth for the token, with
  *   automatic refresh via `getValidDoltHubToken`.
  *
- * Auth: shared `INTERNAL_API_SECRET` over `X-Internal-Secret` header
- * (same pattern as other `/api/internal/...` routes — see
- * `apps/web/src/app/api/internal/triage/post-comment/route.ts`).
+ * Auth: shared `INTERNAL_API_SECRET` over `X-Internal-Secret` header,
+ * enforced by `authorizeInternalApiRequest` in
+ * `apps/web/src/lib/internal-api-auth.ts`.
  *
  * URL: POST /api/internal/integrations/dolthub/token
  */
 
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import * as dolthubService from '@/lib/integrations/dolthub-service';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
@@ -34,10 +33,8 @@ const RequestSchema = z
   });
 
 export async function POST(req: NextRequest) {
-  const secret = req.headers.get('X-Internal-Secret');
-  if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const unauthorized = authorizeInternalApiRequest(req);
+  if (unauthorized) return unauthorized;
 
   let body: unknown;
   try {

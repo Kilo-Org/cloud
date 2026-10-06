@@ -53,6 +53,7 @@ type ChatInputProps = {
   ) => Promise<boolean>;
   onNewChat?: () => Promise<boolean>;
   onStop?: () => void;
+  canInterrupt?: boolean;
   disabled?: boolean;
   textareaDisabled?: boolean;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
@@ -104,6 +105,7 @@ export function ChatInput({
   onSendCommand,
   onNewChat,
   onStop,
+  canInterrupt = false,
   disabled = false,
   textareaDisabled = disabled,
   inputRef,
@@ -298,7 +300,7 @@ export function ChatInput({
   };
 
   const handleStop = () => {
-    if (onStop) {
+    if (canInterrupt && onStop) {
       onStop();
     }
   };
@@ -670,7 +672,7 @@ export function ChatInput({
               variant="destructive"
               size="icon"
               onClick={handleStop}
-              disabled={disabled || !onStop}
+              disabled={!canInterrupt || !onStop}
               className="relative h-8 w-8 rounded-lg before:absolute before:-inset-1.5"
               aria-label="Stop response"
             >

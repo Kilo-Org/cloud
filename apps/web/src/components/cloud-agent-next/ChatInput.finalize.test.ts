@@ -206,6 +206,58 @@ describe('ChatInput finalize failure', () => {
     jest.clearAllMocks();
   });
 
+  it('gates Stop on interrupt capability independently of send availability', () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const onStop = jest.fn();
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const render = (canInterrupt: boolean, disabled: boolean, withHandler = true) => {
+      act(() => {
+        root.render(
+          createElement(ChatInput, {
+            onSend: jest.fn(async () => true),
+            onStop: withHandler ? onStop : undefined,
+            canInterrupt,
+            disabled,
+            isStreaming: true,
+            attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+          })
+        );
+      });
+    };
+    const stopButton = () => {
+      const button = dom.container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Stop response"]'
+      );
+      if (!button) throw new Error('Stop button missing');
+      return button;
+    };
+
+    try {
+      render(true, true);
+      expect(stopButton().hasAttribute('disabled')).toBe(false);
+      act(() => stopButton().click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      render(false, true);
+      expect(stopButton().hasAttribute('disabled')).toBe(true);
+      act(() => stopButton().click());
+      expect(onStop).toHaveBeenCalledTimes(1);
+
+      render(false, false);
+      expect(stopButton().hasAttribute('disabled')).toBe(true);
+
+      render(true, true);
+      expect(stopButton().hasAttribute('disabled')).toBe(false);
+
+      render(true, false, false);
+      expect(stopButton().hasAttribute('disabled')).toBe(true);
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+
   it('keeps the draft editable without refocusing while submission is temporarily disabled', async () => {
     const upload = buildMockUpload();
     mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);

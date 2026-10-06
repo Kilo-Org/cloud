@@ -265,6 +265,7 @@ export default function CloudChatPage({
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
   const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const canSend = useAtomValue(manager.atoms.canSend);
+  const canInterrupt = useAtomValue(manager.atoms.canInterrupt);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const billingFailure = useAtomValue(manager.atoms.billingFailure);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
@@ -1775,6 +1776,7 @@ export default function CloudChatPage({
                                   canCreateWorktreeChat ? handleReplaceWorktreeChat : undefined
                                 }
                                 onStop={handleStopExecution}
+                                canInterrupt={canInterrupt}
                                 disabled={
                                   !canSend ||
                                   isLoading ||

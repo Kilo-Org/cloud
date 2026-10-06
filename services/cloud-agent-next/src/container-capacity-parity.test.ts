@@ -26,6 +26,7 @@ type WranglerContainer = {
     disk_mb: number;
   };
   observability?: { enabled?: boolean };
+  max_instances?: number;
 };
 
 type MeteredWranglerContainer = {
@@ -58,6 +59,28 @@ function isMeteredContainer(container: WranglerContainer): container is MeteredW
 }
 
 describe('production container capacity parity', () => {
+  it('bounds the consolidated non-containment pool without deleting persisted namespaces', () => {
+    const config = parse(
+      fs.readFileSync(path.join(process.cwd(), 'wrangler.jsonc'), 'utf8')
+    ) as WranglerConfig;
+    expect(
+      config.containers.find(container => container.class_name === 'Sandbox')?.max_instances
+    ).toBe(20);
+    for (const [className, productionCap, devCap] of [
+      ['SandboxSmall', 150, 6],
+      ['SandboxCodeReview', 500, 2],
+      ['SandboxDIND', 20, 2],
+    ] as const) {
+      expect(
+        config.containers.find(container => container.class_name === className)?.max_instances
+      ).toBe(productionCap);
+      expect(
+        config.env?.dev?.containers?.find(container => container.class_name === className)
+          ?.max_instances
+      ).toBe(devCap);
+    }
+  });
+
   it('keeps Wrangler, usage metadata, and web reconciliation capacities aligned', () => {
     const config = parse(
       fs.readFileSync(path.join(process.cwd(), 'wrangler.jsonc'), 'utf8')

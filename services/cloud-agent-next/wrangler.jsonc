@@ -169,6 +169,9 @@
       "bucket_name": "kilocode-sessions",
     },
   ],
+  // SandboxSmall, SandboxCodeReview and SandboxDIND remain for persisted DOs.
+  // Legacy IDs retain their namespaces and caps for live and resumable sessions.
+  // Remove retired applications/bindings only after verifying drain and external bindings.
   "containers": [
     {
       "class_name": "Sandbox",
@@ -181,7 +184,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 200,
+      "max_instances": 20,
       "rollout_active_grace_period": 1800,
     },
     {

@@ -1,6 +1,5 @@
 import { relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
 import { validateWrapperDispatchTicket } from './auth.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
@@ -58,10 +57,6 @@ const tokenMocks = vi.hoisted(() => ({
   resolveManagedBitbucketToken: vi.fn(),
   resolveManagedGitLabToken: vi.fn(),
 }));
-const devcontainerMocks = vi.hoisted(() => ({
-  bringUpDevContainer: vi.fn(),
-  detectDevContainer: vi.fn(),
-}));
 const portMocks = vi.hoisted(() => ({
   randomPort: vi.fn(() => 4173),
 }));
@@ -72,11 +67,6 @@ const attachmentMocks = vi.hoisted(() => ({
 vi.mock('./services/git-token-service-client.js', async importActual => ({
   ...(await importActual<typeof GitTokenServiceClientModule>()),
   ...tokenMocks,
-}));
-vi.mock('./kilo/devcontainer.js', async importActual => ({
-  ...(await importActual<typeof DevContainerModule>()),
-  bringUpDevContainer: devcontainerMocks.bringUpDevContainer,
-  detectDevContainer: devcontainerMocks.detectDevContainer,
 }));
 vi.mock('./kilo/ports.js', () => portMocks);
 vi.mock('./execution/attachment-prompt-parts.js', () => attachmentMocks);
@@ -100,10 +90,6 @@ import type { ExecutionSession, SandboxId, SandboxInstance, SessionId } from './
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from './shared/runtime-environment.js';
-import {
-  SandboxCapacityInspectionError,
-  WorkspaceCapacityAdmissionRejectedError,
-} from './workspace-errors.js';
 
 type MockExecutionSession = ExecutionSession & {
   exec: ReturnType<typeof vi.fn>;
@@ -1138,6 +1124,35 @@ describe('buildCloudAgentRules', () => {
 });
 
 describe('SessionService.prepareWorkspace', () => {
+  it.each([false, true])(
+    'rejects retired workspace on the %s warm-path fixture before provisioning',
+    async warm => {
+      const session = createSession(warm);
+      const sandbox = createSandbox(session, warm);
+      const sandboxExec = vi.spyOn(sandbox, 'exec');
+      const metadata = createMetadata({
+        sandboxId: 'dind-abcdef',
+        preparedAt: warm ? 1 : undefined,
+      });
+      await expect(
+        new SessionService().prepareWorkspace({
+          sandbox,
+          sandboxId: 'dind-abcdef',
+          userId: 'user_test',
+          sessionId: 'agent_test' as SessionId,
+          env: createEnv(),
+          metadata,
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_REQUEST',
+        message: expect.stringContaining('Devcontainer support has been retired'),
+      });
+      expect(sandboxExec).not.toHaveBeenCalled();
+      expect(session.exec).not.toHaveBeenCalled();
+      expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
+    }
+  );
+
   beforeEach(() => {
     vi.clearAllMocks();
     workspaceMocks.checkDiskAndCleanBeforeSetup.mockResolvedValue(undefined);
@@ -1196,8 +1211,6 @@ describe('SessionService.prepareWorkspace', () => {
       success: true,
       token: 'fresh-bitbucket-token',
     });
-    devcontainerMocks.detectDevContainer.mockResolvedValue(null);
-    devcontainerMocks.bringUpDevContainer.mockReset();
     portMocks.randomPort.mockReturnValue(4173);
   });
 
@@ -1617,240 +1630,6 @@ describe('SessionService.prepareWorkspace', () => {
     }
   });
 
-  it('binds the restore-token file to the opaque Kilo capability for a standard devcontainer session, never the raw token', async () => {
-    const session = createSession(false);
-    const writeFile = vi.fn().mockResolvedValue(undefined);
-    const sandbox = createSandbox(session, false, writeFile);
-    const metadata = {
-      ...createMetadata({ preparedAt: 1 }),
-      workspace: {
-        sandboxId: 'ses-abcdef' as const,
-        devcontainerRequested: true,
-        credentialContainment: { github: false, gitlab: false, kilocode: true },
-      },
-    } satisfies CloudAgentSessionState;
-    const env = createEnv();
-    const issueKiloSessionCapability = vi.fn().mockResolvedValue({
-      success: true,
-      capability: 'kka1.restore-issued',
-    });
-    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
-    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
-    const devcontainerHandle = {
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
-
-    await new SessionService().prepareWorkspace({
-      sandbox,
-      sandboxId: 'ses-abcdef',
-      userId: 'user_test',
-      sessionId: 'agent_test' as SessionId,
-      env,
-      metadata,
-      kilocodeModel: 'test-model',
-    });
-
-    const restoreTokenCall = writeFile.mock.calls.find(
-      ([path]) => path === '/home/agent_test/.local/share/kilo/session-restore-token'
-    );
-    expect(restoreTokenCall).toBeDefined();
-    expect(restoreTokenCall?.[1]).toBe('kka1.restore-issued');
-    const restoreCall = session.exec.mock.calls.find(
-      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
-    );
-    expect(restoreCall?.[0]).not.toContain('kilo-token');
-  });
-
-  it('types ENOSPC during the cold devcontainer probe before provisioning', async () => {
-    const session = createSession(false);
-    const sandbox = createSandbox(session);
-    (sandbox.exec as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      exitCode: 1,
-      stdout: '',
-      stderr: 'ENOSPC: no space left on device',
-    });
-    const metadata = {
-      ...createMetadata(),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-
-    await expect(
-      new SessionService().prepareWorkspace({
-        sandbox,
-        sandboxId: 'dind-abcdef',
-        userId: 'user_test',
-        sessionId: 'agent_test' as SessionId,
-        env: createEnv(),
-        metadata,
-        kilocodeModel: 'test-model',
-      })
-    ).rejects.toBeInstanceOf(SandboxCapacityInspectionError);
-
-    expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
-    expect(sandbox.createSessionMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects cold devcontainer preparation before workspace or runtime provisioning when admission fails', async () => {
-    const session = createSession(false);
-    const sandbox = createSandbox(session);
-    const metadata = {
-      ...createMetadata(),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    const rejection = new WorkspaceCapacityAdmissionRejectedError({
-      availableMB: 512,
-      thresholdMB: 2048,
-      cleaned: 0,
-      skipped: 1,
-    });
-    workspaceMocks.checkDiskAndCleanBeforeSetup.mockRejectedValueOnce(rejection);
-
-    await expect(
-      new SessionService().prepareWorkspace({
-        sandbox,
-        sandboxId: 'dind-abcdef',
-        userId: 'user_test',
-        sessionId: 'agent_test' as SessionId,
-        env: createEnv(),
-        metadata,
-        kilocodeModel: 'test-model',
-      })
-    ).rejects.toBe(rejection);
-
-    expect(workspaceMocks.checkDiskAndCleanBeforeSetup).toHaveBeenCalledWith(
-      sandbox,
-      undefined,
-      'user_test',
-      'agent_test',
-      { inspectContainers: true }
-    );
-    expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
-    expect(sandbox.createSessionMock).not.toHaveBeenCalled();
-    expect(devcontainerMocks.bringUpDevContainer).not.toHaveBeenCalled();
-  });
-
-  it('keeps requested devcontainer cleanup fail-closed when the sandbox ID is not DIND', async () => {
-    const session = createSession(false);
-    const sandbox = createSandbox(session);
-    const metadata = {
-      ...createMetadata(),
-      workspace: {
-        sandboxId: 'ses-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    const rejection = new WorkspaceCapacityAdmissionRejectedError({
-      availableMB: 512,
-      thresholdMB: 2048,
-      cleaned: 0,
-      skipped: 1,
-    });
-    workspaceMocks.checkDiskAndCleanBeforeSetup.mockRejectedValueOnce(rejection);
-
-    await expect(
-      new SessionService().prepareWorkspace({
-        sandbox,
-        sandboxId: 'ses-abcdef',
-        userId: 'user_test',
-        sessionId: 'agent_test' as SessionId,
-        env: createEnv(),
-        metadata,
-        kilocodeModel: 'test-model',
-      })
-    ).rejects.toBe(rejection);
-
-    expect(workspaceMocks.checkDiskAndCleanBeforeSetup).toHaveBeenCalledWith(
-      sandbox,
-      undefined,
-      'user_test',
-      'agent_test',
-      { inspectContainers: true }
-    );
-    expect(workspaceMocks.setupWorkspace).not.toHaveBeenCalled();
-    expect(sandbox.createSessionMock).not.toHaveBeenCalled();
-    expect(devcontainerMocks.bringUpDevContainer).not.toHaveBeenCalled();
-  });
-
-  it('hydrates requested devcontainer metadata while preparing a cold DIND workspace', async () => {
-    const session = createSession(false);
-    const writeFile = vi.fn().mockResolvedValue(undefined);
-    const sandbox = createSandbox(session, false, writeFile);
-    const metadata = {
-      ...createMetadata(),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    const devcontainerHandle = {
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
-
-    const result = await new SessionService().prepareWorkspace({
-      sandbox,
-      sandboxId: 'dind-abcdef',
-      userId: 'user_test',
-      sessionId: 'agent_test' as SessionId,
-      env: createEnv(),
-      metadata,
-      kilocodeModel: 'test-model',
-    });
-
-    expect(devcontainerMocks.detectDevContainer).toHaveBeenCalledWith(
-      session,
-      '/workspace/user/sessions/agent_test'
-    );
-    expect(devcontainerMocks.bringUpDevContainer).toHaveBeenCalledWith(
-      session,
-      expect.objectContaining({
-        workspacePath: '/workspace/user/sessions/agent_test',
-        wrapperPort: 4173,
-        configPath: '.devcontainer/devcontainer.json',
-      })
-    );
-    expect(result.devcontainer).toBe(devcontainerHandle);
-    expect(result.ready.devcontainer).toEqual({
-      workspacePath: '/workspace/user/sessions/agent_test',
-      innerWorkspaceFolder: '/workspaces/repo',
-      wrapperPort: 4173,
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    expect(writeFile).toHaveBeenCalledWith(
-      '/home/agent_test/tmp/kilo-empty-session-kilo-session.json',
-      expect.any(String)
-    );
-    const bootstrapCall = session.exec.mock.calls.find(
-      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
-    );
-    expect(bootstrapCall?.[0]).toContain(
-      '/home/agent_test/tmp/kilo-empty-session-kilo-session.json'
-    );
-  });
-
   it('reports the failing fresh-session bootstrap step', async () => {
     const session = createSession(false);
     session.exec.mockImplementation(async (command: string) => {
@@ -1882,165 +1661,6 @@ describe('SessionService.prepareWorkspace', () => {
       })
     ).rejects.toThrow(
       'Session bootstrap failed: exit 1, step=diffs, error=failed to parse snapshot JSON'
-    );
-  });
-
-  it('restores devcontainer sessions with session-scoped Kilo XDG paths', async () => {
-    const session = createSession(false);
-    const sandbox = createSandbox(session);
-    const metadata = {
-      ...createMetadata({ preparedAt: 1 }),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    const devcontainerHandle = {
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
-
-    await new SessionService().prepareWorkspace({
-      sandbox,
-      sandboxId: 'dind-abcdef',
-      userId: 'user_test',
-      sessionId: 'agent_test' as SessionId,
-      env: createEnv(),
-      metadata,
-      kilocodeModel: 'test-model',
-    });
-
-    const restoreCall = session.exec.mock.calls.find(
-      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
-    );
-    expect(restoreCall).toBeDefined();
-    const restoreCommand = restoreCall?.[0];
-    expect(restoreCommand).toContain('KILOCODE_TOKEN_FILE=');
-    expect(restoreCommand).toContain('/home/agent_test/.local/share/kilo/session-restore-token');
-    expect(restoreCommand).toContain('XDG_DATA_HOME=');
-    expect(restoreCommand).toContain('/home/agent_test/.local/share');
-    expect(restoreCommand).toContain('XDG_CONFIG_HOME=');
-    expect(restoreCommand).toContain('/home/agent_test/.config');
-    expect(restoreCommand).toContain('XDG_CACHE_HOME=');
-    expect(restoreCommand).toContain('/home/agent_test/.cache');
-    expect(restoreCommand).not.toContain('KILOCODE_TOKEN=');
-  });
-
-  it('cleans up the restore token when devcontainer restore execution fails', async () => {
-    const session = createSession(false);
-    session.exec.mockImplementation(async (command: string) => {
-      if (command.includes('kilo-restore-session.js')) {
-        throw new Error('devcontainer restore execution failed');
-      }
-      return { exitCode: 0, stdout: '', stderr: '' };
-    });
-    const sandbox = createSandbox(session);
-    const metadata = {
-      ...createMetadata({ preparedAt: 1 }),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    const devcontainerHandle = {
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
-
-    await expect(
-      new SessionService().prepareWorkspace({
-        sandbox,
-        sandboxId: 'dind-abcdef',
-        userId: 'user_test',
-        sessionId: 'agent_test' as SessionId,
-        env: createEnv(),
-        metadata,
-        kilocodeModel: 'test-model',
-      })
-    ).rejects.toThrow('devcontainer restore execution failed');
-
-    expect(
-      session.exec.mock.calls.some(
-        ([command]) =>
-          typeof command === 'string' &&
-          command.includes('rm -f') &&
-          command.includes('/home/agent_test/.local/share/kilo/session-restore-token')
-      )
-    ).toBe(true);
-  });
-
-  it('cleans up the restore token and preserves a chmod failure after writing it', async () => {
-    const session = createSession(false);
-    session.exec.mockImplementation(async (command: string) => {
-      if (command.includes('chmod 600')) {
-        throw new Error('restore token chmod failed');
-      }
-      return { exitCode: 0, stdout: '', stderr: '' };
-    });
-    const writeFile = vi.fn().mockResolvedValue(undefined);
-    const sandbox = createSandbox(session, false, writeFile);
-    const metadata = {
-      ...createMetadata({ preparedAt: 1 }),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    const devcontainerHandle = {
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
-
-    await expect(
-      new SessionService().prepareWorkspace({
-        sandbox,
-        sandboxId: 'dind-abcdef',
-        userId: 'user_test',
-        sessionId: 'agent_test' as SessionId,
-        env: createEnv(),
-        metadata,
-        kilocodeModel: 'test-model',
-      })
-    ).rejects.toThrow('restore token chmod failed');
-
-    expect(writeFile).toHaveBeenCalledWith(
-      '/home/agent_test/.local/share/kilo/session-restore-token',
-      expect.any(String)
-    );
-    const chmodCall = session.exec.mock.calls.findIndex(
-      ([command]) => typeof command === 'string' && command.includes('chmod 600')
-    );
-    const cleanupCall = session.exec.mock.calls.findIndex(
-      ([command]) => typeof command === 'string' && command.includes('rm -f')
-    );
-    expect(chmodCall).toBeGreaterThanOrEqual(0);
-    expect(cleanupCall).toBeGreaterThan(chmodCall);
-    expect(session.exec.mock.calls[cleanupCall]?.[0]).toContain(
-      '/home/agent_test/.local/share/kilo/session-restore-token'
     );
   });
 
@@ -2231,111 +1851,6 @@ describe('SessionService.prepareWorkspace', () => {
     expect(result.runtimeEnv.GH_TOKEN).toBe('leftover-github-pat');
   });
 
-  it('restores persisted devcontainer runtime metadata on the warm fast path', async () => {
-    const session = createSession(true);
-    const sandbox = createSandbox(session, true);
-    const metadata = createMetadata({
-      workspacePath: '/workspace/user/sessions/agent_test',
-      sessionHome: '/home/agent_test',
-      branchName: 'session/agent_test',
-      sandboxId: 'dind-abcdef',
-      devcontainer: {
-        workspacePath: '/workspace/user/sessions/agent_test',
-        innerWorkspaceFolder: '/workspaces/repo',
-        wrapperPort: 4173,
-        configPath: '.devcontainer/devcontainer.json',
-      },
-    });
-    const devcontainerHandle = {
-      containerId: 'container-dev-warm',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
-
-    const result = await new SessionService().prepareWorkspace({
-      sandbox,
-      sandboxId: 'dind-abcdef',
-      userId: 'user_test',
-      sessionId: 'agent_test' as SessionId,
-      env: createEnv(),
-      metadata,
-      kilocodeModel: 'test-model',
-    });
-
-    expect(devcontainerMocks.bringUpDevContainer).toHaveBeenCalledWith(
-      session,
-      expect.objectContaining({
-        workspacePath: '/workspace/user/sessions/agent_test',
-        wrapperPort: 4173,
-      })
-    );
-    expect(result.devcontainer).toBe(devcontainerHandle);
-    expect(result.ready.devcontainer).toEqual(metadata.devcontainer);
-  });
-
-  it('hydrates requested devcontainer metadata on the warm fast path when runtime metadata is missing', async () => {
-    const session = createSession(true);
-    const sandbox = createSandbox(session, true);
-    const metadata = {
-      ...createMetadata({
-        workspacePath: '/workspace/user/sessions/agent_test',
-        sessionHome: '/home/agent_test',
-        branchName: 'session/agent_test',
-        sandboxId: 'dind-abcdef',
-      }),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    const devcontainerHandle = {
-      containerId: 'container-dev-warm-detected',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    };
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
-
-    const result = await new SessionService().prepareWorkspace({
-      sandbox,
-      sandboxId: 'dind-abcdef',
-      userId: 'user_test',
-      sessionId: 'agent_test' as SessionId,
-      env: createEnv(),
-      metadata,
-      kilocodeModel: 'test-model',
-    });
-
-    expect(devcontainerMocks.detectDevContainer).toHaveBeenCalledWith(
-      session,
-      '/workspace/user/sessions/agent_test'
-    );
-    expect(devcontainerMocks.bringUpDevContainer).toHaveBeenCalledWith(
-      session,
-      expect.objectContaining({
-        workspacePath: '/workspace/user/sessions/agent_test',
-        wrapperPort: 4173,
-        configPath: '.devcontainer/devcontainer.json',
-      })
-    );
-    expect(result.devcontainer).toBe(devcontainerHandle);
-    expect(result.ready.devcontainer).toEqual({
-      workspacePath: '/workspace/user/sessions/agent_test',
-      innerWorkspaceFolder: '/workspaces/repo',
-      wrapperPort: 4173,
-      configPath: '.devcontainer/devcontainer.json',
-    });
-  });
-
   it('refreshes a prepared warm GitHub remote with a managed capability', async () => {
     const session = createSession(true);
     const sandbox = createSandbox(session, true);
@@ -2507,54 +2022,6 @@ describe('SessionService.prepareWorkspace', () => {
     );
   });
 
-  it('uses direct GitHub authentication for requested devcontainer preparation', async () => {
-    const session = createSession(false);
-    const sandbox = createSandbox(session);
-    const metadata = {
-      ...createMetadata({
-        githubRepo: 'acme/repo',
-        gitUrl: undefined,
-        gitToken: undefined,
-        platform: 'github',
-      }),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-    devcontainerMocks.detectDevContainer.mockResolvedValue({
-      configPath: '.devcontainer/devcontainer.json',
-    });
-    devcontainerMocks.bringUpDevContainer.mockResolvedValue({
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/user/sessions/agent_test',
-      agentSessionId: 'agent_test',
-      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
-      teardown: vi.fn().mockResolvedValue(undefined),
-    });
-
-    await new SessionService().prepareWorkspace({
-      sandbox,
-      sandboxId: 'dind-abcdef',
-      userId: 'user_test',
-      sessionId: 'agent_test' as SessionId,
-      env: createEnv(),
-      metadata,
-      kilocodeModel: 'test-model',
-    });
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
-    expect(workspaceMocks.cloneGitHubRepo).toHaveBeenCalledWith(
-      session,
-      '/workspace/user/sessions/agent_test',
-      'acme/repo',
-      { name: 'kiloconnect[bot]', email: 'bot@example.com' },
-      undefined
-    );
-  });
-
   it('fails closed without a raw GitLab token fallback when prepared workspace capability issuance fails', async () => {
     tokenMocks.issueCloudAgentGitLabSessionCapability.mockResolvedValueOnce({
       success: false,
@@ -2666,8 +2133,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       success: true,
       token: 'fresh-bitbucket-token',
     });
-    devcontainerMocks.detectDevContainer.mockResolvedValue(null);
-    devcontainerMocks.bringUpDevContainer.mockReset();
     portMocks.randomPort.mockReturnValue(4173);
     attachmentMocks.buildSignedPromptAttachments.mockResolvedValue([]);
   });
@@ -3028,64 +2493,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.repo).toMatchObject({ token: 'kgh2.default' });
   });
 
-  it('passes persisted devcontainer intent to the active wrapper readiness request', async () => {
-    const service = new SessionService();
-    const env = createEnv();
-    env.WORKER_URL = 'https://cloud-agent.example.com';
-    const metadata = {
-      ...createMetadata(),
-      workspace: {
-        sandboxId: 'dind-abcdef' as const,
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState;
-
-    const result = await service.buildWrapperSessionReadyAndPromptRequests({
-      env,
-      plan: {
-        scope: {
-          sessionId: 'agent_test',
-          userId: 'user_test',
-        },
-        turn: {
-          type: 'prompt',
-          messageId: 'msg_018f1e2d3c4bDevReadyAbCdEF',
-          prompt: 'Use the devcontainer runtime',
-        },
-        agent: {
-          mode: 'code',
-          model: 'test-model',
-        },
-        workspace: {
-          sandboxId: metadata.workspace?.sandboxId ?? 'ses-abcdef',
-          metadata,
-        },
-        wrapper: {
-          fence: {
-            wrapperRunId: 'wr_devcontainer',
-            wrapperGeneration: 2,
-            wrapperConnectionId: 'conn_devcontainer',
-          },
-        },
-      } satisfies FencedWrapperDispatchRequest,
-    });
-
-    expect(result.readyRequest.devcontainer).toEqual({ requested: true });
-    expect(result.ready.devcontainer).toBeUndefined();
-  });
-
-  it('uses direct GitLab authentication for a DIND sandbox', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata(),
-      workspace: { sandboxId: 'dind-abcdef' },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({ token: 'resolved-gitlab-token' });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
-  });
-
   it('derives a managed capability from the SandboxSmallContainment container ID', async () => {
     await buildPromptWrapperRequests({
       ...createMetadata(),
@@ -3114,25 +2521,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       expect.any(Object),
       expect.objectContaining({ outboundContainerId: 'containment-sandbox-do-id' })
     );
-  });
-
-  it('uses direct GitLab authentication in DIND devcontainer wrapper readiness', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata(),
-      workspace: {
-        sandboxId: 'dind-abcdef',
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({
-      kind: 'git',
-      token: 'resolved-gitlab-token',
-      platform: 'gitlab',
-    });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
   });
 
   it('fails closed without raw GitLab fallback when managed capability issuance fails', async () => {
@@ -3201,76 +2589,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const result = await buildPromptWrapperRequests(createMetadata());
 
     expect(result.readyRequest).not.toHaveProperty('preparation');
-  });
-
-  it('uses direct GitLab authentication for a resumed DIND session', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata({ preparedAt: 1 }),
-      workspace: { sandboxId: 'dind-abcdef' },
-      devcontainer: {
-        workspacePath: '/workspace/user/sessions/agent_test',
-        innerWorkspaceFolder: '/workspaces/repo',
-        wrapperPort: 4173,
-        configPath: '.devcontainer/devcontainer.json',
-      },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitLabSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({ token: 'resolved-gitlab-token' });
-    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
-  });
-
-  it('uses direct GitHub authentication in DIND devcontainer wrapper readiness', async () => {
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata({
-        githubRepo: 'acme/repo',
-        gitUrl: undefined,
-        gitToken: undefined,
-        platform: 'github',
-      }),
-      workspace: {
-        sandboxId: 'dind-abcdef',
-        devcontainerRequested: true,
-      },
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({
-      kind: 'github',
-      token: 'resolved-gh-token',
-    });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('resolved-gh-token');
-  });
-
-  it('uses direct GitHub authentication for a resumed DIND session with resolved devcontainer metadata', async () => {
-    const devcontainer = {
-      workspacePath: '/workspace/user/sessions/agent_test',
-      innerWorkspaceFolder: '/workspaces/repo',
-      wrapperPort: 4173,
-      configPath: '.devcontainer/devcontainer.json',
-    };
-    const result = await buildPromptWrapperRequests({
-      ...createMetadata({
-        preparedAt: 1,
-        githubRepo: 'acme/repo',
-        gitUrl: undefined,
-        gitToken: undefined,
-        platform: 'github',
-      }),
-      workspace: { sandboxId: 'dind-abcdef' },
-      devcontainer,
-    } satisfies CloudAgentSessionState);
-
-    expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).toHaveBeenCalled();
-    expect(tokenMocks.issueCloudAgentGitHubSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.repo).toMatchObject({
-      kind: 'github',
-      token: 'resolved-gh-token',
-    });
-    expect(result.readyRequest.materialized.env.GH_TOKEN).toBe('resolved-gh-token');
-    expect(result.readyRequest.devcontainer).toEqual({ requested: true, resolved: devcontainer });
   });
 
   it('materializes workspace setup and prompt delivery behind an opaque Kilo capability, never the raw tokens', async () => {
@@ -3514,43 +2832,6 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       code: 'WORKSPACE_SETUP_FAILED',
       retryable: true,
       message: 'Kilo session capability issuance failed (rpc_error)',
-    });
-  });
-
-  it('falls back to the raw Kilo token for DIND sandboxes, which have no outbound interceptor to redeem a capability against', async () => {
-    const service = new SessionService();
-    const env = createEnv();
-    env.WORKER_URL = 'https://cloud-agent.example.com';
-    const issueKiloSessionCapability = vi.fn();
-    if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
-    env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = issueKiloSessionCapability;
-    const metadata = createMetadata({ sandboxId: 'dind-abcdef' });
-
-    const result = await service.buildWrapperSessionReadyAndPromptRequests({
-      env,
-      plan: {
-        scope: { sessionId: 'agent_test', userId: 'user_test' },
-        turn: {
-          type: 'prompt',
-          messageId: 'msg_018f1e2d3c4bDindFallbackAA',
-          prompt: 'Do the work',
-        },
-        agent: { mode: 'code', model: 'test-model' },
-        workspace: { sandboxId: 'dind-abcdef', metadata },
-        wrapper: {
-          fence: {
-            wrapperRunId: 'wr_dind',
-            wrapperGeneration: 1,
-            wrapperConnectionId: 'conn_dind',
-          },
-        },
-      } satisfies FencedWrapperDispatchRequest,
-    });
-
-    expect(issueKiloSessionCapability).not.toHaveBeenCalled();
-    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).toBe('kilo-token');
-    expect(JSON.parse(result.readyRequest.materialized.env.KILO_AUTH_CONTENT)).toEqual({
-      kilo: { type: 'api', key: 'kilo-token' },
     });
   });
 
@@ -3855,7 +3136,8 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         gitUrl: undefined,
         gitToken: undefined,
         platform: 'github',
-        sandboxId: 'dind-abcdef',
+        sandboxId: 'ses-abcdef',
+        credentialContainment: { github: false, gitlab: false, bitbucket: false, kilocode: false },
       }),
       repository: {
         type: 'github',

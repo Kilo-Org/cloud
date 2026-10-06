@@ -53,65 +53,68 @@ describe('Code Reviewer ephemeral sandbox lifecycle', () => {
     await clearSessions();
   });
 
-  it('schedules post-terminal cleanup and rejects follow-up messages for review sandboxes', async () => {
-    const userId = 'user_crv_enabled';
-    const sessionId = 'agent_crv_enabled';
-    const orgId = 'org_crv_enabled';
-    const stub = sessionStub(userId, sessionId);
+  it.each(['crv-123456789abc', 'crv-std1-123456789abc'])(
+    'schedules post-terminal cleanup and rejects follow-up messages for %s',
+    async sandboxId => {
+      const userId = 'user_crv_enabled';
+      const sessionId = 'agent_crv_enabled';
+      const orgId = 'org_crv_enabled';
+      const stub = sessionStub(userId, sessionId);
 
-    const result = await runInDurableObject(stub, async instance => {
-      await registerReadySession(instance, {
-        sessionId,
-        userId,
-        orgId,
-        createdOnPlatform: 'code-review',
-        prompt: 'review terminal cleanup',
-        mode: 'code',
-        model: 'test-model',
-        sandboxId: 'crv-123456789abc',
-      });
-      await instance.ctx.storage.put('wrapper_runtime_state', {
-        wrapperGeneration: 1,
-        wrapperConnectionId: 'conn_crv_enabled',
-        wrapperRunId: 'wr_crv_enabled',
-      });
-      await instance.ctx.storage.put('wrapper_lease', {
-        state: 'owns_wrapper',
-        nextInstanceGeneration: 2,
-        instance: { instanceId: 'instance_crv_enabled', instanceGeneration: 1 },
+      const result = await runInDurableObject(stub, async instance => {
+        await registerReadySession(instance, {
+          sessionId,
+          userId,
+          orgId,
+          createdOnPlatform: 'code-review',
+          prompt: 'review terminal cleanup',
+          mode: 'code',
+          model: 'test-model',
+          sandboxId,
+        });
+        await instance.ctx.storage.put('wrapper_runtime_state', {
+          wrapperGeneration: 1,
+          wrapperConnectionId: 'conn_crv_enabled',
+          wrapperRunId: 'wr_crv_enabled',
+        });
+        await instance.ctx.storage.put('wrapper_lease', {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_crv_enabled', instanceGeneration: 1 },
+        });
+
+        await instance.handleWrapperTerminalEvent({
+          wrapperRunId: 'wr_crv_enabled',
+          status: 'completed',
+          messageIds: [],
+        });
+
+        return {
+          cleanupScheduled: await instance.isSandboxCleanupScheduled(),
+          lease: await getWrapperLease(instance.ctx.storage),
+          admission: await instance.admitSubmittedMessage(
+            queueUserMessageInput({
+              userId,
+              prompt: 'must not queue while cleanup is scheduled',
+              messageId: 'msg_018f1e2d3c4bCrvRejectABCDE',
+            })
+          ),
+          destroyAfter: await instance.ctx.storage.get<number>('ephemeral_sandbox_destroy_after'),
+          alarm: await instance.ctx.storage.getAlarm(),
+        };
       });
 
-      await instance.handleWrapperTerminalEvent({
-        wrapperRunId: 'wr_crv_enabled',
-        status: 'completed',
-        messageIds: [],
+      expect(result.cleanupScheduled).toBe(true);
+      expect(result.lease).toMatchObject({ state: 'stop_needed', reason: 'terminal-ended' });
+      expect(result.admission).toEqual({
+        success: false,
+        code: 'BAD_REQUEST',
+        error: 'Session sandbox cleanup is scheduled',
       });
-
-      return {
-        cleanupScheduled: await instance.isSandboxCleanupScheduled(),
-        lease: await getWrapperLease(instance.ctx.storage),
-        admission: await instance.admitSubmittedMessage(
-          queueUserMessageInput({
-            userId,
-            prompt: 'must not queue while cleanup is scheduled',
-            messageId: 'msg_018f1e2d3c4bCrvRejectABCDE',
-          })
-        ),
-        destroyAfter: await instance.ctx.storage.get<number>('ephemeral_sandbox_destroy_after'),
-        alarm: await instance.ctx.storage.getAlarm(),
-      };
-    });
-
-    expect(result.cleanupScheduled).toBe(true);
-    expect(result.lease).toMatchObject({ state: 'stop_needed', reason: 'terminal-ended' });
-    expect(result.admission).toEqual({
-      success: false,
-      code: 'BAD_REQUEST',
-      error: 'Session sandbox cleanup is scheduled',
-    });
-    expect(result.destroyAfter).toEqual(expect.any(Number));
-    expect(result.alarm).toBeLessThanOrEqual(result.destroyAfter!);
-  });
+      expect(result.destroyAfter).toEqual(expect.any(Number));
+      expect(result.alarm).toBeLessThanOrEqual(result.destroyAfter!);
+    }
+  );
 
   it.each([
     {

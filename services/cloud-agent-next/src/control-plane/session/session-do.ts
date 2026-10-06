@@ -27,6 +27,8 @@ import {
   CurrentSessionMetadataSchema,
   parseSessionMetadata,
   serializeSessionMetadata,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import {
@@ -1831,6 +1833,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async deliverQueued(pass = this.transportPass()): Promise<void> {
+    if (await this.failRetiredQueuedMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
@@ -1892,7 +1895,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.applyView(view, pass);
   }
 
+  private async failRetiredQueuedMessages(): Promise<boolean> {
+    if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
+    await this.settleMessages(
+      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      'failed',
+      DEVCONTAINER_RETIRED_MESSAGE
+    );
+    this.finishWorktreePreparation();
+    return true;
+  }
+
   private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredQueuedMessages()) return null;
     const peer = this.sandboxPeer();
     const registration = this.registration;
     if (registration === null) return null;

@@ -11,6 +11,7 @@ vi.mock('../../workspace-backup-observability.js', () => ({
 }));
 
 import type { Env, SandboxInstance } from '../../types.js';
+import { getSandbox } from '@cloudflare/sandbox';
 import type { CredentialContainment, SessionMetadata } from '../../persistence/session-metadata.js';
 import { WrapperClient, WrapperError } from '../../kilo/wrapper-client.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
@@ -164,6 +165,82 @@ function ensureRequest(options?: {
   };
 }
 
+describe('persisted sandbox cleanup routing', () => {
+  it('uses the historical DIND namespace for retired metadata without a saved sandbox ID', async () => {
+    const destroy = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(getSandbox).mockReturnValue({ destroy } as unknown as SandboxInstance);
+    const env = { SandboxDIND: {} } as unknown as Env;
+    const legacy = metadata();
+    legacy.workspace = { devcontainerRequested: true };
+    legacy.identity.sessionId = 'agent_abc123';
+    await new CloudflareAgentSandbox(env, legacy).delete('recovery');
+    expect(getSandbox).toHaveBeenCalledWith(
+      env.SandboxDIND,
+      'dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370'
+    );
+    expect(destroy).toHaveBeenCalledOnce();
+  });
+
+  it.each([{ sandboxId: 'dind-abcdef' as const }, { devcontainer: true }])(
+    'rejects retired wrapper bootstrap before resolving any sandbox: %j',
+    async options => {
+      const resolveSandbox = vi.fn();
+      const legacy = metadata(options);
+      const runtime = new CloudflareAgentSandbox({} as Env, legacy, { resolveSandbox });
+      const request = ensureRequest();
+      request.plan.workspace.metadata = legacy;
+      request.plan.workspace.sandboxId = legacy.workspace!.sandboxId!;
+      await expect(runtime.ensureWrapper(request)).rejects.toMatchObject({
+        code: 'INVALID_REQUEST',
+        message: expect.stringContaining('Devcontainer support has been retired'),
+      });
+      expect(resolveSandbox).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['ses-abcdef', 'SandboxSmall'],
+    ['crv-abcdef', 'SandboxCodeReview'],
+    ['dind-abcdef', 'SandboxDIND'],
+    ['istd-abcdef', 'Sandbox'],
+    ['ses-std1-abcdef', 'Sandbox'],
+    ['crv-std1-abcdef', 'Sandbox'],
+  ] as const)(
+    'destroys persisted %s through its original namespace',
+    async (sandboxId, namespace) => {
+      const destroy = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(getSandbox).mockReturnValue({ destroy } as unknown as SandboxInstance);
+      const env = { [namespace]: {} } as unknown as Env;
+      const runtime = new CloudflareAgentSandbox(env, metadata({ sandboxId }));
+      await runtime.delete('recovery');
+      expect(getSandbox).toHaveBeenCalledWith(env[namespace], sandboxId);
+      expect(destroy).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    [undefined, 'ses', 'SandboxSmall'],
+    ['code-review', 'crv', 'SandboxCodeReview'],
+  ] as const)(
+    'keeps legacy %s fallback routing when metadata has no sandbox ID',
+    async (billingOrigin, prefix, namespace) => {
+      const destroy = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(getSandbox).mockReturnValue({ destroy } as unknown as SandboxInstance);
+      const env = { PER_SESSION_SANDBOX_ORG_IDS: '*', [namespace]: {} } as unknown as Env;
+      const legacy = metadata();
+      legacy.workspace = undefined;
+      legacy.identity.sessionId = 'agent_abc123';
+      legacy.identity.billingOrigin = billingOrigin;
+      await new CloudflareAgentSandbox(env, legacy).delete('recovery');
+      expect(getSandbox).toHaveBeenCalledWith(
+        env[namespace],
+        `${prefix}-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370`
+      );
+      expect(destroy).toHaveBeenCalledOnce();
+    }
+  );
+});
+
 describe('deriveSetupEnvironment', () => {
   it('uses materialized plain values and persisted encrypted secret identities only', () => {
     expect(
@@ -223,7 +300,6 @@ describe('deriveSetupEnvironment', () => {
     if (!setupEnvironment) throw new Error('expected setup environment');
     const candidate = await buildWorkspaceBackupCandidate({
       fresh: true,
-      devcontainer: false,
       setupCommands: ['npm ci'],
       setupEnvironment,
       userId: 'user_cloudflare',
@@ -649,7 +725,6 @@ describe('CloudflareAgentSandbox', () => {
     }
     const candidate = await buildWorkspaceBackupCandidate({
       fresh: true,
-      devcontainer: false,
       setupCommands: ['pnpm install', 'node ./scripts/custom-setup.mjs --arbitrary'],
       setupEnvironment: {
         variables: { CACHE_VARIANT: 'resolved-profile-env' },
@@ -780,7 +855,6 @@ describe('CloudflareAgentSandbox', () => {
     const request = ensureRequest({ cacheEligible: true });
     const candidate = await buildWorkspaceBackupCandidate({
       fresh: true,
-      devcontainer: false,
       setupCommands: ['pnpm install', 'node ./scripts/custom-setup.mjs --arbitrary'],
       setupEnvironment: {
         variables: { CACHE_VARIANT: 'resolved-profile-env' },
@@ -853,7 +927,6 @@ describe('CloudflareAgentSandbox', () => {
     const request = ensureRequest({ cacheEligible: true });
     const candidate = await buildWorkspaceBackupCandidate({
       fresh: true,
-      devcontainer: false,
       setupCommands: ['pnpm install', 'node ./scripts/custom-setup.mjs --arbitrary'],
       setupEnvironment: {
         variables: { CACHE_VARIANT: 'resolved-profile-env' },
@@ -929,7 +1002,6 @@ describe('CloudflareAgentSandbox', () => {
     const request = ensureRequest({ cacheEligible: true });
     const candidate = await buildWorkspaceBackupCandidate({
       fresh: true,
-      devcontainer: false,
       setupCommands: ['pnpm install', 'node ./scripts/custom-setup.mjs --arbitrary'],
       setupEnvironment: {
         variables: { CACHE_VARIANT: 'resolved-profile-env' },
@@ -1035,7 +1107,6 @@ describe('CloudflareAgentSandbox', () => {
     const request = ensureRequest({ cacheEligible: true });
     const candidate = await buildWorkspaceBackupCandidate({
       fresh: true,
-      devcontainer: false,
       setupCommands: ['pnpm install', 'node ./scripts/custom-setup.mjs --arbitrary'],
       setupEnvironment: {
         variables: { CACHE_VARIANT: 'resolved-profile-env' },
@@ -1106,7 +1177,6 @@ describe('CloudflareAgentSandbox', () => {
     const request = ensureRequest({ cacheEligible: true });
     const candidate = await buildWorkspaceBackupCandidate({
       fresh: true,
-      devcontainer: false,
       setupCommands: ['pnpm install', 'node ./scripts/custom-setup.mjs --arbitrary'],
       setupEnvironment: {
         variables: { CACHE_VARIANT: 'resolved-profile-env' },
@@ -1471,42 +1541,6 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
-  it('keeps unresolved DIND bootstrap cleanup fail-closed', async () => {
-    const unresolvedDindMetadata = {
-      ...metadata(),
-      workspace: { sandboxId: 'dind-unresolved' },
-    } satisfies SessionMetadata;
-    const request = ensureRequest();
-    request.plan.workspace = { sandboxId: 'dind-unresolved', metadata: unresolvedDindMetadata };
-    const exec = vi
-      .fn()
-      .mockResolvedValueOnce({ exitCode: 1, stdout: '', stderr: '' })
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '536870912  10485760000\n', stderr: '' })
-      .mockResolvedValueOnce({ exitCode: 0, stdout: 'agent_stale-aaaa\n', stderr: '' })
-      .mockResolvedValueOnce({
-        exitCode: 0,
-        stdout: '/run/user/1000/docker.sock',
-        stderr: '',
-      })
-      .mockRejectedValueOnce(new Error('docker inspection unavailable'))
-      .mockResolvedValueOnce({ exitCode: 0, stdout: '536870912  10485760000\n', stderr: '' });
-    const sandbox = new CloudflareAgentSandbox({} as Env, unresolvedDindMetadata, {
-      resolveSandbox: () =>
-        ({
-          exec,
-          listProcesses: vi.fn().mockResolvedValue([]),
-          createSession: vi.fn(),
-        }) as unknown as SandboxInstance,
-    });
-
-    await expect(sandbox.ensureWrapper(request)).rejects.toBeInstanceOf(
-      WorkspaceCapacityAdmissionRejectedError
-    );
-    expect(exec.mock.calls[4][0]).toContain('docker ps');
-    expect(exec.mock.calls.every(call => !call[0].includes('stat'))).toBe(true);
-    expect(exec.mock.calls.every(call => !call[0].includes('rm -rf'))).toBe(true);
-  });
-
   it('passes a leased physical identity into bootstrap startup', async () => {
     const bootstrapSession = {};
     const ensureBootstrapWrapper = vi
@@ -1528,79 +1562,6 @@ describe('CloudflareAgentSandbox', () => {
       leasedInstance: { instanceId: 'instance_cloudflare', instanceGeneration: 3 },
     });
     ensureBootstrapWrapper.mockRestore();
-  });
-
-  it('does not start a devcontainer wrapper after cold workspace admission is rejected', async () => {
-    const rejection = new WorkspaceCapacityAdmissionRejectedError({
-      availableMB: 512,
-      thresholdMB: 2048,
-      cleaned: 0,
-      skipped: 1,
-    });
-    const prepareWorkspace = vi.fn().mockRejectedValue(rejection);
-    const ensureWrapper = vi.spyOn(WrapperClient, 'ensureWrapper');
-    const sandbox = new CloudflareAgentSandbox({} as Env, metadata({ devcontainer: true }), {
-      resolveSandbox: () => ({}) as SandboxInstance,
-      sessionService: { prepareWorkspace } as never,
-    });
-
-    await expect(sandbox.ensureWrapper(ensureRequest({ devcontainer: true }))).rejects.toBe(
-      rejection
-    );
-    expect(ensureWrapper).not.toHaveBeenCalled();
-    ensureWrapper.mockRestore();
-  });
-
-  it('prepares and starts a devcontainer wrapper through the adapter', async () => {
-    const devcontainer = {
-      containerId: 'container-dev',
-      innerWorkspaceFolder: '/workspaces/repo',
-      workspacePath: '/workspace/cloudflare',
-      agentSessionId: 'agent_cloudflare',
-      overrideConfigPath: '/tmp/devcontainer.json',
-      teardown: vi.fn(),
-    };
-    const request = ensureRequest({ devcontainer: true, leased: true });
-    const updateRuntimeEnvironment = vi.fn().mockResolvedValue(undefined);
-    const prepareWorkspace = vi.fn().mockResolvedValue({
-      context: { workspacePath: '/workspace/cloudflare' },
-      ready: {
-        ...request.prepared.ready,
-        devcontainer: {
-          workspacePath: '/workspace/cloudflare',
-          innerWorkspaceFolder: '/workspaces/repo',
-          wrapperPort: 4173,
-          configPath: '.devcontainer/devcontainer.json',
-        },
-      },
-      runtimeEnv: { GH_TOKEN: 'next-token' },
-      session: {},
-      devcontainer,
-    });
-    const ensureWrapper = vi.spyOn(WrapperClient, 'ensureWrapper').mockResolvedValueOnce({
-      client: { updateRuntimeEnvironment } as unknown as WrapperClient,
-      sessionId: 'kilo_cloudflare',
-    });
-    const sandbox = new CloudflareAgentSandbox({} as Env, metadata({ devcontainer: true }), {
-      resolveSandbox: () => ({}) as SandboxInstance,
-      sessionService: { prepareWorkspace } as never,
-    });
-
-    await expect(sandbox.ensureWrapper(request)).resolves.toMatchObject({
-      status: 'session-ready',
-      kiloSessionId: 'kilo_cloudflare',
-    });
-    expect(ensureWrapper).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        fixedPort: 4173,
-        devcontainer,
-        leasedInstance: { instanceId: 'instance_cloudflare', instanceGeneration: 3 },
-      })
-    );
-    expect(updateRuntimeEnvironment).toHaveBeenCalledWith({ GH_TOKEN: 'next-token' });
-    ensureWrapper.mockRestore();
   });
 
   it('gets an existing running wrapper without provisioning compute', async () => {

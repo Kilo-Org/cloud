@@ -14,7 +14,10 @@ import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js'
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackJob } from '../../src/callbacks/types.js';
-import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import {
+  parseSessionMetadata,
+  DEVCONTAINER_RETIRED_MESSAGE,
+} from '../../src/persistence/session-metadata.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
 import { VercelSandboxRestError } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
@@ -51,6 +54,44 @@ const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const SESSION_OWNER_ID = 'user_123';
 const QUEUED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.queuedBackstopMs;
 const ACCEPTED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.acceptedBackstopMs;
+
+describe('retired control-plane runtime recovery', () => {
+  it.each(['unknown', 'ready'] as const)(
+    'fails stored devcontainer work from a %s route before prepare or delivery and keeps Stop accessible',
+    async routeState => {
+      const sessionId = newSessionId();
+      const sandboxId = `istd-${'a'.repeat(48)}`;
+      const stub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+      const peer = new FakeSandboxPeer();
+      await stub.registerSession(registration(sandboxId, sessionId));
+      await installPeer(stub, peer);
+      await runInDurableObject(stub, async (instance, state) => {
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { userId: SESSION_OWNER_ID, sessionId },
+          auth: { kilocodeToken: NATIVE_KILO_TOKEN },
+          workspace: { sandboxId, devcontainerRequested: true },
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+        Object.assign(instance, { metadata });
+        await state.storage.put('session_metadata', metadata);
+        if (routeState === 'ready') {
+          Object.assign(instance, { route: peer.view('ready') });
+          await state.storage.put('control_plane_route', peer.view('ready'));
+        }
+      });
+      const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+      await expect(stub.send(promptPayload(messageId))).resolves.toEqual({ type: 'ok' });
+      expect(await messageStatus(stub, messageId)).toBe('failed');
+      expect(await readMessageReason(stub, messageId)).toBe(DEVCONTAINER_RETIRED_MESSAGE);
+      expect(peer.prepareCalls).toEqual([]);
+      expect(peer.deliverCalls).toEqual([]);
+      await stub.stop();
+      expect(peer.abortCalls).toEqual([sessionId]);
+      expect((await stub.getMetadata())?.workspace?.devcontainerRequested).toBe(true);
+    }
+  );
+});
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;

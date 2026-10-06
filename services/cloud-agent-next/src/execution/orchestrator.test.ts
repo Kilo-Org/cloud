@@ -303,17 +303,22 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     } satisfies Partial<ExecutionError>);
   });
 
-  it('destroys Code Reviewer sandboxes after wrapper bootstrap failure', async () => {
-    const orgId = 'org_crv_ephemeral';
-    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator();
-    ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
+  it.each(['crv-test', 'crv-std1-abcdef'] as const)(
+    'destroys review sandbox %s after wrapper bootstrap failure',
+    async sandboxId => {
+      const orgId = 'org_crv_ephemeral';
+      const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator();
+      ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
 
-    await expect(orchestrator.execute(codeReviewPlan(orgId))).rejects.toMatchObject({
-      code: 'WRAPPER_START_FAILED',
-      retryable: true,
-    } satisfies Partial<ExecutionError>);
-    expect(deleteSandbox).toHaveBeenCalledWith('recovery');
-  });
+      const plan = codeReviewPlan(orgId);
+      plan.workspace.sandboxId = sandboxId;
+      await expect(orchestrator.execute(plan)).rejects.toMatchObject({
+        code: 'WRAPPER_START_FAILED',
+        retryable: true,
+      } satisfies Partial<ExecutionError>);
+      expect(deleteSandbox).toHaveBeenCalledWith('recovery');
+    }
+  );
 
   it('does not destroy non-crv sandboxes after wrapper bootstrap failure', async () => {
     const orgId = 'org_crv_ephemeral';

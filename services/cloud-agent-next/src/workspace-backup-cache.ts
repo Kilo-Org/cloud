@@ -45,7 +45,6 @@ export type WorkspaceBackupOwner =
 
 export type WorkspaceBackupCandidateRequest = {
   fresh: boolean;
-  devcontainer: boolean;
   setupCommands?: string[];
   setupEnvironment: {
     variables: Record<string, string>;
@@ -174,8 +173,7 @@ function ownersEqual(left: WorkspaceBackupOwner, right: WorkspaceBackupOwner): b
 export async function buildWorkspaceBackupCandidate(
   request: WorkspaceBackupCandidateRequest
 ): Promise<WorkspaceBackupCandidate | null> {
-  if (!request.fresh || request.devcontainer || request.userId.length === 0 || request.orgId === '')
-    return null;
+  if (!request.fresh || request.userId.length === 0 || request.orgId === '') return null;
 
   const canonicalRepository = canonicalizeRepository(request.repository);
   if (!canonicalRepository) return null;

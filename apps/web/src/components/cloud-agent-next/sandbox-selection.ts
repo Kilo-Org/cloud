@@ -38,7 +38,7 @@ const instanceLabels: Record<SandboxDestination['instanceType'], string> = {
   'isolated-standard': 'Large',
   'standard-3': 'Medium',
   'standard-4': 'Large',
-  devcontainer: 'Dev container',
+  devcontainer: 'Retired devcontainer',
   small: 'Small',
   large: 'Medium',
   default: 'Provider default',
@@ -195,14 +195,12 @@ export function resolveSandboxSelection({
   organizationId,
   draft,
   capabilities,
-  devcontainer,
 }: {
   organizationId: string | undefined;
   draft: SandboxSelectionDraft;
   capabilities: SandboxSelectionCapabilities | undefined;
-  devcontainer: boolean;
 }): { sandboxAllocation?: SelectableSandboxAllocationRequest; error?: string } {
-  if (draft.organizationId !== organizationId || devcontainer || !draft.allocation) {
+  if (draft.organizationId !== organizationId || !draft.allocation) {
     return {};
   }
 

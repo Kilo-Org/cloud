@@ -146,7 +146,9 @@ function createSandbox(
   sandboxClassName:
     | 'Sandbox'
     | 'SandboxContainment'
+    | 'SandboxSmall'
     | 'SandboxSmallContainment'
+    | 'SandboxCodeReview'
     | 'SandboxDIND' = 'SandboxSmallContainment',
   heartbeatSeconds?: string
 ) {
@@ -200,6 +202,67 @@ const billingInput = {
 };
 
 describe('MeteredSandbox', () => {
+  it.each([
+    ['ses-abcdef', 'SandboxSmall', 'cloud-agent-next-sandbox-small'],
+    ['crv-abcdef', 'SandboxCodeReview', 'cloud-agent-next-sandbox-code-review'],
+  ] as const)(
+    'preserves billing admission for persisted %s',
+    async (sandboxId, className, service) => {
+      const { sandbox, rpc, storage, flushShadowTasks } = createSandbox(
+        createRpc(),
+        false,
+        className
+      );
+      await expect(
+        sandbox.ensureBillingAdmission({
+          ...billingInput,
+          sandboxId,
+          enforcementRequested: true,
+        })
+      ).resolves.toEqual({ success: true });
+      await sandbox.onStart();
+      await flushShadowTasks();
+      expect(await getBillingContext(storage)).toMatchObject({ measurementStarted: true });
+      expect(rpc.recordStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service,
+          instanceId: sandboxId,
+          sessionId: 'agent_1',
+        })
+      );
+    }
+  );
+
+  it.each(['istd-abcdef', 'ses-std1-abcdef', 'crv-std1-abcdef'] as const)(
+    'admits and meters new standard identity %s through the concrete Sandbox runtime',
+    async sandboxId => {
+      const { rpc, sandbox, storage, flushShadowTasks } = createSandbox(
+        createRpc(),
+        false,
+        'Sandbox'
+      );
+      await expect(
+        sandbox.ensureBillingAdmission({
+          ...billingInput,
+          sandboxId,
+          enforcementRequested: true,
+          metadata: { origin: sandboxId.startsWith('crv-') ? 'code-review' : 'cloud-agent' },
+        })
+      ).resolves.toEqual({ success: true });
+      await sandbox.onStart();
+      await flushShadowTasks();
+      expect(await getBillingContext(storage)).toMatchObject({ measurementStarted: true });
+      expect(rpc.recordStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'cloud-agent-next-sandbox',
+          instanceId: sandboxId,
+          sessionId: 'agent_1',
+          metadata: expect.objectContaining({ container_class: 'Sandbox', vcpu: '4' }),
+        })
+      );
+    }
+  );
+
   it('uses a configurable positive heartbeat interval with the production default as fallback', () => {
     expect(billingHeartbeatSeconds('60')).toBe(60);
     expect(billingHeartbeatSeconds(undefined)).toBe(300);

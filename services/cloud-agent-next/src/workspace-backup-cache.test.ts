@@ -12,7 +12,6 @@ import {
 
 const eligibleRequest = {
   fresh: true,
-  devcontainer: false,
   setupCommands: ['  npm ci  ', ' npm run build\n'],
   setupEnvironment: {
     variables: { NODE_ENV: 'test', FEATURE_FLAG: 'enabled' },
@@ -166,7 +165,6 @@ describe('workspace backup cache policy', () => {
 
   it.each<[string, Partial<WorkspaceBackupCandidateRequest>]>([
     ['resume', { fresh: false }],
-    ['devcontainer', { devcontainer: true }],
     ['empty user', { userId: '' }],
     ['empty organization', { orgId: '' }],
     ['invalid repository', { repository: { type: 'git', url: 'not-a-url' } }],

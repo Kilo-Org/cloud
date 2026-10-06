@@ -10,9 +10,9 @@ import {
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 
-import { PROVIDER_CAPABILITIES } from '../agent-sandbox/capabilities.js';
 import {
   classifySandboxId,
+  sandboxIdMatchesAllocation,
   isGeneratedSharedSandboxId,
   isValidSandboxId,
   type SandboxIdClass,
@@ -286,7 +286,8 @@ const MetadataWorkspaceSchema = z
         !workspace.sandboxId ||
         (shared
           ? !isGeneratedSharedSandboxId(workspace.sandboxId) || !workspace.sandboxRoute
-          : classifySandboxId(workspace.sandboxId) !== SANDBOX_ALLOCATION_ID_CLASS[allocation]) ||
+          : classifySandboxId(workspace.sandboxId) !== SANDBOX_ALLOCATION_ID_CLASS[allocation] &&
+            !sandboxIdMatchesAllocation(workspace.sandboxId, allocation)) ||
         workspace.devcontainerRequested === true
       ) {
         context.addIssue({
@@ -338,7 +339,7 @@ const MetadataWorkspaceSchema = z
   )
   .refine(
     workspace =>
-      PROVIDER_CAPABILITIES[workspace.sandboxProvider ?? 'cloudflare'].devcontainer ||
+      (workspace.sandboxProvider ?? 'cloudflare') === 'cloudflare' ||
       workspace.devcontainerRequested !== true,
     'Sandbox provider does not support devcontainers'
   )
@@ -394,7 +395,7 @@ export const CurrentSessionMetadataSchema = z
   .strip()
   .refine(
     metadata =>
-      PROVIDER_CAPABILITIES[metadata.workspace?.sandboxProvider ?? 'cloudflare'].devcontainer ||
+      (metadata.workspace?.sandboxProvider ?? 'cloudflare') === 'cloudflare' ||
       !metadata.devcontainer,
     'Sandbox provider metadata cannot contain a devcontainer runtime'
   )
@@ -458,9 +459,28 @@ export function getEffectiveCredentialContainment(
   return { github: legacyContainment, gitlab: false, kilocode: legacyContainment };
 }
 
+export function hasCredentialContainment(containment: CredentialContainment): boolean {
+  return (
+    containment.github ||
+    containment.gitlab ||
+    containment.bitbucket === true ||
+    containment.kilocode
+  );
+}
+
+export const DEVCONTAINER_RETIRED_MESSAGE =
+  'Devcontainer support has been retired. This session cannot be started or resumed. Create a new session using the default sandbox.';
+
+export function hasRetiredDevcontainerRuntime(metadata: SessionMetadata): boolean {
+  return (
+    metadata.workspace?.sandboxId?.startsWith('dind-') === true ||
+    metadata.workspace?.devcontainerRequested === true ||
+    metadata.devcontainer !== undefined
+  );
+}
+
 export function requiresContainmentSandbox(metadata: SessionMetadata): boolean {
-  const containment = getEffectiveCredentialContainment(metadata);
-  return containment.github || containment.gitlab || containment.bitbucket || containment.kilocode;
+  return hasCredentialContainment(getEffectiveCredentialContainment(metadata));
 }
 
 export function getSandboxProvider(metadata: SessionMetadata): AgentSandboxProvider {

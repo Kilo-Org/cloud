@@ -253,7 +253,7 @@ into the deployed e2e Worker config:
 Paths outside this stack now read a missing binding and fail. They are
 documented limitations, not supported behaviour:
 
-- Devcontainer / `dind-{hash}` sessions read `env.SandboxDIND`.
+- Retired `dind-{hash}` sessions retain `env.SandboxDIND` for stop/delete access only; start and resume are rejected.
 - Code-review `crv-{hash}` sessions read `env.SandboxCodeReview`.
 - Isolated-standard `istd-{hash}` allocations, and shared `org-`/`usr-`/`bot-`/
   `ubt-` (or legacy `__`) route keys, fall back to `env.Sandbox`.

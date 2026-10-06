@@ -12,7 +12,6 @@ import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
-import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   ensureOrganizationAccess,
   organizationMemberProcedure,
@@ -294,7 +293,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
         kilocodeOrganizationId: input.organizationId,
-        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
       });
     }),
 
@@ -309,16 +307,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(organizationPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      if (
-        input.devcontainer &&
-        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', input.organizationId))
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Dev container sessions are not available',
-        });
-      }
-
       const authToken = await createCloudAgentControlToken(
         ctx.user,
         ctx.headersList,

@@ -4,9 +4,9 @@ import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
   type LayoutChangeEvent,
+  Platform,
   Pressable,
   Text as RNText,
-  Platform,
   useColorScheme,
   View,
 } from 'react-native';

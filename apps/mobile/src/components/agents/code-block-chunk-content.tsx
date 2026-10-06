@@ -72,16 +72,16 @@ export function renderSelectableChunkChildren(
   keepBlankLineBox: boolean
 ): ReactNode[] {
   const children: ReactNode[] = [];
-  chunkLines.forEach((tokens, lineIndex) => {
+  for (const [lineIndex, tokens] of chunkLines.entries()) {
     const prefix = lineIndex > 0 ? CODE_LINE_BREAK : '';
     if (keepBlankLineBox && tokens.every(token => token.text.length === 0)) {
       children.push(prefix + BLANK_CODE_LINE);
-      return;
+      continue;
     }
     if (prefix) {
       children.push(prefix);
     }
-    tokens.forEach((token, tokenIndex) => {
+    for (const [tokenIndex, token] of tokens.entries()) {
       children.push(
         token.className === null ? (
           token.text
@@ -95,7 +95,7 @@ export function renderSelectableChunkChildren(
           </UITextView>
         )
       );
-    });
-  });
+    }
+  }
   return children;
 }

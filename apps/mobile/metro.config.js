@@ -2,6 +2,7 @@
 const path = require('node:path');
 const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const { withNativewind } = require('nativewind/metro');
+const { withRozenite } = require('@rozenite/metro');
 
 const monorepoRoot = path.resolve(__dirname, '../..');
 
@@ -53,4 +54,8 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return resolve(context, moduleName, platform);
 };
 
-module.exports = withNativewind(config, { inlineVariables: false });
+// Rozenite adds plugin panels to React Native DevTools. It is off unless Metro
+// starts with `WITH_ROZENITE=true`, so a release bundle never carries it.
+module.exports = withRozenite(withNativewind(config, { inlineVariables: false }), {
+  enabled: process.env.WITH_ROZENITE === 'true',
+});

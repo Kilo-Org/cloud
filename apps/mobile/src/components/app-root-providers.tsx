@@ -1,6 +1,8 @@
 import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { useNetworkActivityDevTools } from '@rozenite/network-activity-plugin';
+import { useTanStackQueryDevTools } from '@rozenite/tanstack-query-plugin';
 import { usePathname, useSegments } from 'expo-router';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
@@ -51,6 +53,10 @@ export function AppRootProviders({
   readonly languageReady: boolean;
 }) {
   const { t } = useTranslation();
+  // Rozenite DevTools panels. Both hooks are no-ops in a production bundle;
+  // the panels appear only when Metro runs with `WITH_ROZENITE=true`.
+  useTanStackQueryDevTools(queryClient);
+  useNetworkActivityDevTools();
 
   return (
     // bg-background: the gesture root is the first opaque surface above the

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start --dev-client",
+    "start:rozenite": "WITH_ROZENITE=true expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "build": "pnpx eas-cli@24.8.0 build --profile development",
@@ -136,6 +137,9 @@
   },
   "devDependencies": {
     "@expo/plist": "0.8.1",
+    "@rozenite/metro": "2.4.0",
+    "@rozenite/network-activity-plugin": "2.4.0",
+    "@rozenite/tanstack-query-plugin": "2.4.0",
     "@sentry/cli": "catalog:",
     "@types/react": "19.2.14",
     "@typescript/native-preview": "catalog:",

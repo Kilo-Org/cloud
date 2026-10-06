@@ -9,6 +9,7 @@ import {
   type MarkdownHtmlSnapshot,
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
+import { MarkdownMermaid } from './markdown-mermaid';
 import { MarkdownEnriched } from './markdown-enriched';
 import {
   getMarkdownStyles,
@@ -119,19 +120,49 @@ export function MarkdownText({
             onPressLink={onPressLink}
           />
         ) : (
-          <MarkdownEnriched
-            key={`md-content-${index}`}
-            value={segment.raw}
-            palette={palette}
-            selectable={selectable}
-            onLongPressLink={onLongPressLink}
-            onPressLink={onPressLink}
-            onCopyCode={onCopyCode}
-          />
+          splitMermaidFences(segment.raw).map((part, partIndex) =>
+            part.type === 'mermaid' ? (
+              <MarkdownMermaid
+                key={`md-mermaid-${index}-${partIndex}`}
+                source={part.raw}
+                palette={palette}
+              />
+            ) : (
+              <MarkdownEnriched
+                key={`md-content-${index}-${partIndex}`}
+                value={part.raw}
+                palette={palette}
+                selectable={selectable}
+                onLongPressLink={onLongPressLink}
+                onPressLink={onPressLink}
+                onCopyCode={onCopyCode}
+              />
+            )
+          )
         )
       )}
     </View>
   );
+}
+
+// A closed ```mermaid fence at the start of a line. An unclosed fence (still
+// streaming) does not match, so it stays a code block until it closes.
+const MERMAID_FENCE = /^```mermaid[ \t]*\n([\s\S]*?)\n```[ \t]*$/gm;
+
+function splitMermaidFences(raw: string): { type: 'markdown' | 'mermaid'; raw: string }[] {
+  const parts: { type: 'markdown' | 'mermaid'; raw: string }[] = [];
+  let last = 0;
+  for (const match of raw.matchAll(MERMAID_FENCE)) {
+    if (match.index > last) {
+      parts.push({ type: 'markdown', raw: raw.slice(last, match.index) });
+    }
+    parts.push({ type: 'mermaid', raw: match[1] ?? '' });
+    last = match.index + match[0].length;
+  }
+  if (last < raw.length || parts.length === 0) {
+    parts.push({ type: 'markdown', raw: raw.slice(last) });
+  }
+  return parts;
 }
 
 type MarkdownContentProps = Omit<MarkdownTextProps, 'variant'> & {

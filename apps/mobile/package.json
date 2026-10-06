@@ -175,6 +175,7 @@
     "autolinking": {
       "android": {
         "buildFromSource": [
+          "expo-background-task",
           "expo-notifications"
         ]
       }

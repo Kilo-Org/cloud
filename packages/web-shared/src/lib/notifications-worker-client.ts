@@ -21,6 +21,18 @@ type DispatchBody =
   | InternalDispatchSpendAlertRequest;
 
 /**
+ * In-call retry schedule (exponential backoff) for a dispatch the worker
+ * answered 200 but reported failed recipients for. Bounded so the spend-alert
+ * drain's lease is never held long, and deliberately short: the outbox's own
+ * backoff remains the outer retry loop.
+ */
+const DISPATCH_RETRY_DELAYS_MS = [1_000, 4_000];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Best-effort POST to the notifications worker internal dispatch endpoint.
  * Never rejects — missing config, network errors, and non-OK responses are
  * logged/captured and swallowed so email paths are never blocked by push — and
@@ -28,6 +40,10 @@ type DispatchBody =
  * outbox uses to decide whether to retry. A 2xx whose body reports a failed
  * recipient is a refused dispatch, not an accepted one: the worker answers 200
  * with a per-recipient breakdown even when a send failed.
+ *
+ * Sentry only hears about a dispatch worth acting on: every recipient failed,
+ * or a partial failure that survived the bounded in-call retry. A partial
+ * failure that a retry delivered is a structured warning, never an alert.
  */
 async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   if (!NOTIFICATIONS_WORKER_URL) {
@@ -43,54 +59,93 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
     return false;
   }
 
+  // A 2xx is not by itself an accepted dispatch. The worker answers 200 with
+  // a per-recipient breakdown, and a recipient whose preference read threw,
+  // whose DO call rejected, or whose push the DO could not deliver is reported
+  // as `failed` inside that body rather than as an HTTP status. The spend-alert
+  // outbox retries on this boolean, so any failed recipient means the dispatch
+  // was refused. A body that does not parse keeps the previous reading of an
+  // accepted dispatch.
   try {
-    const response = await fetch(`${NOTIFICATIONS_WORKER_URL}/internal/v1/dispatch`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'X-Internal-Secret': INTERNAL_API_SECRET,
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
-      const error = new Error(
-        `Notifications worker dispatch failed: ${response.status} ${response.statusText}${
-          errorText ? ` - ${errorText}` : ''
-        }`
-      );
-      captureException(error, {
-        tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
-        extra: { status: response.status, kind: body.kind },
+    for (let attempt = 0; ; attempt++) {
+      const response = await fetch(`${NOTIFICATIONS_WORKER_URL}/internal/v1/dispatch`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-Internal-Secret': INTERNAL_API_SECRET,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
       });
-      return false;
-    }
 
-    // A 2xx is not by itself an accepted dispatch. The worker answers 200 with
-    // a per-recipient breakdown, and a recipient whose preference read threw,
-    // whose DO call rejected, or whose push the DO could not deliver is reported
-    // as `failed` inside that body rather than as an HTTP status. The spend-alert
-    // outbox retries on this boolean, so any failed recipient means the dispatch
-    // was refused. A body that does not parse keeps the previous reading of an
-    // accepted dispatch.
-    const payload: unknown = await response.json().catch(() => null);
-    const parsed = sendPushForConversationOutputSchema.safeParse(payload);
-    const failedCount = parsed.success
-      ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed').length
-      : 0;
-    if (failedCount > 0) {
-      const error = new Error(
-        `Notifications worker dispatch failed for ${failedCount} recipient${failedCount === 1 ? '' : 's'}`
-      );
-      captureException(error, {
-        tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
-        extra: { kind: body.kind, failedRecipients: failedCount },
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        const error = new Error(
+          `Notifications worker dispatch failed: ${response.status} ${response.statusText}${
+            errorText ? ` - ${errorText}` : ''
+          }`
+        );
+        captureException(error, {
+          tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
+          extra: { status: response.status, kind: body.kind },
+        });
+        return false;
+      }
+
+      const payload: unknown = await response.json().catch(() => null);
+      const parsed = sendPushForConversationOutputSchema.safeParse(payload);
+      const totalRecipients = parsed.success ? parsed.data.perRecipient.length : 0;
+      const failedCount = parsed.success
+        ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed').length
+        : 0;
+      if (failedCount === 0) {
+        return true;
+      }
+
+      // A retry re-POSTs the same body and is safe under the channel DO's
+      // idempotency record: a recipient already delivered answers `duplicate`,
+      // and one whose Expo ticket failure was terminal (an invalid or expired
+      // push token) recorded `failed` and also answers `duplicate`. Only a
+      // transient failure — which left the DO's `pending` marker — is actually
+      // re-sent, so the retry below re-attempts transient failures only.
+      if (failedCount === totalRecipients) {
+        const error = new Error(
+          `Notifications worker dispatch failed for all ${totalRecipients} recipient${totalRecipients === 1 ? '' : 's'}`
+        );
+        captureException(error, {
+          tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
+          extra: { kind: body.kind, failedRecipients: failedCount, totalRecipients },
+        });
+        return false;
+      }
+
+      const retryDelay = DISPATCH_RETRY_DELAYS_MS[attempt];
+      if (retryDelay === undefined) {
+        const error = new Error(
+          `Notifications worker dispatch failed for ${failedCount} recipient${failedCount === 1 ? '' : 's'} after ${attempt + 1} attempts`
+        );
+        captureException(error, {
+          tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
+          extra: {
+            kind: body.kind,
+            failedRecipients: failedCount,
+            totalRecipients,
+            attempts: attempt + 1,
+          },
+        });
+        return false;
+      }
+
+      // A partial failure that a retry may still deliver is logged, not
+      // captured: a single transient recipient failure must not page anyone.
+      console.warn('[notifications-worker-client] dispatch partially failed; retrying', {
+        kind: body.kind,
+        failedRecipients: failedCount,
+        totalRecipients,
+        attempt: attempt + 1,
       });
-      return false;
+      await sleep(retryDelay);
     }
-    return true;
   } catch (error) {
     captureException(error, {
       tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },

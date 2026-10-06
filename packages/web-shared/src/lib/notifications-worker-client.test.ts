@@ -41,6 +41,19 @@ describe('notifications-worker-client internal dispatch', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = fetchMock as unknown as typeof fetch;
+    // Run the retry backoff synchronously; the schedule itself is covered by
+    // the attempt counts asserted below.
+    jest.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      handler: (...args: never[]) => void
+    ) => {
+      handler();
+      return 0;
+    }) as unknown as typeof setTimeout);
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('posts the spend_alert variant to the internal dispatch endpoint', async () => {
@@ -125,7 +138,7 @@ describe('notifications-worker-client internal dispatch', () => {
     );
   });
 
-  it('treats a per-recipient failure inside a 200 body as a refused dispatch', async () => {
+  it('treats a per-recipient failure inside a 200 body as a refused dispatch, capturing only after the bounded retries are exhausted', async () => {
     fetchMock.mockResolvedValue(
       okResponse([
         { userId: 'user-1', outcome: 'delivered' },
@@ -134,13 +147,83 @@ describe('notifications-worker-client internal dispatch', () => {
     );
 
     // The worker answers 200 with a per-recipient breakdown even when a push
-    // failed inside it; the spend-alert outbox retries on this boolean.
+    // failed inside it; the spend-alert outbox retries on this boolean. The
+    // persistent partial failure is retried in-call first, and only the
+    // exhausted retry reaches Sentry.
     await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(false);
 
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenCalledTimes(1);
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
-        extra: expect.objectContaining({ kind: 'spend_alert', failedRecipients: 1 }),
+        extra: expect.objectContaining({
+          kind: 'spend_alert',
+          failedRecipients: 1,
+          totalRecipients: 2,
+          attempts: 3,
+        }),
+      })
+    );
+  });
+
+  it('captures without an in-call retry when every recipient fails', async () => {
+    fetchMock.mockResolvedValue(
+      okResponse([
+        { userId: 'user-1', outcome: 'failed' },
+        { userId: 'user-2', outcome: 'failed' },
+      ])
+    );
+
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(false);
+
+    // All-fail points at the worker or Expo, not one transient send: alert on
+    // the first response instead of retrying inside the call.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          kind: 'spend_alert',
+          failedRecipients: 2,
+          totalRecipients: 2,
+        }),
+      })
+    );
+    expect(console.warn).not.toHaveBeenCalled();
+  });
+
+  it('retries a partial failure and accepts when the retry delivers', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        okResponse([
+          { userId: 'user-1', outcome: 'delivered' },
+          { userId: 'user-2', outcome: 'failed' },
+        ])
+      )
+      .mockResolvedValueOnce(
+        okResponse([
+          { userId: 'user-1', outcome: 'duplicate' },
+          { userId: 'user-2', outcome: 'delivered' },
+        ])
+      );
+
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // A transient partial failure that recovers is a structured warning, never
+    // a Sentry error.
+    expect(captureException).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('partially failed'),
+      expect.objectContaining({
+        kind: 'spend_alert',
+        failedRecipients: 1,
+        totalRecipients: 2,
+        attempt: 1,
       })
     );
   });

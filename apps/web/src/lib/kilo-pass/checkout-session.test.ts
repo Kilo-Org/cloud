@@ -141,6 +141,7 @@ describe('createOrReuseKiloPassCheckoutSession durable reporting', () => {
           userId: user.id,
           amountCents: chargeSession.amountCents ?? chargeSession.amount_total ?? 0,
           accountCreatedAt: '2026-01-01T00:00:00.000Z',
+          accountUsedMicrodollars: user.microdollars_used,
         }),
     });
 
@@ -171,6 +172,7 @@ describe('createOrReuseKiloPassCheckoutSession durable reporting', () => {
           userId: user.id,
           amountCents: 1900,
           accountCreatedAt: '2026-01-01T00:00:00.000Z',
+          accountUsedMicrodollars: user.microdollars_used,
         }),
     });
 
@@ -200,6 +202,7 @@ describe('createOrReuseKiloPassCheckoutSession durable reporting', () => {
         userId: user.id,
         amountCents: 1900,
         accountCreatedAt: '2026-01-01T00:00:00.000Z',
+        accountUsedMicrodollars: user.microdollars_used,
       });
     };
 

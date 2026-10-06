@@ -16,12 +16,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { OrganizationMode } from '@/lib/organizations/organization-modes';
-import type { EditGroupConfig } from '@/lib/organizations/organization-types';
+import type { EditGroupConfig } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Save, FileText } from 'lucide-react';
 import { useModeTemplates } from './useModeTemplates';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
-import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model-shared';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
+import { isOrganizationAutoTargetModel } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 const availableGroups = [
   { value: 'read', label: 'Read Files' },

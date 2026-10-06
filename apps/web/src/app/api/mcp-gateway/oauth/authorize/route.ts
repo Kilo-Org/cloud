@@ -6,7 +6,7 @@ import {
   type OAuthAuthorizationQuery,
 } from '@kilocode/mcp-gateway';
 import { timingSafeEqual } from '@kilocode/encryption';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import type { ScopedConnectRoute } from '@kilocode/mcp-gateway';

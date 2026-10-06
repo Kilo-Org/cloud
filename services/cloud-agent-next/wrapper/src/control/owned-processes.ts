@@ -23,6 +23,20 @@ import path from 'node:path';
 import { Writable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pidStillMatches, readProcessTable } from '../tool-cgroup.js';
+import { nativeControlPlaneLogsEnabled } from '../../../src/shared/control-diagnostics.js';
+
+/**
+ * Native stderr is captured as operational logs, so the raw containment error
+ * text (paths, syscall detail) must not be projected there. The Sandbox SDK and
+ * Vercel wrapper keep the full message.
+ */
+function warnContainmentUnavailable(label: string, message: string): void {
+  if (nativeControlPlaneLogsEnabled(process.env)) {
+    console.warn(label);
+    return;
+  }
+  console.warn(`${label}: ${message}`);
+}
 import {
   applyManagedWorkloadLimits,
   CGROUP_FS_MAGIC,
@@ -344,7 +358,7 @@ function createCgroup(): Cgroup | undefined {
     return { directory, reference, dev, ino, descriptors, procs, procsReference: reference, kill };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown';
-    console.warn(`Owned process containment unavailable: ${message}`);
+    warnContainmentUnavailable('Owned process containment unavailable', message);
     if (created) {
       try {
         const fresh = lstatSync(created.directory);
@@ -496,7 +510,7 @@ function createManagedCgroup(placement: WorkloadPlacement): Cgroup | undefined {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown';
-    console.warn(`Owned process workload containment unavailable: ${message}`);
+    warnContainmentUnavailable('Owned process workload containment unavailable', message);
     if (created) {
       try {
         const fresh = lstatSync(created.directory);
@@ -715,6 +729,8 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         });
       }
       const stats = readWorkloadStats(group.reference);
+      const toolStats = readWorkloadStats(managed.toolsReference);
+      const serverStats = readWorkloadStats(managed.serverReference);
       if (stats.oomKills > lastOomKills || stats.oomGroupKills > lastOomGroupKills) {
         lastOomKills = Math.max(lastOomKills, stats.oomKills);
         lastOomGroupKills = Math.max(lastOomGroupKills, stats.oomGroupKills);
@@ -741,6 +757,27 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           : {}),
         ...(stats.pressureFullTotal !== undefined
           ? { pressureFullTotal: stats.pressureFullTotal }
+          : {}),
+        ...(stats.memoryMaxEvents !== undefined ? { memoryMaxEvents: stats.memoryMaxEvents } : {}),
+        ...(stats.memoryOomEvents !== undefined ? { memoryOomEvents: stats.memoryOomEvents } : {}),
+        ...(stats.cpuUsageUsec !== undefined ? { cpuUsageUsec: stats.cpuUsageUsec } : {}),
+        ...(stats.cpuThrottledUsec !== undefined
+          ? { cpuThrottledUsec: stats.cpuThrottledUsec }
+          : {}),
+        ...(stats.cpuThrottleCount !== undefined
+          ? { cpuThrottleCount: stats.cpuThrottleCount }
+          : {}),
+        ...(stats.ioReadBytes !== undefined ? { ioReadBytes: stats.ioReadBytes } : {}),
+        ...(stats.ioWriteBytes !== undefined ? { ioWriteBytes: stats.ioWriteBytes } : {}),
+        ...(toolStats.cpuUsageUsec !== undefined
+          ? { toolCpuUsageUsec: toolStats.cpuUsageUsec }
+          : {}),
+        ...(serverStats.cpuUsageUsec !== undefined
+          ? { serverCpuUsageUsec: serverStats.cpuUsageUsec }
+          : {}),
+        ...(toolStats.ioReadBytes !== undefined ? { toolIoReadBytes: toolStats.ioReadBytes } : {}),
+        ...(toolStats.ioWriteBytes !== undefined
+          ? { toolIoWriteBytes: toolStats.ioWriteBytes }
           : {}),
       });
     } catch {

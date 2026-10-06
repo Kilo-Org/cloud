@@ -56,7 +56,7 @@ import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete';
 import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import {
   selectedProfileIdAtom,
   resetSessionFormAtom,
@@ -101,7 +101,7 @@ import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import { CloudAgentBillingError } from './CloudAgentBillingError';
 import { billingPayerPresentation } from './billing-payer-presentation';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import {
   buildCloudAgentAttachments,

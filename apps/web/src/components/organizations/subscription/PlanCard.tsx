@@ -7,7 +7,7 @@ import {
   OrganizationPlanSchema,
   type OrganizationPlan,
   type BillingCycle,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type PlanCardProps = {
   plan: OrganizationPlan;

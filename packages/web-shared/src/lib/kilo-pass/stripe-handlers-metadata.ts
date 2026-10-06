@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
-import { getKiloPassPriceMetadataForId } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { getKiloPassPriceMetadataForId } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import type Stripe from 'stripe';
 
 export type KiloPassSubscriptionMetadata = {

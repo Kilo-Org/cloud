@@ -203,6 +203,8 @@ vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
   LinearTransition: 'LinearTransition',
+  // `agent-sessions-section` builds the row entrance with `FadeIn.duration`.
+  FadeIn: { duration: () => ({}) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({
@@ -329,6 +331,17 @@ vi.mock('@/lib/a11y/motion-context', async importOriginal => ({
     reducedMotion: state.reducedMotion,
     scrollAnimated: !state.reducedMotion,
   }),
+}));
+// `agent-sessions-section` (drawn by this screen) reads the motion policy, and
+// the real module reaches `expo-battery` -> `expo-modules-core`, which the
+// node-mounted harness cannot load. Keep the policy wired to the same state.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: state.reducedMotion,
+    scrollAnimated: !state.reducedMotion,
+  }),
+  selectReducedMotionEntrance: (reducedMotion: boolean, crossfade: unknown) =>
+    reducedMotion ? undefined : crossfade,
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => state.tabBarHeight }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({

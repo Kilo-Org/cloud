@@ -7,7 +7,7 @@ import {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   GOOGLE_IOS_CLIENT_ID,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 
 /** Thrown when a native (mobile) ID token fails verification — maps to 401 INVALID_TOKEN. */

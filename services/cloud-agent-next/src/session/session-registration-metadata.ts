@@ -18,6 +18,7 @@ import type {
   ExecutionTurnSubmission,
   SessionFinalization,
 } from '../execution/types.js';
+import type { SessionRepositoryRequest } from './session-requests.js';
 
 export type GroupedRegisterSessionInput = {
   identity: SessionMetadata['identity'];
@@ -32,33 +33,7 @@ export type GroupedRegisterSessionInput = {
   agent: AgentSelection & {
     appendSystemPrompt?: string;
   };
-  repository?:
-    | {
-        type: 'github';
-        repo: string;
-        githubIntegrationId?: string;
-        githubAccessPurpose?: 'workflow' | 'agent';
-        branch?: string;
-      }
-    | {
-        type: 'gitlab';
-        url: string;
-        branch?: string;
-      }
-    | {
-        type: 'bitbucket';
-        url: string;
-        workspaceUuid: string;
-        repositoryUuid: string;
-        bitbucketIntegrationId?: string;
-        branch?: string;
-      }
-    | {
-        type: 'git';
-        url: string;
-        token?: string;
-        branch?: string;
-      };
+  repository?: SessionRepositoryRequest;
   profile?: SessionProfileBundle;
   finalization?: SessionFinalization;
   callback?: SessionMetadata['callback'];
@@ -91,6 +66,9 @@ function repositoryMetadataFromRegistrationInput(
         githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
+          : {}),
+        ...(repository.pullRequestNumber !== undefined
+          ? { pullRequestNumber: repository.pullRequestNumber }
           : {}),
         upstreamBranch: repository.branch,
       };

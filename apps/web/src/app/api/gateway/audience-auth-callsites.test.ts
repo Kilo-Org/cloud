@@ -28,20 +28,20 @@ import * as openrouterV1ModelEndpoints from '@/app/api/openrouter/v1/models/[pro
 import * as openrouterV1TranscriptionModels from '@/app/api/openrouter/v1/transcription-models/route';
 import * as organizationModels from '@/app/api/organizations/[id]/models/route';
 import * as organizationModelValidation from '@/app/api/organizations/[id]/models/validate/route';
-import { handleAudioTranscriptionsRequest } from '@/lib/ai-gateway/handlers/audio-transcriptions';
-import { handleEditCompletionsRequest } from '@/lib/ai-gateway/handlers/edit-completions';
-import { handleEmbeddingModelsRequest } from '@/lib/ai-gateway/handlers/embedding-models';
-import { handleEmbeddingsRequest } from '@/lib/ai-gateway/handlers/embeddings';
-import { handleFimCompletionsRequest } from '@/lib/ai-gateway/handlers/fim-completions';
-import { handleLlmProxyRequest } from '@/lib/ai-gateway/handlers/llm-proxy';
-import { handleModelEndpointsRequest } from '@/lib/ai-gateway/handlers/model-endpoints';
-import { handleModelValidationRequest } from '@/lib/ai-gateway/handlers/model-validation';
-import { handleModelsByProviderRequest } from '@/lib/ai-gateway/handlers/models-by-provider';
-import { handleModelsRequest } from '@/lib/ai-gateway/handlers/models';
-import { handleOrganizationModelValidationRequest } from '@/lib/ai-gateway/handlers/organization-model-validation';
-import { handleOrganizationModelsRequest } from '@/lib/ai-gateway/handlers/organization-models';
-import { handleProvidersRequest } from '@/lib/ai-gateway/handlers/providers';
-import { handleTranscriptionModelsRequest } from '@/lib/ai-gateway/handlers/transcription-models';
+import { handleAudioTranscriptionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/audio-transcriptions';
+import { handleEditCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/edit-completions';
+import { handleEmbeddingModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embedding-models';
+import { handleEmbeddingsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';
+import { handleFimCompletionsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/fim-completions';
+import { handleLlmProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/llm-proxy';
+import { handleModelEndpointsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/model-endpoints';
+import { handleModelValidationRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/model-validation';
+import { handleModelsByProviderRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/models-by-provider';
+import { handleModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/models';
+import { handleOrganizationModelValidationRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/organization-model-validation';
+import { handleOrganizationModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/organization-models';
+import { handleProvidersRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/providers';
+import { handleTranscriptionModelsRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/transcription-models';
 
 describe('gateway route facades', () => {
   test.each([

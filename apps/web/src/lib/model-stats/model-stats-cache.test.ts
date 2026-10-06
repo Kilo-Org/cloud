@@ -3,11 +3,11 @@ import { NextRequest } from 'next/server';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import type { ModelStats } from '@kilocode/db/schema';
-import type * as Cache from '@/lib/model-stats/model-stats-cache';
-import type * as Enkrypt from '@/lib/model-stats/enkrypt';
+import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
 import type * as ListRoute from '@/app/api/models/stats/route';
 import type * as DetailRoute from '@/app/api/models/stats/[slug]/route';
-import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
+import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
 const mockOrderBy = jest.fn<Promise<Cache.ModelStatsCacheEntry[]>, [unknown]>();
@@ -18,11 +18,11 @@ const mockSelect = jest.fn((_selection: { stat: unknown; verification?: SQL }) =
 }));
 const mockReplicaSelect = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { select: mockSelect },
   readDb: { select: mockReplicaSelect },
 }));
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
@@ -76,8 +76,8 @@ beforeEach(async () => {
   jest.setSystemTime(Date.parse(checkedAt));
   jest.spyOn(console, 'error').mockImplementation(() => {});
   [cache, enkrypt, listRoute, detailRoute] = await Promise.all([
-    import('@/lib/model-stats/model-stats-cache'),
-    import('@/lib/model-stats/enkrypt'),
+    import('@kilocode/web-shared/lib/model-stats/model-stats-cache'),
+    import('@kilocode/web-shared/lib/model-stats/enkrypt'),
     import('@/app/api/models/stats/route'),
     import('@/app/api/models/stats/[slug]/route'),
   ]);
@@ -311,7 +311,8 @@ describe('model stats snapshot cache', () => {
       if (boundary === 'deadline') jest.advanceTimersByTime(TTL);
       else cache.invalidateModelStatsCache();
       expect(enkrypt.enkryptFor(snapshot, 'provider/model')).toBeUndefined();
-      const { publishEnkryptModelStats } = await import('@/lib/model-stats/enkrypt-publication');
+      const { publishEnkryptModelStats } =
+        await import('@kilocode/web-shared/lib/model-stats/enkrypt-publication');
       if (!snapshot) throw new Error('Expected loaded snapshot');
       expect(publishEnkryptModelStats(entry().stat, snapshot, verification).benchmarks).toEqual(
         siblings

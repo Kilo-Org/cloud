@@ -22,7 +22,12 @@ import { getWaitingAsk } from '@/lib/glanceable/waiting-ask';
 
 import { getActionNotice, pruneActionNotice, setGlanceableActionNotice } from './action-notice';
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import { formatGlanceableAgo, formatGlanceableCount, isWidgetRtl } from './count-format';
+import {
+  formatGlanceableAgo,
+  formatGlanceableClock,
+  formatGlanceableCount,
+  isWidgetRtl,
+} from './count-format';
 import { ensureAndroidNotificationChannels } from './ensure-notification-channels';
 import {
   buildNotificationActions,
@@ -34,7 +39,6 @@ import {
   update as updateLiveUpdate,
 } from './live-update';
 import { isNotificationPermissionGranted } from './permission';
-import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
   buildCompactNotificationText,
@@ -142,16 +146,20 @@ function postNotification(
   revision = snapshot.revision;
 }
 
+/** The widget props for `snapshot`, with the deadline and staleness checks every redraw runs. */
+function widgetPropsFor(snapshot: GlanceableAgentsSnapshot): AndroidWidgetProps {
+  return buildCurrentWidgetProps(
+    snapshot,
+    translate,
+    formatGlanceableCount,
+    formatGlanceableAgo,
+    formatGlanceableClock
+  );
+}
+
 /** A delayed render must check the current snapshot and its deadline, not cached props. */
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
-  return lastWidgetSnapshot === null
-    ? null
-    : buildCurrentWidgetProps(
-        lastWidgetSnapshot,
-        translate,
-        formatGlanceableCount,
-        formatGlanceableAgo
-      );
+  return lastWidgetSnapshot === null ? null : widgetPropsFor(lastWidgetSnapshot);
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {
@@ -311,19 +319,15 @@ async function retryPendingStart(): Promise<void> {
 }
 
 /**
- * App foreground: when the ongoing cannot start (denied) and work is pending,
- * show the Open Settings alert once. When permission is granted, start at once.
- * The alert needs a foreground Activity, so this never runs on the headless path.
+ * App foreground: start the pending ongoing once permission is granted, for
+ * example after the user turned notifications on in Settings. A missing
+ * permission stays silent: the user never asked for this surface, and the
+ * Notifications screen owns the request.
  */
 export async function handleAppStateActive(): Promise<void> {
-  if (pending === null) {
-    return;
-  }
-  if (await isNotificationPermissionGranted()) {
+  if (pending !== null && (await isNotificationPermissionGranted())) {
     await retryPendingStart();
-    return;
   }
-  showAndroidPermissionAlertOnce();
 }
 
 export const androidSink: GlanceableSink = {
@@ -348,12 +352,7 @@ export const androidSink: GlanceableSink = {
       }
     }
     setWidgetSnapshot(snapshot);
-    const props = buildCurrentWidgetProps(
-      snapshot,
-      translate,
-      formatGlanceableCount,
-      formatGlanceableAgo
-    );
+    const props = widgetPropsFor(snapshot);
     renderWidgetNow(props);
     const eligible = hasCurrentWork(snapshot);
     if (eligible) {

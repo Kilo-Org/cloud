@@ -1,14 +1,17 @@
 import { afterAll, describe, expect, it } from '@jest/globals';
 import { eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   spend_alert_hourly,
   organizations,
   user_notification_preferences,
 } from '@kilocode/db/schema';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
-import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   authorizedBillingContacts,
   derivePushCategoryEnabled,

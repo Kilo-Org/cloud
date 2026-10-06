@@ -1,11 +1,11 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
 import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
-import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cli_sessions_v2,
   cloud_agent_session_runs,
@@ -138,6 +138,7 @@ type EnrichmentRow = {
   status: string | null;
   title: string | null;
   organization_id: string | null;
+  git_url: string | null;
   last_activity_at: string | null;
   status_updated_at: string | null;
   total_cost_microdollars: number | null;
@@ -146,6 +147,9 @@ type EnrichmentRow = {
   session_pr_platform: string | null;
   session_pr_url: string | null;
   session_pr_number: number | null;
+  // Set only after the session's own link passed GitHub identity verification.
+  // Null means the link must not be shown.
+  session_pr_verified_at: string | null;
   // Per-tenant PR cache columns from the LEFT JOIN.
   pr_url: string | null;
   pr_number: number | null;
@@ -182,6 +186,8 @@ function associatedPrFromRow(row: EnrichmentRow): z.infer<typeof associatedPrSch
       pr_url: row.session_pr_url,
       pr_number: row.session_pr_number,
       updated_at: row.updated_at,
+      git_url: row.git_url,
+      pr_link_verified_at: row.session_pr_verified_at,
     },
     {
       pr_url: row.pr_url,
@@ -426,12 +432,14 @@ export async function listActiveSessions({
           status: cli_sessions_v2.status,
           title: cli_sessions_v2.title,
           organization_id: cli_sessions_v2.organization_id,
+          git_url: cli_sessions_v2.git_url,
           last_activity_at: cli_sessions_v2.last_activity_at,
           status_updated_at: cli_sessions_v2.status_updated_at,
           total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
           session_pr_platform: cli_sessions_v2.platform,
           session_pr_url: cli_sessions_v2.pr_url,
           session_pr_number: cli_sessions_v2.pr_number,
+          session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
           pr_url: github_branch_pull_requests.pr_url,
           pr_number: github_branch_pull_requests.pr_number,
           pr_state: github_branch_pull_requests.pr_state,
@@ -536,6 +544,7 @@ export async function listActiveSessions({
           session_pr_platform: cli_sessions_v2.platform,
           session_pr_url: cli_sessions_v2.pr_url,
           session_pr_number: cli_sessions_v2.pr_number,
+          session_pr_verified_at: cli_sessions_v2.pr_link_verified_at,
           pr_url: github_branch_pull_requests.pr_url,
           pr_number: github_branch_pull_requests.pr_number,
           pr_state: github_branch_pull_requests.pr_state,

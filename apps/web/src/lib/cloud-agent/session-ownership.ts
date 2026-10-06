@@ -1,5 +1,5 @@
 import { cliSessions, organization_memberships } from '@kilocode/db/schema';
-import type { db } from '@/lib/drizzle';
+import type { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
 import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 

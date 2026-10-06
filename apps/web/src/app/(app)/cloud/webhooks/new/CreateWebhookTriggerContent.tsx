@@ -15,7 +15,7 @@ import { TriggerForm, type TriggerFormData } from '@/components/webhook-triggers
 import type { GitHubRepository } from '@/components/webhook-triggers/types';
 import type { RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
+import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { ArrowLeft, Webhook, AlertCircle } from 'lucide-react';
 
 type CreateWebhookTriggerContentProps = {

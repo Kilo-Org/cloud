@@ -11,8 +11,8 @@ import {
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
-import { sendKiloPassOrgBlockedEmail } from '@/lib/email';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sendKiloPassOrgBlockedEmail } from '@kilocode/web-shared/lib/email';
 
 const DELIVERY_BATCH_SIZE = 100;
 const MAX_DELIVERY_ATTEMPTS = 3;

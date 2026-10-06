@@ -11,6 +11,7 @@ import { type GlanceableLiveActivityContentState } from '@kilocode/notifications
 import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
+  setNotificationPermissionGrantedValue,
 } from '@/lib/glanceable/live-activity-switch';
 import {
   _resetGlanceablePersistForTests,
@@ -234,6 +235,7 @@ function endedCount(cards: { end: ReturnType<typeof vi.fn> }[]): number {
 
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
+  setNotificationPermissionGrantedValue(true);
   _resetIosSinkForTests();
   _resetGlanceablePersistForTests();
   _resetWaitingAskForTests();
@@ -289,6 +291,27 @@ describe('iosSink start and update', () => {
     setLiveActivityEnabledValue(true);
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
     expect(mockState.started.length).toBe(1);
+  });
+
+  it('starts no card before notification permission is granted, and starts once it is', () => {
+    // A first start raises iOS's "Allow Live Activities?" prompt, so a fresh
+    // install must not reach it before the user opted in to notifications.
+    setNotificationPermissionGrantedValue(false);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    expect(mockState.started).toEqual([]);
+
+    setNotificationPermissionGrantedValue(true);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 1), CTX);
+    expect(mockState.started.length).toBe(1);
+  });
+
+  it('keeps updating a card it already holds after the permission is revoked', () => {
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    setNotificationPermissionGrantedValue(false);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }, { status: 'busy' }], 1), CTX);
+
+    expect(mockState.started.length).toBe(1);
+    expect(mockState.updated.length).toBe(1);
   });
 
   it('starts once and updates the same activity on a newer revision', () => {
@@ -1344,6 +1367,7 @@ describe('buildGlanceableViewProps', () => {
 
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actionLine',
       'actions',
       'countLines',
       'needsInputSince',

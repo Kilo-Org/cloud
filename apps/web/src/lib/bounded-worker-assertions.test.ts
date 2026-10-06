@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import type * as ServerConfig from '@/lib/config.server';
+import type * as ServerConfig from '@kilocode/web-shared/lib/config.server';
 import {
   BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
   BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
@@ -23,8 +23,8 @@ const mockConfig = {
   internalApiSecret: 'test-internal-api-secret',
 };
 
-jest.mock('@/lib/config.server', () => {
-  const actual = jest.requireActual<typeof ServerConfig>('@/lib/config.server');
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual = jest.requireActual<typeof ServerConfig>('@kilocode/web-shared/lib/config.server');
   return {
     ...actual,
     get GIT_TOKEN_SERVICE_API_URL() {
@@ -39,7 +39,7 @@ jest.mock('@/lib/config.server', () => {
   };
 });
 
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   deleteBitbucketWorkspaceWebhooksFromTokenService,
   ensureBitbucketWorkspaceWebhookFromTokenService,

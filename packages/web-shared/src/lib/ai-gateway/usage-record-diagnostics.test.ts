@@ -1,4 +1,4 @@
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   pool: { totalCount: 4, idleCount: 1, waitingCount: 0, options: { max: 10 } },
 }));
 

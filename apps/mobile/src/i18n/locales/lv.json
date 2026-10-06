@@ -3241,7 +3241,6 @@
     "newAgent": "Jauns aģents",
     "approving": "Apstiprina...",
     "couldNotApprove": "Neizdevās apstiprināt",
-    "couldNotStart": "Neizdevās palaist",
     "channelName": "Aktīvie aģenti",
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",

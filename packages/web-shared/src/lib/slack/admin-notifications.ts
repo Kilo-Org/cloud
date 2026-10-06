@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL } from '@/lib/config.server';
+import { SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
 import type { AnyBlock, MessageAttachment } from '@slack/types';
 
 const SLACK_WEBHOOK_TIMEOUT_MS = 10_000;

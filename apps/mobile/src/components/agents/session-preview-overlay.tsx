@@ -242,22 +242,24 @@ function SessionPreviewContent({
     }
   }, []);
 
-  const onDelete = target.onDelete;
+  const { onOpen, onCopySessionId, onViewPr, onRename, onExit, onDelete } = target;
   // One source for the panel's rows: the same builder the action sheet uses, so
   // order, copy and the destructive row cannot diverge.
   const menu = useMemo(
     () =>
       buildSessionActionMenuItems({
-        onOpen: target.onOpen,
-        onRename: target.onRename ? handleRename : undefined,
-        onExit: target.onExit,
+        onOpen,
+        onCopySessionId,
+        onViewPr,
+        onRename: onRename ? handleRename : undefined,
+        onExit,
         onDelete: onDelete
           ? () => {
               confirmDelete(onDelete);
             }
           : undefined,
       }),
-    [target.onOpen, target.onRename, target.onExit, onDelete, handleRename, confirmDelete]
+    [onOpen, onCopySessionId, onViewPr, onRename, onExit, onDelete, handleRename, confirmDelete]
   );
 
   // The header strip alone owns the pan, so the transcript keeps its own scroll.

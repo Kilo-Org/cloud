@@ -1,5 +1,7 @@
 const mockSweepLog = jest.fn();
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => mockSweepLog) }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => mockSweepLog),
+}));
 
 import { describe, expect, it } from '@jest/globals';
 import type { SQL } from 'drizzle-orm';

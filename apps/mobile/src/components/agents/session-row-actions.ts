@@ -128,7 +128,7 @@ export async function copySessionLink(
 }
 
 export type SessionActionMenuItem = {
-  key: 'open' | 'rename' | 'exit' | 'delete';
+  key: 'open' | 'copy' | 'view-pr' | 'rename' | 'exit' | 'delete';
   label: string;
   destructive: boolean;
   run: () => void;
@@ -140,13 +140,18 @@ export type SessionActionMenu = {
 };
 
 /**
- * The one session action set, in today's order: Open, optional
- * Rename, optional Exit session, optional Delete session. Delete wins when
- * both exist; Exit is destructive only when Delete is absent. The preview
- * panel builds from here so its order, copy and indices cannot diverge.
+ * The one session action set, in today's order: Open, optional Copy session ID,
+ * optional View PR, optional Rename, optional Exit session, optional Delete
+ * session. Copy ID and View PR are additive when their callbacks are passed, so
+ * a session without an associated PR never shows View PR, and a caller that
+ * does not own the clipboard keeps the preview-only form. Delete wins when both
+ * exist; Exit is destructive only when Delete is absent. The preview panel
+ * builds from here so its order, copy and indices cannot diverge.
  */
 export function buildSessionActionMenuItems(input: {
   onOpen: () => void;
+  onCopySessionId?: () => void;
+  onViewPr?: () => void;
   onRename?: () => void;
   onExit?: () => void;
   onDelete?: () => void;
@@ -160,6 +165,22 @@ export function buildSessionActionMenuItems(input: {
     },
   ];
 
+  if (input.onCopySessionId) {
+    items.push({
+      key: 'copy',
+      label: i18n.t('agents.sessionRow.copyId'),
+      destructive: false,
+      run: input.onCopySessionId,
+    });
+  }
+  if (input.onViewPr) {
+    items.push({
+      key: 'view-pr',
+      label: i18n.t('securityAgent.findingRow.viewPr'),
+      destructive: false,
+      run: input.onViewPr,
+    });
+  }
   if (input.onRename) {
     items.push({
       key: 'rename',

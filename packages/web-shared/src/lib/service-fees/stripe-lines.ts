@@ -7,23 +7,26 @@ import {
   STRIPE_ENTERPRISE_MONTHLY_PRICE_ID,
   STRIPE_TEAMS_ANNUAL_PRICE_ID,
   STRIPE_TEAMS_MONTHLY_PRICE_ID,
-} from '@/lib/config.server';
-import { getOrganizationKiloPassMetadata } from '@/lib/kilo-pass-org/stripe-metadata';
-import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
-import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
-import { getKnownStripePriceIdsForKiloClaw } from '@/lib/kiloclaw/stripe-price-ids.server';
-import { SEAT_PRODUCT_IDS, isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
-import { getNetPretaxLineAmountMinor } from '@/lib/service-fees/calculation';
+} from '@kilocode/web-shared/lib/config.server';
+import { getOrganizationKiloPassMetadata } from '@kilocode/web-shared/lib/kilo-pass-org/stripe-metadata';
+import { getKiloPassMetadataFromStripeMetadata } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
+import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
+import { getKnownStripePriceIdsForKiloClaw } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
+import {
+  SEAT_PRODUCT_IDS,
+  isSeatLineItem,
+} from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { getNetPretaxLineAmountMinor } from '@kilocode/web-shared/lib/service-fees/calculation';
 import {
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import type {
   ServiceFeeCommercialMetadata,
   ServiceFeeFlow,
   ServiceFeeLineMetadata,
-} from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/types';
 
 const INVOICE_LINE_PAGE_SIZE = 100;
 

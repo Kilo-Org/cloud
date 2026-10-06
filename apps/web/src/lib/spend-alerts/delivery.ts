@@ -3,8 +3,8 @@ import 'server-only';
 import { eq, sql } from 'drizzle-orm';
 import { organizations } from '@kilocode/db/schema';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { sendSpendAlertEmail } from '@/lib/email';
-import { dispatchSpendAlertPush } from '@/lib/notifications-worker-client';
+import { sendSpendAlertEmail } from '@kilocode/web-shared/lib/email';
+import { dispatchSpendAlertPush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import {
   authorizedBillingContacts,
   parseSpendAlertScopeKey,
@@ -13,7 +13,7 @@ import {
   type SpendAlertScope,
 } from './settings';
 import type { SpendAlertChannel } from './sweep';
-import type { db as defaultDb } from '@/lib/drizzle';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * The drain half of the spend-alert feature. The sweep (sweep.ts) writes one

@@ -14,10 +14,10 @@ import {
 } from '@kilocode/db/schema-types';
 import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { normalizeEmail } from '@/lib/email-address';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_CATALOG_VERSION } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { writeDeletionAudit } from '@/lib/user/deletion-queue/deletion-audit';
 import {
   deletionAdvisoryLockKey,

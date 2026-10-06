@@ -15,7 +15,7 @@ jest.mock('@/lib/cloud-agent/dispatch-health/detector', () => {
   };
 });
 
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { CLOUD_AGENT_DISPATCH_RUNBOOK_URL } from '@/lib/cloud-agent/dispatch-health/health-response';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import { GET } from './route';

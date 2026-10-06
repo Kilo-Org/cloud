@@ -7,7 +7,7 @@ import type * as manualAnalysisClientModule from '../services/manual-analysis-cl
 import type * as manualRemediationClientModule from '../services/manual-remediation-client';
 import { randomUUID } from 'crypto';
 import { eq, sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   operation_ledgers,
   organizations,

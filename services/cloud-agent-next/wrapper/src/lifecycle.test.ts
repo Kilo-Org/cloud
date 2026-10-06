@@ -1,6 +1,12 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, jest } from 'bun:test';
 import { WrapperState } from './state';
-import { createLifecycleManager } from './lifecycle';
+import { createLifecycleManager, PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS } from './lifecycle';
+import {
+  assistantReportsNoActionableOutput,
+  classifyPublicationToolPart,
+  decidePublicationRecovery,
+  messageInfoReportsOutputLimit,
+} from './publication-recovery';
 import type { IngestEvent } from '../../src/shared/protocol';
 import type { WrapperKiloClient } from './kilo-api';
 
@@ -53,6 +59,7 @@ describe('wrapper lifecycle drain races', () => {
         },
         isConnected: () => true,
         reconnectEventSubscription: () => {},
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
 
@@ -94,6 +101,7 @@ describe('wrapper lifecycle drain races', () => {
         },
         isConnected: () => true,
         reconnectEventSubscription: () => {},
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
 
@@ -127,6 +135,7 @@ describe('wrapper lifecycle drain races', () => {
         closeConnections: async () => {},
         isConnected: () => true,
         reconnectEventSubscription: () => {},
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
 
@@ -156,6 +165,7 @@ describe('wrapper lifecycle drain races', () => {
         closeConnections: async () => {},
         isConnected: () => true,
         reconnectEventSubscription: () => {},
+        isGitHubReviewPublicationInstalled: () => false,
       }
     );
 
@@ -176,77 +186,366 @@ describe('wrapper lifecycle drain races', () => {
   }, 20_000);
 });
 
-describe('wrapper lifecycle publication self-check', () => {
-  const agent = { mode: 'code', model: { modelID: 'kilo/test-model' }, variant: 'high' };
+describe('decidePublicationRecovery', () => {
+  const base = { configured: true, outputLimit: false, budgetUsed: false };
 
-  function setup(options: { sendFails?: boolean } = {}) {
-    const state = new WrapperState();
-    const events: IngestEvent[] = [];
-    const prompts: Array<{ prompt?: string; agent?: string }> = [];
-    state.bindSession({ ...sessionContext, publicationSelfCheck: true });
-    state.setSendToIngestFn(event => events.push(event));
-    state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false, agent });
-    const kiloClient = {
-      sendPromptAsync: async (opts: { prompt?: string; agent?: string }) => {
-        if (options.sendFails) throw new Error('kilo unavailable');
-        prompts.push(opts);
-      },
-    } as unknown as WrapperKiloClient;
-    const lifecycle = createLifecycleManager(
-      { workspacePath: '/tmp' },
-      {
-        state,
-        kiloClient,
-        closeConnections: async () => {},
-        isConnected: () => true,
-        reconnectEventSubscription: () => {},
-      }
+  it('seals when the tool is not configured or the turn hit its output limit', () => {
+    expect(decidePublicationRecovery({ ...base, configured: false, signal: null })).toBe('seal');
+    expect(decidePublicationRecovery({ ...base, outputLimit: true, signal: null })).toBe('seal');
+  });
+
+  it('seals on a verified result and on terminal tool errors', () => {
+    expect(decidePublicationRecovery({ ...base, signal: { kind: 'verified', commentId: 5 } })).toBe(
+      'seal'
     );
-    const types = () => events.map(event => event.streamEventType);
-    return { state, events, prompts, lifecycle, types };
-  }
+    for (const code of ['locked', 'rate_limited', 'scan_limit', 'forbidden', 'misconfigured']) {
+      expect(decidePublicationRecovery({ ...base, signal: { kind: 'error', code } })).toBe('seal');
+    }
+  });
 
-  it('sends one self-check instead of sealing, then completes on the next stable idle', async () => {
-    const { events, prompts, lifecycle, types } = setup();
-
-    lifecycle.onSessionIdle();
-    await wait(3_100);
-    expect(prompts).toHaveLength(1);
-    expect(prompts[0]?.agent).toBe('code');
-    expect(types()).not.toContain('wrapper_finalizing');
-
-    // The self-check turn runs and goes idle like any other turn.
-    lifecycle.onRootSessionActivity();
-    lifecycle.onSessionIdle();
-    await wait(3_100);
-    await waitForStreamEvent(events, 'complete');
-    expect(types()).toContain('complete');
-    expect(prompts).toHaveLength(1);
-  }, 15_000);
-
-  it('seals without a self-check when the agent already wrote the summary', async () => {
-    const { state, events, prompts, lifecycle, types } = setup();
-    state.observeSummaryPublication();
-
-    lifecycle.onSessionIdle();
-    await wait(3_100);
-    await waitForStreamEvent(events, 'complete');
-    expect(types()).toContain('complete');
-    expect(prompts).toHaveLength(0);
-  }, 15_000);
-
-  it('still completes the turn when the self-check cannot be sent', async () => {
-    const { events, lifecycle, types } = setup({ sendFails: true });
-
-    lifecycle.onSessionIdle();
-    await wait(6_200);
-    await waitForStreamEvent(events, 'complete');
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        streamEventType: 'error',
-        data: { error: 'Publication self-check failed: kilo unavailable', fatal: false },
+  it('prompts once for a rejected or unverified result and then seals', () => {
+    expect(
+      decidePublicationRecovery({ ...base, signal: { kind: 'error', code: 'rejected_body' } })
+    ).toBe('prompt');
+    expect(
+      decidePublicationRecovery({ ...base, signal: { kind: 'error', code: 'unverified' } })
+    ).toBe('prompt');
+    expect(decidePublicationRecovery({ ...base, signal: null })).toBe('prompt');
+    expect(
+      decidePublicationRecovery({
+        ...base,
+        budgetUsed: true,
+        signal: { kind: 'error', code: 'unverified' },
       })
+    ).toBe('seal');
+    expect(decidePublicationRecovery({ ...base, budgetUsed: true, signal: null })).toBe('seal');
+  });
+});
+
+describe('classifyPublicationToolPart', () => {
+  it('reads a verified result from the completed tool output', () => {
+    expect(
+      classifyPublicationToolPart({
+        tool: 'code_review_publish_review_summary',
+        state: {
+          status: 'completed',
+          output: JSON.stringify({ verified: true, commentId: 7, url: 'https://x' }),
+        },
+      })
+    ).toEqual({ kind: 'verified', commentId: 7 });
+  });
+
+  it('reads the leading code from a tool error state', () => {
+    expect(
+      classifyPublicationToolPart({
+        tool: 'code_review_publish_review_summary',
+        state: { status: 'error', error: 'rate_limited: too many requests' },
+      })
+    ).toEqual({ kind: 'error', code: 'rate_limited' });
+  });
+
+  it('ignores other tools, the bare tool name, and unparseable output', () => {
+    expect(
+      classifyPublicationToolPart({ tool: 'bash', state: { status: 'completed', output: '{}' } })
+    ).toBeNull();
+    expect(
+      classifyPublicationToolPart({
+        tool: 'publish_review_summary',
+        state: { status: 'completed', output: '{}' },
+      })
+    ).toBeNull();
+    expect(
+      classifyPublicationToolPart({
+        tool: 'code_review_publish_review_summary',
+        state: { status: 'completed', output: 'not json' },
+      })
+    ).toBeNull();
+  });
+});
+
+describe('output-limit detection', () => {
+  it('detects the structured MessageOutputLengthError on a root message', () => {
+    expect(messageInfoReportsOutputLimit({ error: { name: 'MessageOutputLengthError' } })).toBe(
+      true
     );
-    expect(types()).toContain('complete');
-  }, 20_000);
+    expect(messageInfoReportsOutputLimit({ error: { name: 'ProviderAuthError' } })).toBe(false);
+    expect(messageInfoReportsOutputLimit({ error: null })).toBe(false);
+    expect(messageInfoReportsOutputLimit({})).toBe(false);
+  });
+
+  it('detects the exact two-fragment plaintext notice and ignores a single fragment', () => {
+    expect(
+      assistantReportsNoActionableOutput([
+        { text: 'The task stopped: no actionable output because the output limit was reached.' },
+      ])
+    ).toBe(true);
+    expect(assistantReportsNoActionableOutput([{ text: 'no actionable output reported' }])).toBe(
+      false
+    );
+    expect(assistantReportsNoActionableOutput([{ text: 'the output limit was reached' }])).toBe(
+      false
+    );
+    expect(
+      assistantReportsNoActionableOutput([
+        {
+          type: 'reasoning',
+          text: 'no actionable output because the output limit was reached',
+        },
+      ])
+    ).toBe(false);
+  });
+});
+
+async function flushMicrotasks(): Promise<void> {
+  for (let index = 0; index < 8; index++) await Promise.resolve();
+}
+
+function createRecoveryHarness(options: { abortDeferred?: boolean; submitFails?: boolean } = {}) {
+  const state = new WrapperState();
+  const events: IngestEvent[] = [];
+  state.bindSession(sessionContext);
+  state.setSendToIngestFn(event => events.push(event));
+  state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false });
+
+  const messageIds: string[] = [];
+  let sendCalls = 0;
+  let abortCalls = 0;
+  let resolveDeferredAbort: (() => void) | null = null;
+  const client = {
+    sendPromptAsync: (opts: { messageId?: string; signal?: AbortSignal }) => {
+      sendCalls += 1;
+      if (opts.messageId) messageIds.push(opts.messageId);
+      if (options.submitFails) return Promise.reject(new Error('submit failed'));
+      if (options.abortDeferred) {
+        return new Promise<void>((_resolve, reject) => {
+          opts.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+            once: true,
+          });
+        });
+      }
+      return Promise.resolve();
+    },
+    abortSession: () => {
+      abortCalls += 1;
+      if (options.abortDeferred) {
+        return new Promise<void>(resolve => {
+          resolveDeferredAbort = resolve;
+        });
+      }
+      return Promise.resolve();
+    },
+  } as unknown as WrapperKiloClient;
+
+  const lifecycle = createLifecycleManager(
+    { workspacePath: '/tmp' },
+    {
+      state,
+      kiloClient: client,
+      closeConnections: async () => {},
+      isConnected: () => true,
+      reconnectEventSubscription: () => {},
+      isGitHubReviewPublicationInstalled: () => true,
+    }
+  );
+
+  return {
+    state,
+    events,
+    lifecycle,
+    messageIds,
+    get sendCalls() {
+      return sendCalls;
+    },
+    get abortCalls() {
+      return abortCalls;
+    },
+    resolveDeferredAbort: () => resolveDeferredAbort?.(),
+  };
+}
+
+async function triggerRecovery(harness: ReturnType<typeof createRecoveryHarness>): Promise<void> {
+  harness.lifecycle.onSessionIdle();
+  jest.advanceTimersByTime(3_000);
+  await flushMicrotasks();
+}
+
+describe('publication recovery lifecycle', () => {
+  it('a verified result seals without aborting the session or emitting an error', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness();
+      await triggerRecovery(harness);
+      expect(harness.sendCalls).toBe(1);
+
+      harness.state.observePublicationSignal({ kind: 'verified', commentId: 5 });
+      harness.lifecycle.onSessionIdle();
+      jest.advanceTimersByTime(3_000);
+      await flushMicrotasks();
+
+      expect(harness.abortCalls).toBe(0);
+      expect(harness.events.some(event => event.streamEventType === 'error')).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps a verified result that arrives during submit and does not prompt again', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness();
+      await triggerRecovery(harness);
+      harness.state.observePublicationSignal({ kind: 'verified', commentId: 6 });
+      harness.lifecycle.onSessionIdle();
+      jest.advanceTimersByTime(3_000);
+      await flushMicrotasks();
+      expect(harness.sendCalls).toBe(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('uses a Kilo-valid msg-prefixed id for the recovery prompt', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness();
+      await triggerRecovery(harness);
+
+      expect(harness.messageIds).toHaveLength(1);
+      expect(harness.messageIds[0]?.startsWith('msg')).toBe(true);
+      expect(harness.messageIds[0]?.startsWith('msg_recovery_')).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('superseding a deferred submit via a new message does not emit or abort the new turn', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness({ abortDeferred: true });
+      await triggerRecovery(harness);
+      expect(harness.sendCalls).toBe(1);
+
+      harness.lifecycle.resetPublicationRecoveryBudget();
+      harness.state.acceptMessage('message-new', {
+        autoCommit: false,
+        condenseOnComplete: false,
+      });
+      await flushMicrotasks();
+
+      expect(harness.abortCalls).toBe(0);
+      expect(harness.events.some(event => event.streamEventType === 'error')).toBe(false);
+      expect(harness.events.map(event => event.streamEventType)).not.toContain(
+        'wrapper_finalizing'
+      );
+      expect(harness.events.map(event => event.streamEventType)).not.toContain('complete');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a new message during a failed-submit bounded abort cannot finalize the new batch', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness({ submitFails: true, abortDeferred: true });
+      await triggerRecovery(harness);
+      expect(harness.sendCalls).toBe(1);
+      expect(harness.abortCalls).toBe(1);
+
+      harness.lifecycle.resetPublicationRecoveryBudget();
+      harness.state.acceptMessage('message-new', {
+        autoCommit: false,
+        condenseOnComplete: false,
+      });
+      harness.resolveDeferredAbort();
+      await flushMicrotasks();
+
+      expect(harness.abortCalls).toBe(1);
+      expect(harness.events.map(event => event.streamEventType)).not.toContain(
+        'wrapper_finalizing'
+      );
+      expect(harness.events.map(event => event.streamEventType)).not.toContain('complete');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('a reset during a failed-submit bounded abort cannot finalize the new batch', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness({ submitFails: true, abortDeferred: true });
+      await triggerRecovery(harness);
+      expect(harness.abortCalls).toBe(1);
+
+      harness.lifecycle.reset();
+      harness.state.bindSession({
+        ...sessionContext,
+        kiloSessionId: 'kilo_sess_new',
+        wrapperGeneration: 2,
+        wrapperConnectionId: 'conn_2',
+      });
+      harness.state.acceptMessage('message-new', {
+        autoCommit: false,
+        condenseOnComplete: false,
+      });
+      harness.resolveDeferredAbort();
+      await flushMicrotasks();
+
+      expect(harness.events.map(event => event.streamEventType)).not.toContain(
+        'wrapper_finalizing'
+      );
+      expect(harness.events.map(event => event.streamEventType)).not.toContain('complete');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('aborts a hung recovery submit at the submit bound and fails fast', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness({ abortDeferred: true });
+      await triggerRecovery(harness);
+      expect(harness.sendCalls).toBe(1);
+
+      // The submit is still pending: it must not hold the batch open.
+      expect(harness.abortCalls).toBe(0);
+      expect(harness.events.map(event => event.streamEventType)).not.toContain(
+        'wrapper_finalizing'
+      );
+
+      jest.advanceTimersByTime(PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS);
+      await flushMicrotasks();
+
+      expect(harness.abortCalls).toBe(1);
+      expect(harness.events.some(event => event.streamEventType === 'error')).toBe(true);
+
+      harness.resolveDeferredAbort();
+      await flushMicrotasks();
+
+      expect(harness.events.map(event => event.streamEventType)).toContain('wrapper_finalizing');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not bound a productive post-delivery recovery turn', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness();
+      await triggerRecovery(harness);
+      expect(harness.sendCalls).toBe(1);
+
+      // The submit resolved. A long productive turn must not be aborted or
+      // sealed by any leftover submit bound.
+      jest.advanceTimersByTime(PUBLICATION_RECOVERY_SUBMIT_TIMEOUT_MS * 10);
+      await flushMicrotasks();
+
+      expect(harness.abortCalls).toBe(0);
+      expect(harness.events.some(event => event.streamEventType === 'error')).toBe(false);
+      expect(harness.events.map(event => event.streamEventType)).not.toContain(
+        'wrapper_finalizing'
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

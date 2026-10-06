@@ -1,12 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import type { Organization } from '@kilocode/db/schema';
-import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
-import { verifyEmail } from '@/lib/email-neverbounce';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
-import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
+import { captureException } from '@sentry/nextjs';
+import {
+  getMagicLinkUrl,
+  type MagicLinkTokenWithPlaintext,
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import {
+  getEmailVerificationRecipient,
+  sendViaMailgun,
+} from '@kilocode/web-shared/lib/email-mailgun';
+import { verifyEmail } from '@kilocode/web-shared/lib/email-neverbounce';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 // Subject lines for each template — also serves as the canonical list of template names
 export const subjects = {
@@ -91,9 +98,36 @@ export function renderNonAutolinkedText(str: string): RawHtml {
   return new RawHtml(escapeHtml(str).replace(/[/.]/g, '$&&#8203;'));
 }
 
+// Both Next.js apps live at apps/<name> and run with their app directory as the
+// working directory, locally and on Vercel. Each app's next.config.mjs traces
+// these templates into its functions with outputFileTracingIncludes.
+const EMAIL_TEMPLATES_DIR = path.join(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'web-shared',
+  'src',
+  'emails'
+);
+
+// Report an unreadable template before any caller can swallow the error; the
+// low-balance alert, for one, only logs send failures from after().
+function readTemplate(name: string): string {
+  const templatePath = path.join(EMAIL_TEMPLATES_DIR, `${name}.html`);
+  try {
+    return fs.readFileSync(templatePath, 'utf-8');
+  } catch (error) {
+    captureException(error, {
+      tags: { source: 'email_template', email_template: name },
+      extra: { templatePath },
+    });
+    throw error;
+  }
+}
+
 export function renderTemplate(name: string, vars: TemplateVars): string {
-  const templatePath = path.join(process.cwd(), 'src', 'emails', `${name}.html`);
-  const html = fs.readFileSync(templatePath, 'utf-8');
+  const html = readTemplate(name);
   return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
     if (!(key in vars)) {
       throw new Error(`Missing template variable '${key}' in email template '${name}'`);

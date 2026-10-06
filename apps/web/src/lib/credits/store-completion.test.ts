@@ -3,16 +3,17 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import { and, eq, sql } from 'drizzle-orm';
 
 import {
+  bouncer_credit_event_outbox,
   credit_transactions,
   kilo_pass_audit_log,
   kilo_pass_store_events,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type * as Credits from '@/lib/credits';
-import { db } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/microdollars';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import type * as Credits from '@kilocode/web-shared/lib/credits';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import type * as StoreCompletion from './store-completion';
 import type { ValidatedStoreCreditPurchase } from './store-verifier';
@@ -30,8 +31,8 @@ import {
 // id. The real top-up runs against the test database by default; one test makes
 // it report an already-credited transaction that does not exist, to prove the
 // inconsistent-ledger path.
-jest.mock('@/lib/credits', () => {
-  const actual = jest.requireActual<typeof Credits>('@/lib/credits');
+jest.mock('@kilocode/web-shared/lib/credits', () => {
+  const actual = jest.requireActual<typeof Credits>('@kilocode/web-shared/lib/credits');
   return {
     __esModule: true,
     ...actual,
@@ -39,33 +40,21 @@ jest.mock('@/lib/credits', () => {
   };
 });
 
-jest.mock('@/lib/bouncer/client', () => ({
-  __esModule: true,
-  ...jest.requireActual<object>('@/lib/bouncer/client'),
-  reportCreditEvent: jest.fn(),
-}));
-
-const mockReportCreditEvent = jest.mocked(
-  jest.requireMock<{ reportCreditEvent: jest.Mock }>('@/lib/bouncer/client').reportCreditEvent
-);
-
 const mockProcessTopUp = jest.mocked(
-  jest.requireMock<typeof Credits>('@/lib/credits').processTopUp
+  jest.requireMock<typeof Credits>('@kilocode/web-shared/lib/credits').processTopUp
 );
 
 let completeStoreCreditPurchase: typeof StoreCompletion.completeStoreCreditPurchase;
-let reportStoreCreditPurchaseToBouncer: typeof StoreCompletion.reportStoreCreditPurchaseToBouncer;
 
 beforeAll(() => {
   // Loaded here rather than through a static import for the same reason: a
   // static import is bound before the mock above is registered.
-  ({ completeStoreCreditPurchase, reportStoreCreditPurchaseToBouncer } =
+  ({ completeStoreCreditPurchase } =
     jest.requireActual<typeof StoreCompletion>('./store-completion'));
 });
 
 beforeEach(() => {
   mockProcessTopUp.mockClear();
-  mockReportCreditEvent.mockClear();
 });
 
 function purchase(
@@ -682,49 +671,61 @@ describe('completeStoreCreditPurchase', () => {
   });
 });
 
-describe('reportStoreCreditPurchaseToBouncer', () => {
-  it('reports a new production grant once, in US cents', async () => {
+describe('store purchase bouncer delivery', () => {
+  async function outboxRowsFor(userId: string) {
+    return db
+      .select()
+      .from(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.user_id, userId));
+  }
+
+  it('enqueues one idempotent production purchase row in the grant transaction', async () => {
     const user = await insertTestUser();
     const storePurchase = purchase({ environment: 'Production' });
-    const granted = await completeStoreCreditPurchase({ user, purchase: storePurchase });
-    await reportStoreCreditPurchaseToBouncer({
-      userId: user.id,
-      purchase: storePurchase,
-      result: granted,
-    });
-    const replayed = await completeStoreCreditPurchase({ user, purchase: storePurchase });
-    await reportStoreCreditPurchaseToBouncer({
-      userId: user.id,
-      purchase: storePurchase,
-      result: replayed,
-    });
 
-    expect(mockReportCreditEvent).toHaveBeenCalledTimes(1);
-    expect(mockReportCreditEvent.mock.calls[0]?.[0]).toEqual({
+    await completeStoreCreditPurchase({ user, purchase: storePurchase });
+    // A replay must not insert a second row: the dedupe key is the payment id.
+    await completeStoreCreditPurchase({ user, purchase: storePurchase });
+
+    const rows = await outboxRowsFor(user.id);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.event_id).toBe(
+      storeCreditPaymentId(storePurchase.paymentProvider, storePurchase.providerTransactionId)
+    );
+    expect(rows[0]?.event_type).toBe('store.purchase');
+    expect(rows[0]?.payload).toMatchObject({
       type: 'store.purchase',
       amountCents: 1000,
       provider: 'apple',
-      eventId: storeCreditPaymentId(
-        storePurchase.paymentProvider,
-        storePurchase.providerTransactionId
-      ),
-      occurredAt: storePurchase.purchasedAtIso,
-      userId: user.id,
       referenceId: storePurchase.providerTransactionId,
       environment: 'production',
     });
+    // The apple subscription chain key does not apply to a credit pack.
+    expect(rows[0]?.payload).not.toHaveProperty('storeAccountKey');
+    expect(rows[0]?.payload).not.toHaveProperty('originalTransactionId');
   });
 
-  it('reports nothing for a sandbox grant', async () => {
+  it('enqueues nothing for a sandbox grant', async () => {
     const user = await insertTestUser();
     const storePurchase = purchase({ environment: 'Sandbox' });
-    const granted = await completeStoreCreditPurchase({ user, purchase: storePurchase });
-    await reportStoreCreditPurchaseToBouncer({
-      userId: user.id,
-      purchase: storePurchase,
-      result: granted,
-    });
 
-    expect(mockReportCreditEvent).not.toHaveBeenCalled();
+    await completeStoreCreditPurchase({ user, purchase: storePurchase });
+
+    expect(await outboxRowsFor(user.id)).toHaveLength(0);
+  });
+
+  it('re-attempts the enqueue when the grant already committed (lost-report recovery)', async () => {
+    const user = await insertTestUser();
+    const storePurchase = purchase({ environment: 'Production' });
+
+    await completeStoreCreditPurchase({ user, purchase: storePurchase });
+    // Simulate a grant that committed but whose enqueue was lost.
+    await db
+      .delete(bouncer_credit_event_outbox)
+      .where(eq(bouncer_credit_event_outbox.user_id, user.id));
+
+    const replayed = await completeStoreCreditPurchase({ user, purchase: storePurchase });
+    expect(replayed.alreadyProcessed).toBe(true);
+    expect(await outboxRowsFor(user.id)).toHaveLength(1);
   });
 });

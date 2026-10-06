@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { setTimeout } from 'node:timers/promises';
-import { db } from '@/lib/drizzle';
-import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { invalidateModelStatsCache } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import { insertTestModelStats } from '@/tests/helpers/model-stats.helper';
 import { ENKRYPT_REVIEWED_CASES, ENKRYPT_SCORE_EXAMPLES } from '@/tests/fixtures/enkrypt-scores';
 import { enkrypt_sync_state, modelStats } from '@kilocode/db/schema';
@@ -9,7 +9,7 @@ import type { ModelStats } from '@kilocode/db/schema';
 import type { EnkryptFailureCategory, EnkryptSyncCounts } from '@kilocode/db/schema-types';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { EnkryptSyncError } from './enkrypt-errors';
-import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
+import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 import { ENKRYPT_REQUIRED_MODEL_IDS, matchEnkryptScores } from './enkrypt-identity';
 import type * as EnkryptIdentity from './enkrypt-identity';
 import { getEnkryptSyncHealth } from './enkrypt-status';
@@ -18,7 +18,7 @@ import { syncEnkryptBenchmarks } from './sync-enkrypt';
 let mockApiKey: string | undefined = 'test-key';
 let mockEnabled = true;
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_API_KEY() {
     return mockApiKey;
   },
@@ -28,7 +28,9 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 jest.mock('node:timers/promises', () => ({ setTimeout: jest.fn() }));
-jest.mock('@/lib/model-stats/model-stats-cache', () => ({ invalidateModelStatsCache: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/model-stats/model-stats-cache', () => ({
+  invalidateModelStatsCache: jest.fn(),
+}));
 jest.mock('./enkrypt-identity', () => {
   const actual = jest.requireActual<typeof EnkryptIdentity>('./enkrypt-identity');
   return { ...actual, matchEnkryptScores: jest.fn(actual.matchEnkryptScores) };

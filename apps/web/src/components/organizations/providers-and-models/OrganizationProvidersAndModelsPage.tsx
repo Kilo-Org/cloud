@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo } from 'react';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
-import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -34,8 +34,8 @@ import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCa
 import {
   modelRetainsPrompts,
   modelTrains,
-} from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
-import { getModelDisplayPricing } from '@/lib/ai-gateway/providers/openrouter/display-pricing';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type Props = {

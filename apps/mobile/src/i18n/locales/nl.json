@@ -3200,7 +3200,6 @@
     "newAgent": "Nieuwe agent",
     "approving": "Bezig met goedkeuren...",
     "couldNotApprove": "Goedkeuren mislukt",
-    "couldNotStart": "Starten mislukt",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",

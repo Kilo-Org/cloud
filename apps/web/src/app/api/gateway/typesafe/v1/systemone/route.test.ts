@@ -1,8 +1,10 @@
 import { expect, it } from '@jest/globals';
-import { handleSystemOneRequest } from '@/lib/ai-gateway/typesafe/handler';
+import { handleSystemOneRequest } from '@kilocode/web-shared/lib/ai-gateway/typesafe/handler';
 import { maxDuration, POST } from './route';
 
-jest.mock('@/lib/ai-gateway/typesafe/handler', () => ({ handleSystemOneRequest: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/typesafe/handler', () => ({
+  handleSystemOneRequest: jest.fn(),
+}));
 
 it('exposes the System One handler with the gateway duration limit', () => {
   expect(POST).toBe(handleSystemOneRequest);

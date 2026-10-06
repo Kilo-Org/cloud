@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { cleanupDbForTest, db, sql } from '@/lib/drizzle';
+import { cleanupDbForTest, db, sql } from '@kilocode/web-shared/lib/drizzle';
 
 describe('KiloClaw subscription schema', () => {
   beforeEach(async () => {

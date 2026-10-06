@@ -1,4 +1,4 @@
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from './default-config';
 
 describe('createDefaultCodeReviewConfig', () => {

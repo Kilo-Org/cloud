@@ -1,6 +1,6 @@
 export const CONTROL_PLANE_SANDBOX_PERMISSION = {
   external_directory: 'allow',
-  read: 'allow',
+  read: { '*': 'allow', '*.env': 'allow', '*.env.*': 'allow' },
   edit: 'allow',
   glob: 'allow',
   grep: 'allow',

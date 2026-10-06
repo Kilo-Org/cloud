@@ -1,16 +1,32 @@
-import { db } from '@/lib/drizzle';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { client as stripe } from '@/lib/stripe-client';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
+import type { CheckoutSessionLike } from '@kilocode/web-shared/lib/service-fees/checkout';
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
+
+/** A session handed to `onSession`, carrying whichever charged amount the caller knows. */
+export type KiloPassCheckoutSessionForReport = CheckoutSessionLike & {
+  /** The amount the caller already resolved (for example a price); preferred when present. */
+  amountCents?: number;
+  /** Stripe's `amount_total` when the session carries it (a reused session does). */
+  amount_total?: number | null;
+};
 
 type CreateOrReuseKiloPassCheckoutSessionParams = {
   userId: string;
   stripeCustomerId: string;
   metadata: Stripe.MetadataParam;
-  createSession: () => Promise<{ url?: string | null }>;
+  /** Creates the checkout session, inside the helper's transaction. */
+  createSession: (tx: DrizzleTransaction) => Promise<KiloPassCheckoutSessionForReport>;
+  /**
+   * Runs inside the same transaction for the session that will be charged, whether it was created
+   * or reused, so a durable report (for example a bouncer `charge.attempted`) commits atomically
+   * with the checkout decision and is idempotent across a reuse.
+   */
+  onSession?: (tx: DrizzleTransaction, session: KiloPassCheckoutSessionForReport) => Promise<void>;
 };
 
 const STRIPE_CHECKOUT_TIMEOUT_MS = 10_000;
@@ -58,6 +74,7 @@ export async function createOrReuseKiloPassCheckoutSession(
       checkoutPageCount++;
       for (const session of openSessions.data.filter(isUserKiloPassSession)) {
         if (matchesRequestedProduct(session) && typeof session.url === 'string') {
+          await params.onSession?.(tx, session);
           return { url: session.url };
         }
         await stripe.checkout.sessions.expire(session.id, {
@@ -105,7 +122,8 @@ export async function createOrReuseKiloPassCheckoutSession(
       });
     }
 
-    const session = await params.createSession();
+    const session = await params.createSession(tx);
+    await params.onSession?.(tx, session);
     return { url: typeof session.url === 'string' ? session.url : null };
   });
 }

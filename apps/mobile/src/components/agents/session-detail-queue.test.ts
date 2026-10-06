@@ -130,6 +130,7 @@ vi.mock('@/lib/trpc', () => ({
       listCombined: {
         queryOptions: (input: unknown) => ({ queryKey: ['profiles', 'listCombined'], input }),
       },
+      get: { queryOptions: (input: unknown) => ({ queryKey: ['profiles', 'get'], input }) },
     },
   }),
   trpcClient: {
@@ -306,6 +307,9 @@ vi.mock('@/lib/hooks/use-session-model-options', () => ({
   revalidateLegacyGatewayOverride: vi.fn(),
   useSessionModelOptions: () => ({ options: [], selectedValue: null, selectedVariant: null }),
 }));
+vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
+  useRemoteModelCatalogRetry: vi.fn(),
+}));
 vi.mock('@/lib/use-github-repos-refresh', () => ({
   useGitHubReposRefresh: () => ({ openGitHubIntegration: vi.fn() }),
 }));
@@ -367,11 +371,14 @@ vi.mock('@/components/agents/agent-interaction-policy', () => ({
   getBlockingInteraction: () => 'none',
 }));
 vi.mock('@/components/agents/mode-normalize', () => ({
+  customModeOptionsFromProfileAgents: () => [],
   customModeOptionsFromRuntimeAgents: () => [],
   dedupeCustomModeOptions: (options: unknown) => options,
   ensureSelectedCustomOption: (options: unknown) => options,
   lockedModelOption: () => ({}),
   resolvePinnedAgentModel: () => ({}),
+  resolveSessionRoleView: () => ({ customOptions: [], pinned: {} }),
+  visibleProfileAgents: () => [],
 }));
 vi.mock('@/components/agents/queued-badge-hold', () => ({
   nextHeldQueuedIds: (held: unknown) => held,
@@ -395,9 +402,11 @@ vi.mock('@/components/agents/mobile-session-manager-helpers', () => ({
   buildRemoteAttachmentParts: vi.fn(),
 }));
 vi.mock('@/components/agents/session-working-state', () => ({
+  SEND_REASON_MAX_FONT_SCALE: 1.6,
+  SESSION_FOOTER_ROW_ITEM_PADDING: 'px-4 py-2',
+  resolveSessionFooterRowItem: () => null,
   shouldShowAgentWorkingIndicator: () => false,
   shouldShowFooterWorkingIndicator: () => false,
-  shouldShowSessionFooterRow: () => false,
 }));
 vi.mock('@/components/agents/session-keep-awake', () => ({
   shouldKeepSessionAwake: () => false,

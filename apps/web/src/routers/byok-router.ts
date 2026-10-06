@@ -1,15 +1,15 @@
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
-import { sentryLogger } from '@/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   CreateBYOKKeyInputSchema,
   UpdateBYOKKeyInputSchema,
@@ -19,29 +19,29 @@ import {
   TestBYOKKeyInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
-} from '@/lib/ai-gateway/byok/types';
+} from '@/lib/byok/types';
 import {
   UserByokProviderIdSchema,
   UserByokTestModels,
   getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
-import { decryptByokRow } from '@/lib/ai-gateway/byok';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { decryptByokRow } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
-import DIRECT_BYOK_PROVIDERS from '@/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
   formatDirectByokModelId,
-} from '@/lib/ai-gateway/providers/direct-byok';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =

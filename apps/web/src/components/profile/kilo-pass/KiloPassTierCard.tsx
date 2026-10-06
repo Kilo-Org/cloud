@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_TIER_CONFIG,
-} from '@/lib/kilo-pass/constants';
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { cn } from '@/lib/utils';
 
 import { KiloPassBonusRampDialog } from './KiloPassBonusRampDialog';
@@ -18,8 +18,8 @@ import {
   getTierName,
   getYearlyMonthlyBonusLabel,
 } from './utils';
-import type { KiloPassTier } from '@/lib/kilo-pass/enums';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 export function KiloPassTierCard(props: {
   tier: KiloPassTier;

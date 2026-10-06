@@ -214,8 +214,7 @@ export function ProfileOverviewScreen({
       <ScreenHeader title={profile?.name ?? t('profiles.title')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4 pb-8"
-        keyboardShouldPersistTaps="handled"
+        contentContainerClassName="gap-6 px-6 pt-4"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >

@@ -1,12 +1,12 @@
 import 'server-only';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_branch_pull_requests } from '@kilocode/db/schema';
 import { fetchBatchedReviewDecisions } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type TenantOwner = {
   userId: string;
@@ -25,7 +25,6 @@ function parseGitHubOwnerRepo(gitUrl: string): { owner: string; repo: string } |
 
 type ClaimedRow = {
   git_url: string;
-  git_branch: string;
   pr_number: number | null;
   owned_by_organization_id: string | null;
   owned_by_user_id: string | null;
@@ -59,7 +58,6 @@ async function claimPendingReviewRows(owner: TenantOwner): Promise<ClaimedRow[]>
     )
     .returning({
       git_url: github_branch_pull_requests.git_url,
-      git_branch: github_branch_pull_requests.git_branch,
       pr_number: github_branch_pull_requests.pr_number,
       owned_by_organization_id: github_branch_pull_requests.owned_by_organization_id,
       owned_by_user_id: github_branch_pull_requests.owned_by_user_id,
@@ -69,7 +67,7 @@ async function claimPendingReviewRows(owner: TenantOwner): Promise<ClaimedRow[]>
 
 type FlushedRow = {
   git_url: string;
-  git_branch: string;
+  pr_number: number;
   owned_by_organization_id: string | null;
   owned_by_user_id: string | null;
   fetching_at: string;
@@ -97,6 +95,17 @@ function tenantPredicateForOwner(
   throw new Error('github_branch_pull_requests row has neither org nor user owner');
 }
 
+/**
+ * Identify the cache row by PR identity. `pr_number` can be null for the
+ * legacy sentinel rows ("no PR on this branch") that predate the PR-identity
+ * cache; `eq(column, null)` never matches in SQL, so those need `IS NULL`.
+ */
+function prIdentityPredicate(prNumber: number | null) {
+  return prNumber === null
+    ? isNull(github_branch_pull_requests.pr_number)
+    : eq(github_branch_pull_requests.pr_number, prNumber);
+}
+
 async function flushBatchResults(results: FlushedRow[]): Promise<void> {
   if (results.length === 0) return;
 
@@ -119,7 +128,7 @@ async function flushBatchResults(results: FlushedRow[]): Promise<void> {
         .where(
           and(
             eq(github_branch_pull_requests.git_url, row.git_url),
-            eq(github_branch_pull_requests.git_branch, row.git_branch),
+            prIdentityPredicate(row.pr_number),
             tenantPredicate,
             // TOCTOU guard: only clear the flag if we still hold the claim.
             // A concurrent webhook that re-set review_decision_pending=true will
@@ -134,7 +143,7 @@ async function flushBatchResults(results: FlushedRow[]): Promise<void> {
 
 type AbandonedRow = {
   git_url: string;
-  git_branch: string;
+  pr_number: number | null;
   owned_by_organization_id: string | null;
   owned_by_user_id: string | null;
   fetching_at: string;
@@ -168,7 +177,7 @@ async function abandonClaimedRows(rows: AbandonedRow[]): Promise<void> {
         .where(
           and(
             eq(github_branch_pull_requests.git_url, row.git_url),
-            eq(github_branch_pull_requests.git_branch, row.git_branch),
+            prIdentityPredicate(row.pr_number),
             tenantPredicate,
             // Same TOCTOU guard as flushBatchResults: a concurrent webhook
             // that re-flagged the row will have a different fetching_at,
@@ -186,7 +195,7 @@ function abandonRowsFromClaimed(rows: ClaimedRow[]): AbandonedRow[] {
     if (!row.review_decision_fetching_at) continue;
     out.push({
       git_url: row.git_url,
-      git_branch: row.git_branch,
+      pr_number: row.pr_number,
       owned_by_organization_id: row.owned_by_organization_id,
       owned_by_user_id: row.owned_by_user_id,
       fetching_at: row.review_decision_fetching_at,
@@ -299,9 +308,11 @@ export async function executeBatchReviewDecisionFetch(owner: TenantOwner): Promi
     // claimPendingReviewRows always sets review_decision_fetching_at to now();
     // skip the row if a concurrent writer somehow cleared it.
     if (!row.review_decision_fetching_at) continue;
+    // batchEntries only holds rows that passed the `!row.pr_number` guard above.
+    if (row.pr_number === null) continue;
     toFlush.push({
       git_url: row.git_url,
-      git_branch: row.git_branch,
+      pr_number: row.pr_number,
       owned_by_organization_id: row.owned_by_organization_id,
       owned_by_user_id: row.owned_by_user_id,
       fetching_at: row.review_decision_fetching_at,

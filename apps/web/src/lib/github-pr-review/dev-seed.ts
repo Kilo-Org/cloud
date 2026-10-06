@@ -3,7 +3,7 @@ import 'server-only';
 import { eq, sql } from 'drizzle-orm';
 import { user_github_app_tokens } from '@kilocode/db/schema';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 // Single source of truth for the envelope scheme, active key, and AAD. Reusing
 // the production helper guarantees the seeded row stays decryptable by
 // git-token-service even if the scheme/AAD ever changes.

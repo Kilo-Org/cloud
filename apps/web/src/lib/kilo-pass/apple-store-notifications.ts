@@ -21,14 +21,15 @@ import {
   kilocode_users,
   type User,
 } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import type { BouncerCreditEventOutboxDatabase } from '@kilocode/db/bouncer-credit-event-outbox';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   decodeAppleStoreTransactionJws,
   mapAppleKiloPassTransaction,
@@ -46,7 +47,8 @@ import {
   type CompleteStoreKiloPassPurchaseResult,
 } from './store-subscription-completion';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
-import { reportCreditEvent, type StoreEventKind } from '@/lib/bouncer/client';
+import type { StoreCreditEvent, StoreEventKind } from '@kilocode/web-shared/lib/bouncer/client';
+import { enqueueCreditEvent } from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import {
   getStoreCreditProductByAppleProductId,
@@ -63,7 +65,7 @@ import {
   type StoreCreditReversalResult,
 } from '@/lib/credits/store-refund';
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 type DbOrTx = DrizzleTransaction | typeof db;
 
@@ -1006,8 +1008,9 @@ function getAppStoreUsdAmountCents(transaction: AppleStoreDecodedTransaction): n
 }
 
 /**
- * The store money event an Apple notification maps to. `REVOKE`, the churn notifications
- * (`DID_FAIL_TO_RENEW`, `EXPIRED`, `GRACE_PERIOD_EXPIRED`), and every unmapped type report none.
+ * The store money event an Apple notification maps to. `REVOKE` (a family-sharing loss, not fraud),
+ * the churn notifications (`DID_FAIL_TO_RENEW`, `EXPIRED`, `GRACE_PERIOD_EXPIRED`), and every
+ * unmapped type report none.
  */
 function getAppStoreBouncerReport(
   notificationType: string,
@@ -1016,7 +1019,7 @@ function getAppStoreBouncerReport(
   switch (notificationType) {
     case NotificationTypeV2.CONSUMPTION_REQUEST:
       // The customer asked for a refund; the outcome is still open.
-      return { type: 'store.refund', reason: 'requested' };
+      return { type: 'store.refund_requested' };
     case NotificationTypeV2.REFUND:
       return {
         type: 'store.refund',
@@ -1025,6 +1028,8 @@ function getAppStoreBouncerReport(
             ? 'issue'
             : 'other',
       };
+    case NotificationTypeV2.REFUND_DECLINED:
+      return { type: 'store.refund_declined' };
     case NotificationTypeV2.REFUND_REVERSED:
       return { type: 'store.refund_reversed' };
     case NotificationTypeV2.SUBSCRIBED:
@@ -1036,13 +1041,15 @@ function getAppStoreBouncerReport(
 }
 
 /**
- * The Kilo account that owns an App Store transaction, for a report. A query failure rejects;
- * `runAfterResponse` captures it, so it never reaches the store flow.
+ * The Kilo account that owns an App Store transaction, for a report. The SELECTs run on the passed
+ * database (the caller's transaction), so the lookup is atomic with the enqueue. A query failure
+ * rejects and propagates to the caller.
  */
 async function resolveAppStoreKiloPassOwner(
+  database: BouncerCreditEventOutboxDatabase,
   transaction: AppleStoreDecodedTransaction
 ): Promise<string | null> {
-  const subscriptionRows = await db
+  const subscriptionRows = await database
     .select({ kiloUserId: kilo_pass_subscriptions.kilo_user_id })
     .from(kilo_pass_subscriptions)
     .where(
@@ -1054,7 +1061,7 @@ async function resolveAppStoreKiloPassOwner(
     .limit(1);
   if (subscriptionRows[0]) return subscriptionRows[0].kiloUserId;
 
-  const purchaseRows = await db
+  const purchaseRows = await database
     .select({ kiloUserId: kilo_pass_store_purchases.kilo_user_id })
     .from(kilo_pass_store_purchases)
     .where(
@@ -1067,7 +1074,7 @@ async function resolveAppStoreKiloPassOwner(
   if (purchaseRows[0]) return purchaseRows[0].kiloUserId;
 
   // A credit pack has no Kilo Pass row; its grant row names the owner.
-  const creditPackRows = await db
+  const creditPackRows = await database
     .select({ kiloUserId: credit_transactions.kilo_user_id })
     .from(credit_transactions)
     .where(
@@ -1080,7 +1087,7 @@ async function resolveAppStoreKiloPassOwner(
   if (creditPackRows[0]) return creditPackRows[0].kiloUserId;
 
   if (!transaction.appAccountToken) return null;
-  const tokenRows = await db
+  const tokenRows = await database
     .select({ id: kilocode_users.id })
     .from(kilocode_users)
     .where(eq(kilocode_users.app_store_account_token, transaction.appAccountToken))
@@ -1089,19 +1096,26 @@ async function resolveAppStoreKiloPassOwner(
 }
 
 /**
- * Reports one App Store money event to bouncer. Production events for a resolved Kilo account only:
- * a store event carries no card and no client IP. Call it from `after()`, post-commit.
+ * Durably enqueues one App Store money event for bouncer on the caller's transaction, so it
+ * commits atomically with `kilo_pass_store_events.processed_at`: a crash or DB error can never mark
+ * the store event processed while losing the report, and a provider redelivery that hits
+ * `already_processed` cannot suppress a lost enqueue. Production events for a resolved Kilo account
+ * only: a store event carries no card and no client IP.
  */
-async function reportAppStoreCreditEventToBouncer(params: {
-  notification: AppleStoreDecodedNotification;
-  transaction: AppleStoreDecodedTransaction;
-}): Promise<void> {
+async function enqueueAppStoreCreditEventToBouncer(
+  database: BouncerCreditEventOutboxDatabase,
+  params: {
+    notification: AppleStoreDecodedNotification;
+    transaction: AppleStoreDecodedTransaction;
+  }
+): Promise<void> {
   if (params.notification.environment !== 'Production') return;
   const report = getAppStoreBouncerReport(params.notification.notificationType, params.transaction);
   if (!report) return;
-  const userId = await resolveAppStoreKiloPassOwner(params.transaction);
+  const userId = await resolveAppStoreKiloPassOwner(database, params.transaction);
   if (!userId) return;
-  await reportCreditEvent({
+  const isCreditPack = Boolean(getStoreCreditProductByAppleProductId(params.transaction.productId));
+  const event: StoreCreditEvent = {
     ...report,
     provider: 'apple',
     eventId: params.notification.notificationUUID,
@@ -1110,10 +1124,13 @@ async function reportAppStoreCreditEventToBouncer(params: {
         ? undefined
         : new Date(params.notification.signedDate),
     userId,
-    storeAccountKey: params.transaction.originalTransactionId,
+    // `originalTransactionId` labels the Kilo Pass subscription chain only. A credit pack has no
+    // subscription, so its original transaction id would not correlate one; omit it.
+    originalTransactionId: isCreditPack ? undefined : params.transaction.originalTransactionId,
     referenceId: params.transaction.transactionId,
     environment: 'production',
-  });
+  };
+  await enqueueCreditEvent(database, event);
 }
 
 export async function processAppStoreKiloPassNotification(params: {
@@ -1222,6 +1239,7 @@ export async function processAppStoreKiloPassNotification(params: {
             providerSubscriptionId: purchase.providerSubscriptionId,
           },
         });
+        await enqueueAppStoreCreditEventToBouncer(tx, { notification, transaction });
         await tx
           .update(kilo_pass_store_events)
           .set({ processed_at: new Date().toISOString() })
@@ -1252,9 +1270,6 @@ export async function processAppStoreKiloPassNotification(params: {
           });
         });
       }
-      await runAfterResponse(() =>
-        reportAppStoreCreditEventToBouncer({ notification, transaction })
-      );
       return { processed: true };
     }
   }
@@ -1371,6 +1386,7 @@ export async function processAppStoreKiloPassNotification(params: {
           skippedRegrantedBaseCycleKeys: restoration.skippedRegrantedBaseCycleKeys,
         },
       });
+      await enqueueAppStoreCreditEventToBouncer(tx, { notification, transaction });
       await tx
         .update(kilo_pass_store_events)
         .set({ processed_at: new Date().toISOString() })
@@ -1381,7 +1397,6 @@ export async function processAppStoreKiloPassNotification(params: {
           )
         );
     });
-    await runAfterResponse(() => reportAppStoreCreditEventToBouncer({ notification, transaction }));
     return { processed: true };
   }
 
@@ -1473,6 +1488,7 @@ export async function processAppStoreKiloPassNotification(params: {
           supersededByNewerRefundReversal: reversal?.superseded ?? false,
         },
       });
+      await enqueueAppStoreCreditEventToBouncer(tx, { notification, transaction });
       await tx
         .update(kilo_pass_store_events)
         .set({ processed_at: new Date().toISOString() })
@@ -1483,7 +1499,6 @@ export async function processAppStoreKiloPassNotification(params: {
           )
         );
     });
-    await runAfterResponse(() => reportAppStoreCreditEventToBouncer({ notification, transaction }));
     return { processed: true };
   }
 
@@ -1536,6 +1551,7 @@ export async function processAppStoreKiloPassNotification(params: {
           storeCreditRestoration,
         },
       });
+      await enqueueAppStoreCreditEventToBouncer(tx, { notification, transaction });
       await tx
         .update(kilo_pass_store_events)
         .set({ processed_at: new Date().toISOString() })
@@ -1546,23 +1562,23 @@ export async function processAppStoreKiloPassNotification(params: {
           )
         );
     });
-    await runAfterResponse(() => reportAppStoreCreditEventToBouncer({ notification, transaction }));
     return { processed: true };
   }
 
-  if (transaction) {
-    await runAfterResponse(() => reportAppStoreCreditEventToBouncer({ notification, transaction }));
-  }
-
-  await db
-    .update(kilo_pass_store_events)
-    .set({ processed_at: new Date().toISOString() })
-    .where(
-      and(
-        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
-        eq(kilo_pass_store_events.event_id, notification.notificationUUID)
-      )
-    );
+  await db.transaction(async tx => {
+    if (transaction) {
+      await enqueueAppStoreCreditEventToBouncer(tx, { notification, transaction });
+    }
+    await tx
+      .update(kilo_pass_store_events)
+      .set({ processed_at: new Date().toISOString() })
+      .where(
+        and(
+          eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+          eq(kilo_pass_store_events.event_id, notification.notificationUUID)
+        )
+      );
+  });
 
   return { processed: true };
 }

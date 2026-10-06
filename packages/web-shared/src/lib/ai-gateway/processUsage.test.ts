@@ -16,18 +16,18 @@ import {
   toInsertableDbUsageRecord,
   usageTransactionIdleTimeoutQuery,
 } from './processUsage';
-import { reportUsageEvent } from '@/lib/bouncer/client';
-import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
-import { verifyApproval } from '@/tests/helpers/approval.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { reportUsageEvent } from '@kilocode/web-shared/lib/bouncer/client';
+import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { verifyApproval } from '@kilocode/web-shared/tests/helpers/approval.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   defineMicrodollarUsage,
   insertUsageWithOverrides,
-} from '@/tests/helpers/microdollar-usage.helper';
+} from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   microdollar_usage,
   microdollar_usage_daily,
@@ -37,11 +37,11 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, getTableColumns } from 'drizzle-orm';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { Readable } from 'node:stream';
-import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import { toMicrodollars } from '@/lib/microdollars';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
 jest.mock('@sentry/nextjs', () => ({
@@ -52,8 +52,8 @@ jest.mock('@sentry/nextjs', () => ({
 
 // Bouncer is report-only and its client resolves on any failure; mock it so the
 // usage-event payload can be asserted without a network call.
-jest.mock('@/lib/bouncer/client', () => ({
-  ...(jest.requireActual('@/lib/bouncer/client') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
   reportUsageEvent: jest.fn(async () => undefined),
 }));
 
@@ -1342,44 +1342,32 @@ describe('logMicrodollarUsage', () => {
     expect(dailyRows).toHaveLength(0);
   });
 
-  test('reports the bouncer usage event with the final tokens and request flags', async () => {
+  test('skips anonymous usage without an IP instead of inventing one', async () => {
+    mockedReportUsageEvent.mockClear();
     const user = await insertTestUser({
-      id: 'test-bouncer-usage-user',
+      id: 'test-bouncer-anonymous-no-ip-user',
       microdollars_used: 0,
-      google_user_email: 'bouncer-usage@example.com',
+      google_user_email: 'bouncer-anonymous-no-ip@example.com',
     });
-    // No `messageId`, so the (network) generation lookup is skipped.
-    const usageStats: MicrodollarUsageStats = { ...BASE_USAGE_STATS, messageId: null };
     const usageContext: MicrodollarUsageContext = {
       ...createBaseUsageContext(user),
-      has_tools: true,
       bouncer: {
-        requestId: 'req-bouncer-1',
-        occurredAt: new Date('2026-09-29T10:00:00.000Z'),
-        clientIp: '203.0.113.9',
-        clientAttributed: true,
-        requestedLogprobs: true,
-        samples: 2,
-        promptSimHash: 'a1b2c3d4e5f60718',
+        requestId: 'req-bouncer-anon-2',
+        occurredAt: new Date('2026-09-29T10:06:00.000Z'),
+        accountId: null,
+        clientIp: null,
+        clientAttributed: false,
+        requestedLogprobs: false,
+        samples: null,
+        promptSimHash: null,
       },
     };
 
-    await processTokenData(usageStats, usageContext);
-
-    expect(mockedReportUsageEvent).toHaveBeenCalledWith({
-      requestId: 'req-bouncer-1',
-      occurredAt: new Date('2026-09-29T10:00:00.000Z'),
-      accountId: `user:${user.id}`,
-      ip: '203.0.113.9',
-      inputTokens: 100,
-      outputTokens: 50,
-      clientAttributed: true,
-      feature: 'vscode-extension',
-      hasTools: true,
-      requestedLogprobs: true,
-      samples: 2,
-      promptSimHash: 'a1b2c3d4e5f60718',
-    });
+    // The absence of an IP is a telemetry gap; the row is still persisted.
+    await expect(
+      processTokenData({ ...BASE_USAGE_STATS, messageId: null }, usageContext)
+    ).resolves.not.toBeNull();
+    expect(mockedReportUsageEvent).not.toHaveBeenCalled();
   });
 
   test('does not report a bouncer usage event without the bouncer context', async () => {
@@ -1392,8 +1380,8 @@ describe('logMicrodollarUsage', () => {
 
     await processTokenData({ ...BASE_USAGE_STATS, messageId: null }, createBaseUsageContext(user));
 
-    // The classifier overhead row and anonymous requests build contexts without
-    // a bouncer account, and must not reach the worker.
+    // The classifier overhead row builds a context without a bouncer account and
+    // must not reach the worker.
     expect(mockedReportUsageEvent).not.toHaveBeenCalled();
   });
 });

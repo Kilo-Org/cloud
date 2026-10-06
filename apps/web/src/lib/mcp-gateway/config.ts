@@ -1,7 +1,7 @@
 import 'server-only';
 import { Buffer } from 'node:buffer';
-import { APP_URL } from '@/lib/constants';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { z } from 'zod';
 
 type GatewayPublicJwk = Pick<

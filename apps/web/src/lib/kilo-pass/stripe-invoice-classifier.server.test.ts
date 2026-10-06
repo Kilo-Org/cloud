@@ -1,13 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
 import type Stripe from 'stripe';
 
-import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import {
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
-import { buildServiceFeeLineMetadata } from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/constants';
+import { buildServiceFeeLineMetadata } from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 import {
   invoiceLooksLikeKiloPassByPriceId,
   invoiceLooksLikeOrganizationKiloPass,

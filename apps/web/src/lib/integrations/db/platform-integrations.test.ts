@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { cleanupDbForTest, db, pool } from '@/lib/drizzle';
+import { cleanupDbForTest, db, pool } from '@kilocode/web-shared/lib/drizzle';
 import {
   platform_integrations,
   kilocode_users,
@@ -24,7 +24,7 @@ import {
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { disconnectGitHubInstallation } from './github-installations';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;

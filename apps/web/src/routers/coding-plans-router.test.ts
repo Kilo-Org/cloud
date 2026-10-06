@@ -1,17 +1,17 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { generateText } from 'ai';
 import { eq } from 'drizzle-orm';
-import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
 import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
 import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
 import { CODING_PLAN_IDS } from '@/lib/coding-plans/pricing';
-import { redisClient } from '@/lib/redis';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   byok_api_keys,
   coding_plan_availability_intents,
@@ -22,8 +22,8 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-byteplus-access',
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-byteplus-secret',
 }));
@@ -34,7 +34,7 @@ jest.mock('ai', () => ({
   createGateway: jest.fn(() => jest.fn((modelId: string) => ({ modelId }))),
   generateText: jest.fn(),
 }));
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn(),
     set: jest.fn(),

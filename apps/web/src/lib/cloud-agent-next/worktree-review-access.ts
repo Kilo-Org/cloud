@@ -2,7 +2,7 @@ import 'server-only';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import type { db } from '@/lib/drizzle';
+import type { db } from '@kilocode/web-shared/lib/drizzle';
 
 export async function assertSessionWorktree(
   fromDb: typeof db,

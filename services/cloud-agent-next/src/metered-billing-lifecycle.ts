@@ -41,6 +41,20 @@ export type BillingIdentity = { sandboxClassName: SandboxClassName };
 
 export type ContainerStopParams = { reason: 'exit' | 'runtime_signal'; exitCode?: number };
 
+const sdkCallbackStateSchema = z.enum([
+  'running',
+  'healthy',
+  'stopping',
+  'stopped',
+  'stopped_with_code',
+]);
+
+type SdkStopFields = {
+  sdkCallbackState: z.infer<typeof sdkCallbackStateSchema> | 'unknown' | 'read_error';
+  sdkRecordedExitCodeAvailable: boolean;
+  sdkRecordedExitCode?: number;
+};
+
 /**
  * Result of the pre-create interval open. The caller owns the decision to clear,
  * fail the canonical create, or continue; this method never throws for a meter
@@ -445,7 +459,7 @@ export class MeteredBillingLifecycle {
     // `onStop` is the first durable lifecycle signal after the container has
     // actually stopped. Do not use the earlier budget verdict or force-destroy
     // request as the usage boundary.
-    const stoppedAtMs = await this.getObservedStopTime();
+    const { stoppedAtMs, ...sdkStopFields } = await this.getObservedStopSnapshot();
     const activityExpiryRequested = this.activityExpiryRequested;
     this.activityExpiryRequested = false;
     this.runShadowTask(identity, 'stop lifecycle', async () => {
@@ -466,6 +480,7 @@ export class MeteredBillingLifecycle {
           exitCode: params?.exitCode,
           lifetimeMs: stoppedAtMs - context.startEpochMs,
           sessionId: context.sessionId,
+          ...sdkStopFields,
         })
         .info('Container stopped');
       const pending = await this.heartbeat.persistStop(
@@ -737,13 +752,38 @@ export class MeteredBillingLifecycle {
     return stored === undefined ? undefined : billingBlockSchema.parse(stored);
   }
 
-  private async getObservedStopTime(): Promise<number> {
+  private async getObservedStopSnapshot(): Promise<{ stoppedAtMs: number } & SdkStopFields> {
+    let stoppedAtMs: number | undefined;
+    let sdkStopFields: SdkStopFields = {
+      sdkCallbackState: 'read_error',
+      sdkRecordedExitCodeAvailable: false,
+    };
     try {
-      return stoppedAtFromState(await this.host.getState());
+      const state = await this.host.getState();
+      sdkStopFields.sdkCallbackState = 'unknown';
+      stoppedAtMs = stoppedAtFromState(state);
+      const parsedState = sdkCallbackStateSchema.safeParse(state?.status);
+      if (parsedState.success) sdkStopFields.sdkCallbackState = parsedState.data;
+      const code =
+        sdkStopFields.sdkCallbackState === 'stopped_with_code' ? state.exitCode : undefined;
+      // Retained SDK evidence is restricted to signed 32-bit integers, including zero.
+      if (
+        typeof code === 'number' &&
+        Number.isInteger(code) &&
+        code >= -2147483648 &&
+        code <= 2147483647
+      ) {
+        sdkStopFields = {
+          ...sdkStopFields,
+          sdkRecordedExitCodeAvailable: true,
+          sdkRecordedExitCode: code,
+        };
+      }
+      return { stoppedAtMs, ...sdkStopFields };
     } catch {
       // The lifecycle callback itself is still authoritative when the control
       // plane cannot provide a state transition timestamp.
-      return Date.now();
+      return { stoppedAtMs: stoppedAtMs ?? Date.now(), ...sdkStopFields };
     }
   }
 

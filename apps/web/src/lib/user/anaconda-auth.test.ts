@@ -1,17 +1,17 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
 import type { createOrUpdateUser as CreateOrUpdateUser } from '@/lib/user';
 import { inArray } from 'drizzle-orm';
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
     id: `cus_${metadata.kiloUserId}`,
   })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
 
-jest.mock('@/lib/posthog', () => {
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
   const mockCapture = jest.fn();
   return {
     __esModule: true,
@@ -26,13 +26,15 @@ jest.mock('@/lib/posthog', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/providerHash', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providerHash', () => ({
   generateOpenRouterUpstreamSafetyIdentifier: jest.fn(() => 'openrouter-upstream-test-id'),
   generateOpenRouterDownstreamSafetyIdentifier: jest.fn(() => 'openrouter-downstream-test-id'),
   generateVercelDownstreamSafetyIdentifier: jest.fn(() => 'vercel-downstream-test-id'),
 }));
 
-const { mockCapture } = jest.requireMock('@/lib/posthog') as { mockCapture: jest.Mock };
+const { mockCapture } = jest.requireMock('@kilocode/web-shared/lib/posthog') as {
+  mockCapture: jest.Mock;
+};
 const createdUserIds: string[] = [];
 let createOrUpdateUser: typeof CreateOrUpdateUser;
 

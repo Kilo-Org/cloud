@@ -1,8 +1,8 @@
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import * as z from 'zod';
-import { MAILGUN_API_KEY, MAILGUN_DOMAIN } from '@/lib/config.server';
-import { writeEmailToLocalOutbox } from '@/lib/email-local-outbox';
+import { MAILGUN_API_KEY, MAILGUN_DOMAIN } from '@kilocode/web-shared/lib/config.server';
+import { writeEmailToLocalOutbox } from '@kilocode/web-shared/lib/email-local-outbox';
 import { captureMessage } from '@sentry/nextjs';
 
 const mailgun = new Mailgun(FormData);

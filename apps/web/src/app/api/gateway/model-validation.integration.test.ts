@@ -26,18 +26,20 @@ jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual('@sentry/nextjs'),
   captureException: jest.fn(),
 }));
-jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn(async () => null) } }));
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { get: jest.fn(async () => null) },
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organization-models', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
 
@@ -45,7 +47,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { POST as personalValidator } from '@/app/api/openrouter/models/validate/route';
 import { POST as organizationValidator } from '@/app/api/organizations/[id]/models/validate/route';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
 import { RUNTIME_PROXY_ATTESTATION_HEADER } from '@kilocode/worker-utils/runtime-proxy-attestation';
 
@@ -53,20 +55,25 @@ jest.mock('../../../../../../services/cloud-agent-next/src/logger', () => ({
   logger: { withFields: () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }) },
 }));
 import jwt from 'jsonwebtoken';
-import { JWT_TOKEN_VERSION } from '@/lib/tokens';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 
-const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
-const { getDirectByokModelsForUser } = jest.requireMock('@/lib/ai-gateway/providers/direct-byok');
-const { addUserByokAvailability, getUserByokProviderIds } =
-  jest.requireMock('@/lib/ai-gateway/byok');
+const { getEnhancedOpenRouterModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
+);
+const { getDirectByokModelsForUser } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+);
+const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/byok'
+);
 const { getAvailableModelsForOrganization } = jest.requireMock(
-  '@/lib/organizations/organization-models'
+  '@kilocode/web-shared/lib/organizations/organization-models'
 );
 
 const publicCatalog = { data: [{ id: 'public/model' }] };

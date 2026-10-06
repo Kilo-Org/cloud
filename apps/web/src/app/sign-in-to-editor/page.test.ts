@@ -9,10 +9,10 @@ const mockOpenIdeAutomatically = jest.fn(() => null);
 
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuanceOrRedirect: mockGetUserForCredentialIssuance,
 }));
-jest.mock('@/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({ generateApiToken: mockGenerateApiToken }));
 jest.mock('next/navigation', () => ({ redirect: mockRedirect }));
 jest.mock('next/headers', () => ({ cookies: jest.fn() }));
 jest.mock('@/components/auth/getExtensionUrl', () => ({ getExtensionUrl: mockGetExtensionUrl }));

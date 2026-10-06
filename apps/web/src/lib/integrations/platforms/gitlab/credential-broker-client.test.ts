@@ -9,13 +9,13 @@ const mockGenerateBoundedInternalServiceToken = jest.fn(
     `broker-token:${userId}`
 );
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GIT_TOKEN_SERVICE_API_URL() {
     return mockConfig.apiUrl;
   },
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
   generateBoundedInternalServiceToken: (
     userId: string,

@@ -10,6 +10,7 @@ import {
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { isGlanceableFixtureHeld } from './fixture-hold';
 import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import { hasSameGlanceableContent, withStatus } from './snapshot-transforms';
 import {
@@ -172,6 +173,11 @@ export class GlanceablePublisher {
     sessions: readonly (NewestSessionRow & WaitingAskRow)[],
     ctx: GlanceablePublisherContext
   ): void {
+    // A dev fixture owns the surfaces and the ask it recorded: stay silent
+    // without clearing that ask.
+    if (isGlanceableFixtureHeld()) {
+      return;
+    }
     if (this.isGated()) {
       // Nothing is asking while the publisher is gated: a terminal blank must
       // not leave an approvable ask behind for the action buttons.
@@ -310,6 +316,9 @@ export class GlanceablePublisher {
 
   /** Cache update failed: keep the last counts only until their original deadline. */
   handleFetchError(ctx: GlanceablePublisherContext): void {
+    if (isGlanceableFixtureHeld()) {
+      return;
+    }
     // A failed refetch supersedes the ask: the surface now shows stale counts,
     // so a still-recorded waiting session must not stay approvable from it.
     this.noteWaitingAsk(null);
@@ -375,7 +384,12 @@ export class GlanceablePublisher {
   }
 
   private isGated(): boolean {
-    return this.terminalBlankEpoch() !== this.blankEpochAtStart || this.orgLost();
+    // The fixture hold is dev-only: only the `__DEV__` fixture harness sets it.
+    return (
+      this.terminalBlankEpoch() !== this.blankEpochAtStart ||
+      this.orgLost() ||
+      isGlanceableFixtureHeld()
+    );
   }
 
   /** Hand the current ask to the consumer, when one is wired. */
@@ -468,6 +482,10 @@ export class GlanceablePublisher {
     }
     this.terminalTimer = setTimeout(() => {
       this.terminalTimer = null;
+      // A fixture applied inside the window owns the surfaces now.
+      if (isGlanceableFixtureHeld()) {
+        return;
+      }
       this.activityStarted = false;
       for (const sink of this.sinks) {
         guardSink('terminal_end', () => {

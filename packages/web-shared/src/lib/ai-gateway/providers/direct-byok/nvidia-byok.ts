@@ -1,5 +1,5 @@
-import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
-import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
+import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
+import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'nvidia-byok',
@@ -15,7 +15,6 @@ export default {
 
     request.body.reasoning_effort ??= request.body.reasoning?.effort ?? undefined;
 
-    delete request.body.provider;
     delete request.body.transforms;
     delete request.body.reasoning;
     delete request.body.safety_identifier;

@@ -1,11 +1,12 @@
-import { type ComponentProps, createElement } from 'react';
+/* eslint-disable max-lines -- one suite covering every Home live state: pending, card, zero state, and header notices */
+import { type ComponentProps, createElement, type ReactNode } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
-import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { formatScheduledWake } from '@/components/agents/session-list-helpers';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
 const navigateSpy = vi.hoisted(() => vi.fn());
@@ -16,8 +17,22 @@ const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
 }));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  LinearTransition: {},
+  FadeIn: { duration: () => ({}) },
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+  selectReducedMotionEntrance: (_reduced: boolean, crossfade: unknown) => crossfade,
+}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
-vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', Platform: { OS: 'ios' } }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Pressable: 'Pressable',
+  Platform: { OS: 'ios' },
+  I18nManager: { isRTL: false },
+}));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
@@ -43,7 +58,7 @@ vi.mock('@/lib/hooks/use-session-mutations', () => ({
   useSessionMutations: () => ({ renameSession: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedSoft: '#777777' }),
+  useThemeColors: () => ({ mutedSoft: '#777777', warn: '#ff9900', good: '#22aa22' }),
 }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: () => null }));
 vi.mock('@/components/agents/session-platform-icon', () => ({
@@ -66,7 +81,14 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
-vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
+// A host element that still renders the header notice. The factory is hoisted
+// above the static imports, so it loads React itself.
+vi.mock('@/components/home/section-header', async () => {
+  const { createElement: create } = await import('react');
+  return {
+    SectionHeader: (props: { notice?: ReactNode }) => create('SectionHeader', props, props.notice),
+  };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
@@ -123,23 +145,20 @@ const settled: Props['sessions'] = {
   isPaused: false,
   refetch: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
 };
-function session(id: string): ActiveSession {
-  return { id, status: 'running', title: id, connectionId: 'c1' };
+function session(
+  id: string,
+  status = 'running',
+  extra: Partial<ActiveSession> = {}
+): ActiveSession {
+  return { id, status, title: id, connectionId: 'c1', ...extra };
 }
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-// `RemoteSessionRow` is a `memo()` component, and the test renderer reports the
-// wrapped function (not the memo object) as an instance's `type`, so the row
-// matches either identity.
-const RemoteSessionRowInner = (RemoteSessionRow as unknown as { type: unknown }).type;
 function nodes(type: string) {
   if (!renderer) {
     throw new Error('Missing renderer');
   }
   return renderer.root.findAll(
-    candidate =>
-      (type === 'RemoteSessionRow' &&
-        (candidate.type === RemoteSessionRow || candidate.type === RemoteSessionRowInner)) ||
-      (typeof candidate.type === 'string' && candidate.type === type)
+    candidate => typeof candidate.type === 'string' && candidate.type === type
   );
 }
 function node(type: string, index = 0) {
@@ -148,6 +167,14 @@ function node(type: string, index = 0) {
     throw new Error(`Missing ${type}`);
   }
   return result;
+}
+function text() {
+  return nodes('Text')
+    .map(textNode => textNode.children.filter(child => typeof child === 'string').join(''))
+    .join('\n');
+}
+function classes(type: string) {
+  return nodes(type).map(candidate => String(candidate.props.className ?? ''));
 }
 async function render(sessions = settled, contextOverride = context) {
   await act(async () => {
@@ -173,111 +200,140 @@ afterEach(() => {
   queryClient.clear();
 });
 
-describe('Home live section', () => {
-  it('preserves incoming live order and caps rendered rows at three without stored queries', async () => {
-    await render({ ...settled, activeSessions: ['a3', 'a1', 'a4', 'a2'].map(id => session(id)) });
-    expect(nodes('RemoteSessionRow').map(row => (row.props.session as ActiveSession).id)).toEqual([
-      'a3',
-      'a1',
-      'a4',
-    ]);
-    const secondRow = node('RemoteSessionRow', 1);
-    (secondRow.props.onPress as (session: ActiveSession) => void)(
-      secondRow.props.session as ActiveSession
-    );
-    expect(sessionDestination.id).toBe('a1');
-  });
+const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
+const COUNT_ROW = 'h-6 flex-row items-center gap-2';
+const NEWEST_BLOCK = 'h-[68px] justify-center gap-1 px-4';
 
-  it('keeps row identity and navigation while refreshing cached content', async () => {
-    const sessions = { ...settled, activeSessions: [session('a1')] };
-    await render(sessions);
-    const row = node('RemoteSessionRow');
-    await render({ ...sessions, isFetching: true });
-    expect(node('RemoteSessionRow')).toBe(row);
-    expect(nodes('Skeleton')).toHaveLength(0);
-    (row.props.onPress as (session: ActiveSession) => void)(row.props.session as ActiveSession);
-    expect(sessionDestination.id).toBe('a1');
-  });
-
-  it('renders the pending state as a row-shaped skeleton inside the reserved frame', async () => {
-    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
-    const skeletons = nodes('Skeleton');
-    expect(skeletons.length).toBeGreaterThan(0);
-    expect(
-      skeletons.some(skeleton => String(skeleton.props.className ?? '').includes('w-full'))
-    ).toBe(false);
-    expect(
-      nodes('View').some(view => {
-        const className = String(view.props.className ?? '');
-        return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
-      })
-    ).toBe(true);
-    expect(nodes('Text').some(text => text.children.includes(i18n.t('home.noLiveSessions')))).toBe(
-      false
-    );
-  });
-
-  it('places the pending placeholder on the real row geometry so the arriving row cannot reflow it', async () => {
-    await render({ ...settled, activeSessions: [session('a1')] });
-    const rowGeometry = String(
-      nodes('View').find(view => String(view.props.className ?? '').includes('py-[13px]'))?.props
-        .className
-    );
-    expect(rowGeometry).toContain('py-[13px]');
-
-    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
-    const placeholderRow = nodes('View').find(view =>
-      String(view.props.className ?? '').includes('py-[13px]')
-    );
-    expect(placeholderRow).toBeDefined();
-    // The same row box the incoming SessionRow draws: the copy lands on the
-    // same x-offset, so swapping the placeholder for the row cannot shift it.
-    expect(String(placeholderRow?.props.className)).toBe(rowGeometry);
-    // The leading mark is the row's own 3px edge strip, not a 32px circle.
-    expect(
-      nodes('Skeleton').some(skeleton => {
-        const className = String(skeleton.props.className ?? '');
-        return className.includes('absolute') && className.includes('w-[3px]');
-      })
-    ).toBe(true);
-  });
-
-  it.each([
-    ['running', 'running', false],
-    ['idle', 'idle', false],
-    ['question', 'needsInput', true],
-  ] as const)(
-    'keeps the real %s badge when the phone disconnects',
-    async (status, kind, needsInput) => {
-      const sessions = { ...settled, activeSessions: [{ ...session('a1'), status }] };
-      await render(sessions);
-      const row = node('RemoteSessionRow');
-      connectivity.offline = true;
-      await render(sessions);
-      expect(node('RemoteSessionRow')).toBe(row);
-      expect(node('SessionStatusIcon').props.kind).toBe(kind);
-      expect(nodes('Text').some(text => text.children.includes('NEEDS INPUT'))).toBe(needsInput);
-      expect(nodes('Text').some(text => text.children.includes('No internet connection'))).toBe(
-        true
-      );
-    }
+function newestButton() {
+  const button = nodes('Pressable').find(
+    candidate => candidate.props.accessibilityRole === 'button'
   );
+  if (!button) {
+    throw new Error('Missing newest session button');
+  }
+  return button;
+}
 
-  it('renders no live-sessions header when the accepted live list is empty', async () => {
-    await render();
-    expect(nodes('SectionHeader')).toHaveLength(0);
-    expect(nodes('Text').some(text => text.children.includes('Nothing running right now'))).toBe(
-      true
-    );
+describe('Home live section', () => {
+  it('draws the four ranked state counts with the shared state dots', async () => {
+    await render({
+      ...settled,
+      activeSessions: [
+        session('need', 'question'),
+        session('work', 'busy'),
+        session('idle', 'idle'),
+        session('later', 'scheduled', { scheduledAt: '2026-10-03T09:00:00.000Z' }),
+      ],
+    });
+    expect(
+      nodes('SessionStatusIcon')
+        .map(icon => icon.props.kind)
+        .slice(0, 4)
+    ).toEqual(['needsInput', 'running', 'scheduled', 'idle']);
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).toContain(label);
+    }
+    // The soonest scheduled wake rides the scheduled row.
+    expect(text()).toContain(formatScheduledWake('2026-10-03T09:00:00.000Z') ?? '');
+    // A card, not a row per session.
+    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
   });
 
-  it('switches to the Agents index and dismisses the history subpage', async () => {
+  it('shows the newest session with its state and relative age and opens it', async () => {
+    await render({
+      ...settled,
+      activeSessions: [
+        session('older', 'idle', { statusUpdatedAt: '2026-10-02T09:00:00.000Z' }),
+        session('newer', 'running', { statusUpdatedAt: new Date().toISOString() }),
+      ],
+    });
+    expect(text()).toContain('newer');
+    expect(text()).toContain('Working');
+    expect(text()).toContain('Just now');
+    expect(newestButton().props.accessibilityLabel).toBe('newer, Working, Just now');
+    (newestButton().props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('newer');
+  });
+
+  it('never leaves the newest block blank while a session is live', async () => {
+    // No row carries a status time and the only title is the backend
+    // placeholder: the block still names the session, as the list rows do.
+    await render({
+      ...settled,
+      activeSessions: [
+        session('fresh', 'busy', { title: 'New session - 2026-10-04T08:00:00.000Z' }),
+      ],
+    });
+    expect(text()).toContain(i18n.t('agents.sessionRow.untitled'));
+    expect(text()).toContain('Working');
+    expect(text()).not.toContain('2026-10-04');
+    (newestButton().props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('fresh');
+  });
+
+  it('keeps See all navigation to the Agents live index', async () => {
     await render({ ...settled, activeSessions: [session('a1')] });
+    expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
     (node('SectionHeader').props.onActionPress as () => void)();
     expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
     expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
     expect(navigateSpy.mock.invocationCallOrder[0] ?? 0).toBeLessThan(
       dismissToSpy.mock.invocationCallOrder[0] ?? 0
     );
+  });
+
+  it('reserves the card frame in the pending state with a matching skeleton', async () => {
+    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    expect(nodes('Skeleton').length).toBeGreaterThan(0);
+    expect(classes('View')).toContain(CARD_FRAME);
+    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
+    expect(classes('View')).toContain(NEWEST_BLOCK);
+    expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
+
+    // The loaded card occupies the same frame and row heights.
+    await render({ ...settled, activeSessions: [session('a1')] });
+    expect(classes('View')).toContain(CARD_FRAME);
+    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
+    expect(classes('View')).toContain(NEWEST_BLOCK);
+  });
+
+  it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
+    await render();
+    expect(classes('View')).toContain(CARD_FRAME);
+    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
+    expect(classes('View')).toContain(`${NEWEST_BLOCK} items-center`);
+    for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
+      expect(text()).toContain(`0\n${label}`);
+    }
+    expect(text()).toContain(i18n.t('home.noLiveSessions'));
+    // Nothing to open: the newest block is not a button.
+    expect(
+      nodes('Pressable').some(pressable => pressable.props.accessibilityRole === 'button')
+    ).toBe(false);
+    // The header keeps See all's box but hides it.
+    expect(node('SectionHeader').props.label).toBe(i18n.t('home.agentSessions'));
+    expect(node('SectionHeader').props.actionHidden).toBe(true);
+  });
+
+  it('moves the offline notice into the header and keeps the card in place', async () => {
+    const sessions = {
+      ...settled,
+      activeSessions: [session('a1', 'running', { statusUpdatedAt: new Date().toISOString() })],
+    };
+    await render(sessions);
+    const before = classes('View');
+    const newest = newestButton();
+    connectivity.offline = true;
+    await render(sessions);
+    // No view joins the section body: the notice lives in the header row.
+    expect(classes('View')).toEqual(before);
+    expect(newestButton()).toBe(newest);
+    // The notice renders inside the header row, not in the section body.
+    expect(text()).toContain('No internet connection');
+    expect(
+      node('SectionHeader').findAll(candidate =>
+        candidate.children.includes('No internet connection')
+      )
+    ).not.toHaveLength(0);
   });
 });

@@ -1,6 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
-import { KiloPassCadence, KiloPassIssuanceItemKind, KiloPassTier } from '@/lib/kilo-pass/enums';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
+import {
+  KiloPassCadence,
+  KiloPassIssuanceItemKind,
+  KiloPassTier,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   computeCurrentPeriodBonusModel,
   computeRenewInfoRowModel,
@@ -12,7 +16,7 @@ import type {
   KiloPassCurrentPeriodBonus,
   KiloPassScheduledChange,
 } from './KiloPassActiveSubscriptionCard.logic';
-import { KiloPassScheduledChangeStatus } from '@/lib/kilo-pass/enums';
+import { KiloPassScheduledChangeStatus } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 function buildSubscription(
   overrides: Partial<KiloPassActiveSubscriptionCardLogicSubscription>

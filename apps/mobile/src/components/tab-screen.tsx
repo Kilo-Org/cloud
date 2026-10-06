@@ -1,5 +1,6 @@
-import { type Ref } from 'react';
-import { ScrollView, type ScrollViewProps, View } from 'react-native';
+import { type Ref, useEffect, useRef } from 'react';
+import { Platform, ScrollView, type ScrollViewProps, View } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
@@ -25,10 +26,32 @@ export function TabScreenScrollView({
   children,
   style,
   refreshControl,
+  keyboardShouldPersistTaps = 'handled',
+  onKeyboardOcclusionChange,
   ref,
   ...props
-}: ScrollViewProps & { ref?: Ref<ScrollView> }) {
+}: ScrollViewProps & {
+  ref?: Ref<ScrollView>;
+  /**
+   * Reports the IME occlusion this scroll view reserves, `0` while the keyboard
+   * is down. A caller that must reveal its own pinned bottom action once the
+   * occlusion lands reads it from here instead of adding a second keyboard
+   * listener. Kept in a ref so an inline callback does not resubscribe the
+   * effect on every render.
+   */
+  onKeyboardOcclusionChange?: (occlusion: number) => void;
+}) {
   const tabBarHeight = useTabBarHeight();
+  // The provider's keyboard height reaches the screen bottom on both platforms.
+  const keyboardOcclusion = useKeyboardState(state => state.height);
+  const onKeyboardOcclusionChangeRef = useRef(onKeyboardOcclusionChange);
+  useEffect(() => {
+    onKeyboardOcclusionChangeRef.current = onKeyboardOcclusionChange;
+  }, [onKeyboardOcclusionChange]);
+  useEffect(() => {
+    onKeyboardOcclusionChangeRef.current?.(keyboardOcclusion);
+  }, [keyboardOcclusion]);
+
   // Reserve the tab bar's space in the layout: the bar is an absolute blur
   // overlay, and rows parked behind it read as clipped (b911 vr1 spot check,
   // e2-post-revoke-profile.png / e4-profile-again.png — the Profile Sign-out
@@ -47,12 +70,39 @@ export function TabScreenScrollView({
   // makes NativeWind drop the caller's contentContainerClassName (gap/
   // padding), collapsing section spacing. The same pattern as
   // DetailScreenScrollView.
+  //
+  // While the keyboard is up the tab bar is already hidden
+  // (`tabBarHideOnKeyboard`), so the tab-bar band is replaced, not stacked: the
+  // viewport ends at the IME's top edge so a form's Submit action can scroll
+  // clear of the keyboard and stay tappable (Android's edge-to-edge window does
+  // not resize for the IME, so a keyboard-blind frame parked the last row — the
+  // Delete-account confirmation submit — behind the keyboard with no way to
+  // scroll it clear). `keyboardShouldPersistTaps` defaults to `handled` so that
+  // submit button receives the tap while the keyboard is open instead of the
+  // first tap only dismissing it.
+  //
+  // On iOS a caller that opts into `automaticallyAdjustKeyboardInsets` gets the
+  // IME reserved by the native content inset, which also reveals the focused
+  // field; shrinking the frame by the same occlusion here would book it twice
+  // (a keyboard-height band of blank scroll space). Those callers keep the
+  // tab-bar clearance with the keyboard down and none with it up. Android has
+  // no such prop, so the frame margin is the only reservation there and stays.
+  const reservesImeNatively =
+    Platform.OS === 'ios' && props.automaticallyAdjustKeyboardInsets === true;
+  // With the keyboard down the margin is the tab bar's band. With it up the
+  // tab bar hides, so the band is replaced by the IME occlusion everywhere
+  // except the iOS native-inset callers above, which reserve none here.
+  let frameMargin = tabBarHeight;
+  if (keyboardOcclusion > 0) {
+    frameMargin = reservesImeNatively ? 0 : keyboardOcclusion;
+  }
   return (
     <ScrollView
       {...props}
       ref={ref}
       refreshControl={refreshControl}
-      style={[style, { marginBottom: tabBarHeight }]}
+      keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+      style={[style, { marginBottom: frameMargin }]}
     >
       {children}
       <View style={{ height: TAB_SCREEN_BOTTOM_GAP }} pointerEvents="none" />

@@ -2,10 +2,10 @@ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals
 import { cli_sessions_v2, organizations, type User } from '@kilocode/db/schema';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import type * as MinimumVersionModule from '@/lib/trpc/min-version';
-import { db } from '@/lib/drizzle';
+import type * as MinimumVersionModule from '@kilocode/web-shared/lib/trpc/min-version';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
 import type {
   GetWorktreeChangesOutput,
@@ -177,8 +177,8 @@ jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({
   createWorktreeChat: mockCreateWorktreeChat,
 }));
 
-jest.mock('@/lib/trpc/min-version', () => ({
-  ...jest.requireActual<typeof MinimumVersionModule>('@/lib/trpc/min-version'),
+jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({
+  ...jest.requireActual<typeof MinimumVersionModule>('@kilocode/web-shared/lib/trpc/min-version'),
   getMinimumVersions: jest.fn(async () => ({ ios: '0.0.0', android: '0.0.0' })),
   enforceMinimumVersion: jest.fn(() => ({ pass: true })),
 }));
@@ -187,11 +187,11 @@ jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
   computeCloudAgentNextBalanceCheckEligibility: mockComputeCloudAgentNextBalanceCheckEligibility,
 }));
 
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
 }));
 
-jest.mock('@/lib/user/balance', () => ({
+jest.mock('@kilocode/web-shared/lib/user/balance', () => ({
   getBalanceForUser: mockGetBalanceForUser,
 }));
 
@@ -275,7 +275,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
 };
 
 beforeAll(async () => {
-  const { createCallerFactory } = await import('@/lib/trpc/init');
+  const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const mod = await import('./cloud-agent-next-router');
   createCaller = createCallerFactory(mod.cloudAgentNextRouter);
 });

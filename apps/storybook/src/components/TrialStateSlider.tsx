@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import {
   getOrgTrialStatusFromDays,
   type OrganizationTrialDisplayStatus,
-} from '@/lib/organizations/trial-utils';
+} from '@kilocode/web-shared/lib/organizations/trial-utils';
 
 type TrialStateSliderProps = {
   children: (props: {

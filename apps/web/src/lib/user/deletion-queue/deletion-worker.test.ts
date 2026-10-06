@@ -6,7 +6,7 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { persistRejectedPreflight } from '@/lib/user/deletion-queue/deletion-outcomes';
@@ -16,7 +16,7 @@ import {
   buildDeletionWave,
   runUserDeletionWorker,
 } from '@/lib/user/deletion-queue/deletion-worker';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),

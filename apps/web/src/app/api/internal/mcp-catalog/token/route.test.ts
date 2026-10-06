@@ -1,18 +1,18 @@
 import { NextRequest } from 'next/server';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
 } from '@kilocode/auto-routing-contracts';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   MCP_CATALOG_TOKEN_SECRET: 'catalog-secret',
 }));
 
 const mockRows: unknown[] = [];
 const mockMembershipRows: unknown[] = [];
 let mockSelectCallCount = 0;
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => {
       const callIndex = mockSelectCallCount++;
@@ -27,12 +27,12 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateApiToken: jest.fn(() => 'minted-token'),
 }));
 
 const mockGetBenchmarkConfig = jest.fn();
-jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkConfig: () => mockGetBenchmarkConfig(),
 }));
 

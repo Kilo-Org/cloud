@@ -1,11 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth, isUserBlacklistedByDomain } from '@/lib/user/server';
+import { getUserFromAuth, isUserBlacklistedByDomain } from '@kilocode/web-shared/lib/user/server';
 import type { UsersApiResponse, SortableField, UserTableProps } from '@/types/admin';
 import { sortableFields } from '@/types/admin';
-import { describePaymentMethods, getPaymentStatusByUserIds } from '@/lib/admin-utils-serverside';
-import { getUsersWithAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
-import { db } from '@/lib/drizzle';
+import {
+  describePaymentMethods,
+  getPaymentStatusByUserIds,
+} from '@kilocode/web-shared/lib/admin-utils-serverside';
+import { getUsersWithAnyFreeWelcomeCredits } from '@kilocode/web-shared/lib/welcomeCredits';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   user_admin_notes,

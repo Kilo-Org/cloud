@@ -1,5 +1,5 @@
 import { S3Client } from '@aws-sdk/client-s3';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 // R2 configuration from environment variables
 const R2_ACCOUNT_ID = getEnvVariable('R2_ACCOUNT_ID');

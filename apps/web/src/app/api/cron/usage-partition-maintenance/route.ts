@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
-import { CRON_SECRET } from '@/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   provisionComputeUsageChargePartitions,
   provisionExaUsageLogPartitions,

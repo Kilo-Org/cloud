@@ -2,7 +2,7 @@
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { z } from 'zod';
 
 import * as Sentry from '@sentry/react-native';
@@ -35,6 +35,7 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
+import { setNotificationPermissionGrantedValue } from '@/lib/glanceable/live-activity-switch';
 import { getActiveUserId, getSelectedOrganizationId } from '@/lib/glanceable/scope';
 import {
   getGlanceableSinks,
@@ -485,6 +486,14 @@ export async function runBackgroundNotificationTask(
   // to a channel the app never created, and FirebaseMessaging logs the miss on
   // every message. Idempotent and never rejecting.
   await ensureAndroidNotificationChannels();
+  // A headless start never runs `setupNotificationPermissionGate`, so the Live
+  // Activity gate would read "not granted" on an install that granted it. Read
+  // the permission before the sinks see the push.
+  try {
+    await getNotificationPermissionStatus();
+  } catch {
+    // An unknown answer stays "not granted": the next foreground reads again.
+  }
   return handleBackgroundNotificationTask(body);
 }
 
@@ -819,6 +828,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     // does not. Any non-granted result maps to denied.
     emitNotificationPermissionResponded(finalStatus === Notifications.PermissionStatus.GRANTED);
   }
+  setNotificationPermissionGrantedValue(finalStatus === Notifications.PermissionStatus.GRANTED);
 
   if (finalStatus !== Notifications.PermissionStatus.GRANTED) {
     return null;
@@ -888,7 +898,30 @@ export async function getNotificationPermissionStatus(): Promise<
   'granted' | 'denied' | 'undetermined'
 > {
   const { status } = await Notifications.getPermissionsAsync();
+  setNotificationPermissionGrantedValue(status === Notifications.PermissionStatus.GRANTED);
   return status;
+}
+
+/**
+ * Keep the glanceable permission gate current: read it at launch and on every
+ * foreground, since the user can change it in Settings while the app is away.
+ * The Live Activity and push-to-start wait for a grant (see
+ * `live-activity-switch`).
+ */
+export function setupNotificationPermissionGate(): void {
+  const refresh = async () => {
+    try {
+      await getNotificationPermissionStatus();
+    } catch {
+      // Keep the last answer; the next foreground reads again.
+    }
+  };
+  void refresh();
+  AppState.addEventListener('change', state => {
+    if (state === 'active') {
+      void refresh();
+    }
+  });
 }
 
 export function getPlatform(): 'ios' | 'android' {

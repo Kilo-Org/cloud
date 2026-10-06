@@ -3200,7 +3200,6 @@
     "newAgent": "Yeni agent",
     "approving": "Təsdiqlənir...",
     "couldNotApprove": "Təsdiqlənmədi",
-    "couldNotStart": "Başladılmadı",
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",

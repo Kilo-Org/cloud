@@ -1,5 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   payment_methods,
   kilocode_users,
@@ -122,6 +122,7 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  bouncer_credit_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
   user_data_export_parts,
@@ -143,7 +144,7 @@ import {
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
@@ -158,12 +159,15 @@ import {
   unlinkAuthProviderFromUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
-import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
-import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
-import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
-import { hosted_domain_specials } from '@/lib/auth/constants';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
+import {
+  insertTestUser,
+  insertTestUserAndGoogleAuth,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import { randomUUID } from 'crypto';
 import {
   KiloPassCadence,
@@ -172,7 +176,7 @@ import {
   KiloPassPaymentProvider,
   KiloPassTier,
   KiloPassWelcomePromoPaymentFingerprintType,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import {
@@ -183,7 +187,7 @@ import {
   UserDeletionRequestStatus,
 } from '@kilocode/db/schema-types';
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
     id: `cus_${metadata.kiloUserId}`,
   })),
@@ -197,7 +201,7 @@ jest.mock('@/lib/impact/affiliate-events', () => ({
 // Account deletion purges the deleted user's pending cloud-agent objects from
 // R2 before it drops the ledger rows; keep that off the network in tests.
 const mockR2Send = jest.fn(async (_command: { input: { Key?: string } }) => ({}));
-jest.mock('@/lib/r2/client', () => ({
+jest.mock('@kilocode/web-shared/lib/r2/client', () => ({
   // Read through a wrapper: the factory runs while the module graph loads,
   // before the const below is initialized.
   r2Client: { send: (command: { input: { Key?: string } }) => mockR2Send(command) },
@@ -1560,8 +1564,8 @@ describe('User', () => {
         user.id,
         0
       );
-      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       const encrypted_connection = encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY);
       await db.insert(openai_chatgpt_connections).values([
         {
@@ -1597,8 +1601,8 @@ describe('User', () => {
         connector.id,
         0
       );
-      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: connector.id,
         organization_id: organization.id,
@@ -3866,6 +3870,46 @@ describe('User', () => {
       expect(remainingOutbox[0].invitation_id).toBe(forUser2.id);
     });
 
+    it('deletes the bouncer credit-event outbox rows for the deleted user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(bouncer_credit_event_outbox).values([
+        {
+          event_id: 'evt-deleted-user-pii',
+          event_type: 'charge.attempted',
+          user_id: user1.id,
+          payload: {
+            type: 'charge.attempted',
+            eventId: 'evt-deleted-user-pii',
+            userId: user1.id,
+            ip: '203.0.113.9',
+            cardFingerprint: 'fp-deleted-user',
+          },
+        },
+        {
+          event_id: 'evt-retained-user',
+          event_type: 'charge.attempted',
+          user_id: user2.id,
+          payload: { type: 'charge.attempted', eventId: 'evt-retained-user', userId: user2.id },
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select()
+        .from(bouncer_credit_event_outbox)
+        .where(eq(bouncer_credit_event_outbox.user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+
+      const remainingForOtherUser = await db
+        .select()
+        .from(bouncer_credit_event_outbox)
+        .where(eq(bouncer_credit_event_outbox.user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
+    });
+
     it('should anonymize organization audit logs', async () => {
       const user = await insertTestUser();
       const orgId = randomUUID();
@@ -6062,8 +6106,8 @@ describe('User', () => {
     });
 
     it('should terminate managed Coding Plan access and anonymize inventory on soft delete', async () => {
-      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       const user = await insertTestUser();
       const encrypted = encryptApiKey('test-key-for-gdpr', BYOK_ENCRYPTION_KEY);
       const [inventoryKey] = await db
@@ -6598,8 +6642,8 @@ describe('User', () => {
     }
 
     async function seedOpenAiConnection(userId: string) {
-      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: userId,
         organization_id: null,
@@ -6609,8 +6653,8 @@ describe('User', () => {
     }
 
     async function seedOpenAiOrganizationConnection(organizationId: string, createdBy: string) {
-      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
-      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      const { encryptApiKey } = await import('@kilocode/web-shared/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@kilocode/web-shared/lib/config.server');
       await db.insert(openai_chatgpt_connections).values({
         kilo_user_id: createdBy,
         organization_id: organizationId,

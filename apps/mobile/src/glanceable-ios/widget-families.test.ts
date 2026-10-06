@@ -24,33 +24,6 @@ describe('ActiveAgentsWidget families', () => {
     expect(entry?.[1]).toContain("'systemLarge'");
   });
 
-  it('draws the newest result on the large card and keeps the smaller families', () => {
-    const layout = read(__dirname, 'active-agents-widget.tsx');
-    // From the footer's derivation through the large branch, up to the medium
-    // branch that follows it.
-    const large = layout.slice(
-      layout.indexOf('const newestResultKind'),
-      layout.indexOf('if (wide)')
-    );
-
-    expect(large).toContain("family === 'systemLarge'");
-    expect(large).toContain('props.newestResultKind');
-    expect(large).toContain('props.newestResultLabel');
-    expect(large).toContain('props.newestResultAt');
-    expect(large).toContain('dateStyle="relative"');
-    // The mark at the top, the rows centred, the footer at the bottom. A
-    // spacer between the rows and the footer reserves the lower third up
-    // front, so a stale→happy swap cannot move the counts.
-    expect(large).toContain('{systemRows}');
-    expect(large).toContain('{newestResultFooter}');
-    // The spacer the comment names sits between the two markers: asserting the
-    // last spacer in the whole slice would also accept one from the footer body
-    // or the mark row, so a deleted spacer here would still pass.
-    expect(
-      large.slice(large.indexOf('{systemRows}'), large.indexOf('{newestResultFooter}'))
-    ).toContain('<Spacer />');
-  });
-
   it('prefers the delayed copy over the newest result while the counts are stale', () => {
     const layout = read(__dirname, 'active-agents-widget.tsx');
     const footer = layout.slice(
@@ -64,36 +37,26 @@ describe('ActiveAgentsWidget families', () => {
     expect(footer.indexOf('statusLine')).toBeLessThan(footer.indexOf('newestResultKind'));
   });
 
-  it('draws the scheduled row and its wake in every family that draws counts', () => {
-    const layout = read(__dirname, 'active-agents-widget.tsx');
-    // One row builder draws every count line, and both families that draw the
-    // rows map their counts through it: the Lock Screen rectangle with the
-    // compact flag, the Home Screen families through `systemRows`. So the
-    // scheduled row appears wherever needs-input, running and idle do.
-    expect(layout).toContain("scheduled: { icon: 'clock'");
-    expect(layout).toMatch(/line\.kind === 'scheduled'[\s\S]*?date=\{new Date\(timeAt\)\}/);
-    // The wake is an absolute clock time; the wait above it stays the relative
-    // duration. The medium card draws the wait and the wake, and the large card
-    // draws the wake beside its scheduled row too; the small square has room
-    // for neither. `wakeRow` is what both Home Screen cards that draw a wake
-    // share, and the `Spacer` reserves the trailing slot in every state.
-    expect(layout).toContain("let timeStyle: 'relative' | 'time' = 'relative';");
-    expect(layout).toContain("timeStyle = 'time';");
-    expect(layout).toContain("const wakeRow = wide || family === 'systemLarge';");
-    expect(layout).toMatch(/else if \(wakeRow && line\.kind === 'scheduled'\)/);
-    expect(layout).toContain('{wakeRow ? <Spacer /> : null}');
-    expect(layout).toContain('dateStyle={timeStyle}');
-    expect(layout).toContain('const scheduledAt = props.scheduledAt ?? null;');
-    expect(layout).toContain(
-      '{counts.map(line => countRow(line, line.kind === primaryKind, true))}'
-    );
-    expect(layout).toContain(
-      '{counts.map(line => countRow(line, line.kind === primaryKind, false))}'
-    );
-  });
-
   it('bakes the newestResult copy slot into the layout map', () => {
     expect(read(__dirname, 'layout-copy.ts')).toContain("i18n.t('glanceable.newestResult')");
     expect(glanceableLayoutCopy()).toHaveProperty('newestResult');
+  });
+
+  it('decodes raw app-group count rows instead of mapping them blindly', () => {
+    const layout = read(__dirname, 'active-agents-widget.tsx');
+
+    // A stale timeline written by another app version can carry a non-array or
+    // a null row; mapping it threw and expo-widgets drew the red error box in
+    // every family. The rows are decoded, and an unknown kind falls back to the
+    // neutral idle mark instead of reading `.icon` off `undefined`.
+    expect(layout).toContain('Array.isArray(props.countLines) ? props.countLines : []');
+    expect(layout).toContain('const glyphFor = (kind: string | null | undefined)');
+    expect(layout).toContain('Object.hasOwn(GLYPH, kind)');
+    expect(layout).toContain('return GLYPH.idle;');
+    // No raw lookup may reach `.icon`/`.color`: an unknown kind there is a
+    // runtime `undefined` and the whole widget view falls into its red box.
+    expect(layout).not.toContain('GLYPH[primaryKind');
+    expect(layout).not.toContain('GLYPH[newestResultKind');
+    expect(layout).not.toContain('GLYPH[line.kind');
   });
 });

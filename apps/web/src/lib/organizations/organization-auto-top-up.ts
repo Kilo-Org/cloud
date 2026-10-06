@@ -1,19 +1,19 @@
 import 'server-only';
-import { client } from '@/lib/stripe-client';
-import { APP_URL } from '@/lib/constants';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
-} from '@/lib/autoTopUpConstants';
-import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
+import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   createTopUpCheckoutSession,
   mergeServiceFeeCommercialMetadata,
   prepareTopUpCheckoutFee,
   type ServiceFeeCheckoutDependencies,
-} from '@/lib/service-fees/checkout';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
-import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 
 export async function isOrgAutoTopUpFeatureEnabled(organizationId: string): Promise<boolean> {
   return (

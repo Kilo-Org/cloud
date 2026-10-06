@@ -1,8 +1,8 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, platform_integrations, provider_oauth_attempts } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   beginProviderOAuthAttempt,
   cancelProviderOAuthAttempt,
@@ -10,7 +10,7 @@ import {
 } from './provider-oauth-attempts';
 import { connectVerifiedGitHubInstallation } from './db/github-installations';
 import { anonymizeCloudUserData } from '@/lib/user';
-import { markOrganizationAsDeleted } from '@/lib/organizations/organizations';
+import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 
 describe('provider OAuth attempts', () => {
   afterEach(cleanupDbForTest);

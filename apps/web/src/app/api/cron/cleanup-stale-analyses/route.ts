@@ -7,8 +7,8 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { cleanupStaleAnalyses } from '@/lib/security-agent/db/security-analysis';
-import { sentryLogger } from '@/lib/utils.server';
-import { CRON_SECRET } from '@/lib/config.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');

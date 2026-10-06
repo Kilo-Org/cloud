@@ -1,6 +1,6 @@
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { resolveOpenRouterModelAlias } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { inferVercelFirstPartyInferenceProviderForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
   'mistralai/codestral-2508': 'mistral/codestral',

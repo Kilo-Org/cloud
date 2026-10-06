@@ -3,6 +3,10 @@ import {
   controlPlaneWrapperFrameSchema,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
+import type {
+  ControlDiagnosticReporter,
+  NativeConnectionPhase,
+} from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 
 /** Spec §7 Connection: the bounded outbound buffer holds at most this many frames. */
@@ -19,6 +23,15 @@ type WebSocketWithHeadersCtor = new (
 
 export type ControlPlaneHeartbeat = { active: boolean; degraded: boolean };
 
+/** The live connection phase, derived from the shared tuple so it cannot drift. */
+export type ControlPlaneConnectionPhase = NativeConnectionPhase;
+
+export type ControlPlaneConnectionSnapshot = {
+  phase: ControlPlaneConnectionPhase;
+  attempt: number;
+  outboxBytes: number;
+};
+
 export type ControlPlaneConnectionOptions = {
   url: string;
   credential: string;
@@ -34,11 +47,14 @@ export type ControlPlaneConnectionOptions = {
   random?: () => number;
   outboxMaxFrames?: number;
   outboxMaxBytes?: number;
+  onNativeDiagnostic?: ControlDiagnosticReporter;
 };
 
 export type ControlPlaneConnection = {
   /** The wrapper identity advertised in `hello` (B10 terminal records). */
   readonly wrapperId: string;
+  /** The live phase, reconnect attempt and buffered bytes, without a recount. */
+  snapshot(): ControlPlaneConnectionSnapshot;
   start(): void;
   send(frame: ControlPlaneWrapperFrame): void;
   recycle(): void;
@@ -82,7 +98,7 @@ export function createControlPlaneConnection(
   const maxBytes = options.outboxMaxBytes ?? CONTROL_PLANE_OUTBOX_MAX_BYTES;
   const WebSocketWithHeaders = WebSocket as unknown as WebSocketWithHeadersCtor;
 
-  type Phase = 'idle' | 'connecting' | 'awaiting_welcome' | 'connected' | 'closed';
+  type Phase = ControlPlaneConnectionPhase;
   type OutboxEntry = { serialized: string; bytes: number; droppable: boolean };
 
   let phase: Phase = 'idle';
@@ -90,10 +106,33 @@ export function createControlPlaneConnection(
   let attempt = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
-  let recycling = false;
+  let ackTimer: ReturnType<typeof setTimeout> | undefined;
+  let negotiationTimer: ReturnType<typeof setTimeout> | undefined;
+  let heartbeatAck = false;
   const outbox: OutboxEntry[] = [];
   let outboxBytes = 0;
   let droppedEvents = 0;
+  // One native stderr line per disconnected episode. `welcome` arms the next.
+  let disconnectEpisodeReported = false;
+
+  function reportSocketLine(phase: 'closed' | 'connect_attempt' | 'hello_rejected'): void {
+    try {
+      options.onNativeDiagnostic?.('control.socket', {
+        phase,
+        ...(phase === 'connect_attempt' ? { ok: false } : {}),
+        allocationId: options.allocationId,
+        wrapperInstanceId: wrapperId,
+      });
+    } catch {
+      // The projector must never disturb the connection.
+    }
+  }
+
+  function reportDisconnectEpisode(phase: 'closed' | 'connect_attempt'): void {
+    if (disconnectEpisodeReported) return;
+    disconnectEpisodeReported = true;
+    reportSocketLine(phase);
+  }
 
   function isDroppable(frame: ControlPlaneWrapperFrame): boolean {
     return frame.type === 'session.events';
@@ -146,14 +185,36 @@ export function createControlPlaneConnection(
   }
 
   function stopHeartbeat(): void {
+    heartbeatAck = false;
+    clearTimeout(ackTimer);
+    ackTimer = undefined;
+    clearTimeout(negotiationTimer);
+    negotiationTimer = undefined;
     if (heartbeatTimer !== undefined) {
       clearInterval(heartbeatTimer);
       heartbeatTimer = undefined;
     }
   }
 
-  function startHeartbeat(target: WebSocket): void {
+  function armAckDeadline(target: WebSocket): void {
+    clearTimeout(ackTimer);
+    const deadline = setTimeout(() => {
+      if (ackTimer !== deadline || socket !== target || phase !== 'connected' || !heartbeatAck)
+        return;
+      onSocketEnd(target, 'heartbeat acknowledgement timeout');
+      try {
+        target.close(1000, 'heartbeat acknowledgement timeout');
+      } catch {
+        log('control-plane timed-out socket close failed');
+      }
+    }, options.timers.wrapper.heartbeatAckTimeoutMs);
+    ackTimer = deadline;
+  }
+
+  function startHeartbeat(target: WebSocket, acknowledged: boolean): void {
     stopHeartbeat();
+    heartbeatAck = acknowledged;
+    if (heartbeatAck) armAckDeadline(target);
     heartbeatTimer = setInterval(() => {
       if (socket !== target || phase !== 'connected') return;
       const heartbeat = options.getHeartbeat?.() ?? { active: false, degraded: false };
@@ -170,14 +231,16 @@ export function createControlPlaneConnection(
     attempt += 1;
     const delay = controlPlaneReconnectDelayMs(options.timers, attempt, random);
     log(`control-plane reconnect in ${delay}ms (attempt ${attempt})`);
-    reconnectTimer = setTimeout(() => {
+    const pending = setTimeout(() => {
+      if (reconnectTimer !== pending) return;
       reconnectTimer = undefined;
       connect();
     }, delay);
+    reconnectTimer = pending;
   }
 
   function detachAndReconnect(): void {
-    recycling = false;
+    const wasConnected = phase === 'connected';
     attempt = 0;
     stopHeartbeat();
     const previous = socket;
@@ -190,23 +253,21 @@ export function createControlPlaneConnection(
         // Already closing.
       }
     }
+    if (wasConnected) options.onDisconnected?.('connection recycled');
     connect();
   }
 
   function onSocketEnd(target: WebSocket, reason: string): void {
     if (socket !== target) return;
     const wasConnected = phase === 'connected';
+    const wasConnecting = phase === 'connecting' || phase === 'awaiting_welcome';
     socket = null;
     stopHeartbeat();
     if (phase === 'closed') return;
+    if (wasConnected) reportDisconnectEpisode('closed');
+    else if (wasConnecting) reportDisconnectEpisode('connect_attempt');
     phase = 'idle';
     if (wasConnected) options.onDisconnected?.(reason);
-    if (recycling) {
-      recycling = false;
-      attempt = 0;
-      connect();
-      return;
-    }
     scheduleReconnect();
   }
 
@@ -227,16 +288,22 @@ export function createControlPlaneConnection(
     }
     const frame = result.data;
     if (frame.type === 'welcome') {
-      if (phase === 'connected') return;
+      if (phase !== 'awaiting_welcome') return;
+      disconnectEpisodeReported = false;
       phase = 'connected';
       attempt = 0;
-      options.onConnected?.();
-      startHeartbeat(target);
+      startHeartbeat(target, frame.heartbeatAck === true);
       flushOutbox(target);
+      options.onConnected?.();
+      return;
+    }
+    if (frame.type === 'heartbeat_ack') {
+      if (phase === 'connected' && heartbeatAck) armAckDeadline(target);
       return;
     }
     if (frame.type === 'shutdown') {
       close();
+      if (frame.reason === 'hello_rejected') reportSocketLine('hello_rejected');
       options.onShutdown?.(frame.reason);
       return;
     }
@@ -253,32 +320,44 @@ export function createControlPlaneConnection(
       });
     } catch (error) {
       log(`control-plane connection failed: ${messageOf(error)}`);
+      reportDisconnectEpisode('connect_attempt');
       scheduleReconnect();
       return;
     }
     socket = target;
     target.onopen = () => {
       if (socket !== target || phase === 'closed') return;
-      if (recycling) {
-        try {
-          target.close(1000, 'recycle');
-        } catch {
-          detachAndReconnect();
-        }
-        return;
-      }
       phase = 'awaiting_welcome';
       writeRaw(target, {
         type: 'hello',
         wrapperId,
         allocationId: options.allocationId,
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        heartbeatAck: true,
       });
+      // Older v2 peers strictly reject the capability-bearing hello.
+      negotiationTimer = setTimeout(() => {
+        if (socket !== target || phase !== 'awaiting_welcome') return;
+        negotiationTimer = undefined;
+        writeRaw(target, {
+          type: 'hello',
+          wrapperId,
+          allocationId: options.allocationId,
+          protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        });
+      }, options.timers.wrapper.heartbeatNegotiationMs);
     };
     target.onmessage = event => onMessage(target, event);
     target.onclose = () => onSocketEnd(target, 'connection closed');
     target.onerror = () => {
       // Bun fires `error` and then `close`; the close handler drives reconnect.
+      // The episode latch makes the pair one native line. A deliberate recycle
+      // is not a failure.
+      if (socket !== target || phase === 'closed') return;
+      if (phase === 'connected') reportDisconnectEpisode('closed');
+      else if (phase === 'connecting' || phase === 'awaiting_welcome') {
+        reportDisconnectEpisode('connect_attempt');
+      }
     };
   }
 
@@ -308,27 +387,9 @@ export function createControlPlaneConnection(
 
   function recycle(): void {
     if (phase === 'closed') return;
-    recycling = true;
     if (reconnectTimer !== undefined) {
       clearTimeout(reconnectTimer);
       reconnectTimer = undefined;
-    }
-    const current = socket;
-    if (!current) {
-      detachAndReconnect();
-      return;
-    }
-    if (current.readyState === WebSocket.OPEN) {
-      try {
-        current.close(1000, 'recycle');
-      } catch {
-        detachAndReconnect();
-      }
-      return;
-    }
-    if (current.readyState === WebSocket.CONNECTING) {
-      // The open handler closes it so the recycle happens on one socket.
-      return;
     }
     detachAndReconnect();
   }
@@ -352,5 +413,12 @@ export function createControlPlaneConnection(
     }
   }
 
-  return { wrapperId, start, send, recycle, close };
+  return {
+    wrapperId,
+    snapshot: () => ({ phase, attempt, outboxBytes }),
+    start,
+    send,
+    recycle,
+    close,
+  };
 }

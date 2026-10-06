@@ -10,7 +10,7 @@ import {
   setOrganizationServiceFeeExemption,
   type OrganizationServiceFeeExemptionRecord,
   type OrganizationServiceFeeExemptionStore,
-} from '@/lib/service-fees/organization-exemptions';
+} from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 
 function createMemoryExemptionStore(options?: {
   activeOrganizationIds?: Iterable<string>;

@@ -6,12 +6,12 @@ import {
   UserDeletionStepStatus,
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { USER_DELETION_PYLON_REPLY_HTML } from '@/lib/user/deletion-queue/deletion-constants';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { USER_DELETION_PYLON_REPLY_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handlePylonReply } from '@/lib/user/deletion-queue/handlers/pylon-reply';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const ISSUE_ID = 'iss-case';
 const TARGET_EMAIL = 'user@example.com';

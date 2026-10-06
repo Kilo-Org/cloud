@@ -1,4 +1,4 @@
-import { GOOGLE_WEB_RISK_API_KEY } from '@/lib/config.server';
+import { GOOGLE_WEB_RISK_API_KEY } from '@kilocode/web-shared/lib/config.server';
 
 type ThreatType = 'MALWARE' | 'SOCIAL_ENGINEERING' | 'UNWANTED_SOFTWARE';
 

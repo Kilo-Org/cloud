@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import { Check, ChevronDown } from 'lucide-react';

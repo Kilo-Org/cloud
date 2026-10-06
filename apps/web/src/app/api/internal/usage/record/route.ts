@@ -2,18 +2,18 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { saveUsageRelatedDataLocally } from '@/lib/ai-gateway/processUsage';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import {
   UsageRecordRequestSchema,
   type UsageRecordResponse,
-} from '@/lib/ai-gateway/usage-record-contract';
+} from '@kilocode/web-shared/lib/ai-gateway/usage-record-contract';
 import {
   createPhaseTimer,
   emitUsageRecordTiming,
   readPoolGauges,
   shouldEmitUsageRecordTiming,
-} from '@/lib/ai-gateway/usage-record-diagnostics';
+} from '@kilocode/web-shared/lib/ai-gateway/usage-record-diagnostics';
 
 /**
  * Frankfurt-local sink for AI-gateway usage writes.

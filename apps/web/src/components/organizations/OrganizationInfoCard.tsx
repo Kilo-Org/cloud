@@ -10,8 +10,11 @@ import {
   useAdminToggleCodeIndexing,
   useUpdateSuppressTrialMessaging,
 } from '@/app/api/organizations/hooks';
-import type { OrganizationWithMembersResponse } from '@/lib/organizations/organization-types';
-import { normalizeCompanyDomain, isValidDomain } from '@/lib/organizations/company-domain';
+import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  normalizeCompanyDomain,
+  isValidDomain,
+} from '@kilocode/web-shared/lib/organizations/company-domain';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { AnimatedDollars } from './AnimatedDollars';

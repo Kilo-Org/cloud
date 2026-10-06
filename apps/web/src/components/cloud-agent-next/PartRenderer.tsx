@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { memo } from 'react';
 import { Brain, Loader2 } from 'lucide-react';
 import { ToolCardShell } from './ToolCardShell';
 import { ReadToolCard } from './ReadToolCard';
@@ -29,6 +30,7 @@ import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
 import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
 import type { Part, StoredMessage } from './types';
 import {
@@ -75,6 +77,7 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
 }
 
 const markdownComponents = { a: LinkRenderer };
+const remarkPlugins = [remarkGfm];
 
 // ============================================================================
 // Part Renderers
@@ -83,17 +86,29 @@ const markdownComponents = { a: LinkRenderer };
 /**
  * Renders a TextPart as markdown
  */
-function TextPartRenderer({ part }: { part: Extract<Part, { type: 'text' }> }) {
+const TextPartRenderer = memo(function TextPartRenderer({
+  text,
+  isStreaming,
+}: {
+  text: string;
+  isStreaming?: boolean;
+}) {
+  const parseCache = useMarkdownParseCache();
+  const plugins =
+    parseCache && !isStreaming
+      ? [remarkGfm, createMarkdownParseCachePlugin(parseCache)]
+      : remarkPlugins;
+
   return (
     <div className="prose prose-sm prose-invert prose-p:my-2 prose-headings:mt-4 prose-headings:mb-2 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:text-xs max-w-none overflow-hidden px-2 leading-relaxed">
-      {part.text ? (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {part.text}
+      {text ? (
+        <ReactMarkdown remarkPlugins={plugins} components={markdownComponents}>
+          {text}
         </ReactMarkdown>
       ) : null}
     </div>
   );
-}
+});
 
 /**
  * Check if a tool part has enough input data to render.
@@ -344,7 +359,11 @@ function ReasoningPartRenderer({
 
   return (
     <ToolCardShell icon={Brain} title={header} status={streaming ? 'running' : 'completed'}>
-      <ToolMarkdown content={body} className="text-muted-foreground max-h-64" />
+      <ToolMarkdown
+        content={body}
+        className="text-muted-foreground max-h-64"
+        streaming={streaming}
+      />
     </ToolCardShell>
   );
 }
@@ -408,79 +427,90 @@ function PartErrorFallback({ partType }: { partType: string }) {
   );
 }
 
-export function PartRenderer({
-  part,
-  isStreaming,
-  childSessionMessages,
-  getChildMessages,
-  onOpenChildSession,
-}: PartRendererProps) {
-  // Text parts -> render markdown
-  if (isTextPart(part)) {
-    return (
-      <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
-        <TextPartRenderer part={part} />
-      </MessageErrorBoundary>
-    );
-  }
+export const PartRenderer = memo(
+  function PartRenderer({
+    part,
+    isStreaming,
+    childSessionMessages,
+    getChildMessages,
+    onOpenChildSession,
+  }: PartRendererProps) {
+    // Text parts -> render markdown
+    if (isTextPart(part)) {
+      return (
+        <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
+          <TextPartRenderer
+            text={part.text}
+            isStreaming={(isStreaming ?? true) && isPartStreaming(part)}
+          />
+        </MessageErrorBoundary>
+      );
+    }
 
-  if (isToolPart(part)) {
-    return (
-      <MessageErrorBoundary fallback={<PartErrorFallback partType="tool" />}>
-        <ToolPartRenderer
-          part={part}
-          childSessionMessages={childSessionMessages}
-          getChildMessages={getChildMessages}
-          onOpenChildSession={onOpenChildSession}
-        />
-      </MessageErrorBoundary>
-    );
-  }
+    if (isToolPart(part)) {
+      return (
+        <MessageErrorBoundary fallback={<PartErrorFallback partType="tool" />}>
+          <ToolPartRenderer
+            part={part}
+            childSessionMessages={childSessionMessages}
+            getChildMessages={getChildMessages}
+            onOpenChildSession={onOpenChildSession}
+          />
+        </MessageErrorBoundary>
+      );
+    }
 
-  // File parts -> render file/image attachments
-  if (isFilePart(part)) {
-    return (
-      <MessageErrorBoundary fallback={<PartErrorFallback partType="file" />}>
-        <FilePartRenderer part={part} />
-      </MessageErrorBoundary>
-    );
-  }
+    // File parts -> render file/image attachments
+    if (isFilePart(part)) {
+      return (
+        <MessageErrorBoundary fallback={<PartErrorFallback partType="file" />}>
+          <FilePartRenderer part={part} />
+        </MessageErrorBoundary>
+      );
+    }
 
-  // Reasoning parts -> collapsible reasoning display
-  if (isReasoningPart(part)) {
-    if (!shouldRenderReasoningPart(part)) {
+    // Reasoning parts -> collapsible reasoning display
+    if (isReasoningPart(part)) {
+      if (!shouldRenderReasoningPart(part)) {
+        return null;
+      }
+      return (
+        <MessageErrorBoundary fallback={<PartErrorFallback partType="reasoning" />}>
+          <ReasoningPartRenderer part={part} isStreaming={isStreaming} />
+        </MessageErrorBoundary>
+      );
+    }
+
+    // Step start/finish -> return null (no visible rendering)
+    if (isStepStartPart(part) || isStepFinishPart(part)) {
       return null;
     }
-    return (
-      <MessageErrorBoundary fallback={<PartErrorFallback partType="reasoning" />}>
-        <ReasoningPartRenderer part={part} isStreaming={isStreaming} />
-      </MessageErrorBoundary>
-    );
-  }
 
-  // Step start/finish -> return null (no visible rendering)
-  if (isStepStartPart(part) || isStepFinishPart(part)) {
-    return null;
-  }
+    // Subtask parts -> render child session indicator
+    if (isSubtaskPart(part)) {
+      return (
+        <MessageErrorBoundary fallback={<PartErrorFallback partType="subtask" />}>
+          <SubtaskPartRenderer part={part} />
+        </MessageErrorBoundary>
+      );
+    }
 
-  // Subtask parts -> render child session indicator
-  if (isSubtaskPart(part)) {
-    return (
-      <MessageErrorBoundary fallback={<PartErrorFallback partType="subtask" />}>
-        <SubtaskPartRenderer part={part} />
-      </MessageErrorBoundary>
-    );
-  }
+    // Patch parts -> render patch/commit info
+    if (isPatchPart(part)) {
+      return (
+        <MessageErrorBoundary fallback={<PartErrorFallback partType="patch" />}>
+          <PatchPartRenderer part={part} />
+        </MessageErrorBoundary>
+      );
+    }
 
-  // Patch parts -> render patch/commit info
-  if (isPatchPart(part)) {
-    return (
-      <MessageErrorBoundary fallback={<PartErrorFallback partType="patch" />}>
-        <PatchPartRenderer part={part} />
-      </MessageErrorBoundary>
-    );
-  }
-
-  // Unknown types -> graceful fallback
-  return <UnknownPartRenderer part={part} />;
-}
+    // Unknown types -> graceful fallback
+    return <UnknownPartRenderer part={part} />;
+  },
+  (previous, next) =>
+    previous.part === next.part &&
+    previous.isStreaming === next.isStreaming &&
+    previous.childSessionMessages === next.childSessionMessages &&
+    previous.getChildMessages === next.getChildMessages &&
+    previous.onOpenChildSession === next.onOpenChildSession
+);

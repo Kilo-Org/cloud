@@ -74,6 +74,7 @@ vi.mock('@/components/ui/dialog', () => ({
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 vi.mock('@/components/profiles/profile-repo-pins-section', () => ({
   ProfileRepoPinsSection: 'ProfileRepoPinsSection',
 }));
@@ -112,6 +113,31 @@ describe('ProfileOverviewScreen', () => {
 
     expect(findAll(renderer.root, 'Skeleton').length).toBeGreaterThan(0);
     expect(findAll(renderer.root, 'ConfigureRow')).toHaveLength(0);
+
+    unmount();
+  });
+
+  it('renders the overview in TabScreenScrollView, including the delete action', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    // The shared scroll view reserves the tab bar (and, while the keyboard is
+    // up, the IME) below its viewport, so the destructive action at the end of
+    // the content stays reachable above both. A bare ScrollView parked it
+    // behind the bar.
+    const scroll = findOne(renderer.root, 'TabScreenScrollView');
+    // The metadata form's multiline Description (and any field reached by
+    // scrolling) must come out from behind the keyboard; the native iOS content
+    // inset is what reveals the focused field, and TabScreenScrollView then
+    // leaves the IME to it instead of reserving the frame margin twice.
+    expect(scroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
+    expect(findAll(renderer.root, 'ScrollView')).toHaveLength(0);
+
+    const buttons = findAll(renderer.root, 'Button');
+    expect(buttons).toHaveLength(2);
+    expect(findAll(scroll, 'Button')).toHaveLength(buttons.length);
 
     unmount();
   });

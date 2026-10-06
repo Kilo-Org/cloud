@@ -5,7 +5,7 @@ import {
   readServiceFeeTaxBehaviorFromPrice,
   resolveServiceFeeTaxInput,
   type StripePriceTaxReader,
-} from '@/lib/service-fees/tax';
+} from '@kilocode/web-shared/lib/service-fees/tax';
 
 function priceReader(retrieve: StripePriceTaxReader['prices']['retrieve']): StripePriceTaxReader {
   return { prices: { retrieve } };

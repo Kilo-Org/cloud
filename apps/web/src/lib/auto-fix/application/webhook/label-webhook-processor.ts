@@ -10,7 +10,7 @@
 
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { createFixTicket, findExistingFixTicket } from '../../db/fix-tickets';

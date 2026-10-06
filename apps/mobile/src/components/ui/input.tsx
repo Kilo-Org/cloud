@@ -28,9 +28,10 @@ const INPUT_MULTILINE_INSET_CLASS = 'pl-3 pr-3 pt-2.5 pb-2.5';
 /**
  * The one single-line box: `min-h-[44px] pl-3 pr-3 leading-[normal]`, no vertical
  * padding, Android's center gravity, one line box for the placeholder and the
- * value, and RTL content alignment. A call site keeps its own chrome, text size
- * and horizontal inset; a multiline caller keeps its own gravity and line break
- * mode, plus the shared inset unless its padding classes override it.
+ * value, `numberOfLines={1}`, and RTL content alignment. A call site keeps its
+ * own chrome, text size and horizontal inset; a multiline caller keeps its own
+ * gravity, line break mode and `numberOfLines`, plus the shared inset unless its
+ * padding classes override it.
  */
 function Input({
   className,
@@ -40,6 +41,7 @@ function Input({
   multiline,
   textAlignVertical,
   lineBreakModeIOS,
+  numberOfLines,
   ...props
 }: Readonly<TextInputProps & React.RefAttributes<TextInput>>) {
   const colors = useThemeColors();
@@ -54,6 +56,7 @@ function Input({
     <TextInput
       {...props}
       multiline={multiline}
+      numberOfLines={multiline ? numberOfLines : 1}
       className={cn(
         multiline ? INPUT_MULTILINE_INSET_CLASS : INPUT_BOX_SHAPE_CLASS,
         className,

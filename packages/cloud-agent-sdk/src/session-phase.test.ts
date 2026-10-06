@@ -700,7 +700,11 @@ describe('authoritative message failure settlement', () => {
         sendRaw(createEvent('cloud.message.sent', { messageId: 'active' }));
         sendRaw(kilocode('session.status', { sessionID: TEST_KILO_ID, status: { type: 'busy' } }));
         sendRaw(createEvent('cloud.status', { cloudStatus: { type } }));
-        expect(snapshot().canSend).toBe(false);
+        expect(snapshot()).toMatchObject({
+          cloudStatus: { type },
+          isStreaming: true,
+          canSend: true,
+        });
 
         sendRaw(
           createEvent('cloud.message.failed', {

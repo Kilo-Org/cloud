@@ -2,8 +2,8 @@ import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals'
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cli_sessions_v2,
   github_branch_pull_requests,
@@ -23,12 +23,12 @@ import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-
 // `.env.test` sets SESSION_INGEST_WORKER_URL to '' (shared fixture used by
 // other test files too — do not change it here). `createCallerForUser`'s
 // import chain (test-utils -> trpc/init -> ...) transitively loads
-// `@/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
+// `@kilocode/web-shared/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
 // `const` computed once, the first time that module is evaluated. Static
 // ES `import` statements are always hoisted above every other statement by
 // the transform, so a statically-imported `createCallerForUser` would pull
 // in the real ('') value before any `process.env` assignment written below
-// it could run — and a `jest.mock('@/lib/config.server', ...)` registered
+// it could run — and a `jest.mock('@kilocode/web-shared/lib/config.server', ...)` registered
 // after that first (real) load cannot retroactively change the value
 // active-sessions-router.ts already captured. A dynamic `import()` executes
 // exactly where it is awaited (not hoisted), so resolving it in `beforeAll`
@@ -166,7 +166,7 @@ describe('active-sessions-router', () => {
           headers: { 'Content-Type': 'application/json' },
         })
       );
-      const { NEXTAUTH_SECRET } = await import('@/lib/config.server');
+      const { NEXTAUTH_SECRET } = await import('@kilocode/web-shared/lib/config.server');
       const caller = await createCallerForUser(regularUser.id);
 
       const result = await invoke(caller);
@@ -503,6 +503,7 @@ describe('active-sessions-router', () => {
   describe('list enrichment associatedPr', () => {
     const sessionWithPr = 'ses_active_pr_present_0001';
     const sessionWithoutPr = 'ses_active_pr_absent_0001';
+    const sessionBranchOnly = 'ses_active_pr_branch_only_0001';
     const CACHE_GIT_URL = 'https://github.com/kilo/active-provenance-repo';
 
     beforeEach(async () => {
@@ -514,6 +515,11 @@ describe('active-sessions-router', () => {
           title: 'active with PR',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/active-x',
+          platform: 'github',
+          pr_url: 'https://github.com/kilo/active-provenance-repo/pull/42',
+          pr_number: 42,
+          pr_head_ref: 'feature/active-x',
+          pr_link_verified_at: '2026-01-01T00:00:00.000Z',
         },
         {
           session_id: sessionWithoutPr,
@@ -522,6 +528,15 @@ describe('active-sessions-router', () => {
           title: 'active without PR',
           git_url: CACHE_GIT_URL,
           git_branch: 'feature/active-y',
+        },
+        {
+          // Same repo + branch as the cache row but no verified link of its own.
+          session_id: sessionBranchOnly,
+          kilo_user_id: regularUser.id,
+          created_on_platform: 'cli',
+          title: 'active branch only',
+          git_url: CACHE_GIT_URL,
+          git_branch: 'feature/active-x',
         },
       ]);
       await db.insert(github_branch_pull_requests).values({
@@ -590,6 +605,17 @@ describe('active-sessions-router', () => {
       const withoutPr = result.sessions.find(s => s.id === sessionWithoutPr);
       expect(withoutPr).toBeDefined();
       expect(withoutPr).not.toHaveProperty('associatedPr');
+    });
+
+    it('omits associatedPr for a session with no verified link even on a branch with a cache row', async () => {
+      await mockHeartbeats([sessionBranchOnly]);
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      const branchOnly = result.sessions.find(s => s.id === sessionBranchOnly);
+      expect(branchOnly).toBeDefined();
+      expect(branchOnly).not.toHaveProperty('associatedPr');
     });
   });
 });

@@ -21,7 +21,7 @@ const chain: Record<string, jest.Mock> = {
 const selectMock = jest.fn((): unknown => chain);
 const dbMock = { select: selectMock };
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   get db() {
     return dbMock;
   },
@@ -29,11 +29,11 @@ jest.mock('@/lib/drizzle', () => ({
 
 // Undefined skips phase 1 (the worker fetch), leaving the cloud-candidate
 // query as the only db read this test drives.
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   SESSION_INGEST_WORKER_URL: undefined,
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateBoundedInternalServiceToken: () => 'test-token',
 }));
 
@@ -41,7 +41,17 @@ jest.mock('@/routers/cli-sessions-v2-router', () => {
   const { z } = jest.requireActual('zod');
   return {
     associatedPrSchema: z.object({}).passthrough(),
-    formatAssociatedPr: () => null,
+    // Mirror the real gate: only a session whose own stored link GitHub has
+    // verified renders an associatedPr; no link or an unverified link renders
+    // nothing.
+    formatAssociatedPr: (session: {
+      pr_url: string | null;
+      pr_number: number | null;
+      pr_link_verified_at: string | null;
+    }) =>
+      session.pr_url === null || session.pr_link_verified_at === null
+        ? null
+        : { number: session.pr_number, verified: true },
     sessionPrJoinPredicate: undefined,
   };
 });
@@ -96,6 +106,7 @@ describe('listActiveSessions cloud candidates', () => {
       session_pr_platform: null,
       session_pr_url: null,
       session_pr_number: null,
+      session_pr_verified_at: null,
       pr_url: null,
       pr_number: null,
       pr_state: null,
@@ -115,5 +126,52 @@ describe('listActiveSessions cloud candidates', () => {
 
     expect(limitMock).toHaveBeenCalledWith(CLOUD_AGENT_CANDIDATE_LIMIT);
     expect(result.sessions).toHaveLength(60);
+  });
+
+  it('forwards the session verified-at so an unverified link renders no associatedPr', async () => {
+    const baseRow = {
+      created_on_platform: null,
+      created_at: '2026-09-22T09:00:00.000Z',
+      updated_at: '2026-09-22T09:30:00.000Z',
+      status: 'busy',
+      title: 'candidate',
+      organization_id: null,
+      git_url: 'https://github.com/kilo/repo',
+      git_branch: 'feature/x',
+      last_activity_at: null,
+      status_updated_at: null,
+      total_cost_microdollars: null,
+      cloud_agent_session_id: 'cas-1',
+      run_open: true,
+      session_pr_platform: 'github',
+      session_pr_url: 'https://github.com/kilo/repo/pull/7',
+      session_pr_number: 7,
+      pr_url: null,
+      pr_number: null,
+      pr_state: null,
+      pr_title: null,
+      pr_head_sha: null,
+      pr_last_synced_at: null,
+      pr_review_decision: null,
+      review_decision_pending: null,
+    };
+
+    limitMock.mockResolvedValue([
+      { ...baseRow, session_id: 'verified', session_pr_verified_at: '2026-01-01T00:00:00.000Z' },
+      { ...baseRow, session_id: 'unverified', session_pr_verified_at: null },
+    ]);
+
+    const result = await listActiveSessions({
+      userId: 'user-1',
+      organizationId: undefined,
+      includeCloudAgentSessions: true,
+    });
+
+    const verified = result.sessions.find(s => s.id === 'verified');
+    const unverified = result.sessions.find(s => s.id === 'unverified');
+    // Only the verified link is surfaced at all; the unverified link is a guess
+    // and the key is omitted rather than emitted as `associatedPr: null`.
+    expect(verified?.associatedPr).toMatchObject({ number: 7, verified: true });
+    expect(unverified?.associatedPr).toBeUndefined();
   });
 });

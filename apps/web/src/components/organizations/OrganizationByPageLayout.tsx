@@ -1,7 +1,7 @@
 'use server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { signInUrlWithCallbackPath } from '@/lib/user/server';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { signInUrlWithCallbackPath } from '@kilocode/web-shared/lib/user/server';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { Organization } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
 import type { JSX } from 'react';

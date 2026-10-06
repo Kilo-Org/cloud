@@ -8,7 +8,7 @@ import {
 } from './usage-record-diagnostics';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
-import { createTimer } from '@/lib/timer';
+import { createTimer } from '@kilocode/web-shared/lib/timer';
 import type { OpenAI } from 'openai';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import type {
@@ -18,35 +18,38 @@ import type {
 import { fetchGeneration } from './providers/upstream-request';
 import { OPENROUTER } from './providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
-import PostHogClient from '@/lib/posthog';
-import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
+import { hasPaymentMethod } from '@kilocode/web-shared/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
 import { and, eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
   scheduleOrganizationLowBalanceAlert,
-} from '@/lib/organizations/organization-usage';
-import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { sentryLogger } from '@/lib/utils.server';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
 import {
   runBestEffortPostCommitTasks,
   type BestEffortPostCommitTask,
 } from './usage-post-commit-work';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
-import { KiloPassAuditLogAction, KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type {
   BalanceUpdateResult,
   ChatCompletionChunk,
@@ -65,32 +68,32 @@ import type {
   UsageRecordInsertResult,
   UsageRecordWriteOutcome,
   VercelProviderMetaData,
-} from '@/lib/ai-gateway/processUsage.types';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   parseResponsesMicrodollarUsageFromStream,
   parseResponsesMicrodollarUsageFromString,
-} from '@/lib/ai-gateway/processUsage.responses';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.responses';
 import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
-} from '@/lib/ai-gateway/processUsage.messages';
-import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
-import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.messages';
+import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
+import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
   drainSseStream,
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
-} from '@/lib/ai-gateway/processUsage.shared';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
   type KiloExclusiveModel,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
-import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
-import { bouncerAccountId, reportUsageEvent } from '@/lib/bouncer/client';
+import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import { normalizeJa4, reportUsageEvent } from '@kilocode/web-shared/lib/bouncer/client';
 
 const posthogClient = PostHogClient();
 
@@ -1323,10 +1326,25 @@ export async function processTokenData(
 }
 
 /**
+ * Persists a usage row and then reports the same request to bouncer's usage
+ * ledger. Used by the inference paths whose provider has no generation lookup
+ * (FIM, edit, embeddings, SystemOne); chat and transcription use
+ * `processTokenData`.
+ */
+export async function logMicrodollarUsageAndReportToBouncer(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): Promise<{ usageId: string; createdAt: string } | null> {
+  const record = await logMicrodollarUsage(usageStats, usageContext);
+  await reportBouncerUsageEvent(usageStats, usageContext);
+  return record;
+}
+
+/**
  * Reports this request to bouncer's report-only usage ledger, after the billing
  * write so the final token counts are in hand. The client never rejects, and
- * the verdict is not read back. The prompt SimHash is computed here, off the
- * hot path.
+ * the verdict is not read back. The caller computes the prompt SimHash, so the
+ * raw prompt never reaches this context.
  */
 async function reportBouncerUsageEvent(
   usageStats: MicrodollarUsageStats,
@@ -1334,11 +1352,13 @@ async function reportBouncerUsageEvent(
 ): Promise<void> {
   const bouncer = usageContext.bouncer;
   if (!bouncer) return;
-  await reportUsageEvent({
+  const fields = {
     requestId: bouncer.requestId,
     occurredAt: bouncer.occurredAt,
-    accountId: bouncerAccountId(usageContext.kiloUserId, usageContext.organizationId),
-    ip: bouncer.clientIp,
+    apiKind: usageContext.api_kind,
+    // The client fingerprint comes from the raw fraud headers already carried on
+    // this context; it is bounded here so an invalid header cannot fail the event.
+    ja4: normalizeJa4(usageContext.fraudHeaders.http_x_vercel_ja4_digest),
     inputTokens: usageStats.inputTokens,
     outputTokens: usageStats.outputTokens,
     clientAttributed: bouncer.clientAttributed,
@@ -1347,7 +1367,16 @@ async function reportBouncerUsageEvent(
     requestedLogprobs: bouncer.requestedLogprobs,
     samples: bouncer.samples,
     promptSimHash: bouncer.promptSimHash,
-  });
+  };
+  if (bouncer.accountId === null) {
+    // Anonymous usage is keyed on the IP and carries no payer key, so bouncer
+    // cannot turn it into a payer-sharing row. Without an IP there is nothing to
+    // report; that is a telemetry gap, never a failure to serve the request.
+    if (bouncer.clientIp == null) return;
+    await reportUsageEvent({ ...fields, tier: 'anonymous', ip: bouncer.clientIp });
+    return;
+  }
+  await reportUsageEvent({ ...fields, accountId: bouncer.accountId, ip: bouncer.clientIp });
 }
 
 async function getGenerationLookupProvider(

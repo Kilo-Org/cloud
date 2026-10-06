@@ -8,9 +8,12 @@ import { addUserInteractionListener } from 'expo-widgets';
 
 import { i18n } from '@/i18n';
 import { getGlanceableDelivery, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import { replayGlanceableLiveActivity } from '@/lib/glanceable/activity-kit-prompt';
 import {
   getLiveActivityEnabled,
+  getNotificationPermissionGranted,
   subscribeLiveActivityEnabled,
+  subscribeNotificationPermissionGranted,
 } from '@/lib/glanceable/live-activity-switch';
 
 import { adoptPushStartedActivity } from './adopt-activity';
@@ -117,5 +120,13 @@ if (Platform.OS === 'ios') {
       getGlanceableDelivery().cleanupTokens('scope');
     }
     liveActivityAllowed = next;
+  });
+
+  // The sink starts no card before the user grants notification permission
+  // (see `startCard`). Work that was live at the grant starts its card now.
+  subscribeNotificationPermissionGranted(() => {
+    if (getNotificationPermissionGranted()) {
+      void replayGlanceableLiveActivity();
+    }
   });
 }

@@ -28,7 +28,11 @@ try {
   mermaid.render('g', ${JSON.stringify(source)}).then(({ svg }) => {
     const host = document.getElementById('d');
     host.innerHTML = svg;
-    post({ kind: 'height', height: Math.ceil(host.getBoundingClientRect().height) });
+    // The SVG scales to the page width, which can still be settling when it
+    // first lays out; report the height again whenever the host resizes.
+    const report = () => post({ kind: 'height', height: Math.ceil(host.getBoundingClientRect().height) });
+    new ResizeObserver(report).observe(host);
+    requestAnimationFrame(report);
   }).catch(() => post({ kind: 'error' }));
 } catch (e) { post({ kind: 'error' }); }
 </script></body></html>`;

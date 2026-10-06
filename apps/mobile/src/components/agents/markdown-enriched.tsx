@@ -93,8 +93,23 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
         attribute: TOKEN_DARK_LIGHT.attribute[half],
       },
     },
-    blockquote: { borderColor, borderWidth: 3, gapWidth: 12, color: textColor },
-    list: { color: textColor, fontSize: 16, lineHeight: 24, markerColor: textColor },
+    // The library's quote, bullet and table-row defaults are light-theme
+    // colors; every surface color here comes from the palette so dark mode
+    // and the colored user bubbles stay readable.
+    blockquote: {
+      borderColor,
+      borderWidth: 3,
+      gapWidth: 12,
+      color: textColor,
+      backgroundColor: 'transparent',
+    },
+    list: {
+      color: textColor,
+      fontSize: 16,
+      lineHeight: 24,
+      markerColor: textColor,
+      bulletColor: textColor,
+    },
     thematicBreak: { color: borderColor, height: 1, marginTop: 8, marginBottom: 8 },
     table: {
       color: textColor,
@@ -104,6 +119,8 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
       borderRadius: 6,
       headerTextColor: textColor,
       headerBackgroundColor: codeBackground,
+      rowEvenBackgroundColor: 'transparent',
+      rowOddBackgroundColor: 'transparent',
     },
   };
 }

@@ -1484,12 +1484,6 @@ export const SESSION_CREATE_FINALIZATION_VERSION_KEY = 'finalizationVersion';
  * Deterministic JSON serialization: object keys are sorted and undefined
  * values are dropped (JSON semantics), so field order or an explicit
  * `undefined` never changes a fingerprint.
- *
- * Deliberately not shared with the stricter `canonicalJson` in
- * `workspace-backup-cache.ts`: that one rejects (returns null) where this one
- * serializes — a top-level `undefined`, an `undefined` array element, a
- * non-finite number, or an exotic object. Swapping it in here rotates every
- * live create-intent fingerprint, so the two stay separate.
  */
 function canonicalJson(value: unknown): string {
   if (value === undefined || value === null) {

@@ -23,7 +23,8 @@
     "./operation-ledger": "./src/operation-ledger.ts",
     "./analytics-outbox": "./src/analytics-outbox.ts",
     "./external-side-effect-outbox": "./src/external-side-effect-outbox.ts",
-    "./bouncer-credit-event-outbox": "./src/bouncer-credit-event-outbox.ts"
+    "./bouncer-credit-event-outbox": "./src/bouncer-credit-event-outbox.ts",
+    "./bouncer-usage-event-outbox": "./src/bouncer-usage-event-outbox.ts"
   },
   "dependencies": {
     "@kilocode/app-shared": "workspace:*",

@@ -6,6 +6,8 @@ import {
 
 describe('unavailable models', () => {
   test('keeps exact matching for request rejection', () => {
+    expect(isUnavailableModel('apodex/apodex-1.1-mini:free')).toBe(true);
+    expect(isUnavailableModel('apodex/apodex-1.1-mini')).toBe(false);
     expect(isUnavailableModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
     expect(isUnavailableModel('google/gemma-4-31b-it:free')).toBe(true);
     expect(isUnavailableModel('google/gemma-4-31b-it')).toBe(false);
@@ -15,6 +17,8 @@ describe('unavailable models', () => {
   });
 
   test('matches normalized families for provider metadata', () => {
+    expect(familyHasUnavailableFreeModel('apodex/apodex-1.1-mini:free')).toBe(true);
+    expect(familyHasUnavailableFreeModel('apodex/apodex-1.1-mini')).toBe(true);
     expect(familyHasUnavailableFreeModel('google/gemma-4-26b-a4b-it:free')).toBe(true);
     expect(familyHasUnavailableFreeModel('google/gemma-4-26b-a4b-it')).toBe(true);
     expect(familyHasUnavailableFreeModel('google/gemma-4-31b-it:free')).toBe(true);

@@ -37,7 +37,6 @@ export type WrapperBootstrapWorkspace = {
   strictBranch?: boolean;
   preferSnapshot?: boolean;
   requireSnapshot?: boolean;
-  restoredFromBackup?: boolean;
 };
 
 export type WrapperBootstrapRuntimeSkill = {
@@ -238,15 +237,6 @@ export function restoreIncompleteLogFields(
  */
 export type WrapperBootstrapTelemetry = {
   workspaceWasWarm: boolean;
-  /**
-   * True when the workspace was populated from an R2 backup rather than
-   * genuinely reused from a prior bootstrap. A restored workspace still
-   * reports `workspaceWasWarm: true` (the bootstrap marker is included in
-   * the backup archive), so this disambiguates "reused as-is" from
-   * "restored over the network," which otherwise inflates apparent
-   * sandbox-reuse rates.
-   */
-  restoredFromBackup: boolean;
   clone?: WrapperCloneTelemetry;
   restore?: WrapperRestoreTelemetry;
 };
@@ -340,12 +330,6 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
   if (!hasString(workspace, 'workspacePath')) return false;
   if (!hasString(workspace, 'sessionHome')) return false;
   if (!hasString(workspace, 'branchName')) return false;
-  if (
-    workspace.restoredFromBackup !== undefined &&
-    typeof workspace.restoredFromBackup !== 'boolean'
-  ) {
-    return false;
-  }
   if (workspace.requireSnapshot !== undefined && typeof workspace.requireSnapshot !== 'boolean') {
     return false;
   }

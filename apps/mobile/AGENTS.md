@@ -76,7 +76,8 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
 | Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
-| Markdown | `@/components/markdown/markdown-text` | `react-native-markdown-display` |
+| Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
+| Diagram | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`) | — |
 
 No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`
 outside `@/components/ui/sheet` and `@/components/ui/dialog`. A sheet or a confirm must be able to stack
@@ -85,6 +86,8 @@ tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a 
 is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
 needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
 
+Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
+`markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.
 `ImageViewer` measures its viewport and gives the zoom child concrete dimensions.
 Do not use percentage dimensions inside `ResumableZoom`'s unconstrained child container.
 Use explicit pixel sizes for minimum touch targets; native rem is 14 points.

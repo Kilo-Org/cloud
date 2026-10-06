@@ -182,11 +182,15 @@
           },
           {
             "name": "react-native-markdown-display",
-            "message": "Use the app's markdown chain (@/components/markdown/markdown-text)."
+            "message": "Use MarkdownText from @/components/agents/markdown-text."
           },
           {
             "name": "@ronradtke/react-native-markdown-display",
-            "message": "Use the app's markdown chain (@/components/markdown/markdown-text)."
+            "message": "Use MarkdownText from @/components/agents/markdown-text."
+          },
+          {
+            "name": "react-native-marked",
+            "message": "Use MarkdownText from @/components/agents/markdown-text."
           }
         ]
       }

@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { BenchmarksSection } from './BenchmarksSection';
+import { BenchmarksSection, pinnedModelFor } from './BenchmarksSection';
 import { parseAdminResponse } from './admin-fetch';
 import { useSystemOneModelOptions } from './system-one-models';
 
@@ -479,6 +479,12 @@ export function AutoRoutingAdminContent() {
               models={systemOneModelsQuery.data ?? []}
               value={selectedModel}
               onValueChange={setSelectedModel}
+              pinnedModel={
+                currentOverride &&
+                !systemOneModelsQuery.data?.some(option => option.id === currentOverride)
+                  ? pinnedModelFor(currentOverride)
+                  : undefined
+              }
               isLoading={systemOneModelsQuery.isLoading || classifierModelQuery.isLoading}
               error={classifierModelError ?? systemOneModelsError}
               placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}

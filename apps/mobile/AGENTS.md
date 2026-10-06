@@ -82,6 +82,7 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
+| HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
 | Diagram | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`) | — |
 
 No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`

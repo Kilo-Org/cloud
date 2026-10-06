@@ -9,6 +9,7 @@ import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
 } from './markdown-handlers';
+import { convertHtmlToMarkdown } from './markdown-html-convert';
 import {
   MarkdownHtml,
   type MarkdownHtmlSnapshot,
@@ -64,7 +65,10 @@ export function MarkdownText({
     // parse instead of lexing and segmenting the same source again.
     const cached =
       snapshotRef.current === undefined ? markdownHtmlSplitCache.get(value) : undefined;
-    const result = cached ?? splitMarkdownHtmlIncremental(value, snapshotRef.current);
+    // HTML that markdown can express becomes markdown first, so it renders
+    // natively; only the rest reaches the HTML engine.
+    const result =
+      cached ?? splitMarkdownHtmlIncremental(convertHtmlToMarkdown(value), snapshotRef.current);
     markdownHtmlSplitCache.set(value, result);
     return result;
   }, [value]);

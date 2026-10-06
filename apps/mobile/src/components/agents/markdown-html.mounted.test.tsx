@@ -1,4 +1,4 @@
-/* eslint-disable max-classes-per-file, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async -- the react-native host stub must mimic the module surface the real react-native-render-html engine consumes (classes with no-op methods, promise-returning Linking shims); test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
+/* eslint-disable max-classes-per-file, typescript-eslint/no-extraneous-class, typescript-eslint/no-unnecessary-condition, eslint/class-methods-use-this, eslint/no-empty-function, eslint-plugin-promise/prefer-await-to-callbacks, eslint-plugin-promise/prefer-await-to-then, typescript-eslint/promise-function-async -- the react-native host stub must mimic the module surface the real @native-html/render engine consumes (classes with no-op methods, promise-returning Linking shims); test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MarkdownHtml, splitMarkdownHtml } from './markdown-html';
 import { type MarkdownPalette } from './markdown-palette';
 
-// A host-element stub is the only way to run the real react-native-render-html
+// A host-element stub is the only way to run the real @native-html/render
 // engine in the DOM-free node test env.
 const rnStub = vi.hoisted(() => {
   const dim = { width: 375, height: 800, scale: 2, fontScale: 1 };
@@ -74,8 +74,8 @@ const rnStub = vi.hoisted(() => {
     processColor: (c: unknown) => c,
   };
   // Install the CJS require hook before any import in this file is evaluated
-  // (vi.hoisted factories run above hoisted ESM imports); react-native-
-  // render-html requires react-native outside the ESM graph.
+  // (vi.hoisted factories run above hoisted ESM imports); @native-html/render
+  // requires react-native outside the ESM graph.
   const NodeModule = process.getBuiltinModule('module') as unknown as {
     _load: (request: string, parent: unknown, isMain: boolean) => unknown;
   };
@@ -86,6 +86,14 @@ const rnStub = vi.hoisted(() => {
 });
 
 vi.mock('react-native', () => rnStub);
+vi.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: () => undefined },
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+vi.mock('@/components/ui/icons', () => ({
+  ChevronDown: 'ChevronDown',
+  ChevronRight: 'ChevronRight',
+}));
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
 vi.mock('./markdown-link-confirm', () => ({
   confirmAndOpenMarkdownLink: vi.fn(),
@@ -217,5 +225,71 @@ describe('MarkdownHtml unsupported-image fallback', () => {
     } finally {
       isRtl.isRTL = false;
     }
+  });
+});
+
+function allText(renderer: TestRenderer.ReactTestRenderer): string {
+  return styledTexts(renderer)
+    .map(entry => entry.text)
+    .join('');
+}
+
+describe('MarkdownHtml details', () => {
+  it('starts collapsed and expands its body when the summary row is pressed', async () => {
+    const renderer = await mountHtml(
+      '<details><summary>More <b>info</b></summary><p>Hidden body</p></details>'
+    );
+    const row = renderer.root.findByType('Pressable' as never);
+
+    expect(row.props.accessibilityRole).toBe('button');
+    expect(row.props.accessibilityState).toEqual({ expanded: false });
+    expect(renderer.root.findAllByType('ChevronRight' as never)).toHaveLength(1);
+    expect(allText(renderer)).toContain('More info');
+    expect(allText(renderer)).not.toContain('Hidden body');
+
+    await act(async () => {
+      (row.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(renderer.root.findByType('Pressable' as never).props.accessibilityState).toEqual({
+      expanded: true,
+    });
+    expect(renderer.root.findAllByType('ChevronDown' as never)).toHaveLength(1);
+    expect(allText(renderer)).toContain('Hidden body');
+  });
+
+  it('starts open with the open attribute and labels a details element with no summary', async () => {
+    const renderer = await mountHtml('<details open><p>Visible body</p></details>');
+
+    expect(allText(renderer)).toContain('common.details');
+    expect(allText(renderer)).toContain('Visible body');
+  });
+});
+
+describe('MarkdownHtml inline keys, subscripts, and superscripts', () => {
+  it('draws kbd as an inline key on the palette code background', async () => {
+    const renderer = await mountHtml('<p>Press <kbd>Ctrl</kbd>+<kbd>C</kbd></p>');
+    const keys = renderer.root.findAll(
+      node => node.type === ('View' as never) && node.props.className === 'rounded border px-1'
+    );
+
+    expect(keys).toHaveLength(2);
+    expect(keys[0]?.props.style).toEqual({ backgroundColor: '#eeeeee', borderColor: '#cccccc' });
+    expect(allText(renderer)).toContain('Ctrl');
+  });
+
+  it('draws sub and sup smaller and offset from the baseline', async () => {
+    const renderer = await mountHtml('<p>H<sub>2</sub>O and x<sup>2</sup></p>');
+    const offset = (className: string) =>
+      renderer.root.findAll(
+        node => node.type === ('View' as never) && node.props.className === className
+      );
+
+    expect(offset('translate-y-1')).toHaveLength(1);
+    expect(offset('-translate-y-1.5')).toHaveLength(1);
+    const two = styledTexts(renderer).filter(entry => entry.text === '2');
+    expect(two).toHaveLength(2);
+    expect(two.every(entry => entry.style.some(style => style.fontSize === 11))).toBe(true);
   });
 });

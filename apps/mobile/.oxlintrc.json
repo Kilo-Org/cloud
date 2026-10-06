@@ -85,6 +85,10 @@
             "message": "FlashList is the app's list component."
           },
           {
+            "name": "react-native-render-html",
+            "message": "Render markdown through MarkdownText from @/components/agents/markdown-text; its HTML engine is @native-html/render. See apps/mobile/AGENTS.md."
+          },
+          {
             "name": "@expo/ui/community/bottom-sheet",
             "message": "Use Sheet from @/components/ui/sheet."
           },

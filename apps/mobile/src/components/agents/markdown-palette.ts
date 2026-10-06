@@ -129,14 +129,14 @@ export function getMarkdownHeadingStyles(palette: MarkdownPalette) {
 
 export function getMarkdownHtmlTagStyles(palette: MarkdownPalette) {
   const { textColor, borderColor } = palette;
-  // `@native-html/css-processor` (react-native-render-html) rejects the logical
-  // `borderStartWidth`/`borderStartColor`/`paddingStart` properties with a
-  // warning and drops them, so the quote loses its rule entirely. Spell the
-  // start edge as the physical left edge instead: React Native mirrors physical
-  // left/right padding, margin, and borders under RTL
+  // Spell the quote's start edge as the physical left edge. React Native
+  // mirrors physical left/right padding, margin, and borders under RTL
   // (`doLeftAndRightSwapInRTL` defaults to true), so this rule lands on the
   // right edge of an RTL layout. Choosing the physical side from `isRTL` here
-  // would double-mirror it back to the left.
+  // would double-mirror it back to the left. (`@native-html/css-processor` 2,
+  // under `@native-html/render`, also accepts the logical `borderStart*` and
+  // `paddingStart` properties its 1.x release dropped; the physical spelling
+  // stays because it already mirrors.)
   const blockquoteStart = {
     borderLeftWidth: 3,
     borderLeftColor: borderColor,

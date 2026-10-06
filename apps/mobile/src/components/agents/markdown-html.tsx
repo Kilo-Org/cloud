@@ -4,17 +4,22 @@ import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
+  Platform,
   Text,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import RenderHTML, {
   type CustomBlockRenderer,
   type CustomMixedRenderer,
   type CustomTagRendererRecord,
+  type CustomTextualRenderer,
+  defaultHTMLElementModels,
   type DomVisitorCallbacks,
+  HTMLContentModel,
   type RenderersProps,
   type TNode,
-} from 'react-native-render-html';
+} from '@native-html/render';
 
 import { withRtlWritingDirection } from '@/lib/rtl-text';
 
@@ -22,6 +27,7 @@ import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
 } from './markdown-handlers';
+import { HtmlDetails } from './markdown-html-details';
 import { isSupportedScheme, resolveHtmlImageAspectRatio } from './markdown-html-image';
 import { REMOVED_HTML_TAGS } from './markdown-html-sanitization';
 import { MarkdownImage } from './markdown-image';
@@ -185,11 +191,11 @@ function routesNestedHtml(token: Token): boolean {
   );
 }
 
-function tokenSegment(token: Token): MarkdownHtmlSegment {
+function tokenSegment(token: Token, inDetails: boolean): MarkdownHtmlSegment {
   if (token.type === 'html') {
     return { type: 'html', raw: token.raw };
   }
-  if (hasDirectHtml(token) || routesNestedHtml(token)) {
+  if (inDetails || hasDirectHtml(token) || routesNestedHtml(token)) {
     return {
       type: 'html',
       raw: marked.parse(token.raw, { async: false, gfm: true }),
@@ -198,11 +204,47 @@ function tokenSegment(token: Token): MarkdownHtmlSegment {
   return { type: 'markdown', raw: token.raw };
 }
 
+const DETAILS_TAG = /<(\/?)details\b[^>]*>/gi;
+
+function detailsDepthChange(token: Token): number {
+  const html =
+    token.type === 'paragraph' ? (token.tokens ?? []).filter(inline => inline.type === 'html') : [];
+  let change = 0;
+  for (const part of token.type === 'html' ? [token] : html) {
+    for (const match of part.raw.matchAll(DETAILS_TAG)) {
+      change += match[1] === '/' ? -1 : 1;
+    }
+  }
+  return change;
+}
+
+/**
+ * For each token, the index of the token that opened the `<details>` element
+ * it belongs to, or -1 outside one. GitHub-style details put a blank line
+ * around a markdown body, so the element spans several block tokens; they all
+ * render as one HTML segment so the body collapses with its summary.
+ */
+function detailsGroupStarts(tokens: readonly Token[]): number[] {
+  const starts: number[] = [];
+  let depth = 0;
+  let opener = -1;
+  for (const [index, token] of tokens.entries()) {
+    const change = detailsDepthChange(token);
+    if (depth === 0 && change > 0) {
+      opener = index;
+    }
+    starts.push(depth > 0 || change > 0 ? opener : -1);
+    depth = Math.max(0, depth + change);
+  }
+  return starts;
+}
+
 export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
   const tokens = lexMarkdown(value);
+  const groupStarts = detailsGroupStarts(tokens);
   const segments: MarkdownHtmlSegment[] = [];
-  for (const token of tokens) {
-    pushSegment(segments, tokenSegment(token));
+  for (const [index, token] of tokens.entries()) {
+    pushSegment(segments, tokenSegment(token, (groupStarts[index] ?? -1) !== -1));
   }
   return segments.some(segment => segment.type === 'html')
     ? segments
@@ -270,10 +312,11 @@ function isStableSeparator(token: Token | undefined): boolean {
  *
  * The last non-space token always stays in the tail so the next publish has a
  * non-empty suffix to re-lex; a head that ends at `value.length` would disable
- * reuse. The returned boundary is always 0 or directly preceded by a stable
- * separator.
+ * reuse. A `<details>` element never straddles the boundary: the tail starts at
+ * its opener, because a token's grouping depends on the tags before it. The
+ * returned boundary is always 0 or directly preceded by a stable separator.
  */
-function tailBoundaryIndex(tokens: readonly Token[]): number {
+function tailBoundaryIndex(tokens: readonly Token[], groupStarts: readonly number[]): number {
   let lastNonSpace = -1;
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
     if (tokens[index]?.type !== 'space') {
@@ -296,20 +339,25 @@ function tailBoundaryIndex(tokens: readonly Token[]): number {
   // can start earlier, and a block earlier in that run (a paragraph a list item
   // merges into, as in `<b>x</b>\n2. b \n-`) can absorb the absorbing block and
   // everything after it. Walk back to the run's first token every time the
-  // boundary moves, then repeat the absorbing-block check, because that run can
-  // itself begin with an absorbing block behind a stable separator. The result
-  // is always 0 or a boundary directly preceded by a stable separator.
+  // boundary moves, then repeat the absorbing-block and details checks, because
+  // that run can itself begin with an absorbing block behind a stable separator
+  // or sit inside a details element. The result is always 0 or a boundary
+  // directly preceded by a stable separator.
   let backedUp = true;
   while (backedUp) {
     while (start > 0 && !isStableSeparator(tokens[start - 1])) {
       start -= 1;
     }
-    backedUp =
+    const groupStart = groupStarts[start] ?? -1;
+    const absorbed =
       start >= 2 &&
       isStableSeparator(tokens[start - 1]) &&
       ABSORBING_BLOCK_TYPES.has(tokens[start - 2]?.type ?? '');
-    if (backedUp) {
+    backedUp = absorbed || (groupStart !== -1 && groupStart < start);
+    if (absorbed) {
       start -= 2;
+    } else if (backedUp) {
+      start = groupStart;
     }
   }
   return Math.min(start, lastNonSpace);
@@ -331,9 +379,10 @@ function appendTokens(
   const segments = [...headSegments];
   const tailSegments: MarkdownHtmlSegment[] = [];
   let nextTailStart = tailStart;
-  const boundary = tailBoundaryIndex(tokens);
+  const groupStarts = detailsGroupStarts(tokens);
+  const boundary = tailBoundaryIndex(tokens, groupStarts);
   for (const [index, token] of tokens.entries()) {
-    const segment = tokenSegment(token);
+    const segment = tokenSegment(token, (groupStarts[index] ?? -1) !== -1);
     if (index < boundary) {
       pushSegmentCopyOnWrite(headSegments, segment);
       pushSegmentCopyOnWrite(segments, segment);
@@ -349,13 +398,13 @@ function appendTokens(
 }
 
 /**
- * Streaming-aware `splitMarkdownHtml`: when `value` extends the previous
- * snapshot it re-lexes only the text from that snapshot's tail boundary — the
- * last block run and any list or blockquote that can still absorb it (see
+ * Streaming-aware `splitMarkdownHtml`: when `value` keeps the previous
+ * snapshot's head it re-lexes only the text from that snapshot's tail boundary
+ * — the last block run and any list or blockquote that can still absorb it (see
  * `tailBoundaryIndex`) — and reuses the head segments unchanged, so a message
  * that grows one publish at a time stays proportional to the last block instead
  * of the whole value. The result is identical to `splitMarkdownHtml(value)` for
- * every value that extends the snapshot.
+ * every value that keeps the head.
  */
 export function splitMarkdownHtmlIncremental(
   value: string,
@@ -388,11 +437,16 @@ export function splitMarkdownHtmlIncremental(
   // return never reuses a head either: marked normalizes `\r\n` out of token
   // raws, so a raw-length offset is not a source offset (see the snapshot
   // below).
+  //
+  // Only the head has to match, not the whole previous value: the head's tokens
+  // do not depend on the text after the tail boundary, so a tail rewritten in
+  // place (HTML converted to markdown re-closes an open `<b>` at the new end,
+  // turning `**wor**` into `**word**`) still reuses the head.
   if (
     previous !== undefined &&
-    value.length > previous.value.length &&
-    value.startsWith(previous.value) &&
+    value.length > previous.tailStart &&
     previous.tailStart !== previous.value.length &&
+    value.slice(0, previous.tailStart) === previous.value.slice(0, previous.tailStart) &&
     !previous.hasDefinition &&
     !value.includes('\r')
   ) {
@@ -456,6 +510,28 @@ function parentAnchor(tnode: TNode): TNode | null {
   return null;
 }
 
+// The engine models `details` and `summary` as interactive tags with no
+// content, so it renders neither; give them block content for `HtmlDetails`.
+const HTML_ELEMENT_MODELS = {
+  details: defaultHTMLElementModels.details.extend({ contentModel: HTMLContentModel.block }),
+  summary: defaultHTMLElementModels.summary.extend({ contentModel: HTMLContentModel.block }),
+};
+
+const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
+// Subscript and superscript sit in an inline view, the one way React Native
+// can shift text off the line's baseline.
+const HtmlSub: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
+  <View className="translate-y-1">
+    <TDefaultRenderer {...props} />
+  </View>
+);
+const HtmlSup: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
+  <View className="-translate-y-1.5">
+    <TDefaultRenderer {...props} />
+  </View>
+);
+
 type MarkdownHtmlProps = {
   html: string;
   palette: MarkdownPalette;
@@ -478,7 +554,13 @@ export function MarkdownHtml({
     [palette]
   );
   const tagsStyles = useMemo(
-    () => ({ ...getMarkdownHeadingStyles(palette), ...getMarkdownHtmlTagStyles(palette) }),
+    () => ({
+      ...getMarkdownHeadingStyles(palette),
+      ...getMarkdownHtmlTagStyles(palette),
+      kbd: { fontFamily: CODE_FONT, fontSize: 13, lineHeight: 20 },
+      sub: { fontSize: 11, lineHeight: 16 },
+      sup: { fontSize: 11, lineHeight: 16 },
+    }),
     [palette]
   );
   const renderersProps = useMemo<Partial<RenderersProps>>(
@@ -561,13 +643,29 @@ export function MarkdownHtml({
         />
       );
     };
-    return { a: HtmlAnchor, img: HtmlImage };
-  }, [baseStyle, onLongPressLink, onPressLink, selectable]);
+    const HtmlKbd: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
+      <View
+        className="rounded border px-1"
+        style={{ backgroundColor: palette.codeBackground, borderColor: palette.borderColor }}
+      >
+        <TDefaultRenderer {...props} />
+      </View>
+    );
+    return {
+      a: HtmlAnchor,
+      img: HtmlImage,
+      details: HtmlDetails,
+      kbd: HtmlKbd,
+      sub: HtmlSub,
+      sup: HtmlSup,
+    };
+  }, [baseStyle, onLongPressLink, onPressLink, palette, selectable]);
 
   return (
     <RenderHTML
       baseStyle={baseStyle}
       contentWidth={width}
+      customHTMLElementModels={HTML_ELEMENT_MODELS}
       defaultTextProps={{ selectable }}
       domVisitors={HTML_DOM_VISITORS}
       enableCSSInlineProcessing={false}

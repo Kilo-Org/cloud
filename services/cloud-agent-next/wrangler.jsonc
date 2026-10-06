@@ -169,8 +169,8 @@
       "bucket_name": "kilocode-sessions",
     },
   ],
-  // SandboxSmall, SandboxCodeReview and SandboxDIND remain for persisted DOs.
-  // Legacy IDs retain their namespaces and caps for live and resumable sessions.
+  // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
+  // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
   // Remove retired applications/bindings only after verifying drain and external bindings.
   "containers": [
     {

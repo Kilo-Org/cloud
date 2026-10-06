@@ -199,14 +199,12 @@ describe('persisted sandbox cleanup routing', () => {
   );
 
   it.each([
-    ['ses-abcdef', 'SandboxSmall'],
-    ['crv-abcdef', 'SandboxCodeReview'],
+    ['ses-abcdef', 'Sandbox'],
+    ['crv-abcdef', 'Sandbox'],
     ['dind-abcdef', 'SandboxDIND'],
     ['istd-abcdef', 'Sandbox'],
-    ['ses-std1-abcdef', 'Sandbox'],
-    ['crv-std1-abcdef', 'Sandbox'],
   ] as const)(
-    'destroys persisted %s through its original namespace',
+    'destroys persisted non-contained %s through its routed namespace',
     async (sandboxId, namespace) => {
       const destroy = vi.fn().mockResolvedValue(undefined);
       vi.mocked(getSandbox).mockReturnValue({ destroy } as unknown as SandboxInstance);
@@ -219,8 +217,8 @@ describe('persisted sandbox cleanup routing', () => {
   );
 
   it.each([
-    [undefined, 'ses', 'SandboxSmall'],
-    ['code-review', 'crv', 'SandboxCodeReview'],
+    [undefined, 'ses', 'Sandbox'],
+    ['code-review', 'crv', 'Sandbox'],
   ] as const)(
     'keeps legacy %s fallback routing when metadata has no sandbox ID',
     async (billingOrigin, prefix, namespace) => {

@@ -233,8 +233,8 @@ describe('MeteredSandbox', () => {
     }
   );
 
-  it.each(['istd-abcdef', 'ses-std1-abcdef', 'crv-std1-abcdef'] as const)(
-    'admits and meters new standard identity %s through the concrete Sandbox runtime',
+  it.each(['istd-abcdef', 'ses-abcdef', 'crv-abcdef'] as const)(
+    'admits and meters non-contained isolated identity %s through the concrete Sandbox runtime',
     async sandboxId => {
       const { rpc, sandbox, storage, flushShadowTasks } = createSandbox(
         createRpc(),

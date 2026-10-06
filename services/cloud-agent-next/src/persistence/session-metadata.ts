@@ -12,7 +12,6 @@ import {
 
 import {
   classifySandboxId,
-  sandboxIdMatchesAllocation,
   isGeneratedSharedSandboxId,
   isValidSandboxId,
   type SandboxIdClass,
@@ -286,8 +285,7 @@ const MetadataWorkspaceSchema = z
         !workspace.sandboxId ||
         (shared
           ? !isGeneratedSharedSandboxId(workspace.sandboxId) || !workspace.sandboxRoute
-          : classifySandboxId(workspace.sandboxId) !== SANDBOX_ALLOCATION_ID_CLASS[allocation] &&
-            !sandboxIdMatchesAllocation(workspace.sandboxId, allocation)) ||
+          : classifySandboxId(workspace.sandboxId) !== SANDBOX_ALLOCATION_ID_CLASS[allocation]) ||
         workspace.devcontainerRequested === true
       ) {
         context.addIssue({

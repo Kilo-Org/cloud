@@ -1221,12 +1221,12 @@ describe('prepareSession endpoint', () => {
   });
 
   it.each([
-    ['ses-abcdef', undefined, undefined, 'istd-abcdef'],
-    [`ses-${'a'.repeat(48)}`, 'cloudflare-single', undefined, `ses-std1-${'a'.repeat(48)}`],
-    ['crv-abcdef', undefined, 'code-review', 'crv-std1-abcdef'],
+    ['ses-abcdef', undefined, undefined],
+    [`ses-${'a'.repeat(48)}`, 'cloudflare-single', undefined],
+    ['crv-abcdef', undefined, 'code-review'],
   ] as const)(
-    'persists creation-only standard routing for %s with containment disabled',
-    async (sandboxId, sandboxAllocation, createdOnPlatform, expectedId) => {
+    'persists the generated %s identity unchanged with containment disabled',
+    async (sandboxId, sandboxAllocation, createdOnPlatform) => {
       generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
       const doStub = createMockDOStub();
       const ctx = createInternalApiContext({ doStub, credentialContainmentEnabled: 'false' });
@@ -1243,7 +1243,7 @@ describe('prepareSession endpoint', () => {
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
           workspace: expect.objectContaining({
-            sandboxId: expectedId,
+            sandboxId,
             sandboxProvider: 'cloudflare',
             ...(sandboxAllocation ? { sandboxAllocation } : {}),
             credentialContainment: {

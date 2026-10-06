@@ -54,7 +54,6 @@ import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.j
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
-  hasCredentialContainment,
   DEVCONTAINER_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
   type CredentialContainment,
@@ -91,7 +90,6 @@ import {
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
 import {
-  consolidateNewSandboxSelection,
   generateSandboxRoutingTarget,
   selectSandboxProvider,
   type SandboxSelection,
@@ -732,10 +730,6 @@ async function allocateNewSession(
         sessionId: cloudAgentSessionId,
         sandboxAllocation,
       });
-      sandboxId = consolidateNewSandboxSelection(
-        { sandboxId, provider: sandboxProvider },
-        { containment: hasCredentialContainment(credentialContainment), sandboxAllocation }
-      ).sandboxId;
     }
   } catch (error) {
     await recordPostSetupFailure(() =>

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
-  classifySandboxId,
-  consolidateNewSandboxSelection,
-  deriveSandboxAllocationId,
   deriveSharedSandboxId,
   generateSandboxId,
   generateSandboxRoutingTarget,
@@ -22,29 +19,6 @@ import {
 import { isCodeReviewEphemeralSandboxId } from './code-review-ephemeral-sandbox.js';
 import { CurrentSessionMetadataSchema } from './persistence/session-metadata.js';
 import type { Env, SandboxId } from './types.js';
-
-describe('deriveSandboxAllocationId', () => {
-  it.each(['org', 'usr', 'bot', 'ubt', 'ses', 'istd', 'crv', 'dind'])(
-    'preserves %s allocation classification while separating create intents',
-    async prefix => {
-      const logicalId = `${prefix}-${'a'.repeat(48)}`;
-      const first = await deriveSandboxAllocationId(logicalId, 'intent_1');
-      const second = await deriveSandboxAllocationId(logicalId, 'intent_2');
-      expect(first).toBe(await deriveSandboxAllocationId(logicalId, 'intent_1'));
-      expect(first).not.toBe(logicalId);
-      expect(first).not.toBe(second);
-      expect(first.length).toBeLessThanOrEqual(63);
-      expect(classifySandboxId(first)).toBe(classifySandboxId(logicalId));
-    }
-  );
-
-  it('rejects an invalid logical allocation or missing intent', async () => {
-    await expect(deriveSandboxAllocationId('invalid', 'intent_1')).rejects.toThrow(
-      'generated sandbox ID'
-    );
-    await expect(deriveSandboxAllocationId('ses-abcdef', '')).rejects.toThrow('create intent');
-  });
-});
 
 describe('generateSandboxId', () => {
   describe('shared sandbox (default)', () => {
@@ -845,7 +819,7 @@ describe('selectSandboxForNewSession', () => {
   });
 });
 
-describe('new non-contained creation identity', () => {
+describe('non-contained sandbox consolidation', () => {
   const namespaces = {
     Sandbox: {},
     SandboxContainment: {},
@@ -857,61 +831,43 @@ describe('new non-contained creation identity', () => {
   } as unknown as Env;
 
   it.each([
-    [undefined, undefined, 'istd-'],
-    ['cloudflare-single', undefined, 'ses-std1-'],
-    [undefined, 'code-review', 'crv-std1-'],
+    [undefined, undefined, 'ses-', 'SandboxSmallContainment'],
+    ['cloudflare-single', undefined, 'ses-', 'SandboxSmallContainment'],
+    ['isolated-standard', undefined, 'istd-', 'SandboxContainment'],
+    [undefined, 'code-review', 'crv-', 'SandboxCodeReviewContainment'],
   ] as const)(
-    'consolidates %s / %s only after selection',
-    async (sandboxAllocation, createdOnPlatform, prefix) => {
+    'routes non-contained %s / %s sandboxes to Sandbox and keeps their containment pool',
+    async (sandboxAllocation, createdOnPlatform, prefix, containedNamespace) => {
       const sessionId = 'agent_abc123';
-      const legacyId = await generateSandboxId('*', 'org-id', 'user-id', sessionId, undefined, {
+      const sandboxId = await generateSandboxId('*', 'org-id', 'user-id', sessionId, undefined, {
         sandboxAllocation,
         createdOnPlatform,
       });
+      expect(sandboxId.startsWith(prefix)).toBe(true);
+      expect(getSandboxNamespace(namespaces, sandboxId)).toBe(namespaces.Sandbox);
+      expect(getSandboxNamespace(namespaces, sandboxId, { managedScmContainment: true })).toBe(
+        namespaces[containedNamespace]
+      );
       const provider = selectSandboxProvider({
         env: {},
         orgId: 'org-id',
         userId: 'user-id',
         sessionId,
-        sandboxId: legacyId,
+        sandboxId,
         sandboxAllocation,
       });
-      const selected = consolidateNewSandboxSelection(
-        { sandboxId: legacyId, provider },
-        {
-          containment: false,
-          sandboxAllocation,
-        }
-      );
-      expect(selected.sandboxId).toBe(`${prefix}${legacyId.slice(4)}`);
-      expect(selected.sandboxId.length).toBeLessThanOrEqual(63);
-      expect(getSandboxNamespace(namespaces, selected.sandboxId)).toBe(namespaces.Sandbox);
-      for (const sandboxId of [legacyId, selected.sandboxId]) {
-        expect(
-          CurrentSessionMetadataSchema.safeParse({
-            metadataSchemaVersion: 2,
-            identity: { sessionId, userId: 'user-id' },
-            auth: {},
-            lifecycle: { version: 1, timestamp: 1 },
-            workspace: { sandboxId, sandboxProvider: provider, sandboxAllocation },
-          }).success
-        ).toBe(true);
-      }
+      expect(provider).toBe('cloudflare');
       expect(
-        selectSandboxProvider({
-          env: {},
-          userId: 'user-id',
-          sessionId,
-          sandboxId: selected.sandboxId,
-          sandboxAllocation,
-        })
-      ).toBe('cloudflare');
-      const physicalId = await deriveSandboxAllocationId(selected.sandboxId, 'create-intent');
-      expect(physicalId.startsWith(prefix)).toBe(true);
-      expect(classifySandboxId(physicalId)).toBe('isolated-standard');
-      expect(getSandboxNamespace(namespaces, physicalId)).toBe(namespaces.Sandbox);
+        CurrentSessionMetadataSchema.safeParse({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: 'user-id' },
+          auth: {},
+          lifecycle: { version: 1, timestamp: 1 },
+          workspace: { sandboxId, sandboxProvider: provider, sandboxAllocation },
+        }).success
+      ).toBe(true);
       const billing = parseSandboxBillingInput({
-        sandboxId: physicalId,
+        sandboxId,
         subject: { type: 'user', id: 'user-id' },
         actor: { type: 'user', id: 'user-id' },
         sessionId,
@@ -919,38 +875,24 @@ describe('new non-contained creation identity', () => {
         enforcementRequested: true,
       });
       expect(() => assertSandboxBillingAllocation('Sandbox', billing)).not.toThrow();
-      expect(isCodeReviewEphemeralSandboxId(physicalId)).toBe(createdOnPlatform === 'code-review');
-      expect(
-        await generateSandboxId('*', 'org-id', 'user-id', sessionId, undefined, {
-          sandboxAllocation,
-          createdOnPlatform,
-        })
-      ).toBe(legacyId);
-      expect(
-        consolidateNewSandboxSelection(
-          { sandboxId: legacyId, provider },
-          {
-            containment: true,
-            sandboxAllocation,
-          }
-        ).sandboxId
-      ).toBe(legacyId);
+      expect(() => assertSandboxBillingAllocation(containedNamespace, billing)).not.toThrow();
+      expect(isCodeReviewEphemeralSandboxId(sandboxId)).toBe(createdOnPlatform === 'code-review');
     }
   );
 
-  it.each(['vercel', 'cloudflare-containers'] as const)(
-    'preserves resolved %s allocations',
-    provider => {
-      const selection = { sandboxId: 'ses-abcdef' as const, provider };
-      expect(consolidateNewSandboxSelection(selection, { containment: false })).toBe(selection);
-    }
-  );
-
-  it.each(['org-abcdef', 'istd-abcdef', 'dind-abcdef'] as const)(
-    'preserves %s identity',
+  it.each(['ses-abcdef', 'crv-abcdef'] as const)(
+    'keeps the contained standard pool strict for %s',
     sandboxId => {
-      const selection = { sandboxId, provider: 'cloudflare' as const };
-      expect(consolidateNewSandboxSelection(selection, { containment: false })).toBe(selection);
+      const billing = parseSandboxBillingInput({
+        sandboxId,
+        subject: { type: 'user', id: 'user-id' },
+        actor: { type: 'user', id: 'user-id' },
+        sessionId: 'agent_abc123',
+        metadata: { origin: 'cloud-agent' },
+      });
+      expect(() => assertSandboxBillingAllocation('SandboxContainment', billing)).toThrow(
+        'incompatible sandbox ID'
+      );
     }
   );
 });
@@ -981,9 +923,10 @@ describe('getSandboxNamespace', () => {
     expect(ns).toBe(mockSandboxDIND);
   });
 
-  it('preserves the Small namespace for persisted ses- prefixed IDs', () => {
+  it('routes non-contained ses- prefixed IDs to Sandbox, not the retired Small pool', () => {
     const ns = getSandboxNamespace(mockEnv, 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandboxSmall);
+    expect(ns).toBe(mockSandbox);
+    expect(ns).not.toBe(mockSandboxSmall);
   });
 
   it('should return SandboxSmallContainment for contained ses- prefixed IDs', () => {
@@ -1012,9 +955,10 @@ describe('getSandboxNamespace', () => {
     expect(ns).toBe(mockSandboxContainment);
   });
 
-  it('preserves the review namespace for persisted crv- prefixed IDs', () => {
+  it('routes non-contained crv- prefixed IDs to Sandbox, not the retired review pool', () => {
     const ns = getSandboxNamespace(mockEnv, 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandboxCodeReview);
+    expect(ns).toBe(mockSandbox);
+    expect(ns).not.toBe(mockSandboxCodeReview);
   });
 
   it('should return SandboxCodeReviewContainment for contained crv- prefixed IDs', () => {
@@ -1063,8 +1007,8 @@ describe('getSandboxNamespace', () => {
 describe('getOutboundContainerId', () => {
   it.each([
     ['org-a1b2c3', 'shared-do-id'],
-    ['ses-a1b2c3', 'small-do-id'],
-    ['crv-a1b2c3', 'review-do-id'],
+    ['ses-a1b2c3', 'shared-do-id'],
+    ['crv-a1b2c3', 'shared-do-id'],
     ['istd-a1b2c3', 'shared-do-id'],
     ['dind-a1b2c3', 'dind-do-id'],
   ])('derives %s from the selected sandbox namespace', (sandboxId, expected) => {

@@ -38,10 +38,8 @@ type SandboxNamespaceEnv = Pick<
   Env,
   | 'Sandbox'
   | 'SandboxContainment'
-  | 'SandboxSmall'
   | 'SandboxSmallContainment'
   | 'SandboxDIND'
-  | 'SandboxCodeReview'
   | 'SandboxCodeReviewContainment'
 >;
 
@@ -80,11 +78,7 @@ const SANDBOX_ALLOCATION_ID_PREFIX: Record<SandboxAllocation, 'istd' | 'ses' | u
   'vercel-large': 'ses',
 };
 
-export function sandboxIdMatchesAllocation(
-  sandboxId: string,
-  allocation: SandboxAllocation
-): boolean {
-  if (allocation === 'cloudflare-single' && /^ses-std1-[0-9a-f]{48}$/.test(sandboxId)) return true;
+function sandboxIdMatchesAllocation(sandboxId: string, allocation: SandboxAllocation): boolean {
   const prefix = SANDBOX_ALLOCATION_ID_PREFIX[allocation];
   return prefix === undefined
     ? isGeneratedSharedSandboxId(sandboxId)
@@ -101,7 +95,6 @@ export type SandboxIdClass =
   | 'unknown';
 
 export function classifySandboxId(sandboxId: string): SandboxIdClass {
-  if (/^(ses|crv)-std1-[0-9a-f]+$/.test(sandboxId)) return 'isolated-standard';
   if (/^istd-[0-9a-f]+$/.test(sandboxId)) return 'isolated-standard';
   if (/^ses-[0-9a-f]+$/.test(sandboxId)) return 'isolated-small';
   if (/^crv-[0-9a-f]+$/.test(sandboxId)) return 'code-review';
@@ -167,18 +160,12 @@ export function getSandboxNamespace(
 ): DurableObjectNamespace<Sandbox> {
   // Persisted DIND sessions retain their namespace until operator-verified retirement.
   if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
-  if (/^(ses|crv)-std1-/.test(sandboxId)) {
-    return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
-  }
-  if (sandboxId.startsWith('crv-')) {
-    return options.managedScmContainment === true
-      ? env.SandboxCodeReviewContainment
-      : env.SandboxCodeReview;
-  }
-  if (sandboxId.startsWith('ses-')) {
-    return options.managedScmContainment === true ? env.SandboxSmallContainment : env.SandboxSmall;
-  }
-  return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
+  // Every non-contained sandbox runs in the standard pool; SandboxSmall and
+  // SandboxCodeReview are retired and receive no traffic.
+  if (options.managedScmContainment !== true) return env.Sandbox;
+  if (sandboxId.startsWith('crv-')) return env.SandboxCodeReviewContainment;
+  if (sandboxId.startsWith('ses-')) return env.SandboxSmallContainment;
+  return env.SandboxContainment;
 }
 
 export function getManagedOutboundContainerId(
@@ -214,18 +201,6 @@ export function deriveRetiredDindSandboxId(sessionId: string): Promise<SandboxId
   return hashToSandboxId(sessionId, 'dind');
 }
 
-export async function deriveSandboxAllocationId(
-  sandboxId: string,
-  intentId: string
-): Promise<SandboxId> {
-  const classification = classifySandboxId(sandboxId);
-  if (classification === 'unknown' || classification === 'legacy-shared' || !intentId) {
-    throw new Error('Sandbox allocation requires a generated sandbox ID and create intent');
-  }
-  const prefix = sandboxId.slice(0, sandboxId.lastIndexOf('-'));
-  return hashToSandboxId(`control-allocation-v1:${sandboxId}:${intentId}`, prefix);
-}
-
 export async function deriveSharedSandboxId(
   routeKey: SandboxId,
   suffix: string
@@ -240,28 +215,6 @@ export type SandboxSelection = {
   sandboxId: SandboxId;
   provider: AgentSandboxProvider;
 };
-
-export function consolidateNewSandboxSelection(
-  selection: SandboxSelection,
-  options: { containment: boolean; sandboxAllocation?: SandboxAllocation }
-): SandboxSelection {
-  if (selection.provider !== 'cloudflare' || options.containment) return selection;
-  if (
-    options.sandboxAllocation !== undefined &&
-    options.sandboxAllocation !== 'cloudflare-single' &&
-    options.sandboxAllocation !== 'isolated-standard'
-  )
-    return selection;
-  const { sandboxId } = selection;
-  if (/^ses-[0-9a-f]+$/.test(sandboxId)) {
-    const prefix = options.sandboxAllocation === 'cloudflare-single' ? 'ses-std1-' : 'istd-';
-    return { ...selection, sandboxId: `${prefix}${sandboxId.slice(4)}` };
-  }
-  if (/^crv-[0-9a-f]+$/.test(sandboxId)) {
-    return { ...selection, sandboxId: `crv-std1-${sandboxId.slice(4)}` };
-  }
-  return selection;
-}
 
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;

@@ -313,6 +313,7 @@ export type ControlPlaneSandboxPeer = {
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
   getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  fetch(request: Request): Promise<Response>;
 };
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
@@ -1667,6 +1668,28 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (pathname !== '/stream') return new Response('Not found', { status: 404 });
     if (this.registration === null) return new Response('Session not found', { status: 404 });
+    if (new URL(request.url).searchParams.get('sandboxStatus') === 'true') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      const sandboxId = this.registration.sandboxId;
+      if (this.metadata === null) return new Response('Sandbox unavailable', { status: 503 });
+      const url = new URL('https://sandbox.internal/status-stream');
+      url.searchParams.set('sessionId', this.sessionId);
+      url.searchParams.set('ownerId', this.metadata.identity.userId);
+      try {
+        return await withDORetry(
+          () => {
+            const peer = this.sandboxPeerFor(sandboxId);
+            if (peer === null) throw new Error('Sandbox unavailable');
+            return peer;
+          },
+          peer => peer.fetch(new Request(url, { headers: { Upgrade: 'websocket' } })),
+          'sandboxStatusStream'
+        );
+      } catch {
+        return new Response('Sandbox unavailable', { status: 503 });
+      }
+    }
     return this.streamHandler().handleStreamRequest(request);
   }
 

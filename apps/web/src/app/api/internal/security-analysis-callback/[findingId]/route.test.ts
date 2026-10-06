@@ -4,8 +4,10 @@ import { NextRequest } from 'next/server';
 import type * as routeModule from './route';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
   SECURITY_AUTO_ANALYSIS_WORKER_URL: 'https://security-auto-analysis.test',
+}));
+jest.mock('@/lib/web-config.server', () => ({
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 let POST: typeof routeModule.POST;

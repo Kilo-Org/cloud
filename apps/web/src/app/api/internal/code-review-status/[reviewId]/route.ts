@@ -55,7 +55,7 @@ import {
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';

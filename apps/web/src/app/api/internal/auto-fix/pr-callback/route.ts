@@ -27,7 +27,7 @@ import { tryDispatchPendingFixes } from '@/lib/auto-fix/dispatch/dispatch-pendin
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';

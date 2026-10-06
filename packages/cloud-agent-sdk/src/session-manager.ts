@@ -285,6 +285,13 @@ type FetchedSessionData = {
   isInitiated: boolean;
   needsLegacyPrepare: boolean;
   isPreparingAsync: boolean;
+  /**
+   * Whether the session currently has a ready route that can own a terminal.
+   * Undefined when the adapter cannot resolve route state. Persisted
+   * `preparedAt`/`initiatedAt` are NOT readiness: a stopped sandbox clears the
+   * route while leaving both set.
+   */
+  routeReady?: boolean;
   prompt: string | null;
   initialMessageId: string | null;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */

@@ -1297,6 +1297,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * live gate recovers (or the session switches).
    */
   let postInterruptUnlock = false;
+  /**
+   * After Stop ACK the turn can stay busy/retrying until the terminal status
+   * arrives. Keep Stop disabled for that session until then so a second click
+   * cannot issue a duplicate interrupt.
+   */
+  let interruptAwaitingIdleSession: CloudAgentSession | null = null;
   let stateUnsub: (() => void) | null = null;
   let metadataRecoveryCleanups: Array<() => void> = [];
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1367,6 +1373,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     remoteHistoryReplaying = true;
     postClearSurvivorIds = null;
     postInterruptUnlock = false;
+    interruptAwaitingIdleSession = null;
     store.set(remoteModelOverrideAtom, null);
     store.set(cloudAgentModelOverrideAtom, null);
     store.set(canSendAtom, false);
@@ -1695,7 +1702,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     } else {
       store.set(canSendAtom, liveCanSend);
     }
-    store.set(canInterruptAtom, session.canInterrupt);
+    store.set(canInterruptAtom, session.canInterrupt && interruptAwaitingIdleSession !== session);
   }
 
   /**
@@ -1824,6 +1831,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     let firstActivityFired = false;
     let prevAct = '';
     let prevRetry: Extract<SessionActivity, { type: 'retrying' }> | null = null;
+    let retryIndicator: SessionStatusIndicator | null = null;
     let prevSk = '';
     let prevCsk = '';
     let prevCloudStatusHadIndicator = false;
@@ -1870,6 +1878,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       if (st.type === 'disconnected') {
         postInterruptUnlock = false;
       }
+      if (
+        interruptAwaitingIdleSession === session &&
+        (st.type === 'disconnected' || (act.type !== 'busy' && act.type !== 'retrying'))
+      ) {
+        interruptAwaitingIdleSession = null;
+      }
 
       // Only update read-only state after the transport has been resolved.
       // During the 'connecting' phase the transport is null so canSend is
@@ -1899,17 +1913,23 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         if (act.type === 'busy') {
           setIndicator(null);
         } else if (act.type === 'retrying') {
-          setIndicator({
+          retryIndicator = {
             type: 'warning',
             message: `Retrying… ${act.message}`,
             timestamp: Date.now(),
-          });
+          };
+          setIndicator(retryIndicator);
         } else if (act.type === 'idle') {
-          if (prevAct === 'retrying') setIndicator(null);
+          // Only replace our own retry warning; a newer error/cloud indicator stays.
+          if (retryIndicator !== null && store.get(statusIndicatorAtom) === retryIndicator) {
+            const cloudInd = cs && cs.type !== 'ready' ? indicatorForCloudStatus(cs) : null;
+            setIndicator(cloudInd ?? indicatorForStatus(st));
+          }
           config.onComplete?.();
         }
         prevAct = act.type;
         prevRetry = act.type === 'retrying' ? act : null;
+        if (act.type !== 'retrying') retryIndicator = null;
       }
 
       // Cloud status takes priority over agent status when active
@@ -2774,6 +2794,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     onOptimisticSend?: () => void;
   }): Promise<boolean> {
     store.set(errorAtom, null);
+    interruptAwaitingIdleSession = null;
     if (store.get(agentStatusAtom).type !== 'disconnected') {
       setIndicator(null);
     }
@@ -2979,7 +3000,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isStreamingAtom, false);
     store.set(isReadOnlyAtom, readOnly);
     store.set(canSendAtom, !readOnly && cloudReady);
-    store.set(canInterruptAtom, session.canInterrupt);
+    store.set(canInterruptAtom, session.canInterrupt && interruptAwaitingIdleSession !== session);
   }
 
   async function interrupt(): Promise<void> {
@@ -3001,6 +3022,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         await session.interrupt();
       }
       if (currentSession === session) {
+        const activityType = session.state.getActivity().type;
+        if (activityType === 'busy' || activityType === 'retrying') {
+          interruptAwaitingIdleSession = session;
+        }
         restoreAfterInterrupt(session);
         setIndicator({
           type: 'info',

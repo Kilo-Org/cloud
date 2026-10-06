@@ -184,6 +184,50 @@ describe('CloudAgentTransport event routing', () => {
     transport.destroy();
   });
 
+  it('applies only the latest replayed status per session when connected omits sessionStatus', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    const initialEvents = [...serviceEvents];
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    sendRaw(kilocode('session.status', { sessionID: 'child-1', status: { type: 'busy' } }));
+    sendRaw(
+      kilocode('session.status', {
+        sessionID: 'ses-1',
+        status: { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
+      })
+    );
+    expect(serviceEvents).toEqual(initialEvents);
+
+    sendRaw(createEvent('connected', {}));
+    expect(serviceEvents.slice(initialEvents.length)).toEqual([
+      expect.objectContaining({ type: 'connected' }),
+      {
+        type: 'session.status',
+        sessionId: 'ses-1',
+        status: { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
+      },
+      { type: 'session.status', sessionId: 'child-1', status: { type: 'busy' } },
+    ]);
+    transport.destroy();
+  });
+
+  it('prefers the connected root status over replayed root status but keeps child status', async () => {
+    const { transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    const initialEvents = [...serviceEvents];
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    sendRaw(kilocode('session.status', { sessionID: 'child-1', status: { type: 'idle' } }));
+
+    sendRaw(createEvent('connected', { sessionStatus: { type: 'idle' } }));
+    expect(serviceEvents.slice(initialEvents.length)).toEqual([
+      expect.objectContaining({ type: 'connected', sessionStatus: { type: 'idle' } }),
+      { type: 'session.status', sessionId: 'child-1', status: { type: 'idle' } },
+    ]);
+    transport.destroy();
+  });
+
   it.each([
     ['question.asked', { id: 'request-1' }],
     ['question.replied', { requestID: 'request-1' }],

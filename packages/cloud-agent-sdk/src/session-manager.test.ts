@@ -3201,6 +3201,37 @@ describe('createSessionManager', () => {
       mgr.destroy();
     });
 
+    it('keeps an error indicator raised during a retry when activity returns to idle', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+
+      mockSession.state.getActivity.mockReturnValue({
+        type: 'retrying',
+        attempt: 1,
+        message: 'Overloaded',
+      });
+      notifyStateChange?.();
+      mockSession.state.getStatus.mockReturnValue({ type: 'error', message: 'Provider failed' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Provider failed' })
+      );
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.statusIndicator)).toEqual(
+        expect.objectContaining({ type: 'error', message: 'Provider failed' })
+      );
+      mgr.destroy();
+    });
+
     it('clears disconnected error and indicator after the transport reconnects', async () => {
       let notifyStateChange: (() => void) | undefined;
       mockSession.state.subscribe.mockImplementation(callback => {
@@ -5092,6 +5123,36 @@ describe('createSessionManager', () => {
       expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
       expect(atomValue<boolean>(config.store, mgr.atoms.canInterrupt)).toBe(true);
       expect(atomValue<string | null>(config.store, mgr.atoms.error)).toBeNull();
+    });
+
+    it('keeps Stop disabled after an acknowledged interrupt until the turn leaves retrying', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSession.state.getActivity.mockReturnValue({
+        type: 'retrying',
+        attempt: 1,
+        message: 'Overloaded',
+      });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(true);
+
+      mockSession.interrupt.mockResolvedValueOnce({});
+      await mgr.interrupt();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(false);
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(false);
+
+      mockSession.state.getActivity.mockReturnValue({ type: 'idle' });
+      notifyStateChange?.();
+      expect(config.store.get(mgr.atoms.canInterrupt)).toBe(true);
+      mgr.destroy();
     });
 
     it('re-enables canSend after interrupt even when session.canSend is briefly false', async () => {

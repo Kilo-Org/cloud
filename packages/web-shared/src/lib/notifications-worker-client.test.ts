@@ -16,7 +16,7 @@ import {
 
 const fetchMock = jest.fn();
 
-function okResponse(perRecipient: { userId: string; outcome: string }[] = []) {
+function okResponse(perRecipient: { userId: string; outcome: string; reason?: string }[] = []) {
   return {
     ok: true,
     status: 200,
@@ -142,7 +142,7 @@ describe('notifications-worker-client internal dispatch', () => {
     fetchMock.mockResolvedValue(
       okResponse([
         { userId: 'user-1', outcome: 'delivered' },
-        { userId: 'user-2', outcome: 'failed' },
+        { userId: 'user-2', outcome: 'failed', reason: 'expo_ticket_rejected' },
       ])
     );
 
@@ -158,12 +158,38 @@ describe('notifications-worker-client internal dispatch', () => {
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
+        tags: expect.objectContaining({
+          source: 'notifications-worker-client',
+          endpoint: 'dispatch',
+          kind: 'spend_alert',
+          failure_scope: 'partial',
+        }),
         extra: expect.objectContaining({
           kind: 'spend_alert',
           failedRecipients: 1,
           totalRecipients: 2,
+          failureReasons: { expo_ticket_rejected: 1 },
           attempts: 3,
         }),
+      })
+    );
+
+    // One dispatch id correlates every attempt with the worker-side logs.
+    const dispatchIds = fetchMock.mock.calls.map(([, options]) => options.headers['X-Dispatch-Id']);
+    expect(dispatchIds).toHaveLength(3);
+    expect(new Set(dispatchIds).size).toBe(1);
+    expect(dispatchIds[0]).toEqual(expect.any(String));
+
+    // The warning context carries the same counts and reasons, and no
+    // recipient ids.
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('partially failed'),
+      expect.objectContaining({
+        kind: 'spend_alert',
+        dispatchId: dispatchIds[0],
+        failedRecipients: 1,
+        totalRecipients: 2,
+        failureReasons: { expo_ticket_rejected: 1 },
       })
     );
   });
@@ -224,10 +250,13 @@ describe('notifications-worker-client internal dispatch', () => {
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
+        tags: expect.objectContaining({ kind: 'spend_alert', failure_scope: 'all' }),
         extra: expect.objectContaining({
           kind: 'spend_alert',
           failedRecipients: 2,
           totalRecipients: 2,
+          failureReasons: { unknown: 2 },
+          dispatchId: expect.any(String),
         }),
       })
     );

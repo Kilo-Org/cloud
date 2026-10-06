@@ -5,7 +5,7 @@ returns HTTP 404 for every request. It does not publish messages or consume the
 queue.
 
 | Environment | Worker | `USAGE_QUEUE` queue |
-| --- | --- | --- |
+|---|---|---|
 | Production (top-level config) | `usage-queue` | `usage-queue` |
 | Staging (`env.staging`) | `usage-queue-staging` | `usage-queue-staging` |
 

@@ -21,9 +21,10 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneWrapperFrame,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
@@ -127,6 +128,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: provider.observeStatus, ...(ref === null ? {} : { providerRef: ref }) };
@@ -179,7 +181,7 @@ async function connectAndHello(provider: FakeProvider, sandboxId: string): Promi
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
   const reply = await wrapper.hello({ wrapperId: WRAPPER_ID, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
 

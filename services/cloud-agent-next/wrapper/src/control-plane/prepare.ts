@@ -8,6 +8,7 @@ import {
   type ControlPlaneRouteSpec,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneSetupEvent,
+  type ControlPlaneWorkspaceOutcome,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
@@ -43,8 +44,24 @@ import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../sessi
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
+import {
+  emptyWorkspaceDirectory,
+  refreshAdoptedRepository,
+  removeStaleHomes,
+  stripGitCredentials,
+  truncateWrapperLog,
+} from './workspace-adoption.js';
+import type { WorkspaceCapture } from './workspace-capture.js';
+import {
+  classifyWorkspace,
+  planStamp,
+  snapshotAction,
+  readWorkspaceStamp,
+  writeWorkspaceStamp,
+  type WorkspaceInspection,
+  type WorkspaceStamp,
+} from './workspace-stamp.js';
 
-const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 /** Spec §7 "Setup commands": current per-command limits. */
 const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 5 * 60_000;
 const SETUP_COMMAND_HARD_TIMEOUT_MS = 8 * 60_000;
@@ -115,6 +132,10 @@ export type PrepareDeps = {
   timers: ControlPlaneTimers;
   emit: (frame: ControlPlaneWrapperFrame) => void;
   runtimes: PrepareRuntimePort;
+  /** This wrapper's allocation; a workspace stamped by another one came from a snapshot. */
+  allocationId: string;
+  /** Asks the Sandbox DO to snapshot the container; absent disables capture. */
+  capture?: Pick<WorkspaceCapture, 'request'>;
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
@@ -138,9 +159,14 @@ export type PrepareDeps = {
   ) => Promise<boolean>;
   mkdir?: (directory: string) => Promise<void>;
   hasGit?: (directory: string) => Promise<boolean>;
-  hasBootstrapMarker?: (directory: string) => Promise<boolean>;
-  writeBootstrapMarker?: (directory: string) => Promise<void>;
+  readStamp?: (directory: string) => Promise<WorkspaceStamp | null>;
+  writeStamp?: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
+  emptyDirectory?: (directory: string) => Promise<void>;
+  /** Removes the homes a restored snapshot carries, keeping this route's own. */
+  clearStaleHomes?: (homeRoot: string, keep: string) => Promise<void>;
+  truncateLog?: () => Promise<void>;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
+  now?: () => number;
   inheritedEnv?: NodeJS.ProcessEnv;
   homeRoot?: string;
 };
@@ -192,12 +218,6 @@ async function defaultHasGit(directory: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function markerPath(directory: string, hasGit: boolean): string {
-  return hasGit
-    ? path.join(directory, '.git', BOOTSTRAP_MARKER)
-    : `${path.resolve(directory)}.${BOOTSTRAP_MARKER}`;
 }
 
 async function defaultSessionExists(
@@ -269,6 +289,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const configureGitAuthor = deps.configureGitAuthor ?? configureWorkspaceGitAuthor;
   const sessionExists = deps.sessionExists ?? defaultSessionExists;
   const sleep = deps.sleep ?? defaultSleep;
+  const now = deps.now ?? Date.now;
   const homeRoot = deps.homeRoot ?? path.join(os.tmpdir(), 'kilo-worktrees');
   const prepared = new Map<string, PreparedRoute>();
   const preparing = new Map<string, { promise: Promise<void>; released: boolean }>();
@@ -278,21 +299,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const workspacePreparations = new Map<string, Promise<void>>();
 
   const hasGit = deps.hasGit ?? defaultHasGit;
-  const hasBootstrapMarker =
-    deps.hasBootstrapMarker ??
-    (async (directory: string) => {
-      try {
-        await fs.access(markerPath(directory, await hasGit(directory)));
-        return true;
-      } catch {
-        return false;
-      }
-    });
-  const writeBootstrapMarker =
-    deps.writeBootstrapMarker ??
-    (async (directory: string) => {
-      await fs.writeFile(markerPath(directory, await hasGit(directory)), 'ready\n');
-    });
+  const readStamp =
+    deps.readStamp ??
+    (async (directory: string) => readWorkspaceStamp(directory, await hasGit(directory)));
+  const writeStamp =
+    deps.writeStamp ??
+    (async (directory: string, stamp: WorkspaceStamp) =>
+      writeWorkspaceStamp(directory, await hasGit(directory), stamp));
+  const emptyDirectory = deps.emptyDirectory ?? emptyWorkspaceDirectory;
+  const clearStaleHomes = deps.clearStaleHomes ?? removeStaleHomes;
+  const truncateLog = deps.truncateLog ?? (() => truncateWrapperLog(inheritedEnv.WRAPPER_LOG_PATH));
   const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
 
   function emitProgress(
@@ -398,17 +414,35 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     throw lastError;
   }
 
-  async function cloneWorkspace(
+  /** Runs a git command that talks to the remote; a network failure retries with backoff. */
+  async function runNetworkGit(
+    args: string[],
+    options: ProcessOptions,
+    redact: (text: string) => string,
+    signal: AbortSignal
+  ): Promise<ExecResult> {
+    let last: ExecResult | undefined;
+    for (let attempt = 1; attempt <= CLONE_RETRY_ATTEMPTS; attempt += 1) {
+      signal.throwIfAborted();
+      last = await runGit(args, options);
+      if (last.exitCode === 0) return last;
+      const failure = gitOperationError(last, 'clone', redact);
+      if (!isNetworkFailure(failure.subtype) || attempt === CLONE_RETRY_ATTEMPTS) return last;
+      await sleep(CLONE_RETRY_BACKOFF_MS[attempt - 1] ?? 0, signal);
+    }
+    return last as ExecResult;
+  }
+
+  async function cloneRepository(
     spec: ControlPlaneRouteSpec,
     directory: string,
     env: Record<string, string>,
     redact: (text: string) => string,
-    signal: AbortSignal,
-    onCheckout: () => void
+    signal: AbortSignal
   ): Promise<void> {
     emitProgress(spec.sessionId, 'clone');
     await mkdir(directory);
-    if (!spec.git) return;
+    if (!spec.git || (await hasGit(directory))) return;
     // Diagnostic route class only: a managed credential was injected into the
     // clone URL, otherwise the plain (direct) URL is used. Never log the URL.
     const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
@@ -446,8 +480,35 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       }
       if (lastError) throw lastError;
     }
+  }
+
+  async function cloneWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    env: Record<string, string>,
+    redact: (text: string) => string,
+    signal: AbortSignal,
+    onCheckout: () => void
+  ): Promise<void> {
+    await cloneRepository(spec, directory, env, redact, signal);
+    if (!spec.git) return;
     onCheckout();
+    await checkoutWorkspace(spec, directory, env, redact, signal);
+  }
+
+  /**
+   * Spec §7 "Checkout, branch restore" (legacy apply-attach branch logic), then the
+   * git author. Shared by a fresh clone and an adopted snapshot.
+   */
+  async function checkoutWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    env: Record<string, string>,
+    redact: (text: string) => string,
+    signal: AbortSignal
+  ): Promise<void> {
     emitProgress(spec.sessionId, 'checkout');
+    const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
       runGit(args, { ...options, cwd: directory, env, inheritEnv: false, signal });
     // Spec §7 "Checkout, branch restore" (legacy apply-attach branch logic):
@@ -531,9 +592,185 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     await configureGitAuthor(
       directory,
       (args, options) => runGit(args, { ...options, cwd: directory, env, inheritEnv: false }),
-      spec.git.author,
+      spec.git?.author,
       signal
     );
+  }
+
+  /**
+   * Reconcile a workspace restored from a repository snapshot with this route:
+   * refresh the repository, then the ordinary branch logic. Returns false, leaving
+   * the caller to clone, on any failure; an adopt never fails the preparation.
+   */
+  async function adoptWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    env: Record<string, string>,
+    redact: (text: string) => string,
+    setStep: (step: ControlPlanePreparationStep) => void
+  ): Promise<boolean> {
+    const git = spec.git;
+    if (!git) return false;
+    setStep('restore');
+    try {
+      await withinStep('restore', timers.restoreMs, async signal => {
+        emitProgress(spec.sessionId, 'restore');
+        await refreshAdoptedRepository({
+          remoteUrl: authenticatedGitUrl(git.url, git.token, git.platform),
+          redact,
+          git: (args, options) =>
+            options?.network
+              ? runNetworkGit(
+                  args,
+                  { cwd: directory, env, inheritEnv: false, signal },
+                  redact,
+                  signal
+                )
+              : runGit(args, { cwd: directory, env, inheritEnv: false, signal }),
+        });
+        setStep('checkout');
+        await checkoutWorkspace(spec, directory, env, redact, signal);
+      });
+      return true;
+    } catch (error) {
+      log(
+        `control-plane adopt failed, cloning session=${spec.sessionId} error=${
+          error instanceof Error ? redact(error.message) : 'unknown'
+        }`
+      );
+      return false;
+    }
+  }
+
+  async function inspectWorkspace(
+    directory: string
+  ): Promise<{ inspection: WorkspaceInspection; stamp: WorkspaceStamp | null }> {
+    const stamp = await readStamp(directory);
+    const inspection = classifyWorkspace({
+      hasGit: await hasGit(directory),
+      stamp,
+      allocationId: deps.allocationId,
+    });
+    return { inspection, stamp };
+  }
+
+  async function headCommit(directory: string, env: Record<string, string>): Promise<string> {
+    const result = await runGit(['rev-parse', 'HEAD'], {
+      cwd: directory,
+      env,
+      inheritEnv: false,
+    });
+    return result.exitCode === 0 ? result.stdout.trim() : '';
+  }
+
+  /**
+   * Save the prepared workspace as a repository snapshot. `origin` is bare while the
+   * Sandbox DO snapshots the container, and gets this route's credential back
+   * whatever happens; a failed capture is logged and preparation continues.
+   */
+  async function captureWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    env: Record<string, string>,
+    commit: string
+  ): Promise<void> {
+    const git = spec.git;
+    const capture = deps.capture;
+    if (!git || !capture) return;
+    emitProgress(spec.sessionId, 'snapshot');
+    await truncateLog().catch(() => undefined);
+    const runWorkspaceGit = (args: string[]): Promise<ExecResult> =>
+      runGit(args, { cwd: directory, env, inheritEnv: false });
+    try {
+      const bare = await stripGitCredentials({
+        git: runWorkspaceGit,
+        directory,
+        bareUrl: git.url,
+      });
+      if (!bare) {
+        log(`control-plane capture skipped, origin not bare session=${spec.sessionId}`);
+        return;
+      }
+      const saved = await capture.request(spec.sessionId, commit, timers.captureMs);
+      log(`control-plane capture ${saved ? 'saved' : 'not saved'} session=${spec.sessionId}`);
+    } catch (error) {
+      log(
+        `control-plane capture failed session=${spec.sessionId} error=${
+          error instanceof Error ? error.message : 'unknown'
+        }`
+      );
+    } finally {
+      await restoreOriginCredential(spec, runWorkspaceGit);
+    }
+  }
+
+  async function restoreOriginCredential(
+    spec: ControlPlaneRouteSpec,
+    run: (args: string[]) => Promise<ExecResult>
+  ): Promise<void> {
+    const git = spec.git;
+    if (!git) return;
+    const url = authenticatedGitUrl(git.url, git.token, git.platform);
+    for (let attempt = 1; attempt <= STEP_RETRY_ATTEMPTS; attempt += 1) {
+      const result = await run(['remote', 'set-url', 'origin', url]);
+      if (result.exitCode === 0) return;
+    }
+    throw new WrapperBootstrapError({
+      code: 'WORKSPACE_SETUP_FAILED',
+      message: 'Failed to restore the repository credential after a snapshot',
+      retryable: true,
+    });
+  }
+
+  /**
+   * Bring the route's directory to a prepared workspace and report how. The
+   * filesystem alone decides (spec: workspace stamp): a stamp from this allocation
+   * needs nothing, one from another allocation is a restored snapshot to adopt,
+   * and anything else is cloned. Setup always runs after a clone or an adopt. A
+   * clone is captured as a new snapshot; an adopted snapshot only once it is old,
+   * so the refresh builds on it instead of starting from scratch, until the
+   * generation cap sends it back to a clone.
+   */
+  async function prepareWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    env: Record<string, string>,
+    redact: (text: string) => string,
+    home: string,
+    setStep: (step: ControlPlanePreparationStep) => void
+  ): Promise<ControlPlaneWorkspaceOutcome> {
+    const { inspection, stamp: previous } = await inspectWorkspace(directory);
+    if (inspection === 'same') return 'same';
+    let adopted = false;
+    if (inspection === 'foreign') {
+      await clearStaleHomes(homeRoot, home).catch(() => undefined);
+      // A snapshot at the generation cap that is due again is not adopted: it is
+      // rebuilt from a clone, so the layers stacked on it do not accumulate.
+      const rebuild = previous !== null && snapshotAction(previous, now()) === 'rebuild';
+      adopted = !rebuild && (await adoptWorkspace(spec, directory, env, redact, setStep));
+      if (!adopted) await emptyDirectory(directory);
+    }
+    // A clone happens only when there is no repository yet; a partly prepared
+    // workspace is reused, as before.
+    const cloning = !adopted && Boolean(spec.git) && !(await hasGit(directory));
+    if (!adopted) {
+      setStep('clone');
+      await withinStep('clone', timers.cloneMs, signal =>
+        cloneWorkspace(spec, directory, env, redact, signal, () => setStep('checkout'))
+      );
+    }
+    setStep('setup');
+    await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
+    const commit = await headCommit(directory, env);
+    // The stamp goes down before the snapshot, so a container restored from it
+    // sees another allocation's stamp and adopts rather than trusting the files.
+    const plan = planStamp({ cloning, adopted, previous, now: now() });
+    await writeStamp(directory, { allocationId: deps.allocationId, commit, ...plan.lineage });
+    if (plan.capture && spec.capture === true) {
+      setStep('snapshot');
+      await captureWorkspace(spec, directory, env, commit);
+    }
+    return adopted ? 'adopted' : 'cloned';
   }
 
   async function runSetupCommands(
@@ -710,18 +947,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       });
       const needsWorkspace = Boolean(spec.git) || (spec.setupCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
-      // directory and re-check the marker so a waiting session skips the work.
+      // directory and inspect the stamp inside the lock, so a waiting session
+      // sees the finished workspace and skips the work.
+      let workspace: ControlPlaneWorkspaceOutcome | undefined;
       await withWorkspaceLock(directory, async () => {
-        if (!needsWorkspace || (await hasBootstrapMarker(directory))) return;
-        currentStep = 'clone';
-        await withinStep('clone', timers.cloneMs, signal =>
-          cloneWorkspace(spec, directory, env, redact, signal, () => {
-            currentStep = 'checkout';
-          })
-        );
-        currentStep = 'setup';
-        await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
-        await writeBootstrapMarker(directory);
+        if (!needsWorkspace) return;
+        workspace = await prepareWorkspace(spec, directory, env, redact, home, step => {
+          currentStep = step;
+        });
       });
       if (owner.released) return;
       currentStep = 'kilo_runtime';
@@ -752,8 +985,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         return;
       }
       prepared.set(sessionId, { key, spec, directory, home, kilo: kiloAuth, env });
-      deps.emit({ type: 'session.ready', sessionId });
       emitSessionReadyNative(sessionId);
+      deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
       if (owner.released) {
@@ -846,8 +1079,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               }
             }
             if (!owner.released) {
-              deps.emit({ type: 'session.ready', sessionId: spec.sessionId });
               emitSessionReadyNative(spec.sessionId);
+              deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }
           })().finally(() => {
             if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);

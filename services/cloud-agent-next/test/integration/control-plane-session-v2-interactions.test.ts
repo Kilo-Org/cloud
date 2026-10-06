@@ -6,7 +6,10 @@ import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
 import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-id.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneWrapperFrame } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -99,6 +102,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -236,7 +240,7 @@ async function setupSiblingPair(): Promise<{
     wrapperId: 'wr_sibling',
     allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
   });
-  expect(welcome).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(welcome).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
   const recording: Recording = { prepares: [], prompts: [], aborts: [], answers: [] };
   const stopPump = startWrapperPump(wrapper, recording);

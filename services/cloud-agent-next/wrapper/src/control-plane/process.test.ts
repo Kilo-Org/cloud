@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_ALLOCATION_ID_ENV,
+  CONTROL_PLANE_PROTOCOL_VERSION,
+} from '../../../src/shared/control-plane-protocol.js';
 
 const MAIN_PATH = join(import.meta.dir, 'main.ts');
-const PROTOCOL_VERSION = 2;
+const PROTOCOL_VERSION = CONTROL_PLANE_PROTOCOL_VERSION;
 
 type ServerState = {
   attempts: number;

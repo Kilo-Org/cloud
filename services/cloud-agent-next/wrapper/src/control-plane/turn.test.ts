@@ -28,6 +28,8 @@ const SESSION_TIMERS = {
   heartbeatAckTimeoutMs: 3000,
   heartbeatNegotiationMs: 100,
   cloneMs: 1000,
+  restoreMs: 1000,
+  captureMs: 1000,
   kiloRuntimeStartMs: 1000,
   kiloSessionMs: 1000,
   sseSilenceMs: 1000,

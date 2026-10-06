@@ -1,5 +1,5 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject, SELF } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -33,10 +33,11 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneRouteSpec,
-  ControlPlaneRouteUpdate,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneRouteSpec,
+  type ControlPlaneRouteUpdate,
 } from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import type { MessageResultRPCResponse } from '../../src/session/message-result.js';
@@ -354,6 +355,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -1324,9 +1326,12 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
         db.insert(allocationTable).values(allocation).run();
-        db.insert(routesTable)
-          .values({ ...route, grant: JSON.stringify(grant) })
-          .run();
+        // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
+        db.run(
+          sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
+              VALUES (${route.session_id}, ${route.spec}, ${JSON.stringify(grant)}, ${route.credential_source},
+                      ${route.state}, ${route.attempt_id}, ${route.attempt_deadline_at}, ${route.reason}, ${route.updated_at})`
+        );
         const originalPeerFor = instance.sessionPeerFor;
         let reconstructed: SandboxControlV2 | undefined;
         const restore = () => {
@@ -1782,7 +1787,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           wrapperId: 'wr_recovered',
           allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
         })
-      ).toEqual({ type: 'welcome', protocolVersion: 2 });
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       expect(await wrapper.next()).toMatchObject({ type: 'session.prepare', spec: { sessionId } });
       const recoveredRoute = (await sandboxStub.status({ sessionId })).view;
       if (failedRoute.state !== 'failed' || recoveredRoute.state !== 'preparing')
@@ -1917,7 +1922,10 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     const helloReply = await wrapper.hello({ wrapperId: 'wr_1', allocationId });
-    expect(helloReply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(helloReply).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
 
     const prepareFrame = await wrapper.next();
     expect(prepareFrame?.type).toBe('session.prepare');

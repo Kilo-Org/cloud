@@ -29,6 +29,7 @@ import {
   defaultKiloPidfileDirectory,
 } from './kilo-runtime.js';
 import { createPreparationManager, runtimeKey } from './prepare.js';
+import { createWorkspaceCapture, type WorkspaceCapture } from './workspace-capture.js';
 import { createTurnManager, type TurnManager } from './turn.js';
 import { createControlPlaneTerminals } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
@@ -212,6 +213,9 @@ export async function runControlPlaneWrapper(
   // Preparation is created after the connection (it emits through it), so the
   // connection reaches it through a holder.
   const preparationRef: { current?: ReturnType<typeof createPreparationManager> } = {};
+  // A repository capture is requested by preparation and answered by a frame the
+  // connection delivers, so the connection reaches it through a holder.
+  const captureRef: { current?: WorkspaceCapture } = {};
   // Turns share work with preparation but need the runtimes' restart callbacks,
   // so both sides reach each other through holders.
   const turnsRef: { current?: TurnManager } = {};
@@ -276,6 +280,9 @@ export async function runControlPlaneWrapper(
             })
             .catch(() => undefined);
           return;
+        case 'workspace.captured':
+          captureRef.current?.onCaptured(frame.sessionId, frame.ok);
+          return;
         case 'session.credentials':
           void preparationRef.current?.installCredentials(frame);
           return;
@@ -331,9 +338,12 @@ export async function runControlPlaneWrapper(
     onDiagnostic: diagnostics.onDiagnostic,
     onNativeDiagnostic: projector,
   });
+  captureRef.current = createWorkspaceCapture({ send: frame => connection.send(frame) });
   preparationRef.current = createPreparationManager({
     timers,
     onNativeDiagnostic: projector,
+    allocationId,
+    capture: captureRef.current,
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv) => {

@@ -106,6 +106,18 @@ export type ProviderObservation = {
   providerRef?: string;
 };
 
+/** What a physical start used: the image, or a repository snapshot of it. */
+export type ProviderStartSource = 'image' | 'repository';
+
+export type ProviderLaunchOptions = {
+  /** Keyed hash of the launch's scope, repository and env; a provider may start from its snapshot. */
+  repoKey?: string;
+  /** Start from the image and forget the snapshot stored for `repoKey`. */
+  discardRepository?: true;
+};
+
+export type ProviderLaunchResult = { startSource: ProviderStartSource };
+
 export type ProviderAdapter = {
   readonly resumable: boolean;
   /** The workspace survives a stop; a persistent provider is never destroyed. */
@@ -114,7 +126,11 @@ export type ProviderAdapter = {
   readonly destroysOnStop: boolean;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
-  launch(ref: string, env: Record<string, string>): Promise<void>;
+  launch(
+    ref: string,
+    env: Record<string, string>,
+    options?: ProviderLaunchOptions
+  ): Promise<ProviderLaunchResult>;
   observe(
     ref: string | null,
     intent?: ProviderAllocationIntent | null
@@ -122,6 +138,12 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
+  /**
+   * Save the running container as the repository snapshot for `repoKey`. Only a
+   * provider that can start from one implements it; `false` is a failed capture
+   * that the caller ignores.
+   */
+  captureRepository?(ref: string, repoKey: string, commit?: string): Promise<boolean>;
   updateNetworkPolicy?(
     providerRef: string,
     networkPolicy: VercelSandboxNetworkPolicy
@@ -156,7 +178,9 @@ export function createMemoryProviderAdapter(options?: {
       }
       return { providerRef };
     },
-    async launch() {},
+    async launch() {
+      return { startSource: 'image' };
+    },
     async observe(ref, intent) {
       const providerRef = ref ?? (intent ? `mem_${intent.intentId}` : undefined);
       if (!providerRef) return { status: 'terminal' };

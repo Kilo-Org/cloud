@@ -62,6 +62,12 @@ CREDENTIAL_CONTAINMENT_ENABLED=false
 # Comma-separated list of org IDs that receive workspace repo snapshots, or `*` for all orgs/users
 REPO_SNAPSHOT_ORG_IDS=
 
+# Container repo snapshot IDs (optional)
+# Comma-separated user or org IDs whose isolated control-plane containers start from a saved
+# repository snapshot, or `*` for all. Empty disables it. Needs the REPO_SNAPSHOTS KV
+# binding and only applies to the constant isolated workspace path.
+CONTAINER_REPO_SNAPSHOT_IDS=
+
 # Vercel Sandbox operational configuration (optional)
 # Snapshot/build values must come from a successful `pnpm --filter cloud-agent-next snapshot:vercel`
 # acceptance run. Partial configuration never enables Vercel.

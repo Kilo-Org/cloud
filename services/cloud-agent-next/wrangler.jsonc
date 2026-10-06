@@ -404,6 +404,9 @@
     {
       "binding": "SHARED_SANDBOX_OVERRIDES",
     },
+    {
+      "binding": "REPO_SNAPSHOTS",
+    },
   ],
 
   /**
@@ -455,6 +458,9 @@
       "kv_namespaces": [
         {
           "binding": "SHARED_SANDBOX_OVERRIDES",
+        },
+        {
+          "binding": "REPO_SNAPSHOTS",
         },
       ],
       "vars": {

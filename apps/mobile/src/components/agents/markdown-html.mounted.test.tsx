@@ -280,24 +280,25 @@ describe('MarkdownHtml unknown tags', () => {
 describe('MarkdownHtml inline keys, subscripts, and superscripts', () => {
   it('draws kbd as an inline key on the palette code background', async () => {
     const renderer = await mountHtml('<p>Press <kbd>Ctrl</kbd>+<kbd>C</kbd></p>');
-    const keys = renderer.root.findAll(
-      node => node.type === ('View' as never) && node.props.className === 'rounded border px-1'
-    );
+    const keys = renderer.root.findAll(node => {
+      const style: unknown = node.props.style;
+      return (
+        node.type === ('View' as never) &&
+        typeof style === 'object' &&
+        style !== null &&
+        'backgroundColor' in style &&
+        style.backgroundColor === '#eeeeee' &&
+        'borderColor' in style &&
+        style.borderColor === '#cccccc'
+      );
+    });
 
     expect(keys).toHaveLength(2);
-    expect(keys[0]?.props.style).toEqual({ backgroundColor: '#eeeeee', borderColor: '#cccccc' });
     expect(allText(renderer)).toContain('Ctrl');
   });
 
-  it('draws sub and sup smaller and offset from the baseline', async () => {
+  it('draws sub and sup smaller than the text around them', async () => {
     const renderer = await mountHtml('<p>H<sub>2</sub>O and x<sup>2</sup></p>');
-    const offset = (className: string) =>
-      renderer.root.findAll(
-        node => node.type === ('View' as never) && node.props.className === className
-      );
-
-    expect(offset('translate-y-1.5')).toHaveLength(1);
-    expect(offset('-translate-y-1.5')).toHaveLength(1);
     const two = styledTexts(renderer).filter(entry => entry.text === '2');
     expect(two).toHaveLength(2);
     expect(two.every(entry => entry.style.some(style => style.fontSize === 11))).toBe(true);

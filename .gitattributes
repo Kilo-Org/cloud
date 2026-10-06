@@ -9,3 +9,7 @@ apps/mobile/src/i18n/locales/*.json linguist-generated=true
 apps/mobile/src/i18n/locales/en.json -linguist-generated
 packages/notifications/src/locales/*.json linguist-generated=true
 packages/notifications/src/locales/en.json -linguist-generated
+
+# Vendored third-party build (Mermaid, MIT), byte-identical to the published
+# file. Collapse it so a review reads the code that loads it, not 2.7 MB.
+apps/mobile/assets/vendor/** linguist-generated=true

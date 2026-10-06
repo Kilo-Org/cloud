@@ -61,6 +61,20 @@ describe('design primitive defaults', () => {
     expect(globalsCss).toContain('@media (prefers-reduced-motion: reduce)');
   });
 
+  it('prevents infinite animations from racing under reduced motion', () => {
+    const globalsCss = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
+
+    expect(globalsCss).toContain(`@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}`);
+  });
+
   it('uses canonical field fill, border, and focus treatment', () => {
     expectClasses(inputClassName, [
       'bg-input-background',

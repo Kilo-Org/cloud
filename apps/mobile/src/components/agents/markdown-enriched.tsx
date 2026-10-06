@@ -163,6 +163,10 @@ export function MarkdownEnriched({
         markdown={markdown}
         markdownStyle={markdownStyle}
         selectable={selectable}
+        // A long press on a message opens the host's message details; the
+        // library's own block menu would open on top of it. Copy stays on the
+        // fence header button.
+        enableBlockContextMenu={false}
         onLinkPress={({ url }) => {
           const imageUri = parseImageLoadUrl(url);
           if (imageUri !== null) {

@@ -240,6 +240,10 @@ function billedCost(body: unknown): number | null {
 }
 
 const TRANSIENT_RETRY_DELAY_MS = 250;
+// The gateway waits 5 s for /decide. Two attempts plus the retry delay stay
+// inside that budget, so a hung request ends here with a typed error instead of
+// at the gateway timeout. Jev p95 is under 1 s.
+const ATTEMPT_TIMEOUT_MS = 2_000;
 
 async function postSystemOne(
   client: SystemOneClient,
@@ -255,6 +259,7 @@ async function postSystemOne(
         'Content-Type': 'application/json',
       },
       body,
+      signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
     });
   } catch (error) {
     return new ClassifierRunError(

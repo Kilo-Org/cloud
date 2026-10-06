@@ -44,7 +44,7 @@ export type ConfigAutoDeciderModelRow = typeof configAutoDeciderModels.$inferSel
 type ModelSummaryRow = typeof modelSummaries.$inferSelect;
 
 // D1 rejects statements with too many bound variables. A model summary insert
-// binds 13 values per row (including variant), so 7 rows keeps each INSERT
+// binds 14 values per row (including variant), so 7 rows keeps each INSERT
 // below the 100-variable ceiling while still batching the delete plus inserts.
 const MODEL_SUMMARY_INSERT_BATCH_SIZE = 7;
 
@@ -93,6 +93,7 @@ export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
     cases: row.cases,
     errors: row.errors,
     timeouts: row.timeouts,
+    routeAccuracy: row.route_accuracy,
   };
 }
 
@@ -279,6 +280,7 @@ export async function insertRun(
           cases: s.cases,
           errors: s.errors,
           timeouts: s.timeouts,
+          route_accuracy: s.routeAccuracy,
           carried: true,
         }))
       )
@@ -320,6 +322,7 @@ export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Prom
         cost_usd: row.cost_usd,
         error: row.error,
         fallback_reason: row.fallback_reason,
+        route_hit: row.route_hit,
         retried: row.retried,
         exit_code: row.exit_code,
         output_prefix: row.output_prefix,
@@ -416,6 +419,7 @@ export async function replaceModelSummaries(
           cases: s.cases,
           errors: s.errors,
           timeouts: s.timeouts,
+          route_accuracy: s.routeAccuracy,
           carried: false,
         }))
       )
@@ -1196,6 +1200,7 @@ export async function getLatestSummariesByModel(
       cases: modelSummaries.cases,
       errors: modelSummaries.errors,
       timeouts: modelSummaries.timeouts,
+      route_accuracy: modelSummaries.route_accuracy,
       carried: modelSummaries.carried,
       engine_identity: benchmarkRuns.engine_identity,
       repetitions: benchmarkRuns.repetitions,
@@ -1391,13 +1396,24 @@ export async function getLatestRoutingTable(
   return { table: parsed.data, publishedAt: tableRow.published_at };
 }
 
-export async function getClassifierWinner(db: D1Database): Promise<ClassifierWinner | null> {
+// Only runs measured under the current classifier engine count: a winner from
+// the earlier chat-completions classifier is not a System One model id.
+export async function getClassifierWinner(
+  db: D1Database,
+  engineIdentity: string
+): Promise<ClassifierWinner | null> {
   const orm = drizzle(db);
   // Find the latest completed classifier run.
   const runRow = await orm
     .select()
     .from(benchmarkRuns)
-    .where(and(eq(benchmarkRuns.kind, 'classifier'), eq(benchmarkRuns.status, 'completed')))
+    .where(
+      and(
+        eq(benchmarkRuns.kind, 'classifier'),
+        eq(benchmarkRuns.status, 'completed'),
+        eq(benchmarkRuns.engine_identity, engineIdentity)
+      )
+    )
     .orderBy(desc(benchmarkRuns.completed_at))
     .limit(1)
     .get();
@@ -1419,6 +1435,7 @@ export async function getClassifierWinner(db: D1Database): Promise<ClassifierWin
   if (!winner) return null;
 
   return {
+    engine: 'system-one',
     model: winner.model,
     runId: runRow.id,
     accuracy: winner.accuracy,

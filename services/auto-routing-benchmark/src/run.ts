@@ -1,4 +1,7 @@
-import { classifyWithOpenRouter } from '@kilocode/auto-routing-contracts/classifier';
+import {
+  ClassifierRunError,
+  classifyWithSystemOne,
+} from '@kilocode/auto-routing-contracts/classifier';
 import {
   BENCHMARK_CONTAINER_BUDGET,
   CLASSIFIER_WINNER_KV_KEY,
@@ -53,7 +56,7 @@ import {
   type PriorModelResult,
 } from './db';
 import { gradeClassifierOutput, runDeciderCheck } from './grading';
-import { createOpenRouterClient } from './openrouter';
+import { createSystemOneClient } from './openrouter';
 import {
   buildRoutingTable,
   computeRegistryRoutingTableVersion,
@@ -113,9 +116,9 @@ export const BenchmarkJobMessageSchema = z.object({
 // each stays well under CF's wall-clock limit.
 const DECIDER_CHUNK_SIZE = 5;
 
-// Classifier calls are OpenRouter HTTP requests. Some candidate models can take
-// several minutes per request, so each queue invocation owns exactly one case to
-// keep it below Cloudflare Queues' 15-minute wall-clock limit.
+// Classifier calls are OpenRouter System One HTTP requests. Each queue
+// invocation owns exactly one case, so a slow request cannot push a batch past
+// Cloudflare Queues' 15-minute wall-clock limit.
 const CLASSIFIER_CHUNK_SIZE = 1;
 
 // Cloudflare Queues caps a single sendBatch at 100 messages. Classifier fan-out
@@ -479,9 +482,15 @@ function fnv1aHex(input: string): string {
 // (plus repetitions + reasoning_effort) produced comparable measurements, so a
 // model's prior summaries can be carried instead of re-run.
 export function computeEngineIdentity(kind: BenchmarkKind): string {
+  // Tags the classifier execution path so summaries from the earlier
+  // chat-completions classifier are never carried into System One runs. Bumping
+  // BENCHMARK_ENGINE_VERSION instead would also re-run every decider profile.
   const datasetSignature =
     kind === 'classifier'
-      ? CLASSIFIER_CASES.map(c => ({ id: c.id, expected: c.expected }))
+      ? {
+          engine: 'system-one',
+          cases: CLASSIFIER_CASES.map(c => ({ id: c.id, expected: c.expected })),
+        }
       : DECIDER_CASES.map(c => ({
           id: c.id,
           taskType: c.taskType,
@@ -991,8 +1000,8 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       return;
     }
 
-    // Create the OpenRouter client inside processJob — no module-scope transport clients.
-    const client = await createOpenRouterClient(env);
+    // Create the System One client inside processJob — no module-scope transport clients.
+    const client = await createSystemOneClient(env);
     const caseIds = new Set(message.caseIds);
     const rep = message.rep;
     const expandedItems = CLASSIFIER_CASES.filter(benchCase => caseIds.has(benchCase.id)).map(
@@ -1005,22 +1014,26 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
       async ({ benchCase, rep }) => {
         const startedAt = performance.now();
         try {
-          const result = await classifyWithOpenRouter(client, benchCase.input, message.model);
-          const score = result.fallback
-            ? 0
-            : gradeClassifierOutput(benchCase.expected, result.classification);
+          const { cost, classification } = await classifyWithSystemOne(
+            client,
+            benchCase.input,
+            message.model
+          );
           await upsertCaseResult(env.BENCH_DB, {
             run_id: message.runId,
             model: message.model,
             variant: classifierVariant,
             case_id: benchCase.id,
             route_key: null,
-            score,
+            score: gradeClassifierOutput(benchCase.expected, classification),
             latency_ms: Math.round(performance.now() - startedAt),
-            cost_usd: result.cost,
+            cost_usd: cost,
             error: null,
-            fallback_reason: result.fallback?.reason ?? null,
-            retried: result.retried ?? false,
+            fallback_reason: null,
+            route_hit:
+              classification.taskType === benchCase.expected.taskType &&
+              classification.subtaskType === benchCase.expected.subtaskType,
+            retried: null,
             exit_code: null,
             output_prefix: null,
             event_count: null,
@@ -1303,6 +1316,7 @@ async function processDeciderJob(
           cost_usd: result.costUsd,
           error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
           fallback_reason: null,
+          route_hit: null,
           retried,
           exit_code: result.exitCode,
           output_prefix: result.text.slice(0, 200),
@@ -1439,9 +1453,11 @@ function failedRow(
     route_key: routeKey,
     score: 0,
     latency_ms: Math.round(performance.now() - startedAt),
-    cost_usd: null,
+    cost_usd: error instanceof ClassifierRunError ? error.cost : null,
     error: JSON.stringify(formatError(error)).slice(0, 500),
     fallback_reason: null,
+    // A failed classification missed its route; decider rows carry no route hit.
+    route_hit: message.kind === 'classifier' ? false : null,
     retried: null,
     exit_code: null,
     output_prefix: null,
@@ -1699,6 +1715,8 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
     const [model, storedVariant, routeKey] = key.split('\0');
     const latencies = group.map(r => r.latency_ms).toSorted((a, b) => a - b);
     const costs = group.filter(r => r.cost_usd !== null);
+    // Only classifier rows carry route_hit; decider groups stay null.
+    const routeGraded = group.filter(r => r.route_hit !== null);
     const p95LatencyMs =
       latencies.length > 0
         ? (latencies[Math.min(latencies.length - 1, Math.ceil(0.95 * latencies.length) - 1)] ??
@@ -1718,6 +1736,9 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
       cases: group.length,
       errors: group.filter(r => r.error !== null).length,
       timeouts: group.filter(r => r.timed_out).length,
+      routeAccuracy: routeGraded.length
+        ? Number((routeGraded.filter(r => r.route_hit).length / routeGraded.length).toFixed(4))
+        : null,
     };
   });
 }

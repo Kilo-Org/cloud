@@ -54,6 +54,7 @@ describe('mapSummaryRow', () => {
       cases: 50,
       errors: 2,
       timeouts: 0,
+      route_accuracy: null,
       carried: false,
     };
     const result = mapSummaryRow(row);
@@ -69,6 +70,7 @@ describe('mapSummaryRow', () => {
       cases: 50,
       errors: 2,
       timeouts: 0,
+      routeAccuracy: null,
     });
   });
 
@@ -86,6 +88,7 @@ describe('mapSummaryRow', () => {
       cases: 30,
       errors: 0,
       timeouts: 0,
+      route_accuracy: null,
       carried: false,
     };
     const result = mapSummaryRow(row);
@@ -131,6 +134,7 @@ describe('mapRunRow', () => {
         cases: 100,
         errors: 5,
         timeouts: 0,
+        routeAccuracy: null,
       },
     ];
     const result = mapRunRow(runRow, summaries);

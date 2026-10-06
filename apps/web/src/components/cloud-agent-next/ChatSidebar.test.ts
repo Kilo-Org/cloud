@@ -373,6 +373,29 @@ describe('ChatSidebar row rendering', () => {
     expect(dom.container.textContent).toContain('Renamed five');
   });
 
+  it('exposes the full truncated session title on hover', () => {
+    const longTitle = 'A very long session title that gets visually cut off in the sidebar';
+    const sessions = makeSessions(3);
+    const overrides = replaceSession(sessions, 0, { prompt: longTitle });
+
+    renderSidebar({ sessions: overrides });
+
+    const storedTitle = Array.from(dom.container.querySelectorAll('span')).find(
+      candidate => candidate.textContent === longTitle
+    );
+    expect(storedTitle?.getAttribute('title')).toBe(longTitle);
+
+    renderSidebar({
+      sessions: [],
+      activeSessions: [activeSession({ ...sessions[1]!, prompt: longTitle })],
+    });
+
+    const remoteTitle = Array.from(dom.container.querySelectorAll('span')).find(
+      candidate => candidate.textContent === longTitle
+    );
+    expect(remoteTitle?.getAttribute('title')).toBe(longTitle);
+  });
+
   it('updates the visible status of a live row without touching its siblings', () => {
     const sessions = [
       makeSession(0, { sessionStatus: 'busy' }),

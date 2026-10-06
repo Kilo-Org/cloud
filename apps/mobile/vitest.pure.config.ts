@@ -9,6 +9,8 @@ import { inlineSqlPlugin } from './vitest.sql-plugin';
 // unaffected by the mounted-test harness.
 export default defineProject({
   plugins: [inlineSqlPlugin()],
+  // Vendored text assets resolve to a URL, like images, instead of being run as JS.
+  assetsInclude: ['**/*.txt'],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('src', import.meta.url)),

@@ -139,8 +139,13 @@
   },
   "devDependencies": {
     "@expo/plist": "0.8.1",
+    "@rozenite/expo-atlas-plugin": "2.4.0",
+    "@rozenite/file-system-plugin": "2.4.0",
     "@rozenite/metro": "2.4.0",
     "@rozenite/network-activity-plugin": "2.4.0",
+    "@rozenite/overlay-plugin": "2.4.0",
+    "@rozenite/react-navigation-plugin": "2.4.0",
+    "@rozenite/require-profiler-plugin": "2.4.0",
     "@rozenite/tanstack-query-plugin": "2.4.0",
     "@sentry/cli": "catalog:",
     "@types/react": "19.2.14",

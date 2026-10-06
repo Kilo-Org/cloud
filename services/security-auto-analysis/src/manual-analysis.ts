@@ -411,7 +411,8 @@ export async function consumeManualAnalysisBatch(
         try {
           exhaustionOutcome = await markSecurityAgentCommandRetriesExhausted(
             db,
-            parsed.data.commandId
+            parsed.data.commandId,
+            error
           );
           if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
             console.info(

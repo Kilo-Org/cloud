@@ -99,6 +99,9 @@ export function getSecurityCommandInvalidationScopes(
   return scopesByCommandType[commandType];
 }
 
+const RETRIES_EXHAUSTED_FALLBACK_COPY =
+  'Action could not be completed after several attempts. Retry action.';
+
 // Ported from apps/web/src/components/security-agent/SecurityAgentContext.tsx:362
 // (commandFailureDescription) — the user-visible fallback copy per result code.
 // Result codes with a fixed message (independent of `lastErrorRedacted`).
@@ -114,12 +117,25 @@ const FAILURE_MESSAGE_BY_RESULT_CODE: Record<string, string> = {
     'Repository is no longer available to GitHub App. Refresh repository access, then retry.',
   INVALID_DISMISS_TARGET: 'Finding cannot be dismissed because its Dependabot target is invalid.',
   COMMAND_STALLED: 'Queued action did not finish in time. Retry action.',
-  // The backend stores a raw "…maximum delivery attempts" string in
-  // lastErrorRedacted for this code; surface friendly, actionable copy instead.
-  QUEUE_RETRIES_EXHAUSTED: 'Action could not be completed after several attempts. Retry action.',
+  QUEUE_RETRIES_EXHAUSTED: RETRIES_EXHAUSTED_FALLBACK_COPY,
 };
 
+// Rows failed before the backend preserved the underlying attempt error carry
+// this placeholder in lastErrorRedacted; keep showing the friendly copy for
+// them. Matches SECURITY_AGENT_COMMAND_RETRIES_EXHAUSTED_FALLBACK in
+// @kilocode/db, which app-shared cannot import (server-side package).
+const LEGACY_RETRIES_EXHAUSTED_PLACEHOLDER = 'Queue command failed after maximum delivery attempts';
+
 export function getSecurityCommandFailureMessage(command: SecurityCommand): string {
+  if (command.resultCode === 'QUEUE_RETRIES_EXHAUSTED') {
+    if (
+      command.lastErrorRedacted &&
+      command.lastErrorRedacted !== LEGACY_RETRIES_EXHAUSTED_PLACEHOLDER
+    ) {
+      return command.lastErrorRedacted;
+    }
+    return RETRIES_EXHAUSTED_FALLBACK_COPY;
+  }
   const knownMessage = command.resultCode
     ? FAILURE_MESSAGE_BY_RESULT_CODE[command.resultCode]
     : undefined;

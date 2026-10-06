@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getSecurityCommandFailureMessage,
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
   mergeTrackedCommandIds,
@@ -47,5 +48,66 @@ describe('security agent command helpers', () => {
 
   it('deduplicates recovered and locally tracked command ids', () => {
     expect(mergeTrackedCommandIds(['a', 'b'], ['b', 'c'])).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('getSecurityCommandFailureMessage', () => {
+  it('shows the preserved underlying error for exhausted retries', () => {
+    expect(
+      getSecurityCommandFailureMessage(
+        command({
+          status: 'failed',
+          resultCode: 'QUEUE_RETRIES_EXHAUSTED',
+          lastErrorRedacted: 'GitHub integration unavailable for finding',
+        })
+      )
+    ).toBe('GitHub integration unavailable for finding');
+  });
+
+  it('falls back to friendly copy for exhausted retries without a preserved error', () => {
+    const fallback = 'Action could not be completed after several attempts. Retry action.';
+    expect(
+      getSecurityCommandFailureMessage(
+        command({ status: 'failed', resultCode: 'QUEUE_RETRIES_EXHAUSTED' })
+      )
+    ).toBe(fallback);
+    expect(
+      getSecurityCommandFailureMessage(
+        command({
+          status: 'failed',
+          resultCode: 'QUEUE_RETRIES_EXHAUSTED',
+          lastErrorRedacted: 'Queue command failed after maximum delivery attempts',
+        })
+      )
+    ).toBe(fallback);
+  });
+
+  it('prefers fixed copy for known result codes over lastErrorRedacted', () => {
+    expect(
+      getSecurityCommandFailureMessage(
+        command({
+          status: 'failed',
+          resultCode: 'GITHUB_AUTH_INVALID',
+          lastErrorRedacted: 'raw backend detail',
+        })
+      )
+    ).toBe('GitHub authorization needs attention. Re-authorize GitHub App, then retry.');
+  });
+
+  it('keeps lastErrorRedacted for admission failures and unknown codes', () => {
+    expect(
+      getSecurityCommandFailureMessage(
+        command({
+          status: 'failed',
+          resultCode: 'QUEUE_ADMISSION_FAILED',
+          lastErrorRedacted: 'queue unavailable',
+        })
+      )
+    ).toBe('queue unavailable');
+    expect(
+      getSecurityCommandFailureMessage(
+        command({ status: 'failed', resultCode: null, lastErrorRedacted: 'raw backend detail' })
+      )
+    ).toBe('raw backend detail');
   });
 });

@@ -1042,7 +1042,8 @@ export default {
             const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
             exhaustionOutcome = await markSecurityAgentCommandRetriesExhausted(
               db,
-              correlation.commandId
+              correlation.commandId,
+              error
             );
             if (exhaustionOutcome.command && correlation.ledger) {
               await settleSecurityLedgerForTerminalCommand(

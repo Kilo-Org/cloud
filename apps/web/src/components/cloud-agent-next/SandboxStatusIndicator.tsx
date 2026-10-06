@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useTRPC } from '@/lib/trpc/utils';
-import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
+import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import { subscribeSandboxStatus } from './sandbox-status-stream';
 import { cn } from '@/lib/utils';
 import { sandboxStatusPresentation, type SandboxStatusPresentation } from './sandbox-status';

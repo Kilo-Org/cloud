@@ -7,11 +7,11 @@ import {
   type AutoRoutingClassifierAnalyticsResponse,
   type AutoRoutingClassifierModelResponse,
 } from '@kilocode/auto-routing-contracts';
-import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { BarChart3, Clock3, DollarSign, HelpCircle, RefreshCw, Route, Save } from 'lucide-react';
-import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,13 +25,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  OpenRouterModelsResponseSchema,
-  type OpenRouterModelsResponse,
-} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
 import { BenchmarksSection } from './BenchmarksSection';
 import { parseAdminResponse } from './admin-fetch';
+import { useSystemOneModelOptions } from './system-one-models';
 
 const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '1h', label: '1h' },
@@ -69,11 +66,6 @@ async function fetchClassifierAnalytics(period: AutoRoutingAnalyticsPeriod) {
   );
 }
 
-async function fetchOpenRouterModels() {
-  const response = await fetch('/admin/api/auto-routing/openrouter-models');
-  return parseAdminResponse<OpenRouterModelsResponse>(response, OpenRouterModelsResponseSchema);
-}
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
 }
@@ -100,9 +92,8 @@ function formatCredits(value: number) {
   }).format(value);
 }
 
-// Cache hits and fallbacks are both subsets of requests that produced a
-// classification, so their rates use classifiedRequests (not totalRequests)
-// as the denominator.
+// Cache hits are a subset of requests that produced a classification, so the
+// hit rate uses classifiedRequests (not totalRequests) as the denominator.
 export function summaryRates(
   summary: AutoRoutingClassifierAnalyticsResponse['summary'] | undefined
 ) {
@@ -111,8 +102,6 @@ export function summaryRates(
   return {
     classifiedRate: totalRequests > 0 ? classifiedRequests / totalRequests : 0,
     cacheHitRate: classifiedRequests > 0 ? (summary?.cachedRequests ?? 0) / classifiedRequests : 0,
-    fallbackRate:
-      classifiedRequests > 0 ? (summary?.fallbackRequests ?? 0) / classifiedRequests : 0,
   };
 }
 
@@ -219,7 +208,7 @@ export function AutoRoutingBreakdownTables({
       <div className="grid gap-4 xl:grid-cols-2">
         <BreakdownCard
           title="Status"
-          help="Breakdown by raw classifier status: fallback:<reason> rows for heuristic fallback classifications and classifier_error:<subtype> rows for classifier failures."
+          help="Breakdown by raw classifier status, with classifier_error:<subtype> rows for classifier failures."
           loading={loading}
         >
           <Table>
@@ -374,10 +363,7 @@ export function AutoRoutingAdminContent() {
     queryKey: ['auto-routing', 'classifier-analytics', period],
     queryFn: () => fetchClassifierAnalytics(period),
   });
-  const openRouterModelsQuery = useQuery({
-    queryKey: ['auto-routing', 'openrouter-models'],
-    queryFn: fetchOpenRouterModels,
-  });
+  const systemOneModelsQuery = useSystemOneModelOptions();
 
   useEffect(() => {
     const override = classifierModelQuery.data?.override;
@@ -387,23 +373,13 @@ export function AutoRoutingAdminContent() {
     }
   }, [classifierModelQuery.data?.override, classifierModelQuery.data?.model]);
 
-  const modelOptions = useMemo<ModelOption[]>(() => {
-    return (
-      openRouterModelsQuery.data?.data.map(model => ({
-        id: model.id,
-        name: model.name,
-        supportsVision: model.architecture.input_modalities.includes('image'),
-      })) ?? []
-    );
-  }, [openRouterModelsQuery.data?.data]);
-
   const saveMutation = useMutation({
     mutationFn: saveClassifierModel,
     onSuccess: (data, model) => {
       queryClient.setQueryData(['auto-routing', 'classifier-model'], data);
       setSelectedModel(data.override ?? data.model);
       if (model === null) {
-        toast.success('Override cleared — benchmark winner in effect');
+        toast.success(`Override cleared — ${data.model} in effect`);
       } else {
         toast.success('Classifier model override saved');
       }
@@ -414,13 +390,11 @@ export function AutoRoutingAdminContent() {
   });
 
   const isRefreshing =
-    classifierModelQuery.isFetching ||
-    analyticsQuery.isFetching ||
-    openRouterModelsQuery.isFetching;
+    classifierModelQuery.isFetching || analyticsQuery.isFetching || systemOneModelsQuery.isFetching;
   const classifierModelError =
     classifierModelQuery.error instanceof Error ? classifierModelQuery.error.message : undefined;
-  const openRouterModelsError =
-    openRouterModelsQuery.error instanceof Error ? openRouterModelsQuery.error.message : undefined;
+  const systemOneModelsError =
+    systemOneModelsQuery.error instanceof Error ? systemOneModelsQuery.error.message : undefined;
   const currentOverride = classifierModelQuery.data?.override ?? null;
   const hasClassifierModelLoaded = classifierModelQuery.isSuccess;
   const hasModelChange =
@@ -429,7 +403,7 @@ export function AutoRoutingAdminContent() {
     selectedModel !== (currentOverride ?? '');
   const summary = analyticsQuery.data?.summary;
   const totalRequests = summary?.totalRequests ?? 0;
-  const { classifiedRate, cacheHitRate, fallbackRate } = summaryRates(summary);
+  const { classifiedRate, cacheHitRate } = summaryRates(summary);
   const analyticsErrorMessage =
     analyticsQuery.error instanceof Error
       ? analyticsQuery.error.message
@@ -451,7 +425,7 @@ export function AutoRoutingAdminContent() {
           onClick={() => {
             void classifierModelQuery.refetch();
             void analyticsQuery.refetch();
-            void openRouterModelsQuery.refetch();
+            void systemOneModelsQuery.refetch();
             // Invalidate the shared selector catalog the benchmark pickers read
             // from (query key prefix ['openrouter-models']).
             void queryClient.invalidateQueries({ queryKey: ['openrouter-models'] });
@@ -469,7 +443,7 @@ export function AutoRoutingAdminContent() {
           <CardTitle className="text-base">Classifier model override</CardTitle>
           <MetricHelp
             label="Classifier model override"
-            description="When unset, the latest classifier benchmark winner is used. Setting an override bypasses the benchmark winner. Saving updates KV config without a redeploy."
+            description="Classifier models are System One models. When unset, the latest classifier benchmark winner is used, or the default model when no winner is published. Setting an override bypasses the benchmark winner. Saving updates KV config without a redeploy."
           />
         </CardHeader>
         <CardContent className="flex flex-col gap-4 p-4 pt-0">
@@ -494,15 +468,19 @@ export function AutoRoutingAdminContent() {
                 (classifierModelQuery.data?.benchmarkWinner ?? 'not yet published')
               )}
             </dd>
+            <dt className="text-muted-foreground">Default model</dt>
+            <dd className="font-mono text-xs truncate">
+              {classifierModelQuery.data?.defaultModel ?? <Skeleton className="h-4 w-48" />}
+            </dd>
           </dl>
           <div className="grid gap-4 lg:grid-cols-[1fr_auto_auto] lg:items-end">
             <ModelCombobox
               label="Set override"
-              models={modelOptions}
+              models={systemOneModelsQuery.data ?? []}
               value={selectedModel}
               onValueChange={setSelectedModel}
-              isLoading={openRouterModelsQuery.isLoading || classifierModelQuery.isLoading}
-              error={classifierModelError ?? openRouterModelsError}
+              isLoading={systemOneModelsQuery.isLoading || classifierModelQuery.isLoading}
+              error={classifierModelError ?? systemOneModelsError}
               placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}
               className="w-full"
             />
@@ -604,14 +582,6 @@ export function AutoRoutingAdminContent() {
               icon={DollarSign}
               loading={analyticsQuery.isLoading}
               help="Summed OpenRouter classifier cost in OpenRouter credits, not USD."
-            />
-            <MetricCard
-              title="Fallback Rate"
-              value={formatPercent(fallbackRate)}
-              detail={`${formatNumber(summary?.fallbackRequests ?? 0)} heuristic fallbacks`}
-              icon={Route}
-              loading={analyticsQuery.isLoading}
-              help="Percent of classified requests that used the heuristic fallback classification because the classifier model call failed or returned invalid output. The Status table breaks fallbacks down by reason."
             />
             <MetricCard
               title="Classifier Errors"

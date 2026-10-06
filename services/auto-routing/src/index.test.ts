@@ -9,6 +9,7 @@ import { ClassifierRunError } from './model-classifier';
 import type * as DbModule from '@kilocode/db';
 import type * as ModelClassifierModule from './model-classifier';
 import type { AutoRoutingMode, EfficientModelPool } from '@kilocode/auto-routing-contracts';
+import { CLASSIFIER_WINNER_KV_KEY } from '@kilocode/auto-routing-contracts';
 
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const getWorkerDb = vi.hoisted(() => vi.fn());
@@ -304,7 +305,7 @@ describe('auto routing worker', () => {
   describe('capability-aware routing', () => {
     // A two-candidate route where the cheaper model is text-only and the
     // second is image-capable. This lets a single fixture exercise both
-    // the fresh, cached, and fallback code paths in decide.ts.
+    // the fresh and cached classification paths in decide.ts.
     const visionTable = {
       ...benchmarkRoutingTable,
       routes: {
@@ -376,25 +377,6 @@ describe('auto routing worker', () => {
         classifierResult: { classification: mockClassification },
       });
       expect(classifyNormalizedInput).not.toHaveBeenCalled();
-    });
-
-    it('skips a non-vision top candidate on the heuristic-fallback-classification path', async () => {
-      setVisionBenchmark();
-      setVisionCaps();
-      classifyNormalizedInput.mockResolvedValueOnce({
-        ...mockClassifierResult,
-        classification: { ...mockClassification, confidence: 0 },
-        fallback: { reason: 'invalid_output' },
-      });
-      const response = await decideRequest(
-        mirrorPayload({ constraints: { requiredInputModalities: ['image'] } })
-      );
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toMatchObject({
-        decision: { model: 'vision/chat', sticky: false },
-      });
-      // A fallback classification must not re-anchor the sticky model.
-      expect(cachePutEntry).not.toHaveBeenCalledWith('sticky', expect.anything());
     });
 
     it('is byte-identical for an old-gateway payload (no constraints field)', async () => {
@@ -709,14 +691,7 @@ describe('auto routing worker', () => {
         normalized: normalizedInput,
       },
     });
-    // The outbound session id is a hash: the conversation key embeds the raw
-    // user id, which must not be sent to OpenRouter.
-    expect(classifyNormalizedInput).toHaveBeenCalledWith(
-      env,
-      normalizedInput,
-      'google/gemini-2.5-flash-lite',
-      { openrouterSessionId: expect.stringMatching(/^[0-9a-f]{16}$/) }
-    );
+    expect(classifyNormalizedInput).toHaveBeenCalledWith(env, normalizedInput, 'typesafe/jev-1.13');
     expect(writeDataPoint).toHaveBeenCalledWith({
       indexes: ['google/gemini-2.5-flash-lite'],
       blobs: [
@@ -1890,71 +1865,6 @@ describe('auto routing worker', () => {
     await expect(response.json()).resolves.toMatchObject({ cost: 0 });
   });
 
-  it('logs fallback decisions with failure diagnostics', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    classifyNormalizedInput.mockResolvedValueOnce({
-      ...mockClassifierResult,
-      classification: {
-        ...mockClassification,
-        confidence: 0,
-      },
-      fallback: {
-        reason: 'invalid_output',
-        failureStage: 'invalid_schema',
-        schemaIssueSummary: ['taskType:invalid_value'],
-        topLevelKeys: ['minecraft'],
-      },
-    });
-
-    const response = await decideRequest(mirrorPayload());
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      cost: 0.00000123,
-      classifierResult: {
-        classification: {
-          confidence: 0,
-        },
-      },
-    });
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    const [logMessage] = warnSpy.mock.calls[0] ?? [];
-    expect(JSON.parse(String(logMessage))).toMatchObject({
-      event: 'auto_routing_decision',
-      status: 'fallback:invalid_output',
-      cacheHit: false,
-      fallbackReason: 'invalid_output',
-      classifierModel: 'google/gemini-2.5-flash-lite',
-      requestedModel: 'anthropic/claude-sonnet-4',
-      apiKind: 'chat_completions',
-      sessionId: 'task-123',
-      classifierDurationMs: expect.any(Number),
-      classifierCostCredits: 0.00000123,
-      confidence: 0,
-      classifierFailureStage: 'invalid_schema',
-      classifierSchemaIssueSummary: ['taskType:invalid_value'],
-      classifierOutputTopLevelKeys: ['minecraft'],
-    });
-    expect(writeDataPoint).toHaveBeenCalledWith({
-      indexes: ['google/gemini-2.5-flash-lite'],
-      blobs: [
-        'google/gemini-2.5-flash-lite',
-        'anthropic/claude-sonnet-4',
-        'fallback:invalid_output',
-        'implementation',
-        'feature_development',
-        'medium',
-        'medium',
-        'code_change',
-        '1',
-      ],
-      doubles: [expect.any(Number), 0.00000123, 0, 0],
-    });
-    // A heuristic fallback classification is served but must not re-anchor
-    // the session's sticky model (same rule as the classification cache).
-    expect(cachePutEntry).not.toHaveBeenCalledWith('sticky', expect.anything());
-  });
-
   it('makes no decision when no routing table is published', async () => {
     benchmarkFetch.mockImplementation(async (url: string) => {
       if (String(url).includes('/admin/classifier-winner')) {
@@ -1981,9 +1891,8 @@ describe('auto routing worker', () => {
       new ClassifierRunError('Classifier model returned invalid classification', {
         cost: 0.00000123,
         classifierModel: 'google/gemini-2.5-flash-lite',
-        failureStage: 'invalid_schema',
+        failureStage: 'invalid_response',
         schemaIssueSummary: ['taskType:invalid_value'],
-        topLevelKeys: ['confidence'],
       })
     );
 
@@ -2000,7 +1909,7 @@ describe('auto routing worker', () => {
     expect(typeof logMessage).toBe('string');
     expect(JSON.parse(String(logMessage))).toMatchObject({
       event: 'auto_routing_decision',
-      status: 'classifier_error:invalid_schema',
+      status: 'classifier_error:invalid_response',
       cacheHit: false,
       reason: 'classifier_run_error',
       classifierModel: 'google/gemini-2.5-flash-lite',
@@ -2009,9 +1918,8 @@ describe('auto routing worker', () => {
       sessionId: null,
       classifierDurationMs: expect.any(Number),
       classifierCostCredits: 0.00000123,
-      classifierFailureStage: 'invalid_schema',
+      classifierFailureStage: 'invalid_response',
       classifierSchemaIssueSummary: ['taskType:invalid_value'],
-      classifierOutputTopLevelKeys: ['confidence'],
       error: 'Classifier model returned invalid classification',
       stack: expect.any(String),
     });
@@ -2020,7 +1928,7 @@ describe('auto routing worker', () => {
       blobs: [
         'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
-        'classifier_error:invalid_schema',
+        'classifier_error:invalid_response',
         '',
         '',
         '',
@@ -2109,7 +2017,7 @@ describe('auto routing worker', () => {
       model: 'google/gemini-2.5-flash-lite',
       override: 'google/gemini-2.5-flash-lite',
       benchmarkWinner: null,
-      defaultModel: 'google/gemini-2.5-flash-lite',
+      defaultModel: 'typesafe/jev-1.13',
     });
     expect(configGet).toHaveBeenCalledWith('classifier_model');
   });
@@ -2117,9 +2025,9 @@ describe('auto routing worker', () => {
   it('falls back to the benchmark winner when no override is set', async () => {
     configGet.mockImplementation(key =>
       Promise.resolve(
-        key === 'classifier_benchmark_winner'
+        key === CLASSIFIER_WINNER_KV_KEY
           ? JSON.stringify({
-              model: 'qwen/qwen3.7-plus',
+              model: 'cloudflare/clef',
               runId: 'classifier-run-1',
               accuracy: 0.93,
               generatedAt: '2026-06-12T00:00:00.000Z',
@@ -2134,10 +2042,10 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      model: 'qwen/qwen3.7-plus',
+      model: 'cloudflare/clef',
       override: null,
-      benchmarkWinner: 'qwen/qwen3.7-plus',
-      defaultModel: 'google/gemini-2.5-flash-lite',
+      benchmarkWinner: 'cloudflare/clef',
+      defaultModel: 'typesafe/jev-1.13',
     });
   });
 
@@ -2163,7 +2071,7 @@ describe('auto routing worker', () => {
       model: 'google/gemini-2.5-flash-lite:free',
       override: 'google/gemini-2.5-flash-lite:free',
       benchmarkWinner: null,
-      defaultModel: 'google/gemini-2.5-flash-lite',
+      defaultModel: 'typesafe/jev-1.13',
     });
     expect(configPut).toHaveBeenCalledWith('classifier_model', 'google/gemini-2.5-flash-lite:free');
   });
@@ -2180,10 +2088,10 @@ describe('auto routing worker', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      model: 'google/gemini-2.5-flash-lite',
+      model: 'typesafe/jev-1.13',
       override: null,
       benchmarkWinner: null,
-      defaultModel: 'google/gemini-2.5-flash-lite',
+      defaultModel: 'typesafe/jev-1.13',
     });
     expect(configDelete).toHaveBeenCalledWith('classifier_model');
   });
@@ -2212,7 +2120,6 @@ describe('auto routing worker', () => {
               total_requests: 10,
               classified_requests: 8,
               cached_requests: 6,
-              fallback_requests: 2,
               classifier_errors: 1,
               invalid_requests: 1,
               total_cost_credits: 0.0000123,
@@ -2279,7 +2186,6 @@ describe('auto routing worker', () => {
         totalRequests: 10,
         classifiedRequests: 8,
         cachedRequests: 6,
-        fallbackRequests: 2,
         classifierErrors: 1,
         invalidRequests: 1,
         totalCostCredits: 0.0000123,
@@ -2310,7 +2216,7 @@ describe('auto routing worker', () => {
       })
     );
     const summarySql = mockedFetch.mock.calls[0]?.[1]?.body as string;
-    expect(summarySql).toContain("startsWith(blob3, 'fallback:')");
+    expect(summarySql).toContain("IF(blob3 = 'classified', 1, 0)");
     expect(summarySql).toContain('FROM auto_routing_classifier_metrics_v2');
     expect(summarySql).not.toContain('invalid_body');
   });
@@ -2329,7 +2235,6 @@ describe('auto routing worker', () => {
         totalRequests: 0,
         classifiedRequests: 0,
         cachedRequests: 0,
-        fallbackRequests: 0,
         classifierErrors: 0,
         invalidRequests: 0,
         totalCostCredits: 0,
@@ -2353,7 +2258,6 @@ describe('auto routing worker', () => {
               {
                 total_requests: 0,
                 classified_requests: 0,
-                fallback_requests: null,
                 classifier_errors: 0,
                 invalid_requests: 0,
                 total_cost_credits: 0,
@@ -2379,7 +2283,6 @@ describe('auto routing worker', () => {
       summary: {
         avgDurationMs: 0,
         p95DurationMs: 0,
-        fallbackRequests: 0,
       },
     });
   });

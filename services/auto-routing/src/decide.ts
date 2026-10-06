@@ -19,7 +19,6 @@ import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifi
 import {
   computeContentHashes,
   deriveConversationKey,
-  deriveOutboundSessionId,
   hashIdentifierForTelemetry,
 } from './conversation-identity';
 import type { ContentHashes } from './conversation-identity';
@@ -131,7 +130,6 @@ function getClassifierFailureMetadata(error: unknown): {
   classifierModel?: string;
   failureStage?: string;
   schemaIssueSummary?: string[];
-  topLevelKeys?: string[];
 } {
   if (error instanceof ClassifierRunError) {
     return {
@@ -139,7 +137,6 @@ function getClassifierFailureMetadata(error: unknown): {
       classifierModel: error.classifierModel,
       failureStage: error.failureStage,
       schemaIssueSummary: error.schemaIssueSummary,
-      topLevelKeys: error.topLevelKeys,
     };
   }
   return {};
@@ -154,7 +151,7 @@ function getClassifierFailureReason(error: unknown): string {
 
 function classifierErrorStatus(error: unknown): `classifier_error:${string}` {
   if (error instanceof ClassifierRunError) {
-    return `classifier_error:${error.failureStage ?? 'run_error'}`;
+    return `classifier_error:${error.failureStage}`;
   }
   if (error instanceof Error && error.message.startsWith('Secrets Worker:')) {
     return 'classifier_error:secret_error';
@@ -187,8 +184,7 @@ type DecisionSummary = {
   classification?: ClassifierOutput;
   cost: number | null;
   cacheHit: boolean;
-  retried: boolean;
-  // Outcome-specific log fields (model-call metadata, failure diagnostics).
+  // Outcome-specific log fields (failure diagnostics).
   details: Record<string, unknown>;
 };
 
@@ -201,46 +197,17 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
         classification: outcome.classification,
         cost: 0,
         cacheHit: true,
-        retried: false,
         details: {},
       };
     case 'model': {
       const { classifier } = outcome;
-      const meta = classifier.modelCallMeta;
-      const callDetails = {
-        ...(meta
-          ? {
-              finishReason: meta.finishReason,
-              completionTokens: meta.completionTokens,
-              reasoningTokens: meta.reasoningTokens,
-            }
-          : {}),
-        ...(classifier.firstAttemptFailure
-          ? { firstAttemptFailure: classifier.firstAttemptFailure }
-          : {}),
-      };
-      const fallback = classifier.fallback;
       return {
-        status: fallback ? `fallback:${fallback.reason}` : 'classified',
+        status: 'classified',
         classifierModel: classifier.classifierModel,
         classification: classifier.classification,
         cost: classifier.cost,
         cacheHit: false,
-        retried: classifier.retried ?? false,
-        details: fallback
-          ? {
-              ...callDetails,
-              fallbackReason: fallback.reason,
-              ...(fallback.failureStage ? { classifierFailureStage: fallback.failureStage } : {}),
-              ...(fallback.schemaIssueSummary?.length
-                ? { classifierSchemaIssueSummary: fallback.schemaIssueSummary }
-                : {}),
-              ...(fallback.topLevelKeys?.length
-                ? { classifierOutputTopLevelKeys: fallback.topLevelKeys }
-                : {}),
-              ...(meta ? { textLength: meta.textLength } : {}),
-            }
-          : callDetails,
+        details: {},
       };
     }
     case 'error': {
@@ -250,15 +217,11 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
         classifierModel: metadata.classifierModel ?? null,
         cost: metadata.cost ?? null,
         cacheHit: false,
-        retried: false,
         details: {
           reason: getClassifierFailureReason(outcome.error),
           ...(metadata.failureStage ? { classifierFailureStage: metadata.failureStage } : {}),
           ...(metadata.schemaIssueSummary?.length
             ? { classifierSchemaIssueSummary: metadata.schemaIssueSummary }
-            : {}),
-          ...(metadata.topLevelKeys?.length
-            ? { classifierOutputTopLevelKeys: metadata.topLevelKeys }
             : {}),
           ...formatError(outcome.error),
         },
@@ -269,8 +232,8 @@ function summarizeOutcome(outcome: DecisionOutcome): DecisionSummary {
 
 // Single sink for decision telemetry: one Analytics Engine data point and
 // one `auto_routing_decision` log line per decision. Successes are sampled
-// per the KV-configured rate; fallbacks, errors, and real model switches
-// always log (failures at warn).
+// per the KV-configured rate; errors and real model switches always log
+// (failures at warn).
 function recordDecision(
   env: Env,
   ctx: DecisionContext,
@@ -306,12 +269,10 @@ function recordDecision(
   const routeChanged =
     routeKey !== null && incumbent?.routeKey != null ? routeKey !== incumbent.routeKey : null;
 
-  // Retried decisions are rare and diagnostically valuable, so they bypass
-  // sampling along with failures. Real model switches also always log:
-  // within-session switch sequences are the signal the sampled stream
-  // decimates.
+  // Failures bypass sampling, and so do real model switches: within-session
+  // switch sequences are the signal the sampled stream decimates.
   const isFailure = summary.status !== 'classified';
-  const alwaysLog = isFailure || summary.retried || switched;
+  const alwaysLog = isFailure || switched;
   if (!alwaysLog && Math.random() >= ctx.successSampleRate) {
     return;
   }
@@ -321,7 +282,6 @@ function recordDecision(
       event: 'auto_routing_decision',
       status: summary.status,
       cacheHit: summary.cacheHit,
-      retried: summary.retried,
       classifierModel: summary.classifierModel,
       requestedModel: ctx.payload.input.requestedModel,
       apiKind: ctx.payload.input.apiKind,
@@ -520,20 +480,16 @@ export const decideHandler: Handler<HonoEnv> = async c => {
   }
 
   try {
-    const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel, {
-      openrouterSessionId: await deriveOutboundSessionId(ctx.conversationKey),
-    });
-    if (!classifier.fallback) {
-      c.executionCtx.waitUntil(
-        putCachedClassification(
-          c.env,
-          ctx.conversationKey,
-          hashes.exact,
-          classifier.classifierModel,
-          classifier.classification
-        )
-      );
-    }
+    const classifier = await classifyNormalizedInput(c.env, payload.input, classifierModel);
+    c.executionCtx.waitUntil(
+      putCachedClassification(
+        c.env,
+        ctx.conversationKey,
+        hashes.exact,
+        classifier.classifierModel,
+        classifier.classification
+      )
+    );
     const decision = computeDecision(
       classifier.classification,
       routingTable,
@@ -542,9 +498,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       routingMode,
       decisionOptions
     );
-    // Like the classification cache, sticky state only trusts real classifier
-    // output: a heuristic fallback must not re-anchor the session's model.
-    if (decision && !classifier.fallback) {
+    if (decision) {
       c.executionCtx.waitUntil(
         putStickyDecision(
           c.env,
@@ -577,9 +531,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       null,
       sticky
     );
-    // A failed run can still have billed the first attempt (e.g. a valid-but-
-    // invalid response followed by a throwing retry), so report that cost
-    // even though there is no usable classifier result.
+    // A failed System One run can still have billed the request, so report
+    // that cost even though there is no usable classifier result.
     return c.json(emptyDecisionResponse(getClassifierFailureMetadata(error).cost ?? 0));
   }
 };

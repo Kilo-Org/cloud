@@ -206,7 +206,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
   });
 
   app.get('/admin/classifier-winner', async c => {
-    const winner = await getClassifierWinner(c.env.BENCH_DB);
+    const winner = await getClassifierWinner(c.env.BENCH_DB, computeEngineIdentity('classifier'));
     return c.json({ winner });
   });
 

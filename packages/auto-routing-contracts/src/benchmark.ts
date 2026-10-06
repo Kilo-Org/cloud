@@ -236,6 +236,10 @@ export const BenchmarkModelSummarySchema = z.object({
   cases: z.number().int(),
   errors: z.number().int(),
   timeouts: z.number().int().default(0),
+  // Classifier runs only: share of cases whose predicted taskType/subtaskType
+  // equals the golden route key, the only axes the decision engine reads.
+  // Null for decider runs and for classifier runs recorded before it existed.
+  routeAccuracy: z.number().min(0).max(1).nullable().default(null),
 });
 export type BenchmarkModelSummary = z.infer<typeof BenchmarkModelSummarySchema>;
 
@@ -331,7 +335,8 @@ export const ClassifierWinnerSchema = z.object({
 });
 export type ClassifierWinner = z.infer<typeof ClassifierWinnerSchema>;
 
-export const CLASSIFIER_WINNER_KV_KEY = 'classifier_benchmark_winner';
+// Renamed at the System One cutover so a cached chat-model winner is never read.
+export const CLASSIFIER_WINNER_KV_KEY = 'classifier_system_one_winner';
 
 export const ClassifierWinnerResponseSchema = z.object({
   winner: ClassifierWinnerSchema.nullable(),

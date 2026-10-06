@@ -13,7 +13,6 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
-  type KiloPassTier,
   type KiloPassWelcomePromoEligibilityReason,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
@@ -192,29 +191,6 @@ async function getOrCreateIssuanceForYearlyCadence(
   };
 }
 
-/**
- * The highest tier the issuance's base credits paid for, capped at the subscription tier. A store
- * plan change can move the subscription above the credited base before the new price is paid (a
- * Google Play switch bills at the old renewal date), and the bonus must follow the paid base.
- */
-function getCreditedTier(
-  subscriptionTier: KiloPassTier,
-  creditedBaseUsd: number
-): KiloPassTier | null {
-  let credited: KiloPassTier | null = null;
-  for (const tier of Object.keys(KILO_PASS_TIER_CONFIG) as KiloPassTier[]) {
-    const priceUsd = KILO_PASS_TIER_CONFIG[tier].monthlyPriceUsd;
-    if (
-      priceUsd <= creditedBaseUsd &&
-      priceUsd <= KILO_PASS_TIER_CONFIG[subscriptionTier].monthlyPriceUsd &&
-      (credited === null || priceUsd > KILO_PASS_TIER_CONFIG[credited].monthlyPriceUsd)
-    ) {
-      credited = tier;
-    }
-  }
-  return credited;
-}
-
 async function maybeIssueBonusFromUsageThreshold(
   tx: Tx,
   params: {
@@ -252,11 +228,12 @@ async function maybeIssueBonusFromUsageThreshold(
     return;
   }
 
-  const tier = getCreditedTier(subscription.tier, baseItem.amount_usd);
-  if (!tier) {
-    await clearKiloPassThreshold(tx, { kiloUserId });
-    return;
-  }
+  // The bonus follows the base this issuance credited. A store plan switch can move the
+  // subscription tier above it before the new price is paid.
+  const baseAmountUsd = Math.min(
+    KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd,
+    baseItem.amount_usd
+  );
 
   if (subscription.paymentProvider === KiloPassPaymentProvider.GooglePlay) {
     const refund = await tx.query.credit_transactions.findFirst({
@@ -291,7 +268,7 @@ async function maybeIssueBonusFromUsageThreshold(
     if (subscription.cadence !== KiloPassCadence.Monthly) {
       return {
         bonusPercentApplied: KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
-        description: `Kilo Pass yearly monthly bonus (${tier}, ${issuance.issueMonth})`,
+        description: `Kilo Pass yearly monthly bonus (${subscription.tier}, ${issuance.issueMonth})`,
       };
     }
 
@@ -318,7 +295,7 @@ async function maybeIssueBonusFromUsageThreshold(
       initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
     });
     const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
-      tier,
+      tier: subscription.tier,
       startedAtIso: subscription.startedAt,
       currentStreakMonths: subscription.currentStreakMonths,
       isFirstTimeSubscriberEver,
@@ -339,7 +316,7 @@ async function maybeIssueBonusFromUsageThreshold(
     issuanceId: issuance.issuanceId,
     subscriptionId: subscription.subscriptionId,
     kiloUserId,
-    baseAmountUsd: KILO_PASS_TIER_CONFIG[tier].monthlyPriceUsd,
+    baseAmountUsd,
     bonusPercentApplied: decision.bonusPercentApplied,
     stripeInvoiceId: issuance.stripeInvoiceId,
     description: decision.description,

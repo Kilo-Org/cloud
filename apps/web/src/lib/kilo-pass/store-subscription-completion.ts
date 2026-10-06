@@ -531,6 +531,12 @@ async function applyStoreUpgradeCreditAdjustments(
   }
 }
 
+/**
+ * The first order of a Play replacement token starts at the switch, seconds from the token's
+ * start time. A later order of the token starts when a paid period ends.
+ */
+const PLAY_REPLACEMENT_FIRST_ORDER_TOLERANCE_MS = 5 * 60 * 1000;
+
 // ----- purchase ledger (P1-A-08d) -------------------------------------------
 
 const PURCHASE_LEDGER_DOMAIN = 'purchase' as const;
@@ -677,12 +683,19 @@ export async function completeStoreKiloPassPurchase(params: {
       }
       // Every other replacement mode switches the plan at once, but Play bills the new price at
       // the old renewal date (WITHOUT_PRORATION) or converts the unused time (WITH_TIME_PRORATION).
-      // Inside the paid period, the new plan has no paid period of its own yet. Keep the paid
-      // tier and its credits until the renewal order of the new plan completes.
+      // The first order of the new token then starts at the switch, inside the paid period, and
+      // pays for no period of the new plan. Keep the paid tier and its credits; the next order of
+      // the token (its renewal) changes the tier. A charged switch (CHARGE_*_PRICE) waits too: a
+      // prorated charge near the period end must not buy a full base of the new tier.
+      const startedAt = purchase.subscriptionStartedAtIso
+        ? dayjs(purchase.subscriptionStartedAtIso).valueOf()
+        : NaN;
+      const periodStart = dayjs(purchase.purchasedAtIso).valueOf();
       const isMidPeriodReplacement =
         !replacement.deferred &&
         receipt?.expires_at != null &&
-        dayjs(purchase.purchasedAtIso).valueOf() < dayjs(receipt.expires_at).valueOf();
+        Math.abs(periodStart - startedAt) <= PLAY_REPLACEMENT_FIRST_ORDER_TOLERANCE_MS &&
+        periodStart < dayjs(receipt.expires_at).valueOf();
       await tx
         .update(kilo_pass_subscriptions)
         .set({ provider_subscription_id: purchase.providerSubscriptionId })

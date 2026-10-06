@@ -18,11 +18,18 @@ let deliverCreditEvent: typeof BouncerClient.deliverCreditEvent;
 let decide: typeof BouncerClient.decide;
 let reportUsageEvent: typeof BouncerClient.reportUsageEvent;
 let creditEventWireBody: typeof BouncerClient.creditEventWireBody;
+let usageEventWireBody: typeof BouncerClient.usageEventWireBody;
 let normalizeJa4: typeof BouncerClient.normalizeJa4;
 
 beforeAll(() => {
-  ({ deliverCreditEvent, decide, reportUsageEvent, creditEventWireBody, normalizeJa4 } =
-    jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
+  ({
+    deliverCreditEvent,
+    decide,
+    reportUsageEvent,
+    creditEventWireBody,
+    usageEventWireBody,
+    normalizeJa4,
+  } = jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
 });
 
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
@@ -140,6 +147,83 @@ describe('decide', () => {
       decide({ requestId: 'r', tier: 'free', accountId: 'org:o' }, { timeoutMs: 50 })
     ).resolves.toBeNull();
   });
+
+  it('returns a valid verdict, including its internal flags', async () => {
+    const verdict = {
+      enforced: true,
+      code: 'spend_limited',
+      retryAfterMs: 2_000,
+      spendWatch: true,
+      flags: [
+        { name: 'spend:watch', decision: 'throttle', enforced: true, until: 5, source: 'payer' },
+      ],
+    };
+    mockFetch.mockResolvedValue(Response.json(verdict));
+    await expect(
+      decide({ requestId: 'r', tier: 'paid', accountId: 'user:u' }, { timeoutMs: 50 })
+    ).resolves.toEqual(verdict);
+  });
+
+  it.each([
+    ['the pre-enforcement verdict', { decision: 'allow', reasons: [], enforced: false }],
+    ['an unknown code', { enforced: true, code: 'banned', spendWatch: false, flags: [] }],
+    ['a missing spendWatch', { enforced: false, flags: [] }],
+    ['a non-object body', 'allow'],
+  ])('fails open on %s', async (_name, body) => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockResolvedValue(Response.json(body));
+    await expect(
+      decide({ requestId: 'r', tier: 'paid', accountId: 'user:u' }, { timeoutMs: 50 })
+    ).resolves.toBeNull();
+  });
+
+  it('sends the payer facts as ISO time and non-negative integers', async () => {
+    mockFetch.mockResolvedValue(Response.json({ enforced: false, spendWatch: false, flags: [] }));
+    await decide(
+      {
+        requestId: 'r',
+        tier: 'paid',
+        accountId: 'org:o',
+        accountCreatedAt: '2026-04-29 01:16:12.945+00',
+        usedMicrodollars: 5_000_000_000,
+        acquiredMicrodollars: -1,
+      },
+      { timeoutMs: 50 }
+    );
+    const body = lastRequestBody();
+    expect(body.accountCreatedAt).toBe('2026-04-29T01:16:12.945Z');
+    expect(body.usedMicrodollars).toBe(5_000_000_000);
+    expect(body).not.toHaveProperty('acquiredMicrodollars');
+  });
+});
+
+describe('usage event and charge cost fields', () => {
+  it('carries the charged cost on the usage wire body', () => {
+    const body = usageEventWireBody({
+      requestId: 'r',
+      accountId: 'user:u',
+      inputTokens: 1,
+      outputTokens: 2,
+      clientAttributed: true,
+      hasTools: false,
+      requestedLogprobs: false,
+      costMicrodollars: 1234.4,
+    });
+    expect(body.costMicrodollars).toBe(1234);
+  });
+
+  it('carries the payer usage on charge.attempted', () => {
+    const body = creditEventWireBody({
+      type: 'charge.attempted',
+      eventId: 'evt-used',
+      userId: 'user-1',
+      flow: 'topup',
+      amountCents: 100,
+      accountCreatedAt: new Date('2026-01-01T00:00:00Z'),
+      accountUsedMicrodollars: 42_000_000,
+    });
+    expect(body.accountUsedMicrodollars).toBe(42_000_000);
+  });
 });
 
 function lastRequestBody(): Record<string, unknown> {
@@ -209,7 +293,7 @@ describe('reportUsageEvent ja4', () => {
 
 describe('decide ja4', () => {
   it('sends a bounded ja4 on a signed-in decide', async () => {
-    mockFetch.mockResolvedValue(Response.json({ decision: 'allow', reasons: [], enforced: false }));
+    mockFetch.mockResolvedValue(Response.json({ enforced: false, spendWatch: false, flags: [] }));
     await decide(
       { requestId: 'r', tier: 'free', accountId: 'user:u', ip: '203.0.113.7', ja4: 'A_B' },
       { timeoutMs: 50 }

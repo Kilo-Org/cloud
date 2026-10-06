@@ -1,11 +1,12 @@
 /* oxlint-disable max-lines -- cohesive HTML segmentation, sanitization, and image/link wiring share one renderer */
-import { useMemo } from 'react';
+import { type ComponentProps, useMemo } from 'react';
 import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
   Platform,
   Text,
+  type TextStyle,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -523,18 +524,34 @@ const HTML_ELEMENT_MODELS = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
+type TextualRendererProps = ComponentProps<CustomTextualRenderer>;
+
+/**
+ * Draws a textual node with the library's default renderer. The library types
+ * its computed style loosely (`userSelect: string`, `transitionDuration`
+ * accepting numbers), and Expo's react-native-web augmentation
+ * (`expo-env.d.ts`, which `expo start` writes) narrows those `TextStyle` keys,
+ * so with that file present the style no longer matches the default
+ * renderer's own type. The style is the library's own value, passed back
+ * unchanged; only its declared type is restated.
+ */
+function DefaultTextual({ TDefaultRenderer, style, ...props }: TextualRendererProps) {
+  const textStyle = style as TextStyle;
+  return <TDefaultRenderer {...props} style={textStyle} />;
+}
+
 // Subscript and superscript sit in an inline view, the one way React Native
 // can shift text off the line's baseline. The view's bottom sits on the
 // baseline, which already lifts its glyphs, so the subscript moves down by
 // more than the superscript moves up.
-const HtmlSub: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
+const HtmlSub: CustomTextualRenderer = props => (
   <View className="translate-y-[9px]">
-    <TDefaultRenderer {...props} />
+    <DefaultTextual {...props} />
   </View>
 );
-const HtmlSup: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
+const HtmlSup: CustomTextualRenderer = props => (
   <View className="-translate-y-1.5">
-    <TDefaultRenderer {...props} />
+    <DefaultTextual {...props} />
   </View>
 );
 
@@ -651,12 +668,12 @@ export function MarkdownHtml({
     };
     // The inline view's bottom sits on the baseline; move the key down so its
     // label shares the line's baseline instead of floating above it.
-    const HtmlKbd: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
+    const HtmlKbd: CustomTextualRenderer = props => (
       <View
         className="translate-y-1.5 rounded border px-1"
         style={{ backgroundColor: palette.codeBackground, borderColor: palette.borderColor }}
       >
-        <TDefaultRenderer {...props} />
+        <DefaultTextual {...props} />
       </View>
     );
     return {

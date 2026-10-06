@@ -59,6 +59,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/agents/code-block-model.ts': 'language-identifier normalization',
   'components/agents/live-session-filters.ts': 'search folding',
   'components/agents/markdown-html.tsx': 'HTML tag-name comparison',
+  'components/agents/markdown-html-tree.ts': 'HTML tag-name comparison',
   'components/agents/markdown-image.tsx': 'hostname comparison',
   'components/agents/markdown-link-confirm.ts': 'hostname comparison',
   'components/agents/new-session-prefill.ts': 'repo full-name comparison',

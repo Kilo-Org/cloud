@@ -3218,7 +3218,6 @@
     "newAgent": "Uusi agentti",
     "approving": "Hyväksytään...",
     "couldNotApprove": "Hyväksyntä epäonnistui",
-    "couldNotStart": "Käynnistys epäonnistui",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",

@@ -3,7 +3,6 @@ import { Button, type ButtonProps, HStack, Image, Spacer, Text, VStack } from '@
 import {
   accessibilityElement,
   accessibilityLabel,
-  allowsTightening,
   buttonStyle,
   containerBackground,
   controlSize,
@@ -15,8 +14,8 @@ import {
   frame,
   layoutPriority,
   lineLimit,
-  minimumScaleFactor,
   monospacedDigit,
+  multilineTextAlignment,
   resizable,
   widgetURL,
 } from '@expo/ui/swift-ui/modifiers';
@@ -50,12 +49,11 @@ type WidgetProps = GlanceableWidgetProps;
  * The press patch. `@expo/ui` types `onPress` as `() => void`, but in the
  * widget process the bundle calls the handler and merges the returned patch
  * into the pressed entry's props (its `findAndCallOnPress`), so the return
- * value is load-bearing. The patch rides in these two fields; the app maps
- * them back to the action (see `pendingActionOf` in widget-actions).
+ * value is load-bearing. The app maps the marker back to the action (see
+ * `pendingActionOf` in widget-actions).
  */
 type WidgetPressPatch = {
   pendingAction: GlanceableWidgetAction;
-  pendingActionVisible: boolean;
 };
 
 /**
@@ -117,22 +115,34 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   );
   const primaryLabel = props.primaryLabel ?? null;
   const primaryKind = props.primaryKind ?? null;
-  // The Home Screen families share the card's single content-row height budget,
-  // so all three draw the count rows small enough that four rows, the reserved
-  // slot and the action row still fit at the Dynamic Type ceiling set below.
-  // The small square is the tightest: its 158 pt frame leaves about 126 pt of
-  // content, so its four rows step down to `caption2` and the medium row and
-  // the tall large card keep the larger `caption` and `subheadline`.
-  const denseRows = family !== 'systemLarge';
-  const squareRows = family === 'systemSmall';
-  // Only the medium row is wide enough for a wait beside the label; in the
-  // small square the pair wraps and truncates both halves.
+  // Only the medium row and the tall large card are wide enough for a time
+  // beside the label; in the small square the pair wraps and truncates both
+  // halves, so it draws neither (the time is the first thing a narrow cell
+  // drops).
+  const large = family === 'systemLarge';
+  const square = family === 'systemSmall';
   const wide = family === 'systemMedium';
-  // The large card is a wide card with a footer, so its scheduled row has the
-  // same room for the wake as the medium row; the small square has none.
-  const wakeRow = wide || family === 'systemLarge';
+  const timedRows = wide || large;
   const needsInputSince = props.needsInputSince ?? null;
   const scheduledAt = props.scheduledAt ?? null;
+  // Labels draw at their full text size and never scale: in the widget
+  // renderer a label with `minimumScaleFactor` always resolved at its minimum
+  // scale, room or not, which drew the labels far smaller than their counts.
+  // The square and the Lock Screen rectangle are the cells a wide row can
+  // overflow, so there the mark gives its width up before a label truncates
+  // (the count never does). The width measure available in this process is
+  // the row's character count, count digits included: 12 keeps "2 Needs
+  // input" beside the mark, and "128 Needs input" or German's "Eingabe
+  // erforderlich" take its place.
+  const widestRow = Math.max(
+    0,
+    ...counts.map(
+      line =>
+        // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
+        (typeof line.label === 'string' ? line.label.length : 0) + String(line.count).length
+    )
+  );
+  const crowdedRows = widestRow > 12;
   // The rows carry zeros too, so their number never says whether work exists —
   // the ranked primary does, because it is null only when every count is zero.
   const hasCounts = primaryKind !== null;
@@ -193,51 +203,87 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
       />
     );
 
-  // `compact` is the Lock Screen rectangle, which is four lines tall and narrow
-  // enough that a subheadline label truncates once the mark takes its width.
+  // The row text size per surface. Every row shares one type size and one
+  // glyph size so the counts and the labels line up on a grid; only the label
+  // colour ranks them. The tall large card scales the rows up with its height
+  // so it does not read empty, the medium row takes `footnote`, and the square
+  // steps down to `caption2` so "Needs input" fits beside the mark.
+  type RowStyle = 'caption' | 'caption2' | 'footnote' | 'title3';
+  let rowStyle: RowStyle = 'footnote';
+  let glyphSize = 13;
+  let rowSpacing = 7;
+  if (large) {
+    rowStyle = 'title3';
+    glyphSize = 17;
+    rowSpacing = 9;
+  } else if (square) {
+    rowStyle = 'caption2';
+  }
+  // A time that cannot fit beside its label is dropped whole, never
+  // truncated. The medium row holds every shipped label plus its time at
+  // `footnote`; the large card's `title3` holds a time beside labels up to 15
+  // characters (Spanish "En espera de respuesta" drops it).
+  const timeLabelBudget = large ? 15 : 24;
+  // `elapsed` is the repo-local @expo/ui style (patches/@expo+ui): the wait in
+  // its one largest unit, seconds only under a minute ("31 minutes", "20
+  // seconds"); before iOS 18 it is the relative style.
+  const waitStyle = 'elapsed';
+  // The rows a state actually has lead: a zero row is kept (the grid never
+  // reflows as work appears) but sinks below every non-zero one, and draws
+  // fully muted — glyph, number and label in the secondary colour, the number
+  // without its emphasis. A stable sort keeps the kind order inside each group.
+  const ledgerRows = [
+    ...counts.filter(line => line.count > 0),
+    ...counts.filter(line => line.count === 0),
+  ];
+  const mutedColor = PlatformColor('secondaryLabel');
+  // `compact` is the Lock Screen rectangle: four `caption` rows beside the mark.
   const countRow = (
     line: { label: string; kind: string; count: number },
     isPrimary: boolean,
     compact: boolean
   ) => {
     const glyph = glyphFor(line.kind);
-    // Every row shares one type size and one glyph size so the counts and the
-    // labels line up on a grid; only the label colour ranks them, because a
-    // second font size in a three-row list reads as a mistake. The small square
-    // draws the rows at `caption2`, the medium row at `caption`, and only the
-    // tall large card keeps the larger `subheadline`; `compact` is the Lock
-    // Screen rectangle.
-    let textStyle: 'caption' | 'caption2' | 'subheadline' = 'subheadline';
-    if (compact || denseRows) {
-      textStyle = squareRows && !compact ? 'caption2' : 'caption';
-    }
+    const textStyle: RowStyle = compact ? 'caption' : rowStyle;
+    const zero = line.count === 0;
+    // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
+    const labelLength = typeof line.label === 'string' ? line.label.length : 0;
+    const timed = !compact && timedRows && labelLength <= timeLabelBudget;
     // One time at most per row: a needs-input wait or a scheduled wake, never
-    // both. The wait renders as a relative duration ("28 min") and the wake as
-    // an absolute clock time ("9:00 AM"): a wait is an interval the user is
-    // enduring, while a wake is the moment the user asked for, and it must
-    // read as a time of day the way the session list shows it. The medium card
-    // draws the wait and the wake; the large card draws the wake beside its
-    // scheduled row too; the small square has room for neither.
+    // both. The wait is a duration ("31 minutes") and the wake a clock time
+    // ("9:00 AM"): a wait is an interval the user is enduring, a wake is the
+    // moment the user asked for. The medium and large cards draw both in the
+    // row's trailing column, so the two times line up.
     let timeAt: string | null = null;
-    let timeStyle: 'relative' | 'time' = 'relative';
-    if (wide && line.kind === 'needsInput') {
+    let timeStyle: 'elapsed' | 'time' = waitStyle;
+    if (timed && line.kind === 'needsInput') {
       timeAt = needsInputSince;
-    } else if (wakeRow && line.kind === 'scheduled') {
+    } else if (timed && line.kind === 'scheduled') {
       timeAt = scheduledAt;
       timeStyle = 'time';
     }
     return (
-      <HStack key={line.label} alignment="center" spacing={compact ? 4 : 7}>
-        <Image systemName={glyph.icon} color={glyph.color} size={compact ? 11 : 13} />
+      <HStack
+        key={line.label}
+        alignment="center"
+        spacing={compact ? 4 : rowSpacing}
+        // A row that draws a trailing time fills the card's width, so its time
+        // sits in the same trailing column as every other row's.
+        modifiers={timedRows && !compact ? [frame({ maxWidth: 10_000, alignment: 'leading' })] : []}
+      >
+        <Image
+          systemName={glyph.icon}
+          color={zero ? mutedColor : glyph.color}
+          size={compact ? 11 : glyphSize}
+        />
         <Text
           modifiers={[
-            font({ textStyle, weight: 'semibold' }),
+            font({ textStyle, weight: zero ? 'regular' : 'semibold' }),
             monospacedDigit(),
             // The number is the whole point of the row, so it takes its space
-            // first. Without the priority a long label squeezed it to nothing
-            // and the row drew a glyph and a word with no count.
+            // first: a long label truncates before the count does.
             layoutPriority(1),
-            primaryForeground,
+            zero ? mutedForeground : primaryForeground,
           ]}
         >
           {count(line.count)}
@@ -245,25 +291,33 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         <Text
           modifiers={[
             font({ textStyle }),
-            // The label carries the meaning, so it shrinks and tightens
-            // rather than truncating: a German or Albanian label wrapped to
-            // two lines otherwise, which broke the row grid the three counts
-            // read on. Do not add `truncationMode` here — it suppresses the
-            // scaling and the label truncates again. Tail is the default.
+            // One line at the row's own size. Do not add `minimumScaleFactor`:
+            // in the widget renderer it always drew the label at its minimum.
             lineLimit(1),
-            minimumScaleFactor(0.6),
-            allowsTightening(true),
-            isPrimary ? primaryForeground : mutedForeground,
+            // A live time reserves more width than it draws, so without the
+            // priority it took the label's room ("Eingabe erforde…" beside
+            // "31 Minuten" with space to spare).
+            layoutPriority(1),
+            isPrimary && !zero ? primaryForeground : mutedForeground,
           ]}
         >
           {line.label}
         </Text>
-        {wakeRow ? <Spacer /> : null}
+        {timedRows && !compact ? <Spacer /> : null}
         {timeAt === null ? null : (
           <Text
             date={new Date(timeAt)}
             dateStyle={timeStyle}
-            modifiers={[font({ textStyle }), monospacedDigit(), lineLimit(1), mutedForeground]}
+            // A live time reserves more width than it draws and draws at the
+            // leading edge of that box: trailing alignment puts the wait flush
+            // with the wake.
+            modifiers={[
+              font({ textStyle }),
+              monospacedDigit(),
+              lineLimit(1),
+              multilineTextAlignment('trailing'),
+              mutedForeground,
+            ]}
           />
         )}
       </HStack>
@@ -321,10 +375,10 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         spacing={6}
         modifiers={[widgetURL('kiloapp:///cloud/sessions'), ...a11y]}
       >
-        {logo(18)}
+        {crowdedRows ? null : logo(18)}
         {hasCounts ? (
           <VStack alignment="leading" spacing={1}>
-            {counts.map(line => countRow(line, line.kind === primaryKind, true))}
+            {ledgerRows.map(line => countRow(line, line.kind === primaryKind, true))}
           </VStack>
         ) : (
           <Text modifiers={[font({ textStyle: 'subheadline' })]}>{statusLine}</Text>
@@ -338,68 +392,36 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
     // The Home Screen families keep the four rows inside one fixed card height,
     // so the medium row and the small square run them tighter than the tall
     // large card, whose extra height affords the wider gap.
-    <VStack alignment="leading" spacing={family === 'systemLarge' ? 4 : 2}>
-      {counts.map(line => countRow(line, line.kind === primaryKind, false))}
+    <VStack alignment="leading" spacing={large ? 10 : 2}>
+      {ledgerRows.map(line => countRow(line, line.kind === primaryKind, false))}
     </VStack>
   ) : (
-    <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
+    // Only the medium row draws a status this way; the square and the large
+    // card centre theirs. `subheadline` so the line is not lost in the card.
+    <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>{statusLine}</Text>
   );
 
   // The newest-session slot and the action row are Home Screen families only:
   // the Lock Screen families keep their generic layout, which is what the
-  // snapshot privacy contract protects. While a press is unanswered, the App
-  // Intent's patch owns the slot with the pressed action's copy, so the press
-  // is visible in place before the app answers; when the app answers it pushes
-  // fresh props, and the slot shows the failure line or the newest session.
+  // snapshot privacy contract protects.
   //
   // The height is declared inside this function, not at module scope: the
   // widget transform stringifies this function's source alone and the widget
   // process evaluates it against widget globals, so a module-scope binding
-  // would be a `ReferenceError` at render. The literal copy fallbacks follow
-  // the same rule as `COPY` above: the widget process is the only consumer.
+  // would be a `ReferenceError` at render.
   const NEWEST_SLOT_HEIGHT = 16;
-  // The press patch carries which action was pressed, so the slot names it
-  // instead of always reading "Approving…" under a New agent tap. The baked
-  // fallbacks carry the typographic ellipsis their catalog keys use
-  // (`common.starting`, `glanceable.approving`), so the gallery placeholder
-  // matches the pushed copy in this same reserved slot.
-  //
-  // A press marker never draws on a settled surface. A widget button's App
-  // Intent runs in the widget extension and does not foreground the app, so the
-  // marker it writes into the stored timeline is cleared only by the next sweep
-  // (see `hasPressMarker` in widget-actions). Until then it must not hold
-  // "Starting…" beside populated counts: a marker that names a known action —
-  // the owner's stored `pendingAction: 'new-agent'`, `pendingActionVisible:
-  // true` on an idle-only tray — still drew the lingering start line. The line
-  // draws only where no count rows are drawn, so it cannot contradict data the
-  // app has already answered with; the sweep clears the marker from the
-  // timeline, and the app's own `newestTitle` still reaches the slot on every
-  // surface.
-  const pendingActionKind: GlanceableWidgetAction | null =
-    props.pendingAction === 'approve' || props.pendingAction === 'new-agent'
-      ? props.pendingAction
-      : null;
-  const pressCopy =
-    pendingActionKind === 'new-agent'
-      ? (COPY.starting ?? 'Starting…')
-      : (COPY.approving ?? 'Approving…');
-  const newestLine =
-    props.pendingActionVisible === true && pendingActionKind !== null && counts.length === 0
-      ? pressCopy
-      : (props.newestTitle ?? null);
+  const newestLine = props.newestTitle ?? null;
   const actions = props.actions ?? { approve: false, newAgent: false };
   // The slot is laid out whether or not it carries a line, so a title arriving
-  // after a process restart, the press line taking the slot, and the answer
-  // replacing it move neither the count rows above nor the actions below.
+  // after a process restart, or an approve's progress line replacing it, moves
+  // neither the count rows above nor the actions below.
   const newestSlot = (
     <VStack alignment="leading" spacing={0} modifiers={[frame({ height: NEWEST_SLOT_HEIGHT })]}>
       {newestLine === null ? null : (
         <Text
           modifiers={[
-            font({ textStyle: 'caption' }),
+            font({ textStyle: square ? 'caption2' : 'caption' }),
             lineLimit(1),
-            minimumScaleFactor(0.6),
-            allowsTightening(true),
             mutedForeground,
           ]}
         >
@@ -410,37 +432,49 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
   );
 
   // The patch a press returns marks the action in the pressed entry's props;
-  // the app sweeps it up, runs it, and pushes the answer. `onPress` is the
-  // shared prop that @expo/ui's widget Button turns into the native
-  // `onButtonPress` event the widget bundle dispatches, so a tap opens the
-  // press patch in place instead of the app — the body keeps its own
-  // `widgetURL` deep link for taps beside the buttons. `WidgetButton` is the
-  // narrow local view of the shared Button whose `onPress` carries the patch
-  // the bundle reads; the shared `onPress: () => void` type would forbid the
-  // value-returning handler the widget press depends on.
+  // the app sweeps it up and runs it. `onPress` is the shared prop that
+  // @expo/ui's widget Button turns into the native `onButtonPress` event the
+  // widget bundle dispatches — the body keeps its own `widgetURL` deep link for
+  // taps beside the buttons. `WidgetButton` is the narrow local view of the
+  // shared Button whose `onPress` carries the patch the bundle reads; the
+  // shared `onPress: () => void` type would forbid the value-returning handler
+  // the widget press depends on.
+  //
+  // Approve answers in place, so its intent stays in the background. New agent
+  // needs the composer: `openAppWhenRun` selects the foregrounding intent in
+  // the patched expo-widgets button view, so the tap brings Kilo up and the
+  // app's press listener opens the new-session screen. Without it the intent
+  // only marked the timeline, and nothing happened until the next launch. It
+  // is a prop of that view, not of `@expo/ui`'s `Button`, so it travels as the
+  // plain extra prop the widget process serialises with the rest.
   const WidgetButton = Button as (props: WidgetButtonProps) => React.JSX.Element;
-  const actionButtons = (
+  const openButtonProps = { openAppWhenRun: true };
+  // `regular` is the tall card's centred empty composition, whose mark and
+  // status line scale up with the card; every count-bearing family takes the
+  // small control.
+  const actionButtons = (size: 'small' | 'regular') => (
     <HStack alignment="center" spacing={8}>
       {actions.approve ? (
         <WidgetButton
           label={COPY.approve}
           modifiers={[
             buttonStyle('borderedProminent'),
-            controlSize('small'),
-            font({ textStyle: 'caption' }),
+            controlSize(size),
+            font({ textStyle: size === 'small' ? 'caption' : 'body' }),
           ]}
-          onPress={() => ({ pendingAction: 'approve', pendingActionVisible: true })}
+          onPress={() => ({ pendingAction: 'approve' })}
         />
       ) : null}
       {actions.newAgent ? (
         <WidgetButton
+          {...openButtonProps}
           label={COPY.newAgent}
           modifiers={[
             buttonStyle('bordered'),
-            controlSize('small'),
-            font({ textStyle: 'caption' }),
+            controlSize(size),
+            font({ textStyle: size === 'small' ? 'caption' : 'body' }),
           ]}
-          onPress={() => ({ pendingAction: 'new-agent', pendingActionVisible: true })}
+          onPress={() => ({ pendingAction: 'new-agent' })}
         />
       ) : null}
     </HStack>
@@ -495,8 +529,6 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
           modifiers={[
             font({ textStyle: 'subheadline', weight: 'semibold' }),
             lineLimit(1),
-            minimumScaleFactor(0.6),
-            allowsTightening(true),
             primaryForeground,
           ]}
         >
@@ -505,7 +537,10 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         <Spacer />
         <Text
           date={new Date(newestResultAt)}
-          dateStyle="relative"
+          // `ago` words the age as a past reference ("3 minutes ago"), the way
+          // the Android widget and the session list read it; a bare duration
+          // there reads as one still running.
+          dateStyle="ago"
           modifiers={[
             font({ textStyle: 'subheadline' }),
             monospacedDigit(),
@@ -530,18 +565,58 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
       </VStack>
     );
 
-  // StandBy draws this family on a charging phone in landscape. The mark sits
-  // at the top, the three count rows centre, and the newest result owns the
-  // bottom of the card, so the extra height reads as composed rather than
-  // empty. The spacers hold the rows in place as the footer appears and
-  // disappears, so a state change cannot shift the counts.
-  if (family === 'systemLarge') {
+  const hasAction = actions.approve || actions.newAgent;
+
+  // A state with no counts (empty, signed out, waiting, locked, expired) in
+  // the square and the tall card: one centred composition — the mark, the
+  // status line, and New agent when offered — instead of one line stuck in a
+  // corner of a blank card. The tall card scales the mark, the status line and
+  // the control up with its height, or the composition reads as a stamp in a
+  // big card.
+  if (!hasCounts && (large || square)) {
     return (
-      <VStack alignment="leading" spacing={10} modifiers={systemModifiers}>
-        <HStack alignment="center" spacing={8}>
-          {logo(24)}
+      <VStack alignment="center" spacing={large ? 18 : 8} modifiers={systemModifiers}>
+        <Spacer />
+        {logo(large ? 56 : 28)}
+        <Text
+          modifiers={[
+            font({ textStyle: large ? 'title3' : 'footnote' }),
+            multilineTextAlignment('center'),
+            lineLimit(2),
+            mutedForeground,
+          ]}
+        >
+          {statusLine}
+        </Text>
+        {hasAction ? actionButtons(large ? 'regular' : 'small') : null}
+        <Spacer />
+      </VStack>
+    );
+  }
+
+  // StandBy draws this family on a charging phone in landscape. A header row
+  // holds the mark and the action, the count rows sit in the middle at a size
+  // that fills the card, and the newest result owns the bottom. An Approve in
+  // flight or failed says so under its button: the large card has no reserved
+  // slot for it. The spacers hold the rows in place as the footer appears and
+  // disappears, so a state change cannot shift the counts.
+  const actionLine = props.actionLine ?? null;
+  if (large) {
+    return (
+      <VStack alignment="leading" spacing={0} modifiers={systemModifiers}>
+        <HStack alignment="center" spacing={8} modifiers={[frame({ minHeight: 30 })]}>
+          {logo(28)}
           <Spacer />
+          {hasAction ? actionButtons('small') : null}
         </HStack>
+        {actionLine === null ? null : (
+          <HStack alignment="center" spacing={0}>
+            <Spacer />
+            <Text modifiers={[font({ textStyle: 'footnote' }), lineLimit(1), mutedForeground]}>
+              {actionLine}
+            </Text>
+          </HStack>
+        )}
         <Spacer />
         {systemRows}
         <Spacer />
@@ -561,26 +636,24 @@ const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => Reac
         {logo(28)}
         <VStack alignment="leading" spacing={3}>
           {systemRows}
-          {newestSlot}
-          {actions.approve || actions.newAgent ? actionButtons : null}
+          {hasCounts ? newestSlot : null}
+          {hasAction ? actionButtons('small') : null}
         </VStack>
       </HStack>
     );
   }
 
-  // The small square is the tightest Home Screen family: four `caption2` count
-  // rows, the reserved slot and the action row need about 112 pt of the ~126 pt
-  // content box. The mark cannot also fit above them — that was what overflowed
-  // and clipped both the mark and the button — so it sits beside the body, the
-  // same composition as the medium row, and every element stays inside the
-  // frame.
+  // The small square is the tightest Home Screen family: four count rows, the
+  // reserved slot and the action row fill its ~126 pt content box, so the mark
+  // sits beside the body rather than above it. A label too long for the square
+  // takes the mark's width instead.
   return (
     <HStack alignment="center" spacing={8} modifiers={systemModifiers}>
-      {logo(18)}
+      {crowdedRows ? null : logo(18)}
       <VStack alignment="leading" spacing={3}>
         {systemRows}
         {newestSlot}
-        {actions.approve || actions.newAgent ? actionButtons : null}
+        {hasAction ? actionButtons('small') : null}
       </VStack>
     </HStack>
   );

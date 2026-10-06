@@ -151,6 +151,13 @@
     }
   },
   "expo": {
+    "autolinking": {
+      "android": {
+        "buildFromSource": [
+          "expo-notifications"
+        ]
+      }
+    },
     "install": {
       "exclude": [
         "@sentry/react-native",

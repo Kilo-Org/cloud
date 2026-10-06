@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive suite: the ask selection and its durable store share the fixtures */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -170,6 +171,26 @@ describe('selectWaitingAsk', () => {
     expect(selectWaitingAsk([{ id: 'bare', status: 'question' }], CTX, NOW)?.isCloudAgent).toBe(
       false
     );
+  });
+
+  it('names a newer approvable permission over an older question or non-cloud permission', () => {
+    // The widget offers Approve for the oldest permission; the Live Activity and
+    // the ongoing card must name that same row, or they show Open alone.
+    const ask = selectWaitingAsk(
+      [
+        { id: 'old-question', status: 'question', statusUpdatedAt: at(-90_000) },
+        { id: 'old-cli', status: 'permission', statusUpdatedAt: at(-80_000), connectionId: 'cli' },
+        {
+          id: 'newer-cloud',
+          status: 'permission',
+          statusUpdatedAt: at(-10_000),
+          connectionId: CLOUD_AGENT_CONNECTION_ID,
+        },
+      ],
+      CTX,
+      NOW
+    );
+    expect(ask).toMatchObject({ kiloSessionId: 'newer-cloud', isCloudAgent: true });
   });
 });
 

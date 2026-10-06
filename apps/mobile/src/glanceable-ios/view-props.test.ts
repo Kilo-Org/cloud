@@ -18,9 +18,7 @@ const NOW = Date.parse('2026-01-02T00:00:00Z');
 
 const COPY: Record<string, string> = {
   'glanceable.approving': 'Approving…',
-  'common.starting': 'Starting…',
   'glanceable.couldNotApprove': 'Could not approve',
-  'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
 };
 const translate = (key: string): string => COPY[key] ?? key;
@@ -56,25 +54,15 @@ const QUESTION_ROW: GlanceableSessionRow = {
 describe('newestTitleFor', () => {
   it.each([
     ['approving', 'Approving…'],
-    ['starting', 'Starting…'],
     ['couldNotApprove', 'Could not approve'],
-    ['couldNotStart', 'Could not start'],
   ] as const)('renders the %s action feedback on a happy surface', (feedback, expected) => {
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: feedback });
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'question' }]), {}, translate);
     expect(props.newestTitle).toBe(expected);
   });
 
-  it('renders a failed create in the empty surface’s reserved line', () => {
-    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'couldNotStart' });
-    const props = buildGlanceableViewProps(snapshotFor([], 'empty'), {}, translate);
-    expect(props.newestTitle).toBe('Could not start');
-    expect(props.countLines).toEqual([]);
-    expect(props.actions).toEqual({ approve: false, newAgent: true });
-  });
-
   it('never draws the reserved line on a locked surface, even with feedback set', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
     expect(
       buildGlanceableViewProps(snapshotFor([], 'signed_out'), { signedOut: true }, translate)
         .newestTitle
@@ -94,8 +82,8 @@ describe('newestTitleFor', () => {
   });
 
   it('never shows the newest-session title on the empty surface', () => {
-    // Empty offers the create, so its slot carries the create's feedback; with
-    // none in flight the slot is blank rather than a stale title.
+    // Empty offers no in-place action, so its slot stays blank rather than
+    // carrying a stale title.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
     expect(
       buildGlanceableViewProps(snapshotFor([], 'empty'), {}, translate).newestTitle
@@ -221,6 +209,7 @@ describe('buildGlanceableLiveActivityContentState needsApproval', () => {
     const props = buildGlanceableViewProps(snapshotFor([PERMISSION_ROW]), {}, translate);
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actionLine',
       'actions',
       'countLines',
       'needsInputSince',

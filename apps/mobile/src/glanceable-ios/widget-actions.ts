@@ -4,11 +4,7 @@ import { Linking } from 'react-native';
 import { i18n } from '@/i18n';
 import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import {
-  failureFeedback,
-  runWidgetAction,
-  type WidgetAction,
-} from '@/lib/glanceable/widget-actions';
+import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
 
 import { ActiveAgentsWidget, WIDGET_NAME, type WidgetProps } from './active-agents-widget';
@@ -20,10 +16,9 @@ import {
 } from './view-props';
 
 /**
- * Handling for the widget's in-place App Intent buttons.
+ * Handling for the widget's App Intent buttons.
  *
- * Two paths, because the intent runs in the widget extension and can patch the
- * timeline before this process has JS alive at all:
+ * Two paths, because the intent runs before this process may have JS alive:
  *
  * 1. Live — subscribe to `onExpoWidgetsUserInteraction` at app start. The
  *    intent has already merged the press marker (`pendingAction`) into the
@@ -33,6 +28,10 @@ import {
  *    stored timeline and run any entry whose props carry the marker. This
  *    covers a cold start, where the intent patched the marker long before JS
  *    subscribed.
+ *
+ * New agent's intent foregrounds the app (`openAppWhenRun`), so one of the two
+ * paths answers it at once with the new-session screen. Approve's intent stays
+ * in the background and is answered at the next launch or foreground.
  *
  * Both paths funnel through one sweep that clears the marker from the timeline
  * before invoking the action, so a crash mid-action — or the foreground sweep
@@ -49,27 +48,8 @@ export function pendingActionOf(
 
 /** The pressed entry's props without the marker, in the form the timeline stores. */
 function stripPendingAction(props: WidgetProps | null | undefined): WidgetProps {
-  const {
-    pendingAction: _pendingAction,
-    pendingActionVisible: _pendingActionVisible,
-    ...rest
-  } = props ?? {};
+  const { pendingAction: _pendingAction, ...rest } = props ?? {};
   return rest;
-}
-
-/**
- * Whether an entry carries any press marker, including the visible flag alone.
- *
- * The App Intent writes `pendingAction` and `pendingActionVisible` together, but
- * the stored timeline is long-lived: a partial write, or a marker whose action a
- * later app version no longer knows, can leave the visible flag behind with no
- * action this build can run. The layout already refuses to draw that orphan (it
- * only shows the press line while the flag names a known action); this predicate
- * is what lets the sweep strip the orphan, so a "Starting…" line cannot outlive
- * the press that wrote it.
- */
-function hasPressMarker(props: WidgetProps | null | undefined): boolean {
-  return props?.pendingActionVisible === true || pendingActionOf(props) !== null;
 }
 
 /**
@@ -137,63 +117,59 @@ function republishWidgetProps(): void {
   }
 }
 
-/** Where an unfinished action lands: the same agents list the body tap opens. */
+/** Where an Approve with nothing to answer lands: the agents list the body tap opens. */
 const OPEN_AGENTS_URI = 'kiloapp:///cloud/sessions';
-/**
- * Where a create with nothing to start from lands: the new-session screen.
- *
- * `LAUNCHER_NEW_AGENT_URL` is the canonical `kiloapp:///cloud/sessions/new` the
- * launcher shortcuts already use; `resolveIncomingUrl` maps it to
- * `/(app)/agent-chat/new`. The old widget-local `kiloapp://agent-chat/new`
- * matched no universal-link row, so the deep link resolved to null and the tap
- * dead-ended. Sharing the constant with the Android twin keeps both platforms
- * on the canonical row.
- */
-const OPEN_NEW_AGENT_URI = LAUNCHER_NEW_AGENT_URL;
 
 /**
- * Run one press. `runWidgetAction` republishes the tray through every sink on
- * success, which writes fresh widget props and is the answer the widget shows;
- * a failed call pushes the action's own couldn't-do-it feedback here, because no
- * republish happens. An action that cannot complete in place (`none`:
- * nothing to act on or no draft/repository/model to start from;
- * `no-permission`: the agent asked a free-form question the widget must never
- * invent an answer to) hands the user to the app instead — the same
- * destinations the Android twin opens (`glanceable-android/register.ts`), so
- * the press never dead-ends silently on either platform.
+ * Open a Kilo deep link from a press. A host that cannot bring the app up
+ * leaves the settled widget on screen; the sweep itself must not fail on it.
  */
-async function performWidgetAction(action: WidgetAction): Promise<void> {
+async function openFromPress(uri: string): Promise<void> {
+  try {
+    await Linking.openURL(uri);
+  } catch {
+    // Contained: see above.
+  }
+}
+
+/**
+ * Run one press. New agent opens the new-session screen: starting an agent
+ * needs the composer, and the press already brought the app up.
+ *
+ * Approve runs in place. `runWidgetApprove` republishes the tray through every
+ * sink on success, which writes fresh widget props and is the answer the widget
+ * shows; a failed call pushes Approve's own couldn't-do-it feedback here,
+ * because no republish happens. An approve that cannot complete in place
+ * (`none`: nothing waiting; `no-permission`: the agent asked a free-form
+ * question the widget must never invent an answer to) opens the agents list —
+ * the same destination the Android twin opens (`glanceable-android/register.ts`).
+ */
+async function performWidgetAction(action: GlanceableWidgetAction): Promise<void> {
+  if (action === 'new-agent') {
+    await openFromPress(LAUNCHER_NEW_AGENT_URL);
+    return;
+  }
   // Retire the previous press's failure line before this one runs. A success
-  // republishes the tray from inside `runWidgetAction`, and the builder reads
+  // republishes the tray from inside `runWidgetApprove`, and the builder reads
   // this module's extras while it does: a leftover couldn't-approve line would
   // ride out with the fresh counts and show an error for an approval that just
   // worked. Clearing up front also makes every outcome below the only writer.
   // The sweep runs its presses sequentially, so no sibling press can observe
   // the gap.
   setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: null });
-  const result = await runWidgetAction(action);
-  if (result.kind === 'approved' || result.kind === 'created') {
+  const result = await runWidgetApprove();
+  if (result.kind === 'approved') {
     return;
   }
   setSurfaceExtras({
     ...getSurfaceExtras(),
-    // The failure line is the action's own retry copy, so the button that
-    // failed stays offered and the body tap still opens Kilo.
-    actionFeedback: result.kind === 'failed' ? failureFeedback(action) : null,
+    // The failure line is Approve's own retry copy, so Approve stays offered
+    // and the body tap still opens Kilo.
+    actionFeedback: result.kind === 'failed' ? 'couldNotApprove' : null,
   });
   republishWidgetProps();
-  // Nothing to act on, or the wait is a free-form question: the action hands
-  // the user to the app. The create action lands on the new-session screen
-  // when it had no draft or repository to start from. A failed call stays on
-  // the widget, whose retry row and body tap remain offered.
   if (result.kind === 'none' || result.kind === 'no-permission') {
-    const uri = action === 'approve' ? OPEN_AGENTS_URI : OPEN_NEW_AGENT_URI;
-    try {
-      await Linking.openURL(uri);
-    } catch {
-      // A host that cannot bring the app up leaves the settled widget on
-      // screen; the sweep itself must not fail on the open.
-    }
+    await openFromPress(OPEN_AGENTS_URI);
   }
 }
 
@@ -287,35 +263,26 @@ function takeResweepRequest(): boolean {
  * clear — the writes it raced already took it — so it is answered from the held
  * read, which is dropped when this read still carries its marker so the same
  * press never runs twice. The marker is cleared before the action is invoked, so
- * a crash mid-action reads as a dropped press instead of a repeated one, and the
- * widget drops its "Approving…" line immediately (the write reloads the
- * timelines).
+ * a crash mid-action reads as a dropped press instead of a repeated one.
  */
 async function sweepPendingActions(): Promise<void> {
   const timeline = await ActiveAgentsWidget.getTimeline();
-  const pending = new Map<number, WidgetAction>();
-  // Every entry with a marker, including a visible flag no action names: the
-  // orphan is not run, but it is still stripped so it cannot keep the press
-  // line on a settled widget. `pending` is the subset that names an action.
-  const marked = new Set<number>();
+  const pending = new Map<number, GlanceableWidgetAction>();
   const pressed: PressedEntry[] = [];
   for (const [index, entry] of timeline.entries()) {
-    if (hasPressMarker(entry.props)) {
-      marked.add(index);
-      const action = pendingActionOf(entry.props);
-      if (action !== null) {
-        pending.set(index, action);
-        pressed.push({ date: entry.date.getTime(), action });
-      }
+    const action = pendingActionOf(entry.props);
+    if (action !== null) {
+      pending.set(index, action);
+      pressed.push({ date: entry.date.getTime(), action });
     }
   }
   const carried = takeCarriedPresses().filter(
     press => !pressed.some(read => read.date === press.date && read.action === press.action)
   );
-  if (marked.size > 0) {
+  if (pending.size > 0) {
     ActiveAgentsWidget.updateTimeline(
       timeline.map((entry, index) =>
-        marked.has(index) ? { date: entry.date, props: stripPendingAction(entry.props) } : entry
+        pending.has(index) ? { date: entry.date, props: stripPendingAction(entry.props) } : entry
       )
     );
   }
@@ -400,14 +367,13 @@ let registrationId = 0;
  * timeline. The capability check therefore lives once, at the registration
  * boundary (`glanceable-ios/register.ts`, the same place the sibling
  * `registerGlanceableApproveAction` gets its iOS scope); Android runs the same
- * action from the widget host's headless task (`glanceable-android/register.ts`).
+ * Approve from the widget host's headless task (`glanceable-android/register.ts`).
  *
- * The one user-visible difference is when the action runs: Android's task
- * answers the press in the background the moment it is tapped, while an iOS
- * press is answered at this process's next launch or foreground, because an
- * App Intent cannot run this JS in a cold process. Both draw the press's
- * progress line immediately, and both run the same shared action
- * (`lib/glanceable/widget-actions`).
+ * The one user-visible difference is when Approve runs: Android's task answers
+ * the press in the background the moment it is tapped, while an iOS Approve is
+ * answered at this process's next launch or foreground, because an App Intent
+ * cannot run this JS in a cold process. Both run the same shared approve
+ * (`lib/glanceable/widget-actions`). New agent opens the app on both platforms.
  *
  * A second call replaces neither the listener nor the ownership: the returned
  * unsubscribe removes the listener only while its own registration still owns

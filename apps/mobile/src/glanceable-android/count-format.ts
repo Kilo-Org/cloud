@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n';
 import { RTL_LANGUAGES, type SupportedLanguage } from '@/i18n/languages';
-import { numberFormat } from '@/lib/intl-cache';
+import { dateTimeFormat, numberFormat } from '@/lib/intl-cache';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -28,7 +28,7 @@ export function isWidgetRtl(): boolean {
 
 /**
  * The relative time an Android glanceable draws: the large cell's newest-result
- * footer, and the wake time beside a scheduled count row.
+ * footer, and the ongoing notification's scheduled wake.
  *
  * `timeAgo` already localizes through `Intl.RelativeTimeFormat` and falls back
  * to `common.justNow` for sub-minute ages, so the widget bakes no timer and no
@@ -39,4 +39,13 @@ export function isWidgetRtl(): boolean {
  */
 export function formatGlanceableAgo(at: string): string {
   return timeAgo(parseTimestamp(at));
+}
+
+/**
+ * The clock time a scheduled count row draws beside its count ("8:00 PM", or
+ * "20:00" where the language reads a 24-hour clock): the row says when the
+ * agent wakes, the way the iOS widget's scheduled row does.
+ */
+export function formatGlanceableClock(at: string): string {
+  return dateTimeFormat(i18n.language, { timeStyle: 'short' }).format(parseTimestamp(at));
 }

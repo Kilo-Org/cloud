@@ -33,8 +33,8 @@ import {
 // render. No React dependency here: the publisher is plain state.
 registerGlanceableSink(androidSink);
 
-// The permission alert needs a foreground Activity; RN Android's AlertModule
-// no-ops in headless JS. Show it when the app returns to the foreground instead.
+// A Live Update the permission blocked starts once the user grants it, which
+// can happen in Settings while the app is away.
 AppState.addEventListener('change', state => {
   if (state === 'active') {
     void handleAppStateActive();

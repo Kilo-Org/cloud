@@ -160,6 +160,9 @@ function snapshot(sessions: { status: string }[], revision = 0): GlanceableAgent
 async function loadSink() {
   const { iosSink } = await import('./ios-sink');
   const { registerGlanceableSink } = await import('@/lib/glanceable/sink-registry');
+  const { setNotificationPermissionGrantedValue } =
+    await import('@/lib/glanceable/live-activity-switch');
+  setNotificationPermissionGrantedValue(true);
   registerGlanceableSink(iosSink);
   return iosSink;
 }

@@ -13,7 +13,9 @@ import { getGlanceableSinks } from './sink-registry';
  * dropped or throttled that push.
  *
  * A fresh publisher lets its first write through, so the sinks reconcile the
- * native surfaces this process did not start. The counts are the ack-resolved
+ * native surfaces this process did not start. It is built before the fetch:
+ * it captures the terminal-blank epoch at construction, so a sign-out that
+ * lands during the read wins the surface. The counts are the ack-resolved
  * ones, like every other republish path. A failed fetch rejects before any
  * write: the last published snapshot stays, and nothing is invented.
  *
@@ -22,10 +24,11 @@ import { getGlanceableSinks } from './sink-registry';
  * task reports to the OS as a failed run.
  */
 export async function publishTrayOnce(ctx: GlanceablePublisherContext): Promise<void> {
+  const publisher = createGlanceablePublisher();
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(ctx.organizationId)
   );
-  createGlanceablePublisher().handleSessions(resolveAnsweredRaises(sessions), ctx);
+  publisher.handleSessions(resolveAnsweredRaises(sessions), ctx);
   await Promise.all(
     getGlanceableSinks().flatMap(sink => [
       sink.waitForNativeStart?.(),

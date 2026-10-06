@@ -2,9 +2,6 @@
 const path = require('node:path');
 const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 const { withNativewind } = require('nativewind/metro');
-const { withRozenite } = require('@rozenite/metro');
-const { withRozeniteExpoAtlasPlugin } = require('@rozenite/expo-atlas-plugin');
-const { withRozeniteRequireProfiler } = require('@rozenite/require-profiler-plugin/metro');
 
 const monorepoRoot = path.resolve(__dirname, '../..');
 
@@ -53,22 +50,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     return { type: 'empty' };
   }
   const resolve = upstreamResolveRequest || context.resolveRequest;
-  // expo-router vendors React Navigation, so no `@react-navigation/core`
-  // package exists. The Rozenite navigation plugin imports it for
-  // `CommonActions`; point it at the vendored copy the router itself uses.
-  if (moduleName === '@react-navigation/core') {
-    return {
-      type: 'sourceFile',
-      filePath: require.resolve('expo-router/build/react-navigation/core', { paths: [__dirname] }),
-    };
-  }
   return resolve(context, moduleName, platform);
 };
 
-// Rozenite adds plugin panels to React Native DevTools. It is off unless Metro
-// starts with `WITH_ROZENITE=true`, so a release bundle never carries it.
-module.exports = withRozenite(withNativewind(config, { inlineVariables: false }), {
-  enabled: process.env.WITH_ROZENITE === 'true',
-  enhanceMetroConfig: rozeniteConfig =>
-    withRozeniteRequireProfiler(withRozeniteExpoAtlasPlugin(rozeniteConfig)),
-});
+module.exports = withNativewind(config, { inlineVariables: false });

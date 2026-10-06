@@ -23,7 +23,6 @@ import { ToolSummaryTranslationRuntimeBootstrap } from '@/lib/tool-summary-trans
 import { getEffectiveTabBarHeight, shouldHideTabBar } from '@/lib/tab-bar-layout';
 import { getToastBottomOffset } from '@/lib/toast-offset';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
-import { RozeniteDevTools } from '@/lib/rozenite-devtools';
 
 /**
  * sonner-native's container for bottom-center toasts is `position: absolute`
@@ -92,7 +91,6 @@ export function AppRootProviders({
                         a toast may cover the composer briefly, never the navigation.
                       */}
                       <AppToaster />
-                      <RozeniteDevTools />
                     </>
                   </ActionSheetProvider>
                 </OrganizationProvider>

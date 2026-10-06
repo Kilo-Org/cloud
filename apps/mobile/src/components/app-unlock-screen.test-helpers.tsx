@@ -316,8 +316,6 @@ vi.mock('@/lib/system-search-index-mount', () => ({
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-retry-mount', () => ({
   ToolSummaryTranslationRetryMount: 'ToolSummaryTranslationRetryMount',
 }));
-// Dev-only panels; their file-system adapter loads the Expo native runtime.
-vi.mock('@/lib/rozenite-devtools', () => ({ RozeniteDevTools: () => null }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/pr-review/pr-review-connect-gate', () => ({
   PrReviewConnectGate: 'PrReviewConnectGate',

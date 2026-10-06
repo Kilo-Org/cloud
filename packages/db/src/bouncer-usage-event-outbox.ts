@@ -19,7 +19,7 @@
  * `enqueueBouncerUsageEvent` is idempotent on the unique `request_id`; Bouncer also dedupes a usage
  * event by `requestId`, so a redelivery after a lost acknowledgement counts once.
  */
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import type { BouncerCreditEventOutboxDatabase } from './bouncer-credit-event-outbox';
 import {
@@ -130,15 +130,23 @@ export async function claimBouncerUsageEventByRequestId(
   return row ?? null;
 }
 
-/** True when an outbox row exists for `requestId`, in any status. */
-export async function bouncerUsageEventExists(
+/**
+ * True when a non-terminal (`pending` or `sending`) outbox row exists for `requestId`, so the
+ * drainer still owns its delivery. A `failed` row will never be sent again.
+ */
+export async function bouncerUsageEventInFlight(
   database: BouncerUsageEventOutboxDatabase,
   requestId: string
 ): Promise<boolean> {
   const [row] = await database
     .select({ id: bouncer_usage_event_outbox.id })
     .from(bouncer_usage_event_outbox)
-    .where(eq(bouncer_usage_event_outbox.request_id, requestId))
+    .where(
+      and(
+        eq(bouncer_usage_event_outbox.request_id, requestId),
+        inArray(bouncer_usage_event_outbox.status, ['pending', 'sending'])
+      )
+    )
     .limit(1);
   return row !== undefined;
 }

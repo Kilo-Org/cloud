@@ -18,7 +18,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { deliverUsageEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
-  bouncerUsageEventExists,
+  bouncerUsageEventInFlight,
   claimBouncerUsageEventByRequestId,
   claimDueBouncerUsageEvents,
   deleteBouncerUsageEvent,
@@ -66,15 +66,16 @@ type DispatchSource = 'immediate' | 'cron';
 
 /**
  * Claims and delivers the row the usage write just enqueued for `requestId`. Never throws.
- * Resolves true when the outbox holds the event (delivered now, or left for the cron drainer), and
- * false when no row exists or the lookup failed, so the caller falls back to the best-effort send.
+ * Resolves true when the outbox owns the event (delivered now, or left pending for the cron
+ * drainer), and false when no deliverable row exists (never written, already failed) or the lookup
+ * failed, so the caller falls back to the best-effort send.
  */
 export async function deliverBouncerUsageEventNow(requestId: string): Promise<boolean> {
   let row: BouncerUsageEventOutboxRow | null;
   try {
     row = await claimBouncerUsageEventByRequestId(db, requestId);
     // Unclaimable: the drainer holds it, it is terminal, or it was never written.
-    if (!row) return await bouncerUsageEventExists(db, requestId);
+    if (!row) return await bouncerUsageEventInFlight(db, requestId);
   } catch (error) {
     logError('Bouncer usage-event outbox claim failed', {
       request_id: requestId,

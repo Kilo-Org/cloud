@@ -69,6 +69,30 @@ describe('bouncer usage-event outbox delivery', () => {
     expect(mockDeliver).not.toHaveBeenCalled();
   });
 
+  it('reports a failed row as not deliverable so the caller falls back', async () => {
+    const user = await insertTestUser();
+    const requestId = await insertPending(user.id);
+    await db
+      .update(bouncer_usage_event_outbox)
+      .set({ status: 'failed' })
+      .where(eq(bouncer_usage_event_outbox.request_id, requestId));
+
+    await expect(deliverBouncerUsageEventNow(requestId)).resolves.toBe(false);
+    expect(mockDeliver).not.toHaveBeenCalled();
+  });
+
+  it('reports a row the drainer holds as owned by the outbox', async () => {
+    const user = await insertTestUser();
+    const requestId = await insertPending(user.id);
+    await db
+      .update(bouncer_usage_event_outbox)
+      .set({ status: 'sending', claimed_at: new Date().toISOString() })
+      .where(eq(bouncer_usage_event_outbox.request_id, requestId));
+
+    await expect(deliverBouncerUsageEventNow(requestId)).resolves.toBe(true);
+    expect(mockDeliver).not.toHaveBeenCalled();
+  });
+
   it('leaves a failed immediate delivery to the cron drainer, which retries it', async () => {
     const user = await insertTestUser();
     const requestId = await insertPending(user.id);

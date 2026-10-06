@@ -168,6 +168,45 @@ describe('notifications-worker-client internal dispatch', () => {
     );
   });
 
+  it('retries a single-recipient failure instead of capturing it as an all-fail', async () => {
+    fetchMock.mockResolvedValue(okResponse([{ userId: 'user-1', outcome: 'failed' }]));
+
+    // A single-recipient failure is indistinguishable from one transient send,
+    // so it runs the bounded retry like a partial failure; only the exhausted
+    // retry reaches Sentry.
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(false);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(console.warn).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          kind: 'spend_alert',
+          failedRecipients: 1,
+          totalRecipients: 1,
+          attempts: 3,
+        }),
+      })
+    );
+  });
+
+  it('accepts a single-recipient failure whose retry answers duplicate', async () => {
+    fetchMock
+      .mockResolvedValueOnce(okResponse([{ userId: 'user-1', outcome: 'failed' }]))
+      .mockResolvedValueOnce(okResponse([{ userId: 'user-1', outcome: 'duplicate' }]));
+
+    // A terminal failure (invalid or expired push token) recorded `failed` in
+    // the DO, so the retry dedups as `duplicate`; an undeliverable token must
+    // not page anyone.
+    await expect(dispatchSpendAlertPush(spendAlertInput)).resolves.toBe(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(captureException).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledTimes(1);
+  });
+
   it('captures without an in-call retry when every recipient fails', async () => {
     fetchMock.mockResolvedValue(
       okResponse([
@@ -218,7 +257,7 @@ describe('notifications-worker-client internal dispatch', () => {
     expect(captureException).not.toHaveBeenCalled();
     expect(console.warn).toHaveBeenCalledTimes(1);
     expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('partially failed'),
+      expect.stringContaining('retrying'),
       expect.objectContaining({
         kind: 'spend_alert',
         failedRecipients: 1,

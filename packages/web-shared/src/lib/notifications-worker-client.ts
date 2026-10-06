@@ -41,9 +41,10 @@ function sleep(ms: number): Promise<void> {
  * recipient is a refused dispatch, not an accepted one: the worker answers 200
  * with a per-recipient breakdown even when a send failed.
  *
- * Sentry only hears about a dispatch worth acting on: every recipient failed,
- * or a partial failure that survived the bounded in-call retry. A partial
- * failure that a retry delivered is a structured warning, never an alert.
+ * Sentry only hears about a dispatch worth acting on: every recipient of a
+ * multi-recipient dispatch failed at once, or a failure that survived the
+ * bounded in-call retry. A partial failure that a retry delivered is a
+ * structured warning, never an alert.
  */
 async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   if (!NOTIFICATIONS_WORKER_URL) {
@@ -105,12 +106,20 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
       // A retry re-POSTs the same body and is safe under the channel DO's
       // idempotency record: a recipient already delivered answers `duplicate`,
       // and one whose Expo ticket failure was terminal (an invalid or expired
-      // push token) recorded `failed` and also answers `duplicate`. Only a
-      // transient failure — which left the DO's `pending` marker — is actually
-      // re-sent, so the retry below re-attempts transient failures only.
-      if (failedCount === totalRecipients) {
+      // push token) recorded `failed` and also answers `duplicate`. These
+      // dispatch kinds are badge-less and set no rate limit, so the DO writes
+      // no `pending` marker for them and a transient failure left no record at
+      // all — the retry simply re-sends it, which is what the retry is for.
+      //
+      // Every recipient of a multi-recipient dispatch failing at once points
+      // at the worker or Expo rather than one transient send, so it alerts on
+      // the first response. A single-recipient failure is indistinguishable
+      // from one transient send and falls through to the bounded retry below;
+      // if the failure was terminal, the retry answers `duplicate` and the
+      // dispatch is accepted without alerting.
+      if (totalRecipients > 1 && failedCount === totalRecipients) {
         const error = new Error(
-          `Notifications worker dispatch failed for all ${totalRecipients} recipient${totalRecipients === 1 ? '' : 's'}`
+          `Notifications worker dispatch failed for all ${totalRecipients} recipients`
         );
         captureException(error, {
           tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
@@ -136,9 +145,9 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
         return false;
       }
 
-      // A partial failure that a retry may still deliver is logged, not
-      // captured: a single transient recipient failure must not page anyone.
-      console.warn('[notifications-worker-client] dispatch partially failed; retrying', {
+      // A failure that a retry may still deliver is logged, not captured: a
+      // single transient recipient failure must not page anyone.
+      console.warn('[notifications-worker-client] dispatch failed for some recipients; retrying', {
         kind: body.kind,
         failedRecipients: failedCount,
         totalRecipients,

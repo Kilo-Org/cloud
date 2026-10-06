@@ -76,25 +76,25 @@ export function renderSelectableChunkChildren(
     const prefix = lineIndex > 0 ? CODE_LINE_BREAK : '';
     if (keepBlankLineBox && tokens.every(token => token.text.length === 0)) {
       children.push(prefix + BLANK_CODE_LINE);
-      continue;
-    }
-    if (prefix) {
-      children.push(prefix);
-    }
-    for (const [tokenIndex, token] of tokens.entries()) {
-      children.push(
-        token.className === null ? (
-          token.text
-        ) : (
-          <UITextView
-            key={`tok-${lineIndex}-${tokenIndex}`}
-            // eslint-disable-next-line react-native/no-inline-styles -- per-token syntax color
-            style={{ color: tokenColorForScheme(token.className, scheme) }}
-          >
-            {token.text}
-          </UITextView>
-        )
-      );
+    } else {
+      if (prefix) {
+        children.push(prefix);
+      }
+      for (const [tokenIndex, token] of tokens.entries()) {
+        children.push(
+          token.className === null ? (
+            token.text
+          ) : (
+            <UITextView
+              key={`tok-${lineIndex}-${tokenIndex}`}
+              // eslint-disable-next-line react-native/no-inline-styles -- per-token syntax color
+              style={{ color: tokenColorForScheme(token.className, scheme) }}
+            >
+              {token.text}
+            </UITextView>
+          )
+        );
+      }
     }
   }
   return children;

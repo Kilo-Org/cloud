@@ -114,6 +114,28 @@ describe('applyVoiceRecognitionResult', () => {
     expect(state.interim).toBe('');
     expect(state.transcript).toBe('');
   });
+
+  it('ignores the iOS stop final that repeats the final-like result before it', () => {
+    // iOS 18+ event order on stop: interim, final-like (speechDuration > 0),
+    // then the task's real final with a leading space.
+    let state = createVoiceTranscriptState();
+    state = applyVoiceRecognitionResult(state, { isFinal: false, transcript: 'hello world' });
+    state = applyVoiceRecognitionResult(state, { isFinal: true, transcript: 'hello world' });
+    state = applyVoiceRecognitionResult(state, { isFinal: true, transcript: ' hello world' });
+
+    expect(state.finalSegments).toEqual(['hello world']);
+    expect(state.transcript).toBe('hello world');
+  });
+
+  it('keeps a spoken repeat when interim results arrive between the two finals', () => {
+    let state = createVoiceTranscriptState();
+    state = applyVoiceRecognitionResult(state, { isFinal: true, transcript: 'yes' });
+    state = applyVoiceRecognitionResult(state, { isFinal: false, transcript: ' yes' });
+    state = applyVoiceRecognitionResult(state, { isFinal: true, transcript: ' yes' });
+
+    expect(state.finalSegments).toEqual(['yes', 'yes']);
+    expect(state.transcript).toBe('yes yes');
+  });
 });
 
 describe('appendVoiceTranscript', () => {

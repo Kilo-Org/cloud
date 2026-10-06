@@ -50,8 +50,16 @@ export function applyVoiceRecognitionResult(
   const normalized = normalizeSegment(result.transcript);
 
   if (result.isFinal) {
+    // iOS 18+ marks the end of an utterance with a final-like result, then
+    // expo-speech-recognition can deliver the task's real final result with
+    // the same text after `stop()`. With no interim result between them, the
+    // second final repeats the first; appending it duplicates the dictation.
+    const repeatsLastFinal =
+      state.interim.length === 0 && state.finalSegments.at(-1) === normalized;
     const finalSegments =
-      normalized.length === 0 ? state.finalSegments : [...state.finalSegments, normalized];
+      normalized.length === 0 || repeatsLastFinal
+        ? state.finalSegments
+        : [...state.finalSegments, normalized];
     return {
       finalSegments,
       interim: '',

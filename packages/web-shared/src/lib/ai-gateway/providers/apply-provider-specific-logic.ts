@@ -147,8 +147,8 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   }
   if (isClaudeModel(requestedModel)) {
     return [
-      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
+      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
     ];
   }
   if (isMinimaxModel(requestedModel)) {

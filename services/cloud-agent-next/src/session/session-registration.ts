@@ -54,6 +54,7 @@ import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.j
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
+  DEVCONTAINER_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
   type CredentialContainment,
   type SessionMetadata,
@@ -124,7 +125,8 @@ type SharedSandboxRouteMetadata = NonNullable<
  */
 function sessionPlaneForCreate(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): SessionPlane {
   return sandboxAllocationRequiresControlPlane(input.runtime?.sandboxAllocation)
     ? 'control'
@@ -134,7 +136,10 @@ function sessionPlaneForCreate(
           userId: ctx.userId,
           orgId: input.options?.kilocodeOrganizationId,
         },
-        { createdOnPlatform: input.options?.createdOnPlatform }
+        {
+          createdOnPlatform: input.options?.createdOnPlatform,
+          billingOrigin: options?.billingOrigin,
+        }
       );
 }
 
@@ -143,13 +148,15 @@ function assertSupportedSandboxAllocation(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
+  if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: DEVCONTAINER_RETIRED_MESSAGE });
+  }
   const allocation = input.runtime?.sandboxAllocation;
   if (allocation === undefined) return;
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
   }
   if (
-    input.runtime?.devcontainer === true ||
     options?.billingOrigin === 'code-review' ||
     input.options?.createdOnPlatform === 'code-review'
   ) {
@@ -159,7 +166,10 @@ function assertSupportedSandboxAllocation(
     });
   }
   // Isolated Standard predates the selectable allocations and remains legacy-plane only.
-  if (allocation === 'isolated-standard' && sessionPlaneForCreate(input, ctx) === 'control') {
+  if (
+    allocation === 'isolated-standard' &&
+    sessionPlaneForCreate(input, ctx, options) === 'control'
+  ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Isolated Standard allocation is not supported for control-plane sessions',
@@ -494,8 +504,7 @@ function computeCredentialContainment(
     env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  const containmentEnabled =
-    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false' && input.runtime?.devcontainer !== true;
+  const containmentEnabled = env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
   return {
     github: containmentEnabled && input.repository.type === 'github',
     gitlab: containmentEnabled && input.repository.type === 'gitlab',
@@ -514,7 +523,6 @@ function isEligibleFirstWorktreeSession(
     input.options.operationKey !== undefined &&
     input.initialTurn !== undefined &&
     input.clone === undefined &&
-    input.runtime?.devcontainer !== true &&
     ctx.botId === undefined
   );
 }
@@ -636,7 +644,7 @@ async function allocateNewSession(
   }
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx));
+  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx, options));
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -704,7 +712,6 @@ async function allocateNewSession(
       cloudAgentSessionId,
       ctx.botId,
       {
-        devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
         sandboxAllocation,
       }
@@ -728,7 +735,6 @@ async function allocateNewSession(
         userId: ctx.userId,
         sandboxId,
         sessionId: cloudAgentSessionId,
-        devcontainer: input.runtime?.devcontainer,
         sandboxAllocation,
       });
     }
@@ -1095,7 +1101,6 @@ function buildSessionRegistrationCommand(
         : {}),
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       credentialContainment: allocation.credentialContainment,
-      ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
       ...(input.runtime?.sandboxAllocation
         ? { sandboxAllocation: input.runtime.sandboxAllocation }
         : {}),
@@ -1624,7 +1629,6 @@ export async function sessionCreateIntentFingerprint(
       finalization: input.finalization,
       runtime: input.runtime
         ? {
-            ...(input.runtime.devcontainer ? { devcontainer: true } : {}),
             ...(input.runtime.sandboxAllocation
               ? { sandboxAllocation: input.runtime.sandboxAllocation }
               : {}),

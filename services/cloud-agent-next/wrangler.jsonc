@@ -169,6 +169,9 @@
       "bucket_name": "kilocode-sessions",
     },
   ],
+  // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
+  // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
+  // Remove retired applications/bindings only after verifying drain and external bindings.
   "containers": [
     {
       "class_name": "Sandbox",
@@ -181,7 +184,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 200,
+      "max_instances": 40,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -195,7 +198,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 150,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -209,7 +212,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 20,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -223,7 +226,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 500,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {

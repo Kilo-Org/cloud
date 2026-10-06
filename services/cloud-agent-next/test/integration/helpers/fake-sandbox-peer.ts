@@ -15,6 +15,11 @@ import type {
  * `prepare`/`deliver` results deterministically.
  */
 export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
+  readonly fetchCalls: Request[] = [];
+  async fetch(request: Request): Promise<Response> {
+    this.fetchCalls.push(request);
+    return new Response('status-stream');
+  }
   /** The route attempt every view/notification from this peer belongs to. */
   attemptId = crypto.randomUUID();
   prepareView: ControlPlaneRouteView = { state: 'preparing', attemptId: this.attemptId };

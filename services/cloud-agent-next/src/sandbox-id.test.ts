@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
-  classifySandboxId,
-  deriveSandboxAllocationId,
   deriveSharedSandboxId,
   generateSandboxId,
   generateSandboxRoutingTarget,
@@ -12,31 +10,15 @@ import {
   getSandboxNamespace,
   isOrgInList,
   selectSandboxForNewSession,
+  selectSandboxProvider,
 } from './sandbox-id.js';
+import {
+  assertSandboxBillingAllocation,
+  parseSandboxBillingInput,
+} from './container-usage-context.js';
+import { isCodeReviewEphemeralSandboxId } from './code-review-ephemeral-sandbox.js';
+import { CurrentSessionMetadataSchema } from './persistence/session-metadata.js';
 import type { Env, SandboxId } from './types.js';
-
-describe('deriveSandboxAllocationId', () => {
-  it.each(['org', 'usr', 'bot', 'ubt', 'ses', 'istd', 'crv', 'dind'])(
-    'preserves %s allocation classification while separating create intents',
-    async prefix => {
-      const logicalId = `${prefix}-${'a'.repeat(48)}`;
-      const first = await deriveSandboxAllocationId(logicalId, 'intent_1');
-      const second = await deriveSandboxAllocationId(logicalId, 'intent_2');
-      expect(first).toBe(await deriveSandboxAllocationId(logicalId, 'intent_1'));
-      expect(first).not.toBe(logicalId);
-      expect(first).not.toBe(second);
-      expect(first.length).toBeLessThanOrEqual(63);
-      expect(classifySandboxId(first)).toBe(classifySandboxId(logicalId));
-    }
-  );
-
-  it('rejects an invalid logical allocation or missing intent', async () => {
-    await expect(deriveSandboxAllocationId('invalid', 'intent_1')).rejects.toThrow(
-      'generated sandbox ID'
-    );
-    await expect(deriveSandboxAllocationId('ses-abcdef', '')).rejects.toThrow('create intent');
-  });
-});
 
 describe('generateSandboxId', () => {
   describe('shared sandbox (default)', () => {
@@ -401,76 +383,6 @@ describe('generateSandboxId', () => {
     });
   });
 
-  describe('devcontainer sandbox', () => {
-    it('bypasses shared slot routing', async () => {
-      await expect(
-        generateSandboxRoutingTarget(
-          undefined,
-          'org-id',
-          'user-id',
-          'agent_abc123',
-          undefined,
-          true
-        )
-      ).resolves.toEqual({
-        kind: 'isolated',
-        sandboxId: 'dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
-      });
-    });
-
-    it('should preserve the existing devcontainer ID generation', async () => {
-      const id = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        'agent_abc123',
-        undefined,
-        true
-      );
-      expect(id).toBe('dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
-    });
-
-    it('should be exactly 53 characters', async () => {
-      const id = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        'agent_abc123',
-        undefined,
-        true
-      );
-      expect(id.length).toBe(53);
-    });
-
-    it('should be deterministic for the same session ID', async () => {
-      const id1 = await generateSandboxId(undefined, 'org', 'user', 'session', undefined, true);
-      const id2 = await generateSandboxId(undefined, 'org', 'user', 'session', undefined, true);
-      expect(id1).toBe(id2);
-    });
-
-    it('should take precedence over per-session routing', async () => {
-      const id = await generateSandboxId('*', 'org', 'user', 'session', undefined, true);
-      expect(id).toMatch(/^dind-/);
-    });
-
-    it('should not produce dind- prefix when devcontainer is false', async () => {
-      const id = await generateSandboxId(
-        undefined,
-        'org-id',
-        'user-id',
-        'session',
-        undefined,
-        false
-      );
-      expect(id).toMatch(/^org-/);
-    });
-
-    it('should not produce dind- prefix when devcontainer is undefined', async () => {
-      const id = await generateSandboxId(undefined, 'org-id', 'user-id', 'session');
-      expect(id).toMatch(/^org-/);
-    });
-  });
-
   describe('Code Reviewer ephemeral sandbox', () => {
     it('routes Code Reviewer sessions to dedicated crv sandboxes', async () => {
       const target = await generateSandboxRoutingTarget(
@@ -499,22 +411,6 @@ describe('generateSandboxId', () => {
         kind: 'isolated',
         sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
       });
-    });
-
-    it('lets devcontainer routing take precedence over Code Reviewer ephemeral routing', async () => {
-      const id = await generateSandboxId(
-        undefined,
-        'org-review',
-        'user-id',
-        'agent_abc123',
-        undefined,
-        {
-          devcontainer: true,
-          createdOnPlatform: 'code-review',
-        }
-      );
-
-      expect(id).toBe('dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
     });
   });
 });
@@ -751,19 +647,6 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('keeps devcontainer sessions on Cloudflare DIND allocation', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', ...completeVercelConfiguration },
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: 'session-id',
-      devcontainer: true,
-    });
-
-    expect(selection.provider).toBe('cloudflare');
-    expect(selection.sandboxId).toMatch(/^dind-/);
-  });
-
   it('keeps isolated control-plane sessions on Cloudflare when the containers gate is unset', async () => {
     const selection = await selectSandboxForNewSession({
       env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id' },
@@ -815,19 +698,6 @@ describe('selectSandboxForNewSession', () => {
 
     expect(selection.provider).toBe('cloudflare');
     expect(selection.sandboxId).toMatch(/^ses-/);
-  });
-
-  it('keeps enrolled devcontainer sessions on Cloudflare DIND allocation', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' },
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: controlSessionId,
-      devcontainer: true,
-    });
-
-    expect(selection.provider).toBe('cloudflare');
-    expect(selection.sandboxId).toMatch(/^dind-/);
   });
 
   it('keeps enrolled shared control-plane sessions on Cloudflare', async () => {
@@ -949,6 +819,84 @@ describe('selectSandboxForNewSession', () => {
   });
 });
 
+describe('non-contained sandbox consolidation', () => {
+  const namespaces = {
+    Sandbox: {},
+    SandboxContainment: {},
+    SandboxSmall: {},
+    SandboxSmallContainment: {},
+    SandboxCodeReview: {},
+    SandboxCodeReviewContainment: {},
+    SandboxDIND: {},
+  } as unknown as Env;
+
+  it.each([
+    [undefined, undefined, 'ses-', 'SandboxSmallContainment'],
+    ['cloudflare-single', undefined, 'ses-', 'SandboxSmallContainment'],
+    ['isolated-standard', undefined, 'istd-', 'SandboxContainment'],
+    [undefined, 'code-review', 'crv-', 'SandboxCodeReviewContainment'],
+  ] as const)(
+    'routes non-contained %s / %s sandboxes to Sandbox and keeps their containment pool',
+    async (sandboxAllocation, createdOnPlatform, prefix, containedNamespace) => {
+      const sessionId = 'agent_abc123';
+      const sandboxId = await generateSandboxId('*', 'org-id', 'user-id', sessionId, undefined, {
+        sandboxAllocation,
+        createdOnPlatform,
+      });
+      expect(sandboxId.startsWith(prefix)).toBe(true);
+      expect(getSandboxNamespace(namespaces, sandboxId)).toBe(namespaces.Sandbox);
+      expect(getSandboxNamespace(namespaces, sandboxId, { managedScmContainment: true })).toBe(
+        namespaces[containedNamespace]
+      );
+      const provider = selectSandboxProvider({
+        env: {},
+        orgId: 'org-id',
+        userId: 'user-id',
+        sessionId,
+        sandboxId,
+        sandboxAllocation,
+      });
+      expect(provider).toBe('cloudflare');
+      expect(
+        CurrentSessionMetadataSchema.safeParse({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: 'user-id' },
+          auth: {},
+          lifecycle: { version: 1, timestamp: 1 },
+          workspace: { sandboxId, sandboxProvider: provider, sandboxAllocation },
+        }).success
+      ).toBe(true);
+      const billing = parseSandboxBillingInput({
+        sandboxId,
+        subject: { type: 'user', id: 'user-id' },
+        actor: { type: 'user', id: 'user-id' },
+        sessionId,
+        metadata: { origin: createdOnPlatform ?? 'cloud-agent' },
+        enforcementRequested: true,
+      });
+      expect(() => assertSandboxBillingAllocation('Sandbox', billing)).not.toThrow();
+      expect(() => assertSandboxBillingAllocation(containedNamespace, billing)).not.toThrow();
+      expect(isCodeReviewEphemeralSandboxId(sandboxId)).toBe(createdOnPlatform === 'code-review');
+    }
+  );
+
+  it.each(['ses-abcdef', 'crv-abcdef'] as const)(
+    'keeps the contained standard pool strict for %s',
+    sandboxId => {
+      const billing = parseSandboxBillingInput({
+        sandboxId,
+        subject: { type: 'user', id: 'user-id' },
+        actor: { type: 'user', id: 'user-id' },
+        sessionId: 'agent_abc123',
+        metadata: { origin: 'cloud-agent' },
+      });
+      expect(() => assertSandboxBillingAllocation('SandboxContainment', billing)).toThrow(
+        'incompatible sandbox ID'
+      );
+    }
+  );
+});
+
 describe('getSandboxNamespace', () => {
   const mockSandbox = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxContainment = {} as DurableObjectNamespace<Sandbox>;
@@ -975,9 +923,10 @@ describe('getSandboxNamespace', () => {
     expect(ns).toBe(mockSandboxDIND);
   });
 
-  it('should return SandboxSmall for ses- prefixed IDs', () => {
+  it('routes non-contained ses- prefixed IDs to Sandbox, not the retired Small pool', () => {
     const ns = getSandboxNamespace(mockEnv, 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandboxSmall);
+    expect(ns).toBe(mockSandbox);
+    expect(ns).not.toBe(mockSandboxSmall);
   });
 
   it('should return SandboxSmallContainment for contained ses- prefixed IDs', () => {
@@ -1006,9 +955,10 @@ describe('getSandboxNamespace', () => {
     expect(ns).toBe(mockSandboxContainment);
   });
 
-  it('should return SandboxCodeReview for crv- prefixed IDs', () => {
+  it('routes non-contained crv- prefixed IDs to Sandbox, not the retired review pool', () => {
     const ns = getSandboxNamespace(mockEnv, 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
-    expect(ns).toBe(mockSandboxCodeReview);
+    expect(ns).toBe(mockSandbox);
+    expect(ns).not.toBe(mockSandboxCodeReview);
   });
 
   it('should return SandboxCodeReviewContainment for contained crv- prefixed IDs', () => {
@@ -1057,7 +1007,8 @@ describe('getSandboxNamespace', () => {
 describe('getOutboundContainerId', () => {
   it.each([
     ['org-a1b2c3', 'shared-do-id'],
-    ['ses-a1b2c3', 'small-do-id'],
+    ['ses-a1b2c3', 'shared-do-id'],
+    ['crv-a1b2c3', 'shared-do-id'],
     ['istd-a1b2c3', 'shared-do-id'],
     ['dind-a1b2c3', 'dind-do-id'],
   ])('derives %s from the selected sandbox namespace', (sandboxId, expected) => {
@@ -1067,6 +1018,7 @@ describe('getOutboundContainerId', () => {
     const env = {
       Sandbox: createNamespace('shared-do-id'),
       SandboxSmall: createNamespace('small-do-id'),
+      SandboxCodeReview: createNamespace('review-do-id'),
       SandboxDIND: createNamespace('dind-do-id'),
     } as unknown as Env;
 

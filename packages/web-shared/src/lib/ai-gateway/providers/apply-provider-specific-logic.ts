@@ -4,6 +4,7 @@ import {
   type OpenRouterChatCompletionRequest,
   type GatewayRequest,
   type GatewayMessagesRequest,
+  type OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   applyMistralModelSettings,
@@ -147,7 +148,6 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel)) {
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
-      OpenRouterInferenceProviderIdSchema.enum.anthropic,
       OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
     ];
   }
@@ -181,25 +181,53 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   return [];
 }
 
+/**
+ * Claude goes to Anthropic directly only for non-trial enterprise
+ * organizations; everyone else is served by the other Claude providers.
+ */
+export function getIgnoredProviders(
+  requestedModel: string,
+  isAnthropicProviderAllowed: boolean
+): string[] {
+  if (!isAnthropicProviderAllowed && isClaudeModel(requestedModel)) {
+    return [OpenRouterInferenceProviderIdSchema.enum.anthropic];
+  }
+  return [];
+}
+
+export function withIgnoredProviders(
+  provider: OpenRouterProviderConfig | undefined,
+  ignoredProviders: string[]
+): OpenRouterProviderConfig | undefined {
+  if (ignoredProviders.length === 0) {
+    return provider;
+  }
+  return { ...provider, ignore: [...new Set([...(provider?.ignore ?? []), ...ignoredProviders])] };
+}
+
 export function applyPreferredProvider(
   requestedModel: string,
   requestToMutate:
     | OpenRouterChatCompletionRequest
     | GatewayResponsesRequest
-    | GatewayMessagesRequest
+    | GatewayMessagesRequest,
+  isAnthropicProviderAllowed: boolean
 ) {
   const preferredProviderOrder = getPreferredProviderOrder(requestedModel);
-  if (preferredProviderOrder.length === 0) {
+  const ignoredProviders = getIgnoredProviders(requestedModel, isAnthropicProviderAllowed);
+  if (preferredProviderOrder.length === 0 && ignoredProviders.length === 0) {
     return;
   }
-  console.debug(
-    `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
-  );
-  if (!isOpenRouterProviderConfig(requestToMutate.provider)) {
-    requestToMutate.provider = { order: preferredProviderOrder };
-  } else if (!requestToMutate.provider.order) {
-    requestToMutate.provider.order = preferredProviderOrder;
+  const provider = isOpenRouterProviderConfig(requestToMutate.provider)
+    ? requestToMutate.provider
+    : {};
+  if (preferredProviderOrder.length > 0 && !provider.order) {
+    console.debug(
+      `[applyPreferredProvider] Preferentially routing ${requestedModel} to ${preferredProviderOrder.join()}`
+    );
+    provider.order = preferredProviderOrder;
   }
+  requestToMutate.provider = withIgnoredProviders(provider, ignoredProviders);
 }
 
 export async function applyGatewayModelsFallback(
@@ -280,7 +308,8 @@ export async function applyProviderSpecificLogic(
   userId: string,
   organizationId: string | null,
   sessionId: string | null,
-  taskId: string | null
+  taskId: string | null,
+  isNonTrialEnterprise: boolean
 ) {
   await applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -324,7 +353,12 @@ export async function applyProviderSpecificLogic(
   }
 
   if (provider.id === 'openrouter' || provider.id === 'vercel') {
-    applyPreferredProvider(requestedModel, requestToMutate.body);
+    // A user's own BYOK credential is never ignored.
+    applyPreferredProvider(
+      requestedModel,
+      requestToMutate.body,
+      isNonTrialEnterprise || userByok !== null
+    );
   }
 
   if (isKimiModel(requestedModel)) {

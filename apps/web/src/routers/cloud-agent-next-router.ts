@@ -12,7 +12,6 @@ import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
-import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getGitLabInstanceUrlForUser,
@@ -170,11 +169,9 @@ export const cloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: baseProcedure
     .input(z.object({ devcontainer: z.boolean().optional() }))
     .output(sandboxSelectionCapabilitiesSchema)
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx }) => {
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
-        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
-      });
+      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({});
     }),
 
   /**
@@ -188,16 +185,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(personalPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      if (
-        input.devcontainer &&
-        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', ctx.user.id))
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Dev container sessions are not available',
-        });
-      }
-
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const eligibility = await computeCloudAgentNextBalanceCheckEligibility({
         fromDb: db,

@@ -27,6 +27,8 @@ import {
   CurrentSessionMetadataSchema,
   parseSessionMetadata,
   serializeSessionMetadata,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import {
@@ -313,6 +315,7 @@ export type ControlPlaneSandboxPeer = {
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
   getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  fetch(request: Request): Promise<Response>;
 };
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
@@ -1667,6 +1670,28 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     if (pathname !== '/stream') return new Response('Not found', { status: 404 });
     if (this.registration === null) return new Response('Session not found', { status: 404 });
+    if (new URL(request.url).searchParams.get('sandboxStatus') === 'true') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket')
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      const sandboxId = this.registration.sandboxId;
+      if (this.metadata === null) return new Response('Sandbox unavailable', { status: 503 });
+      const url = new URL('https://sandbox.internal/status-stream');
+      url.searchParams.set('sessionId', this.sessionId);
+      url.searchParams.set('ownerId', this.metadata.identity.userId);
+      try {
+        return await withDORetry(
+          () => {
+            const peer = this.sandboxPeerFor(sandboxId);
+            if (peer === null) throw new Error('Sandbox unavailable');
+            return peer;
+          },
+          peer => peer.fetch(new Request(url, { headers: { Upgrade: 'websocket' } })),
+          'sandboxStatusStream'
+        );
+      } catch {
+        return new Response('Sandbox unavailable', { status: 503 });
+      }
+    }
     return this.streamHandler().handleStreamRequest(request);
   }
 
@@ -1831,6 +1856,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private async deliverQueued(pass = this.transportPass()): Promise<void> {
+    if (await this.failRetiredQueuedMessages()) return;
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
@@ -1892,7 +1918,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.applyView(view, pass);
   }
 
+  private async failRetiredQueuedMessages(): Promise<boolean> {
+    if (this.metadata === null || !hasRetiredDevcontainerRuntime(this.metadata)) return false;
+    await this.settleMessages(
+      this.messages.filter(message => message.state === 'queued').map(message => message.messageId),
+      'failed',
+      DEVCONTAINER_RETIRED_MESSAGE
+    );
+    this.finishWorktreePreparation();
+    return true;
+  }
+
   private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
+    if (await this.failRetiredQueuedMessages()) return null;
     const peer = this.sandboxPeer();
     const registration = this.registration;
     if (registration === null) return null;

@@ -3,6 +3,7 @@ import type { WrapperKiloClient } from './kilo-api.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
+import { createMessageId } from '../../src/shared/message-id.js';
 import { decidePublicationRecovery, PUBLICATION_RECOVERY_PROMPT } from './publication-recovery.js';
 
 const DRAIN_DELAY_MS = 250;
@@ -314,9 +315,10 @@ export function createLifecycleManager(
     try {
       await deps.kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
-        // Kilo rejects a message id without its `msg` prefix (400), so the
-        // synthetic recovery turn must use the same convention as admissions.
-        messageId: `msg_recovery_${crypto.randomUUID()}`,
+        // The synthetic recovery turn is a real Kilo message: mint the same
+        // time-sortable id admissions use so it lands in chronological order
+        // instead of sorting after every `msg_<hex>...` id.
+        messageId: createMessageId(),
         prompt: PUBLICATION_RECOVERY_PROMPT,
         directory: config.workspacePath,
         signal: controller.signal,

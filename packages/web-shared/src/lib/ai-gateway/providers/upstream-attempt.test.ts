@@ -72,6 +72,7 @@ describe('sendUpstreamAttempt with a ChatGPT connection (real database)', () => 
       organizationId: null,
       sessionId: null,
       taskId: null,
+      isNonTrialEnterprise: false,
       search: '',
       method: 'POST',
     });

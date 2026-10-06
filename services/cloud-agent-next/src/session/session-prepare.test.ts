@@ -1405,39 +1405,6 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
-  it.each([
-    {
-      sessionId: WORKSPACE_SESSION_ID,
-      expected: { github: true, gitlab: false, bitbucket: false, kilocode: true },
-    },
-    {
-      sessionId: CLOUD_AGENT_SESSION_ID,
-      expected: { github: false, gitlab: false, bitbucket: false, kilocode: false },
-    },
-  ])(
-    'excludes devcontainers from toggle containment for $sessionId',
-    async ({ sessionId, expected }) => {
-      generateSessionIdMock.mockReturnValue(sessionId);
-      generateSandboxRoutingTargetMock.mockResolvedValueOnce({
-        kind: 'isolated',
-        sandboxId: 'dind-abcdef',
-      });
-      const doStub = makeDoStub();
-      const ctx = makeContext(doStub);
-
-      await runCreate(ctx, makeRequest({ runtime: { devcontainer: true } }));
-
-      expect(createdMetadata(doStub)).toMatchObject(
-        expect.objectContaining({
-          workspace: expect.objectContaining({
-            devcontainerRequested: true,
-            credentialContainment: expected,
-          }),
-        })
-      );
-    }
-  );
-
   it('routes and persists isolated Standard allocation for an enrolled organization', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
     const sandboxId = `istd-${'a'.repeat(48)}` as const;
@@ -1881,10 +1848,7 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
-  it.each([
-    ['devcontainer', { devcontainer: true }, undefined],
-    ['bot identity', undefined, 'bot_123'],
-  ] as const)(
+  it.each([['bot identity', undefined, 'bot_123']] as const)(
     'leaves %s browser sessions ungrouped with their requested auto-commit',
     async (_label, runtime, botId) => {
       const doStub = makeDoStub();
@@ -4428,12 +4392,48 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
+  it('routes an enrolled Code Reviewer owner to the control plane via the trusted billing origin', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '';
+    ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = USER_ID;
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+    await createSessionWithLedger(
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+      }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
+      })
+    );
+  });
+
+  it('keeps a Code Reviewer owner on the legacy plane when only CONTROL_PLANE_IDS is enrolled', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = USER_ID;
+    ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = '';
+    generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
+
+    await createSessionWithLedger(
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+      }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+  });
+
   it.each([
-    {
-      name: 'devcontainer',
-      runtime: { devcontainer: true, sandboxAllocation: 'isolated-standard' } as const,
-      billingOrigin: 'cloud-agent',
-    },
     {
       name: 'code review',
       runtime: { sandboxAllocation: 'isolated-standard' } as const,

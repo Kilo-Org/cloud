@@ -8,14 +8,11 @@ import {
   type WrapperObservation,
   type WrapperStopTarget,
 } from '../protocol.js';
-import type {
-  Env,
-  SandboxId,
-  SandboxInstance,
-  SessionId as ServiceSessionId,
-} from '../../types.js';
+import type { Env, SandboxId, SandboxInstance } from '../../types.js';
 import {
   requiresContainmentSandbox,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import type { SandboxDeleteReason, WrapperStopReason } from '../protocol.js';
@@ -24,6 +21,7 @@ import { posix } from 'node:path';
 import { SANDBOX_SLEEP_AFTER_SECONDS } from '../../core/lease.js';
 import {
   generateSandboxId,
+  deriveRetiredDindSandboxId,
   getSandboxNamespace,
   isOrgInList,
   MANAGED_SCM_OUTBOUND_HANDLER,
@@ -69,7 +67,6 @@ import {
 import {
   isSandboxFilesystemUnusableError,
   SandboxCapacityInspectionError,
-  WorkspaceCapacityAdmissionRejectedError,
   WorkspaceFilesystemPreparationError,
 } from '../../workspace-errors.js';
 import { KILO_SERVER_ENV_KEYS, type KiloServerEnv } from '../../shared/kilo-server-env.js';
@@ -253,16 +250,18 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     if (!this.sandboxIdPromise) {
       this.sandboxIdPromise = this.metadata.workspace?.sandboxId
         ? Promise.resolve(this.metadata.workspace.sandboxId)
-        : generateSandboxId(
-            this.env.PER_SESSION_SANDBOX_ORG_IDS,
-            this.metadata.identity.orgId,
-            this.metadata.identity.userId,
-            this.metadata.identity.sessionId,
-            this.metadata.identity.botId,
-            {
-              createdOnPlatform: this.metadata.identity.billingOrigin,
-            }
-          );
+        : hasRetiredDevcontainerRuntime(this.metadata)
+          ? deriveRetiredDindSandboxId(this.metadata.identity.sessionId)
+          : generateSandboxId(
+              this.env.PER_SESSION_SANDBOX_ORG_IDS,
+              this.metadata.identity.orgId,
+              this.metadata.identity.userId,
+              this.metadata.identity.sessionId,
+              this.metadata.identity.botId,
+              {
+                createdOnPlatform: this.metadata.identity.billingOrigin,
+              }
+            );
     }
     return this.sandboxIdPromise;
   }
@@ -366,19 +365,8 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     }
   }
 
-  private requiresPreparedDevcontainerRuntime(request: EnsureWrapperRequest): boolean {
-    return (
-      request.plan.workspace.metadata.workspace?.devcontainerRequested === true ||
-      request.plan.workspace.metadata.devcontainer !== undefined
-    );
-  }
-
   private usesDevcontainerRuntime(): boolean {
-    return (
-      this.metadata.workspace?.sandboxId?.startsWith('dind-') === true ||
-      this.metadata.workspace?.devcontainerRequested === true ||
-      this.metadata.devcontainer !== undefined
-    );
+    return hasRetiredDevcontainerRuntime(this.metadata);
   }
 
   private existingWrapperSessionName(): string {
@@ -423,7 +411,6 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     const repo = readyRequest.repo;
     return buildWorkspaceBackupCandidate({
       fresh: request.plan.workspace.metadata.lifecycle.preparedAt === undefined,
-      devcontainer: readyRequest.devcontainer?.requested === true,
       setupCommands: readyRequest.materialized.setupCommands,
       setupEnvironment,
       userId: request.plan.scope.userId,
@@ -635,6 +622,13 @@ export class CloudflareAgentSandbox implements AgentSandbox {
 
   async ensureWrapper(request: EnsureWrapperRequest) {
     const { plan, prepared } = request;
+    if (
+      hasRetiredDevcontainerRuntime(this.metadata) ||
+      hasRetiredDevcontainerRuntime(plan.workspace.metadata) ||
+      plan.workspace.sandboxId.startsWith('dind-')
+    ) {
+      throw ExecutionError.invalidRequest(DEVCONTAINER_RETIRED_MESSAGE);
+    }
     const { sessionId, userId, orgId } = plan.scope;
     this.sandboxIdPromise = Promise.resolve(plan.workspace.sandboxId as SandboxId);
     const sandboxId = await this.resolveSandboxId();
@@ -650,81 +644,6 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       }
       await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
       logger.withFields({ sandboxId, sessionId }).info('Activated managed SCM containment');
-    }
-
-    if (this.requiresPreparedDevcontainerRuntime(request)) {
-      let preparedWorkspace;
-      try {
-        preparedWorkspace = await withWorkspacePreparationTimeout(
-          this.sessionService.prepareWorkspace({
-            sandbox,
-            sandboxId,
-            orgId,
-            userId,
-            sessionId: sessionId as ServiceSessionId,
-            kilocodeModel: plan.agent.model,
-            env: this.env,
-            metadata: plan.workspace.metadata,
-            onProgress: request.onProgress,
-          }),
-          'devcontainer workspace preparation'
-        );
-      } catch (error) {
-        if (error instanceof WorkspaceCapacityAdmissionRejectedError) throw error;
-        const storageFull =
-          error instanceof SandboxCapacityInspectionError ||
-          isSandboxFilesystemUnusableError(error);
-        throw ExecutionError.workspaceSetupFailed(
-          storageFull ? 'Sandbox storage is full' : 'Devcontainer workspace preparation failed',
-          error,
-          {
-            subtype: storageFull ? 'sandbox_storage_full' : 'workspace_setup_unknown',
-            safeFailureMessage: storageFull
-              ? 'Sandbox storage is full'
-              : 'Devcontainer workspace preparation failed',
-          }
-        );
-      }
-      if (!preparedWorkspace.devcontainer || !preparedWorkspace.ready.devcontainer) {
-        throw ExecutionError.workspaceSetupFailed(
-          'Devcontainer workspace preparation did not resolve runtime metadata',
-          undefined,
-          {
-            subtype: 'workspace_setup_unknown',
-            safeFailureMessage:
-              'Devcontainer workspace preparation did not resolve runtime metadata',
-          }
-        );
-      }
-      const toolCgroupEnv = buildToolCgroupEnv(this.env);
-      const kiloServerEnv = buildKiloServerEnv(this.env);
-      let wrapper: Awaited<ReturnType<typeof WrapperClient.ensureWrapper>>;
-      try {
-        wrapper = await WrapperClient.ensureWrapper(sandbox, preparedWorkspace.session, {
-          agentSessionId: sessionId,
-          userId,
-          workspacePath: preparedWorkspace.context.workspacePath,
-          sessionId: plan.wrapper.kiloSessionId,
-          runtimeEnv: preparedWorkspace.runtimeEnv,
-          devcontainer: preparedWorkspace.devcontainer,
-          fixedPort: preparedWorkspace.ready.devcontainer.wrapperPort,
-          ...(request.leasedInstance ? { leasedInstance: request.leasedInstance } : {}),
-          ...(toolCgroupEnv ? { toolCgroupEnv } : {}),
-          ...(kiloServerEnv ? { kiloServerEnv } : {}),
-        });
-      } catch (error) {
-        throw ExecutionError.wrapperStartFailed(
-          `Failed to start devcontainer wrapper: ${error instanceof Error ? error.message : String(error)}`,
-          error
-        );
-      }
-      await wrapper.client.updateRuntimeEnvironment(preparedWorkspace.runtimeEnv);
-      return {
-        status: 'session-ready' as const,
-        client: wrapper.client,
-        ready: preparedWorkspace.ready,
-        kiloSessionId: wrapper.sessionId,
-      };
     }
 
     const workspacePath = prepared.context.workspacePath;

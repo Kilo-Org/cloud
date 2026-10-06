@@ -4,8 +4,12 @@ export type SessionPlane = 'legacy' | 'control';
 
 export const CONTROL_PLANE_SESSION_PREFIX = 'workspace_';
 
+/** `billingOrigin` value that identifies a Code Reviewer session. */
+export const CODE_REVIEW_PLATFORM = 'code-review';
+
 export type ControlPlaneOwnerEnv = {
   CONTROL_PLANE_IDS?: string;
+  CODE_REVIEW_CONTROL_PLANE_IDS?: string;
 };
 
 export function sessionPlaneFromId(sessionId: string): SessionPlane {
@@ -71,10 +75,20 @@ export function sessionIdFromDoName(name: string): string {
 
 export type SessionCreateOrigin = {
   createdOnPlatform?: string;
+  /**
+   * Worker-owned effective origin. Unlike the client-supplied
+   * `createdOnPlatform`, this cannot be forged by a public create endpoint, so
+   * specialized routing decisions read it here.
+   */
+  billingOrigin?: string;
 };
 
 export function isInteractiveWebSession(origin?: SessionCreateOrigin): boolean {
   return origin?.createdOnPlatform === 'cloud-agent-web';
+}
+
+export function isCodeReviewSession(origin?: SessionCreateOrigin): boolean {
+  return origin?.billingOrigin === CODE_REVIEW_PLATFORM;
 }
 
 export function isControlPlaneOwner(
@@ -84,6 +98,16 @@ export function isControlPlaneOwner(
   return (
     ownerIdInList(env.CONTROL_PLANE_IDS, owner.userId) ||
     ownerIdInList(env.CONTROL_PLANE_IDS, owner.orgId)
+  );
+}
+
+export function isCodeReviewControlPlaneOwner(
+  env: ControlPlaneOwnerEnv,
+  owner: { userId: string; orgId?: string }
+): boolean {
+  return (
+    ownerIdInList(env.CODE_REVIEW_CONTROL_PLANE_IDS, owner.userId) ||
+    ownerIdInList(env.CODE_REVIEW_CONTROL_PLANE_IDS, owner.orgId)
   );
 }
 
@@ -102,7 +126,13 @@ export function sessionPlaneForNewOwner(
   owner: { userId: string; orgId?: string },
   origin?: SessionCreateOrigin
 ): SessionPlane {
-  return isControlPlaneOwner(env, owner) && isInteractiveWebSession(origin) ? 'control' : 'legacy';
+  if (isInteractiveWebSession(origin)) {
+    return isControlPlaneOwner(env, owner) ? 'control' : 'legacy';
+  }
+  if (isCodeReviewSession(origin)) {
+    return isCodeReviewControlPlaneOwner(env, owner) ? 'control' : 'legacy';
+  }
+  return 'legacy';
 }
 
 function ownerIdInList(raw: string | undefined, id: string | undefined): boolean {

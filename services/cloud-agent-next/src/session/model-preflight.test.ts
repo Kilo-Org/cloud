@@ -7,6 +7,7 @@ import type { PersistenceEnv, CloudAgentSessionState } from '../persistence/type
 import {
   preflightExistingPromptModel,
   preflightPreparedInitialPromptModel,
+  preflightSessionRuntime,
 } from './model-preflight.js';
 
 vi.mock('../sandbox-session/session-stub.js', () => ({
@@ -39,6 +40,39 @@ describe('model preflight for stored sessions', () => {
     vi.clearAllMocks();
     vi.mocked(fetchSessionMetadata).mockResolvedValue(metadata);
     vi.mocked(assertKiloModelAvailable).mockResolvedValue(undefined);
+  });
+
+  it.each([
+    { workspace: { sandboxId: 'dind-abcdef' as const } },
+    { workspace: { sandboxId: 'ses-abcdef' as const, devcontainerRequested: true } },
+    {
+      devcontainer: {
+        workspacePath: '/repo',
+        innerWorkspaceFolder: '/repo',
+        wrapperPort: 3000,
+        configPath: '.devcontainer/devcontainer.json',
+      },
+    },
+  ])('rejects retired metadata before auth renewal or catalog checks: %j', async legacy => {
+    vi.mocked(fetchSessionMetadata).mockResolvedValue({ ...metadata, ...legacy });
+    const input = {
+      env,
+      userId: 'user-1',
+      cloudAgentSessionId: metadata.identity.sessionId,
+      procedure: 'resume',
+    };
+    for (const preflight of [
+      preflightSessionRuntime,
+      preflightExistingPromptModel,
+      preflightPreparedInitialPromptModel,
+    ]) {
+      await expect(preflight(input)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Devcontainer support has been retired'),
+      });
+    }
+    expect(resolveSessionStub).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailable).not.toHaveBeenCalled();
   });
 
   it('validates an explicit continuation model in stored runtime context', async () => {

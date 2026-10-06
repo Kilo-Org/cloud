@@ -69,18 +69,6 @@ export type WrapperRuntimeCredentialProxyConfig = {
   };
 };
 
-export type WrapperDevContainerMetadata = {
-  workspacePath: string;
-  innerWorkspaceFolder: string;
-  wrapperPort: number;
-  configPath: string;
-};
-
-export type WrapperBootstrapDevContainer = {
-  requested: true;
-  resolved?: WrapperDevContainerMetadata;
-};
-
 export type WrapperSessionBinding = {
   ingestUrl: string;
   ingestToken?: string;
@@ -138,7 +126,6 @@ export type WrapperSessionReadyRequest = {
   kiloSessionId: string;
   workspace: WrapperBootstrapWorkspace;
   repo?: WrapperBootstrapRepoSource;
-  devcontainer?: WrapperBootstrapDevContainer;
   materialized: WrapperBootstrapMaterializedConfig;
   runtimeCredentialProxy?: WrapperRuntimeCredentialProxyConfig;
   session: WrapperSessionBinding;
@@ -159,7 +146,6 @@ export type WrapperWorkspaceReady = {
   gitToken?: string;
   gitlabTokenManaged?: boolean;
   bitbucketTokenManaged?: boolean;
-  devcontainer?: WrapperDevContainerMetadata;
 };
 
 /**
@@ -342,20 +328,6 @@ function isRuntimeCredentialProxyConfig(
   });
 }
 
-function isWrapperDevContainerMetadata(value: unknown): value is WrapperDevContainerMetadata {
-  if (!isRecord(value)) return false;
-  if (!hasString(value, 'workspacePath')) return false;
-  if (!hasString(value, 'innerWorkspaceFolder')) return false;
-  if (!hasString(value, 'configPath')) return false;
-  const wrapperPort = value.wrapperPort;
-  return (
-    typeof wrapperPort === 'number' &&
-    Number.isInteger(wrapperPort) &&
-    wrapperPort >= 1 &&
-    wrapperPort <= 65535
-  );
-}
-
 export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSessionReadyRequest {
   if (!isRecord(value)) return false;
   if (!hasString(value, 'agentSessionId')) return false;
@@ -378,16 +350,12 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
     return false;
   }
 
-  const devcontainer = value.devcontainer;
-  if (devcontainer !== undefined) {
-    if (!isRecord(devcontainer) || devcontainer.requested !== true) return false;
-    if (
-      devcontainer.resolved !== undefined &&
-      !isWrapperDevContainerMetadata(devcontainer.resolved)
-    ) {
-      return false;
-    }
-  }
+  if (
+    value.devcontainer !== undefined ||
+    typeof value.sandboxId !== 'string' ||
+    value.sandboxId.startsWith('dind-')
+  )
+    return false;
 
   const materialized = value.materialized;
   if (!isRecord(materialized) || !isRecord(materialized.env)) return false;

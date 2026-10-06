@@ -432,7 +432,10 @@ const PrepareSessionSharedFields = {
   autoCommit: z.boolean().optional(),
   attachments: cloudAgentAttachmentsSchema.optional(),
   images: cloudAgentImagesSchema,
-  devcontainer: z.boolean().optional(),
+  devcontainer: z
+    .boolean()
+    .refine(value => !value, { message: 'Devcontainer support has been retired' })
+    .optional(),
 };
 
 const PrepareSessionNonCloneVariant = z.object({

@@ -24,6 +24,7 @@ import { Writable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pidStillMatches, readProcessTable } from '../tool-cgroup.js';
 import { nativeControlPlaneLogsEnabled } from '../../../src/shared/control-diagnostics.js';
+import { releaseGate, spawnGated } from './gated-spawn.js';
 
 /**
  * Native stderr is captured as operational logs, so the raw containment error
@@ -268,11 +269,6 @@ function releaseChildStreams(child: OwnedChild): void {
       console.warn('Owned process child stream release failed; continuing stream cleanup');
     }
   }
-}
-
-function releaseGate(gate: Writable): void {
-  gate.on('error', () => undefined);
-  gate.end('start\n');
 }
 
 function isErofs(error: unknown): boolean {
@@ -900,17 +896,11 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
 
       const spawnChild = (gatedChild: boolean): OwnedChild => {
         const child = gatedChild
-          ? spawn(
-              '/bin/sh',
-              [
-                '-c',
-                'IFS= read -r start <&3 && [ "$start" = start ] && exec 3<&- && exec "$@"',
-                'kilo-owned',
-                command,
-                ...args,
-              ],
-              { ...options, detached: true, stdio: ['pipe', 'pipe', 'pipe', 'pipe'] }
-            )
+          ? spawnGated(command, args, {
+              ...options,
+              detached: true,
+              stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+            })
           : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
         const record: OwnedChild = { process: child, exited: false };
         children.add(record);

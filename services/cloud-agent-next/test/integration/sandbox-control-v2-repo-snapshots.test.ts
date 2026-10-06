@@ -483,6 +483,26 @@ describe('repository snapshot launch', () => {
     );
   });
 
+  it('does not carry a previous confirmation onto a launch that never connects', async () => {
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const stub = await setup('sbx__repo_launch_unconfirmed', provider);
+    await putLaunchRecord(stub, {
+      allocationId: 'previous-allocation',
+      startSource: 'repository',
+      confirmed: true,
+    });
+    await stub.prepare(prepareInput());
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+
+    // The previous start was confirmed, but this launch's wrapper never
+    // connected, so the record must stay unconfirmed. Carrying the previous
+    // confirmation would make the next start reuse a broken snapshot.
+    expect(await readLaunchRecord(stub)).toMatchObject({
+      startSource: 'repository',
+      confirmed: false,
+    });
+  });
+
   it('keeps a launch confirmed when its slow start stops before it returns', async () => {
     const sandboxId = 'sbx__repo_launch_slow_stop';
     const provider = createFakeProvider({

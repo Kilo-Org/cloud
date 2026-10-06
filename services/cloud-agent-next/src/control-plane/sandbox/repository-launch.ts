@@ -38,10 +38,12 @@ export async function recordRepositoryLaunch(
  * this allocation; `recordRepositoryLaunch` later fills in the start source and
  * keeps that confirmation even if the allocation stops first.
  *
- * The previous `startSource`/`confirmed` are carried over. If this launch fails
- * before `recordLaunch` runs, the record must still describe the last completed
- * start, or a broken snapshot that this launch was asked to discard would be
- * forgotten and reused.
+ * The previous `startSource` is carried over but `confirmed` is not: if this
+ * launch fails before `recordLaunch` runs, the record must still describe the
+ * last completed start, or a broken snapshot this launch was asked to discard
+ * would be forgotten and reused. Keeping `confirmed` false is what lets
+ * `recordLaunch` treat a never-connected wrapper as unconfirmed; only
+ * `confirmRepositoryLaunch`, called on `hello`, promotes it.
  */
 export async function beginRepositoryLaunch(
   storage: Pick<DurableObjectStorage, 'get' | 'put'>,
@@ -52,7 +54,7 @@ export async function beginRepositoryLaunch(
   await recordRepositoryLaunch(storage, {
     allocationId,
     ...(startSource === undefined ? {} : { startSource }),
-    confirmed: previous?.confirmed ?? false,
+    confirmed: false,
   });
 }
 

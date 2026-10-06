@@ -1435,6 +1435,7 @@ export async function getClassifierWinner(
   if (!winner) return null;
 
   return {
+    engine: 'system-one',
     model: winner.model,
     runId: runRow.id,
     accuracy: winner.accuracy,

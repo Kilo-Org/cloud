@@ -2027,6 +2027,7 @@ describe('auto routing worker', () => {
       Promise.resolve(
         key === CLASSIFIER_WINNER_KV_KEY
           ? JSON.stringify({
+              engine: 'system-one',
               model: 'cloudflare/clef',
               runId: 'classifier-run-1',
               accuracy: 0.93,

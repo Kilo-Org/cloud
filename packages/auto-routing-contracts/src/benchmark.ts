@@ -327,6 +327,11 @@ export type BenchmarkRoutingTableResponse = z.infer<typeof BenchmarkRoutingTable
 // on read from the latest completed classifier run (served via
 // /admin/classifier-winner and cached in the auto-routing KV namespace).
 export const ClassifierWinnerSchema = z.object({
+  // Marks a winner measured by the System One classifier. A winner from a
+  // benchmark worker that predates the cutover lacks it and fails to parse, so
+  // the auto-routing worker falls back to DEFAULT_CLASSIFIER_MODEL whatever the
+  // deploy order.
+  engine: z.literal('system-one'),
   model: z.string().trim().min(1),
   runId: z.string(),
   accuracy: z.number(),

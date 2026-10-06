@@ -40,7 +40,8 @@ const FENCE_CLOSE = /^(?:[ \t]*>)*([ \t]*)(`{3,}|~{3,})[ \t]*$/;
 const INDENTED_CODE = /^(?: {4}|\t| {1,3}\t)/;
 const BLANK_LINE = /^[ \t]*$/;
 /** An ATX heading or a thematic break (or setext underline): a line that ends any paragraph. */
-const PARAGRAPH_END_LINE = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$|=+[ \t]*$)/;
+const PARAGRAPH_END_LINE =
+  /^ {0,3}(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$|[=-]+[ \t]*$)/;
 
 /** The indent width of leading spaces and tabs, a tab advancing to the next multiple of four. */
 function indentWidth(indent: string): number {

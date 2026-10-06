@@ -8,6 +8,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { ChevronDown, ChevronRight } from '@/components/ui/icons';
+import { withRtlWritingDirection } from '@/lib/rtl-text';
 
 /**
  * `<details>` as a collapsible block, collapsed unless it carries `open`. The
@@ -37,7 +38,9 @@ export const HtmlDetails: CustomBlockRenderer = function HtmlDetails({ tnode, st
           {summary ? (
             <TNodeChildrenRenderer tnode={summary} />
           ) : (
-            <Text style={tnode.styles.nativeTextFlow}>{t('common.details')}</Text>
+            <Text style={withRtlWritingDirection(tnode.styles.nativeTextFlow)}>
+              {t('common.details')}
+            </Text>
           )}
         </View>
       </Pressable>

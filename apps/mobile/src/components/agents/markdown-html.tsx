@@ -1,20 +1,17 @@
 /* oxlint-disable max-lines -- cohesive HTML segmentation, sanitization, and image/link wiring share one renderer */
-import { type ComponentProps, useMemo } from 'react';
+import { useMemo } from 'react';
 import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
   Platform,
   Text,
-  type TextStyle,
   useWindowDimensions,
-  View,
 } from 'react-native';
 import RenderHTML, {
   type CustomBlockRenderer,
   type CustomMixedRenderer,
   type CustomTagRendererRecord,
-  type CustomTextualRenderer,
   defaultHTMLElementModels,
   type DomVisitorCallbacks,
   HTMLContentModel,
@@ -524,37 +521,6 @@ const HTML_ELEMENT_MODELS = {
 
 const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
-type TextualRendererProps = ComponentProps<CustomTextualRenderer>;
-
-/**
- * Draws a textual node with the library's default renderer. The library types
- * its computed style loosely (`userSelect: string`, `transitionDuration`
- * accepting numbers), and Expo's react-native-web augmentation
- * (`expo-env.d.ts`, which `expo start` writes) narrows those `TextStyle` keys,
- * so with that file present the style no longer matches the default
- * renderer's own type. The style is the library's own value, passed back
- * unchanged; only its declared type is restated.
- */
-function DefaultTextual({ TDefaultRenderer, style, ...props }: TextualRendererProps) {
-  const textStyle = style as TextStyle;
-  return <TDefaultRenderer {...props} style={textStyle} />;
-}
-
-// Subscript and superscript sit in an inline view, the one way React Native
-// can shift text off the line's baseline. The view's bottom sits on the
-// baseline, which already lifts its glyphs, so the subscript moves down by
-// more than the superscript moves up.
-const HtmlSub: CustomTextualRenderer = props => (
-  <View className="translate-y-[9px]">
-    <DefaultTextual {...props} />
-  </View>
-);
-const HtmlSup: CustomTextualRenderer = props => (
-  <View className="-translate-y-1.5">
-    <DefaultTextual {...props} />
-  </View>
-);
-
 type MarkdownHtmlProps = {
   html: string;
   palette: MarkdownPalette;
@@ -576,11 +542,20 @@ export function MarkdownHtml({
     () => ({ color: palette.textColor, fontSize: 16, lineHeight: 24 }),
     [palette]
   );
+  // Most keys, subscripts and superscripts become markdown before they reach
+  // this renderer (`markdown-html-inline.ts`). What is left draws as smaller
+  // or code-colored text on the line's own baseline: an offset inline view is
+  // clipped by the paragraph on iOS.
   const tagsStyles = useMemo(
     () => ({
       ...getMarkdownHeadingStyles(palette),
       ...getMarkdownHtmlTagStyles(palette),
-      kbd: { fontFamily: CODE_FONT, fontSize: 13, lineHeight: 20 },
+      kbd: {
+        fontFamily: CODE_FONT,
+        fontSize: 13,
+        lineHeight: 20,
+        backgroundColor: palette.codeBackground,
+      },
       sub: { fontSize: 11, lineHeight: 16 },
       sup: { fontSize: 11, lineHeight: 16 },
     }),
@@ -666,25 +641,12 @@ export function MarkdownHtml({
         />
       );
     };
-    // The inline view's bottom sits on the baseline; move the key down so its
-    // label shares the line's baseline instead of floating above it.
-    const HtmlKbd: CustomTextualRenderer = props => (
-      <View
-        className="translate-y-1.5 rounded border px-1"
-        style={{ backgroundColor: palette.codeBackground, borderColor: palette.borderColor }}
-      >
-        <DefaultTextual {...props} />
-      </View>
-    );
     return {
       a: HtmlAnchor,
       img: HtmlImage,
       details: HtmlDetails,
-      kbd: HtmlKbd,
-      sub: HtmlSub,
-      sup: HtmlSup,
     };
-  }, [baseStyle, onLongPressLink, onPressLink, palette, selectable]);
+  }, [baseStyle, onLongPressLink, onPressLink, selectable]);
 
   return (
     <RenderHTML

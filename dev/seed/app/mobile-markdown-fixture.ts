@@ -184,6 +184,8 @@ const HTML = [
   '',
   'Water is H<sub>2</sub>O and the area is x<sup>2</sup>.',
   '',
+  'A footnote mark with no script form stays HTML: see note<sup>[1]</sup>.',
+  '',
   'An unknown tag: <custom-note>stays HTML</custom-note>.',
   '',
   'A literal tag in a code fence:',

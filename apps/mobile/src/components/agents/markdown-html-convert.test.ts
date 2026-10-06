@@ -12,6 +12,10 @@ describe('convertHtmlToMarkdown inline tags', () => {
     ['<del>gone</del>', '~~gone~~'],
     ['<strike>gone</strike>', '~~gone~~'],
     ['<code>run()</code>', '`run()`'],
+    ['Copy with <kbd>Ctrl</kbd>+<kbd>C</kbd>', 'Copy with `Ctrl`+`C`'],
+    ['H<sub>2</sub>O', 'H₂O'],
+    ['x<sup>2</sup> and e<sup>-(n+1)</sup>', 'x² and e⁻⁽ⁿ⁺¹⁾'],
+    ['log<sub>x</sub>', 'logₓ'],
     ['Say <B>hi</B> now', 'Say **hi** now'],
   ])('converts %s', (html, markdown) => {
     expect(convertHtmlToMarkdown(html)).toBe(markdown);
@@ -184,7 +188,9 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
   it('keeps unknown tags and tags with meaningful attributes, with their children', () => {
     for (const html of [
       '<span style="color:red"><b>x</b></span>',
-      '<kbd>Ctrl</kbd>',
+      '<kbd><b>Ctrl</b></kbd>',
+      'note<sup>[1]</sup>',
+      'H<sub>2<i>x</i></sub>',
       '<details><summary>More</summary><b>body</b></details>',
       '<custom-tag>hello</custom-tag>',
       '<b class="loud">x</b>',
@@ -195,8 +201,8 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
   });
 
   it('converts around elements it keeps', () => {
-    expect(convertHtmlToMarkdown('Press <kbd>Ctrl</kbd> and <b>go</b>')).toBe(
-      'Press <kbd>Ctrl</kbd> and **go**'
+    expect(convertHtmlToMarkdown('See <u>this</u> and <b>go</b>')).toBe(
+      'See <u>this</u> and **go**'
     );
   });
 
@@ -213,6 +219,7 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
       '> ```\n> <b>x</b>\n> ```',
       'para\n\n    <b>x</b>',
       '# Title\n    <b>x</b>',
+      'Title\n--\n    <b>x</b>',
       '***\n    <b>x</b>',
       '```\ncode\n```\n    <b>x</b>',
       '```\n    ```\n<b>x</b>\n```',

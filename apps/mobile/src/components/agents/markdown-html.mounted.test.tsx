@@ -277,24 +277,17 @@ describe('MarkdownHtml unknown tags', () => {
   });
 });
 
+// These elements reach the HTML renderer only when markdown cannot express
+// them (the converter turns plain keys and script text into markdown first).
 describe('MarkdownHtml inline keys, subscripts, and superscripts', () => {
-  it('draws kbd as an inline key on the palette code background', async () => {
+  it('draws kbd as code-colored text on the line', async () => {
     const renderer = await mountHtml('<p>Press <kbd>Ctrl</kbd>+<kbd>C</kbd></p>');
-    const keys = renderer.root.findAll(node => {
-      const style: unknown = node.props.style;
-      return (
-        node.type === ('View' as never) &&
-        typeof style === 'object' &&
-        style !== null &&
-        'backgroundColor' in style &&
-        style.backgroundColor === '#eeeeee' &&
-        'borderColor' in style &&
-        style.borderColor === '#cccccc'
-      );
-    });
+    const keys = styledTexts(renderer).filter(entry => entry.text === 'Ctrl' || entry.text === 'C');
 
     expect(keys).toHaveLength(2);
-    expect(allText(renderer)).toContain('Ctrl');
+    expect(
+      keys.every(entry => entry.style.some(style => style.backgroundColor === '#eeeeee'))
+    ).toBe(true);
   });
 
   it('draws sub and sup smaller than the text around them', async () => {

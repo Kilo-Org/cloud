@@ -332,7 +332,7 @@ describe('MarkdownText HTML routing', () => {
   it('leaves the HTML blockquote start rule to RN physical-edge mirroring in RTL', async () => {
     rnStub.I18nManager.isRTL = true;
     try {
-      const renderer = await mount(<MarkdownText value="> <kbd>quoted</kbd>" />);
+      const renderer = await mount(<MarkdownText value="> <u>quoted</u>" />);
 
       // RN mirrors physical left/right padding, margin, and borders under RTL
       // (`doLeftAndRightSwapInRTL` defaults to true), so the rule stays on the
@@ -386,12 +386,12 @@ describe('MarkdownText HTML routing', () => {
   });
 
   it('routes styled inline HTML with no markdown form inside a blockquote to the HTML renderer', async () => {
-    const value = '> Press <kbd>Ctrl</kbd> and <a href="https://example.com">HTML link</a>';
+    const value = '> Press <u>Ctrl</u> and <a href="https://example.com">HTML link</a>';
     const renderer = await mount(<MarkdownText value={value} />);
     const props = htmlProps(renderer);
 
     expect(props.source.html).toContain('<blockquote>');
-    expect(props.source.html).toContain('<kbd>Ctrl</kbd>');
+    expect(props.source.html).toContain('<u>Ctrl</u>');
     expect(props.source.html).toContain('<a href="https://example.com">HTML link</a>');
     expect(props.tagsStyles).toMatchObject({ a: { textDecorationLine: 'underline' } });
   });

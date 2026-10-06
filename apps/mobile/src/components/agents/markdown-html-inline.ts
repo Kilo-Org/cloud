@@ -1,4 +1,5 @@
 import { type HtmlElement, type HtmlNode, type MaskRange } from './markdown-html-scan';
+import { toScriptText } from './markdown-html-script';
 
 /** The source a conversion reads: the markdown value and its code ranges. */
 export type ConvertContext = { value: string; masks: readonly MaskRange[] };
@@ -212,6 +213,17 @@ function codeSpan(context: ConvertContext, element: HtmlElement): string | null 
   return `${fence}${pad}${content}${pad}${fence}`;
 }
 
+/** The script form of a text-only `sub`/`sup`; null when it has none. */
+function scriptText(context: ConvertContext, element: HtmlElement): string | null {
+  if (element.children.some(child => child.kind === 'element')) {
+    return null;
+  }
+  const decoded = decodeEntities(context.value.slice(element.contentStart, element.contentEnd));
+  return decoded === null
+    ? null
+    : toScriptText(decoded.trim(), element.name === 'sup' ? 'sup' : 'sub');
+}
+
 function elementPiece(
   context: ConvertContext,
   element: HtmlElement,
@@ -231,9 +243,15 @@ function elementPiece(
     }
     return core === '' ? text(lead + trail) : { delimiter, lead, core, trail };
   }
-  if (element.name === 'code') {
+  if (element.name === 'code' || element.name === 'kbd') {
+    // A key reads as inline code: the native renderer draws it on the line's
+    // baseline, where an offset key box would be clipped on iOS.
     const code = codeSpan(context, element);
     return code === null ? null : text(code);
+  }
+  if (element.name === 'sub' || element.name === 'sup') {
+    const scripted = scriptText(context, element);
+    return scripted === null ? null : text(scripted);
   }
   if (element.name === 'br') {
     return options.allowBreak ? text(HARD_BREAK) : null;

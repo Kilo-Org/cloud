@@ -39,9 +39,10 @@ const FENCE_OPEN = /^(?:[ \t]*>)*([ \t]*)(`{3,}|~{3,})(.*)$/;
 const FENCE_CLOSE = /^(?:[ \t]*>)*([ \t]*)(`{3,}|~{3,})[ \t]*$/;
 const INDENTED_CODE = /^(?: {4}|\t| {1,3}\t)/;
 const BLANK_LINE = /^[ \t]*$/;
-/** An ATX heading or a thematic break (or setext underline): a line that ends any paragraph. */
-const PARAGRAPH_END_LINE =
-  /^ {0,3}(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$|[=-]+[ \t]*$)/;
+/** An ATX heading or a thematic break: a line that ends any paragraph. */
+const HEADING_OR_BREAK = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$)/;
+/** A setext underline: a run of one character, which ends only a paragraph above it. */
+const SETEXT_UNDERLINE = /^ {0,3}(?:=+|-+)[ \t]*$/;
 
 /** The indent width of leading spaces and tabs, a tab advancing to the next multiple of four. */
 function indentWidth(indent: string): number {
@@ -56,10 +57,11 @@ function blockCodeRanges(value: string): MaskRange[] {
   const ranges: MaskRange[] = [];
   let fence: { marker: string; start: number; indent: number } | null = null;
   // Whether an indented line here starts code: after a blank line, a closed
-  // fence, a heading, or a thematic break. Inside a paragraph it continues the
-  // paragraph instead.
+  // fence, a heading, a thematic break, or a setext underline. Inside a
+  // paragraph it continues the paragraph instead.
   let codeCanStart = true;
   let inIndented = false;
+  let inParagraph = false;
   let lineStart = 0;
   while (lineStart <= value.length) {
     const newline = value.indexOf('\n', lineStart);
@@ -84,6 +86,7 @@ function blockCodeRanges(value: string): MaskRange[] {
     } else {
       const open = FENCE_OPEN.exec(line);
       const marker = open?.[2];
+      let paragraphLine = false;
       if (marker && !(marker.startsWith('`') && open[3]?.includes('`'))) {
         fence = { marker, start: lineStart, indent: indentWidth(open[1] ?? '') };
         inIndented = false;
@@ -92,8 +95,12 @@ function blockCodeRanges(value: string): MaskRange[] {
         inIndented = true;
       } else if (!blank) {
         inIndented = false;
+        paragraphLine = true;
       }
-      codeCanStart = blank || PARAGRAPH_END_LINE.test(line);
+      const endsParagraph: boolean =
+        HEADING_OR_BREAK.test(line) || (inParagraph && SETEXT_UNDERLINE.test(line));
+      codeCanStart = blank || endsParagraph;
+      inParagraph = paragraphLine && !endsParagraph;
     }
     if (newline === -1) {
       break;

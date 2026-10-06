@@ -191,6 +191,8 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
       '<kbd><b>Ctrl</b></kbd>',
       'note<sup>[1]</sup>',
       'H<sub>2<i>x</i></sub>',
+      'foo<sub> 2</sub>bar',
+      'H<sub>&nbsp;2</sub>O',
       '<details><summary>More</summary><b>body</b></details>',
       '<custom-tag>hello</custom-tag>',
       '<b class="loud">x</b>',
@@ -203,6 +205,17 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
   it('converts around elements it keeps', () => {
     expect(convertHtmlToMarkdown('See <u>this</u> and <b>go</b>')).toBe(
       'See <u>this</u> and **go**'
+    );
+  });
+
+  it('keeps a key or code element as HTML when its code span would touch another', () => {
+    // `Ctrl``C` would read as one code span holding both labels.
+    expect(convertHtmlToMarkdown('Press <kbd>Ctrl</kbd><kbd>C</kbd>')).toBe(
+      'Press `Ctrl`<kbd>C</kbd>'
+    );
+    expect(convertHtmlToMarkdown('<code>a</code><code>b</code>')).toBe('`a`<code>b</code>');
+    expect(convertHtmlToMarkdown('<p><kbd>Ctrl</kbd><kbd>C</kbd></p>')).toBe(
+      '<p><kbd>Ctrl</kbd><kbd>C</kbd></p>'
     );
   });
 
@@ -233,6 +246,10 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
     );
     // An indented line inside a paragraph continues it, so it still converts.
     expect(convertHtmlToMarkdown('para\n    <b>y</b>')).toBe('para\n    **y**');
+    // A mixed run is text, and a lone dash with no paragraph above is a list
+    // marker; neither is a setext underline, so the next line still converts.
+    expect(convertHtmlToMarkdown('=-\n    <b>y</b>')).toBe('=-\n    **y**');
+    expect(convertHtmlToMarkdown('-\n    <b>y</b>')).toBe('-\n    **y**');
   });
 
   it('returns a value with no tags unchanged', () => {

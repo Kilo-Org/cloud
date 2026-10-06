@@ -131,11 +131,19 @@ function delimiterFits(before: string | undefined, core: string, after: string |
   );
 }
 
-/** Joins inline pieces; null when an emphasis would not parse back as emphasis. */
+/**
+ * Joins inline pieces; null when an emphasis would not parse back as emphasis,
+ * or when two backtick runs would touch, inside the run or at its edges:
+ * `a``b` reads as one code span, so adjacent `<kbd>`/`<code>` keep their HTML.
+ */
 function joinInline(pieces: readonly InlinePiece[], options: InlineOptions): string | null {
   let joined = '';
+  // Set inside `append`, which flow analysis does not follow.
+  let backticksTouch = false as boolean;
   // Collapsing across piece edges, as HTML collapses whitespace across tags.
   const append = (part: string) => {
+    backticksTouch ||=
+      part.startsWith('`') && (joined === '' ? options.before === '`' : joined.endsWith('`'));
     joined += joined.endsWith(' ') && part.startsWith(' ') ? part.slice(1) : part;
   };
   for (const [index, piece] of pieces.entries()) {
@@ -153,7 +161,7 @@ function joinInline(pieces: readonly InlinePiece[], options: InlineOptions): str
     append(piece.delimiter + piece.core + piece.delimiter);
     append(piece.trail);
   }
-  return joined;
+  return backticksTouch || (joined.endsWith('`') && options.after === '`') ? null : joined;
 }
 
 function linkDestination(href: string): string | null {
@@ -213,15 +221,16 @@ function codeSpan(context: ConvertContext, element: HtmlElement): string | null 
   return `${fence}${pad}${content}${pad}${fence}`;
 }
 
-/** The script form of a text-only `sub`/`sup`; null when it has none. */
+/**
+ * The script form of a text-only `sub`/`sup`; null when it has none. Edge
+ * whitespace has no script form either, so content that needs it stays HTML.
+ */
 function scriptText(context: ConvertContext, element: HtmlElement): string | null {
   if (element.children.some(child => child.kind === 'element')) {
     return null;
   }
   const decoded = decodeEntities(context.value.slice(element.contentStart, element.contentEnd));
-  return decoded === null
-    ? null
-    : toScriptText(decoded.trim(), element.name === 'sup' ? 'sup' : 'sub');
+  return decoded === null ? null : toScriptText(decoded, element.name === 'sup' ? 'sup' : 'sub');
 }
 
 function elementPiece(

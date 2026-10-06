@@ -16,13 +16,12 @@ import {
   requestMarkdownImageTrust,
   subscribeMarkdownImageLoadAllowed,
 } from './markdown-image-confirm';
-import { resolveMarkdownImageSrc } from './markdown-image-src';
+import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
 import {
   IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
   resolveImagePreviewAspectRatio,
 } from './tool-card-attachments';
-import { getFilename } from './tool-card-utils';
 
 type MarkdownImageKind = 'https' | 'http' | 'data' | null;
 
@@ -161,8 +160,7 @@ export function MarkdownImage({
     setMeasuredAspectRatio(undefined);
   }
 
-  const filename =
-    alt || (uri.startsWith('http') ? getFilename(uri.split('?')[0] ?? '') : '') || 'image';
+  const filename = markdownImageFilename(uri, alt);
   const imageAccessibilityLabel = alt
     ? t('agentChat.filePart.viewImageWithAlt', { alt })
     : t('agentChat.filePart.viewImage');

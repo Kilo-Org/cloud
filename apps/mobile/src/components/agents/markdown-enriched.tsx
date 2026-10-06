@@ -1,16 +1,29 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 import { EnrichedMarkdownText, type MarkdownStyle } from 'react-native-enriched-markdown';
+import { useTranslation } from 'react-i18next';
 
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { TOKEN_DARK_LIGHT } from '@/lib/pr-review/diff/syntax-colors';
 
-import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
-import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palette';
 import {
   type MarkdownCopyCodeHandler,
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
-} from './markdown-renderer';
+} from './markdown-handlers';
+import {
+  requestMarkdownImageTrust,
+  subscribeMarkdownImageLoadAllowed,
+} from './markdown-image-confirm';
+import {
+  findMarkdownImages,
+  gateMarkdownImages,
+  isMarkdownImageDisplayable,
+  parseImageLoadUrl,
+} from './markdown-image-gate';
+import { markdownImageFilename, resolveMarkdownImageSrc } from './markdown-image-src';
+import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
+import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palette';
 
 type MarkdownEnrichedProps = {
   value: string;
@@ -95,7 +108,11 @@ function enrichedStyle(palette: MarkdownPalette): MarkdownStyle {
   };
 }
 
-/** One markdown run rendered as native text by `react-native-enriched-markdown`. */
+/**
+ * One markdown run rendered as native text by `react-native-enriched-markdown`.
+ * Images the reader has not allowed are rewritten before the native view sees
+ * them (`markdown-image-gate`), so it never fetches an untrusted image.
+ */
 export function MarkdownEnriched({
   value,
   palette,
@@ -104,20 +121,66 @@ export function MarkdownEnriched({
   onPressLink,
   onCopyCode,
 }: Readonly<MarkdownEnrichedProps>) {
+  const { t } = useTranslation();
+  const [viewer, setViewer] = useState<{ uri: string; filename: string } | null>(null);
   const markdownStyle = useMemo(() => enrichedStyle(palette), [palette]);
+  const images = useMemo(() => findMarkdownImages(value), [value]);
+  // One flag per image, so trusting a host or confirming a URI re-renders
+  // with the real image and a revoke gates it again.
+  const displayable = useSyncExternalStore(subscribeMarkdownImageLoadAllowed, () =>
+    images.map(image => (isMarkdownImageDisplayable(image.href) ? '1' : '0')).join('')
+  );
+  const markdown = useMemo(
+    () =>
+      gateMarkdownImages(
+        value,
+        images.filter((_, index) => displayable[index] !== '1'),
+        t
+      ),
+    [value, images, displayable, t]
+  );
   return (
-    <EnrichedMarkdownText
-      flavor="github"
-      markdown={value}
-      markdownStyle={markdownStyle}
-      selectable={selectable}
-      onLinkPress={({ url }) => {
-        if (onPressLink?.(url) !== true) {
-          confirmAndOpenMarkdownLink(url);
+    <>
+      <EnrichedMarkdownText
+        flavor="github"
+        markdown={markdown}
+        markdownStyle={markdownStyle}
+        selectable={selectable}
+        onLinkPress={({ url }) => {
+          const imageUri = parseImageLoadUrl(url);
+          if (imageUri !== null) {
+            requestMarkdownImageTrust(imageUri);
+          } else if (onPressLink?.(url) !== true) {
+            confirmAndOpenMarkdownLink(url);
+          }
+        }}
+        onLinkLongPress={
+          onLongPressLink
+            ? ({ url }) => {
+                onLongPressLink(parseImageLoadUrl(url) ?? url);
+              }
+            : undefined
         }
-      }}
-      onLinkLongPress={onLongPressLink ? ({ url }) => onLongPressLink(url) : undefined}
-      onCopyPress={onCopyCode ? ({ code }) => onCopyCode(code) : undefined}
-    />
+        onImagePress={({ url, altText }) => {
+          if (isMarkdownImageDisplayable(url)) {
+            setViewer({
+              uri: resolveMarkdownImageSrc(url),
+              filename: markdownImageFilename(url, altText),
+            });
+          }
+        }}
+        onCopyPress={onCopyCode ? ({ code }) => onCopyCode(code) : undefined}
+      />
+      {viewer ? (
+        <ImageViewer
+          visible
+          uri={viewer.uri}
+          filename={viewer.filename}
+          onClose={() => {
+            setViewer(null);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

@@ -9,6 +9,7 @@ import {
   type MarkdownHtmlSnapshot,
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
+import { MarkdownEnriched } from './markdown-enriched';
 import {
   getMarkdownStyles,
   getPalette,
@@ -118,16 +119,14 @@ export function MarkdownText({
             onPressLink={onPressLink}
           />
         ) : (
-          <MarkdownContent
+          <MarkdownEnriched
             key={`md-content-${index}`}
             value={segment.raw}
             palette={palette}
             selectable={selectable}
-            renderScope={renderScope}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
             onCopyCode={onCopyCode}
-            onLongPressCode={onLongPressCode}
           />
         )
       )}

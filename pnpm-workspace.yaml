@@ -272,6 +272,7 @@ allowBuilds:
   esbuild: true
   libpq: true
   workerd: true
+  react-native-enriched-markdown: true
   '@sentry/cli': false
   bufferutil: false
   core-js: false

@@ -95,7 +95,7 @@ type ChatSidebarProps = {
   worktreeDetails?: Record<string, SidebarWorktreeDetails>;
   onRenameWorktree?: (worktreeId: string, name: string) => Promise<void>;
   onDeleteWorktree?: (worktreeId: string) => void;
-  deletingWorktreeId?: string;
+  deletingWorktreeIds?: string[];
   isInSheet?: boolean;
   activeSessions?: ActiveSession[];
   foregroundSession?: SidebarForegroundSessionStatus | null;
@@ -651,7 +651,7 @@ export function ChatSidebar({
   worktreeDetails = {},
   onRenameWorktree,
   onDeleteWorktree,
-  deletingWorktreeId,
+  deletingWorktreeIds = [],
   isInSheet = false,
   activeSessions = [],
   foregroundSession,
@@ -931,7 +931,7 @@ export function ChatSidebar({
       creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
       onRenameWorktree={onRenameWorktree}
       onDeleteWorktree={onDeleteWorktree}
-      isDeleting={deletingWorktreeId === group.worktreeId}
+      isDeleting={deletingWorktreeIds.includes(group.worktreeId)}
       activeSessionStatuses={activeSessionStatuses}
       foregroundSession={foregroundSession}
       folderControls={

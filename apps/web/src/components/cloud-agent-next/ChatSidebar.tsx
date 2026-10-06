@@ -202,7 +202,9 @@ const SessionRow = memo(function SessionRow({
           />
         ) : (
           <>
-            <span className="line-clamp-1 min-w-0 flex-1 leading-snug">{session.prompt}</span>
+            <span className="line-clamp-1 min-w-0 flex-1 leading-snug" title={session.prompt}>
+              {session.prompt}
+            </span>
             <SessionPrIndicator session={session} />
             <span className="group/session-actions relative flex w-6 shrink-0 justify-end [@media(any-pointer:coarse)]:w-auto [@media(hover:none)]:w-auto">
               {isDeleting ? (
@@ -1228,7 +1230,10 @@ export function ChatSidebar({
                         activeS.id === currentSessionId && 'bg-accent font-medium'
                       )}
                     >
-                      <span className="line-clamp-1 min-w-0 flex-1 leading-snug">
+                      <span
+                        className="line-clamp-1 min-w-0 flex-1 leading-snug"
+                        title={activeS.title}
+                      >
                         {activeS.title}
                       </span>
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center">

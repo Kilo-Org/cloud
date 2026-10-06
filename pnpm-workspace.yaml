@@ -119,6 +119,8 @@ minimumReleaseAgeExclude:
   # SDK 57 pins 1.21.9, which predates all three, so the pin is overridden with
   # the same mechanism flash-list uses.
   - react-native-keyboard-controller@1.22.6
+  # react-native-enriched-markdown 1.1.0 adds onImagePress/onCodeBlockPress, which the transcript markdown cutover wires.
+  - react-native-enriched-markdown@1.1.0
 overrides:
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)

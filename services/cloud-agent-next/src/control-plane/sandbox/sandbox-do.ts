@@ -1224,10 +1224,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const sessionId = url.searchParams.get('sessionId');
         if (owner === null || owner !== url.searchParams.get('ownerId') || !sessionId)
           return new Response('Sandbox owner mismatch', { status: 403 });
+        const allocation = await this.readAllocation();
         const pair = new WebSocketPair();
         this.ctx.acceptWebSocket(pair[1], ['sandbox-status']);
         pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId });
-        this.sendStatusSnapshot(pair[1], sessionId, await this.readAllocation());
+        this.sendStatusSnapshot(pair[1], sessionId, allocation);
         return new Response(null, { status: 101, webSocket: pair[0] });
       });
     }

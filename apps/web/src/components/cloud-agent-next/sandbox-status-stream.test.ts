@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { WebSocketManagerConfig } from '@/lib/cloud-agent/websocket-manager';
 import type * as WebSocketManager from '@/lib/cloud-agent/websocket-manager';
 import type * as SandboxStatusStream from './sandbox-status-stream';
@@ -44,12 +44,17 @@ describe('sandbox status subscription', () => {
   });
 
   beforeEach(() => {
+    jest.useFakeTimers();
     jest.clearAllMocks();
     getTicket.mockResolvedValue({ ticket: 'single-use-ticket', expiresAt: 100 });
     createManager.mockImplementation(value => {
       config = value;
       return { connect, disconnect, getState: () => ({ status: 'disconnected' }) };
     });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('requests the authorized status-only route and accepts only validated session snapshots', async () => {
@@ -117,5 +122,53 @@ describe('sandbox status subscription', () => {
     expect(onDisconnected).toHaveBeenCalledTimes(1);
     expect(createManager).not.toHaveBeenCalled();
     dispose();
+  });
+
+  it('retries failed ticket acquisition with capped backoff and connects after recovery', async () => {
+    getTicket.mockRejectedValue(new Error('Temporarily unavailable'));
+    const dispose = subscribe();
+    await Promise.resolve();
+    await Promise.resolve();
+    for (const delay of [1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]) {
+      const attempts = getTicket.mock.calls.length;
+      await jest.advanceTimersByTimeAsync(delay - 1);
+      expect(getTicket).toHaveBeenCalledTimes(attempts);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(getTicket).toHaveBeenCalledTimes(attempts + 1);
+    }
+    expect(createManager).not.toHaveBeenCalled();
+    getTicket.mockResolvedValue({ ticket: 'recovered-ticket', expiresAt: 100 });
+    await jest.advanceTimersByTimeAsync(30_000);
+    expect(config.ticket).toBe('recovered-ticket');
+    expect(connect).toHaveBeenCalledTimes(1);
+    config.onEvent(frame());
+    expect(onSnapshot).toHaveBeenCalledWith(snapshot);
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(getTicket).toHaveBeenCalledTimes(9);
+    dispose();
+  });
+
+  it('cancels scheduled ticket retries when disposed', async () => {
+    getTicket.mockRejectedValue(new Error('Temporarily unavailable'));
+    const dispose = subscribe();
+    await Promise.resolve();
+    await Promise.resolve();
+    dispose();
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(getTicket).toHaveBeenCalledTimes(1);
+    expect(onDisconnected).toHaveBeenCalledTimes(1);
+    expect(createManager).not.toHaveBeenCalled();
+  });
+
+  it('does not schedule another retry when an in-flight ticket fails after disposal', async () => {
+    const ticket = Promise.withResolvers<{ ticket: string; expiresAt: number }>();
+    getTicket.mockReturnValue(ticket.promise);
+    const dispose = subscribe();
+    dispose();
+    ticket.reject(new Error('Temporarily unavailable'));
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(getTicket).toHaveBeenCalledTimes(1);
+    expect(onDisconnected).not.toHaveBeenCalled();
+    expect(createManager).not.toHaveBeenCalled();
   });
 });

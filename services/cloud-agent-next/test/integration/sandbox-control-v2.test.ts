@@ -432,6 +432,33 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     wrapper.close();
   });
 
+  it('does not accept a status socket when reading allocation state fails', async () => {
+    const stub = sandboxNamespace.getByName('sbx__status_read_failure');
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.getAllocationState();
+      await state.storage.put('control_plane_owner', 'owner-1');
+      const allocationReader = instance as unknown as {
+        readAllocation: () => Promise<unknown>;
+      };
+      const read = vi
+        .spyOn(allocationReader, 'readAllocation')
+        .mockRejectedValueOnce(new Error('Allocation unavailable'));
+      try {
+        await expect(
+          instance.fetch(
+            new Request(
+              'https://sandbox.internal/status-stream?ownerId=owner-1&sessionId=workspace_status',
+              { headers: { Upgrade: 'websocket' } }
+            )
+          )
+        ).rejects.toThrow('Allocation unavailable');
+        expect(state.getWebSockets('sandbox-status')).toHaveLength(0);
+      } finally {
+        read.mockRestore();
+      }
+    });
+  });
+
   it('rejects a status subscription without the registered sandbox owner', async () => {
     const stub = sandboxNamespace.getByName('sbx__status_authorization');
     await runInDurableObject(stub, (_instance, state) =>

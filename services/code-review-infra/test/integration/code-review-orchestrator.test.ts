@@ -456,6 +456,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(rawMarkdown).toContain('Every list read uses --paginate');
     expect(rawMarkdown).toContain('current HEAD');
     expect(rawMarkdown).toContain('one atomic call only');
+    expect(rawMarkdown).toContain('Publish the summary next');
     expect(rawMarkdown).toContain('trusted existing Kilo summary ID');
     expect(rawMarkdown).toContain('fix link and verify it ends with the current review ID');
 

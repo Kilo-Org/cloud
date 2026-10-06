@@ -34,7 +34,7 @@ import { slashCommandCatalogStatus } from '../../src/shared/slash-commands.js';
 import {
   assistantReportsNoActionableOutput,
   classifyPublicationToolPart,
-  messageInfoReportsOutputLimit,
+  messageInfoReportsAssistantError,
 } from './publication-recovery.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1246,8 +1246,8 @@ export function createConnectionManager(
               const currentSessionId = state.currentSession?.kiloSessionId;
               if (currentSessionId !== undefined && msgSessionId === currentSessionId) {
                 state.setLastAssistantMessageId(messageInfo.id);
-                if (messageInfoReportsOutputLimit(messageInfo)) {
-                  state.observeAssistantOutputLimit();
+                if (messageInfoReportsAssistantError(messageInfo)) {
+                  state.observeAssistantTurnFailure();
                 }
               }
             }
@@ -1326,7 +1326,7 @@ export function createConnectionManager(
               ? [...(assistantTextByMessage.get(lastAssistantId)?.values() ?? [])].join('\n')
               : '';
             if (assistantReportsNoActionableOutput([{ text: assistantText }])) {
-              state.observeAssistantOutputLimit();
+              state.observeAssistantTurnFailure();
             }
             assistantTextByMessage.clear();
             callbacks.onCompletionSignal();

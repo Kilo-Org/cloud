@@ -351,7 +351,7 @@ export function createLifecycleManager(
     if (publicationRecoveryInFlight) return;
     const decision = decidePublicationRecovery({
       configured: deps.isGitHubReviewPublicationInstalled(),
-      outputLimit: state.consumeAssistantOutputLimit(),
+      turnFailed: state.consumeAssistantTurnFailure(),
       signal: state.consumePublicationSignal(),
       budgetUsed: publicationRecoveryBudgetUsed,
     });
@@ -447,13 +447,13 @@ export function createLifecycleManager(
       supersedePublicationRecovery();
       publicationRecoveryBudgetUsed = false;
       publicationRecoveryInFlight = false;
-      state.clearAssistantOutputLimit();
+      state.clearAssistantTurnFailure();
       drainPromise = null;
     },
     resetPublicationRecoveryBudget: () => {
       supersedePublicationRecovery();
       publicationRecoveryBudgetUsed = false;
-      state.clearAssistantOutputLimit();
+      state.clearAssistantTurnFailure();
     },
     onSseEvent: resetSseTransportTimer,
   };

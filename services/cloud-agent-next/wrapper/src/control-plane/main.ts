@@ -16,6 +16,7 @@ import {
   initializeControlWorkload,
   readWorkloadStats,
 } from '../control/workload-cgroup.js';
+import { createSetupSpawn } from '../control/setup-cgroup.js';
 import {
   createControlFileLogUploader,
   type ControlFileLogUploader,
@@ -350,6 +351,7 @@ export async function runControlPlaneWrapper(
     emit: frame => connection.send(frame),
     log: logToFile,
     inheritedEnv: env,
+    spawnSetup: createSetupSpawn(workload),
   });
   worktreeChangesRef.current = createControlPlaneWorktreeChanges({
     emit: frame => connection.send(frame),

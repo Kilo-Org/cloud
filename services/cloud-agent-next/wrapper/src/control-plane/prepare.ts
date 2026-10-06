@@ -22,6 +22,7 @@ import {
   type ExecResult,
   type ProcessOptions,
   type ProcessOutputStream,
+  type ProcessSpawn,
 } from '../utils.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import {
@@ -124,6 +125,8 @@ export type PrepareDeps = {
     onOutput?: (stream: ProcessOutputStream, output: string) => void,
     signal?: AbortSignal
   ) => Promise<ExecResult>;
+  /** Starts the default setup command, e.g. inside the setup cgroup. */
+  spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
   seedRegistration?: typeof seedSessionIngestRegistration;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
@@ -255,6 +258,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         cwd: directory,
         env,
         inheritEnv: false,
+        ...(deps.spawnSetup ? { spawn: deps.spawnSetup } : {}),
         ...(signal ? { signal } : {}),
         inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
         hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,

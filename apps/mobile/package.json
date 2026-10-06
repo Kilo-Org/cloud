@@ -26,6 +26,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@bsky.app/react-native-uitextview": "2.7.1",
     "@expo-google-fonts/jetbrains-mono": "0.4.1",
     "@expo/app-integrity": "57.0.1",
     "@expo/react-native-action-sheet": "4.1.1",

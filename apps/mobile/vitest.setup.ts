@@ -30,6 +30,12 @@ vi.mock('@expo/ui/community/bottom-sheet', () => ({ BottomSheet: 'BottomSheet' }
 // not have. The inline video surface is asserted through host elements.
 vi.mock('expo-video', () => ({ VideoView: 'VideoView', useVideoPlayer: () => ({}) }));
 
+// `@bsky.app/react-native-uitextview` registers native views at import time,
+// and `react-native-css` loads the native CSS runtime; neither exists in Node.
+// The selectable iOS fence is asserted through the `UITextView` host element.
+vi.mock('@bsky.app/react-native-uitextview', () => ({ UITextView: 'UITextView' }));
+vi.mock('react-native-css', () => ({ styled: (component: unknown) => component }));
+
 // `react-native-keyboard-controller` is a native module. Tests assert the app's
 // keyboard surfaces through host elements, so the provider and the views are
 // plain hosts and the keyboard read reports a hidden keyboard. `useKeyboardState`

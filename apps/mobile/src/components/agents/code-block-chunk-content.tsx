@@ -1,8 +1,9 @@
+import { UITextView } from '@bsky.app/react-native-uitextview';
 import { Fragment, type ReactNode } from 'react';
 
 import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
-import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
+import { tokenColorForScheme, type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 
 /**
  * A blank source line still occupies its line box; an `RNText` whose only
@@ -57,4 +58,44 @@ export function renderChunkChildren(
       {renderLineRuns(tokens, scheme, keepBlankLineBox)}
     </Fragment>
   ));
+}
+
+/**
+ * The same chunk as flat `UITextView` children for the iOS selectable fence.
+ * `UITextView` turns a raw string child into a native span and passes an
+ * element child through, so a `Fragment` would drop its strings: every run is
+ * either a string or a nested `UITextView` carrying its token color.
+ */
+export function renderSelectableChunkChildren(
+  chunkLines: readonly (readonly HighlightToken[])[],
+  scheme: TokenScheme,
+  keepBlankLineBox: boolean
+): ReactNode[] {
+  const children: ReactNode[] = [];
+  chunkLines.forEach((tokens, lineIndex) => {
+    const prefix = lineIndex > 0 ? CODE_LINE_BREAK : '';
+    if (keepBlankLineBox && tokens.every(token => token.text.length === 0)) {
+      children.push(prefix + BLANK_CODE_LINE);
+      return;
+    }
+    if (prefix) {
+      children.push(prefix);
+    }
+    tokens.forEach((token, tokenIndex) => {
+      children.push(
+        token.className === null ? (
+          token.text
+        ) : (
+          <UITextView
+            key={`tok-${lineIndex}-${tokenIndex}`}
+            // eslint-disable-next-line react-native/no-inline-styles -- per-token syntax color
+            style={{ color: tokenColorForScheme(token.className, scheme) }}
+          >
+            {token.text}
+          </UITextView>
+        )
+      );
+    });
+  });
+  return children;
 }

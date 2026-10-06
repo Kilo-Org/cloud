@@ -1,0 +1,2 @@
+# QA reviews every change to the isolated UI test package.
+/e2e/ @yz-anaconda

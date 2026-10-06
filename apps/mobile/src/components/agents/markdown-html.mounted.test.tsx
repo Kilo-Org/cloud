@@ -267,6 +267,16 @@ describe('MarkdownHtml details', () => {
   });
 });
 
+describe('MarkdownHtml unknown tags', () => {
+  it('renders an unknown tag as inline text, as a browser does', async () => {
+    const renderer = await mountHtml(
+      '<p>An unknown tag: <custom-note>stays HTML</custom-note>.</p>'
+    );
+
+    expect(allText(renderer)).toContain('An unknown tag: stays HTML.');
+  });
+});
+
 describe('MarkdownHtml inline keys, subscripts, and superscripts', () => {
   it('draws kbd as an inline key on the palette code background', async () => {
     const renderer = await mountHtml('<p>Press <kbd>Ctrl</kbd>+<kbd>C</kbd></p>');
@@ -286,7 +296,7 @@ describe('MarkdownHtml inline keys, subscripts, and superscripts', () => {
         node => node.type === ('View' as never) && node.props.className === className
       );
 
-    expect(offset('translate-y-1')).toHaveLength(1);
+    expect(offset('translate-y-1.5')).toHaveLength(1);
     expect(offset('-translate-y-1.5')).toHaveLength(1);
     const two = styledTexts(renderer).filter(entry => entry.text === '2');
     expect(two).toHaveLength(2);

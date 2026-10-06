@@ -43,8 +43,10 @@ import { lexMarkdown } from './markdown-parse-cache';
 const REMOVED_HTML_TAG_SET = new Set<string>(REMOVED_HTML_TAGS);
 
 // Ignore only void tags here: the engine drops an ignored tag's whole subtree.
-// The visitor below handles containers — clearing the contents of removed ones
-// and hoisting the children of `picture` so its fallback `<img>` still renders.
+// The visitor below handles containers — clearing the contents of removed ones,
+// hoisting the children of `picture` so its fallback `<img>` still renders, and
+// reading an unknown tag as a `span`, as a browser does: the engine renders a
+// tag it has no model for as nothing, dropping its text.
 const IGNORED_HTML_TAGS = ['link', 'frame', 'embed', 'source', 'track', 'input', 'base', 'meta'];
 const HTML_DOM_VISITORS: DomVisitorCallbacks = {
   onElement(element) {
@@ -58,6 +60,8 @@ const HTML_DOM_VISITORS: DomVisitorCallbacks = {
       if (index !== -1) {
         element.parent.children.splice(index, 1, ...element.children);
       }
+    } else if (!Object.hasOwn(defaultHTMLElementModels, element.name)) {
+      element.name = 'span';
     }
   },
 };
@@ -522,7 +526,7 @@ const CODE_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 // Subscript and superscript sit in an inline view, the one way React Native
 // can shift text off the line's baseline.
 const HtmlSub: CustomTextualRenderer = ({ TDefaultRenderer, ...props }) => (
-  <View className="translate-y-1">
+  <View className="translate-y-1.5">
     <TDefaultRenderer {...props} />
   </View>
 );

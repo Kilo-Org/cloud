@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
+import { randomUUID } from 'crypto';
 import { db, pool } from '@kilocode/web-shared/lib/drizzle';
-import { security_findings, agent_configs } from '@kilocode/db/schema';
+import { security_findings, agent_configs, platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -78,6 +79,21 @@ function makeFinding(overrides: Partial<ParsedSecurityFinding> = {}): ParsedSecu
     dependency_scope: 'runtime',
     ...overrides,
   };
+}
+
+async function insertGithubIntegration(userId: string): Promise<string> {
+  const id = randomUUID();
+  await db.insert(platform_integrations).values({
+    id,
+    owned_by_user_id: userId,
+    platform: 'github',
+    integration_type: 'app',
+    platform_installation_id: `test-installation-${randomUUID()}`,
+    permissions: { vulnerability_alerts: 'read' },
+    integration_status: 'active',
+    github_connection_role: 'workflow',
+  });
+  return id;
 }
 
 describe('upsertSecurityFinding', () => {
@@ -353,6 +369,69 @@ describe('upsertSecurityFinding', () => {
         )
       );
     expect(otherRows).toHaveLength(1);
+  });
+
+  it('relinks platform_integration_id when the stored value is NULL and the source is unchanged', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const repo = 'test-org/relink-null-repo';
+    const integrationId = await insertGithubIntegration(user.id);
+
+    const first = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '40' }),
+      owner,
+      repoFullName: repo,
+    });
+    expect(first.wasInserted).toBe(true);
+
+    const [beforeRelink] = await db
+      .select()
+      .from(security_findings)
+      .where(eq(security_findings.id, first.findingId));
+    expect(beforeRelink.platform_integration_id).toBeNull();
+
+    const second = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '40' }),
+      owner,
+      repoFullName: repo,
+      platformIntegrationId: integrationId,
+    });
+    expect(second.wasInserted).toBe(false);
+
+    const [afterRelink] = await db
+      .select()
+      .from(security_findings)
+      .where(eq(security_findings.id, first.findingId));
+    expect(afterRelink.platform_integration_id).toBe(integrationId);
+  });
+
+  it('updates platform_integration_id when the current integration changes', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const repo = 'test-org/relink-changed-repo';
+    const integrationA = await insertGithubIntegration(user.id);
+    const integrationB = await insertGithubIntegration(user.id);
+
+    const first = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '41' }),
+      owner,
+      repoFullName: repo,
+      platformIntegrationId: integrationA,
+    });
+
+    const second = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '41' }),
+      owner,
+      repoFullName: repo,
+      platformIntegrationId: integrationB,
+    });
+    expect(second.wasInserted).toBe(false);
+
+    const [row] = await db
+      .select()
+      .from(security_findings)
+      .where(eq(security_findings.id, first.findingId));
+    expect(row.platform_integration_id).toBe(integrationB);
   });
 
   it('handles null cwe_ids without serialization error', async () => {

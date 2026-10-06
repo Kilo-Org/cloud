@@ -1,8 +1,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 import { createDrizzleClient } from '@kilocode/db/client';
-import { agent_configs, kilocode_users, platform_integrations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  agent_configs,
+  kilocode_users,
+  platform_integrations,
+  security_findings,
+} from '@kilocode/db/schema';
+import { eq, and } from 'drizzle-orm';
 import {
   advanceOwnerSyncFreshness,
   claimOwnerSyncLease,
@@ -50,6 +55,89 @@ async function resetRuntimeState(state: Record<string, unknown> = {}): Promise<v
     .update(agent_configs)
     .set({ runtime_state: state })
     .where(eq(agent_configs.id, agentConfigId));
+}
+
+const relinkAlert = {
+  number: 4242,
+  state: 'open',
+  dependency: {
+    package: { ecosystem: 'npm', name: 'lodash' },
+    manifest_path: 'package.json',
+    scope: 'runtime',
+  },
+  security_advisory: {
+    ghsa_id: 'GHSA-relink-0000-0001',
+    cve_id: null,
+    summary: 'Relink test advisory',
+    description: 'Advisory used to exercise platform integration relinking.',
+    severity: 'high',
+    cvss: { score: 7.5, vector_string: null },
+    cwes: [{ cwe_id: 'CWE-1321', name: 'Prototype Pollution' }],
+  },
+  security_vulnerability: {
+    vulnerable_version_range: '< 4.17.21',
+    first_patched_version: { identifier: '4.17.21' },
+  },
+  created_at: '2026-01-15T00:00:00Z',
+  updated_at: '2026-01-15T00:00:00Z',
+  fixed_at: null,
+  dismissed_at: null,
+  html_url: 'https://github.com/acme/relink/security/dependabot/4242',
+  url: 'https://api.github.com/repos/acme/relink/dependabot/alerts/4242',
+};
+
+function stubRelinkFetch(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify([relinkAlert]), { status: 200 }))
+  );
+}
+
+async function insertSyncIntegration(repoFullName: string): Promise<string> {
+  const id = randomUUID();
+  const [, repoName] = repoFullName.split('/');
+  await client.db.insert(platform_integrations).values({
+    id,
+    owned_by_user_id: testUserId,
+    platform: 'github',
+    integration_type: 'app',
+    platform_installation_id: `security-sync-relink-${randomUUID()}`,
+    permissions: { vulnerability_alerts: 'read' },
+    repositories: [{ id: 1, name: repoName ?? 'relink', full_name: repoFullName, private: true }],
+    integration_status: 'active',
+    github_connection_role: 'workflow',
+  });
+  return id;
+}
+
+async function readRelinkFinding(repoFullName: string) {
+  const [row] = await client.db
+    .select()
+    .from(security_findings)
+    .where(
+      and(
+        eq(security_findings.repo_full_name, repoFullName),
+        eq(security_findings.owned_by_user_id, testUserId)
+      )
+    );
+  return row;
+}
+
+async function cleanupRelink(repoFullName: string, integrationIds: string[]): Promise<void> {
+  await client.db
+    .delete(security_findings)
+    .where(eq(security_findings.repo_full_name, repoFullName));
+  for (const id of integrationIds) {
+    await client.db.delete(platform_integrations).where(eq(platform_integrations.id, id));
+  }
+}
+
+function createSyncOwnerDeps() {
+  return {
+    db: client.db as never,
+    gitTokenService: { getToken: vi.fn(async () => 'github-token') } as never,
+    owner,
+  };
 }
 
 describe('security sync owner lease in PostgreSQL', () => {
@@ -375,5 +463,83 @@ describe('security sync owner lease in PostgreSQL', () => {
 
     const state = await readRuntimeState();
     expect(state.sync_lease).toMatchObject({ runId: 'run-stale', chunkIndex: 2 });
+  });
+
+  it('relinks a NULL platform_integration_id on re-sync when the alert is unchanged', async () => {
+    const repo = 'acme/relink-null';
+    const integrationId = await insertSyncIntegration(repo);
+    try {
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-null-1', chunkIndex: 0 });
+
+      const inserted = await readRelinkFinding(repo);
+      expect(inserted?.platform_integration_id).toBe(integrationId);
+
+      await client.db
+        .update(security_findings)
+        .set({ platform_integration_id: null })
+        .where(eq(security_findings.id, inserted!.id));
+
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-null-2', chunkIndex: 0 });
+
+      const relinked = await readRelinkFinding(repo);
+      expect(relinked?.platform_integration_id).toBe(integrationId);
+    } finally {
+      await cleanupRelink(repo, [integrationId]);
+    }
+  });
+
+  it('updates platform_integration_id when the owner current integration changes', async () => {
+    const repo = 'acme/relink-changed';
+    const integrationA = await insertSyncIntegration(repo);
+    let integrationB: string | undefined;
+    try {
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-changed-1', chunkIndex: 0 });
+
+      let row = await readRelinkFinding(repo);
+      expect(row?.platform_integration_id).toBe(integrationA);
+
+      await client.db
+        .update(platform_integrations)
+        .set({ integration_status: 'suspended' })
+        .where(eq(platform_integrations.id, integrationA));
+      integrationB = await insertSyncIntegration(repo);
+
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-changed-2', chunkIndex: 0 });
+
+      row = await readRelinkFinding(repo);
+      expect(row?.platform_integration_id).toBe(integrationB);
+    } finally {
+      await cleanupRelink(repo, [integrationA, ...(integrationB ? [integrationB] : [])]);
+    }
+  });
+
+  it('does not write an unchanged finding on re-sync', async () => {
+    const repo = 'acme/relink-noop';
+    const integrationId = await insertSyncIntegration(repo);
+    const sentinel = '2020-01-01T00:00:00.000Z';
+    try {
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-noop-1', chunkIndex: 0 });
+
+      const inserted = await readRelinkFinding(repo);
+      expect(inserted?.platform_integration_id).toBe(integrationId);
+
+      await client.db
+        .update(security_findings)
+        .set({ last_synced_at: sentinel })
+        .where(eq(security_findings.id, inserted!.id));
+
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-noop-2', chunkIndex: 0 });
+
+      const after = await readRelinkFinding(repo);
+      expect(new Date(after!.last_synced_at).getTime()).toBe(new Date(sentinel).getTime());
+    } finally {
+      await cleanupRelink(repo, [integrationId]);
+    }
   });
 });

@@ -206,6 +206,7 @@ export async function upsertSecurityFinding(
         LEFT JOIN existing_match ON true
         ON CONFLICT ${ownerConflictTarget(owner)} DO UPDATE
         SET
+          ${sql.identifier(security_findings.platform_integration_id.name)} = EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)},
           ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
           ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
           ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},

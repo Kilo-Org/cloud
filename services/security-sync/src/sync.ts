@@ -1171,13 +1171,17 @@ async function upsertSecurityFinding(
   // and GitHub only advances the alert's updated_at on real changes, so comparing the
   // stored raw_data (jsonb, order-independent) detects any source-driven change in one
   // check. sla_due_at is the only value we compute ourselves, so it is compared separately
-  // to catch SLA-policy changes. When neither differs the DO UPDATE matches no row and the
-  // fallback SELECT below returns the existing finding with wasInserted=false and no
-  // status/severity delta, so notifications and audit events behave exactly as they did for
-  // an unchanged re-sync.
+  // to catch SLA-policy changes. platform_integration_id is not derived from the alert; it
+  // is the owner's current active GitHub integration for this run, so it is compared
+  // separately to relink findings whose integration was deleted or recreated (NULL/stale)
+  // without rewriting rows on ordinary unchanged re-syncs. When none differs the DO UPDATE
+  // matches no row and the fallback SELECT below returns the existing finding with
+  // wasInserted=false and no status/severity delta, so notifications and audit events
+  // behave exactly as they did for an unchanged re-sync.
   const materialChangePredicate = sql`(
         ${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}
         OR ${security_findings.sla_due_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)}
+        OR ${security_findings.platform_integration_id} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)}
       )`;
 
   const result = await db.execute<Record<string, unknown>>(sql`
@@ -1254,6 +1258,7 @@ async function upsertSecurityFinding(
       LEFT JOIN existing_match ON true
       ON CONFLICT ${findingOwnerConflictTarget(owner)} DO UPDATE
       SET
+        ${sql.identifier(security_findings.platform_integration_id.name)} = EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)},
         ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
         ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
         ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},

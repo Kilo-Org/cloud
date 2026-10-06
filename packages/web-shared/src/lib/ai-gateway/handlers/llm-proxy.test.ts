@@ -49,6 +49,7 @@ import {
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { stepfun_37_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { decide, type DecideVerdict } from '@kilocode/web-shared/lib/bouncer/client';
 import { NextRequest } from 'next/server';
@@ -91,6 +92,9 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
+}));
+jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => ({
+  isNonTrialEnterpriseOrganization: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
@@ -176,6 +180,7 @@ const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
+const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
 
 const provider = {
   id: 'openrouter',
@@ -901,6 +906,109 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect(getRoutingProviderConfig).toBeDefined();
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
+  });
+
+  describe('Anthropic provider for Claude', () => {
+    function setOrganizationAuth(plan: 'teams' | 'enterprise') {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: {},
+        plan,
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+    }
+
+    async function sendClaudeRequest() {
+      let routingProvider: OpenRouterProviderConfig | undefined;
+      mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
+        routingProvider = await getRoutingProviderConfig?.();
+        return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
+      });
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never
+      );
+      expect(response.status).toBe(200);
+      return {
+        routingProvider,
+        upstreamProvider: mockedUpstreamRequest.mock.calls[0]?.[0].body.provider,
+      };
+    }
+
+    it('ignores Anthropic for personal accounts without an organization lookup', async () => {
+      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+
+      expect(routingProvider).toEqual({ ignore: ['anthropic'] });
+      expect(upstreamProvider).toEqual({
+        order: ['amazon-bedrock', 'google-vertex'],
+        ignore: ['anthropic'],
+      });
+      expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+    });
+
+    it('ignores Anthropic for teams organizations without an organization lookup', async () => {
+      setOrganizationAuth('teams');
+
+      const { upstreamProvider } = await sendClaudeRequest();
+
+      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
+      expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+    });
+
+    it('ignores Anthropic for trial enterprise organizations', async () => {
+      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
+
+      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+
+      expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[0]).toBe('org-1');
+      expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[1]).toBe(readDb);
+      expect(routingProvider?.ignore).toEqual(['anthropic']);
+      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
+    });
+
+    it('allows Anthropic for non-trial enterprise organizations', async () => {
+      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(true);
+
+      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+
+      expect(routingProvider?.ignore).toBeUndefined();
+      expect(upstreamProvider).toEqual({ order: ['amazon-bedrock', 'google-vertex'] });
+    });
+
+    it('ignores Anthropic when the enterprise lookup fails', async () => {
+      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockRejectedValueOnce(new Error('db down'));
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const { upstreamProvider } = await sendClaudeRequest();
+
+      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
+      consoleError.mockRestore();
+    });
+
+    it('does not look up enterprise status for non-Claude models', async () => {
+      setOrganizationAuth('enterprise');
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+      const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
+      expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
+        order: ['openai'],
+      });
+    });
   });
 
   it('routes virtual routers through the allowed real providers only', async () => {

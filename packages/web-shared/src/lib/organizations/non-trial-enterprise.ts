@@ -1,9 +1,10 @@
 import type { Organization } from '@kilocode/db/schema';
-import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
+import { organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { nonTrialEnterpriseRedisKey } from '@kilocode/web-shared/lib/redis-keys';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
+import { getMostRecentSeatPurchase } from './organization-seat-purchases';
 import { classifyOrganizationEntitlement } from './trial-utils';
 
 const CACHE_TTL_SECONDS = 60 * 60;
@@ -33,7 +34,7 @@ async function queryIsNonTrialEnterpriseOrganization(
   organizationId: Organization['id'],
   fromDb: typeof db
 ): Promise<boolean> {
-  const [[organization], [latestSeatPurchase]] = await Promise.all([
+  const [[organization], latestSeatPurchase] = await Promise.all([
     fromDb
       .select({
         plan: organizations.plan,
@@ -45,12 +46,7 @@ async function queryIsNonTrialEnterpriseOrganization(
       .from(organizations)
       .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
       .limit(1),
-    fromDb
-      .select({ subscription_status: organization_seats_purchases.subscription_status })
-      .from(organization_seats_purchases)
-      .where(eq(organization_seats_purchases.organization_id, organizationId))
-      .orderBy(desc(organization_seats_purchases.created_at))
-      .limit(1),
+    getMostRecentSeatPurchase(organizationId, fromDb),
   ]);
 
   if (organization?.plan !== 'enterprise') return false;

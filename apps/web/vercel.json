@@ -103,6 +103,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/dispatch-bouncer-usage-event-outbox",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/process-user-deletions",
       "schedule": "* * * * *"
     },

@@ -93,7 +93,16 @@ import {
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
-import { normalizeJa4, reportUsageEvent } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  normalizeJa4,
+  releaseDecideLease,
+  reportUsageEvent,
+  usageEventWireBody,
+  type UsageEvent,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
+import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
+import type { BouncerUsageEventEnqueue } from './usage-record-contract';
 
 const posthogClient = PostHogClient();
 
@@ -277,7 +286,8 @@ export async function toInsertableDbUsageRecord(
 
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
-  usageContext: MicrodollarUsageContext
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
 ): Promise<{ usageId: string; createdAt: string } | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
@@ -287,7 +297,8 @@ export async function logMicrodollarUsage(
     core,
     metadata,
     usageContext.prior_microdollar_usage,
-    usageContext.posthog_distinct_id ?? null
+    usageContext.posthog_distinct_id ?? null,
+    bouncerUsageEvent
   );
 
   // `insertUsageRecord` swallows DB errors and returns null; surface that
@@ -319,7 +330,8 @@ async function saveUsageRelatedData(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
-  posthog_distinct_id: string | null
+  posthog_distinct_id: string | null,
+  bouncer_usage_event: BouncerUsageEventEnqueue | null
 ): Promise<UsageRecordInsertResult | null> {
   if (isUSRegion()) {
     const outcome = await recordUsageInPrimaryRegion({
@@ -327,6 +339,7 @@ async function saveUsageRelatedData(
       metadata: metadataFields,
       prior_microdollar_usage,
       posthog_distinct_id,
+      bouncer_usage_event,
     });
     // On `unavailable` fall through to the local write. It is slow from here,
     // but a slow billing record beats a lost one. `recordUsageInPrimaryRegion`
@@ -338,7 +351,8 @@ async function saveUsageRelatedData(
     coreUsageFields,
     metadataFields,
     prior_microdollar_usage,
-    posthog_distinct_id
+    posthog_distinct_id,
+    bouncer_usage_event
   );
 }
 
@@ -350,7 +364,8 @@ export async function saveUsageRelatedDataLocally(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData,
   prior_microdollar_usage: number,
-  posthog_distinct_id: string | null
+  posthog_distinct_id: string | null,
+  bouncer_usage_event: BouncerUsageEventEnqueue | null = null
 ): Promise<UsageRecordWriteOutcome | null> {
   // `isFirst` must be evaluated before the insert — afterwards this record is
   // itself prior usage — but the event it drives is only emitted once the insert
@@ -358,7 +373,7 @@ export async function saveUsageRelatedDataLocally(
   // transaction is still open cannot see the uncommitted row either, so it also
   // computes `isFirst`; emitting here would double-count `first_usage`.
   const isFirst = await isFirstUsage(coreUsageFields, prior_microdollar_usage);
-  const inserted = await insertUsageRecord(coreUsageFields, metadataFields);
+  const inserted = await insertUsageRecord(coreUsageFields, metadataFields, bouncer_usage_event);
   if (!inserted) return null;
   if (posthog_distinct_id && !inserted.wasRedelivery) {
     if (isFirst) await sendFirstUsageEvent(coreUsageFields, posthog_distinct_id);
@@ -505,7 +520,8 @@ export async function setUsageTransactionIdleTimeout(tx: UsageStatementExecutor)
 
 async function insertUsageTransaction(
   coreUsageFields: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  metadataFields: UsageMetaData,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
 ): Promise<UsageTransactionResult> {
   return db.transaction(async tx => {
     await setUsageTransactionIdleTimeout(tx);
@@ -535,6 +551,15 @@ async function insertUsageTransaction(
         kiloUserId: coreUsageFields.kilo_user_id,
         organizationId: coreUsageFields.organization_id,
         createdAt: coreUsageFields.created_at,
+      });
+    }
+    // A spend-watched request's usage event commits with its billing row, so a Bouncer outage
+    // cannot lose the spend it reports. A PK collision rolls this back together with the usage.
+    if (bouncerUsageEvent) {
+      await enqueueBouncerUsageEvent(tx, {
+        requestId: bouncerUsageEvent.request_id,
+        userId: coreUsageFields.kilo_user_id,
+        payload: bouncerUsageEvent.payload,
       });
     }
     return { inserted };
@@ -671,7 +696,8 @@ async function findAlreadyRecordedUsage(
 
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
-  metadataFields: UsageMetaData
+  metadataFields: UsageMetaData,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
 ): Promise<UsageRecordWriteOutcome | null> {
   try {
     const result = await startSpan(
@@ -685,7 +711,7 @@ export async function insertUsageRecord(
           try {
             // This can fail if new deduplicated values are inserted simultaneously.
             // Every retry opens a fresh transaction for the usage and balance write.
-            return await insertUsageTransaction(coreUsageFields, metadataFields);
+            return await insertUsageTransaction(coreUsageFields, metadataFields, bouncerUsageEvent);
           } catch (error) {
             // A collision on this record's own id can never be resolved by
             // retrying — `id` is fixed for the delivery — so stop immediately and
@@ -1239,6 +1265,11 @@ export async function processTokenData(
       tags: { source: 'usage_processing' },
       extra: { usageContext },
     });
+    // No usage event follows, so it cannot release a spend-watched decide's concurrency lease.
+    const bouncer = usageContext.bouncer;
+    if (bouncer?.spendWatch === true && bouncer.accountId !== null) {
+      await releaseDecideLease({ requestId: bouncer.requestId, accountId: bouncer.accountId });
+    }
     return null;
   }
 
@@ -1320,38 +1351,50 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  const usageRecord = await logMicrodollarUsage(usageStats, usageContext);
-  await reportBouncerUsageEvent(usageStats, usageContext);
-  return usageRecord;
+  return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
 }
 
 /**
- * Persists a usage row and then reports the same request to bouncer's usage
- * ledger. Used by the inference paths whose provider has no generation lookup
- * (FIM, edit, embeddings, SystemOne); chat and transcription use
- * `processTokenData`.
+ * Persists a usage row and reports the same request to bouncer's usage ledger, after the billing
+ * cost is final. Chat and transcription reach it through `processTokenData`; FIM, edit,
+ * embeddings, and SystemOne call it directly.
+ *
+ * When the request's decide verdict said `spendWatch`, the usage event is enqueued in the usage
+ * write's transaction and delivered from the outbox right after commit; the cron drainer retries a
+ * failure. If no outbox row exists afterwards (the write failed, or a Frankfurt usage endpoint from
+ * before this change dropped the field), the event falls back to the best-effort send; bouncer
+ * dedupes on `requestId`, so a double send counts once. Every other request keeps the best-effort
+ * send, which never rejects.
  */
 export async function logMicrodollarUsageAndReportToBouncer(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
 ): Promise<{ usageId: string; createdAt: string } | null> {
-  const record = await logMicrodollarUsage(usageStats, usageContext);
-  await reportBouncerUsageEvent(usageStats, usageContext);
+  const event = bouncerUsageEvent(usageStats, usageContext);
+  if (!event || usageContext.bouncer?.spendWatch !== true) {
+    const record = await logMicrodollarUsage(usageStats, usageContext);
+    if (event) await reportUsageEvent(event);
+    return record;
+  }
+  const record = await logMicrodollarUsage(usageStats, usageContext, {
+    request_id: event.requestId,
+    payload: usageEventWireBody(event),
+  });
+  if (!(await deliverBouncerUsageEventNow(event.requestId))) await reportUsageEvent(event);
   return record;
 }
 
 /**
- * Reports this request to bouncer's report-only usage ledger, after the billing
- * write so the final token counts are in hand. The client never rejects, and
- * the verdict is not read back. The caller computes the prompt SimHash, so the
- * raw prompt never reaches this context.
+ * This request's bouncer usage event, or null when it has no bouncer context or is an anonymous
+ * request without an IP (a telemetry gap, never a failure to serve the request). The caller
+ * computes the prompt SimHash, so the raw prompt never reaches this context.
  */
-async function reportBouncerUsageEvent(
+function bouncerUsageEvent(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
-): Promise<void> {
+): UsageEvent | null {
   const bouncer = usageContext.bouncer;
-  if (!bouncer) return;
+  if (!bouncer) return null;
   const fields = {
     requestId: bouncer.requestId,
     occurredAt: bouncer.occurredAt,
@@ -1367,16 +1410,16 @@ async function reportBouncerUsageEvent(
     requestedLogprobs: bouncer.requestedLogprobs,
     samples: bouncer.samples,
     promptSimHash: bouncer.promptSimHash,
+    // The charged cost, after free-model and BYOK zeroing.
+    costMicrodollars: usageStats.cost_mUsd,
   };
   if (bouncer.accountId === null) {
     // Anonymous usage is keyed on the IP and carries no payer key, so bouncer
-    // cannot turn it into a payer-sharing row. Without an IP there is nothing to
-    // report; that is a telemetry gap, never a failure to serve the request.
-    if (bouncer.clientIp == null) return;
-    await reportUsageEvent({ ...fields, tier: 'anonymous', ip: bouncer.clientIp });
-    return;
+    // cannot turn it into a payer-sharing row.
+    if (bouncer.clientIp == null) return null;
+    return { ...fields, tier: 'anonymous', ip: bouncer.clientIp };
   }
-  await reportUsageEvent({ ...fields, accountId: bouncer.accountId, ip: bouncer.clientIp });
+  return { ...fields, accountId: bouncer.accountId, ip: bouncer.clientIp };
 }
 
 async function getGenerationLookupProvider(

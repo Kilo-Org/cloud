@@ -100,11 +100,26 @@ const UsageMetadataSchema = z.object({
   abuse_downgraded_from: z.string().nullable(),
 });
 
+/**
+ * The Bouncer usage event to enqueue in the usage-write transaction, for a request whose decide
+ * verdict said `spendWatch`. `payload` is the shaped usage-event wire body; the outbox row's owner
+ * is `core.kilo_user_id`.
+ */
+export const BouncerUsageEventEnqueueSchema = z.object({
+  request_id: z.string().min(1),
+  payload: z.record(z.string(), z.unknown()),
+});
+
+export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSchema>;
+
 export const UsageRecordRequestSchema = z.object({
   core: CoreUsageSchema,
   metadata: UsageMetadataSchema,
   prior_microdollar_usage: z.number(),
   posthog_distinct_id: z.string().nullable(),
+  // Optional, unlike the fields above: a sender from before this field existed omits it, and that
+  // must still record the billing row. Null or absent means no outbox row.
+  bouncer_usage_event: BouncerUsageEventEnqueueSchema.nullable().optional(),
 });
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;

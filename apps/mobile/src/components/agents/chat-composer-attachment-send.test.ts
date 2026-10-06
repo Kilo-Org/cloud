@@ -189,10 +189,6 @@ vi.mock('@/components/ui/blur-bar', () => ({
   BlurBar: () => null,
 }));
 
-vi.mock('@/components/voice-input-control', () => ({
-  VoiceInputStatus: () => null,
-}));
-
 // ── hooks and libs ─────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({

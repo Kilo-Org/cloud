@@ -138,7 +138,6 @@ vi.mock('@/components/agents/attachment-picker', () => ({
 }));
 vi.mock('@/components/voice-input-control', () => ({
   VoiceInputButton: 'VoiceInputButton',
-  VoiceInputStatus: () => null,
 }));
 
 // ── hooks and libs ───────────────────────────────────────────────────────────

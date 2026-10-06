@@ -350,7 +350,13 @@ export default function CloudChatPage({
     Record<string, TerminalStatusSummary | undefined>
   >({});
   const preserveTerminalSelectionRef = useRef(false);
-  const workspaceTabSelectionInitializedRef = useRef(false);
+  const previousSessionIdRef = useRef<string | null>(sessionIdFromParams);
+  const fileTabClearRef = useRef<{
+    fileScope: string;
+    currentUserId?: string;
+    organizationId?: string;
+    scope: string | null;
+  } | null>(null);
   const workspaceTabScope = getWorkspaceTabScope(selectedWorktreeId, sessionIdFromParams);
   const workspaceIdentityResolved =
     !sessionIdFromParams ||
@@ -425,13 +431,6 @@ export default function CloudChatPage({
 
   if (resolvedFileScope !== fileScope) {
     setResolvedFileScope(fileScope);
-    if (
-      resolvedWorkspaceScope.currentUserId === currentUserId &&
-      resolvedWorkspaceScope.organizationId === organizationId &&
-      resolvedWorkspaceScope.scope === workspaceTabScope
-    ) {
-      setWorkspaceTabs(clearFileTabs);
-    }
   }
 
   if (
@@ -448,10 +447,28 @@ export default function CloudChatPage({
   }
 
   useEffect(() => {
-    if (!workspaceTabSelectionInitializedRef.current) {
-      workspaceTabSelectionInitializedRef.current = true;
+    const previous = fileTabClearRef.current;
+    fileTabClearRef.current = {
+      fileScope,
+      currentUserId,
+      organizationId,
+      scope: workspaceTabScope,
+    };
+    if (previous === null || previous.fileScope === fileScope) return;
+    if (
+      previous.currentUserId !== currentUserId ||
+      previous.organizationId !== organizationId ||
+      previous.scope !== workspaceTabScope
+    ) {
       return;
     }
+    setWorkspaceTabs(clearFileTabs);
+  }, [fileScope, currentUserId, organizationId, workspaceTabScope, setWorkspaceTabs]);
+
+  useEffect(() => {
+    const previousSessionId = previousSessionIdRef.current;
+    previousSessionIdRef.current = sessionIdFromParams;
+    if (previousSessionId === sessionIdFromParams) return;
     if (preserveTerminalSelectionRef.current) {
       preserveTerminalSelectionRef.current = false;
       return;
@@ -459,7 +476,7 @@ export default function CloudChatPage({
     if (sessionIdFromParams) {
       setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
     }
-  }, [sessionIdFromParams]);
+  }, [sessionIdFromParams, setWorkspaceTabs]);
 
   useEffect(() => {
     closeChangesView();

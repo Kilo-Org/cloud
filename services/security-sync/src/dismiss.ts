@@ -14,6 +14,11 @@ import {
 } from '@kilocode/worker-utils/security-finding-audit';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { SecurityDismissMessage } from './index.js';
+import {
+  isGitHubInstallationAccessDeniedError,
+  PermanentSecurityCommandError,
+  permanentGithubDismissalFailure,
+} from './permanent-command-error.js';
 
 type FindingDismissalResult = {
   dismissed: boolean;
@@ -192,7 +197,10 @@ export async function processSecurityFindingDismissal(params: {
 
     await timedDismissalStage('github_writeback', stageContext, async () => {
       if (!finding.platform_integration_id) {
-        throw new Error('GitHub integration unavailable for finding');
+        throw new PermanentSecurityCommandError({
+          resultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+          lastErrorRedacted: 'GitHub integration is not linked to this finding',
+        });
       }
       const [integration] = await params.db
         .select({ githubAppType: platform_integrations.github_app_type })
@@ -214,12 +222,29 @@ export async function processSecurityFindingDismissal(params: {
           )
         )
         .limit(1);
-      if (!integration) throw new Error('GitHub integration unavailable for finding');
-      const token = await params.gitTokenService.getToken(
-        params.message.installationId,
-        integration.githubAppType ?? 'standard',
-        finding.platform_integration_id
-      );
+      if (!integration) {
+        throw new PermanentSecurityCommandError({
+          resultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+          lastErrorRedacted: 'GitHub integration is disconnected or inactive for this finding',
+        });
+      }
+      let token: string;
+      try {
+        token = await params.gitTokenService.getToken(
+          params.message.installationId,
+          integration.githubAppType ?? 'standard',
+          finding.platform_integration_id
+        );
+      } catch (error) {
+        if (isGitHubInstallationAccessDeniedError(error)) {
+          throw new PermanentSecurityCommandError({
+            resultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+            lastErrorRedacted: 'GitHub App installation is no longer active for this finding',
+            cause: error,
+          });
+        }
+        throw error;
+      }
       const response = await fetch(
         `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
         {
@@ -240,6 +265,10 @@ export async function processSecurityFindingDismissal(params: {
       );
 
       if (!response.ok) {
+        const permanent = permanentGithubDismissalFailure(response.status);
+        if (permanent) {
+          throw new PermanentSecurityCommandError(permanent);
+        }
         throw new Error(
           `GitHub Dependabot dismissal failed with ${response.status} for finding ${finding.id}`
         );

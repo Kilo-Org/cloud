@@ -1,6 +1,7 @@
 import { createExpoFileSystemAdapter, useFileSystemDevTools } from '@rozenite/file-system-plugin';
 import { useNetworkActivityDevTools } from '@rozenite/network-activity-plugin';
 import { RozeniteOverlay } from '@rozenite/overlay-plugin';
+import { usePerformanceMonitorDevTools } from '@rozenite/performance-monitor-plugin';
 import { useReactNavigationDevTools } from '@rozenite/react-navigation-plugin';
 import { useRequireProfilerDevTools } from '@rozenite/require-profiler-plugin';
 import { useTanStackQueryDevTools } from '@rozenite/tanstack-query-plugin';
@@ -24,5 +25,6 @@ export function RozeniteDevTools() {
   useReactNavigationDevTools({ ref: navigationRef });
   useFileSystemDevTools({ adapter: FILE_SYSTEM_ADAPTER });
   useRequireProfilerDevTools();
+  usePerformanceMonitorDevTools();
   return <RozeniteOverlay />;
 }

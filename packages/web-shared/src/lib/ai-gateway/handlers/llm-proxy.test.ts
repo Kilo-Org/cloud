@@ -949,7 +949,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
       expect(routingProvider).toEqual({ ignore: ['anthropic'] });
       expect(upstreamProvider).toEqual({
-        order: ['amazon-bedrock', 'google-vertex'],
+        order: ['google-vertex', 'amazon-bedrock'],
         ignore: ['anthropic'],
       });
       expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
@@ -983,7 +983,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       const { routingProvider, upstreamProvider } = await sendClaudeRequest();
 
       expect(routingProvider?.ignore).toBeUndefined();
-      expect(upstreamProvider).toEqual({ order: ['amazon-bedrock', 'google-vertex'] });
+      expect(upstreamProvider).toEqual({ order: ['google-vertex', 'amazon-bedrock'] });
     });
 
     it('does not ignore Anthropic for non-Claude models of trial enterprise organizations', async () => {

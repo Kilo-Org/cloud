@@ -5,7 +5,7 @@ import {
 import { GITHUB_REVIEW_TOOL_PERMISSION_KEY } from '../../src/shared/github-review-target.js';
 
 export const PUBLICATION_RECOVERY_PROMPT =
-  'Publish the review summary now: make code_review_publish_review_summary your next tool call, with the summary wording only. Do not use gh for the summary, and do not retry inline comments or any other write before it.';
+  'Reminder: the review summary has not been published yet. When your review is complete, publish it with the code_review_publish_review_summary tool, passing only the summary wording rather than using gh.';
 
 const NO_PROMPT_ERROR_CODES = new Set([
   'locked',

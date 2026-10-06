@@ -212,6 +212,10 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
       '~~~\n<b>x</b>\n~~~',
       '> ```\n> <b>x</b>\n> ```',
       'para\n\n    <b>x</b>',
+      '# Title\n    <b>x</b>',
+      '***\n    <b>x</b>',
+      '```\ncode\n```\n    <b>x</b>',
+      '```\n    ```\n<b>x</b>\n```',
       '<!-- <b>x</b> -->',
       String.raw`\<b>x</b>`,
     ]) {
@@ -220,6 +224,8 @@ describe('convertHtmlToMarkdown leaves the rest alone', () => {
     expect(convertHtmlToMarkdown('```\n<b>x</b>\n```\n\n<b>y</b>')).toBe(
       '```\n<b>x</b>\n```\n\n**y**'
     );
+    // An indented line inside a paragraph continues it, so it still converts.
+    expect(convertHtmlToMarkdown('para\n    <b>y</b>')).toBe('para\n    **y**');
   });
 
   it('returns a value with no tags unchanged', () => {

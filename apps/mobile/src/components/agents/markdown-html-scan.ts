@@ -35,15 +35,29 @@ export type HtmlElement = {
 
 export type HtmlNode = HtmlElement | HtmlText;
 
-const FENCE_OPEN = /^(?:[ \t]*>)*[ \t]*(`{3,}|~{3,})(.*)$/;
-const FENCE_CLOSE = /^(?:[ \t]*>)*[ \t]*(`{3,}|~{3,})[ \t]*$/;
+const FENCE_OPEN = /^(?:[ \t]*>)*([ \t]*)(`{3,}|~{3,})(.*)$/;
+const FENCE_CLOSE = /^(?:[ \t]*>)*([ \t]*)(`{3,}|~{3,})[ \t]*$/;
 const INDENTED_CODE = /^(?: {4}|\t| {1,3}\t)/;
 const BLANK_LINE = /^[ \t]*$/;
+/** An ATX heading or a thematic break (or setext underline): a line that ends any paragraph. */
+const PARAGRAPH_END_LINE = /^ {0,3}(?:#{1,6}(?:[ \t]|$)|([-*_])(?:[ \t]*\1){2,}[ \t]*$|=+[ \t]*$)/;
+
+/** The indent width of leading spaces and tabs, a tab advancing to the next multiple of four. */
+function indentWidth(indent: string): number {
+  let width = 0;
+  for (const char of indent) {
+    width = char === '\t' ? width + 4 - (width % 4) : width + 1;
+  }
+  return width;
+}
 
 function blockCodeRanges(value: string): MaskRange[] {
   const ranges: MaskRange[] = [];
-  let fence: { marker: string; start: number } | null = null;
-  let previousBlank = true;
+  let fence: { marker: string; start: number; indent: number } | null = null;
+  // Whether an indented line here starts code: after a blank line, a closed
+  // fence, a heading, or a thematic break. Inside a paragraph it continues the
+  // paragraph instead.
+  let codeCanStart = true;
   let inIndented = false;
   let lineStart = 0;
   while (lineStart <= value.length) {
@@ -53,25 +67,33 @@ function blockCodeRanges(value: string): MaskRange[] {
     const blank = BLANK_LINE.test(line);
     if (fence) {
       const close = FENCE_CLOSE.exec(line);
-      const marker = close?.[1];
-      if (marker?.startsWith(fence.marker[0] ?? '') && marker.length >= fence.marker.length) {
+      const marker = close?.[2];
+      // A closing fence may sit at most three columns deeper than its opener
+      // (the opener's indent is the list item's content column inside a list);
+      // deeper, it is fence content.
+      if (
+        marker?.startsWith(fence.marker[0] ?? '') &&
+        marker.length >= fence.marker.length &&
+        indentWidth(close?.[1] ?? '') <= fence.indent + 3
+      ) {
         ranges.push({ start: fence.start, end: lineEnd, block: true });
         fence = null;
+        codeCanStart = true;
       }
     } else {
       const open = FENCE_OPEN.exec(line);
-      const marker = open?.[1];
-      if (marker && !(marker.startsWith('`') && open[2]?.includes('`'))) {
-        fence = { marker, start: lineStart };
+      const marker = open?.[2];
+      if (marker && !(marker.startsWith('`') && open[3]?.includes('`'))) {
+        fence = { marker, start: lineStart, indent: indentWidth(open[1] ?? '') };
         inIndented = false;
-      } else if (!blank && (previousBlank || inIndented) && INDENTED_CODE.test(line)) {
+      } else if (!blank && (codeCanStart || inIndented) && INDENTED_CODE.test(line)) {
         ranges.push({ start: lineStart, end: lineEnd, block: true });
         inIndented = true;
       } else if (!blank) {
         inIndented = false;
       }
+      codeCanStart = blank || PARAGRAPH_END_LINE.test(line);
     }
-    previousBlank = blank;
     if (newline === -1) {
       break;
     }

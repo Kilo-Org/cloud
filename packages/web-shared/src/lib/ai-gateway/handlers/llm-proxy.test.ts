@@ -986,25 +986,14 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(upstreamProvider).toEqual({ order: ['amazon-bedrock', 'google-vertex'] });
     });
 
-    it('ignores Anthropic when the enterprise lookup fails', async () => {
+    it('does not ignore Anthropic for non-Claude models of trial enterprise organizations', async () => {
       setOrganizationAuth('enterprise');
-      mockedIsNonTrialEnterpriseOrganization.mockRejectedValueOnce(new Error('db down'));
-      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-
-      const { upstreamProvider } = await sendClaudeRequest();
-
-      expect(upstreamProvider?.ignore).toEqual(['anthropic']);
-      consoleError.mockRestore();
-    });
-
-    it('does not look up enterprise status for non-Claude models', async () => {
-      setOrganizationAuth('enterprise');
+      mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
       const { handleLlmProxyRequest } = await import('./llm-proxy');
 
       const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
       expect(response.status).toBe(200);
-      expect(mockedIsNonTrialEnterpriseOrganization).not.toHaveBeenCalled();
       expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({
         order: ['openai'],
       });

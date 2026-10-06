@@ -25,7 +25,6 @@ import {
   getIgnoredProviders,
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
@@ -762,16 +761,10 @@ export async function handleLlmProxyRequest(
   const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
 
   async function resolveIsNonTrialEnterprise(): Promise<boolean> {
-    if (!organizationId || !isClaudeModel(effectiveModelIdLowerCased)) return false;
+    if (!organizationId) return false;
     const { plan } = await balanceAndSettingsPromise;
     if (plan !== 'enterprise') return false;
-    try {
-      return await isNonTrialEnterpriseOrganization(organizationId, readDb);
-    } catch (error) {
-      // Claude stays available through the other providers, so fail closed.
-      console.error('Failed to resolve enterprise trial status', error);
-      return false;
-    }
+    return await isNonTrialEnterpriseOrganization(organizationId, readDb);
   }
 
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();

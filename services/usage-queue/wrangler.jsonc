@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "usage-queue",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  // Matches the workerd runtime pinned by the repository's Wrangler version.
+  "compatibility_date": "2026-09-18",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "queues": {
+    "producers": [{ "binding": "USAGE_QUEUE", "queue": "usage-queue" }],
+  },
+  "env": {
+    "staging": {
+      "name": "usage-queue-staging",
+      "queues": {
+        "producers": [{ "binding": "USAGE_QUEUE", "queue": "usage-queue-staging" }],
+      },
+    },
+  },
+}

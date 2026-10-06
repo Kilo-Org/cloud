@@ -99,7 +99,7 @@ jobs:
         id: set-matrix
         run: |
           # Auto-discover all deployable workers (folders containing wrangler.jsonc)
-          # and exclude workers that have their own deploy pipelines.
+          # and exclude workers with custom deploy pipelines or unfinished setup.
           #
           # Diff from the last complete deployment so failed runs do not lose
           # Worker changes. Staging requires an explicitly configured environment.
@@ -163,11 +163,12 @@ jobs:
           NODE
           }
 
-          # Workers excluded from this workflow (they have custom deploy pipelines):
+          # Workers excluded from automatic deployment:
           EXCLUDED=(
             services/kiloclaw  # Docker-based deploy in deploy-production.yml
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
+            services/usage-queue # Scaffold only; provision queues and complete the service before enabling automatic deployment
             services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker
           )
 

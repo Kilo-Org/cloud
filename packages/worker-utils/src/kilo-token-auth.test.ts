@@ -3,7 +3,11 @@ import { SignJWT } from 'jose';
 
 import { clearSecretCacheForTest } from './cached-secret';
 import { signKiloToken } from './kilo-token';
-import { verifyKiloBearerAgainstCurrentPepper, type KiloUserPepperResult } from './kilo-token-auth';
+import {
+  verifyKiloBearerAgainstCurrentPepper,
+  verifyKiloBearerAgainstCurrentPepperWithOutcome,
+  type KiloUserPepperResult,
+} from './kilo-token-auth';
 
 const TEST_JWT_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
@@ -555,5 +559,190 @@ describe('C15 deviceSessionId compatibility', () => {
       .sign(new TextEncoder().encode(TEST_JWT_SECRET));
 
     await expect(verifyToken(token)).resolves.toEqual({ userId: 'user-xyz-789' });
+  });
+});
+
+describe('verifyKiloBearerAgainstCurrentPepperWithOutcome', () => {
+  beforeEach(() => {
+    clearSecretCacheForTest();
+    userResultByUserId.clear();
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+  });
+
+  function verifyOutcome(token: string | null, overrides: Record<string, unknown> = {}) {
+    return verifyKiloBearerAgainstCurrentPepperWithOutcome({
+      token,
+      nextAuthSecret: { get: async () => TEST_JWT_SECRET },
+      workerEnv: 'production',
+      connectionString: 'postgres://test',
+      getUserPepper,
+      ...overrides,
+    } as Parameters<typeof verifyKiloBearerAgainstCurrentPepperWithOutcome>[0]);
+  }
+
+  async function signExpiredToken(): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    return new SignJWT({
+      version: 3,
+      kiloUserId: 'user-xyz-789',
+      apiTokenPepper: 'pepper-current',
+      env: 'production',
+    })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(now - 120)
+      .setExpirationTime(now - 60)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+  }
+
+  async function signWrongVersionToken(): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    return new SignJWT({
+      version: 2,
+      kiloUserId: 'user-xyz-789',
+      apiTokenPepper: 'pepper-current',
+      env: 'production',
+    })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+  }
+
+  async function signDisallowedAlgorithmToken(): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    return new SignJWT({
+      version: 3,
+      kiloUserId: 'user-xyz-789',
+      apiTokenPepper: 'pepper-current',
+      env: 'production',
+    })
+      .setProtectedHeader({ alg: 'HS384', typ: 'JWT' })
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+  }
+
+  it('reports no_token for absent and empty tokens', async () => {
+    await expect(verifyOutcome(null)).resolves.toStrictEqual({ ok: false, reason: 'no_token' });
+    await expect(verifyOutcome('')).resolves.toStrictEqual({ ok: false, reason: 'no_token' });
+  });
+
+  it('reports the auth result on success', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(verifyOutcome(token)).resolves.toStrictEqual({
+      ok: true,
+      auth: { userId: 'user-xyz-789' },
+    });
+  });
+
+  it('classifies expired verification failures', async () => {
+    await expect(verifyOutcome(await signExpiredToken())).resolves.toStrictEqual({
+      ok: false,
+      reason: 'token_verification_failed',
+      verificationFailure: 'expired',
+    });
+  });
+
+  it('classifies signature verification failures', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(verifyOutcome(`${token}x`)).resolves.toStrictEqual({
+      ok: false,
+      reason: 'token_verification_failed',
+      verificationFailure: 'signature',
+    });
+  });
+
+  it('classifies audience claim-validation failures', async () => {
+    const { token } = await signKiloToken({
+      userId: 'user-xyz-789',
+      pepper: 'pepper-current',
+      secret: TEST_JWT_SECRET,
+      expiresInSeconds: 3600,
+      env: 'production',
+      audience: 'other-audience',
+    });
+
+    await expect(verifyOutcome(token, { audience: 'resource-audience' })).resolves.toStrictEqual({
+      ok: false,
+      reason: 'token_verification_failed',
+      verificationFailure: 'audience',
+    });
+  });
+
+  it('classifies malformed JWTs', async () => {
+    await expect(verifyOutcome('not-a-jwt')).resolves.toStrictEqual({
+      ok: false,
+      reason: 'token_verification_failed',
+      verificationFailure: 'malformed',
+    });
+  });
+
+  it('classifies payload-schema failures', async () => {
+    await expect(verifyOutcome(await signWrongVersionToken())).resolves.toStrictEqual({
+      ok: false,
+      reason: 'token_verification_failed',
+      verificationFailure: 'payload_schema',
+    });
+  });
+
+  it('classifies a plain-Error audience rejection through the resource policy as other', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    await expect(
+      verifyOutcome(token, {
+        resourceAudience: { audience: 'resource-audience', mode: 'required' },
+      })
+    ).resolves.toStrictEqual({
+      ok: false,
+      reason: 'token_verification_failed',
+      verificationFailure: 'other',
+    });
+  });
+
+  it('classifies an unrecognized jose failure code as other', async () => {
+    await expect(verifyOutcome(await signDisallowedAlgorithmToken())).resolves.toStrictEqual({
+      ok: false,
+      reason: 'token_verification_failed',
+      verificationFailure: 'other',
+    });
+  });
+
+  it('reports worker_env_mismatch without a verification failure detail', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+    const outcome = await verifyOutcome(token, { workerEnv: 'staging' });
+
+    expect(outcome).toStrictEqual({ ok: false, reason: 'worker_env_mismatch' });
+    expect(Object.keys(outcome)).toStrictEqual(['ok', 'reason']);
+  });
+
+  it('reports unknown_user, blocked_user and pepper_mismatch from the account checks', async () => {
+    const { token } = await signToken({ pepper: 'pepper-current', tokenSource: 'kilo-chat' });
+
+    userResultByUserId.clear();
+    await expect(verifyOutcome(token)).resolves.toStrictEqual({
+      ok: false,
+      reason: 'unknown_user',
+    });
+
+    userResultByUserId.set('user-xyz-789', {
+      pepper: 'pepper-current',
+      blockedReason: 'manual block',
+    });
+    await expect(verifyOutcome(token)).resolves.toStrictEqual({
+      ok: false,
+      reason: 'blocked_user',
+    });
+
+    userResultByUserId.set('user-xyz-789', { pepper: 'pepper-current', blockedReason: null });
+    const { token: staleToken } = await signToken({
+      pepper: 'pepper-stale',
+      tokenSource: 'kilo-chat',
+    });
+    await expect(verifyOutcome(staleToken)).resolves.toStrictEqual({
+      ok: false,
+      reason: 'pepper_mismatch',
+    });
   });
 });

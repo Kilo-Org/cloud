@@ -149,7 +149,7 @@
     "knip": "6.39.0",
     "postcss": "8.5.28",
     "test-renderer": "1.3.0",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vitest": "catalog:"
   },
   "dependenciesMeta": {

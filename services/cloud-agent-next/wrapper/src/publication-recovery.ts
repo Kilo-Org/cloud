@@ -1,6 +1,6 @@
 import {
+  assistantErrorDetail,
   assistantReportsNoActionableOutput,
-  classifyAssistantFailure,
 } from '../../src/shared/assistant-failure.js';
 import { GITHUB_REVIEW_TOOL_PERMISSION_KEY } from '../../src/shared/github-review-target.js';
 
@@ -25,16 +25,19 @@ export type PublicationRecoveryDecision = 'seal' | 'prompt';
  * One-shot recovery decision for a terminal batch that did not verify a
  * publication. Verified results and terminal tool errors seal without a
  * prompt; a missing, rejected, or unverified result prompts once while the
- * batch budget is unused. Output-limit endings never prompt.
+ * batch budget is unused. A turn that failed (an assistant error, including
+ * the output limit, or a no-actionable-output notice) never prompts: the
+ * review is already settled as failed, so recovery could only publish a
+ * partial review next to a failed status.
  */
 export function decidePublicationRecovery(input: {
   configured: boolean;
-  outputLimit: boolean;
+  turnFailed: boolean;
   signal: PublicationRecoverySignal | null;
   budgetUsed: boolean;
 }): PublicationRecoveryDecision {
   if (!input.configured) return 'seal';
-  if (input.outputLimit) return 'seal';
+  if (input.turnFailed) return 'seal';
   if (input.signal?.kind === 'verified') return 'seal';
   if (input.signal?.kind === 'error' && NO_PROMPT_ERROR_CODES.has(input.signal.code)) return 'seal';
   if (input.budgetUsed) return 'seal';
@@ -81,13 +84,11 @@ export function classifyPublicationToolPart(part: unknown): PublicationRecoveryS
 export { assistantReportsNoActionableOutput };
 
 /**
- * True when a root assistant message carries the structured output-limit error
- * (the SDK `MessageOutputLengthError`), so the wrapper marks the output-limit
- * predicate before idle and never sends a publication recovery prompt.
+ * True when a root assistant message carries any error. The session settles
+ * the admitted turn as failed (or interrupted) from this same field, so the
+ * wrapper marks the turn failed before idle and never sends a publication
+ * recovery prompt whose result the review outcome can no longer reflect.
  */
-export function messageInfoReportsOutputLimit(info: unknown): boolean {
-  if (!isRecord(info)) return false;
-  const error = info.error;
-  if (error === undefined || error === null) return false;
-  return classifyAssistantFailure(error).reason === 'output_limit';
+export function messageInfoReportsAssistantError(info: unknown): boolean {
+  return isRecord(info) && assistantErrorDetail(info.error) !== undefined;
 }

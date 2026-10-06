@@ -1,5 +1,5 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -22,6 +22,7 @@ import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../../src/sandbox-control/crede
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
   controlPlanePrepareInputSchema,
+  CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneCredentialSource,
   type ControlPlanePrepareInput,
   type ControlPlaneRouteSpec,
@@ -105,6 +106,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -285,7 +287,7 @@ async function prepareWarmRoute(
   const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
   expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
     type: 'welcome',
-    protocolVersion: 2,
+    protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
   });
   const prepareFrame = await wrapper.next();
   wrapper.send({ type: 'session.ready', sessionId: input.spec.sessionId });
@@ -378,7 +380,14 @@ async function reconstructPreB(
     for (const [key, value] of retained) await state.storage.put(key, value);
     expect(await state.storage.get('control_plane_generation')).toBe(2);
     db.insert(allocationTable).values(allocation).run();
-    db.insert(routesTable).values(snapshots).run();
+    // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
+    for (const snapshot of snapshots) {
+      db.run(
+        sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
+            VALUES (${snapshot.session_id}, ${snapshot.spec}, ${snapshot.grant}, ${snapshot.credential_source},
+                    ${snapshot.state}, ${snapshot.attempt_id}, ${snapshot.attempt_deadline_at}, ${snapshot.reason}, ${snapshot.updated_at})`
+      );
+    }
     const updates: Array<{ sessionId: string; update: ControlPlaneRouteUpdate }> = [];
     const reconstructed = new SandboxControlV2(state, instance.env);
     Object.assign(reconstructed, {
@@ -1895,7 +1904,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     expect(await wrapper2.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
 
     // The failing route is marked failed; the loop still serves the sibling.

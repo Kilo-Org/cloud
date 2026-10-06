@@ -214,7 +214,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         completed = false;
         terminated = false;
       }
-    } else if (sessionStatus.type === 'retry') {
+    } else if (sessionStatus.type === 'retry' && isRootSession(sessionId)) {
       activity = {
         type: 'retrying',
         attempt: sessionStatus.attempt,

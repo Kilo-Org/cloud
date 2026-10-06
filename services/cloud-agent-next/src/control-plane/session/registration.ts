@@ -26,6 +26,7 @@ import {
 import { hasModernRuntimeAuthorization } from '../../session/runtime-authorization-persistence.js';
 import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
+import { getControlPlaneSessionDirectory } from '../../workspace.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -129,7 +130,17 @@ function materializeAttachPayload(
   mcpPrivateKey: string | undefined
 ): SessionAttachPayload {
   try {
-    return buildSessionAttachPayload(metadata, undefined, mcpPrivateKey);
+    const payload = buildSessionAttachPayload(metadata, undefined, mcpPrivateKey);
+    return {
+      ...payload,
+      directory: getControlPlaneSessionDirectory({
+        workspacePath: metadata.workspace?.workspacePath,
+        sandboxId: metadata.workspace?.sandboxId,
+        orgId: metadata.identity.orgId,
+        userId: metadata.identity.userId,
+        sessionId: metadata.identity.sessionId,
+      }),
+    };
   } catch (error) {
     if (error instanceof McpConfigurationError) {
       throw new McpAttachValidationError(

@@ -22,6 +22,8 @@ const remoteExitState: RemoteCommandState = {
 
 const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
+const voiceStatus = vi.hoisted(() => ({ value: 'idle' }));
+const announceForAccessibility = vi.hoisted(() => vi.fn());
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
   {
@@ -94,6 +96,7 @@ vi.mock('react', async () => {
 
 // ── react-native and native bridges ────────────────────────────────────────
 vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility },
   AppState: {
     addEventListener: () => ({ remove: vi.fn() }),
   },
@@ -266,10 +269,6 @@ const MockBlurBar = () => null;
 
 vi.mock('@/components/ui/blur-bar', () => ({ BlurBar: MockBlurBar }));
 
-vi.mock('@/components/voice-input-control', () => ({
-  VoiceInputStatus: () => null,
-}));
-
 // ── hooks and libs ─────────────────────────────────────────────────────────
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -354,7 +353,7 @@ vi.mock('@/lib/voice-input/use-voice-input', () => ({
       available: false,
       isActive: false,
       settleBeforeSubmit: vi.fn(async () => true),
-      status: 'idle',
+      status: voiceStatus.value,
       toggle: vi.fn(),
     };
   },
@@ -521,6 +520,7 @@ beforeEach(() => {
   returnSendsPref.returnSendsMessage = false;
   reducedMotionOn.value = false;
   layoutDirection.isRTL = false;
+  voiceStatus.value = 'idle';
   safeAreaInsets.bottom = 0;
   safeAreaInsets.left = 0;
   safeAreaInsets.right = 0;
@@ -942,5 +942,28 @@ describe('ChatComposer slash-command rejection feedback', () => {
       makeProps({ activeSessionType: 'remote', commandState: remoteExitState })
     );
     expect(statusMessage(edited)).toBeNull();
+  });
+});
+
+// A caption row under the toolbar used to carry the voice status, so starting
+// speech grew the composer and shifted the transcript above it. The status now
+// rides in the input's placeholder slot, which keeps the composer's height.
+describe('ChatComposer voice status', () => {
+  it.each([
+    { status: 'idle', placeholder: 'Message the agent' },
+    { status: 'listening', placeholder: 'Listening...' },
+    { status: 'transcribing', placeholder: 'Transcribing...' },
+  ])('shows "$placeholder" in the input while $status', async ({ status, placeholder }) => {
+    voiceStatus.value = status;
+    const render = await mount(makeProps({ placeholder: 'Message the agent' }));
+
+    expect(findInputRowProps(render)?.placeholder).toBe(placeholder);
+  });
+
+  it('announces transcribing, which no live region carries any more', async () => {
+    voiceStatus.value = 'transcribing';
+    await mount(makeProps({}));
+
+    expect(announceForAccessibility).toHaveBeenCalledWith('Transcribing...');
   });
 });

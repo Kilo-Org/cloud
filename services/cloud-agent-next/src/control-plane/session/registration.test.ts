@@ -7,6 +7,7 @@ import {
   controlPlaneRouteSpecSchema,
 } from '../../shared/control-plane-protocol.js';
 import { encryptWithPublicKey } from '../../utils/encryption.js';
+import { getSessionWorkspacePath, getWorktreeWorkspacePath } from '../../workspace.js';
 import { buildControlPlaneSessionRegistration } from './registration.js';
 
 function generateKeyPair() {
@@ -364,5 +365,134 @@ describe('controlPlaneRouteSpecSchema MCP boundaries', () => {
       remote: { type: 'remote', url: 'https://mcp.example.com/x', headers },
     };
     expect(controlPlaneRouteSpecSchema.safeParse(spec(servers)).success).toBe(false);
+  });
+});
+
+describe('buildControlPlaneSessionRegistration session directory', () => {
+  const SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
+  const SHARED_SANDBOX_ID = `usr-${'a'.repeat(48)}`;
+
+  it('uses the isolated container directory for a ses-* sandbox with no explicit path', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata(), selection);
+
+    expect(registration.spec.directory).toBe('/workspace/app');
+  });
+
+  it('uses the isolated container directory for an istd-* sandbox with no explicit path', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: { sandboxId: 'istd-0123456789abcdef', sandboxProvider: 'cloudflare' },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe('/workspace/app');
+  });
+
+  it('keeps the per-session path for a shared personal sandbox', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ workspace: { sandboxId: SHARED_SANDBOX_ID, sandboxProvider: 'cloudflare' } }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(
+      getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)
+    );
+    expect(registration.spec.directory).not.toBe('/workspace/app');
+  });
+
+  it('keeps the per-session path for a shared organization sandbox', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        identity: {
+          sessionId: SESSION_ID,
+          userId: 'usr_1',
+          orgId: 'org_1',
+          createdOnPlatform: 'cloud-agent',
+        },
+        workspace: { sandboxId: SHARED_SANDBOX_ID, sandboxProvider: 'cloudflare' },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(getSessionWorkspacePath('org_1', 'usr_1', SESSION_ID));
+  });
+
+  it.each([
+    ['code-review', `crv-${'a'.repeat(48)}`],
+    ['devcontainer', `dind-${'a'.repeat(48)}`],
+  ])('keeps the per-session path for a %s sandbox', (_label, sandboxId) => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ workspace: { sandboxId, sandboxProvider: 'cloudflare' } }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(
+      getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)
+    );
+  });
+
+  it('uses the isolated container directory over an explicit worktree path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const worktreePath = getWorktreeWorkspacePath(undefined, 'usr_1', worktreeId);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId,
+          workspacePath: worktreePath,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe('/workspace/app');
+  });
+
+  it('keeps the worktree path on a shared sandbox with the same explicit path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const worktreePath = getWorktreeWorkspacePath(undefined, 'usr_1', worktreeId);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: SHARED_SANDBOX_ID,
+          sandboxProvider: 'cloudflare',
+          worktreeId,
+          workspacePath: worktreePath,
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec.directory).toBe(worktreePath);
+  });
+
+  it('shares the isolated container directory across a worktree scope and keeps the identity path', () => {
+    const worktreeId = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
+    const worktreePath = getWorktreeWorkspacePath(undefined, 'usr_1', worktreeId);
+    const siblingMetadata = (sessionId: string) =>
+      metadata({
+        identity: { sessionId, userId: 'usr_1', createdOnPlatform: 'cloud-agent' },
+        workspace: {
+          sandboxId: 'ses-0123456789abcdef',
+          sandboxProvider: 'cloudflare',
+          worktreeId,
+          workspacePath: worktreePath,
+        },
+      });
+    const firstInput = siblingMetadata('workspace_12345678-1234-1234-1234-123456789abc');
+    const secondInput = siblingMetadata('workspace_abcdefab-abcd-abcd-abcd-abcdefabcdef');
+    const first = buildControlPlaneSessionRegistration(firstInput, selection);
+    const second = buildControlPlaneSessionRegistration(secondInput, selection);
+
+    expect(first.spec.directory).toBe('/workspace/app');
+    expect(second.spec.directory).toBe('/workspace/app');
+    expect(first.credentials.scopeId).toBe(worktreeId);
+    expect(second.credentials.scopeId).toBe(worktreeId);
+    // Registration derives `spec.directory` without mutating the input metadata:
+    // the identity worktree path must survive on the caller's object.
+    expect(firstInput.workspace?.workspacePath).toBe(worktreePath);
+    expect(secondInput.workspace?.workspacePath).toBe(worktreePath);
   });
 });

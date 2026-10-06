@@ -87,7 +87,6 @@ import {
 } from '@/components/agents/chat-composer-stop-remount';
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
-import { VoiceInputStatus } from '@/components/voice-input-control';
 import {
   AGENT_ATTACHMENT_MAX_BYTES,
   AGENT_ATTACHMENT_MAX_FILES,
@@ -114,7 +113,6 @@ import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-s
 import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
 import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
-import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
 import {
   shouldArmAutoSendOnDelivery,
@@ -756,6 +754,22 @@ export function ChatComposer({
     },
   });
   abortVoiceInputRef.current = voiceInput.abort;
+  // The voice status rides in the input's placeholder slot instead of a caption
+  // row, so starting or stopping speech never changes the composer's height.
+  const voiceTranscribing = voiceInput.status === 'transcribing';
+  let voiceStatusMessage: string | null = null;
+  if (voiceInput.status === 'listening') {
+    voiceStatusMessage = i18n.t('voiceInput.listening');
+  } else if (voiceTranscribing) {
+    voiceStatusMessage = i18n.t('voiceInput.transcribing');
+  }
+  // Entering `listening` is announced by the voice controller; the placeholder
+  // is not a live region, so `transcribing` is announced here.
+  useEffect(() => {
+    if (voiceTranscribing) {
+      AccessibilityInfo.announceForAccessibility(i18n.t('voiceInput.transcribing'));
+    }
+  }, [voiceTranscribing]);
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
@@ -1359,17 +1373,6 @@ export function ChatComposer({
           className="mb-2 px-4 text-xs"
         />
 
-        <View
-          className={cn(
-            'px-3',
-            voiceInput.status === 'listening' || voiceInput.status === 'transcribing'
-              ? 'pb-1'
-              : 'pb-0'
-          )}
-        >
-          <VoiceInputStatus status={voiceInput.status} />
-        </View>
-
         {goalComposeActive ? (
           <AccessibleStatus
             message={i18n.t('agentChat.goal.editPlaceholder')}
@@ -1434,7 +1437,7 @@ export function ChatComposer({
                 void voiceInput.toggle();
               }}
               paperclipDisabled={control.paperclipDisabled}
-              placeholder={placeholder}
+              placeholder={voiceStatusMessage ?? placeholder}
               returnSendsMessage={returnSendsMessage}
               sendDisabledReason={sendDisabledReason}
               textInputStyle={textInputStyle}

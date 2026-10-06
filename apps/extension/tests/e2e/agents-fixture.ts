@@ -947,6 +947,7 @@ export const buildRunningCloudAgentStream = (
 
   return [
     kilocode('session.created', { info: { id: sessionId } }),
+    // Historical status is ignored during replay; the connected snapshot is authoritative.
     kilocode('session.status', { sessionID: sessionId, status: { type: 'busy' } }),
     kilocode('message.updated', {
       info: {
@@ -967,6 +968,7 @@ export const buildRunningCloudAgentStream = (
         type: 'text',
       },
     }),
+    { ...ev('connected', { sessionStatus: { type: 'busy' } }), eventId: 0, executionId: null },
   ];
 };
 

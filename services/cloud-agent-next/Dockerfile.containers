@@ -107,6 +107,7 @@ RUN cd /tmp/wrapper-build/wrapper && \
 # The intercept CA is not baked in; the control wrapper trusts it when containment is enabled.
 RUN printf '%s\n' \
 	'#!/bin/sh' \
+	'if [ "$#" -gt 0 ]; then exec "$@"; fi' \
 	'exec sleep infinity' \
 	> /usr/local/bin/kilo-containers-entrypoint \
 	&& chmod +x /usr/local/bin/kilo-containers-entrypoint

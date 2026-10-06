@@ -67,6 +67,12 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
   // outbox retries on this boolean, so any failed recipient means the dispatch
   // was refused. A body that does not parse keeps the previous reading of an
   // accepted dispatch.
+  //
+  // One dispatch id per call lets worker-side logs correlate with the
+  // client-side warning/capture for the same dispatch. Context stays free of
+  // recipient identifiers: counts and stable failure reasons only.
+  const dispatchId = crypto.randomUUID();
+  const tags = { source: 'notifications-worker-client', endpoint: 'dispatch', kind: body.kind };
   try {
     for (let attempt = 0; ; attempt++) {
       const response = await fetch(`${NOTIFICATIONS_WORKER_URL}/internal/v1/dispatch`, {
@@ -74,6 +80,7 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
         headers: {
           'content-type': 'application/json',
           'X-Internal-Secret': INTERNAL_API_SECRET,
+          'X-Dispatch-Id': dispatchId,
         },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(30_000),
@@ -87,20 +94,29 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
           }`
         );
         captureException(error, {
-          tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
-          extra: { status: response.status, kind: body.kind },
+          tags,
+          extra: { status: response.status, kind: body.kind, dispatchId, attempt: attempt + 1 },
         });
         return false;
       }
 
       const payload: unknown = await response.json().catch(() => null);
       const parsed = sendPushForConversationOutputSchema.safeParse(payload);
+      const failed = parsed.success
+        ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed')
+        : [];
       const totalRecipients = parsed.success ? parsed.data.perRecipient.length : 0;
-      const failedCount = parsed.success
-        ? parsed.data.perRecipient.filter(recipient => recipient.outcome === 'failed').length
-        : 0;
+      const failedCount = failed.length;
       if (failedCount === 0) {
         return true;
+      }
+
+      // Failure reasons come from the worker as stable tokens; aggregate them
+      // so the context carries the failure shape without any recipient id.
+      const failureReasons: Record<string, number> = {};
+      for (const recipient of failed) {
+        const reason = recipient.reason ?? 'unknown';
+        failureReasons[reason] = (failureReasons[reason] ?? 0) + 1;
       }
 
       // A retry re-POSTs the same body and is safe under the channel DO's
@@ -122,8 +138,14 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
           `Notifications worker dispatch failed for all ${totalRecipients} recipients`
         );
         captureException(error, {
-          tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
-          extra: { kind: body.kind, failedRecipients: failedCount, totalRecipients },
+          tags: { ...tags, failure_scope: 'all' },
+          extra: {
+            kind: body.kind,
+            dispatchId,
+            failedRecipients: failedCount,
+            totalRecipients,
+            failureReasons,
+          },
         });
         return false;
       }
@@ -134,11 +156,13 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
           `Notifications worker dispatch failed for ${failedCount} recipient${failedCount === 1 ? '' : 's'} after ${attempt + 1} attempts`
         );
         captureException(error, {
-          tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
+          tags: { ...tags, failure_scope: 'partial' },
           extra: {
             kind: body.kind,
+            dispatchId,
             failedRecipients: failedCount,
             totalRecipients,
+            failureReasons,
             attempts: attempt + 1,
           },
         });
@@ -149,16 +173,18 @@ async function dispatchInternal(body: DispatchBody): Promise<boolean> {
       // single transient recipient failure must not page anyone.
       console.warn('[notifications-worker-client] dispatch failed for some recipients; retrying', {
         kind: body.kind,
+        dispatchId,
         failedRecipients: failedCount,
         totalRecipients,
+        failureReasons,
         attempt: attempt + 1,
       });
       await sleep(retryDelay);
     }
   } catch (error) {
     captureException(error, {
-      tags: { source: 'notifications-worker-client', endpoint: 'dispatch' },
-      extra: { kind: body.kind },
+      tags,
+      extra: { kind: body.kind, dispatchId },
     });
     return false;
   }

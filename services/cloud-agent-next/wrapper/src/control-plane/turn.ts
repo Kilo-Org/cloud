@@ -822,6 +822,25 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return childRoots.get(kiloSessionId);
   }
 
+  /**
+   * The route whose runtime emitted an event. A per-session runtime key is its
+   * route's session id; a directory-shared key is the directory, resolved to
+   * the route with an active turn on that runtime. Descendants are attributed
+   * to this route so a reported parent in another worktree route cannot steal
+   * their events.
+   */
+  function emittingRoute(event: KiloFeedEvent): TurnRoute | undefined {
+    const key = event.runtimeKey;
+    if (key === undefined) return undefined;
+    const direct = routes.get(key);
+    if (direct !== undefined) return direct;
+    for (const turn of turns.values()) {
+      const route = routes.get(turn.route.sessionId);
+      if (route !== undefined && route.runtimeKey === key) return route;
+    }
+    return undefined;
+  }
+
   function onKiloError(turn: Turn, properties: Record<string, unknown>): void {
     const failure = classifyAssistantFailure(properties.error ?? properties);
     sendOutcome(turn, 'failed', failure.safeMessage, {
@@ -889,7 +908,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
   function registerChild(event: KiloFeedEvent): void {
     const child = childFromSessionCreated(event.properties);
     if (child === undefined) return;
-    const parentRoot = resolveRootKiloSession(child.parentId);
+    const parentRoot =
+      emittingRoute(event)?.kiloSessionId ?? resolveRootKiloSession(child.parentId);
     if (parentRoot === undefined) return;
     childRoots.set(child.childId, parentRoot);
   }
@@ -1053,7 +1073,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (SYNTHETIC_KILO_EVENTS.has(event.type)) return;
       const eventSessionId = eventKiloSessionId(event.properties);
       if (event.type === 'session.created') registerChild(event);
-      const root = resolveRootKiloSession(eventSessionId);
+      let root = resolveRootKiloSession(eventSessionId);
+      // A descendant's reported parent may name another route in the same
+      // worktree; the runtime that emitted it is authoritative. Route roots keep
+      // their own identity so a runtime never captures another route's events.
+      const emitting = emittingRoute(event);
+      const isRouteRoot = eventSessionId !== undefined && turnByKiloSession.has(eventSessionId);
+      if (emitting !== undefined && !isRouteRoot && root !== emitting.kiloSessionId) {
+        root = emitting.kiloSessionId;
+      }
       if (root === undefined) return;
       const sessionId = turnByKiloSession.get(root);
       if (sessionId === undefined) return;

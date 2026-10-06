@@ -19,6 +19,14 @@ export type KiloFeedEvent = {
   properties: Record<string, unknown>;
   directory?: string;
   nativeRuntimeId: string;
+  /**
+   * Runtime key of the runtime that emitted the event: the route's session id
+   * under per-session isolation, or the directory under directory-shared
+   * isolation. Lets the turn manager attribute an event to the route that
+   * produced it instead of trusting a descendant's reported parent, which can
+   * point at another route in the same worktree.
+   */
+  runtimeKey?: string;
 };
 
 export type WorktreeFeedSource = Readonly<{

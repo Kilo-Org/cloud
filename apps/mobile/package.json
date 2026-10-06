@@ -117,7 +117,7 @@
     "react-i18next": "^17.0.15",
     "react-native": "0.86.3",
     "react-native-android-widget": "^0.22.1",
-    "react-native-appsflyer": "6.18.0",
+    "react-native-appsflyer": "7.0.2-v2",
     "react-native-css": "3.1.0-rc.0",
     "react-native-enriched-markdown": "1.1.0",
     "react-native-gesture-handler": "2.32.0",

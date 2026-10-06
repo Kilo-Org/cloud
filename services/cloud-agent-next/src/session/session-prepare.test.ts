@@ -4428,6 +4428,47 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
+  it('routes an enrolled Code Reviewer owner to the control plane via the trusted billing origin', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = '';
+    ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = USER_ID;
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+
+    await createSessionWithLedger(
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+      }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(createdMetadata(doStub)).toMatchObject(
+      expect.objectContaining({
+        identity: expect.objectContaining({ createdOnPlatform: 'code-review' }),
+      })
+    );
+  });
+
+  it('keeps a Code Reviewer owner on the legacy plane when only CONTROL_PLANE_IDS is enrolled', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = USER_ID;
+    ctx.env.CODE_REVIEW_CONTROL_PLANE_IDS = '';
+    generateSessionIdMock.mockReturnValue(CLOUD_AGENT_SESSION_ID);
+
+    await createSessionWithLedger(
+      makeRequest({
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' },
+      }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+  });
+
   it.each([
     {
       name: 'devcontainer',

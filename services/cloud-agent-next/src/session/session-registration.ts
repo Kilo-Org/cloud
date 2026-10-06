@@ -124,7 +124,8 @@ type SharedSandboxRouteMetadata = NonNullable<
  */
 function sessionPlaneForCreate(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): SessionPlane {
   return sandboxAllocationRequiresControlPlane(input.runtime?.sandboxAllocation)
     ? 'control'
@@ -134,7 +135,10 @@ function sessionPlaneForCreate(
           userId: ctx.userId,
           orgId: input.options?.kilocodeOrganizationId,
         },
-        { createdOnPlatform: input.options?.createdOnPlatform }
+        {
+          createdOnPlatform: input.options?.createdOnPlatform,
+          billingOrigin: options?.billingOrigin,
+        }
       );
 }
 
@@ -159,7 +163,10 @@ function assertSupportedSandboxAllocation(
     });
   }
   // Isolated Standard predates the selectable allocations and remains legacy-plane only.
-  if (allocation === 'isolated-standard' && sessionPlaneForCreate(input, ctx) === 'control') {
+  if (
+    allocation === 'isolated-standard' &&
+    sessionPlaneForCreate(input, ctx, options) === 'control'
+  ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Isolated Standard allocation is not supported for control-plane sessions',
@@ -636,7 +643,7 @@ async function allocateNewSession(
   }
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx));
+  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx, options));
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')

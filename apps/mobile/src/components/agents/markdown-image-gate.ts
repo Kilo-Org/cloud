@@ -1,5 +1,5 @@
 import { type TFunction } from 'i18next';
-import { marked, type Token, type Tokens } from 'marked';
+import { marked, type Token, type Tokens, type TokensList } from 'marked';
 
 import { formatTrustedImageHost } from '@/lib/hooks/use-trusted-image-hosts';
 
@@ -28,13 +28,14 @@ export type MarkdownImageRef = {
  * `![` cannot hold an image, so streaming text skips the lex.
  */
 export function findMarkdownImages(value: string): MarkdownImageRef[] {
-  if (!value.includes('![')) {
-    return [];
-  }
+  return value.includes('![') ? collectImages(lexMarkdown(value)) : [];
+}
+
+function collectImages(tokens: TokensList): MarkdownImageRef[] {
   const linked = new Set<Token>();
   const images: MarkdownImageRef[] = [];
   // `walkTokens` returns the async-extension promises; none are registered.
-  void marked.walkTokens(lexMarkdown(value), token => {
+  void marked.walkTokens(tokens, token => {
     if (token.type === 'link') {
       void marked.walkTokens((token as Tokens.Link).tokens, child => {
         linked.add(child);
@@ -88,61 +89,6 @@ function gatedImageMarkdown(image: MarkdownImageRef, t: TFunction): string {
   return `[${escapeMarkdownText(prefix + load)}](${IMAGE_LOAD_SCHEME}${destination})`;
 }
 
-const FENCE_OPEN = /^(?:[ \t]*>)*[ \t]*(`{3,}|~{3,})/;
-
-/**
- * Source ranges of fenced code blocks and inline code spans, where image
- * syntax is literal text and must not be rewritten. An unclosed fence runs to
- * the end, as it does while streaming.
- */
-function codeRanges(value: string): [number, number][] {
-  const ranges: [number, number][] = [];
-  let fence: { marker: string; start: number } | null = null;
-  let offset = 0;
-  let textStart = 0;
-  for (const line of value.split('\n')) {
-    const lineEnd = offset + line.length;
-    const marker = FENCE_OPEN.exec(line)?.[1];
-    if (fence === null && marker !== undefined) {
-      ranges.push(...codeSpanRanges(value, textStart, offset));
-      fence = { marker, start: offset };
-    } else if (
-      fence !== null &&
-      marker?.startsWith(fence.marker) &&
-      line.trimEnd().endsWith(marker)
-    ) {
-      ranges.push([fence.start, lineEnd]);
-      fence = null;
-      textStart = lineEnd;
-    }
-    offset = lineEnd + 1;
-  }
-  if (fence === null) {
-    ranges.push(...codeSpanRanges(value, textStart, value.length));
-  } else {
-    ranges.push([fence.start, value.length]);
-  }
-  return ranges;
-}
-
-/** Inline code spans in `value[start, end)`: a backtick run closed by the next run of the same length. */
-function codeSpanRanges(value: string, start: number, end: number): [number, number][] {
-  const ranges: [number, number][] = [];
-  const runs = [...value.slice(start, end).matchAll(/`+/g)];
-  for (let open = 0; open < runs.length; open += 1) {
-    const opening = runs[open];
-    const closeAt = opening
-      ? runs.findIndex((run, index) => index > open && run[0].length === opening[0].length)
-      : -1;
-    const closing = runs[closeAt];
-    if (opening && closing) {
-      ranges.push([start + opening.index, start + closing.index + closing[0].length]);
-      open = closeAt;
-    }
-  }
-  return ranges;
-}
-
 function occurrences(value: string, raw: string): number[] {
   const found: number[] = [];
   for (let at = value.indexOf(raw); at !== -1; at = value.indexOf(raw, at + raw.length)) {
@@ -154,10 +100,10 @@ function occurrences(value: string, raw: string): number[] {
 /**
  * Rewrites every image in `blocked` so the native markdown view never fetches
  * it: HTTPS images become a "Load" link (see `parseImageLoadUrl`), http and
- * data images an "HTTPS images only" note. Image syntax inside code is left
- * alone. If an image's syntax cannot be told apart from code, every copy is
- * rewritten; if it cannot be found at all, its URL is replaced so it still
- * never loads.
+ * data images an "HTTPS images only" note. A copy of the image syntax that
+ * `marked` reads as literal text (code, an escaped `\!`) is left alone. If a
+ * copy cannot be located, every copy is rewritten and its URL is replaced so
+ * it still never loads.
  */
 export function gateMarkdownImages(
   value: string,
@@ -176,21 +122,30 @@ export function gateMarkdownImages(
       count: (entry?.count ?? 0) + 1,
     });
   }
-  const code = codeRanges(value);
   const edits: { start: number; end: number; text: string }[] = [];
   const unfoundHrefs: string[] = [];
   for (const [raw, { image, count }] of byRaw) {
     const all = occurrences(value, raw);
-    if (all.length === 0) {
+    // With no more copies than images every copy is an image. Otherwise tell
+    // images from literal text (code, an escaped `\!`) with the lexer: swapping
+    // a copy's `!` for a letter turns a real image into a link and changes
+    // nothing else, so the image count drops only for a real copy. The probe
+    // lexes uncached so it never evicts real values from the parse cache.
+    const images =
+      all.length > count
+        ? all.filter(at => {
+            const probed = `${value.slice(0, at)}x${value.slice(at + 1)}`;
+            const left = collectImages(marked.lexer(probed, { gfm: true }));
+            return left.filter(other => other.raw === raw).length < count;
+          })
+        : all;
+    const located = images.length >= count;
+    if (!located) {
       unfoundHrefs.push(image.href);
-    } else {
-      const outside = all.filter(
-        at => !code.some(([start, end]) => at < end && at + raw.length > start)
-      );
-      const text = gatedImageMarkdown(image, t);
-      for (const at of outside.length >= count ? outside : all) {
-        edits.push({ start: at, end: at + raw.length, text });
-      }
+    }
+    const text = gatedImageMarkdown(image, t);
+    for (const at of located ? images : all) {
+      edits.push({ start: at, end: at + raw.length, text });
     }
   }
   edits.sort((a, b) => a.start - b.start);

@@ -9,6 +9,7 @@ import { ChatSidebar } from '../ChatSidebar';
 import { SessionPrIndicator } from '../SessionPrIndicator';
 import type { DbSessionV2 } from '../store/db-session-atoms';
 import type { StoredSession } from '../types';
+import { groupWorkspacesByFolder } from '../workspace-folders';
 import {
   createSidebarQueryReconciler,
   dbSessionToStoredSession,
@@ -27,6 +28,7 @@ import {
   PR_LINK_ATTEMPT_HISTORY_LIMIT,
   recordPrLinkVerificationAttempt,
   shouldRetryPrLinkVerification,
+  mergeSidebarFolderSessions,
   patchSidebarWorktreeSessionStatus,
   removeSidebarDbSession,
   sessionCacheKey,
@@ -216,6 +218,48 @@ function makeStoredSession(
 ): StoredSession {
   return { ...dbSessionToStoredSession(makeDbSession(sessionId, updatedAt)), ...overrides };
 }
+
+describe('mergeSidebarFolderSessions', () => {
+  it('includes all-time folder workspaces beyond the recent 200-session cap', () => {
+    const recent = Array.from({ length: 200 }, (_, i) =>
+      makeStoredSession(`recent-${i}`, '2026-10-03T00:00:00.000Z', { worktreeId: 'busy' })
+    );
+    const folder = Array.from({ length: 250 }, (_, i) =>
+      makeStoredSession(`old-${i}`, '2026-01-01T00:00:00.000Z', {
+        worktreeId: `worktree_11111111-1111-4111-8111-${i.toString(16).padStart(12, '0')}`,
+        cloudAgentSessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+      })
+    );
+    const merged = mergeSidebarFolderSessions(recent, folder);
+    expect(merged).toHaveLength(450);
+    expect(groupSidebarSessions(merged)).toHaveLength(251);
+    expect(merged.slice(0, 200).every(session => session.sessionId.startsWith('recent-'))).toBe(
+      true
+    );
+    const grouped = groupWorkspacesByFolder(groupSidebarSessionsByDate(merged), [
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        name: 'Saved',
+        color: 'default',
+        worktreeIds: folder.flatMap(session => (session.worktreeId ? [session.worktreeId] : [])),
+      },
+    ]);
+    expect(grouped.folderGroups[0].worktrees).toHaveLength(250);
+    expect(grouped.ungrouped.flatMap(group => group.items)).toHaveLength(1);
+  });
+
+  it('deduplicates matching recent rows and preserves the newest local updates', () => {
+    const older = makeStoredSession('shared', '2026-01-01T00:00:00.000Z');
+    const newer = makeStoredSession('shared', '2026-10-03T00:00:00.000Z', { prompt: 'Renamed' });
+    expect(mergeSidebarFolderSessions([newer], [older])).toEqual([newer]);
+    expect(mergeSidebarFolderSessions([older], [newer])).toEqual([newer]);
+  });
+
+  it('does not add old ungrouped sessions absent from the folder query', () => {
+    const recent = makeStoredSession('recent', '2026-10-03T00:00:00.000Z');
+    expect(mergeSidebarFolderSessions([recent], [])).toEqual([recent]);
+  });
+});
 
 type ForegroundSessionStatusInput = Parameters<typeof deriveForegroundSessionStatus>[0];
 

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
 import {
   parseSandboxBillingInput,
   type MeteredSandboxInstance,
@@ -66,6 +67,15 @@ function cloudflareProvider(
 afterEach(() => vi.unstubAllGlobals());
 
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
+  it('preserves RPC-wrapped quota denial instead of converting it to a meter outage', async () => {
+    const denial = new Error(
+      `remote RPC: ${new ContainerConcurrencyLimitError('personal', 20).message}`
+    );
+    const provider = cloudflareProvider(kind, async () => {
+      throw denial;
+    });
+    await expect(provider.create(intent)).rejects.toBe(denial);
+  });
   it.each(['insufficient_credits', 'stopping', 'meter_unavailable'] as const)(
     'preserves %s independently of unsafe provider text',
     async code => {

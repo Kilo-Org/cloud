@@ -1,4 +1,5 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
+import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -93,7 +94,8 @@ export function createCloudflareContainersProviderAdapter(deps: {
       let admission: SandboxBillingAdmissionResult;
       try {
         admission = await container.ensureBillingAdmission(input, instance);
-      } catch {
+      } catch (error) {
+        if (isContainerConcurrencyLimitError(error)) throw error;
         admission = {
           success: false,
           code: 'meter_unavailable',
@@ -104,7 +106,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         throw new ProviderCreationError(admission.code);
       }
     } else {
-      await container.configureBilling(input, instance).catch(() => undefined);
+      await container.configureBilling(input, instance);
     }
   };
 

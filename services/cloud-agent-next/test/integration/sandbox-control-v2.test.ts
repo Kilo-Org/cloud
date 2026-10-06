@@ -28,6 +28,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
+import { ContainerConcurrencyLimitError } from '../../src/container-concurrency.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import {
@@ -548,6 +549,25 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.stopCalls).toEqual(
       Array.from({ length: TIMERS.providerStopLadderMs.length + 1 }, () => provider.refs[0])
     );
+  });
+
+  it('fails a container limit denial from the sandbox start without retrying the create', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () =>
+      provider.launchGates[0](
+        new Error(`remote: ${new ContainerConcurrencyLimitError('personal', 20).message}`)
+      )
+    );
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'container_limit_reached',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+    expect(provider.createCalls).toBe(1);
   });
 
   it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {

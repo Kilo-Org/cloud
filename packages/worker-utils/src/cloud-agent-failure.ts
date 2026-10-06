@@ -29,6 +29,7 @@ export const CLOUD_AGENT_FAILURE_CODES = [
   'missing_assistant_reply',
   'payment_required',
   'admission_billing_unavailable',
+  'container_limit_reached',
   'user_interrupt',
   'container_shutdown',
   'system_interrupt',
@@ -393,6 +394,8 @@ export function classifyCloudAgentFailure(
   }
 
   switch (input.code) {
+    case 'container_limit_reached':
+      return classified('user', 'admission_capacity');
     case 'workspace_setup_failed':
       return classifyWorkspaceFailure(input.workspaceSubtype);
     case 'sandbox_connect_failed':

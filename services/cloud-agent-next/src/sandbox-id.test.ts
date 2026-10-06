@@ -21,13 +21,17 @@ import { CurrentSessionMetadataSchema } from './persistence/session-metadata.js'
 import type { Env, SandboxId } from './types.js';
 
 describe('generateSandboxId', () => {
-  describe('shared sandbox (default)', () => {
+  const sharedOptions = { sandboxAllocation: 'cloudflare-shared' } as const;
+
+  describe('explicit shared sandbox', () => {
     it('should generate sandboxId within 63 character limit', async () => {
       const sandboxId = await generateSandboxId(
         undefined,
         '9d278969-5453-4ae3-a51f-a8d2274a7b56',
         'fd93a81c-63c2-4d14-84b3-60d6ac3b592f',
-        'agent_session-1'
+        'agent_session-1',
+        undefined,
+        sharedOptions
       );
       expect(sandboxId.length).toBeLessThanOrEqual(63);
       expect(sandboxId.length).toBe(52);
@@ -39,7 +43,8 @@ describe('generateSandboxId', () => {
         'a'.repeat(36),
         'b'.repeat(36),
         'agent_session-1',
-        'c'.repeat(50)
+        'c'.repeat(50),
+        sharedOptions
       );
       expect(sandboxId.length).toBe(52);
     });
@@ -50,6 +55,8 @@ describe('generateSandboxId', () => {
         '9d278969-5453-4ae3-a51f-a8d2274a7b56',
         'fd93a81c-63c2-4d14-84b3-60d6ac3b592f',
         'agent_session-1',
+        undefined,
+        sharedOptions,
       ] as const;
       expect(await generateSandboxId(...args)).toBe(await generateSandboxId(...args));
     });
@@ -61,20 +68,49 @@ describe('generateSandboxId', () => {
         'fd93a81c-63c2-4d14-84b3-60d6ac3b592f',
         'agent_session-1',
         'reviewer',
+        sharedOptions,
       ] as const;
       expect(await generateSandboxId(...args)).toBe(await generateSandboxId(...args));
     });
 
     it('should produce the same shared ID for different sessionIds', async () => {
-      const id1 = await generateSandboxId(undefined, 'org-id', 'user-id', 'session-a');
-      const id2 = await generateSandboxId(undefined, 'org-id', 'user-id', 'session-b');
+      const id1 = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        'session-a',
+        undefined,
+        sharedOptions
+      );
+      const id2 = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        'session-b',
+        undefined,
+        sharedOptions
+      );
       expect(id1).toBe(id2);
     });
 
     it('keeps control-plane and legacy shared IDs disjoint for the same owner', async () => {
       const uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-      const legacy = await generateSandboxId(undefined, 'org-id', 'user-id', `agent_${uuid}`);
-      const control = await generateSandboxId(undefined, 'org-id', 'user-id', `workspace_${uuid}`);
+      const legacy = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        `agent_${uuid}`,
+        undefined,
+        sharedOptions
+      );
+      const control = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        `workspace_${uuid}`,
+        undefined,
+        sharedOptions
+      );
       expect(legacy).not.toBe(control);
       expect(legacy.startsWith('org-')).toBe(true);
       expect(control.startsWith('org-')).toBe(true);
@@ -82,8 +118,8 @@ describe('generateSandboxId', () => {
 
     it('keeps control-plane and legacy isolated IDs disjoint', async () => {
       const uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-      const legacy = await generateSandboxId('*', 'org-id', 'user-id', `agent_${uuid}`);
-      const control = await generateSandboxId('*', 'org-id', 'user-id', `workspace_${uuid}`);
+      const legacy = await generateSandboxId(undefined, 'org-id', 'user-id', `agent_${uuid}`);
+      const control = await generateSandboxId(undefined, 'org-id', 'user-id', `workspace_${uuid}`);
       expect(legacy).not.toBe(control);
       expect(legacy.startsWith('ses-')).toBe(true);
       expect(control.startsWith('ses-')).toBe(true);
@@ -95,13 +131,17 @@ describe('generateSandboxId', () => {
         undefined,
         'org-id',
         'user-id',
-        `agent_${uuid}`
+        `agent_${uuid}`,
+        undefined,
+        sharedOptions
       );
       const controlRoute = await generateSandboxRoutingTarget(
         undefined,
         'org-id',
         'user-id',
-        `workspace_${uuid}`
+        `workspace_${uuid}`,
+        undefined,
+        sharedOptions
       );
       expect(legacyRoute.kind).toBe('shared');
       expect(controlRoute.kind).toBe('shared');
@@ -149,7 +189,8 @@ describe('generateSandboxId', () => {
           orgId,
           'user-id',
           'session-a',
-          botId
+          botId,
+          sharedOptions
         );
 
         expect(target).toEqual({
@@ -160,7 +201,14 @@ describe('generateSandboxId', () => {
           failoverSandboxId
         );
         expect(target).toEqual(
-          await generateSandboxRoutingTarget(undefined, orgId, 'user-id', 'session-b', botId)
+          await generateSandboxRoutingTarget(
+            undefined,
+            orgId,
+            'user-id',
+            'session-b',
+            botId,
+            sharedOptions
+          )
         );
       }
     );
@@ -197,7 +245,14 @@ describe('generateSandboxId', () => {
     ])(
       'should use the current shared sandbox ID generation for %s IDs',
       async (_prefix, orgId, botId, expectedId, previousId) => {
-        const id = await generateSandboxId(undefined, orgId, 'user-id', 'session', botId);
+        const id = await generateSandboxId(
+          undefined,
+          orgId,
+          'user-id',
+          'session',
+          botId,
+          sharedOptions
+        );
 
         expect(id).toBe(expectedId);
         expect(id).not.toBe(previousId);
@@ -205,63 +260,168 @@ describe('generateSandboxId', () => {
     );
   });
 
-  describe('prefix correctness', () => {
+  describe('explicit shared prefix correctness', () => {
     it('should use "org" prefix for organization accounts', async () => {
-      const sandboxId = await generateSandboxId(undefined, 'org-id', 'user-id', 's');
+      const sandboxId = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        's',
+        undefined,
+        sharedOptions
+      );
       expect(sandboxId).toMatch(/^org-[0-9a-f]{48}$/);
     });
 
     it('should use "usr" prefix for personal accounts', async () => {
-      const sandboxId = await generateSandboxId(undefined, undefined, 'user-id', 's');
+      const sandboxId = await generateSandboxId(
+        undefined,
+        undefined,
+        'user-id',
+        's',
+        undefined,
+        sharedOptions
+      );
       expect(sandboxId).toMatch(/^usr-[0-9a-f]{48}$/);
     });
 
     it('should use "bot" prefix for org accounts with bot', async () => {
-      const sandboxId = await generateSandboxId(undefined, 'org-id', 'user-id', 's', 'reviewer');
+      const sandboxId = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        's',
+        'reviewer',
+        sharedOptions
+      );
       expect(sandboxId).toMatch(/^bot-[0-9a-f]{48}$/);
     });
 
     it('should use "ubt" prefix for personal accounts with bot', async () => {
-      const sandboxId = await generateSandboxId(undefined, undefined, 'user-id', 's', 'reviewer');
+      const sandboxId = await generateSandboxId(
+        undefined,
+        undefined,
+        'user-id',
+        's',
+        'reviewer',
+        sharedOptions
+      );
       expect(sandboxId).toMatch(/^ubt-[0-9a-f]{48}$/);
     });
   });
 
-  describe('uniqueness', () => {
+  describe('explicit shared uniqueness', () => {
     it('should generate different IDs for different orgIds', async () => {
-      const id1 = await generateSandboxId(undefined, 'org-1', 'user-id', 's');
-      const id2 = await generateSandboxId(undefined, 'org-2', 'user-id', 's');
+      const id1 = await generateSandboxId(
+        undefined,
+        'org-1',
+        'user-id',
+        's',
+        undefined,
+        sharedOptions
+      );
+      const id2 = await generateSandboxId(
+        undefined,
+        'org-2',
+        'user-id',
+        's',
+        undefined,
+        sharedOptions
+      );
       expect(id1).not.toBe(id2);
     });
 
     it('should generate different IDs for different userIds', async () => {
-      const id1 = await generateSandboxId(undefined, 'org-id', 'user-1', 's');
-      const id2 = await generateSandboxId(undefined, 'org-id', 'user-2', 's');
+      const id1 = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-1',
+        's',
+        undefined,
+        sharedOptions
+      );
+      const id2 = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-2',
+        's',
+        undefined,
+        sharedOptions
+      );
       expect(id1).not.toBe(id2);
     });
 
     it('should generate different IDs for different botIds', async () => {
-      const id1 = await generateSandboxId(undefined, 'org-id', 'user-id', 's', 'bot-1');
-      const id2 = await generateSandboxId(undefined, 'org-id', 'user-id', 's', 'bot-2');
+      const id1 = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        's',
+        'bot-1',
+        sharedOptions
+      );
+      const id2 = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        's',
+        'bot-2',
+        sharedOptions
+      );
       expect(id1).not.toBe(id2);
     });
 
     it('should differ between org and personal accounts', async () => {
-      const orgId = await generateSandboxId(undefined, 'org-id', 'user-id', 's');
-      const personal = await generateSandboxId(undefined, undefined, 'user-id', 's');
+      const orgId = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        's',
+        undefined,
+        sharedOptions
+      );
+      const personal = await generateSandboxId(
+        undefined,
+        undefined,
+        'user-id',
+        's',
+        undefined,
+        sharedOptions
+      );
       expect(orgId).not.toBe(personal);
     });
 
     it('should differ with and without bot', async () => {
-      const withoutBot = await generateSandboxId(undefined, 'org-id', 'user-id', 's');
-      const withBot = await generateSandboxId(undefined, 'org-id', 'user-id', 's', 'reviewer');
+      const withoutBot = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        's',
+        undefined,
+        sharedOptions
+      );
+      const withBot = await generateSandboxId(
+        undefined,
+        'org-id',
+        'user-id',
+        's',
+        'reviewer',
+        sharedOptions
+      );
       expect(withoutBot).not.toBe(withBot);
     });
   });
 
   describe('edge cases', () => {
     it('should handle special characters in IDs', async () => {
-      const sandboxId = await generateSandboxId(undefined, 'org@123', 'user#456', 's', 'bot$789');
+      const sandboxId = await generateSandboxId(
+        undefined,
+        'org@123',
+        'user#456',
+        's',
+        'bot$789',
+        sharedOptions
+      );
       expect(sandboxId.length).toBe(52);
       expect(sandboxId).toMatch(/^bot-[0-9a-f]{48}$/);
     });
@@ -283,10 +443,10 @@ describe('generateSandboxId', () => {
     });
   });
 
-  describe('per-session sandbox', () => {
+  describe('per-session sandbox (default)', () => {
     it('bypasses shared slot routing', async () => {
       await expect(
-        generateSandboxRoutingTarget('my-org', 'my-org', 'user-id', 'agent_abc123')
+        generateSandboxRoutingTarget(undefined, 'my-org', 'user-id', 'agent_abc123')
       ).resolves.toEqual({
         kind: 'isolated',
         sandboxId: 'ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
@@ -294,25 +454,25 @@ describe('generateSandboxId', () => {
     });
 
     it('should preserve the existing per-session ID generation', async () => {
-      const id = await generateSandboxId('my-org', 'my-org', 'user-id', 'agent_abc123');
+      const id = await generateSandboxId(undefined, 'my-org', 'user-id', 'agent_abc123');
       expect(id).toBe('ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
     });
 
     it('should be exactly 52 characters', async () => {
-      const id = await generateSandboxId('my-org', 'my-org', 'user-id', 'agent_abc123');
+      const id = await generateSandboxId(undefined, 'my-org', 'user-id', 'agent_abc123');
       expect(id.length).toBe(52);
     });
 
     it('should be deterministic for the same session ID', async () => {
       const sessionId = 'agent_11111111-2222-3333-4444-555555555555';
-      const id1 = await generateSandboxId('org', 'org', 'user', sessionId);
-      const id2 = await generateSandboxId('org', 'org', 'user', sessionId);
+      const id1 = await generateSandboxId(undefined, 'org', 'user', sessionId);
+      const id2 = await generateSandboxId(undefined, 'org', 'user', sessionId);
       expect(id1).toBe(id2);
     });
 
     it('should produce different IDs for different session IDs', async () => {
-      const id1 = await generateSandboxId('org', 'org', 'user', 'session-a');
-      const id2 = await generateSandboxId('org', 'org', 'user', 'session-b');
+      const id1 = await generateSandboxId(undefined, 'org', 'user', 'session-a');
+      const id2 = await generateSandboxId(undefined, 'org', 'user', 'session-b');
       expect(id1).not.toBe(id2);
     });
 
@@ -326,24 +486,29 @@ describe('generateSandboxId', () => {
       expect(id).toMatch(/^ses-/);
     });
 
-    it('should fall back to shared when perSessionOrgIds is empty', async () => {
+    it('defaults to isolated when perSessionOrgIds is empty', async () => {
       const id = await generateSandboxId('', 'org', 'user', 'session');
-      expect(id).toMatch(/^org-/);
+      expect(id).toMatch(/^ses-/);
     });
 
-    it('should fall back to shared when perSessionOrgIds is undefined', async () => {
+    it('defaults to isolated when perSessionOrgIds is undefined', async () => {
       const id = await generateSandboxId(undefined, 'org', 'user', 'session');
-      expect(id).toMatch(/^org-/);
+      expect(id).toMatch(/^ses-/);
     });
 
-    it('should fall back to shared for orgs not in the list', async () => {
+    it('defaults to isolated for orgs not in the list', async () => {
       const id = await generateSandboxId('other-org', 'org', 'user', 'session');
-      expect(id).toMatch(/^org-/);
+      expect(id).toMatch(/^ses-/);
     });
 
-    it('should fall back to shared when orgId is undefined', async () => {
+    it('defaults personal sessions to isolated without an allowlist', async () => {
+      const id = await generateSandboxId(undefined, undefined, 'user', 'session');
+      expect(id).toMatch(/^ses-/);
+    });
+
+    it('defaults to isolated when orgId is undefined', async () => {
       const id = await generateSandboxId('anything', undefined, 'user', 'session');
-      expect(id).toMatch(/^usr-/);
+      expect(id).toMatch(/^ses-/);
     });
 
     it('should treat "*" as wildcard matching any org', async () => {
@@ -433,7 +598,7 @@ describe('selectSandboxForNewSession', () => {
   it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
     'routes explicit %s independently of conflicting allocation and provider rollouts',
     async sandboxAllocation => {
-      for (const rollout of ['', '*']) {
+      for (const rollout of [undefined, '', '*']) {
         const selection = await selectSandboxForNewSession({
           env: {
             ...completeVercelConfiguration,
@@ -455,8 +620,17 @@ describe('selectSandboxForNewSession', () => {
     }
   );
 
-  it('retains the default shared identity for an explicit shared preset', async () => {
-    const shared = await generateSandboxRoutingTarget('', 'org-id', 'user-id', controlSessionId);
+  it('retains the shared identity across rollout changes for an explicit shared preset', async () => {
+    const shared = await generateSandboxRoutingTarget(
+      undefined,
+      'org-id',
+      'user-id',
+      controlSessionId,
+      undefined,
+      {
+        sandboxAllocation: 'cloudflare-shared',
+      }
+    );
     expect(
       await generateSandboxRoutingTarget('*', 'org-id', 'user-id', controlSessionId, undefined, {
         sandboxAllocation: 'cloudflare-shared',
@@ -468,7 +642,16 @@ describe('selectSandboxForNewSession', () => {
       })
     ).not.toEqual(shared);
     expect(
-      await generateSandboxRoutingTarget('', 'org-id', 'user-id', legacySessionId)
+      await generateSandboxRoutingTarget(
+        undefined,
+        'org-id',
+        'user-id',
+        legacySessionId,
+        undefined,
+        {
+          sandboxAllocation: 'cloudflare-shared',
+        }
+      )
     ).not.toEqual(shared);
   });
 
@@ -504,21 +687,24 @@ describe('selectSandboxForNewSession', () => {
     }
   );
 
-  it('selects Cloudflare by default while preserving shared sandbox allocation', async () => {
-    const selection = await selectSandboxForNewSession({
-      env: {},
-      orgId: 'org-id',
-      userId: 'user-id',
-      sessionId: 'session-id',
-    });
+  it.each([{ orgId: 'org-id' }, {}, { orgId: 'org-id', botId: 'bot-id' }, { botId: 'bot-id' }])(
+    'defaults to isolated Cloudflare without an allowlist for %j',
+    async owner => {
+      const selection = await selectSandboxForNewSession({
+        env: {},
+        ...owner,
+        userId: 'user-id',
+        sessionId: 'session-id',
+      });
 
-    expect(selection.provider).toBe('cloudflare');
-    expect(selection.sandboxId).toMatch(/^org-/);
-  });
+      expect(selection.provider).toBe('cloudflare');
+      expect(selection.sandboxId).toMatch(/^ses-/);
+    }
+  );
 
   it('selects Vercel for an enabled, allowlisted, isolated control-plane session', async () => {
     const selection = await selectSandboxForNewSession({
-      env: { PER_SESSION_SANDBOX_ORG_IDS: 'org-id', ...completeVercelConfiguration },
+      env: completeVercelConfiguration,
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
@@ -540,12 +726,13 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('keeps an enrolled organization on Cloudflare when it is not isolated', async () => {
+  it('keeps an enrolled organization on Cloudflare with an explicit shared allocation', async () => {
     const selection = await selectSandboxForNewSession({
       env: { ...completeVercelConfiguration },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: 'session-id',
+      sandboxAllocation: 'cloudflare-shared',
     });
 
     expect(selection.provider).toBe('cloudflare');
@@ -706,6 +893,7 @@ describe('selectSandboxForNewSession', () => {
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
+      sandboxAllocation: 'cloudflare-shared',
     });
 
     expect(selection.provider).toBe('cloudflare');

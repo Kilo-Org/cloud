@@ -111,7 +111,7 @@ export async function resolveLiveWrapperTarget(params: {
     const admission = await ensureSandboxBillingAdmissionInput(sandbox, billingInput);
     if (!admission.success) return { kind: 'billing-rejected', admission };
   } else {
-    void configureSandboxBillingInput(sandbox, billingInput);
+    await configureSandboxBillingInput(sandbox, billingInput);
   }
   const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
   if (!wrapperInfo) {

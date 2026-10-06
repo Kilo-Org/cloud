@@ -247,11 +247,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           );
         }
       } else {
-        void this.configureBilling(sandbox, input).catch(error => {
-          logger
-            .withFields({ error: error instanceof Error ? error.message : String(error) })
-            .warn('Container usage shadow configuration deferred');
-        });
+        await this.configureBilling(sandbox, input);
       }
     }
     return sandbox;

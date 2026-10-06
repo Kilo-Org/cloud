@@ -191,15 +191,25 @@ describe('CloudflareAgentSandbox', () => {
     expect(renewActivityTimeout).toHaveBeenCalledOnce();
   });
 
-  it('does not await shadow configuration before using an injected sandbox', async () => {
-    const configureBilling = vi.fn(() => new Promise<void>(() => undefined));
+  it('awaits trusted attribution configuration before using an injected sandbox', async () => {
+    let finishConfiguration = () => {};
+    const configureBilling = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          finishConfiguration = resolve;
+        })
+    );
     const renewActivityTimeout = vi.fn();
     const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
       resolveSandbox: () => ({ renewActivityTimeout }) as unknown as SandboxInstance,
       configureBilling,
     });
 
-    await expect(sandbox.keepAlive()).resolves.toBeUndefined();
+    const keepAlive = sandbox.keepAlive();
+    await vi.waitFor(() => expect(configureBilling).toHaveBeenCalledOnce());
+    expect(renewActivityTimeout).not.toHaveBeenCalled();
+    finishConfiguration();
+    await expect(keepAlive).resolves.toBeUndefined();
 
     expect(configureBilling).toHaveBeenCalledOnce();
     expect(renewActivityTimeout).toHaveBeenCalledOnce();

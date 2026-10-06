@@ -316,13 +316,12 @@ export function getDefaultSandboxDestination(
   env: SandboxSelectionEnv & ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string }
 ): SandboxDestination {
-  const isolated = isOrgInList(env.PER_SESSION_SANDBOX_ORG_IDS, owner.orgId);
   const provider = selectDefaultSandboxProvider({
     env,
     orgId: owner.orgId,
     userId: owner.userId,
     plane: sessionPlaneForNewOwner(env, owner, { createdOnPlatform: 'cloud-agent-web' }),
-    isolated,
+    isolated: true,
   });
   if (provider === 'vercel') {
     return { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' };
@@ -330,7 +329,7 @@ export function getDefaultSandboxDestination(
   if (provider === 'cloudflare-containers') {
     return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }
-  return getSandboxAllocationRequest(isolated ? 'cloudflare-single' : 'cloudflare-shared');
+  return getSandboxAllocationRequest('cloudflare-single');
 }
 
 export async function selectSandboxForNewSession(
@@ -359,21 +358,12 @@ export async function selectSandboxForNewSession(
 /**
  * Generate a deterministic, Cloudflare-compatible sandboxId (≤63 chars).
  *
- * Code Reviewer sessions (createdOnPlatform === 'code-review') always get an
- * ephemeral, isolated sandbox (crv-{hash}). Otherwise,
- * when the org is in PER_SESSION_SANDBOX_ORG_IDS the sandbox is isolated
- * per session (ses-{hash}). Otherwise it is shared
- * per org/user/bot (org-|usr-|bot-|ubt-{hash}, using Sandbox).
- *
- * @param perSessionOrgIds - Comma-separated org IDs that get per-session sandboxes (env var value)
- * @param orgId    - Organization ID (undefined for personal accounts)
- * @param userId   - User ID (required)
- * @param sessionId - Cloud-agent session ID (used for per-session sandboxes)
- * @param botId    - Bot ID (optional)
- * @returns Deterministic sandboxId string (52 characters)
+ * Normal sessions default to isolated `ses-` identities. Explicit shared
+ * allocations retain per-owner routing; trusted Code Reviewer sessions retain
+ * their dedicated namespace.
  */
 export async function generateSandboxRoutingTarget(
-  perSessionOrgIds: string | undefined,
+  _perSessionOrgIds: string | undefined,
   orgId: string | undefined,
   userId: string,
   sessionId: string,
@@ -399,7 +389,7 @@ export async function generateSandboxRoutingTarget(
   if (routingOptions.createdOnPlatform === 'code-review') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
   }
-  if (allocation !== 'cloudflare-shared' && isOrgInList(perSessionOrgIds, orgId)) {
+  if (allocation !== 'cloudflare-shared') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
   }
 

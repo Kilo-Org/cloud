@@ -26,6 +26,10 @@ import {
 import { resolveSecret } from '../../auth.js';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../../metered-billing-lifecycle.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
+import {
+  assertContainerCapacity,
+  isContainerConcurrencyLimitError,
+} from '../../container-concurrency.js';
 import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import {
   VercelBilling,
@@ -2787,6 +2791,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId);
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
+        if (pin.billing) {
+          await assertContainerCapacity(this.env, {
+            subject: pin.billing.subject,
+            instanceId: pin.billing.sandboxId,
+            checkpoint: 'control-plane-create',
+          });
+        }
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
         if (pin.provider === 'vercel') {
@@ -2929,6 +2940,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           },
           'warn'
         );
+        if (isContainerConcurrencyLimitError(error)) {
+          await this.failCreationRoutes(allocationId, false, 'container_limit_reached');
+          return;
+        }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;

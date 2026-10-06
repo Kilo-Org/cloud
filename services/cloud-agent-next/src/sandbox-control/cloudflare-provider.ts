@@ -115,7 +115,7 @@ export function createCloudflareProviderAdapter(deps: {
         throw new ProviderCreationError(admission.code);
       }
     } else {
-      await configureSandboxBillingInput(sandbox, input).catch(() => undefined);
+      await configureSandboxBillingInput(sandbox, input);
     }
   };
 

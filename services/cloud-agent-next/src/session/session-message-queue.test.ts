@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
 import { ExecutionError } from '../execution/errors.js';
 import type {
   ExecutionDeliveryContext,
@@ -9,6 +10,7 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE } from '../sandbox-recovery.js';
 import type { SessionId, UserId } from '../types/ids.js';
 import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
+import { projectTerminalClientError } from './terminal-error-projector.js';
 import {
   createSessionMessageQueue,
   flushNextPendingSessionMessage,
@@ -31,6 +33,7 @@ import {
   createQueuedSessionMessageState,
   getSessionMessageState,
   putSessionMessageState,
+  terminalizeMessageOnce,
   type SessionMessageState,
   type TerminalizeParams,
 } from './session-message-state.js';
@@ -750,6 +753,55 @@ describe('flushNextPendingSessionMessage', () => {
 });
 
 describe('SessionMessageQueue', () => {
+  it.each([
+    new ContainerConcurrencyLimitError('personal', 20),
+    new Error(`remote RPC: ${new ContainerConcurrencyLimitError('organization', 50).message}`),
+    ExecutionError.wrapperStartFailed(new ContainerConcurrencyLimitError('personal', 20).message),
+  ])(
+    'fails the first quota-denied flush promptly with actionable non-retryable UX: %s',
+    async denial => {
+      const harness = createQueueHarness({
+        deliver: async () => {
+          throw denial;
+        },
+      });
+      await harness.queue.admitSubmittedMessage({
+        userId: 'user_test' as UserId,
+        turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'start this turn' },
+      });
+      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
+        remainingPendingCount: 0,
+      });
+      expect(harness.deliver).toHaveBeenCalledOnce();
+      expect(harness.terminalizations).toHaveLength(1);
+      expect(harness.terminalizations[0]?.params).toMatchObject({
+        kind: 'failed',
+        failureStage: 'pre_dispatch',
+        failureCode: 'container_limit_reached',
+        attempts: 1,
+        error: denial.message,
+      });
+      const params = harness.terminalizations[0]?.params;
+      if (!params) throw new Error('Expected quota-denied terminal transition');
+      const { state } = await terminalizeMessageOnce(harness.storage, FIRST_MESSAGE_ID, params);
+      if (!state) throw new Error('Expected terminal quota-denied message state');
+      expect(state?.status).toBe('failed');
+      expect(projectTerminalClientError({ ...state, status: 'failed' })).toMatchObject({
+        code: 'CONTAINER_LIMIT_REACHED',
+        retryable: false,
+      });
+      expect(buildCloudMessageFailedPayload(state)).toMatchObject({
+        failure: {
+          code: 'container_limit_reached',
+          message: expect.stringContaining('Stop an existing container'),
+        },
+      });
+      await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
+      await harness.queue.drainNextPendingMessage();
+      expect(harness.deliver).toHaveBeenCalledOnce();
+      expect(harness.finalizedTerminalCallbacks).toHaveLength(1);
+    }
+  );
   it('rejects new work before persisting it when container billing is blocked', async () => {
     const harness = createQueueHarness({
       checkBillingAdmission: async () => ({

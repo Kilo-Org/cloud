@@ -1,10 +1,3 @@
-/**
- * Prepare Triage Payload
- *
- * Extracts all preparation logic (DB lookups, token generation)
- * Returns complete payload ready for cloud agent
- */
-
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -26,23 +19,17 @@ export interface PreparePayloadParams {
   };
 }
 
-/**
- * Prepare complete payload for auto triage
- * Does all the heavy lifting: DB queries, token generation
- */
 export async function prepareTriagePayload(
   params: PreparePayloadParams
 ): Promise<DispatchTriageRequest> {
   const { ticketId, owner, agentConfig } = params;
 
   try {
-    // 1. Get the ticket from DB
     const ticket = await getTriageTicketById(ticketId);
     if (!ticket) {
       throw new Error(`Ticket ${ticketId} not found`);
     }
 
-    // 2. Get the user by userId
     const [user] = await db
       .select()
       .from(kilocode_users)
@@ -53,7 +40,6 @@ export async function prepareTriagePayload(
       throw new Error(`User ${owner.userId} not found`);
     }
 
-    // 3. Generate auth token for cloud agent with bot identifier
     const authToken = generateCloudAgentWorkflowToken(await prepareCloudAgentWorkflowUser(user), {
       organizationId: owner.type === 'org' ? owner.id : undefined,
       tokenSource: 'auto-triage',
@@ -61,10 +47,8 @@ export async function prepareTriagePayload(
       expiresIn: TOKEN_EXPIRY.default,
     });
 
-    // 4. Get config values
     const config = agentConfig.config as AutoTriageAgentConfig;
 
-    // 5. Prepare session input
     const sessionInput = {
       repoFullName: ticket.repo_full_name,
       issueNumber: ticket.issue_number,
@@ -82,7 +66,6 @@ export async function prepareTriagePayload(
       maxPRCreationTimeMinutes: config.max_pr_creation_time_minutes || 15,
     };
 
-    // 6. Build complete payload
     const payload: DispatchTriageRequest = {
       ticketId,
       authToken,

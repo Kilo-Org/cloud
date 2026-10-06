@@ -1,10 +1,3 @@
-/**
- * Auto Triage - Database Operations
- *
- * Database operations for auto triage tickets.
- * Follows Drizzle ORM patterns used throughout the codebase.
- */
-
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_triage_tickets } from '@kilocode/db/schema';
 import { eq, and, desc, count, or } from 'drizzle-orm';
@@ -20,10 +13,6 @@ import type {
   AutoTriageTicket,
 } from './types';
 
-/**
- * Creates a new triage ticket record
- * Returns the created ticket ID
- */
 export async function createTriageTicket(params: CreateTicketParams): Promise<string> {
   try {
     const [ticket] = await db
@@ -54,10 +43,6 @@ export async function createTriageTicket(params: CreateTicketParams): Promise<st
   }
 }
 
-/**
- * Gets a triage ticket by ID
- * Returns null if not found
- */
 export async function getTriageTicketById(ticketId: string): Promise<AutoTriageTicket | null> {
   try {
     const [ticket] = await db
@@ -76,10 +61,6 @@ export async function getTriageTicketById(ticketId: string): Promise<AutoTriageT
   }
 }
 
-/**
- * Gets a triage ticket by session ID
- * Returns null if not found
- */
 export async function getTriageTicketBySessionId(
   sessionId: string
 ): Promise<AutoTriageTicket | null> {
@@ -100,10 +81,6 @@ export async function getTriageTicketBySessionId(
   }
 }
 
-/**
- * Checks if a triage ticket already exists for a given repo and issue number
- * Returns the existing ticket if found, null otherwise
- */
 export async function findExistingTicket(
   repoFullName: string,
   issueNumber: number
@@ -130,10 +107,6 @@ export async function findExistingTicket(
   }
 }
 
-/**
- * Gets a triage ticket by repo and issue number
- * Returns null if not found
- */
 export async function getTriageTicketByRepoAndIssue(
   repoFullName: string,
   issueNumber: number
@@ -160,10 +133,6 @@ export async function getTriageTicketByRepoAndIssue(
   }
 }
 
-/**
- * Updates triage ticket status and optional fields
- * Can update session_id, classification, confidence, and other fields
- */
 export async function updateTriageTicketStatus(
   ticketId: string,
   status: TriageStatus,
@@ -175,7 +144,6 @@ export async function updateTriageTicketStatus(
       updated_at: new Date().toISOString(),
     };
 
-    // Add optional updates
     if (updates.sessionId !== undefined) {
       updateData.session_id = updates.sessionId;
     }
@@ -219,7 +187,6 @@ export async function updateTriageTicketStatus(
       updateData.completed_at = updates.completedAt.toISOString();
     }
 
-    // Auto-set timestamps based on status
     if (status === 'analyzing' && !updates.startedAt) {
       updateData.started_at = new Date().toISOString();
     }
@@ -243,11 +210,6 @@ export async function updateTriageTicketStatus(
   }
 }
 
-/**
- * Lists triage tickets for an owner (org or user)
- * Supports filtering by status, classification, and repository
- * Returns tickets sorted by creation date (newest first)
- */
 export async function listTriageTickets(params: ListTicketsParams): Promise<AutoTriageTicket[]> {
   try {
     const {
@@ -259,17 +221,14 @@ export async function listTriageTickets(params: ListTicketsParams): Promise<Auto
       repoFullName,
     } = params;
 
-    // Build WHERE conditions
     const conditions = [];
 
-    // Owner condition
     if (owner.type === 'org') {
       conditions.push(eq(auto_triage_tickets.owned_by_organization_id, owner.id));
     } else {
       conditions.push(eq(auto_triage_tickets.owned_by_user_id, owner.id));
     }
 
-    // Optional filters
     if (status) {
       conditions.push(eq(auto_triage_tickets.status, status));
     }
@@ -298,10 +257,6 @@ export async function listTriageTickets(params: ListTicketsParams): Promise<Auto
   }
 }
 
-/**
- * Counts total triage tickets for an owner
- * Supports same filtering as listTriageTickets
- */
 export async function countTriageTickets(params: {
   owner: Owner;
   status?: TriageStatus;
@@ -311,17 +266,14 @@ export async function countTriageTickets(params: {
   try {
     const { owner, status, classification, repoFullName } = params;
 
-    // Build WHERE conditions
     const conditions = [];
 
-    // Owner condition
     if (owner.type === 'org') {
       conditions.push(eq(auto_triage_tickets.owned_by_organization_id, owner.id));
     } else {
       conditions.push(eq(auto_triage_tickets.owned_by_user_id, owner.id));
     }
 
-    // Optional filters
     if (status) {
       conditions.push(eq(auto_triage_tickets.status, status));
     }
@@ -347,10 +299,6 @@ export async function countTriageTickets(params: {
   }
 }
 
-/**
- * Resets a failed triage ticket for retry
- * Clears status back to 'pending' and removes error/session data
- */
 export async function resetTriageTicketForRetry(ticketId: string): Promise<void> {
   try {
     await db
@@ -408,10 +356,6 @@ export async function interruptTriageTicket(ticketId: string): Promise<boolean> 
   }
 }
 
-/**
- * Gets count of active triage tickets for an owner (for concurrency control)
- * Active tickets are those with status 'analyzing'
- */
 export async function getActiveTriageTicketsCount(owner: Owner): Promise<number> {
   try {
     const conditions = [

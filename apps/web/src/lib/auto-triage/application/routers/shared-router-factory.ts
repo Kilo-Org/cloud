@@ -124,9 +124,6 @@ export function createAutoTriageRouter({
   ticketOwnershipVerifier,
 }: RouterFactoryParams) {
   return {
-    /**
-     * Gets the GitHub App installation status
-     */
     getGitHubStatus: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const owner = await ownerResolver(ctx, input);
       const integration = await integrationGetter(owner);
@@ -149,23 +146,16 @@ export function createAutoTriageRouter({
       };
     },
 
-    /**
-     * List GitHub repositories accessible by the integration
-     */
     listGitHubRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const owner = await ownerResolver(ctx, input);
       return await repositoryFetcher(owner);
     },
 
-    /**
-     * Gets the auto-triage agent configuration
-     */
     getAutoTriageConfig: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const owner = await ownerResolver(ctx, input);
       const config = await agentConfigGetter(owner, 'auto_triage', 'github');
 
       if (!config) {
-        // Return default configuration
         return DEFAULT_AUTO_TRIAGE_CONFIG;
       }
 
@@ -192,9 +182,6 @@ export function createAutoTriageRouter({
       };
     },
 
-    /**
-     * Saves the auto-triage agent configuration
-     */
     saveAutoTriageConfig: {
       inputSchema: SaveAutoTriageConfigInputSchema,
       handler: async ({
@@ -244,7 +231,6 @@ export function createAutoTriageRouter({
             createdBy: ctx.user.id,
           });
 
-          // Audit log (if provided)
           if (auditLogger) {
             await auditLogger({
               owner,
@@ -264,9 +250,6 @@ export function createAutoTriageRouter({
       },
     },
 
-    /**
-     * Toggles the auto-triage agent on/off
-     */
     toggleAutoTriageAgent: {
       inputSchema: z.object({
         isEnabled: z.boolean(),
@@ -275,7 +258,6 @@ export function createAutoTriageRouter({
         try {
           const owner = await ownerResolver(ctx, input);
 
-          // Get existing config to update enabled_for_issues
           const existingConfig = await agentConfigGetter(owner, 'auto_triage', 'github');
 
           if (existingConfig) {
@@ -312,7 +294,6 @@ export function createAutoTriageRouter({
 
           await agentEnabledSetter(owner, 'auto_triage', 'github', input.isEnabled);
 
-          // Audit log (if provided)
           if (auditLogger) {
             await auditLogger({
               owner,
@@ -332,17 +313,12 @@ export function createAutoTriageRouter({
       },
     },
 
-    /**
-     * Retry a failed triage ticket
-     * Resets status to pending and triggers dispatch
-     */
     retryTicket: {
       inputSchema: z.object({
         ticketId: z.string().uuid(),
       }),
       handler: async ({ ctx, input }: { ctx: TRPCContext; input: { ticketId: string } }) => {
         try {
-          // 1. Get ticket and verify ownership
           const ticket = await getTriageTicketById(input.ticketId);
 
           if (!ticket) {
@@ -352,7 +328,6 @@ export function createAutoTriageRouter({
             });
           }
 
-          // 2. Verify ticket belongs to owner
           const owner = await ownerResolver(ctx, input);
           if (!ticketOwnershipVerifier(ticket, owner)) {
             throw new TRPCError({
@@ -361,7 +336,6 @@ export function createAutoTriageRouter({
             });
           }
 
-          // 3. Verify ticket is in failed or actioned state
           if (ticket.status !== 'failed' && ticket.status !== 'actioned') {
             throw new TRPCError({
               code: 'BAD_REQUEST',
@@ -369,13 +343,10 @@ export function createAutoTriageRouter({
             });
           }
 
-          // 4. Reset ticket to pending
           await resetTriageTicketForRetry(input.ticketId);
 
-          // 5. Trigger dispatch to process pending tickets
           await tryDispatchPendingTickets(owner);
 
-          // 6. Audit log (if provided)
           if (auditLogger) {
             await auditLogger({
               owner,
@@ -397,17 +368,12 @@ export function createAutoTriageRouter({
       },
     },
 
-    /**
-     * Interrupt a pending or analyzing triage ticket
-     * Sets status to failed and frees the concurrency slot
-     */
     interruptTicket: {
       inputSchema: z.object({
         ticketId: z.string().uuid(),
       }),
       handler: async ({ ctx, input }: { ctx: TRPCContext; input: { ticketId: string } }) => {
         try {
-          // 1. Get ticket and verify ownership
           const ticket = await getTriageTicketById(input.ticketId);
 
           if (!ticket) {
@@ -417,7 +383,6 @@ export function createAutoTriageRouter({
             });
           }
 
-          // 2. Verify ticket belongs to owner
           const owner = await ownerResolver(ctx, input);
           if (!ticketOwnershipVerifier(ticket, owner)) {
             throw new TRPCError({
@@ -426,7 +391,6 @@ export function createAutoTriageRouter({
             });
           }
 
-          // 3. Verify ticket is in pending or analyzing state
           if (ticket.status !== 'pending' && ticket.status !== 'analyzing') {
             throw new TRPCError({
               code: 'BAD_REQUEST',
@@ -434,7 +398,6 @@ export function createAutoTriageRouter({
             });
           }
 
-          // 4. Interrupt the ticket (status-guarded to avoid TOCTOU race)
           const wasInterrupted = await interruptTriageTicket(input.ticketId);
 
           if (!wasInterrupted) {
@@ -448,7 +411,6 @@ export function createAutoTriageRouter({
           // 5. Dispatch pending tickets to free the concurrency slot
           await tryDispatchPendingTickets(owner);
 
-          // 6. Audit log (if provided)
           if (auditLogger) {
             await auditLogger({
               owner,
@@ -470,9 +432,6 @@ export function createAutoTriageRouter({
       },
     },
 
-    /**
-     * List triage tickets
-     */
     listTickets: {
       inputSchema: z.object({
         limit: z

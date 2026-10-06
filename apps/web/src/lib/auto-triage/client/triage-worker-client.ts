@@ -7,17 +7,12 @@ import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 const AUTO_TRIAGE_URL = process.env.AUTO_TRIAGE_URL;
 const AUTO_TRIAGE_AUTH_TOKEN = process.env.AUTO_TRIAGE_AUTH_TOKEN;
 
-// Types for API responses
 export interface DispatchTriageResponse {
   success: boolean;
   ticketId: string;
   status: string;
 }
 
-/**
- * Auto Triage Worker API Client
- * Handles all communication with the Cloudflare Worker for auto triage
- */
 class TriageWorkerClient {
   private readonly baseUrl: string;
   private readonly authToken: string;
@@ -31,9 +26,6 @@ class TriageWorkerClient {
     this.authToken = AUTO_TRIAGE_AUTH_TOKEN;
   }
 
-  /**
-   * Get common headers for API requests
-   */
   private getHeaders(additionalHeaders?: Record<string, string>): HeadersInit {
     return {
       Authorization: `Bearer ${this.authToken}`,
@@ -68,5 +60,4 @@ class TriageWorkerClient {
   }
 }
 
-// Export a singleton instance
 export const triageWorkerClient = new TriageWorkerClient();

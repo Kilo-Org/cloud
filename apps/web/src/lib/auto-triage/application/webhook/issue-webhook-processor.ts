@@ -9,9 +9,6 @@ import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
 import type { ConfigValidator } from './config-validator';
 
-/**
- * Issue payload type
- */
 export type IssuePayload = {
   action: 'opened' | 'reopened' | 'edited';
   issue: {
@@ -36,18 +33,9 @@ export type IssuePayload = {
   };
 };
 
-/**
- * IssueWebhookProcessor
- *
- * Processes GitHub issue webhook events for auto triage.
- * Orchestrates the workflow: validation, ticket creation, and dispatch.
- */
 export class IssueWebhookProcessor {
   constructor(private readonly configValidator: ConfigValidator) {}
 
-  /**
-   * Process an issue webhook event
-   */
   async process(payload: IssuePayload, integration: PlatformIntegration) {
     const { issue, repository } = payload;
 
@@ -60,18 +48,15 @@ export class IssueWebhookProcessor {
         author: issue.user?.login,
       });
 
-      // 1. Skip bot events
       if (this.shouldSkipEvent(payload)) {
         return this.skipResponse('Skipped bot event');
       }
 
-      // 2. Resolve owner from integration
       const owner = await this.resolveOwner(integration);
       if (!owner) {
         return NextResponse.json({ message: 'Integration missing user context' }, { status: 500 });
       }
 
-      // 3. Get and validate agent configuration
       const agentConfig = await getAgentConfigForOwner(owner, 'auto_triage', 'github');
 
       if (!agentConfig || !agentConfig.is_enabled) {
@@ -87,14 +72,11 @@ export class IssueWebhookProcessor {
         `Auto triage agent enabled for ${owner.type} ${owner.id}, processing ${repository.full_name}#${issue.number}`
       );
 
-      // 4. Validate configuration requirements
       const validationResult = this.configValidator.validate(config, payload, owner.type, owner.id);
       if (!validationResult.isValid) {
-        // Type narrowing: when isValid is false, reason property exists
         return this.skipResponse(validationResult.reason);
       }
 
-      // 5. Check for duplicate ticket
       const existingTicket = await findExistingTicket(repository.full_name, issue.number);
       if (existingTicket) {
         logExceptInTest(
@@ -109,17 +91,14 @@ export class IssueWebhookProcessor {
         );
       }
 
-      // 6. Create triage ticket
       const ticketId = await this.createTicket(payload, owner, integration);
 
       logExceptInTest(
         `Created triage ticket ${ticketId} for ${repository.full_name}#${issue.number}`
       );
 
-      // 7. Trigger dispatch system
       await this.tryDispatch(owner, ticketId, repository.full_name, issue.number);
 
-      // 8. Return accepted response
       return this.acceptedResponse(ticketId);
     } catch (error) {
       logExceptInTest('Error processing auto triage:', error);
@@ -141,9 +120,6 @@ export class IssueWebhookProcessor {
     }
   }
 
-  /**
-   * Check if event should be skipped (bot events)
-   */
   private shouldSkipEvent(payload: IssuePayload): boolean {
     if (payload.sender.type === 'Bot') {
       logExceptInTest('Skipping bot event:', {
@@ -156,9 +132,6 @@ export class IssueWebhookProcessor {
     return false;
   }
 
-  /**
-   * Resolve owner from platform integration
-   */
   private async resolveOwner(integration: PlatformIntegration): Promise<Owner | null> {
     // For orgs: use bot user, fallback to integration creator
     const orgBotUserId = integration.owned_by_organization_id
@@ -169,7 +142,6 @@ export class IssueWebhookProcessor {
       ? {
           type: 'org',
           id: integration.owned_by_organization_id,
-          // Use bot user if available, fallback to integration creator
           userId: (orgBotUserId ?? integration.kilo_requester_user_id) as string,
         }
       : {
@@ -178,7 +150,6 @@ export class IssueWebhookProcessor {
           userId: integration.owned_by_user_id as string,
         };
 
-    // Validate we have a valid user ID
     if (!owner.userId) {
       logExceptInTest('No valid user ID found for integration:', {
         integrationId: integration.id,
@@ -188,7 +159,6 @@ export class IssueWebhookProcessor {
         botUserId: orgBotUserId,
       });
 
-      // For organizations, provide a more actionable error message
       if (integration.owned_by_organization_id) {
         logExceptInTest(
           'Bot user not configured for organization. Please disable and re-enable auto-triage to create the bot user.',
@@ -202,9 +172,6 @@ export class IssueWebhookProcessor {
     return owner;
   }
 
-  /**
-   * Create triage ticket record
-   */
   private async createTicket(
     payload: IssuePayload,
     owner: Owner,
@@ -227,9 +194,6 @@ export class IssueWebhookProcessor {
     });
   }
 
-  /**
-   * Try to dispatch pending tickets for the owner
-   */
   private async tryDispatch(
     owner: Owner,
     ticketId: string,
@@ -256,16 +220,10 @@ export class IssueWebhookProcessor {
     }
   }
 
-  /**
-   * Return skip response
-   */
   private skipResponse(message: string) {
     return NextResponse.json({ message }, { status: 200 });
   }
 
-  /**
-   * Return accepted response (ticket queued)
-   */
   private acceptedResponse(ticketId: string) {
     return NextResponse.json(
       {

@@ -1,26 +1,9 @@
-/**
- * Auto Triage - Zod Validation Schemas
- *
- * Runtime validation schemas for auto triage inputs and outputs.
- * Follows validation patterns used throughout the codebase.
- */
-
 import * as z from 'zod';
 import type { AutoTriageTicket } from '@kilocode/db/schema';
 import { AUTO_TRIAGE_CONSTANTS } from './constants';
 
-// ============================================================================
-// Status and Ownership Schemas
-// ============================================================================
-
-/**
- * Auto triage ticket status enum
- */
 export const TriageStatusSchema = z.enum(['pending', 'analyzing', 'actioned', 'failed', 'skipped']);
 
-/**
- * Classification types for issues
- */
 export const ClassificationTypeSchema = z.enum([
   'bug',
   'feature',
@@ -29,9 +12,6 @@ export const ClassificationTypeSchema = z.enum([
   'unclear',
 ]);
 
-/**
- * Action taken on a ticket
- */
 export const ActionTakenSchema = z.enum([
   'pr_created',
   'comment_posted',
@@ -39,9 +19,6 @@ export const ActionTakenSchema = z.enum([
   'needs_clarification',
 ]);
 
-/**
- * Owner schema - discriminated union
- */
 export const OwnerSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('org'),
@@ -54,10 +31,6 @@ export const OwnerSchema = z.discriminatedUnion('type', [
     userId: z.string(),
   }),
 ]);
-
-// ============================================================================
-// Configuration Schemas
-// ============================================================================
 
 /**
  * Auto triage agent configuration schema
@@ -126,9 +99,6 @@ export const AutoTriageAgentConfigSchema = z
   })
   .strict();
 
-/**
- * Schema for saving auto triage configuration via tRPC
- */
 export const SaveAutoTriageConfigSchema = z
   .object({
     organizationId: z.string().uuid(),
@@ -153,30 +123,17 @@ export const SaveAutoTriageConfigSchema = z
   })
   .strict();
 
-// ============================================================================
-// GitHub Webhook Schemas
-// ============================================================================
-
-/**
- * GitHub user schema
- */
 const GitHubUserSchema = z.object({
   login: z.string(),
   type: z.string().optional(),
 });
 
-/**
- * GitHub repository schema
- */
 export const GitHubRepositorySchema = z.object({
   id: z.number().int(),
   full_name: z.string(),
   private: z.boolean(),
 });
 
-/**
- * GitHub label schema (can be string or object)
- */
 const GitHubLabelSchema = z.union([
   z.string(),
   z.object({
@@ -184,9 +141,6 @@ const GitHubLabelSchema = z.union([
   }),
 ]);
 
-/**
- * GitHub issue schema
- */
 export const GitHubIssueSchema = z.object({
   number: z.number().int().positive(),
   html_url: z.string().url(),
@@ -196,10 +150,6 @@ export const GitHubIssueSchema = z.object({
   labels: z.array(GitHubLabelSchema).optional(),
 });
 
-/**
- * GitHub issue webhook payload
- * Actions: opened, reopened, edited
- */
 export const WebhookIssuePayloadSchema = z.object({
   action: z.enum(['opened', 'reopened', 'edited']),
   issue: GitHubIssueSchema,
@@ -207,13 +157,6 @@ export const WebhookIssuePayloadSchema = z.object({
   sender: GitHubUserSchema,
 });
 
-// ============================================================================
-// Database Operation Schemas
-// ============================================================================
-
-/**
- * Create ticket params schema
- */
 export const CreateTicketParamsSchema = z.object({
   owner: OwnerSchema,
   platformIntegrationId: z.string().uuid().optional(),
@@ -227,9 +170,6 @@ export const CreateTicketParamsSchema = z.object({
   issueLabels: z.array(z.string()).default([]),
 });
 
-/**
- * Update ticket status params schema
- */
 export const UpdateTicketStatusParamsSchema = z.object({
   ticketId: z.string().uuid(),
   status: TriageStatusSchema,
@@ -249,9 +189,6 @@ export const UpdateTicketStatusParamsSchema = z.object({
   completedAt: z.date().optional(),
 });
 
-/**
- * List tickets params schema
- */
 export const ListTicketsParamsSchema = z.object({
   owner: OwnerSchema,
   limit: z
@@ -266,13 +203,6 @@ export const ListTicketsParamsSchema = z.object({
   repoFullName: z.string().optional(),
 });
 
-// ============================================================================
-// tRPC Input Schemas
-// ============================================================================
-
-/**
- * List triage tickets input (for organizations)
- */
 export const ListTriageTicketsInputSchema = z.object({
   organizationId: z.string().uuid(),
   limit: z
@@ -288,9 +218,6 @@ export const ListTriageTicketsInputSchema = z.object({
   repoFullName: z.string().optional(),
 });
 
-/**
- * List triage tickets input (for personal users)
- */
 export const ListTriageTicketsForUserInputSchema = z.object({
   limit: z
     .number()
@@ -305,34 +232,18 @@ export const ListTriageTicketsForUserInputSchema = z.object({
   repoFullName: z.string().optional(),
 });
 
-/**
- * Get triage ticket input
- */
 export const GetTriageTicketInputSchema = z.object({
   ticketId: z.string().uuid(),
 });
 
-/**
- * Retrigger triage ticket input
- */
 export const RetriggerTriageTicketInputSchema = z.object({
   ticketId: z.string().uuid(),
 });
 
-/**
- * Get auto triage config input
- */
 export const GetAutoTriageConfigInputSchema = z.object({
   organizationId: z.string().uuid(),
 });
 
-// ============================================================================
-// Classification Result Schemas
-// ============================================================================
-
-/**
- * Classification result from LLM analysis
- */
 export const ClassificationResultSchema = z.object({
   classification: ClassificationTypeSchema,
   confidence: z.number().min(0).max(1).describe('Confidence score (0-1)'),
@@ -342,13 +253,6 @@ export const ClassificationResultSchema = z.object({
   suggestedAction: z.string().optional().describe('Suggested action to take on this issue'),
 });
 
-// ============================================================================
-// Duplicate Detection Result Schemas
-// ============================================================================
-
-/**
- * Similar ticket found during duplicate detection
- */
 export const SimilarTicketSchema = z.object({
   ticketId: z.string().uuid(),
   issueNumber: z.number().int().positive(),
@@ -357,9 +261,6 @@ export const SimilarTicketSchema = z.object({
   repoFullName: z.string(),
 });
 
-/**
- * Duplicate detection result
- */
 export const DuplicateDetectionResultSchema = z.object({
   isDuplicate: z.boolean(),
   duplicateOfTicketId: z.string().uuid().nullable(),
@@ -368,13 +269,6 @@ export const DuplicateDetectionResultSchema = z.object({
   reasoning: z.string().optional().describe('LLM reasoning for duplicate decision'),
 });
 
-// ============================================================================
-// Worker Communication Schemas
-// ============================================================================
-
-/**
- * Triage status update from worker to backend
- */
 export const TriageStatusUpdateSchema = z.object({
   ticketId: z.string().uuid(),
   status: TriageStatusSchema,
@@ -391,9 +285,6 @@ export const TriageStatusUpdateSchema = z.object({
   errorMessage: z.string().optional(),
 });
 
-/**
- * Dispatch triage request to worker
- */
 export const DispatchTriageRequestSchema = z.object({
   ticketId: z.string().uuid(),
   authToken: z.string(),
@@ -414,14 +305,6 @@ export const DispatchTriageRequestSchema = z.object({
   }),
 });
 
-// ============================================================================
-// Inferred TypeScript Types from Zod Schemas
-// ============================================================================
-
-/**
- * Infer TypeScript types from Zod schemas for use in function signatures.
- * These provide type safety while keeping schemas as the single source of truth.
- */
 export type TriageStatus = z.infer<typeof TriageStatusSchema>;
 export type ClassificationType = z.infer<typeof ClassificationTypeSchema>;
 export type ActionTaken = z.infer<typeof ActionTakenSchema>;
@@ -437,9 +320,6 @@ export type DuplicateDetectionResult = z.infer<typeof DuplicateDetectionResultSc
 export type TriageStatusUpdate = z.infer<typeof TriageStatusUpdateSchema>;
 export type DispatchTriageRequest = z.infer<typeof DispatchTriageRequestSchema>;
 
-/**
- * Response type for list triage tickets
- */
 export type ListTriageTicketsResponse = {
   tickets: AutoTriageTicket[];
   total: number;

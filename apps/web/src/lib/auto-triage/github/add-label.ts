@@ -1,10 +1,3 @@
-/**
- * GitHub Issue Label Helper
- *
- * Adds labels to GitHub issues using the GitHub REST API.
- * Used by the auto-triage system to add the kilo-auto-fix label.
- */
-
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -18,15 +11,6 @@ export type AddIssueLabelParams = {
   githubToken: string;
 };
 
-/**
- * Ensure a label exists in a GitHub repository with the specified color
- *
- * @param owner - Repository owner
- * @param repo - Repository name
- * @param label - Label name
- * @param color - Label color (hex without #)
- * @param githubToken - GitHub API token
- */
 async function ensureLabelExists(
   owner: string,
   repo: string,
@@ -34,7 +18,6 @@ async function ensureLabelExists(
   color: string,
   githubToken: string
 ): Promise<void> {
-  // Check if label exists
   const checkResponse = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/labels/${encodeURIComponent(label)}`,
     {
@@ -52,7 +35,6 @@ async function ensureLabelExists(
     return;
   }
 
-  // Label doesn't exist, create it
   logExceptInTest('[ensureLabelExists] Creating label', {
     owner,
     repo,
@@ -100,12 +82,6 @@ async function ensureLabelExists(
   logExceptInTest('[ensureLabelExists] Label created successfully', { label });
 }
 
-/**
- * Add a label to a GitHub issue
- *
- * @param params - Label parameters
- * @throws Error if label addition fails
- */
 export async function addIssueLabel(params: AddIssueLabelParams): Promise<void> {
   const { repoFullName, issueNumber, label, githubToken } = params;
 
@@ -115,7 +91,6 @@ export async function addIssueLabel(params: AddIssueLabelParams): Promise<void> 
     label,
   });
 
-  // Parse repo owner and name
   const [owner, repo] = repoFullName.split('/');
 
   if (!owner || !repo) {
@@ -126,7 +101,6 @@ export async function addIssueLabel(params: AddIssueLabelParams): Promise<void> 
     // Ensure the label exists with the correct color before adding it
     await ensureLabelExists(owner, repo, label, LABEL_COLOR, githubToken);
 
-    // Add the label to the issue
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
       {

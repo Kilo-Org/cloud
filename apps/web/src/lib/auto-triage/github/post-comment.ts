@@ -1,10 +1,3 @@
-/**
- * GitHub Issue Comment Helper
- *
- * Posts comments on GitHub issues using the GitHub REST API.
- * Used by the auto-triage system to communicate with issue reporters.
- */
-
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -16,12 +9,6 @@ export type PostIssueCommentParams = {
   githubToken: string;
 };
 
-/**
- * Post a comment on a GitHub issue
- *
- * @param params - Comment parameters
- * @throws Error if comment posting fails
- */
 export async function postIssueComment(params: PostIssueCommentParams): Promise<void> {
   const { repoFullName, issueNumber, body, githubToken } = params;
 
@@ -31,7 +18,6 @@ export async function postIssueComment(params: PostIssueCommentParams): Promise<
     bodyLength: body.length,
   });
 
-  // Parse repo owner and name
   const [owner, repo] = repoFullName.split('/');
 
   if (!owner || !repo) {

@@ -215,7 +215,11 @@ export function createMessageCallbacks(
           .warn('Unable to include the assistant answer in the callback snapshot');
       }
     }
-    const failure = facts ? projectSettledMessageFailure(message, facts) : undefined;
+    // The classification is derived from the message alone; settlement facts
+    // only enrich it (workspace subtype, assistant reason, provider ownership).
+    // Every terminal callback carries the structured failure, matching the
+    // legacy plane's `projectSafeFailure(state)`.
+    const failure = projectSettledMessageFailure(message, facts ?? {});
     // A workspace subtype carries a specific cause ("Repository clone timed
     // out"); the generic control reason would hide it from receivers that match
     // on error text. Non-workspace failures keep the friendlier control copy.

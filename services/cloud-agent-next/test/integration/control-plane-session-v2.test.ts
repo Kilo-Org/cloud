@@ -1776,6 +1776,12 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           ? 'Sandbox billing requires additional credits'
           : 'Sandbox configuration is invalid or unsupported'
       );
+      // A settlement without facts still carries the structured failure.
+      expect(callbacks[0]?.payload.failureStage).toBe('pre_dispatch');
+      expect(callbacks[0]?.payload.failure).toMatchObject({
+        stage: 'pre_dispatch',
+        code,
+      });
       expect(provider.createCalls).toBe(1);
       await waitFor(async () =>
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')

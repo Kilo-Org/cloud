@@ -6,9 +6,9 @@
  * above the message the user just sent or received. Schedule the scroll twice:
  * once now, once after the row has had a frame to measure.
  *
- * The keyboard-driven scroll is not here: the list's scroll container is
- * `KeyboardChatScrollView` (`react-native-keyboard-controller`), which adjusts
- * the content inset and the offset natively while the IME moves.
+ * The keyboard lift is not here: the conversation screen's `KeyboardAvoidingView`
+ * (`react-native-keyboard-controller`) shrinks the list's viewport while the
+ * IME moves, and the list follows the newest message when its viewport shrinks.
  */
 export const MESSAGE_LIST_NEWEST_SCROLL_RETRY_DELAY_MS = 80;
 

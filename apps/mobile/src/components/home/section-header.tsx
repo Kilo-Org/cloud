@@ -14,13 +14,16 @@ type SectionHeaderProps = {
   onActionPress?: () => void;
   /**
    * Keeps the action's box but makes it invisible, inert and hidden from
-   * screen readers, so hiding it cannot change the header's size.
+   * screen readers, so hiding it cannot change the header's size. Beside a
+   * notice the hidden box is dropped instead: it would hold the notice off the
+   * row edge, over empty space.
    */
   actionHidden?: boolean;
   /**
    * Optional one-line status between the label and the action. It takes only
    * the free space on the label's line (zero basis), so it can never wrap the
-   * row or change the header's height when it appears.
+   * row or change the header's height when it appears. A divider separates it
+   * from a visible action. Pass null while there is nothing to report.
    */
   notice?: ReactNode;
 };
@@ -32,6 +35,7 @@ export function SectionHeader({
   actionHidden = false,
   notice,
 }: Readonly<SectionHeaderProps>) {
+  const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
   return (
     <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
       {/* With a notice the label keeps its own width, so the notice takes all
@@ -44,7 +48,8 @@ export function SectionHeader({
           {notice}
         </View>
       ) : null}
-      {actionLabel && onActionPress ? (
+      {notice && hasAction ? <View className="h-3 w-px bg-border" /> : null}
+      {hasAction ? (
         <Pressable
           onPress={onActionPress}
           disabled={actionHidden}

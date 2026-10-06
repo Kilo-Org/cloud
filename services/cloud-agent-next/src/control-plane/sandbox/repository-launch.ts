@@ -116,7 +116,7 @@ export function repositoryLaunchOptions(
   if (distinctKeyCount !== 1) {
     return {
       options: {},
-      reason: distinctKeyCount === 0 ? 'no_repo_key' : 'multiple_keys',
+      reason: 'multiple_keys',
       preparingRouteCount,
       distinctKeyCount,
       discarded: false,

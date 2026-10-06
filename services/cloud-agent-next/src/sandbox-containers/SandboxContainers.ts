@@ -392,29 +392,29 @@ export class SandboxContainers extends DurableObject<Env> {
     };
     const index = this.repoSnapshotIndex();
     if (index === null) {
-      this.logSnapshotLookup(input.allocationRef, 'image', 'index_unavailable');
+      this.logSnapshotLookup('image', 'index_unavailable');
       return imageStart;
     }
     if (input.repoKey === undefined) {
-      this.logSnapshotLookup(input.allocationRef, 'image', 'no_repo_key');
+      this.logSnapshotLookup('image', 'no_repo_key');
       return imageStart;
     }
     const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
     if (input.discardRepository === true) {
       await index.remove(indexKey);
-      this.logSnapshotLookup(input.allocationRef, 'image', 'discarded');
+      this.logSnapshotLookup('image', 'discarded');
       return imageStart;
     }
     if (!allowRepository) {
-      this.logSnapshotLookup(input.allocationRef, 'image', 'not_allowed');
+      this.logSnapshotLookup('image', 'not_allowed');
       return imageStart;
     }
     const entry = await index.lookup(indexKey);
     if (entry === null) {
-      this.logSnapshotLookup(input.allocationRef, 'image', 'index_miss');
+      this.logSnapshotLookup('image', 'index_miss');
       return imageStart;
     }
-    this.logSnapshotLookup(input.allocationRef, 'repository', 'index_hit');
+    this.logSnapshotLookup('repository', 'index_hit');
     return {
       source: 'repository',
       options: this.startOptions(
@@ -430,14 +430,9 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.ctx.id.name ?? this.ctx.id.toString();
   }
 
-  private logSnapshotLookup(
-    allocationRef: string,
-    source: ContainersStartSource,
-    reason: string
-  ): void {
+  private logSnapshotLookup(source: ContainersStartSource, reason: string): void {
     logControlDiagnostic('snapshot_lookup', {
       sandboxId: this.sandboxNameForLog(),
-      allocationRef,
       source,
       reason,
     });

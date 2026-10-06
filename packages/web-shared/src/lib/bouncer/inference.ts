@@ -185,7 +185,9 @@ export function bouncerRejectionResponse(
 ): NextResponse | null {
   if (!verdict) return null;
   const rejects = verdict.enforced === true && verdict.code !== undefined;
-  if (verdict.flags.length > 0 || rejects) {
+  // Bouncer already logs every verdict with its flags; the gateway logs only the rejections it
+  // applies, so shadow flags on most requests do not multiply the log volume.
+  if (rejects) {
     logBouncerVerdict('[bouncer] decide verdict', {
       requestId,
       enforced: verdict.enforced,

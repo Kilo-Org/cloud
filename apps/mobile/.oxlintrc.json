@@ -169,6 +169,14 @@
             "message": "Use expo-video and expo-audio."
           },
           {
+            "name": "expo-glass-effect",
+            "message": "The app does not use Liquid Glass. Use expo-blur."
+          },
+          {
+            "name": "@callstack/liquid-glass",
+            "message": "The app does not use Liquid Glass. Use expo-blur."
+          },
+          {
             "name": "@react-native-segmented-control/segmented-control",
             "message": "Use @/components/ui/segmented-control."
           },

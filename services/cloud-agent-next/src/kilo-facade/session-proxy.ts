@@ -92,6 +92,7 @@ export async function resolveLiveWrapperTarget(params: {
       metadata.identity.botId,
       {
         createdOnPlatform: metadata.identity.billingOrigin,
+        legacyFallback: true,
       }
     ));
 

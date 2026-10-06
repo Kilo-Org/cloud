@@ -522,6 +522,37 @@ describe('generateSandboxId', () => {
     });
   });
 
+  describe('legacy fallback routing', () => {
+    it('preserves the shared owner identity for sessions that predate sandboxId storage', async () => {
+      const id = await generateSandboxId(undefined, 'org-id', 'user-id', 'session', undefined, {
+        legacyFallback: true,
+      });
+      expect(id).toMatch(/^org-/);
+    });
+
+    it('keeps isolated routing for allowlisted orgs', async () => {
+      const id = await generateSandboxId('org-id', 'org-id', 'user-id', 'session', undefined, {
+        legacyFallback: true,
+      });
+      expect(id).toMatch(/^ses-/);
+    });
+
+    it('preserves the shared identity for personal accounts', async () => {
+      const id = await generateSandboxId(undefined, undefined, 'user-id', 'session', undefined, {
+        legacyFallback: true,
+      });
+      expect(id).toMatch(/^usr-/);
+    });
+
+    it('still honors an explicit shared allocation', async () => {
+      const id = await generateSandboxId(undefined, 'org-id', 'user-id', 'session', undefined, {
+        sandboxAllocation: 'cloudflare-shared',
+        legacyFallback: true,
+      });
+      expect(id).toMatch(/^org-/);
+    });
+  });
+
   describe('isolated Standard sandbox', () => {
     it('bypasses organization routing with a deterministic per-session identity', async () => {
       await expect(

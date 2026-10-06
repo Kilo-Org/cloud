@@ -62,6 +62,13 @@ export type SandboxRoutingTarget =
 export type SandboxRoutingOptions = {
   sandboxAllocation?: SandboxAllocation;
   createdOnPlatform?: string;
+  /**
+   * Marks a fallback for a session that predates `workspace.sandboxId` storage.
+   * Such a session must regenerate the identity it originally used, which
+   * predates the isolated-by-default routing, so honor the per-session org
+   * allowlist and otherwise fall back to the owner-scoped shared identity.
+   */
+  legacyFallback?: boolean;
 };
 
 /**
@@ -363,7 +370,7 @@ export async function selectSandboxForNewSession(
  * their dedicated namespace.
  */
 export async function generateSandboxRoutingTarget(
-  _perSessionOrgIds: string | undefined,
+  perSessionOrgIds: string | undefined,
   orgId: string | undefined,
   userId: string,
   sessionId: string,
@@ -390,7 +397,11 @@ export async function generateSandboxRoutingTarget(
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
   }
   if (allocation !== 'cloudflare-shared') {
-    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
+    const preserveLegacySharedRouting =
+      routingOptions.legacyFallback === true && !isOrgInList(perSessionOrgIds, orgId);
+    if (!preserveLegacySharedRouting) {
+      return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
+    }
   }
 
   const sandboxOrgSegment = orgId ?? `user:${userId}`;

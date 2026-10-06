@@ -968,6 +968,7 @@ export class SessionService {
         this._metadata.identity.botId,
         {
           createdOnPlatform: this._metadata.identity.createdOnPlatform,
+          legacyFallback: true,
         }
       ));
 

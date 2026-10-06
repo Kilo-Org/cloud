@@ -188,6 +188,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
               this.metadata.identity.botId,
               {
                 createdOnPlatform: this.metadata.identity.billingOrigin,
+                legacyFallback: true,
               }
             );
     }

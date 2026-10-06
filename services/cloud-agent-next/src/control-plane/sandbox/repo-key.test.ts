@@ -9,7 +9,6 @@ const REPO_URL = 'https://github.com/acme/widgets.git';
 function gate(overrides: Partial<RepoSnapshotGate> = {}): RepoSnapshotGate {
   return {
     enrolledIds: undefined,
-    enrolledOrgIds: undefined,
     userId: USER,
     orgId: ORG,
     ...overrides,
@@ -37,26 +36,6 @@ describe('repoSnapshotEligible', () => {
     expect(
       repoSnapshotEligible(gate({ enrolledIds: 'user_other,org_other', orgId: undefined }), route)
     ).toBe(false);
-  });
-
-  it('still enrolls an org by the legacy org-only flag', () => {
-    expect(repoSnapshotEligible(gate({ enrolledOrgIds: ORG }), route)).toBe(true);
-    expect(repoSnapshotEligible(gate({ enrolledOrgIds: '*' }), route)).toBe(true);
-  });
-
-  it('does not enroll a personal owner by the legacy org-only flag', () => {
-    expect(repoSnapshotEligible(gate({ enrolledOrgIds: ORG, orgId: undefined }), route)).toBe(
-      false
-    );
-  });
-
-  it('enrolls when either list matches', () => {
-    expect(
-      repoSnapshotEligible(gate({ enrolledIds: 'user_other', enrolledOrgIds: ORG }), route)
-    ).toBe(true);
-    expect(
-      repoSnapshotEligible(gate({ enrolledIds: USER, enrolledOrgIds: 'org_other' }), route)
-    ).toBe(true);
   });
 
   it('requires a repository at the isolated constant path', () => {

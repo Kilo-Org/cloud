@@ -1763,7 +1763,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const route = { repoUrl: spec.git?.url, directory: spec.directory };
     const gate = {
       enrolledIds: this.env.CONTAINER_REPO_SNAPSHOT_IDS,
-      enrolledOrgIds: this.env.CONTAINER_REPO_SNAPSHOT_ORG_IDS,
       userId: source.userId,
       orgId: source.orgId,
     };

@@ -27,8 +27,8 @@ const KILO_SESSION = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 const REPO_URL = 'https://github.com/acme/widgets.git';
 const ISOLATED_DIRECTORY = '/workspace/app';
 const LAUNCH_KEY = 'repository_launch';
-const ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '*', CONTAINER_REPO_SNAPSHOT_ORG_IDS: '' };
-const NOT_ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '', CONTAINER_REPO_SNAPSHOT_ORG_IDS: '' };
+const ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '*' };
+const NOT_ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '' };
 // The Durable Object shares one env object across tests, so every test states the env it
 // needs and the Worker secret a previous test removed is put back.
 const WORKER_SECRET = (env as unknown as { NEXTAUTH_SECRET: unknown }).NEXTAUTH_SECRET;
@@ -294,17 +294,8 @@ describe('repository snapshot key', () => {
   it.each([
     ['a per-session directory', { directory: '/workspace/org/user/sessions/s1' }, undefined],
     ['no repository', { git: null }, undefined],
-    [
-      'an owner that is not enrolled',
-      {},
-      { CONTAINER_REPO_SNAPSHOT_IDS: '', CONTAINER_REPO_SNAPSHOT_ORG_IDS: 'other-org' },
-    ],
-    ['an empty enrollment', {}, NOT_ENROLLED],
-    [
-      'no enrollment setting',
-      {},
-      { CONTAINER_REPO_SNAPSHOT_IDS: '', CONTAINER_REPO_SNAPSHOT_ORG_IDS: undefined },
-    ],
+    ['an owner that is not enrolled', {}, NOT_ENROLLED],
+    ['no enrollment setting', {}, { CONTAINER_REPO_SNAPSHOT_IDS: undefined }],
   ] as const)('gives no key for %s', async (_name, overrides, extraEnv) => {
     const stub = await setup('sbx__repo_key_none', createFakeProvider(), extraEnv ?? ENROLLED);
     await stub.prepare(prepareInput(overrides));
@@ -332,7 +323,6 @@ describe('repository snapshot enrollment', () => {
     const provider = createFakeProvider({ startSource: 'repository' });
     const stub = await setup('sbx__repo_elig_user', provider, {
       CONTAINER_REPO_SNAPSHOT_IDS: 'user_123',
-      CONTAINER_REPO_SNAPSHOT_ORG_IDS: '',
     });
     await stub.prepare(prepareInput({ orgId: null }));
     const key = await repoKeyOf(stub);
@@ -355,19 +345,9 @@ describe('repository snapshot enrollment', () => {
     ]);
   });
 
-  it('enrolls an org owner by org ID from the unified flag', async () => {
+  it('enrolls an org owner by org ID', async () => {
     const stub = await setup('sbx__repo_elig_org', createFakeProvider(), {
       CONTAINER_REPO_SNAPSHOT_IDS: 'org_123',
-      CONTAINER_REPO_SNAPSHOT_ORG_IDS: '',
-    });
-    await stub.prepare(prepareInput());
-    expect(await repoKeyOf(stub)).toMatch(/^[0-9a-f]{64}$/);
-  });
-
-  it('keeps the legacy org-only flag working when the unified flag is empty', async () => {
-    const stub = await setup('sbx__repo_elig_legacy', createFakeProvider(), {
-      CONTAINER_REPO_SNAPSHOT_IDS: '',
-      CONTAINER_REPO_SNAPSHOT_ORG_IDS: 'org_123',
     });
     await stub.prepare(prepareInput());
     expect(await repoKeyOf(stub)).toMatch(/^[0-9a-f]{64}$/);
@@ -377,7 +357,6 @@ describe('repository snapshot enrollment', () => {
     const provider = createFakeProvider();
     const stub = await setup('sbx__repo_elig_none', provider, {
       CONTAINER_REPO_SNAPSHOT_IDS: 'user_other,org_other',
-      CONTAINER_REPO_SNAPSHOT_ORG_IDS: '',
     });
     await stub.prepare(prepareInput({ orgId: null }));
     expect(await repoKeyOf(stub)).toBeNull();

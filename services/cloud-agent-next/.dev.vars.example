@@ -64,10 +64,6 @@ REPO_SNAPSHOT_ORG_IDS=
 # binding and only applies to the constant isolated workspace path.
 CONTAINER_REPO_SNAPSHOT_IDS=
 
-# Legacy org-only container repo snapshot IDs (optional). Superseded by
-# CONTAINER_REPO_SNAPSHOT_IDS; kept so deployments that only set this keep working.
-CONTAINER_REPO_SNAPSHOT_ORG_IDS=
-
 # Vercel Sandbox operational configuration (optional)
 # Snapshot/build values must come from a successful `pnpm --filter cloud-agent-next snapshot:vercel`
 # acceptance run. Partial configuration never enables Vercel.

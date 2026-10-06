@@ -13,10 +13,8 @@ export type RepoKeyInput = {
 };
 
 export type RepoSnapshotGate = {
-  /** User or org IDs admitted by the unified flag. `*` includes everyone. */
+  /** User or org IDs admitted. `*` includes everyone. */
   enrolledIds: string | undefined;
-  /** Org IDs admitted by the legacy org-only flag, honored for existing configs. */
-  enrolledOrgIds: string | undefined;
   userId: string;
   orgId: string | undefined;
 };
@@ -29,17 +27,14 @@ export type RepoSnapshotGate = {
  * sandbox could only capture something no later session can reuse.
  *
  * Enrollment follows the `CONTROL_PLANE_IDS`/`SANDBOX_SELECTION_IDS` convention:
- * one list matched against the user ID and then the org ID. The legacy org-only
- * list is also honored so a deployment that only sets it keeps working.
+ * one list matched against the user ID and then the org ID.
  */
 export function repoSnapshotEligible(
   gate: RepoSnapshotGate,
   route: Pick<RepoKeyInput, 'repoUrl' | 'directory'>
 ): boolean {
   return (
-    (isOrgInList(gate.enrolledIds, gate.userId) ||
-      isOrgInList(gate.enrolledIds, gate.orgId) ||
-      isOrgInList(gate.enrolledOrgIds, gate.orgId)) &&
+    (isOrgInList(gate.enrolledIds, gate.userId) || isOrgInList(gate.enrolledIds, gate.orgId)) &&
     route.repoUrl !== undefined &&
     route.directory === ISOLATED_CONTAINER_WORKSPACE_PATH
   );

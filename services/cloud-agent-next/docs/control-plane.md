@@ -369,8 +369,7 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **Key.** When a route is first prepared, the Sandbox DO hashes the owner and the repository URL
   with HMAC-SHA256 under a Worker secret. Env is not part of the key: setup re-runs on every start.
   It stores the digest on the route (`repo_key`) and keeps it across attempts. No key is computed, and
-  no snapshot used, when the owner is not enrolled (`CONTAINER_REPO_SNAPSHOT_IDS`, or the legacy
-  org-only `CONTAINER_REPO_SNAPSHOT_ORG_IDS`), the route
+  no snapshot used, when the owner is not enrolled (`CONTAINER_REPO_SNAPSHOT_IDS`), the route
   has no repository, the provider cannot capture, or the secret is missing. Scope is per user;
   per org is a change to that one field.
 - **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,

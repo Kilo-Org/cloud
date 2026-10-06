@@ -55,6 +55,7 @@ import {
   type ProviderAdapter,
   type ProviderAllocationIntent,
   type ProviderCreateIntent,
+  type ProviderStartSource,
   type SandboxProviderConfiguration,
 } from '../../sandbox-control/provider.js';
 import {
@@ -200,6 +201,7 @@ import {
 } from './scope-grants.js';
 import { computeRepoKey, repoSnapshotEligible } from './repo-key.js';
 import {
+  beginRepositoryLaunch,
   captureRequested,
   confirmRepositoryLaunch,
   readRepositoryLaunch,
@@ -1760,7 +1762,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (this.provider.captureRepository === undefined) return null;
     const route = { repoUrl: spec.git?.url, directory: spec.directory };
     const gate = {
+      enrolledIds: this.env.CONTAINER_REPO_SNAPSHOT_IDS,
       enrolledOrgIds: this.env.CONTAINER_REPO_SNAPSHOT_ORG_IDS,
+      userId: source.userId,
       orgId: source.orgId,
     };
     if (!repoSnapshotEligible(gate, route)) return null;
@@ -2726,6 +2730,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           await listRoutes(this.db),
           await readRepositoryLaunch(this.ctx.storage)
         );
+        // Persist a placeholder before the launch so a `hello` accepted while it
+        // runs confirms this allocation, and that confirmation outlives the
+        // allocation stopping before the launch resolves.
+        await beginRepositoryLaunch(this.ctx.storage, allocationId);
         const launched = await withTimeout(
           this.provider.launch(createdRef, launchEnv, launchOptions),
           remainingMs(launchDeadline),
@@ -2775,20 +2783,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /**
    * Remember how this allocation's container started. A wrapper that connected
-   * while a slow launch was still returning has already proven the start.
+   * while a slow launch was still returning has already confirmed the start
+   * through the placeholder `beginRepositoryLaunch` wrote, so keep that
+   * confirmation even if the allocation has since stopped.
    */
   private async recordLaunch(
     allocationId: string,
-    startSource: Parameters<typeof recordRepositoryLaunch>[1]['startSource']
+    startSource: ProviderStartSource
   ): Promise<void> {
     const state = await this.readAllocation();
     const connected =
       state.allocationId === allocationId &&
       (state.kind === 'connected' || state.kind === 'disconnected');
+    const existing = await readRepositoryLaunch(this.ctx.storage);
+    const confirmed = connected || (existing?.allocationId === allocationId && existing.confirmed);
     await recordRepositoryLaunch(this.ctx.storage, {
       allocationId,
       startSource,
-      confirmed: connected,
+      confirmed,
     });
   }
 

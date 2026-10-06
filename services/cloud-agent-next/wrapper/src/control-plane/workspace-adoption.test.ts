@@ -105,6 +105,20 @@ describe('stripGitCredentials', () => {
     ).toBe(false);
     expect(git('reflog').length).toBeGreaterThan(0);
   });
+
+  it('reports false when FETCH_HEAD cannot be removed', async () => {
+    const fetchHead = path.join(repo, '.git', 'FETCH_HEAD');
+    await fs.mkdir(fetchHead);
+    await fs.writeFile(path.join(fetchHead, 'keep'), 'x');
+
+    expect(
+      await stripGitCredentials({
+        git: run,
+        directory: repo,
+        bareUrl: 'https://github.com/acme/repo.git',
+      })
+    ).toBe(false);
+  });
 });
 
 describe('emptyWorkspaceDirectory', () => {

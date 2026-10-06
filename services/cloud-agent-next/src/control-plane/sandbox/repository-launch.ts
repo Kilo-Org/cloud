@@ -14,7 +14,8 @@ const LAUNCH_KEY = 'repository_launch';
  */
 export type RepositoryLaunchRecord = {
   allocationId: string;
-  startSource: ProviderStartSource;
+  /** Absent in the placeholder written before `launch` reports the source. */
+  startSource?: ProviderStartSource;
   confirmed: boolean;
 };
 
@@ -29,6 +30,19 @@ export async function recordRepositoryLaunch(
   record: RepositoryLaunchRecord
 ): Promise<void> {
   await storage.put(LAUNCH_KEY, record);
+}
+
+/**
+ * Write the placeholder for `allocationId` before its launch runs. The launch
+ * can be slow, so a `hello` that arrives while it is still returning confirms
+ * this allocation; `recordRepositoryLaunch` later fills in the start source and
+ * keeps that confirmation even if the allocation stops first.
+ */
+export async function beginRepositoryLaunch(
+  storage: Pick<DurableObjectStorage, 'put'>,
+  allocationId: string
+): Promise<void> {
+  await recordRepositoryLaunch(storage, { allocationId, confirmed: false });
 }
 
 /** The wrapper of `allocationId` connected, so its start source was sound. */

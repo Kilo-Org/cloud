@@ -13,7 +13,7 @@ import {
 } from './sandbox-control-protocol.js';
 import { sessionGitSummaryPayloadSchema } from './worktree-changes-wire.js';
 
-export const CONTROL_PLANE_PROTOCOL_VERSION = 2;
+export const CONTROL_PLANE_PROTOCOL_VERSION = 3;
 
 /**
  * Launch-environment key that carries the allocation id. The wrapper echoes it

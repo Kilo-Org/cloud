@@ -615,7 +615,9 @@ export type Env = {
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
   /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */
   REPO_SNAPSHOT_ORG_IDS?: string;
-  /** Comma-separated org IDs whose isolated control-plane containers start from repository snapshots, or '*' for all */
+  /** Comma-separated user or org IDs whose isolated control-plane containers start from repository snapshots, or '*' for all */
+  CONTAINER_REPO_SNAPSHOT_IDS?: string;
+  /** Legacy org-only list for repository snapshots. Superseded by CONTAINER_REPO_SNAPSHOT_IDS, kept for existing deploys. */
   CONTAINER_REPO_SNAPSHOT_ORG_IDS?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See

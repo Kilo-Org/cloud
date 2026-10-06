@@ -1283,11 +1283,6 @@ export class SandboxContainers extends DurableObject<Env> {
     await this.ctx.storage.put(RECORD_KEY, record);
   }
 
-  private async markStartSource(startSource: ContainersStartSource): Promise<void> {
-    const latest = await this.readRecord();
-    await this.writeRecord({ ...latest, startSource });
-  }
-
   private async markWrapperAttempt(wrapperAttempt: WrapperAttempt): Promise<void> {
     const latest = await this.readRecord();
     await this.writeRecord({ ...latest, wrapperAttempt });

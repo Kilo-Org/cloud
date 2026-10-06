@@ -369,7 +369,8 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **Key.** When a route is first prepared, the Sandbox DO hashes the owner and the repository URL
   with HMAC-SHA256 under a Worker secret. Env is not part of the key: setup re-runs on every start.
   It stores the digest on the route (`repo_key`) and keeps it across attempts. No key is computed, and
-  no snapshot used, when the owner is not enrolled (`CONTAINER_REPO_SNAPSHOT_ORG_IDS`), the route
+  no snapshot used, when the owner is not enrolled (`CONTAINER_REPO_SNAPSHOT_IDS`, or the legacy
+  org-only `CONTAINER_REPO_SNAPSHOT_ORG_IDS`), the route
   has no repository, the provider cannot capture, or the secret is missing. Scope is per user;
   per org is a change to that one field.
 - **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,
@@ -383,9 +384,9 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 - **Capture.** `session.prepare` carries `capture: true` when the route has a key and the provider
   can capture. The wrapper decides whether to capture (a fresh clone, or an adopted snapshot that is
   due for a refresh) and then sends `workspace.capture` after setup, with origin bare. The Sandbox DO
-  calls the provider off its serial queue, bounded at 3 min 5 s, and answers `workspace.captured`
+  calls the provider off its serial queue, bounded at 5 min 5 s, and answers `workspace.captured`
   (`ok: false` at once when nothing can be saved). `SandboxContainers` snapshots the running
-  container (bounded at 3 min), and writes `{ snapshotId, commit }` to the index with a 10-day TTL,
+  container (bounded at 5 min), and writes `{ snapshotId, commit }` to the index with a 10-day TTL,
   which only expires a snapshot nobody uses (the platform keeps one for 30 days).
   It does not take its operation queue, so a stop or launch is never delayed by a capture. The
   snapshot is published only while that allocation is still the running one.
@@ -434,7 +435,7 @@ The wrapper owns the step timeouts and retries:
 | Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; any other failure falls back to a clone |
 | Checkout, branch restore | In the clone budget | No |
 | Setup commands | Current per-command limits | No; a failure fails preparation |
-| Save the repository (`snapshot`) | 3 min 10 s wait | No; a failure is logged and preparation continues |
+| Save the repository (`snapshot`) | 5 min 10 s wait | No; a failure is logged and preparation continues |
 | Kilo runtime start | 2 min | 1 retry |
 | Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min | 1 retry |
 
@@ -625,10 +626,10 @@ them through one development-only override.
 | Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
 | Sandbox DO | Credential grant | 4 h; re-issued on `deliver` below 1 h | — |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
-| Sandbox DO | Repository capture call | 3 min 5 s (container DO: 3 min) | Answer `ok: false`; preparation continues |
+| Sandbox DO | Repository capture call | 5 min 5 s (container DO: 5 min) | Answer `ok: false`; preparation continues |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
 | Wrapper | Adopt a repository snapshot | 2 min | Empty the directory and clone |
-| Wrapper | Wait for a capture | 3 min 10 s | Continue without a snapshot |
+| Wrapper | Wait for a capture | 5 min 10 s | Continue without a snapshot |
 | Wrapper | SSE silence | 30 s | Health request |
 | Wrapper | Kilo health request | 5 s | Restart Kilo |
 | Wrapper | SSE reconnects | 6 in 2 min | Restart Kilo |

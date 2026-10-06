@@ -30,10 +30,11 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneRouteSpec,
-  ControlPlaneRouteUpdate,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneRouteSpec,
+  type ControlPlaneRouteUpdate,
 } from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import type { MessageResultRPCResponse } from '../../src/session/message-result.js';
@@ -1745,7 +1746,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           wrapperId: 'wr_recovered',
           allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
         })
-      ).toEqual({ type: 'welcome', protocolVersion: 2 });
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       expect(await wrapper.next()).toMatchObject({ type: 'session.prepare', spec: { sessionId } });
       const recoveredRoute = (await sandboxStub.status({ sessionId })).view;
       if (failedRoute.state !== 'failed' || recoveredRoute.state !== 'preparing')
@@ -1880,7 +1881,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     const helloReply = await wrapper.hello({ wrapperId: 'wr_1', allocationId });
-    expect(helloReply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(helloReply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
     const prepareFrame = await wrapper.next();
     expect(prepareFrame?.type).toBe('session.prepare');

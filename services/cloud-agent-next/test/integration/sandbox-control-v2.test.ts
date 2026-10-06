@@ -4,6 +4,7 @@ import {
   mintSandboxLaunchCredential,
   verifySandboxLaunchCredential,
 } from '../../src/sandbox-control/credential.js';
+import { CONTROL_PLANE_PROTOCOL_VERSION } from '../../src/shared/control-plane-protocol.js';
 import type { Env } from '../../src/types.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -305,7 +306,7 @@ async function connectAndHello(
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
   return { wrapper, credential, allocationId };
 }
@@ -446,12 +447,12 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(await readState(stub)).toEqual(before);
     expect(await first.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     await expect(wrapper.waitForClose()).resolves.toBe(1000);
     expect(await second.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     expect((await readState(stub)).kind).toBe('connected');
     expect(provider.stopCalls).toEqual([]);
@@ -806,16 +807,16 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       type: 'hello',
       wrapperId: 'wr_ack',
       allocationId,
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
     });
     expect(await wrapper.next()).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
     });
     const before = await readState(stub);
-    wrapper.send({ type: 'hello', wrapperId: 'wr_ack', allocationId, protocolVersion: 2 });
+    wrapper.send({ type: 'hello', wrapperId: 'wr_ack', allocationId, protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     expect(await wrapper.next(20)).toBeNull();
     expect(await readState(stub)).toEqual(before);
     wrapper.send({ type: 'heartbeat', active: 'invalid', degraded: false });
@@ -830,7 +831,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const legacy = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     expect(await legacy.hello({ wrapperId: 'wr_legacy', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     legacy.heartbeat(false);
     expect(await legacy.next(20)).toBeNull();
@@ -934,7 +935,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(credential.length).toBeGreaterThan(0);
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_hello', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
     const state = await readState(stub);
     expect(state.kind).toBe('connected');
@@ -995,7 +996,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_reconnect', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
     const state = await readState(stub);
     expect(state.kind).toBe('connected');
@@ -1044,7 +1045,11 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const { credential, allocationId } = launchIdentity(provider);
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
-    const reply = await wrapper.hello({ wrapperId: 'wr_old', allocationId, protocolVersion: 1 });
+    const reply = await wrapper.hello({
+      wrapperId: 'wr_old',
+      allocationId,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION - 1,
+    });
     expect(reply).toEqual({ type: 'shutdown', reason: 'unsupported_protocol_version' });
     await expect(wrapper.waitForClose()).resolves.toBe(1008);
     expect((await readState(stub)).kind).toBe('starting');
@@ -1095,7 +1100,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const replacement = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await replacement.hello({ wrapperId: 'wr_second', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     await waitFor(async () => expect((await readState(stub)).wrapperId).toBe('wr_second'));
 
     // Deliver the replaced socket's close directly, with its stale connection id.
@@ -1365,7 +1370,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_early', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     state = await readState(stub);
     expect(state.kind).toBe('connected');
     expect(state.providerRef).toBe(provider.refs[0]);
@@ -1469,7 +1474,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const reconnected = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await reconnected.hello({ wrapperId: 'wr_after_evict', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     await waitFor(async () => expect((await readState(stub)).kind).toBe('connected'));
 
     reconnected.heartbeat(true);
@@ -1485,7 +1490,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     const reply = await wrapper.hello({ wrapperId: 'wr_n5', allocationId });
-    expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     expect((await readState(stub)).kind).toBe('connected');
 
     await releaseGate(stub, () => provider.launchGates[0](new Error('launch failed')));

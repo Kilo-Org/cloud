@@ -27,8 +27,8 @@ const KILO_SESSION = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 const REPO_URL = 'https://github.com/acme/widgets.git';
 const ISOLATED_DIRECTORY = '/workspace/app';
 const LAUNCH_KEY = 'repository_launch';
-const ENROLLED = { CONTAINER_REPO_SNAPSHOT_ORG_IDS: '*' };
-const NOT_ENROLLED = { CONTAINER_REPO_SNAPSHOT_ORG_IDS: '' };
+const ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '*', CONTAINER_REPO_SNAPSHOT_ORG_IDS: '' };
+const NOT_ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '', CONTAINER_REPO_SNAPSHOT_ORG_IDS: '' };
 // The Durable Object shares one env object across tests, so every test states the env it
 // needs and the Worker secret a previous test removed is put back.
 const WORKER_SECRET = (env as unknown as { NEXTAUTH_SECRET: unknown }).NEXTAUTH_SECRET;
@@ -46,12 +46,23 @@ type FakeProvider = {
   captures: Capture[];
   captureResult: boolean | 'throw' | 'hang';
   releaseCapture: () => void;
+  launchHold: boolean;
+  releaseLaunch: () => void;
+  stopHold: boolean;
+  releaseStop: () => void;
 };
 
 function createFakeProvider(
-  options: { capture?: boolean; startSource?: ProviderStartSource } = {}
+  options: {
+    capture?: boolean;
+    startSource?: ProviderStartSource;
+    holdLaunch?: boolean;
+    holdStop?: boolean;
+  } = {}
 ): FakeProvider {
   let release: () => void = () => undefined;
+  let releaseLaunch: () => void = () => undefined;
+  let releaseStop: () => void = () => undefined;
   const provider: FakeProvider = {
     adapter: null as unknown as ProviderAdapter,
     launchEnvs: [],
@@ -59,6 +70,10 @@ function createFakeProvider(
     captures: [],
     captureResult: true,
     releaseCapture: () => release(),
+    launchHold: options.holdLaunch ?? false,
+    releaseLaunch: () => releaseLaunch(),
+    stopHold: options.holdStop ?? false,
+    releaseStop: () => releaseStop(),
   };
   provider.adapter = {
     resumable: false,
@@ -71,12 +86,22 @@ function createFakeProvider(
     async launch(_ref, launchEnv, launchOptions) {
       provider.launchEnvs.push({ ...launchEnv });
       provider.launchOptions.push(launchOptions);
+      if (provider.launchHold) {
+        await new Promise<void>(resolve => {
+          releaseLaunch = resolve;
+        });
+      }
       return { startSource: options.startSource ?? 'image' };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
     },
     async stop() {
+      if (provider.stopHold) {
+        await new Promise<void>(resolve => {
+          releaseStop = resolve;
+        });
+      }
       return 'terminal';
     },
     async ensureLeaseAtLeast() {},
@@ -107,6 +132,7 @@ type RouteOverrides = {
   git?: ControlPlaneRouteSpec['git'] | null;
   env?: Record<string, string>;
   userId?: string;
+  orgId?: string | null;
   sessionId?: string;
 };
 
@@ -127,7 +153,7 @@ function prepareInput(overrides: RouteOverrides = {}) {
       userId: overrides.userId ?? 'user_123',
       kiloSessionId: KILO_SESSION,
       kiloToken: 'native-kilo-token-user',
-      orgId: 'org_123',
+      orgId: overrides.orgId === null ? undefined : (overrides.orgId ?? 'org_123'),
       repository: { type: 'github' as const, repo: 'acme/widgets' },
       scopeId: sessionId,
     },
@@ -194,6 +220,17 @@ async function releaseCapture(
   });
 }
 
+/** Releases a hung launch or stop from inside the Durable Object awaiting it. */
+async function releaseHeld(
+  stub: DurableObjectStub<SandboxControlV2>,
+  release: () => void
+): Promise<void> {
+  await runInDurableObject(stub, async () => {
+    release();
+    await new Promise(resolve => setTimeout(resolve, 25));
+  });
+}
+
 async function prepareFrameOf(wrapper: FakeWrapper) {
   const frame = await wrapper.next();
   if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
@@ -255,9 +292,17 @@ describe('repository snapshot key', () => {
   it.each([
     ['a per-session directory', { directory: '/workspace/org/user/sessions/s1' }, undefined],
     ['no repository', { git: null }, undefined],
-    ['an owner that is not enrolled', {}, { CONTAINER_REPO_SNAPSHOT_ORG_IDS: 'other-org' }],
+    [
+      'an owner that is not enrolled',
+      {},
+      { CONTAINER_REPO_SNAPSHOT_IDS: '', CONTAINER_REPO_SNAPSHOT_ORG_IDS: 'other-org' },
+    ],
     ['an empty enrollment', {}, NOT_ENROLLED],
-    ['no enrollment setting', {}, { CONTAINER_REPO_SNAPSHOT_ORG_IDS: undefined }],
+    [
+      'no enrollment setting',
+      {},
+      { CONTAINER_REPO_SNAPSHOT_IDS: '', CONTAINER_REPO_SNAPSHOT_ORG_IDS: undefined },
+    ],
   ] as const)('gives no key for %s', async (_name, overrides, extraEnv) => {
     const stub = await setup('sbx__repo_key_none', createFakeProvider(), extraEnv ?? ENROLLED);
     await stub.prepare(prepareInput(overrides));
@@ -277,6 +322,75 @@ describe('repository snapshot key', () => {
     });
     await stub.prepare(prepareInput());
     expect(await repoKeyOf(stub)).toBeNull();
+  });
+});
+
+describe('repository snapshot enrollment', () => {
+  it('enrolls a personal user by user ID and drives both capture and restore', async () => {
+    const provider = createFakeProvider({ startSource: 'repository' });
+    const stub = await setup('sbx__repo_elig_user', provider, {
+      CONTAINER_REPO_SNAPSHOT_IDS: 'user_123',
+      CONTAINER_REPO_SNAPSHOT_ORG_IDS: '',
+    });
+    await stub.prepare(prepareInput({ orgId: null }));
+    const key = await repoKeyOf(stub);
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+
+    const { wrapper } = await connect('sbx__repo_elig_user', provider);
+
+    expect(provider.launchOptions).toEqual([{ repoKey: key }]);
+    const frame = await prepareFrameOf(wrapper);
+    expect(frame.spec.capture).toBe(true);
+
+    wrapper.send({ type: 'workspace.capture', sessionId: SESSION, commit: 'abc123' });
+    expect(await wrapper.next()).toEqual({
+      type: 'workspace.captured',
+      sessionId: SESSION,
+      ok: true,
+    });
+    expect(provider.captures).toEqual([
+      { ref: expect.stringMatching(/^mem_/), repoKey: key, commit: 'abc123' },
+    ]);
+  });
+
+  it('enrolls an org owner by org ID from the unified flag', async () => {
+    const stub = await setup('sbx__repo_elig_org', createFakeProvider(), {
+      CONTAINER_REPO_SNAPSHOT_IDS: 'org_123',
+      CONTAINER_REPO_SNAPSHOT_ORG_IDS: '',
+    });
+    await stub.prepare(prepareInput());
+    expect(await repoKeyOf(stub)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('keeps the legacy org-only flag working when the unified flag is empty', async () => {
+    const stub = await setup('sbx__repo_elig_legacy', createFakeProvider(), {
+      CONTAINER_REPO_SNAPSHOT_IDS: '',
+      CONTAINER_REPO_SNAPSHOT_ORG_IDS: 'org_123',
+    });
+    await stub.prepare(prepareInput());
+    expect(await repoKeyOf(stub)).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('gives no key and no capture to a non-matching personal owner', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup('sbx__repo_elig_none', provider, {
+      CONTAINER_REPO_SNAPSHOT_IDS: 'user_other,org_other',
+      CONTAINER_REPO_SNAPSHOT_ORG_IDS: '',
+    });
+    await stub.prepare(prepareInput({ orgId: null }));
+    expect(await repoKeyOf(stub)).toBeNull();
+
+    const { wrapper } = await connect('sbx__repo_elig_none', provider);
+    expect(provider.launchOptions).toEqual([{}]);
+    await prepareFrameOf(wrapper);
+
+    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
+    expect(await wrapper.next()).toEqual({
+      type: 'workspace.captured',
+      sessionId: SESSION,
+      ok: false,
+    });
+    expect(provider.captures).toEqual([]);
   });
 });
 
@@ -342,12 +456,54 @@ describe('repository snapshot launch', () => {
     expect(provider.launchOptions).toEqual([{ repoKey: key }]);
   });
 
+  it('keeps a launch confirmed when its slow start stops before it returns', async () => {
+    const sandboxId = 'sbx__repo_launch_slow_stop';
+    const provider = createFakeProvider({
+      startSource: 'repository',
+      holdLaunch: true,
+      holdStop: true,
+    });
+    const stub = await setup(sandboxId, provider);
+    await stub.prepare(prepareInput());
+    const key = await repoKeyOf(stub);
+    const { allocationId } = await connect(sandboxId, provider);
+
+    // The launch is still held when the wrapper connects. Stop the allocation
+    // before the launch returns, so a naive completion would drop the proof.
+    await runInDurableObject(stub, async (instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      await db
+        .update(allocationTable)
+        .set({ last_frame_at: Date.now(), last_activity_at: Date.now() - 60 * 60_000 });
+      await instance.alarm();
+      expect((await instance.getAllocationState()).kind).toBe('stopping');
+    });
+
+    await releaseHeld(stub, () => provider.releaseLaunch());
+    await waitFor(async () =>
+      expect(await readLaunchRecord(stub)).toMatchObject({
+        allocationId,
+        startSource: 'repository',
+        confirmed: true,
+      })
+    );
+
+    // Completing the stop starts the next allocation, which must keep the snapshot.
+    await releaseHeld(stub, () => provider.releaseStop());
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+    expect(provider.launchOptions[1]).toEqual({ repoKey: key });
+  });
+
   it('marks the launch confirmed only for the allocation whose wrapper connected', async () => {
     const provider = createFakeProvider({ startSource: 'repository' });
     const stub = await setup('sbx__repo_launch_confirm', provider);
     await stub.prepare(prepareInput());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    await waitFor(async () => expect(await readLaunchRecord(stub)).toBeDefined());
+    // The placeholder written before `launch` has no source yet; wait for the
+    // completed record so this test owns the value it overwrites.
+    await waitFor(async () =>
+      expect(await readLaunchRecord(stub)).toMatchObject({ startSource: 'repository' })
+    );
     const record = (await readLaunchRecord(stub)) as { allocationId: string; confirmed: boolean };
     const launchEnv = provider.launchEnvs[0];
     expect(record.allocationId).toBe(launchEnv?.CONTROL_PLANE_ALLOCATION_ID);

@@ -124,23 +124,20 @@ repository".
 
 - **Store:** a KV namespace, `REPO_SNAPSHOTS`.
 - **Key:** a keyed hash (HMAC) of:
-  - scope;
-  - repository URL;
-  - env and secret values;
-  - image;
-  - instance.
+  - scope (the user);
+  - repository URL.
 
-  The Sandbox DO computes the first three as `repoKey`. `SandboxContainers` appends image and
-  instance, which it owns.
-- **Why env and secrets are in the key:** anything setup writes from them (`.npmrc`, `.env`) is
-  then only reused by a session that already holds the same values.
+  The Sandbox DO computes that as `repoKey`. `SandboxContainers` appends the image, which it owns.
+- **Why env and secrets are not in the key:** setup re-runs on every start and rewrites whatever it
+  derives from env, so an adopted snapshot only has to save the clone and checkout.
 - **What is not in the key:**
   - setup commands, because setup always re-runs;
   - the path, because it is constant;
   - the branch, because adopt checks out the branch.
-- **Scope:** per user for now (decided). Per org is one key change once the credential scan
-  passes; see D3.
-- **Value:** `{ snapshotId, commit }`, with `expirationTtl` 24 h.
+- **Scope:** per user for now (decided). Per org would share one user's secret-derived files with
+  the org; until those files have security handling, the key stays per user and org sharing is out;
+  see D3.
+- **Value:** `{ snapshotId, commit }`, with `expirationTtl` 10 days.
 - **Concurrent writes:** harmless. The last write wins, and orphans expire on the platform TTL.
 
 ### 4. Capture: after setup, before Kilo starts (D1: before the first prompt)
@@ -223,7 +220,7 @@ Steps that snapshots do not touch and that could overlap:
 
 | Case | Effect |
 |---|---|
-| First cold start per key and image, per 24 h | Waits once for the capture, before Kilo starts |
+| First cold start per key and image, per 10 days | Waits once for the capture, before Kilo starts |
 | Every later start | Skips the clone and the cold install. Pays the snapshot restore and an incremental setup. |
 | Broken snapshot | At most one create attempt |
 | Deploy | The next start per key is cold |
@@ -234,8 +231,9 @@ Steps that snapshots do not touch and that could overlap:
 - **D1 (decided):** capture before the first prompt. In practice this means after setup and before
   Kilo starts.
 - **D2 (decided):** setup always re-runs after adopt.
-- **D3 (decided):** per user for now. Per org follows once the credential scan passes. Tokens are
-  easy to keep out: bare remote during capture, and no Kilo home yet. Secret-derived files are
-  covered by the env and secrets hash in the key.
-- **D4 (decided):** the index store is KV (`REPO_SNAPSHOTS`), with a 24-hour `expirationTtl`.
+- **D3 (decided):** per user for now. Tokens are easy to keep out: bare remote during capture, and
+  no Kilo home yet. Setup can still write secret-derived files (`.npmrc`, `.env`) and the key no
+  longer hashes env, so org sharing would hand those files to the whole org. It stays per user, with
+  no org sharing, until those files have security handling.
+- **D4 (decided):** the index store is KV (`REPO_SNAPSHOTS`), with a 10-day `expirationTtl`.
 - **D6 (decided):** remove session snapshots.

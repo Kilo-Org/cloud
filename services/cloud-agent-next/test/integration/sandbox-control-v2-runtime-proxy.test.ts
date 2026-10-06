@@ -25,7 +25,10 @@ import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
@@ -631,7 +634,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
 
     const frame = await wrapper.next();
@@ -727,7 +730,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const reconnected = await FakeWrapper.connect({ sandboxId, credential });
       expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
         type: 'welcome',
-        protocolVersion: 2,
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
 
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
@@ -791,7 +794,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const restarted = await FakeWrapper.connect({ sandboxId, credential });
     expect(await restarted.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     const second = await restarted.next();
     if (second?.type !== 'session.prepare') throw new Error('expected session.prepare');
@@ -833,7 +836,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const restarted = await FakeWrapper.connect({ sandboxId, credential });
     expect(await restarted.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     const second = await restarted.next();
     if (second?.type !== 'session.prepare') throw new Error('expected session.prepare');
@@ -885,7 +888,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const reconnected = await FakeWrapper.connect({ sandboxId, credential });
     expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     const second = await reconnected.next();
     if (second?.type !== 'session.prepare') throw new Error('expected session.prepare');
@@ -941,7 +944,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const restarted = await FakeWrapper.connect({ sandboxId, credential });
     expect(await restarted.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     await waitFor(() => expect(bindCalls).toBe(2));
 
@@ -978,7 +981,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
 
     await waitFor(async () => {

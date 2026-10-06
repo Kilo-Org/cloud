@@ -6,7 +6,10 @@ import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
 import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-id.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneWrapperFrame } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -237,7 +240,7 @@ async function setupSiblingPair(): Promise<{
     wrapperId: 'wr_sibling',
     allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
   });
-  expect(welcome).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(welcome).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
   const recording: Recording = { prepares: [], prompts: [], aborts: [], answers: [] };
   const stopPump = startWrapperPump(wrapper, recording);

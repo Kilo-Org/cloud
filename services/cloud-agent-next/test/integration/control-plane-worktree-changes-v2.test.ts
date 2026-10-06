@@ -7,9 +7,10 @@ import { events } from '../../src/db/sqlite-schema.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneWrapperFrame,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -159,7 +160,7 @@ async function connectAndHello(
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
 

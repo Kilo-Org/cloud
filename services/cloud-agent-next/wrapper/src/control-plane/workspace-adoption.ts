@@ -56,8 +56,8 @@ export async function refreshAdoptedRepository(input: {
 /**
  * Leave no credential in `.git` before a snapshot: `origin` is set to the bare URL
  * and the reflogs and `FETCH_HEAD`, which can record the URL a command ran with,
- * are cleared. Returns false when the URL could not be made bare, in which case
- * the workspace must not be captured.
+ * are cleared. Returns false when any of that fails, in which case the workspace
+ * must not be captured.
  */
 export async function stripGitCredentials(input: {
   git: WorkspaceGit;
@@ -69,7 +69,11 @@ export async function stripGitCredentials(input: {
   if (bare.exitCode !== 0) return false;
   const expired = await git(['reflog', 'expire', '--expire=now', '--all']);
   if (expired.exitCode !== 0) return false;
-  await fs.rm(path.join(directory, '.git', 'FETCH_HEAD'), { force: true }).catch(() => undefined);
+  try {
+    await fs.rm(path.join(directory, '.git', 'FETCH_HEAD'), { force: true });
+  } catch {
+    return false;
+  }
   return true;
 }
 

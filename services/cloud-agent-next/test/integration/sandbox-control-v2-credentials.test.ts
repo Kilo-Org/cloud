@@ -22,6 +22,7 @@ import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../../src/sandbox-control/crede
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
   controlPlanePrepareInputSchema,
+  CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneCredentialSource,
   type ControlPlanePrepareInput,
   type ControlPlaneRouteSpec,
@@ -286,7 +287,7 @@ async function prepareWarmRoute(
   const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
   expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
     type: 'welcome',
-    protocolVersion: 2,
+    protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
   });
   const prepareFrame = await wrapper.next();
   wrapper.send({ type: 'session.ready', sessionId: input.spec.sessionId });
@@ -1903,7 +1904,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
     expect(await wrapper2.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
 
     // The failing route is marked failed; the loop still serves the sibling.

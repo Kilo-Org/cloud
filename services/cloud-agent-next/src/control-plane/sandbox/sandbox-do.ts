@@ -237,7 +237,6 @@ const OWNER_KEY = 'control_plane_owner';
 /** Backstop over the container DO's own capture timeout; the wrapper waits slightly longer. */
 const REPOSITORY_CAPTURE_CALL_MS = 5 * 60_000 + 5_000;
 const ALLOCATION_ROW_ID = 'current';
-const CREATE_FAILURES_KEY = 'sandbox_create_failures';
 const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
 const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
 
@@ -1607,9 +1606,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const { state, effects, stopReason } = reduceAllocation(previous, event, this.sandboxTimers());
     await this.writeAllocation(state, previous);
-    if (state.kind !== previous.kind && (state.kind === 'creating' || state.kind === 'starting')) {
-      await this.clearCreateFailures();
-    }
     if (
       previous.kind !== state.kind ||
       previous.stopAttempt !== state.stopAttempt ||
@@ -2864,7 +2860,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           'Sandbox create timed out'
         );
         if ('unresolved' in created) {
-          await this.retryOrFailCreate(allocationId);
+          await this.dispatchCreateFailed(allocationId);
           return;
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
@@ -2963,7 +2959,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
           }
         }
-        await this.retryOrFailCreate(allocationId);
+        await this.dispatchCreateFailed(allocationId);
       }
     } finally {
       this.createInFlight = false;
@@ -3010,22 +3006,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       nextAllocationId: crypto.randomUUID(),
       retryAllowed: await this.retryAllowed(),
     });
-  }
-
-  /**
-   * Retry a failed create/launch while the attempt bound allows it, else fail the
-   * preparing routes with a specific reason. Without the bound, a sandbox that can
-   * never create retries until the route's preparation deadline (12 min).
-   */
-  private async retryOrFailCreate(allocationId: string): Promise<void> {
-    const failures = (await this.readCreateFailures()) + 1;
-    if (failures >= this.sandboxTimers().providerCreateMaxAttempts) {
-      await this.clearCreateFailures();
-      await this.failCreationRoutes(allocationId, false, 'workspace_setup_failed');
-      return;
-    }
-    await this.ctx.storage.put(CREATE_FAILURES_KEY, failures);
-    await this.dispatchCreateFailed(allocationId);
   }
 
   private async stopRef(ref: string, allocationId: string | null): Promise<boolean> {
@@ -4136,19 +4116,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async retryAllowed(): Promise<boolean> {
     return routeRetryAllowed(this.routeContext(await this.readAllocation()));
-  }
-
-  /**
-   * Consecutive create/launch failures for this preparation. The reducer would
-   * otherwise retry until the route's preparation deadline; a sandbox that cannot
-   * create (a persistent provider conflict) must fail fast instead.
-   */
-  private async readCreateFailures(): Promise<number> {
-    return (await this.ctx.storage.get<number>(CREATE_FAILURES_KEY)) ?? 0;
-  }
-
-  private async clearCreateFailures(): Promise<void> {
-    await this.ctx.storage.delete(CREATE_FAILURES_KEY);
   }
 
   private async readAllocation(): Promise<AllocationState> {

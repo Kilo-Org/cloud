@@ -20,8 +20,6 @@ export type ControlPlaneTimers = {
   sandbox: {
     providerCreateMs: number;
     providerCreateRetryMs: number;
-    /** Consecutive create/launch failures allowed before the attempt is failed. */
-    providerCreateMaxAttempts: number;
     wrapperFirstConnectMs: number;
     wrapperHelloMs: number;
     heartbeatMs: number;
@@ -75,7 +73,6 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const sandbox = {
     providerCreateMs: 2 * MINUTE_MS,
     providerCreateRetryMs: 10_000,
-    providerCreateMaxAttempts: 3,
     wrapperFirstConnectMs: 5 * MINUTE_MS,
     wrapperHelloMs: 30_000,
     heartbeatMs: ms(45_000),

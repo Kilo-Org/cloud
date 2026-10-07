@@ -196,10 +196,9 @@ async function maybeIssueBonusFromUsageThreshold(
   params: {
     subscription: KiloPassSubscriptionState;
     kiloUserId: string;
-    monthlyBaseAmountUsd: number;
   }
 ): Promise<void> {
-  const { subscription, kiloUserId, monthlyBaseAmountUsd } = params;
+  const { subscription, kiloUserId } = params;
 
   const issuance =
     subscription.cadence === KiloPassCadence.Monthly
@@ -218,7 +217,7 @@ async function maybeIssueBonusFromUsageThreshold(
   }
 
   const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
-    columns: { id: true, credit_transaction_id: true },
+    columns: { id: true, credit_transaction_id: true, amount_usd: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),
       eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
@@ -228,6 +227,13 @@ async function maybeIssueBonusFromUsageThreshold(
     await clearKiloPassThreshold(tx, { kiloUserId });
     return;
   }
+
+  // The bonus follows the base this issuance credited. A store plan switch can move the
+  // subscription tier above it before the new price is paid.
+  const baseAmountUsd = Math.min(
+    KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd,
+    baseItem.amount_usd
+  );
 
   if (subscription.paymentProvider === KiloPassPaymentProvider.GooglePlay) {
     const refund = await tx.query.credit_transactions.findFirst({
@@ -310,7 +316,7 @@ async function maybeIssueBonusFromUsageThreshold(
     issuanceId: issuance.issuanceId,
     subscriptionId: subscription.subscriptionId,
     kiloUserId,
-    baseAmountUsd: monthlyBaseAmountUsd,
+    baseAmountUsd,
     bonusPercentApplied: decision.bonusPercentApplied,
     stripeInvoiceId: issuance.stripeInvoiceId,
     description: decision.description,
@@ -352,13 +358,9 @@ export async function maybeIssueKiloPassBonusFromUsageThreshold(params: {
       return;
     }
 
-    const tierConfig = KILO_PASS_TIER_CONFIG[subscriptionState.tier];
-    const monthlyBaseAmountUsd = tierConfig.monthlyPriceUsd;
-
     await maybeIssueBonusFromUsageThreshold(tx, {
       subscription: subscriptionState,
       kiloUserId,
-      monthlyBaseAmountUsd,
     });
   });
 }

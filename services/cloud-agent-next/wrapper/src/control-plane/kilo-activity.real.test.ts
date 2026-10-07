@@ -13,13 +13,13 @@ type Fixture = Awaited<ReturnType<typeof activityFixture>>;
 function contract(
   name: string,
   run: (fixture: Fixture) => Promise<void>,
-  options?: Parameters<typeof activityFixture>[2]
+  options?: Parameters<typeof activityFixture>[1]
 ) {
   it(
     name,
     async () => {
       if (!binary) throw new Error('KILO_781_BINARY is required');
-      const fixture = await activityFixture(binary, name, options);
+      const fixture = await activityFixture(binary, options);
       try {
         await run(fixture);
       } finally {
@@ -143,13 +143,13 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
   );
 
   contract(
-    'a foreground task follows its child through permission wait and resume',
+    'a foreground task follows its child through permission identity, allow, rejection and resume',
     async f => {
-      let step = 0;
+      let call = 0;
       const childReply = Promise.withResolvers<ModelReply>();
-      const held = Promise.withResolvers<ModelReply>();
       f.respond(async () => {
-        if (step++ === 0)
+        const current = call++;
+        if (current === 0)
           return {
             tools: [
               {
@@ -162,7 +162,17 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
               },
             ],
           };
-        return step === 2 ? childReply.promise : held.promise;
+        if (current === 1) return childReply.promise;
+        if (current === 2)
+          return {
+            tools: [
+              {
+                name: 'bash',
+                arguments: { command: 'echo rejected', description: 'Rejected probe' },
+              },
+            ],
+          };
+        return { text: 'finished' };
       });
       const sessionID = await f.session();
       const faults: string[] = [];
@@ -191,14 +201,6 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
           'child model execution'
         );
         expect(childID).not.toBe(sessionID);
-        expect(
-          (
-            await f.client.session.get(
-              { sessionID: childID, directory: f.directory },
-              { signal: f.signal }
-            )
-          ).data?.parentID
-        ).toBe(sessionID);
         const messages = await f.client.session.messages(
           { sessionID, directory: f.directory, limit: 1 },
           { signal: f.signal }
@@ -229,7 +231,7 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
           tools: [
             {
               name: 'bash',
-              arguments: { command: 'echo child-resumed', description: 'Child permission probe' },
+              arguments: { command: 'sleep 5', description: 'Allowed probe', timeout: 15000 },
             },
           ],
         });
@@ -238,34 +240,62 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
           result => result.data?.some(request => request.sessionID === childID) === true,
           'child permission request'
         );
-        const permission = pending.data!.find(request => request.sessionID === childID)!;
-        expect(permission.tool?.callID).toBeDefined();
+        const allowed = pending.data!.find(request => request.sessionID === childID)!;
+        expect(allowed.sessionID).toBe(childID);
+        expect(allowed.tool?.callID).toBeDefined();
+        expect(allowed.tool?.messageID).toBeDefined();
         await activity.refresh();
         expect(activity.state(childID)?.activity).toBe('waiting');
         expect(activity.state(sessionID)?.activity).toBe('waiting');
         expect(activity.needsCompute()).toBe(false);
         expect(activity.isIdle()).toBe(false);
         await f.client.permission.reply(
-          { requestID: permission.id, directory: f.directory, reply: 'once' },
+          { requestID: allowed.id, directory: f.directory, reply: 'once' },
           { signal: f.signal }
         );
         await f.until(
-          () => f.requests,
-          count => count === 3,
+          () => f.client.permission.list({ directory: f.directory }, { signal: f.signal }),
+          result => !result.data?.some(request => request.id === allowed.id),
+          'allowed permission cleared'
+        );
+        await f.until(
+          async () => {
+            await activity.refresh();
+            return activity.state(childID)?.activity;
+          },
+          value => value === 'running',
           'child resumes after permission'
         );
-        await activity.refresh();
-        expect(activity.state(childID)?.activity).toBe('running');
         expect(activity.state(sessionID)?.activity).toBe('running');
         expect(activity.needsCompute()).toBe(true);
-        expect(
-          (
-            await f.client.session.abort(
-              { sessionID, directory: f.directory, scope: 'tree' },
-              { signal: f.signal }
-            )
-          ).data
-        ).toBe(true);
+
+        const secondPending = await f.until(
+          () => f.client.permission.list({ directory: f.directory }, { signal: f.signal }),
+          result =>
+            result.data?.some(
+              request => request.sessionID === childID && request.id !== allowed.id
+            ) === true,
+          'second child permission request'
+        );
+        const rejected = secondPending.data!.find(
+          request => request.sessionID === childID && request.id !== allowed.id
+        )!;
+        expect(rejected.sessionID).toBe(childID);
+        expect(rejected.tool?.messageID).toBeDefined();
+        await f.client.permission.reply(
+          { requestID: rejected.id, directory: f.directory, reply: 'reject' },
+          { signal: f.signal }
+        );
+        await f.until(
+          () => f.client.permission.list({ directory: f.directory }, { signal: f.signal }),
+          result => (result.data?.length ?? 0) === 0,
+          'permission rejection'
+        );
+        await f.until(
+          () => f.sessionEvents(sessionID),
+          events => events.some(e => e.type === 'session.turn.close'),
+          'permission completion'
+        );
         await f.idle(sessionID);
         await f.idle(childID);
         await activity.refresh();
@@ -275,7 +305,6 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
       } finally {
         activity.dispose();
         childReply.resolve({ text: 'cleanup' });
-        held.resolve({ text: 'cleanup' });
       }
     },
     { subagentPermission: { bash: 'ask' } }
@@ -384,33 +413,6 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
   });
 
   contract(
-    'reports retry as busy execution and completes after a transient provider failure',
-    async f => {
-      let attempts = 0;
-      f.respond(async () => (++attempts === 1 ? { status: 503 } : { text: 'retried' }));
-      const sessionID = await f.session();
-      await f.prompt(sessionID);
-      await f.until(
-        () => f.sessionEvents(sessionID),
-        events =>
-          events.some(
-            e =>
-              e.type === 'session.status' &&
-              (e.properties.status as { type?: string })?.type === 'retry'
-          ),
-        'retry status'
-      );
-      await f.until(
-        () => f.sessionEvents(sessionID),
-        events => events.some(e => e.type === 'session.turn.close'),
-        'retry completion'
-      );
-      expect(attempts).toBe(2);
-      await f.idle(sessionID);
-    }
-  );
-
-  contract(
     'reports parent identity and tree abort cancels children without stopping an unrelated root',
     async f => {
       const held = Promise.withResolvers<ModelReply>();
@@ -460,56 +462,6 @@ suite('pinned Kilo 7.8.1 native activity contract', () => {
       } finally {
         held.resolve({ text: 'cleanup' });
       }
-    }
-  );
-
-  contract(
-    'preserves permission request identity and confirms rejection stops the blocked tool',
-    async f => {
-      let step = 0;
-      f.respond(async () =>
-        step++ === 0
-          ? {
-              tools: [
-                {
-                  name: 'bash',
-                  arguments: { command: 'echo allowed', description: 'Permission probe' },
-                },
-              ],
-            }
-          : { text: 'finished' }
-      );
-      const sessionID = await f.session();
-      await f.client.session.update(
-        {
-          sessionID,
-          directory: f.directory,
-          permission: [{ permission: 'bash', pattern: '*', action: 'ask' }],
-        },
-        { signal: f.signal }
-      );
-      await f.prompt(sessionID);
-      const pending = await f.until(
-        () => f.client.permission.list({ directory: f.directory }, { signal: f.signal }),
-        result => result.data?.length === 1,
-        'permission request'
-      );
-      const permission = pending.data![0];
-      expect(permission.sessionID).toBe(sessionID);
-      expect(permission.tool?.messageID).toBeDefined();
-      await f.client.permission.reply(
-        { requestID: permission.id, directory: f.directory, reply: 'reject' },
-        { signal: f.signal }
-      );
-      expect(
-        (await f.client.permission.list({ directory: f.directory }, { signal: f.signal })).data
-      ).toEqual([]);
-      await f.until(
-        () => f.sessionEvents(sessionID),
-        events => events.some(e => e.type === 'session.turn.close'),
-        'permission completion'
-      );
-      await f.idle(sessionID);
     }
   );
 

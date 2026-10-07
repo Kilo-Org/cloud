@@ -1000,12 +1000,15 @@ describe('turn resubmission', () => {
 });
 
 describe('turn outcome rules', () => {
-  it('ignores idle until Kilo explicitly completes its turn', async () => {
+  it('does not settle on idle or a superseded close without an explicit completion', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
     h.manager.observeKiloEvent(kiloEvent('session.idle', { sessionID: KILO_SESSION }));
+    h.manager.observeKiloEvent(
+      kiloEvent('session.turn.close', { sessionID: KILO_SESSION, reason: 'superseded' })
+    );
     await settle();
     expect(outcomeFrames(h.frames)).toHaveLength(0);
     expect(h.manager.activeTurnCount() > 0).toBe(true);
@@ -1076,50 +1079,36 @@ describe('turn outcome rules', () => {
     ]);
   });
 
-  it('does not treat a superseded close as completion even after the queue drains', async () => {
-    const h = createHarness();
-    h.registerRoute(routeSpec());
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
+  it('forwards abort to the Kilo route and only cancels an active turn', async () => {
+    const active = createHarness();
+    active.registerRoute(routeSpec());
+    active.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
-    h.manager.observeKiloEvent(
-      kiloEvent('session.turn.close', { sessionID: KILO_SESSION, reason: 'superseded' })
-    );
+    active.manager.abort(SESSION_ID);
     await settle();
-    expect(outcomeFrames(h.frames)).toHaveLength(0);
-    expect(h.manager.activeTurnCount() > 0).toBe(true);
-  });
+    expect(active.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(active.frames)[0]).toMatchObject({
+      status: 'cancelled',
+      lastMessageId: 'm1',
+    });
 
-  it('aborts the Kilo session on an explicit abort and reports cancelled', async () => {
-    const h = createHarness();
-    h.registerRoute(routeSpec());
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    const idle = createHarness();
+    idle.registerRoute(routeSpec());
+    idle.manager.abort(SESSION_ID);
     await settle();
-    h.manager.abort(SESSION_ID);
-    await settle();
-    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
-    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'cancelled', lastMessageId: 'm1' });
-  });
+    expect(idle.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(idle.frames)).toHaveLength(0);
 
-  it('forwards abort to an existing Kilo route without an active turn', async () => {
-    const h = createHarness();
-    h.registerRoute(routeSpec());
-    h.manager.abort(SESSION_ID);
+    const completed = createHarness();
+    completed.registerRoute(routeSpec());
+    completed.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
-    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
-    expect(outcomeFrames(h.frames)).toHaveLength(0);
-  });
-
-  it('forwards abort after completion without changing the terminal outcome', async () => {
-    const h = createHarness();
-    h.registerRoute(routeSpec());
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    completed.manager.observeKiloEvent(completedKiloTurn());
     await settle();
-    h.manager.observeKiloEvent(completedKiloTurn());
+    completed.manager.abort(SESSION_ID);
     await settle();
-    h.manager.abort(SESSION_ID);
-    await settle();
-    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
-    expect(outcomeFrames(h.frames)).toEqual([
+    expect(completed.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(outcomeFrames(completed.frames)).toEqual([
       { type: 'session.outcome', sessionId: SESSION_ID, status: 'completed', lastMessageId: 'm1' },
     ]);
   });
@@ -1157,58 +1146,57 @@ describe('turn outcome rules', () => {
     });
   });
 
-  it('does not complete while a received prompt has not been dispatched', async () => {
-    const h = createHarness();
-    h.registerRoute(routeSpec());
-    const client = h.client(routeSpec());
-    let releaseM1: (() => void) | undefined;
-    client.setPromptImpl(opts =>
-      opts.messageId === 'm1' ? new Promise<void>(r => (releaseM1 = r)) : Promise.resolve()
-    );
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
-    await settle();
-    h.manager.submit(SESSION_ID, promptPayload('m2'));
-    await settle();
-    // m1's Kilo call is still in flight, so m2 is received but not dispatched.
-    h.manager.observeKiloEvent(kiloEvent('session.idle', { sessionID: KILO_SESSION }));
-    await settle();
-    expect(outcomeFrames(h.frames)).toHaveLength(0);
-    expect(h.manager.activeTurnCount() > 0).toBe(true);
-
-    releaseM1?.();
-    await settle();
-    h.manager.observeKiloEvent(completedKiloTurn());
-    await settle();
-    const outcomes = outcomeFrames(h.frames);
-    expect(outcomes).toHaveLength(1);
-    expect(outcomes[0]).toMatchObject({ status: 'completed', lastMessageId: 'm2' });
-  });
-
-  it('does not count a prompt as dispatched until its attachments materialize', async () => {
+  it('does not complete while a prompt has not been dispatched or materialized', async () => {
     let releaseMaterialize: (() => void) | undefined;
-    const h = createHarness({
+    const materializing = createHarness({
       materializeAttachments: () =>
         new Promise(resolve => {
           releaseMaterialize = () => resolve({ prompt: 'hello', parts: [] });
         }),
     });
-    h.registerRoute(routeSpec());
-    const client = h.client(routeSpec());
-    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    materializing.registerRoute(routeSpec());
+    const materializeClient = materializing.client(routeSpec());
+    materializing.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
-    // m1 has not reached Kilo yet, so an idle cannot complete the turn.
-    expect(client.prompts).toHaveLength(0);
-    h.manager.observeKiloEvent(kiloEvent('session.idle', { sessionID: KILO_SESSION }));
+    expect(materializeClient.prompts).toHaveLength(0);
+    materializing.manager.observeKiloEvent(kiloEvent('session.idle', { sessionID: KILO_SESSION }));
     await settle();
-    expect(outcomeFrames(h.frames)).toHaveLength(0);
-    expect(h.manager.activeTurnCount() > 0).toBe(true);
+    expect(outcomeFrames(materializing.frames)).toHaveLength(0);
+    expect(materializing.manager.activeTurnCount() > 0).toBe(true);
 
     releaseMaterialize?.();
     await settle();
-    expect(client.prompts).toHaveLength(1);
-    h.manager.observeKiloEvent(completedKiloTurn());
+    expect(materializeClient.prompts).toHaveLength(1);
+    materializing.manager.observeKiloEvent(completedKiloTurn());
     await settle();
-    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
+    expect(outcomeFrames(materializing.frames)[0]).toMatchObject({
+      status: 'completed',
+      lastMessageId: 'm1',
+    });
+
+    const queued = createHarness();
+    queued.registerRoute(routeSpec());
+    const queuedClient = queued.client(routeSpec());
+    let releaseM1: (() => void) | undefined;
+    queuedClient.setPromptImpl(opts =>
+      opts.messageId === 'm1' ? new Promise<void>(r => (releaseM1 = r)) : Promise.resolve()
+    );
+    queued.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    queued.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    queued.manager.observeKiloEvent(kiloEvent('session.idle', { sessionID: KILO_SESSION }));
+    await settle();
+    expect(outcomeFrames(queued.frames)).toHaveLength(0);
+    expect(queued.manager.activeTurnCount() > 0).toBe(true);
+
+    releaseM1?.();
+    await settle();
+    queued.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    const outcomes = outcomeFrames(queued.frames);
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({ status: 'completed', lastMessageId: 'm2' });
   });
 
   it('does not send a queued prompt after the turn was aborted', async () => {

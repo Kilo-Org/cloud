@@ -192,7 +192,7 @@ describe('native session supervision', () => {
     expect(f.failures[0].reason).toBe('no_progress');
   });
 
-  it('keeps independent tools runnable while questions or idle suggestions wait', () => {
+  it('keeps independent tools runnable while blocking questions wait, but not nonblocking ones', () => {
     const f = fixture();
     f.open();
     f.tool('root', 'question', 'running', 'question');
@@ -203,16 +203,14 @@ describe('native session supervision', () => {
     expect(f.supervisor.needsCompute()).toBe(true);
     f.tool('root', 'bash', 'completed');
     expect(f.supervisor.needsCompute()).toBe(false);
-  });
 
-  it('does not let a nonblocking question without a waiting tool suppress execution', () => {
-    const f = fixture();
-    f.open();
-    f.event('question.asked', { sessionID: 'root', id: 'async', blocking: false });
-    expect(f.supervisor.needsCompute()).toBe(true);
-    f.advance(20 * MINUTE);
-    f.supervisor.tick();
-    expect(f.failures[0].reason).toBe('no_progress');
+    const nonblocking = fixture();
+    nonblocking.open();
+    nonblocking.event('question.asked', { sessionID: 'root', id: 'async', blocking: false });
+    expect(nonblocking.supervisor.needsCompute()).toBe(true);
+    nonblocking.advance(20 * MINUTE);
+    nonblocking.supervisor.tick();
+    expect(nonblocking.failures[0].reason).toBe('no_progress');
   });
 
   it('a parent task waiting on a blocked child permits sleep until independent work resumes', () => {
@@ -281,17 +279,31 @@ describe('native session supervision', () => {
     expect(f.failures).toEqual([]);
   });
 
-  it('rejects stale idle and busy snapshots, including a session completed during the read', () => {
-    const f = fixture();
-    f.open();
-    const token = f.supervisor.beginSnapshot();
-    f.text();
-    f.supervisor.reconcile([observation('root', 'idle')], token);
-    expect(f.supervisor.needsCompute()).toBe(true);
-    const next = f.supervisor.beginSnapshot();
-    f.close();
-    f.supervisor.reconcile([observation()], next);
-    expect(f.supervisor.needsCompute()).toBe(false);
+  it('never resets clocks for repeated snapshots and rejects snapshots staled by native progress', () => {
+    const repeated = fixture();
+    repeated.open();
+    for (let step = 0; step < 20; step++) {
+      repeated.advance(MINUTE);
+      repeated.supervisor.reconcile([observation()], repeated.supervisor.beginSnapshot());
+    }
+    repeated.supervisor.tick();
+    expect(repeated.failures[0].reason).toBe('no_progress');
+
+    const idle = fixture();
+    idle.open();
+    idle.supervisor.reconcile([observation('root', 'idle')], idle.supervisor.beginSnapshot());
+    expect(idle.supervisor.needsCompute()).toBe(false);
+
+    const stale = fixture();
+    stale.open();
+    const token = stale.supervisor.beginSnapshot();
+    stale.text();
+    stale.supervisor.reconcile([observation('root', 'idle')], token);
+    expect(stale.supervisor.needsCompute()).toBe(true);
+    const next = stale.supervisor.beginSnapshot();
+    stale.close();
+    stale.supervisor.reconcile([observation()], next);
+    expect(stale.supervisor.needsCompute()).toBe(false);
   });
 
   it('descendant progress fences an older parent snapshot', () => {
@@ -401,21 +413,6 @@ describe('native session supervision', () => {
     expect(f.supervisor.state('root')).toBeUndefined();
     expect(f.supervisor.state('child')).toBeUndefined();
     expect(f.supervisor.state('sibling')?.activity).toBe('running');
-  });
-
-  it('repairs a missed end and never resets clocks for repeated snapshots', () => {
-    const f = fixture();
-    f.open();
-    for (let step = 0; step < 20; step++) {
-      f.advance(MINUTE);
-      f.supervisor.reconcile([observation()], f.supervisor.beginSnapshot());
-    }
-    f.supervisor.tick();
-    expect(f.failures[0].reason).toBe('no_progress');
-    const other = fixture();
-    other.open();
-    other.supervisor.reconcile([observation('root', 'idle')], other.supervisor.beginSnapshot());
-    expect(other.supervisor.needsCompute()).toBe(false);
   });
 
   it('does not turn a feed gap or a failed snapshot into no_progress', () => {

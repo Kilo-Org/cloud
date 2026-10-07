@@ -9,48 +9,9 @@ import { unfilteredKiloEvents } from '../control/feed.js';
 type ToolCall = { name: string; arguments: Record<string, unknown> };
 export type ModelReply = { text?: string; tools?: ToolCall[]; status?: number };
 
-const evidenceKeys = new Set([
-  'id',
-  'sessionID',
-  'parentID',
-  'directory',
-  'type',
-  'role',
-  'status',
-  'tool',
-  'messageID',
-  'callID',
-  'blocking',
-  'reason',
-  'time',
-  'created',
-  'updated',
-  'completed',
-  'start',
-  'end',
-  'data',
-  'info',
-  'parts',
-  'state',
-  'properties',
-]);
-
-function evidence(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(evidence);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key]) => evidenceKeys.has(key) || key.startsWith('ses_'))
-        .map(([key, item]) => [key, evidence(item)])
-    );
-  }
-  return value;
-}
-
 /** Isolated real-binary fixture: no inherited credentials or user configuration. */
 export async function activityFixture(
   binary: string,
-  name: string,
   options: {
     subagentPermission?: Record<string, 'allow' | 'ask' | 'deny'>;
     modelBaseUrl?: string;
@@ -143,22 +104,12 @@ export async function activityFixture(
   let consume: Promise<void> | undefined;
   const events: Array<{ type: string; properties: Record<string, unknown>; directory?: string }> =
     [];
-  const snapshots: Array<{ label: string; at: number; data: unknown }> = [];
-  const startedAt = Date.now();
   async function dispose() {
     lifetime.abort();
     proc.kill();
     await proc.exited;
     await fake.stop(true);
     await consume?.catch(() => undefined);
-    const evidenceDirectory = process.env.KILO_ACTIVITY_EVIDENCE_DIR;
-    if (evidenceDirectory) {
-      await fsp.mkdir(evidenceDirectory, { recursive: true });
-      await fsp.writeFile(
-        path.join(evidenceDirectory, `${name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.json`),
-        JSON.stringify({ version: '7.8.1', events: evidence(events), snapshots }, null, 2)
-      );
-    }
     await fsp.rm(root, { recursive: true, force: true });
   }
   try {
@@ -193,12 +144,7 @@ export async function activityFixture(
       while (true) {
         signal.throwIfAborted();
         const value = await read();
-        if (predicate(value)) {
-          if (value && typeof value === 'object' && 'data' in value) {
-            snapshots.push({ label, at: Date.now() - startedAt, data: evidence(value.data) });
-          }
-          return value;
-        }
+        if (predicate(value)) return value;
         if (Date.now() >= deadline)
           throw new Error(
             `Timed out: ${label}; events=${events

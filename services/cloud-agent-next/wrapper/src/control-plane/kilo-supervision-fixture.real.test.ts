@@ -23,7 +23,7 @@ suite('shared supervision fake with pinned Kilo 7.8.1', () => {
       const server = await startFakeLlmServer({ host: '127.0.0.1' });
       let fixture: Awaited<ReturnType<typeof activityFixture>> | undefined;
       try {
-        const f = await activityFixture(binary, `shared-supervision-${mode}`, {
+        const f = await activityFixture(binary, {
           modelBaseUrl: `${server.url}/api/openrouter`,
         });
         fixture = f;

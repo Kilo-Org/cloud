@@ -10,9 +10,5 @@ export const VERCEL_AI_GATEWAY = {
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'messages', 'responses'],
   responseTransforms: null,
-  async transformRequest(context) {
-    const { applyVercelSettings } =
-      await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel');
-    await applyVercelSettings(context.model, context.request, context.userByok);
-  },
+  transformRequest() {},
 } as const satisfies Provider;

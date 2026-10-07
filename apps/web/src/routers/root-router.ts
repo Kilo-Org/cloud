@@ -11,6 +11,7 @@ import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
 import { workspaceFoldersRouter } from '@/routers/workspace-folders-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
+import { cloudAgentNextFailuresRouter } from '@/routers/cloud-agent-next-failures-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
 import { platformIntegrationsRouter } from '@/routers/platform-integrations-router';
@@ -74,6 +75,7 @@ export const rootRouter = createTRPCRouter({
   dolthub: dolthubRouter,
   discord: discordRouter,
   cloudAgentNext: cloudAgentNextRouter,
+  cloudAgentNextFailures: cloudAgentNextFailuresRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
   personalReviewAgent: personalReviewAgentRouter,

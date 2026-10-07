@@ -132,19 +132,7 @@ import {
   quick_chat_threads,
   quick_chat_messages,
 } from '@kilocode/db/schema';
-import {
-  eq,
-  and,
-  inArray,
-  isNotNull,
-  isNull,
-  sql,
-  or,
-  gte,
-  count,
-  ne,
-  notExists,
-} from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
@@ -218,62 +206,8 @@ if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
 }
 
-// Per-IP signup rate limit. Two overlapping windows so an IP can absorb a
-// one-off spike (e.g. meetup where 100 people sign up from the same NAT in a
-// single day) while still bounding sustained abuse. Passing requires both:
-//   - <= 100 signups in the last 24h (burst)
-//   - <= 150 signups in the last 30d  (sustained, averages ~5/day)
-// After a full burst day, only ~50 more signups are allowed over the next
-// 29 days, and the burst day must roll out of the 30d window before the IP
-// can spike again.
-const SIGNUP_BURST_MAX = 100;
-const SIGNUP_BURST_WINDOW_MS = 24 * 60 * 60 * 1000;
-const SIGNUP_SUSTAINED_MAX = 150;
-const SIGNUP_SUSTAINED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
 function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
-}
-
-async function countSignupsFromIpSince(
-  signupIp: string,
-  sinceIso: string,
-  tx: DrizzleTransaction
-): Promise<number> {
-  const [result] = await tx
-    .select({ count: count() })
-    .from(kilocode_users)
-    .where(and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, sinceIso)));
-  return result?.count ?? 0;
-}
-
-async function checkSignupIpRateLimit(
-  signupIp: string | null,
-  tx: DrizzleTransaction
-): Promise<Result<null, AuthErrorType>> {
-  if (IS_DEVELOPMENT) return successResult(null);
-  if (!signupIp) return successResult(null);
-
-  const now = Date.now();
-  const burstWindowStart = new Date(now - SIGNUP_BURST_WINDOW_MS).toISOString();
-  const sustainedWindowStart = new Date(now - SIGNUP_SUSTAINED_WINDOW_MS).toISOString();
-
-  const burstCount = await countSignupsFromIpSince(signupIp, burstWindowStart, tx);
-  const sustainedCount = await countSignupsFromIpSince(signupIp, sustainedWindowStart, tx);
-
-  if (burstCount < SIGNUP_BURST_MAX && sustainedCount < SIGNUP_SUSTAINED_MAX) {
-    return successResult(null);
-  }
-
-  console.warn('[auth] Signup rejected due to per-IP rate limit', {
-    ip_address: signupIp,
-    existing_accounts_24h: burstCount,
-    existing_accounts_30d: sustainedCount,
-    max_signups_24h: SIGNUP_BURST_MAX,
-    max_signups_30d: SIGNUP_SUSTAINED_MAX,
-  });
-
-  return failureResult('SIGNUP-RATE-LIMITED');
 }
 
 async function checkNormalizedEmailUnique(
@@ -677,8 +611,8 @@ export async function createOrUpdateUser(
 
   // New user creation path — Stripe customer is created before the DB
   // transaction because stripe_customer_id is NOT NULL. If the transaction
-  // fails (rate limit, constraint violation, etc.) we clean up the Stripe
-  // customer to prevent orphans.
+  // fails (uniqueness rejection, constraint violation, etc.) we clean up the
+  // Stripe customer to prevent orphans.
   const stripeCustomer = await createStripeCustomer({
     email: args.google_user_email,
     name: args.google_user_name,
@@ -718,9 +652,6 @@ export async function createOrUpdateUser(
   let caughtError: unknown;
   try {
     txResult = await db.transaction(async tx => {
-      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
-      if (!signupRateLimitResult.success) return signupRateLimitResult;
-
       const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
       if (!dedupResult.success) return dedupResult;
 
@@ -754,7 +685,7 @@ export async function createOrUpdateUser(
   }
 
   // Clean up the Stripe customer when signup didn't succeed (thrown error
-  // or returned failure like rate-limit rejection).
+  // or returned failure like a normalized-email uniqueness rejection).
   if (!txResult.success) {
     console.info('[auth] Signup creation outcome', {
       operationId,

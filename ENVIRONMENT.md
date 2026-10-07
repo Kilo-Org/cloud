@@ -283,10 +283,18 @@ The connection-role migration preserves a sole eligible connection, prefers an u
   - Signed-in decisions carry the actual actor's `userId` separately from the payer's `accountId`, including organization-paid requests.
   - IP exemptions cover signup and inference; IPv6 covers the whole /64. Signup has no user ID before account creation.
   - Admission and creation logs share the operation ID. They exclude raw email and distinguish completed creation, rejection, and Stripe or transaction failure.
-  - Cloud retains its local limits: 100 accounts per IP in 24 hours and 150 in 30 days. Existing authentication and identity guards remain unchanged.
+  - Bouncer owns signup admission. Cloud keeps `signup_ip` as evidence and retains all authentication and identity guards.
   - Deploy Bouncer first with `enforcement.signup=false`. Both `enforcement.signup` and the global `enforcement.enabled` switch must be on to reject signups.
   - Bouncer counts admissions, including failed creations. Imported history counts completed accounts. Limits and window lengths are configurable in the Bouncer admin panel.
-  - Import history and catch up overlapping traffic before the cutover. Only Igor enables signup enforcement. Verify enforced rejection before removing Cloud's local limiter.
+  - Deploy the first integration PR fully before this ownership cutover. Its existing Cloud limiter protects the historical import.
+  - From this checked-out cutover branch, run `pnpm --filter web script:run db import-signup-history` with the production script environment.
+  - The importer reads completed accounts from the last 30 days through a fixed time bound in 100-row pages. It changes no Cloud users.
+  - Each page requires a full Bouncer acknowledgement. Duplicate admissions are safe. Missing or empty IPs match the old limiter's exclusions.
+  - Invalid nonempty IPs, partial acknowledgement, HTTP errors, and saturation stop the import with a nonzero exit.
+  - Run the importer again after all first-PR instances deploy. For an incremental catch-up, append the previous run's `through` timestamp.
+  - After full acknowledgement and catch-up, only Igor enables both signup enforcement switches. Check shadow flags before enabling enforcement.
+  - Verify allowed and rejected signups with live configuration before merging and deploying the ownership cutover PR.
+  - After the cutover, Bouncer failure deliberately fails open. Revert the cutover PR to restore the old Cloud limiter.
   - Signed-in decide requests carry the payer's `created_at`, `microdollars_used`, and `total_microdollars_acquired` (the organization's for an org request); `charge.attempted` carries the payer's `microdollars_used`.
   - Usage reports have a 30-second transport budget and carry the request's charged `costMicrodollars`. Every inference endpoint reports its API kind, with the same request id as its decide.
   - When the decide verdict says `spendWatch`, the usage event enters the durable `bouncer_usage_event_outbox` in the usage-write transaction, is delivered immediately after commit, and is retried by the cron drainer (eight attempts; delivered rows kept 1 day, failed rows 7 days).

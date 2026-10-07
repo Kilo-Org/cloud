@@ -710,20 +710,28 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(mockClosedPtys).toEqual([]);
   });
 
-  it('clears changes when the last chat closes before its session atoms are cleared', () => {
+  it('keeps workspace changes available when the last chat closes and its session atoms clear', () => {
     render();
     const terminal = openTerminal();
     openChanges();
 
     mockSessionId = null;
     render();
-    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
-    expect(dom.container.querySelector('[data-changes-trigger]')).toBeNull();
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    expect(dom.container.querySelector('[data-changes-trigger]')).not.toBeNull();
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+
+    mockAtomValues.sessionId = null;
+    mockAtomValues.fetchedSessionData = null;
+    render();
+    const workspaceChanges = openChanges();
+    expect(workspaceChanges?.getAttribute('data-changes-owner')).toBe('workspace_recent');
     expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
     expect(mockClosedPtys).toEqual([]);
 
     mockSessionId = 'ses_recent';
-    render();
+    resolveSession('worktree_shared');
     expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
   });
 

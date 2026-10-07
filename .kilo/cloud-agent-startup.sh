@@ -26,8 +26,19 @@ if (( EUID != 0 )); then
 fi
 
 "${root[@]}" apt-get update
+docker_packages=(docker.io)
+for package in docker-cli docker-buildx; do
+  if apt-cache show "$package" >/dev/null 2>&1; then
+    docker_packages+=("$package")
+  fi
+done
+if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
+  docker_packages+=(docker-compose-v2)
+else
+  docker_packages+=(docker-compose)
+fi
 "${root[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  ca-certificates chromium curl git git-lfs openssl sudo unzip tmux docker.io docker-compose
+  ca-certificates chromium curl git git-lfs openssl sudo unzip tmux "${docker_packages[@]}"
 
 if ! command -v node >/dev/null || [[ $(node -p 'process.versions.node.split(".")[0]') != 24 ]]; then
   printf 'The sandbox image must provide Node.js 24 and Corepack before running this script.\n' >&2
@@ -92,11 +103,12 @@ if (!stdinDockerfile) {
   process.stdin.on('data', chunk => { dockerfile += chunk; });
   process.stdin.on('end', () => {
     const cert = fs.readFileSync(process.env.NODE_EXTRA_CA_CERTS).toString('base64');
-    dockerfile = dockerfile.replace(/^FROM (?:docker.io\/library\/)?docker:dind-rootless/m,
-      'FROM mirror.gcr.io/library/docker:dind-rootless');
     // Trust the sandbox's HTTPS interception CA inside development images, not production sources.
+    const trust = `RUN mkdir -p /usr/local/share/ca-certificates && printf '%s' '${cert}' | base64 -d > /usr/local/share/ca-certificates/kilo-sandbox.crt && (command -v update-ca-certificates || (apt-get update && apt-get install -y --no-install-recommends ca-certificates)) && update-ca-certificates\nENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/kilo-sandbox.crt`;
+    dockerfile = dockerfile.replace(/^FROM (?:docker.io\/library\/)?(docker:dind-rootless|debian:trixie-slim)([^\n]*)/gm,
+      (_, image, suffix) => `FROM mirror.gcr.io/library/${image}${suffix}\nUSER root\n${trust}`);
     dockerfile = dockerfile.replace(/^FROM (?:docker.io\/)?cloudflare\/sandbox:[^\n]+/m, from =>
-      `${from}\nRUN mkdir -p /usr/local/share/ca-certificates && printf '%s' '${cert}' | base64 -d > /usr/local/share/ca-certificates/kilo-sandbox.crt && update-ca-certificates\nENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/kilo-sandbox.crt`);
+      `${from}\n${trust}`);
     run(dockerfile);
   });
 }

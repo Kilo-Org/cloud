@@ -6,7 +6,6 @@ CREATE TABLE "reasoning_setting" (
 DROP VIEW "public"."microdollar_usage_view";--> statement-breakpoint
 ALTER TABLE "microdollar_usage_metadata" ADD COLUMN "reasoning_setting_id" integer;--> statement-breakpoint
 CREATE UNIQUE INDEX "UQ_reasoning_setting" ON "reasoning_setting" USING btree ("reasoning_setting");--> statement-breakpoint
-ALTER TABLE "microdollar_usage_metadata" ADD CONSTRAINT "microdollar_usage_metadata_reasoning_setting_id_reasoning_setting_reasoning_setting_id_fk" FOREIGN KEY ("reasoning_setting_id") REFERENCES "public"."reasoning_setting"("reasoning_setting_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE VIEW "public"."microdollar_usage_view" AS (
   SELECT
     mu.id,

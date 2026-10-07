@@ -2807,7 +2807,7 @@ export const microdollar_usage_metadata = pgTable(
     session_id: text(),
     mode_id: integer(),
     auto_model_id: integer(),
-    reasoning_setting_id: integer().references(() => reasoning_setting.reasoning_setting_id),
+    reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),

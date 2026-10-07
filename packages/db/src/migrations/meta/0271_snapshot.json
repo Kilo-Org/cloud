@@ -1,5 +1,5 @@
 {
-  "id": "79b79562-aba6-4b3c-800f-d7bf2cf1c3a7",
+  "id": "4310989a-94fd-4cd0-814c-e50815652819",
   "prevId": "3280dff3-e08e-4cff-a55b-4f6f269b4c48",
   "version": "7",
   "dialect": "postgresql",
@@ -26630,19 +26630,6 @@
           ],
           "columnsTo": [
             "system_prompt_prefix_id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "microdollar_usage_metadata_reasoning_setting_id_reasoning_setting_reasoning_setting_id_fk": {
-          "name": "microdollar_usage_metadata_reasoning_setting_id_reasoning_setting_reasoning_setting_id_fk",
-          "tableFrom": "microdollar_usage_metadata",
-          "tableTo": "reasoning_setting",
-          "columnsFrom": [
-            "reasoning_setting_id"
-          ],
-          "columnsTo": [
-            "reasoning_setting_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"

@@ -686,6 +686,8 @@ function readAssignments(file: string): Map<string, string> {
   return assignments;
 }
 
+const GATEWAY_ONLY_ENV_VARS = new Set(['VERCEL_SUPPORT_LARGE_REQUEST_BODY']);
+
 void test('ai-gateway production env file is tracked and matches apps/web/.env', () => {
   const repoRoot = findRepoRoot();
   assert.ok(trackedEnvFiles(repoRoot).includes('apps/ai-gateway/.env.production'));
@@ -694,6 +696,7 @@ void test('ai-gateway production env file is tracked and matches apps/web/.env',
   const gateway = readAssignments(path.join(repoRoot, 'apps/ai-gateway/.env.production'));
   assert.ok(gateway.size > 0);
   for (const [name, value] of gateway) {
+    if (GATEWAY_ONLY_ENV_VARS.has(name)) continue;
     assert.equal(value, web.get(name), `${name} must match apps/web/.env`);
   }
 });

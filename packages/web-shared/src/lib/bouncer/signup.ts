@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { createHash } from 'crypto';
 
 /** Shared by live admission and history import; never send the normalized email to Bouncer. */

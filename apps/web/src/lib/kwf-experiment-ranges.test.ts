@@ -14,14 +14,14 @@ describe('range', () => {
   });
 
   it('rejects a zero step instead of looping forever', () => {
-    expect(() => range(0, 6, 0)).toThrow('range step must be a positive integer');
+    expect(() => range(0, 6, 0)).toThrow('range: step must be a positive integer, got 0');
   });
 
   it('rejects a negative step instead of looping forever', () => {
-    expect(() => range(0, 6, -1)).toThrow('range step must be a positive integer');
+    expect(() => range(0, 6, -1)).toThrow('range: step must be a positive integer, got -1');
   });
 
   it('rejects a non-integer step', () => {
-    expect(() => range(0, 6, 0.5)).toThrow('range step must be a positive integer');
+    expect(() => range(0, 6, 0.5)).toThrow('range: step must be a positive integer, got 0.5');
   });
 });

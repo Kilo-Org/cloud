@@ -10,7 +10,7 @@
  */
 export function range(start: number, end: number, step = 1): number[] {
   if (!Number.isInteger(step) || step <= 0) {
-    throw new Error(`range step must be a positive integer, received ${step}`);
+    throw new Error(`range: step must be a positive integer, got ${step}`);
   }
   const values: number[] = [];
   for (let value = start; value <= end; value += step) {

@@ -1,6 +1,6 @@
 /**
  * Single implementation of the post-response scheduling helper used by
- * provider-webhook and store-notification paths. Errors go to Sentry.
+ * provider-webhook and store-notification paths.
  */
 import 'server-only';
 

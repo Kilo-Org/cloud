@@ -45,6 +45,7 @@ if (( ${#tools[@]} )); then
 fi
 export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 export AGENT_BROWSER_SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-/tmp/kilo-browser}"
+export AGENT_BROWSER_ARGS="${AGENT_BROWSER_ARGS:---disable-gpu}"
 
 if ! docker info >/dev/null 2>&1; then
   if [[ -n ${DOCKER_HOST:-} ]] || [[ -S /var/run/docker.sock ]]; then
@@ -91,6 +92,8 @@ if (!stdinDockerfile) {
   process.stdin.on('data', chunk => { dockerfile += chunk; });
   process.stdin.on('end', () => {
     const cert = fs.readFileSync(process.env.NODE_EXTRA_CA_CERTS).toString('base64');
+    dockerfile = dockerfile.replace(/^FROM (?:docker.io\/library\/)?docker:dind-rootless/m,
+      'FROM mirror.gcr.io/library/docker:dind-rootless');
     // Trust the sandbox's HTTPS interception CA inside development images, not production sources.
     dockerfile = dockerfile.replace(/^FROM (?:docker.io\/)?cloudflare\/sandbox:[^\n]+/m, from =>
       `${from}\nRUN mkdir -p /usr/local/share/ca-certificates && printf '%s' '${cert}' | base64 -d > /usr/local/share/ca-certificates/kilo-sandbox.crt && update-ca-certificates\nENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/kilo-sandbox.crt`);
@@ -115,6 +118,14 @@ if [[ ! -s .env.local ]]; then
   (umask 077; pnpm dev:setup-env --ci)
   printf 'Created local-only credentials. Real payment, model, and Git integrations require supplied secrets.\n'
 fi
+node -e '
+  const fs = require("node:fs");
+  const match = fs.readFileSync(".env.local", "utf8").match(/^POSTGRES_URL\s*=\s*(.*)$/m);
+  const value = process.env.POSTGRES_URL || match?.[1].trim().replace(/^(["\x27])(.*)\1$/, (_, quote, inner) => inner);
+  if (!value || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(value).hostname)) {
+    throw new Error("Sandbox startup requires a local POSTGRES_URL; remote databases will not be migrated or seeded");
+  }
+'
 
 # Avoid Docker Hub's shared unauthenticated pull limit without changing Compose files.
 while IFS= read -r image; do
@@ -130,7 +141,19 @@ done < <(docker compose -f dev/docker-compose.yml config --images | sort -u)
 if (( $# == 0 )); then
   set -- cloud-agent
 fi
-pnpm dev:start --no-attach --reuse-running "$@"
+mkdir -p .wrangler/kilo-startup
+selection=$(printf '%s\n' "$@")
+status=$(pnpm -s dev:status --json)
+if node -e 'process.exit(JSON.parse(process.argv[1]).services.length ? 0 : 1)' "$status"; then
+  if [[ ! -f .wrangler/kilo-startup/selection || $(< .wrangler/kilo-startup/selection) != "$selection" ]]; then
+    printf 'A different dev stack is already running. Stop it with pnpm dev:stop before changing the selection.\n' >&2
+    exit 1
+  fi
+  printf 'Reusing this sandbox startup script\x27s existing dev stack.\n'
+else
+  pnpm dev:start --no-attach "$@"
+  printf '%s\n' "$selection" > .wrangler/kilo-startup/selection
+fi
 pnpm test:db
 
 web_port=$(node -e '
@@ -155,10 +178,43 @@ if [[ $ready != true ]]; then
   exit 1
 fi
 
+if node -e 'const m = require("./dev/logs/manifest.json"); process.exit(m.services.some(s => s.name === "cloud-agent-next") ? 0 : 1)'; then
+  ready=false
+  for (( attempt=0; attempt<450; attempt++ )); do
+    if grep -Fq 'Container image(s) ready' dev/logs/cloud-agent-next.log; then
+      ready=true
+      break
+    fi
+    if grep -Fq '[ERROR]' dev/logs/cloud-agent-next.log; then
+      printf 'Cloud Agent image preparation failed. See dev/logs/cloud-agent-next.log.\n' >&2
+      exit 1
+    fi
+    sleep 2
+  done
+  if [[ $ready != true ]]; then
+    printf 'Cloud Agent images did not become ready within 15 minutes. See dev/logs/cloud-agent-next.log.\n' >&2
+    exit 1
+  fi
+fi
+
+test_email="kilo-$(basename "$HOME")-$(date -u +%Y%m%d%H%M%S)@example.com"
+test_user_id=$(docker compose -f dev/docker-compose.yml exec -T postgres \
+  psql -U postgres -d postgres -X -qAt -v ON_ERROR_STOP=1 -v email="$test_email" <<'SQL'
+INSERT INTO kilocode_users (
+  id, google_user_email, google_user_name, google_user_image_url, hosted_domain,
+  stripe_customer_id, completed_welcome_form, has_validation_stytch, customer_source
+) VALUES (
+  gen_random_uuid()::text, :'email', 'Sandbox Test User', '', '@@fake@@',
+  'cus_local_sandbox', true, true, 'dev-seed'
+) RETURNING id;
+SQL
+)
+pnpm dev:seed app:add-credits "$test_user_id" 100 --free
+
 pnpm dev:status --json
-printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=kilo-%s-%s%%2Bstytchpass@example.com&callbackPath=/profile\n' \
-  "$web_url" "$web_url" "$(basename "$HOME")" "$(date -u +%Y%m%d%H%M%S)"
-printf 'Browser setup: export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium AGENT_BROWSER_SOCKET_DIR=%q\n' "$AGENT_BROWSER_SOCKET_DIR"
+printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=%s&callbackPath=/profile\n' \
+  "$web_url" "$web_url" "$test_email"
+printf 'Browser setup: export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q\n' "$AGENT_BROWSER_SOCKET_DIR" "$AGENT_BROWSER_ARGS"
 printf 'Browser: agent-browser open <login-url>, then agent-browser snapshot -i\n'
 printf 'Cloud Agent testing: select kilo/fake-deterministic for local inference; real inference needs provider credentials.\n'
 printf 'Manage services with pnpm dev:status, pnpm dev:restart <service>, and pnpm dev:stop.\n'

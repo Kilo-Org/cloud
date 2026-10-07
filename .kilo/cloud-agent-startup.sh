@@ -8,6 +8,8 @@ export CI=true
 export KILO_PORT_OFFSET="${KILO_PORT_OFFSET:-auto}"
 export NEXT_TELEMETRY_DISABLED=1
 export SKIP_STRIPE_API="${SKIP_STRIPE_API:-true}"
+export GOMAXPROCS="${GOMAXPROCS:-2}"
+export RAYON_NUM_THREADS="${RAYON_NUM_THREADS:-2}"
 
 if [[ $(uname -s) != Linux ]] || ! command -v apt-get >/dev/null; then
   printf 'This startup script requires a Debian/Ubuntu Linux sandbox.\n' >&2
@@ -65,8 +67,8 @@ fi
 docker compose version
 export WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST=1
 if [[ -n ${NODE_EXTRA_CA_CERTS:-} && -f $NODE_EXTRA_CA_CERTS ]]; then
-  mkdir -p dev/logs
-  export WRANGLER_DOCKER_BIN="$PWD/dev/logs/sandbox-docker.cjs"
+  mkdir -p .wrangler/kilo-startup
+  export WRANGLER_DOCKER_BIN="$PWD/.wrangler/kilo-startup/sandbox-docker.cjs"
   cat > "$WRANGLER_DOCKER_BIN" <<'JS'
 #!/usr/bin/env node
 const fs = require('node:fs');
@@ -100,6 +102,8 @@ JS
 fi
 if tmux list-sessions >/dev/null 2>&1; then
   tmux set-environment -g WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST 1
+  tmux set-environment -g GOMAXPROCS "$GOMAXPROCS"
+  tmux set-environment -g RAYON_NUM_THREADS "$RAYON_NUM_THREADS"
   if [[ -n ${WRANGLER_DOCKER_BIN:-} ]]; then
     tmux set-environment -g WRANGLER_DOCKER_BIN "$WRANGLER_DOCKER_BIN"
     tmux set-environment -g NODE_EXTRA_CA_CERTS "$NODE_EXTRA_CA_CERTS"
@@ -152,7 +156,7 @@ if [[ $ready != true ]]; then
 fi
 
 pnpm dev:status --json
-printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=kilo-%s-%s@example.com&callbackPath=/profile\n' \
+printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=kilo-%s-%s%%2Bstytchpass@example.com&callbackPath=/profile\n' \
   "$web_url" "$web_url" "$(basename "$HOME")" "$(date -u +%Y%m%d%H%M%S)"
 printf 'Browser setup: export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium AGENT_BROWSER_SOCKET_DIR=%q\n' "$AGENT_BROWSER_SOCKET_DIR"
 printf 'Browser: agent-browser open <login-url>, then agent-browser snapshot -i\n'

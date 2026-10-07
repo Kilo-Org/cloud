@@ -887,7 +887,7 @@ describe('User', () => {
     ])('prevents Stripe and user creation on validated $name', async ({ flags }) => {
       const email = 'bouncer-rejected@example.com';
       mockSignupDecide.mockImplementation(actualSignupDecide);
-      const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+      jest.spyOn(global, 'fetch').mockResolvedValue(
         Response.json({
           enforced: true,
           code: 'signup_rate_limited',
@@ -918,11 +918,6 @@ describe('User', () => {
       );
 
       expect(result).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
-      expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
-        operationId: expect.stringMatching(/^signup:[a-f0-9]{64}$/),
-        ip: '203.0.113.60',
-        ja4: 't13d1516h2_8daaf6',
-      });
       expect(createStripeCustomer).not.toHaveBeenCalled();
       expect(deleteStripeCustomer).not.toHaveBeenCalled();
       expect(

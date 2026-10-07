@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Alefaso fampitandremana amin'ny mailaka na push ho an'ny mpifandray amin'ny faktiora rehefa mihoatra fetra ny fandaniana amin'ity faritra ity na miakatra ambonin'ny taha isan'ora mahazatra.",
-    "enable": "Velomy ny fampitandremana momba ny fandaniana",
     "thresholdTitle": "Fihoaram-bidy",
     "thresholdSubtitle": "Mihoatra ny fetranao ny fandaniana mitohy",
     "anomalyTitle": "Fitsambikinana isan'ora",

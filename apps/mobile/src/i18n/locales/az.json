@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Bu əhatənin xərci həddi aşdıqda və ya adi saatlıq sürətindən yuxarı sıçradıqda ödəniş əlaqələrinə e-poçt və ya push ilə bildiriş göndər.",
-    "enable": "Xərc bildirişlərini aktivləşdir",
     "thresholdTitle": "Həddin aşılması",
     "thresholdSubtitle": "Yığılan xərc limitini aşır",
     "anomalyTitle": "Saatlıq sıçrayış",

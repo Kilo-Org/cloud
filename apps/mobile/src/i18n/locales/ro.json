@@ -3302,7 +3302,6 @@
   },
   "spendAlerts": {
     "subtitle": "Trimite o alertă prin e-mail sau push către contactele de facturare când cheltuielile acestui domeniu depășesc o limită sau sar peste ritmul orar obișnuit.",
-    "enable": "Activează alertele de cheltuieli",
     "thresholdTitle": "Depășirea pragului",
     "thresholdSubtitle": "Cheltuielile cumulate depășesc limita ta",
     "anomalyTitle": "Vârf orar",

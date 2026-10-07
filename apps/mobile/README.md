@@ -39,6 +39,8 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Expo's scene delegate creates the window and forwards lifecycle events and links to the app delegate.
 - After a native config change, regenerate the iOS project and rebuild the app.
 - Do not edit the generated `ios/` files.
+- Sign local simulator builds with an Apple Development identity and its correct team ID.
+- Unsigned builds cannot restore the local account from the keychain on this simulator.
 - Check both displays, all three fold poses, and each orientation after the rebuild.
 - When the app moves to Expo SDK 58, remove the scene support option; its template includes scene support.
 

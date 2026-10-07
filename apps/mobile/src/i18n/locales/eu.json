@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Bidali alerta bat posta elektronikoz edo push bidez fakturatze-kontaktuei, eremu honen gastuak muga bat gainditzen duenean edo bere ohiko ordu-tasaren gainetik igotzen denean.",
-    "enable": "Gaitu gastu-alertak",
     "thresholdTitle": "Atalasaren gainditzea",
     "thresholdSubtitle": "Metatutako gastuak zure muga gainditzen du",
     "anomalyTitle": "Orduko gorakada",

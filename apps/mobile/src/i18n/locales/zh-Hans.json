@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "当此范围的支出超过限额或高于其平时每小时速率时，通过邮件或推送向账单联系人发送提醒。",
-    "enable": "启用支出提醒",
     "thresholdTitle": "阈值突破",
     "thresholdSubtitle": "累计支出超过你的限额",
     "anomalyTitle": "每小时激增",

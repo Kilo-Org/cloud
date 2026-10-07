@@ -3431,7 +3431,6 @@
   },
   "spendAlerts": {
     "subtitle": "Anfon rhybudd drwy e-bost neu wthiad at y cysylltiadau bilio pan fo gwariant y cwmpas hwn yn croesi terfyn neu'n codi uwchlaw ei gyfradd awr arferol.",
-    "enable": "Galluogi rhybuddion gwariant",
     "thresholdTitle": "Croesi trothwy",
     "thresholdSubtitle": "Mae gwariant crynodedig yn croesi dy derfyn",
     "anomalyTitle": "Sbig awr",

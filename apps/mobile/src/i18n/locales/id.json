@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Kirim peringatan lewat email atau push ke kontak penagihan saat pengeluaran cakupan ini melewati batas atau melonjak di atas laju per jam biasanya.",
-    "enable": "Aktifkan peringatan pengeluaran",
     "thresholdTitle": "Melewati ambang batas",
     "thresholdSubtitle": "Pengeluaran berjalan melewati batas kamu",
     "anomalyTitle": "Lonjakan per jam",

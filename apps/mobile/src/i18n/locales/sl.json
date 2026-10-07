@@ -3345,7 +3345,6 @@
   },
   "spendAlerts": {
     "subtitle": "Pošlji opozorilo po e-pošti ali push sporočilu obračunskim stikom, ko poraba tega obsega preseže omejitev ali skoči nad običajno urno stopnjo.",
-    "enable": "Omogoči opozorila o porabi",
     "thresholdTitle": "Preseganje praga",
     "thresholdSubtitle": "Tekoča poraba presega tvojo omejitev",
     "anomalyTitle": "Urni skok",

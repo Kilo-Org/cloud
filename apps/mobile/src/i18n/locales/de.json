@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
-    "enable": "Ausgaben-Warnungen aktivieren",
     "thresholdTitle": "Schwellenwertüberschreitung",
     "thresholdSubtitle": "Laufende Ausgaben überschreiten dein Limit",
     "anomalyTitle": "Stündliche Spitze",

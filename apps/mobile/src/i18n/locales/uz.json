@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Bu sohaning xarajati chegaradan oshganda yoki odatdagi soatlik sur'atidan yuqoriga ko'tarilganda to'lov bo'yicha kontaktlarga email yoki push orqali bildirishnoma yubor.",
-    "enable": "Xarajat bildirishnomalarini yoqish",
     "thresholdTitle": "Chegaradan oshish",
     "thresholdSubtitle": "Joriy xarajat limitingizdan oshib ketdi",
     "anomalyTitle": "Soatlik ko'tarilish",

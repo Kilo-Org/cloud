@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Envía unha alerta por correo ou notificación push aos contactos de facturación cando o gasto deste ámbito supere un límite ou se dispare por riba do seu ritmo horario habitual.",
-    "enable": "Activar as alertas de gasto",
     "thresholdTitle": "Superación do limiar",
     "thresholdSubtitle": "O gasto acumulado supera o teu límite",
     "anomalyTitle": "Pico por hora",

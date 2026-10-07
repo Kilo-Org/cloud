@@ -3388,7 +3388,6 @@
   },
   "spendAlerts": {
     "subtitle": "Ibgħat twissija bil-posta elettronika jew push lill-kuntatti tal-ħlasijiet meta l-infiq ta' dan il-kamp jinqabeż limitu jew jogħla 'l fuq mir-rata tas-siegħa tas-soltu.",
-    "enable": "Attiva t-twissijiet tal-infiq",
     "thresholdTitle": "Qbiż tal-limitu",
     "thresholdSubtitle": "L-infiq attwali jaqbeż il-limitu tiegħek",
     "anomalyTitle": "Żieda fis-siegħa",

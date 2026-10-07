@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Tukuna he matohi mā te īmēra, mā te push rānei ki ngā hoapā nama ina whiti te whakapaunga o tēnei rohe i tētahi paepae, ina piki rānei ki runga ake i tōna tere ia hāora.",
-    "enable": "Whakahohea ngā matohi whakapaunga",
     "thresholdTitle": "Whitinga paepae",
     "thresholdSubtitle": "Kei te whiti te whakapaunga haere tonu i tō paepae",
     "anomalyTitle": "Pikinga ia hāora",

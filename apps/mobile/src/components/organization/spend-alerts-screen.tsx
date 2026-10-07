@@ -432,7 +432,7 @@ function SpendAlertsForm({
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
         <Text className="text-sm font-medium">{t('notifications.channel.spend')}</Text>
         <Switch
-          accessibilityLabel={t('spendAlerts.enable')}
+          accessibilityLabel={t('notifications.channel.spend')}
           value={enabled}
           onValueChange={value => {
             void Haptics.selectionAsync();

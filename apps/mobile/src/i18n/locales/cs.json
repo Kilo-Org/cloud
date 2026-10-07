@@ -3345,7 +3345,6 @@
   },
   "spendAlerts": {
     "subtitle": "Pošli e-mailem nebo push oznámením upozornění fakturačním kontaktům, když útrata tohoto rozsahu překročí limit nebo vyskočí nad obvyklou hodinovou sazbu.",
-    "enable": "Povolit upozornění na útratu",
     "thresholdTitle": "Překročení prahu",
     "thresholdSubtitle": "Průběžná útrata překračuje tvůj limit",
     "anomalyTitle": "Hodinová špička",

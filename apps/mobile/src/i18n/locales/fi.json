@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Lähetä laskutusyhteyshenkilöille sähköposti- tai push-varoitus, kun tämän alueen kulutus ylittää rajan tai nousee tavanomaisen tuntitahdin yläpuolelle.",
-    "enable": "Ota kulutusvaroitukset käyttöön",
     "thresholdTitle": "Rajan ylitys",
     "thresholdSubtitle": "Juokseva kulutus ylittää rajasi",
     "anomalyTitle": "Tunneittainen piikki",

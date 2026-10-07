@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Hantar amaran melalui e-mel atau push kepada kenalan pengebilan apabila perbelanjaan skop ini melepasi had atau melonjak melebihi kadar setiap jam biasanya.",
-    "enable": "Dayakan amaran perbelanjaan",
     "thresholdTitle": "Melepasi ambang",
     "thresholdSubtitle": "Perbelanjaan berjalan melepasi had anda",
     "anomalyTitle": "Lonjakan setiap jam",

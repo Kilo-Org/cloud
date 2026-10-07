@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Voye yon alèt pa imèl oswa push bay kontak fakti yo lè depans sektè sa a depase yon limit oswa monte pi wo pase vitès èdtan abityèl li.",
-    "enable": "Aktive alèt depans yo",
     "thresholdTitle": "Depasman papòt",
     "thresholdSubtitle": "Depans aktyèl la depase limit ou",
     "anomalyTitle": "Ogmantasyon chak èdtan",

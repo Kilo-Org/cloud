@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Fi ìkìlọ̀ ránṣẹ́ nípasẹ̀ ímeèlì tàbí push sí àwọn olùbáṣepọ̀ ìsanwó nígbà tí ìnáwó ẹ̀ka yìí bá kọjá ààlà tàbí gòkè ju ìwọ̀n wákàtí tó máa ń ṣe lọ.",
-    "enable": "Tan àwọn ìkìlọ̀ ìnáwó",
     "thresholdTitle": "Ìkọjá ààlà",
     "thresholdSubtitle": "Ìnáwó tí ń lọ kọjá ààlà rẹ",
     "anomalyTitle": "Ìgbésókè lójú wákàtí",

@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Bu kapsamın harcaması bir sınırı aştığında veya olağan saatlik hızının üzerine çıktığında faturalandırma kişilerine e-posta veya push ile uyarı gönder.",
-    "enable": "Harcama uyarılarını etkinleştir",
     "thresholdTitle": "Eşik aşımı",
     "thresholdSubtitle": "Cari harcama limitini aşıyor",
     "anomalyTitle": "Saatlik artış",

@@ -3345,7 +3345,6 @@
   },
   "spendAlerts": {
     "subtitle": "Siųsk įspėjimą el. paštu arba push pranešimu atsiskaitymo kontaktams, kai šios srities išlaidos viršija limitą arba pakyla virš įprasto valandinio tempo.",
-    "enable": "Įjungti išlaidų įspėjimus",
     "thresholdTitle": "Slenksčio viršijimas",
     "thresholdSubtitle": "Einamosios išlaidos viršija tavo limitą",
     "anomalyTitle": "Valandinis šuolis",

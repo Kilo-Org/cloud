@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Send en advarsel via e-mail eller push til faktureringskontakterne, når dette områdes forbrug overskrider en grænse eller stiger over den sædvanlige timesats.",
-    "enable": "Aktivér forbrugsadvarsler",
     "thresholdTitle": "Grænseoverskridelse",
     "thresholdSubtitle": "Løbende forbrug overskrider din grænse",
     "anomalyTitle": "Spike pr. time",

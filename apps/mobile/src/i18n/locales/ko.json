@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "이 범위의 지출이 한도를 넘거나 평소 시간당 속도를 크게 웃돌면 청구 담당자에게 이메일 또는 푸시로 알림을 보냅니다.",
-    "enable": "지출 알림 켜기",
     "thresholdTitle": "임계값 초과",
     "thresholdSubtitle": "누적 지출이 한도를 초과합니다",
     "anomalyTitle": "시간당 급증",

@@ -3345,7 +3345,6 @@
   },
   "spendAlerts": {
     "subtitle": "Wyślij alert e-mailem lub powiadomieniem push do kontaktów rozliczeniowych, gdy wydatki tego zakresu przekroczą limit lub wzrosną powyżej zwykłego tempa godzinowego.",
-    "enable": "Włącz alerty o wydatkach",
     "thresholdTitle": "Przekroczenie progu",
     "thresholdSubtitle": "Bieżące wydatki przekraczają twój limit",
     "anomalyTitle": "Skok godzinowy",

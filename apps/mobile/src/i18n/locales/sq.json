@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Dërgo një njoftim me email ose push te kontaktet e faturimit kur shpenzimet e këtij fushëveprimi kalojnë një kufi ose hidhen mbi ritmin e zakonshëm për orë.",
-    "enable": "Aktivizo njoftimet për shpenzimet",
     "thresholdTitle": "Tejkalimi i pragut",
     "thresholdSubtitle": "Shpenzimet rrjedhëse tejkalojnë kufirin tënd",
     "anomalyTitle": "Rritje për orë",

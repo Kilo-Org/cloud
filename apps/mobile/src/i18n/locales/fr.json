@@ -3302,7 +3302,6 @@
   },
   "spendAlerts": {
     "subtitle": "Envoyez une alerte par e-mail ou notification push aux contacts de facturation lorsque les dépenses de ce périmètre dépassent une limite ou s'envolent au-dessus de leur rythme horaire habituel.",
-    "enable": "Activer les alertes de dépenses",
     "thresholdTitle": "Franchissement du seuil",
     "thresholdSubtitle": "Les dépenses cumulées dépassent votre limite",
     "anomalyTitle": "Pic horaire",

@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Email or push an alert to the billing contacts when this scope's own spend crosses a limit or spikes above its usual hourly rate.",
-    "enable": "Enable spend alerts",
     "thresholdTitle": "Threshold crossing",
     "thresholdSubtitle": "This scope's rolling spend over the chosen window crosses your limit",
     "anomalyTitle": "Hourly spike",

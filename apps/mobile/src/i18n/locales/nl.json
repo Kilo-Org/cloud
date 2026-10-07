@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Stuur een e-mail- of pushmelding naar de factuurcontacten wanneer de besteding van dit bereik een limiet overschrijdt of boven het gebruikelijke uurtarief uitstijgt.",
-    "enable": "Bestedingswaarschuwingen inschakelen",
     "thresholdTitle": "Drempeloverschrijding",
     "thresholdSubtitle": "Lopende besteding overschrijdt je limiet",
     "anomalyTitle": "Uurlijkse piek",

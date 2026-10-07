@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụ ọgụgụ awa ya.",
-    "enable": "Gbanye ọkwa gbasara mmefu",
     "thresholdTitle": "Ịgafe oke",
     "thresholdSubtitle": "Mmefu na-aga n'ihu na-agafe oke gị",
     "anomalyTitle": "Mmụba kwa awa",

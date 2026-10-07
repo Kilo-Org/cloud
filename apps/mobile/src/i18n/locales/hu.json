@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Küldj e-mailes vagy push értesítést a számlázási kapcsolatoknak, amikor ennek a hatókörnek a költése átlép egy limitet, vagy a szokásos óránkénti üteme fölé ugrik.",
-    "enable": "Költésfigyelmeztetések engedélyezése",
     "thresholdTitle": "Küszöbátlépés",
     "thresholdSubtitle": "A folyó költés átlépi a limited",
     "anomalyTitle": "Óránkénti kiugrás",

@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
-    "enable": "Aktiveer bestedingswaarskuwings",
     "thresholdTitle": "Oorskryding van drempel",
     "thresholdSubtitle": "Lopende besteding oorskry jou limiet",
     "anomalyTitle": "Uurlikse piek",

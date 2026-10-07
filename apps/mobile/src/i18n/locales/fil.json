@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Magpadala ng babala sa email o push sa mga contact sa pagsingil kapag ang gastos ng saklaw na ito ay lumampas sa limitasyon o tumaas nang higit sa karaniwang rate bawat oras.",
-    "enable": "Paganahin ang mga babala sa gastos",
     "thresholdTitle": "Paglampas sa hangganan",
     "thresholdSubtitle": "Ang kasalukuyang gastos ay lumampas sa iyong limitasyon",
     "anomalyTitle": "Pagtaas bawat oras",

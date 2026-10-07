@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Yeroo baasiin naannoo kanaa daangaa darbu ykn sadarkaa sa'aatii baramaa isaa ol ka'u, qunnamtiiwwan kaffaltiitti imeelii ykn push ergaa.",
-    "enable": "Akeekkachiisa baasii dandeessisi",
     "thresholdTitle": "Daangaa darbuu",
     "thresholdSubtitle": "Baasiin yeroo ammaa daangaa kee darbaa jira",
     "anomalyTitle": "Olka'iinsa sa'aatii",

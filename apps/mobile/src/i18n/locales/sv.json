@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Skicka en varning via e-post eller push till faktureringskontakterna när detta områdes utgifter överskrider en gräns eller stiger över den vanliga timtakten.",
-    "enable": "Aktivera utgiftsvarningar",
     "thresholdTitle": "Gränsöverskridande",
     "thresholdSubtitle": "Löpande utgifter överskrider din gräns",
     "anomalyTitle": "Topp per timme",

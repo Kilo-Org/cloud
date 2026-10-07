@@ -3259,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Thumela isexwayiso nge-imeyili noma nge-push kwabathintwayo bokukhokha lapho ukusetshenziswa kwemali kwalesi sikhathi kweqa umkhawulo noma kukhuphuka ngaphezu kwezinga elivamile lehora.",
-    "enable": "Vula izexwayiso zokusebenzisa imali",
     "thresholdTitle": "Ukweqa umkhawulo",
     "thresholdSubtitle": "Ukusetshenziswa kwemali okwamanje kweqa umkhawulo wakho",
     "anomalyTitle": "Ukukhuphuka ngehora",

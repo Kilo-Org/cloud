@@ -57,6 +57,7 @@ fi
 export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 export AGENT_BROWSER_SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-/tmp/kilo-browser}"
 export AGENT_BROWSER_ARGS="${AGENT_BROWSER_ARGS:---disable-gpu}"
+export AGENT_BROWSER_DEFAULT_TIMEOUT="${AGENT_BROWSER_DEFAULT_TIMEOUT:-120000}"
 
 if ! docker info >/dev/null 2>&1; then
   if [[ -n ${DOCKER_HOST:-} ]] || [[ -S /var/run/docker.sock ]]; then
@@ -223,10 +224,27 @@ SQL
 )
 pnpm dev:seed app:add-credits "$test_user_id" 100 --free
 
-pnpm dev:status --json
+status=$(pnpm -s dev:status --json)
+node -e '
+  const status = JSON.parse(process.argv[1]);
+  const unavailable = status.services.filter(service => service.status !== "up");
+  if (unavailable.length) throw new Error(`Services are not ready: ${unavailable.map(s => s.name).join(", ")}`);
+' "$status"
+printf '%s\n' "$status"
+export KILO_DEV_WEB_URL="$web_url"
+export KILO_TEST_LOGIN_URL="$web_url/users/sign_in?fakeUser=$test_email&callbackPath=/profile"
+printf 'export AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q AGENT_BROWSER_DEFAULT_TIMEOUT=%q KILO_DEV_WEB_URL=%q KILO_TEST_LOGIN_URL=%q\n' \
+  "$AGENT_BROWSER_EXECUTABLE_PATH" "$AGENT_BROWSER_SOCKET_DIR" "$AGENT_BROWSER_ARGS" \
+  "$AGENT_BROWSER_DEFAULT_TIMEOUT" "$KILO_DEV_WEB_URL" "$KILO_TEST_LOGIN_URL" \
+  > .wrangler/kilo-startup/browser.env
+if [[ ${KILO_STARTUP_BROWSER_SMOKE:-true} == true ]]; then
+  agent-browser --session kilo-startup open "$KILO_TEST_LOGIN_URL"
+  agent-browser --session kilo-startup wait --fn 'window.location.pathname === "/profile"'
+  agent-browser --session kilo-startup snapshot -i
+fi
 printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=%s&callbackPath=/profile\n' \
   "$web_url" "$web_url" "$test_email"
-printf 'Browser setup: export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q\n' "$AGENT_BROWSER_SOCKET_DIR" "$AGENT_BROWSER_ARGS"
-printf 'Browser: agent-browser open <login-url>, then agent-browser snapshot -i\n'
+printf 'Browser setup: source .wrangler/kilo-startup/browser.env\n'
+printf 'Browser: agent-browser --session kilo-startup open %q, then agent-browser --session kilo-startup snapshot -i\n' "$KILO_TEST_LOGIN_URL"
 printf 'Cloud Agent testing: select kilo/fake-deterministic for local inference; real inference needs provider credentials.\n'
 printf 'Manage services with pnpm dev:status, pnpm dev:restart <service>, and pnpm dev:stop.\n'

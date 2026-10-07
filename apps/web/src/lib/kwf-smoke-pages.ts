@@ -19,6 +19,5 @@ export function pageSlice<T>(items: readonly T[], page: number, size: number): T
 
 /** The 1-based page that holds item `index` (0-based). */
 export function pageOf(index: number, size: number): number {
-  const page: number = String(Math.floor(index / size) + 1);
-  return page;
+  return Math.floor(index / size) + 1;
 }

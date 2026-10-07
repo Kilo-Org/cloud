@@ -2,9 +2,24 @@
 
 Authenticated `POST /usage` validates the existing usage request contract and
 publishes it to `USAGE_INGEST_QUEUE`, preserving the supplied usage ID. A 202 means
-queue acceptance after `send` resolves. Processing queued events requires a future
-consumer; this publisher does not record usage or deduct credits. No consumer or
-gateway integration is included.
+queue acceptance after `send` resolves, not consumer completion. The same Worker
+consumes shadow events, logs a safe receipt, then acknowledges each message.
+Acknowledged events are removed from the queue: this is not durable recovery
+storage or a billing consumer. Current direct usage writes remain authoritative;
+this Worker does not record usage, deduct credits, or call Vercel. The consumer has
+no mode flag: it always logs and acknowledges messages. The gateway's shadow
+setting controls sending only. Before authoritative queue processing, replace
+receipt-only handling with successful usage persistence before acknowledgement.
+
+Receipts contain only the validated usage ID, queue message ID, delivery attempt
+count, and non-negative event age in milliseconds. Malformed messages log an
+`invalid` receipt without body/schema details and are acknowledged and discarded.
+Acknowledgement follows a successful console call; it does not prove durable log
+storage. If validation or logging throws,
+the handler fails; already acknowledged messages stay acknowledged, while failed
+and later messages use the queue's default bounded retries (three retries, then
+discard without a DLQ). Logs can repeat on redelivery. This stage provides neither
+deduplication nor reconciliation.
 
 The wire schema comes from `@kilocode/usage-contracts` through its package export.
 That package depends only on Zod at runtime; the Worker does not depend on
@@ -16,7 +31,7 @@ auth returns 401. Invalid JSON/schema returns 400, requests or serialized events
 over 120,000 bytes return 413, and enqueue failure returns a generic 503.
 Unrelated paths return 404; other methods on `/usage` return 405.
 
-| Environment | Worker | `USAGE_INGEST_QUEUE` queue |
+| Environment | Worker | Producer and receipt consumer queue |
 |---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging` |
@@ -31,7 +46,13 @@ or `staging`.
 Wrangler 4.135.0 automatically provisions the configured producer queue if it
 does not already exist, then deploys the Worker with its `USAGE_INGEST_QUEUE` binding.
 No dashboard setup or separate queue-create command is required. Subsequent
-deployments reuse the existing queue.
+deployments reuse the existing queue. The same Worker is registered as its consumer
+in each environment, using default batch and retry settings.
+
+Deploy and verify receipt consumption before enabling the gateway's default-off
+shadow publisher. Deploying this consumer can drain an existing backlog, including
+discarding malformed messages. Keep current direct usage writes enabled. Local
+synthetic proof does not confirm hosted delivery; no rollout is performed here.
 
 To deploy directly from the repository root with Wrangler authenticated to the
 account in `wrangler.jsonc`:
@@ -48,8 +69,9 @@ Staging enables its public `workers.dev` URL. After deployment, append `/usage`
 to the hostname shown for `usage-ingest-staging` and use that as the gateway's
 `USAGE_INGEST_URL`. Requests require the dedicated publisher secret above.
 Production keeps `workers_dev: false`; no custom routes or preview URLs are
-configured. These settings do not prevent deployment. The queue can exist
-without a consumer, and publishing does not require database access. See
+configured. These settings do not prevent deployment. This configuration attaches
+the receipt consumer to each environment's producer queue. Publishing and receipt
+handling require no database access. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 
 ## Verify locally
@@ -71,8 +93,10 @@ Worker. The compatibility date matches the repository's pinned workerd runtime.
 
 For local HTTP testing, put a synthetic `USAGE_INGEST_PUBLISH_SECRET` in this
 service's ignored `.dev.vars`, then run `pnpm --filter cloudflare-usage-ingest dev`.
-The queue is simulated locally; receipt verification needs a temporary local
-consumer. Keep tokens and payloads out of logs. Before a future remote rollout,
+The queue is simulated locally and delivered to the shipped `queue()` handler in
+the same Worker. Runtime tests load the actual configured entry for production
+and staging, send synthetic HTTP events, and observe receipts and queue drainage.
+Keep tokens and payloads out of logs. Before a future remote rollout,
 configure a reachable URL and separate dedicated publisher secrets for production
 and staging. The staging `workers.dev` URL is enabled on deployment; production
 public URLs and all preview URLs remain disabled.

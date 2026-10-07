@@ -14,10 +14,12 @@ permissions:
   contents: read
   deployments: read
 
-# Shares the scheduled deploy's group so a gateway deploy never overlaps that
-# environment's migrations.
+# Not the scheduled deploy's `deploy-<env>` group: a group holds one pending
+# run, so the next scheduled deploy would cancel a waiting gateway deploy. The
+# gateway only deploys an already-migrated release, so overlapping a newer
+# release's migrations is the same as the live web app running through them.
 concurrency:
-  group: deploy-${{ inputs.target_environment }}
+  group: deploy-ai-gateway-${{ inputs.target_environment }}
   cancel-in-progress: false
 
 jobs:

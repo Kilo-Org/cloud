@@ -873,11 +873,14 @@ export function findRepoRoot(): string {
 }
 
 export function trackedEnvFiles(repoRoot: string): string[] {
-  return run('git', ['ls-files', '-z', '--', '.env*', 'apps/web/.env*'], { cwd: repoRoot })
+  return run('git', ['ls-files', '-z', '--', '.env*', 'apps/web/.env*', 'apps/ai-gateway/.env*'], {
+    cwd: repoRoot,
+  })
     .split('\0')
     .filter(file => {
       if (!file) return false;
-      const inScope = !file.includes('/') || file.startsWith('apps/web/');
+      const inScope =
+        !file.includes('/') || file.startsWith('apps/web/') || file.startsWith('apps/ai-gateway/');
       const basename = path.basename(file);
       return (
         inScope &&

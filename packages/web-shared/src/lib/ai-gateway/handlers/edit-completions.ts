@@ -181,6 +181,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null,
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,

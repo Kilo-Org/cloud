@@ -37,6 +37,7 @@ import {
   microdollar_usage_daily,
   microdollar_usage_daily_repairs,
   microdollar_usage_metadata,
+  microdollar_usage_view,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
@@ -48,6 +49,7 @@ import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detecti
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { extractReasoningSetting } from './llm-proxy-helpers';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -684,6 +686,7 @@ describe('logMicrodollarUsage', () => {
       session_id: null,
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
       ttfb_ms: null,
     }) satisfies MicrodollarUsageContext;
 
@@ -704,47 +707,72 @@ describe('logMicrodollarUsage', () => {
     throw lastError;
   }
 
-  test('stores usage data and increments user microdollars for positive cost', async () => {
-    const user = await insertTestUser({
-      id: 'test-log-user-1',
-      microdollars_used: 1000,
-      google_user_email: 'test@example.com',
-    });
+  test.each([
+    {
+      name: 'Messages thinking',
+      body: { thinking: { type: 'enabled', budget_tokens: 32_000 } },
+      expected: 'thinking:enabled:le64k',
+    },
+    { name: 'chat effort', body: { reasoning_effort: 'high' }, expected: 'effort:high' },
+    { name: 'no reasoning', body: {}, expected: null },
+  ])(
+    'stores usage data and increments user microdollars for $name',
+    async ({ name, body, expected }) => {
+      const user = await insertTestUser({
+        id: `test-log-user-${name}`,
+        microdollars_used: 1000,
+        google_user_email: `test-${name.replaceAll(' ', '-')}@example.com`,
+      });
 
-    const usageStats = BASE_USAGE_STATS;
-    const usageContext = createBaseUsageContext(user);
+      const usageStats = { ...BASE_USAGE_STATS, messageId: `test-msg-${name}` };
+      const usageContext = {
+        ...createBaseUsageContext(user),
+        reasoning_setting: extractReasoningSetting(body),
+      };
 
-    await logMicrodollarUsage(usageStats, usageContext);
+      await logMicrodollarUsage(usageStats, usageContext);
 
-    const updatedUser = await findUserById('test-log-user-1');
-    expect(updatedUser?.microdollars_used).toBe(1500); // 1000 + 500
+      const updatedUser = await findUserById(user.id);
+      expect(updatedUser?.microdollars_used).toBe(1500); // 1000 + 500
 
-    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
-      where: eq(microdollar_usage_metadata.message_id, 'test-msg-123'),
-    });
-    expect(metadataRecord).toBeTruthy();
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.message_id, usageStats.messageId),
+      });
+      expect(metadataRecord).toBeTruthy();
 
-    const usageRecord = await db.query.microdollar_usage.findFirst({
-      where: eq(microdollar_usage.id, metadataRecord!.id),
-    });
-    expect(usageRecord).toBeTruthy();
-    expect(usageRecord?.kilo_user_id).toBe('test-log-user-1');
-    expect(usageRecord?.cost).toBe(500);
-    expect(usageRecord?.input_tokens).toBe(100);
-    expect(usageRecord?.output_tokens).toBe(50);
-    expect(usageRecord?.cache_write_tokens).toBe(10);
-    expect(usageRecord?.cache_hit_tokens).toBe(5);
-    expect(usageRecord?.provider).toBe('openrouter');
-    expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
-    expect(metadataRecord?.system_prompt_length).toBe(27);
-    expect(metadataRecord?.user_prompt_prefix).toBe('Please help me with');
-    expect(metadataRecord?.max_tokens).toBe(200);
-    expect(metadataRecord?.has_middle_out_transform).toBe(true);
-    expect(metadataRecord?.session_id).toBeNull();
-    expect(usageRecord?.has_error).toBe(false);
-    expect(usageRecord?.created_at).toBeTruthy();
-    expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
-  });
+      const usageRecord = await db.query.microdollar_usage.findFirst({
+        where: eq(microdollar_usage.id, metadataRecord!.id),
+      });
+      expect(usageRecord).toBeTruthy();
+      expect(usageRecord?.kilo_user_id).toBe(user.id);
+      expect(usageRecord?.cost).toBe(500);
+      expect(usageRecord?.input_tokens).toBe(100);
+      expect(usageRecord?.output_tokens).toBe(50);
+      expect(usageRecord?.cache_write_tokens).toBe(10);
+      expect(usageRecord?.cache_hit_tokens).toBe(5);
+      expect(usageRecord?.provider).toBe('openrouter');
+      expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
+      expect(metadataRecord?.system_prompt_length).toBe(27);
+      expect(metadataRecord?.user_prompt_prefix).toBe('Please help me with');
+      expect(metadataRecord?.max_tokens).toBe(200);
+      expect(metadataRecord?.has_middle_out_transform).toBe(true);
+      if (expected === null) {
+        expect(metadataRecord?.reasoning_setting_id).toBeNull();
+      } else {
+        expect(metadataRecord?.reasoning_setting_id).not.toBeNull();
+      }
+      const [usageViewRecord] = await db
+        .select({ reasoning_setting: microdollar_usage_view.reasoning_setting })
+        .from(microdollar_usage_view)
+        .where(eq(microdollar_usage_view.id, metadataRecord!.id))
+        .limit(1);
+      expect(usageViewRecord?.reasoning_setting).toBe(expected);
+      expect(metadataRecord?.session_id).toBeNull();
+      expect(usageRecord?.has_error).toBe(false);
+      expect(usageRecord?.created_at).toBeTruthy();
+      expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
+    }
+  );
 
   test('stores session_id when provided', async () => {
     const user = await insertTestUser({
@@ -1565,6 +1593,7 @@ describe('toInsertableDbUsageRecord NUL-byte sanitization', () => {
       session_id: 'session',
       mode: null,
       auto_model: null,
+      reasoning_setting: null,
       ttfb_ms: null,
       ...overrides,
     }) satisfies MicrodollarUsageContext;

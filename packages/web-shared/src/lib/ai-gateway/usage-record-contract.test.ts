@@ -59,6 +59,7 @@ function validMetadata() {
     session_id: null,
     mode: null,
     auto_model: null,
+    reasoning_setting: null as string | null,
     market_cost: null,
     is_free: null,
     abuse_delay: null,
@@ -78,6 +79,23 @@ function validRequest() {
 describe('UsageRecordRequestSchema', () => {
   test('accepts a well-formed payload', () => {
     expect(UsageRecordRequestSchema.safeParse(validRequest()).success).toBe(true);
+  });
+
+  test.each([null, 'effort:high', 'thinking:enabled:le64k'])(
+    'preserves reasoning_setting %s',
+    reasoningSetting => {
+      const request = validRequest();
+      request.metadata.reasoning_setting = reasoningSetting;
+      expect(UsageRecordRequestSchema.parse(request).metadata.reasoning_setting).toBe(
+        reasoningSetting
+      );
+    }
+  );
+
+  test('defaults absent reasoning_setting from older gateway senders to null', () => {
+    const request = validRequest();
+    delete (request.metadata as Record<string, unknown>).reasoning_setting;
+    expect(UsageRecordRequestSchema.parse(request).metadata.reasoning_setting).toBeNull();
   });
 
   // Required by packages/db/AGENTS.md "Timestamp boundaries": PostgreSQL

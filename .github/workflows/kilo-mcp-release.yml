@@ -1,9 +1,7 @@
 name: kilo-mcp Release
 
 # One kilo-mcp release per production deploy that changed the deployed bundle.
-# Worker deploys are manual (deploy-workers.yml), so this workflow is manual
-# too: dispatch it from the Actions tab after deploying the kilo-mcp worker.
-# A release:
+# deploy-production.yml calls this after deploy-workers succeeds. A release:
 #
 # - builds the bundle from the deployed commit (`wrangler deploy --dry-run`,
 #   the same build `wrangler deploy` uploads) and stops when its SHA-256
@@ -20,13 +18,6 @@ name: kilo-mcp Release
 # commit, so it completes the release instead of skipping it.
 
 on:
-  workflow_dispatch:
-    inputs:
-      source_sha:
-        description: 'Commit to release (defaults to the selected ref)'
-        required: false
-        default: ''
-        type: string
   workflow_call:
     inputs:
       source_sha:
@@ -46,15 +37,11 @@ jobs:
       pull-requests: write # open or refresh the changelog PR
       issues: write # PR assignees are an Issues API operation
     steps:
-      - name: Resolve source SHA
-        id: source
-        run: echo "sha=${{ inputs.source_sha || github.sha }}" >> "$GITHUB_OUTPUT"
-
       # Full history and tags: the release range starts at the previous tag.
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           fetch-depth: 0
-          ref: ${{ steps.source.outputs.sha }}
+          ref: ${{ inputs.source_sha }}
 
       # The cheap gate, before any install. The inputs mirror the kilo-mcp row
       # of deploy-workers.yml minus `packages`: kilo-mcp imports no workspace
@@ -175,7 +162,7 @@ jobs:
         if: steps.bundle.outputs.release == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: kilo-mcp-sbom-${{ steps.source.outputs.sha }}
+          name: kilo-mcp-sbom-${{ inputs.source_sha }}
           path: ${{ steps.sbom.outputs.file }}
           retention-days: 90
           if-no-files-found: error

@@ -130,10 +130,49 @@ jobs:
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-  # Cloudflare Worker deploys (deploy-workers.yml), the KiloClaw image deploy
-  # (deploy-kiloclaw.yml) and the kilo-mcp release (kilo-mcp-release.yml) are
-  # no longer part of the scheduled pipeline. They run manually via
-  # workflow_dispatch from the Actions tab.
+  deploy-workers:
+    needs:
+      [
+        check-production-db-startup,
+        run-migrations,
+        check-changes,
+        stage-app,
+        stage-global-app,
+        promote-app,
+        promote-global-app,
+      ]
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.check-production-db-startup.result == 'success' &&
+        needs.run-migrations.result == 'success' &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result)
+      }}
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+    secrets: inherit
+
+  # The kilo-mcp changelog, GitHub Release and SBOM. It runs after every
+  # successful worker deploy and releases only when the kilo-mcp bundle changed.
+  kilo-mcp-release:
+    needs: [check-changes, deploy-workers]
+    if: ${{ !cancelled() && needs.deploy-workers.result == 'success' }}
+    # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
+    # exceed the caller).
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    uses: ./.github/workflows/kilo-mcp-release.yml
+    with:
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+    secrets: inherit
 
   detect-gastown-wasteland-changes:
     needs: check-changes
@@ -267,6 +306,10 @@ jobs:
         continue-on-error: true
         run: pnpm --filter cloudflare-gastown sentry:sourcemaps
 
+  # The KiloClaw image and worker deploy (deploy-kiloclaw.yml) is not part of
+  # the scheduled pipeline. It runs manually via workflow_dispatch from the
+  # Actions tab.
+
   record-deployment:
     needs:
       [
@@ -277,6 +320,7 @@ jobs:
         stage-global-app,
         promote-app,
         promote-global-app,
+        deploy-workers,
         detect-gastown-wasteland-changes,
         deploy-gastown-wasteland,
       ]
@@ -290,6 +334,7 @@ jobs:
         needs.stage-global-app.result == 'success' &&
         needs.promote-app.result == 'success' &&
         needs.promote-global-app.result == 'success' &&
+        needs.deploy-workers.result == 'success' &&
         needs.detect-gastown-wasteland-changes.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result)
       }}

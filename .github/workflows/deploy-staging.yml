@@ -108,9 +108,15 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
-  # Cloudflare Worker deploys (deploy-workers.yml) are no longer part of the
-  # scheduled pipeline. They run manually via workflow_dispatch from the
-  # Actions tab.
+  deploy-workers:
+    needs: [check-changes, check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      target_environment: staging
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+    secrets: inherit
 
   record-deployment:
     needs:
@@ -120,6 +126,7 @@ jobs:
         run-migrations,
         deploy-app,
         deploy-global-app,
+        deploy-workers,
       ]
     if: >-
       ${{
@@ -128,7 +135,8 @@ jobs:
         needs.check-staging-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
         needs.deploy-app.result == 'success' &&
-        needs.deploy-global-app.result == 'success'
+        needs.deploy-global-app.result == 'success' &&
+        needs.deploy-workers.result == 'success'
       }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

@@ -8,6 +8,8 @@ import { createKiloClient } from '@kilocode/sdk';
 import type { QuestionRequest } from '@kilocode/sdk/v2';
 import {
   createWrapperKiloClient,
+  KILO_ACTIVITY_DISCOVERY_LIMIT,
+  KILO_ACTIVITY_MESSAGE_LIMIT,
   isKiloServerUnreachableError,
   type WrapperKiloClient,
 } from './kilo-api';
@@ -149,6 +151,79 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       '/workspace'
     );
   }
+
+  it('discovers directory and ancestry across the process without retaining session history', async () => {
+    let query: URL | undefined;
+    let header: string | null = null;
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        query = new URL(request.url);
+        header = request.headers.get('x-kilo-directory');
+        return Response.json([
+          {
+            id: 'ses_child',
+            directory: '/another',
+            parentID: 'ses_parent',
+            title: 'private title',
+            metadata: { secret: 'private' },
+          },
+        ]);
+      },
+    });
+    startedServers.push(server);
+    const sessions = await createClient(server.url.toString()).listSessionMetadata(
+      AbortSignal.timeout(1000)
+    );
+    expect(sessions).toEqual([{ id: 'ses_child', directory: '/another', parentID: 'ses_parent' }]);
+    expect(query?.pathname).toBe('/experimental/session');
+    expect(query?.searchParams.get('directory')).toBeNull();
+    expect(header).toBeNull();
+    expect(query?.searchParams.get('limit')).toBe(String(KILO_ACTIVITY_DISCOVERY_LIMIT));
+    expect(query?.searchParams.get('archived')).toBe('true');
+  });
+
+  it('rejects incomplete discovery instead of silently treating undiscovered directories as idle', async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => Response.json([], { headers: { 'x-next-cursor': '123' } }),
+    });
+    startedServers.push(server);
+    const error = await createClient(server.url.toString())
+      .listSessionMetadata(AbortSignal.timeout(1000))
+      .catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({
+      message: 'Activity session discovery exceeded its bounded complete window',
+    });
+  });
+
+  it('bounds activity message reads and passes the owned directory and cancellation signal', async () => {
+    let query: URL | undefined;
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        query = new URL(request.url);
+        return Response.json([]);
+      },
+    });
+    startedServers.push(server);
+    await createClient(server.url.toString()).getRecentSessionMessages(
+      'ses_1',
+      '/other',
+      AbortSignal.timeout(1000)
+    );
+    expect(query?.pathname).toBe('/session/ses_1/message');
+    expect(query?.searchParams.get('directory')).toBe('/other');
+    expect(query?.searchParams.get('limit')).toBe(String(KILO_ACTIVITY_MESSAGE_LIMIT));
+    const controller = new AbortController();
+    controller.abort();
+    const error = await createClient(server.url.toString())
+      .getRecentSessionMessages('ses_1', '/other', controller.signal)
+      .catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: 'Activity session messages failed: request error' });
+  });
 
   it('keeps skill-sourced rows in the catalog so the composer can list and invoke them', async () => {
     const stub = startStub(200, [

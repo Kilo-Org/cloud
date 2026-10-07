@@ -8,6 +8,10 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
 
+The camera purpose string lives in the `expo-image-picker` options in `app.config.ts`.
+It explains photo attachments in AI agent chats and gives a design example.
+Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
+
 1. obtain Expo access
 2. `pnpx eas-cli login -b`
 3. obtain Apple access (developer)

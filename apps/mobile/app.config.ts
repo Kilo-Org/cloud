@@ -320,6 +320,13 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    [
+      'expo-image-picker',
+      {
+        cameraPermission:
+          'Kilo uses your camera to take photos you attach to AI agent chats. For example, share a photo of a design so your agent can help implement it.',
+      },
+    ],
     'expo-font',
     // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
     // writes the union of the SecureStore and AppsFlyer exclusions). Disable the

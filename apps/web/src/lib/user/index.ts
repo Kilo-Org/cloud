@@ -163,7 +163,7 @@ import {
   generateVercelDownstreamSafetyIdentifier,
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import { signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
+import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
 import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
 import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
@@ -657,7 +657,11 @@ export async function createOrUpdateUser(
   const operationId = signupOperationId(normalizedEmail);
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
   if (!IS_DEVELOPMENT && bouncerIp) {
-    const verdict = await signupDecide({ operationId, ip: bouncerIp });
+    const verdict = await signupDecide({
+      operationId,
+      ip: bouncerIp,
+      ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
+    });
     console.info('[auth] Bouncer signup admission', {
       operationId,
       enforced: verdict?.enforced ?? false,

@@ -22,6 +22,10 @@ permissions:
 
 jobs:
   source-sbom:
+    # Guard: a fork with Actions enabled can trigger this on schedule or via
+    # workflow_dispatch. Only the canonical repo needs the weekly SBOM
+    # regeneration.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     name: Source dependency SBOM

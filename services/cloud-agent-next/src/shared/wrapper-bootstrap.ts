@@ -56,6 +56,8 @@ export type WrapperBootstrapMaterializedConfig = {
   env: Record<string, string>;
   setupCommands?: string[];
   runtimeSkills?: WrapperBootstrapRuntimeSkill[];
+  /** Env key names whose values the wrapper redacts in setup output and diagnostics. */
+  secretEnvKeys?: string[];
 };
 
 export type WrapperRuntimeCredentialProxyConfig = {

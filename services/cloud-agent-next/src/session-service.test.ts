@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
@@ -5,6 +6,7 @@ import { validateWrapperDispatchTicket } from './auth.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import jwt from 'jsonwebtoken';
 import { ExecutionError } from './execution/errors.js';
+import { encryptWithPublicKey } from './utils/encryption.js';
 import {
   createPendingSessionMessage,
   recordPendingFlushFailure,
@@ -3615,6 +3617,51 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(materialized.BASH_ENV).toBeUndefined();
     expect(materialized.LD_PRELOAD).toBeUndefined();
     expect(materialized.PROFILE_SECRET).toBeUndefined();
+  });
+
+  it('advertises decrypted secret env key names on the materialized config', async () => {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const metadata = createMetadata({
+      profile: {
+        envVars: { PUBLIC_VALUE: 'visible' },
+        encryptedSecrets: { DATABASE_URL: encryptWithPublicKey('db-from-profile', publicKey) },
+      },
+    });
+
+    const result = await buildPromptWrapperRequests(metadata, env => {
+      env.AGENT_ENV_VARS_PRIVATE_KEY = privateKey;
+    });
+
+    expect(result.readyRequest.materialized.env.DATABASE_URL).toBe('db-from-profile');
+    expect(result.readyRequest.materialized.env.PUBLIC_VALUE).toBe('visible');
+    expect(result.readyRequest.materialized.secretEnvKeys).toEqual(['DATABASE_URL']);
+  });
+
+  it('does not advertise a decrypted secret the platform overwrote', async () => {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const metadata = createMetadata({
+      profile: {
+        encryptedSecrets: {
+          DATABASE_URL: encryptWithPublicKey('db-from-profile', publicKey),
+          KILOCODE_TOKEN: encryptWithPublicKey('secret-kilo-token', publicKey),
+        },
+      },
+    });
+
+    const result = await buildPromptWrapperRequests(metadata, env => {
+      env.AGENT_ENV_VARS_PRIVATE_KEY = privateKey;
+    });
+
+    expect(result.readyRequest.materialized.env.KILOCODE_TOKEN).not.toBe('secret-kilo-token');
+    expect(result.readyRequest.materialized.secretEnvKeys).toEqual(['DATABASE_URL']);
   });
 
   it('materializes fixed Bitbucket CLI environment for ordinary Bitbucket sessions', async () => {

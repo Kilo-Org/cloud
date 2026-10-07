@@ -2398,24 +2398,30 @@ describe('turn finalization', () => {
     });
   });
 
-  it('falls back to the user message ID, passes runtime env and aborts auto-commit on abort', async () => {
-    const autoCommitCalls: Array<{ env?: unknown; signal?: AbortSignal; messageId?: string }> = [];
+  it('falls back to the user message ID, passes runtime env and named secret keys, and aborts auto-commit on abort', async () => {
+    const autoCommitCalls: Array<{
+      env?: unknown;
+      secretEnvKeys?: unknown;
+      signal?: AbortSignal;
+      messageId?: string;
+    }> = [];
     const h = createHarness({
       runAutoCommit: (async (opts: { env?: unknown; signal?: AbortSignal }) => {
         autoCommitCalls.push(opts);
         return new Promise(() => undefined);
       }) as never,
     });
-    const spec = routeSpec();
+    const spec = routeSpec({ secretEnvKeys: ['DATABASE_URL'] });
     h.registerRoute(spec);
-    h.setEnv(spec, { FOO: 'bar' });
+    h.setEnv(spec, { FOO: 'bar', DATABASE_URL: 'db-secret' });
     h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
     await settle();
     h.manager.observeKiloEvent(completedKiloTurn());
     await settle();
     expect(autoCommitCalls).toHaveLength(1);
     expect(autoCommitCalls[0].messageId).toBe('m1');
-    expect(autoCommitCalls[0].env).toEqual({ FOO: 'bar' });
+    expect(autoCommitCalls[0].env).toEqual({ FOO: 'bar', DATABASE_URL: 'db-secret' });
+    expect(autoCommitCalls[0].secretEnvKeys).toEqual(['DATABASE_URL']);
     h.manager.abort(SESSION_ID);
     expect(autoCommitCalls[0].signal?.aborted).toBe(true);
   });

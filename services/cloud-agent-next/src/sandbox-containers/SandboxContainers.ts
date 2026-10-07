@@ -372,6 +372,11 @@ export class SandboxContainers extends DurableObject<Env> {
    * the launch's `repoKey` and this image when the index has one, and the image
    * otherwise. `discard` forgets the stored entry first, so a start that follows a
    * failed repository start cannot use it again.
+   *
+   * Emits one `snapshot_lookup` diagnostic per start so `image` vs `repository`
+   * and the reason (no key, no index, miss, discarded, not allowed) are visible.
+   * Like the capture line it carries no repository key; the key is logged by the
+   * Sandbox DO, which owns it.
    */
   private async resolveStart(
     input: ContainersLaunchInput,
@@ -386,15 +391,30 @@ export class SandboxContainers extends DurableObject<Env> {
       indexKey: null,
     };
     const index = this.repoSnapshotIndex();
-    if (index === null || input.repoKey === undefined) return imageStart;
+    if (index === null) {
+      this.logSnapshotLookup('image', 'index_unavailable');
+      return imageStart;
+    }
+    if (input.repoKey === undefined) {
+      this.logSnapshotLookup('image', 'no_repo_key');
+      return imageStart;
+    }
     const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
     if (input.discardRepository === true) {
       await index.remove(indexKey);
+      this.logSnapshotLookup('image', 'discarded');
       return imageStart;
     }
-    if (!allowRepository) return imageStart;
+    if (!allowRepository) {
+      this.logSnapshotLookup('image', 'not_allowed');
+      return imageStart;
+    }
     const entry = await index.lookup(indexKey);
-    if (entry === null) return imageStart;
+    if (entry === null) {
+      this.logSnapshotLookup('image', 'index_miss');
+      return imageStart;
+    }
+    this.logSnapshotLookup('repository', 'index_hit');
     return {
       source: 'repository',
       options: this.startOptions(
@@ -404,6 +424,18 @@ export class SandboxContainers extends DurableObject<Env> {
       ),
       indexKey,
     };
+  }
+
+  private sandboxNameForLog(): string {
+    return this.ctx.id.name ?? this.ctx.id.toString();
+  }
+
+  private logSnapshotLookup(source: ContainersStartSource, reason: string): void {
+    logControlDiagnostic('snapshot_lookup', {
+      sandboxId: this.sandboxNameForLog(),
+      source,
+      reason,
+    });
   }
 
   /**
@@ -416,6 +448,10 @@ export class SandboxContainers extends DurableObject<Env> {
     } catch (error) {
       if (start.source === 'repository' && start.indexKey !== null) {
         await this.repoSnapshotIndex()?.remove(start.indexKey);
+        logControlDiagnostic('snapshot_discard', {
+          sandboxId: this.sandboxNameForLog(),
+          reason: 'repository_start_failed',
+        });
       }
       throw error;
     }

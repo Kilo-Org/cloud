@@ -199,7 +199,7 @@ import {
   scopeGrantId,
   writeScopeGrant,
 } from './scope-grants.js';
-import { computeRepoKey, repoSnapshotEligible } from './repo-key.js';
+import { computeRepoKey, repoSnapshotEligibility } from './repo-key.js';
 import {
   beginRepositoryLaunch,
   captureRequested,
@@ -1775,25 +1775,56 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * The repository snapshot key for a route, or null when none applies. It is hashed
    * from the input spec: the grant rewrites `spec.env` with per-attempt credential
    * aliases, so the stored spec would give every session its own key.
+   *
+   * Emits one `snapshot_key` diagnostic per route so a missing snapshot can be
+   * traced to the gate that rejected it (or to a missing key secret).
    */
   private async repoKeyFor(
     spec: ControlPlaneRouteSpec,
     source: ControlPlaneCredentialSource
   ): Promise<string | null> {
-    if (this.provider.captureRepository === undefined) return null;
+    if (this.provider.captureRepository === undefined) {
+      this.logSnapshotKey(spec.sessionId, false, 'provider_no_capture');
+      return null;
+    }
     const route = { repoUrl: spec.git?.url, directory: spec.directory };
     const gate = {
       enrolledIds: this.env.CONTAINER_REPO_SNAPSHOT_IDS,
       userId: source.userId,
       orgId: source.orgId,
     };
-    if (!repoSnapshotEligible(gate, route)) return null;
+    const eligibility = repoSnapshotEligibility(gate, route);
+    if (!eligibility.eligible) {
+      this.logSnapshotKey(spec.sessionId, false, eligibility.reason);
+      return null;
+    }
     const secret = await withTimeout(
       resolveSecret(this.env.NEXTAUTH_SECRET),
       1_000,
       'Repository snapshot key secret lookup timed out'
     ).catch(() => null);
-    return computeRepoKey({ secret, userId: source.userId, ...route });
+    const key = await computeRepoKey({ secret, userId: source.userId, ...route });
+    if (key === null) {
+      this.logSnapshotKey(spec.sessionId, false, 'secret_missing');
+      return null;
+    }
+    this.logSnapshotKey(spec.sessionId, true, 'eligible', key);
+    return key;
+  }
+
+  private logSnapshotKey(
+    sessionId: string,
+    eligible: boolean,
+    reason: string,
+    repoKey?: string
+  ): void {
+    logControlDiagnostic('snapshot_key', {
+      sandboxId: this.sandboxId,
+      sessionId,
+      eligible,
+      reason,
+      repoKey: repoKey?.slice(0, 16),
+    });
   }
 
   private async requireOwner(): Promise<string | null> {
@@ -2746,16 +2777,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
           return;
         }
         const launchDeadline = current.createDeadlineAt ?? createDeadline;
-        const launchOptions = repositoryLaunchOptions(
+        const launch = repositoryLaunchOptions(
           await listRoutes(this.db),
           await readRepositoryLaunch(this.ctx.storage)
         );
+        logControlDiagnostic('snapshot_launch', {
+          sandboxId: this.sandboxId,
+          allocationId,
+          reason: launch.reason,
+          preparingRoutes: launch.preparingRouteCount,
+          distinctKeys: launch.distinctKeyCount,
+          discard: launch.discarded,
+          repoKey: launch.options.repoKey?.slice(0, 16),
+        });
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
         await beginRepositoryLaunch(this.ctx.storage, allocationId);
         const launched = await withTimeout(
-          this.provider.launch(createdRef, launchEnv, launchOptions),
+          this.provider.launch(createdRef, launchEnv, launch.options),
           remainingMs(launchDeadline),
           'Sandbox launch timed out'
         );
@@ -2806,6 +2846,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * while a slow launch was still returning has already confirmed the start
    * through the placeholder `beginRepositoryLaunch` wrote, so keep that
    * confirmation even if the allocation has since stopped.
+   *
+   * Emits one `snapshot_start` diagnostic per allocation so `image` vs
+   * `repository` is durable evidence of whether a snapshot was actually used.
    */
   private async recordLaunch(
     allocationId: string,
@@ -2820,6 +2863,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await recordRepositoryLaunch(this.ctx.storage, {
       allocationId,
       startSource,
+      confirmed,
+    });
+    logControlDiagnostic('snapshot_start', {
+      sandboxId: this.sandboxId,
+      allocationId,
+      source: startSource,
       confirmed,
     });
   }
@@ -3254,25 +3303,39 @@ export class SandboxControlV2 extends DurableObject<Env> {
     state: AllocationState
   ): Promise<void> {
     let ok = false;
+    let reason = 'threw';
+    let repoKeyPrefix: string | undefined;
     try {
       const route = await readRoute(this.db, frame.sessionId);
+      repoKeyPrefix = route?.repoKey?.slice(0, 16) ?? undefined;
       const provider = this.provider;
-      if (
-        route !== null &&
-        route.state === 'preparing' &&
-        route.repoKey !== null &&
-        provider.captureRepository !== undefined &&
-        state.providerRef !== null
-      ) {
+      if (route === null) reason = 'no_route';
+      else if (route.state !== 'preparing') reason = 'route_not_preparing';
+      else if (route.repoKey === null) reason = 'no_repo_key';
+      else if (provider.captureRepository === undefined) reason = 'provider_no_capture';
+      else if (state.providerRef === null) reason = 'no_provider_ref';
+      else {
+        reason = 'capture_declined';
         ok = await withTimeout(
           provider.captureRepository(state.providerRef, route.repoKey, frame.commit),
           REPOSITORY_CAPTURE_CALL_MS,
           'Repository capture timed out'
         );
+        if (ok) reason = 'captured';
       }
     } catch {
       ok = false;
+      reason = 'threw';
     }
+    logControlDiagnostic('snapshot_capture', {
+      sandboxId: this.sandboxId,
+      sessionId: frame.sessionId,
+      allocationId: state.allocationId,
+      ok,
+      reason,
+      repoKey: repoKeyPrefix,
+      commit: frame.commit,
+    });
     const latest = await this.readAllocation();
     if (latest.allocationId !== state.allocationId) return;
     const capture = this.repositoryCaptures.get(frame.sessionId);

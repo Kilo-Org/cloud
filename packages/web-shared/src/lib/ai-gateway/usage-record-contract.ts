@@ -16,12 +16,11 @@ import type { UsageMetaData } from './processUsage.types';
  *
  * Invariants this schema deliberately encodes:
  *
- * - Nullable fields use `.nullable()`, never `.optional()`. `JSON.stringify`
- *   drops `undefined`-valued keys, and `null` is load-bearing here: for
- *   organization usage `toInsertableDbUsageRecord` explicitly sets
- *   `user_prompt_prefix` and `system_prompt_prefix` to `null` so prompt text is
- *   never persisted. A dropped key must be a 400, not a silent write of the
- *   wrong value.
+ * - Nullable fields use `.nullable()`. Except for additive rollout fields that
+ *   default to null, missing keys are rejected: `JSON.stringify` drops
+ *   `undefined`-valued keys, and `null` is load-bearing here. For organization
+ *   usage `toInsertableDbUsageRecord` explicitly sets `user_prompt_prefix` and
+ *   `system_prompt_prefix` to `null` so prompt text is never persisted.
  * - `created_at` is validated as strict ISO 8601. Both `core.created_at` and
  *   `metadata.created_at` come from `new Date().toISOString()` on the sender, so
  *   this holds by construction. It would NOT hold for a value read back out of
@@ -94,17 +93,35 @@ const UsageMetadataSchema = z.object({
   session_id: z.string().nullable(),
   mode: z.string().nullable(),
   auto_model: z.string().nullable(),
+  // Like bouncer_usage_event, older gateway senders omit this additive field.
+  // Default it to null so parsed metadata still satisfies UsageMetaData.
+  reasoning_setting: z.string().nullable().default(null),
   market_cost: z.number().nullable(),
   is_free: z.boolean().nullable(),
   abuse_delay: z.number().nullable(),
   abuse_downgraded_from: z.string().nullable(),
 });
 
+/**
+ * The Bouncer usage event to enqueue in the usage-write transaction, for a request whose decide
+ * verdict said `spendWatch`. `payload` is the shaped usage-event wire body; the outbox row's owner
+ * is `core.kilo_user_id`.
+ */
+export const BouncerUsageEventEnqueueSchema = z.object({
+  request_id: z.string().min(1),
+  payload: z.record(z.string(), z.unknown()),
+});
+
+export type BouncerUsageEventEnqueue = z.infer<typeof BouncerUsageEventEnqueueSchema>;
+
 export const UsageRecordRequestSchema = z.object({
   core: CoreUsageSchema,
   metadata: UsageMetadataSchema,
   prior_microdollar_usage: z.number(),
   posthog_distinct_id: z.string().nullable(),
+  // Optional, unlike the fields above: a sender from before this field existed omits it, and that
+  // must still record the billing row. Null or absent means no outbox row.
+  bouncer_usage_event: BouncerUsageEventEnqueueSchema.nullable().optional(),
 });
 
 export type UsageRecordRequest = z.infer<typeof UsageRecordRequestSchema>;

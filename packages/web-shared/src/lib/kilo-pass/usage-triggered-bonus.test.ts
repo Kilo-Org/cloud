@@ -44,6 +44,7 @@ async function seedBaseIssuance(params: {
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   initialWelcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
   issuanceCreatedAt?: string;
+  baseAmountUsd?: number;
 }) {
   const {
     kiloUserId,
@@ -58,6 +59,7 @@ async function seedBaseIssuance(params: {
     welcomePromoEligibilityReason,
     initialWelcomePromoEligibilityReason,
     issuanceCreatedAt,
+    baseAmountUsd = getMonthlyPriceUsd(tier),
   } = params;
 
   const providerSubscriptionId = `sub_${Math.random()}`;
@@ -118,7 +120,7 @@ async function seedBaseIssuance(params: {
     id: baseCreditTxId,
     kilo_user_id: kiloUserId,
     is_free: false,
-    amount_microdollars: 1_000_000,
+    amount_microdollars: baseAmountUsd * 1_000_000,
     description: 'seed base credits',
     original_baseline_microdollars_used: 0,
     stripe_payment_id: stripeInvoiceId ?? null,
@@ -128,7 +130,7 @@ async function seedBaseIssuance(params: {
     kilo_pass_issuance_id: issuanceId,
     kind: KiloPassIssuanceItemKind.Base,
     credit_transaction_id: baseCreditTxId,
-    amount_usd: 1,
+    amount_usd: baseAmountUsd,
     bonus_percent_applied: null,
   });
 
@@ -184,6 +186,44 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
       where: eq(kilocode_users.id, user.id),
     });
     expect(userRow?.kilo_pass_threshold).toBeNull();
+  });
+
+  test('monthly: bases the bonus on the credited base when the subscription tier is higher', async () => {
+    const user = await insertTestUser({
+      microdollars_used: 20_000_000,
+      kilo_pass_threshold: 19_000_000,
+    });
+
+    // A Google Play switch to tier_199 that Play bills only at renewal: the month credited $19.
+    const { issuanceId } = await seedBaseIssuance({
+      kiloUserId: user.id,
+      cadence: KiloPassCadence.Monthly,
+      tier: KiloPassTier.Tier199,
+      baseAmountUsd: getMonthlyPriceUsd(KiloPassTier.Tier19),
+      issueMonth: '2026-01-01',
+      stripeInvoiceId: null,
+      currentStreakMonths: 1,
+      nextYearlyIssueAt: null,
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+    });
+
+    await maybeIssueKiloPassBonusFromUsageThreshold({
+      kiloUserId: user.id,
+      nowIso: new Date('2026-01-15T00:00:00.000Z').toISOString(),
+      db,
+    });
+
+    const bonusItem = await db.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Bonus)
+      ),
+    });
+    const bonusTx = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusItem?.credit_transaction_id ?? ''),
+    });
+    // First month promo: 50% of the credited $19.00, not of tier_199's $199.00.
+    expect(bonusTx?.amount_microdollars).toBe(9_500_000);
   });
 
   test('monthly: skips usage-triggered bonus when referral_bonus item already exists and clears threshold', async () => {

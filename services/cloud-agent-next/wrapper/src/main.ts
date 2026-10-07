@@ -46,7 +46,6 @@ import {
   type BootstrapProgressStep,
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
-  RestoredWorkspaceReconciliationError,
 } from './session-bootstrap.js';
 
 /** Grace period before force exit during shutdown (110 seconds) */
@@ -795,11 +794,7 @@ async function main() {
     } catch (error) {
       if (request.preparation) {
         const safeError =
-          error instanceof WrapperBootstrapError
-            ? error.message
-            : error instanceof RestoredWorkspaceReconciliationError
-              ? 'Workspace reconciliation failed'
-              : 'Environment preparation failed';
+          error instanceof WrapperBootstrapError ? error.message : 'Environment preparation failed';
         emitPreparing?.({
           version: 2,
           attemptId: request.preparation.attemptId,
@@ -821,18 +816,12 @@ async function main() {
       const bootstrapError =
         error instanceof WrapperBootstrapError
           ? error
-          : error instanceof RestoredWorkspaceReconciliationError
-            ? new WrapperBootstrapError({
-                code: 'WORKSPACE_RECONCILIATION_FAILED',
-                message: error.message,
-                retryable: true,
-              })
-            : new WrapperBootstrapError({
-                code: 'WORKSPACE_SETUP_FAILED',
-                subtype: 'workspace_setup_unknown',
-                message: 'Workspace setup failed',
-                retryable: true,
-              });
+          : new WrapperBootstrapError({
+              code: 'WORKSPACE_SETUP_FAILED',
+              subtype: 'workspace_setup_unknown',
+              message: 'Workspace setup failed',
+              retryable: true,
+            });
       logToFile(
         `session/ready failed kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
       );

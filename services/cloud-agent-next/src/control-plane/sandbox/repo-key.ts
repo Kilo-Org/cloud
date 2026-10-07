@@ -19,25 +19,48 @@ export type RepoSnapshotGate = {
   orgId: string | undefined;
 };
 
+export type RepoSnapshotIneligibilityReason =
+  | 'not_enrolled'
+  | 'no_repo_url'
+  | 'directory_not_isolated';
+
+export type RepoSnapshotEligibility =
+  | { eligible: true }
+  | { eligible: false; reason: RepoSnapshotIneligibilityReason };
+
 /**
- * Whether a repository snapshot may be used for this route at all: the owner
- * (personal user, or the org when the session is org-owned) is enrolled, and the
- * route has a repository at the constant path the snapshots are taken at. A
- * snapshot holds one repository at one path, so a per-session path or a shared
- * sandbox could only capture something no later session can reuse.
+ * Why a route is or is not eligible to use a repository snapshot. This is the one
+ * owner of the decision; `repoSnapshotEligible` is the boolean projection for
+ * callers that do not need the reason (the reason is logged when the key is null).
+ *
+ * The owner (personal user, or the org when the session is org-owned) must be
+ * enrolled, and the route must have a repository at the constant path the
+ * snapshots are taken at. A snapshot holds one repository at one path, so a
+ * per-session path or a shared sandbox could only capture something no later
+ * session can reuse.
  *
  * Enrollment follows the `CONTROL_PLANE_IDS`/`SANDBOX_SELECTION_IDS` convention:
  * one list matched against the user ID and then the org ID.
  */
+export function repoSnapshotEligibility(
+  gate: RepoSnapshotGate,
+  route: Pick<RepoKeyInput, 'repoUrl' | 'directory'>
+): RepoSnapshotEligibility {
+  if (!(isOrgInList(gate.enrolledIds, gate.userId) || isOrgInList(gate.enrolledIds, gate.orgId))) {
+    return { eligible: false, reason: 'not_enrolled' };
+  }
+  if (route.repoUrl === undefined) return { eligible: false, reason: 'no_repo_url' };
+  if (route.directory !== ISOLATED_CONTAINER_WORKSPACE_PATH) {
+    return { eligible: false, reason: 'directory_not_isolated' };
+  }
+  return { eligible: true };
+}
+
 export function repoSnapshotEligible(
   gate: RepoSnapshotGate,
   route: Pick<RepoKeyInput, 'repoUrl' | 'directory'>
 ): boolean {
-  return (
-    (isOrgInList(gate.enrolledIds, gate.userId) || isOrgInList(gate.enrolledIds, gate.orgId)) &&
-    route.repoUrl !== undefined &&
-    route.directory === ISOLATED_CONTAINER_WORKSPACE_PATH
-  );
+  return repoSnapshotEligibility(gate, route).eligible;
 }
 
 /**

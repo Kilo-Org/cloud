@@ -2952,6 +2952,7 @@ export const kiloPassRouter = createTRPCRouter({
             userId: ctx.user.id,
             amountCents: session.amountCents ?? session.amount_total ?? 0,
             accountCreatedAt: ctx.user.created_at,
+            accountUsedMicrodollars: ctx.user.microdollars_used,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
             ja4: ja4FromHeaders(ctx.headersList),

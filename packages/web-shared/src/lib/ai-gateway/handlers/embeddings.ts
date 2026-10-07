@@ -28,7 +28,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import {
+  getBalanceAndOrgSettings,
+  type BalancePayer,
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
@@ -42,9 +45,10 @@ import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
+  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -219,6 +223,7 @@ export async function handleEmbeddingsRequest(
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,
@@ -255,13 +260,15 @@ export async function handleEmbeddingsRequest(
   let organizationDataCollection: OrganizationSettings['data_collection'];
   let accountBalance = 0;
   let accountPlan: OrganizationPlan | undefined;
+  let accountPayer: BalancePayer | undefined;
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+    const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
       await getBalanceAndOrgSettings(organizationId, user);
     accountBalance = balance;
     accountPlan = plan;
+    accountPayer = payer;
     organizationDataCollection = settings?.data_collection;
 
     if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
@@ -314,9 +321,9 @@ export async function handleEmbeddingsRequest(
     );
   }
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited just before the upstream call within its 500 ms
+  // budget. Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
@@ -325,6 +332,7 @@ export async function handleEmbeddingsRequest(
       : {
           accountId: bouncerAccountId(user.id, organizationId),
           tier: bouncerDecideTier(organizationId, accountPlan, accountBalance),
+          payer: accountPayer,
         },
   });
 
@@ -372,6 +380,11 @@ export async function handleEmbeddingsRequest(
       },
     };
   }
+
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const response = await embeddingProxyRequest({
     body: upstreamBody,

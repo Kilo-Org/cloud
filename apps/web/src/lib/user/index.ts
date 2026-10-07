@@ -120,6 +120,7 @@ import {
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  bouncer_usage_event_outbox,
   external_side_effect_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -998,6 +999,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   writer's email lookup failed, the user id)
  * - bouncer_credit_event_outbox (every row for the user; its payload carries the
  *   user id, client ip, and card fingerprint)
+ * - bouncer_usage_event_outbox (every row for the user; its payload carries the
+ *   account id, client ip, and client-fingerprint digest)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1077,6 +1080,9 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(bouncer_credit_event_outbox)
     .where(eq(bouncer_credit_event_outbox.user_id, userId));
+  // Bouncer usage-event payloads carry the account id, client ip, and JA4
+  // digest. The usage-event drainer also rechecks the owner before sending.
+  await tx.delete(bouncer_usage_event_outbox).where(eq(bouncer_usage_event_outbox.user_id, userId));
 
   // ── 1. Anonymize the user row ────────────────────────────────────────
   await tx

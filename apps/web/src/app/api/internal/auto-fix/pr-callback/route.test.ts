@@ -17,7 +17,7 @@ const mockGetIntegrationById = jest.fn();
 const mockHandleCommentReply = jest.fn();
 const mockHandleCreateIssuePR = jest.fn();
 
-jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+jest.mock('@/lib/web-config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 

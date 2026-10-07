@@ -94,9 +94,16 @@ test('ai-gateway deploys only on demand, from the last completed release', () =>
     'production',
     'staging',
   ]);
-  assert.equal(gateway.concurrency.group, 'deploy-${{ inputs.target_environment }}');
-  assert.equal(production.concurrency.group, 'deploy-production');
-  assert.equal(staging.concurrency.group, 'deploy-staging');
+  for (const [environment, deployment] of [
+    ['production', production],
+    ['staging', staging],
+  ]) {
+    assert.notEqual(
+      gateway.concurrency.group.replace('${{ inputs.target_environment }}', environment),
+      deployment.concurrency.group,
+      `a scheduled ${environment} deploy must not cancel a waiting gateway deploy`
+    );
+  }
   assert.equal(gateway.concurrency['cancel-in-progress'], false);
 
   const release = gateway.jobs['resolve-release'].steps.find(step => step.id === 'release');

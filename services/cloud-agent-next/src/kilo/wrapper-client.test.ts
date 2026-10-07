@@ -436,9 +436,8 @@ describe('WrapperClient', () => {
         request: vi.fn().mockResolvedValue(
           createReadyResponse({
             workspaceWasWarm: true,
-            restoredFromBackup: true,
             restore: {
-              path: 'backup',
+              path: 'cold',
               diffs: {
                 applied: 1,
                 skipped: 1,
@@ -464,7 +463,7 @@ describe('WrapperClient', () => {
           platform: 'github',
           wrapperRunId: 'wr_test',
           wrapperGeneration: 1,
-          restorePath: 'backup',
+          restorePath: 'cold',
           diffsApplied: 1,
           diffsSkipped: 1,
           diffsTotal: 2,
@@ -480,13 +479,12 @@ describe('WrapperClient', () => {
         request: vi.fn().mockResolvedValue(
           createReadyResponse({
             workspaceWasWarm: true,
-            restoredFromBackup: true,
             // The response body is parsed without runtime validation, so a
             // wrapper bug can send a non-array `skippedDiffs`. Formatting the
             // log fields must not turn the already-successful ready response
             // into a readiness failure.
             restore: {
-              path: 'backup',
+              path: 'cold',
               diffs: { applied: 0, skipped: 1, total: 1, skippedDiffs: {} },
             },
           })
@@ -510,9 +508,8 @@ describe('WrapperClient', () => {
         request: vi.fn().mockResolvedValue(
           createReadyResponse({
             workspaceWasWarm: true,
-            restoredFromBackup: true,
             restore: {
-              path: 'backup',
+              path: 'cold',
               diffs: { applied: 2, skipped: 0, total: 2 },
             },
           })

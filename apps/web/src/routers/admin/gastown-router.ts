@@ -5,12 +5,14 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   GASTOWN_SERVICE_URL,
-  GASTOWN_CF_ACCESS_CLIENT_ID,
-  GASTOWN_CF_ACCESS_CLIENT_SECRET,
   CLOUDFLARE_ACCOUNT_ID,
   CLOUDFLARE_TOWN_DO_NAMESPACE_ID,
   CLOUDFLARE_CONTAINER_DO_NAMESPACE_ID,
 } from '@kilocode/web-shared/lib/config.server';
+import {
+  GASTOWN_CF_ACCESS_CLIENT_ID,
+  GASTOWN_CF_ACCESS_CLIENT_SECRET,
+} from '@/lib/web-config.server';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import type { User } from '@kilocode/db/schema';
 

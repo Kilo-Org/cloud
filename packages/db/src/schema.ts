@@ -2807,6 +2807,7 @@ export const microdollar_usage_metadata = pgTable(
     session_id: text(),
     mode_id: integer(),
     auto_model_id: integer(),
+    reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),
@@ -2963,6 +2964,15 @@ export const auto_model = pgTable(
   table => [uniqueIndex('UQ_auto_model').on(table.auto_model)]
 );
 
+export const reasoning_setting = pgTable(
+  'reasoning_setting',
+  {
+    reasoning_setting_id: serial().notNull().primaryKey(),
+    reasoning_setting: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -3012,6 +3022,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   session_id: text(),
   mode: text(),
   auto_model: text(),
+  reasoning_setting: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
   abuse_delay: integer(),
@@ -3066,6 +3077,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
+    rs.reasoning_setting,
     meta.market_cost,
     meta.is_free,
     meta.abuse_delay,
@@ -3084,6 +3096,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
+  LEFT JOIN ${reasoning_setting} rs ON meta.reasoning_setting_id = rs.reasoning_setting_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
@@ -11682,6 +11695,54 @@ export const bouncer_credit_event_outbox = pgTable(
 
 export type BouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferSelect;
 export type NewBouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferInsert;
+
+/**
+ * Durable outbox for Bouncer usage events of requests whose decide verdict said `spendWatch`.
+ * Bouncer debits a watched account's spend bucket from these events, so they must not be lost to a
+ * Bouncer or network outage. The usage write enqueues the row in the same transaction as the
+ * `microdollar_usage` insert, the gateway then tries one immediate delivery, and the cron drainer
+ * retries failures with the same state machine as `bouncer_credit_event_outbox`. `request_id` is
+ * the bouncer request id shared by decide and the usage event; Bouncer dedupes on it, so a
+ * redelivery counts once. `payload` is the shaped usage-event wire body and carries account PII
+ * (account id, client ip, JA4 client-fingerprint digest); `user_id` is denormalized onto the row
+ * so user soft deletion can delete it.
+ */
+export type BouncerUsageEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_usage_event_outbox = pgTable(
+  'bouncer_usage_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The bouncer request id; the dedupe key that makes enqueue idempotent. */
+    request_id: text().notNull(),
+    /** The Kilo user who made the request; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerUsageEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_usage_event_outbox_request_id').on(table.request_id),
+    index('IDX_bouncer_usage_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_usage_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerUsageEventOutboxRow = typeof bouncer_usage_event_outbox.$inferSelect;
 
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 

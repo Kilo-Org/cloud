@@ -125,7 +125,7 @@ jest.mock('next/server', () => {
   };
 });
 
-jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+jest.mock('@/lib/web-config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 

@@ -2255,7 +2255,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     // Persist the callback, attempt delivery now, then arm only what remains:
     // a failed send keeps its due time and is retried by the alarm.
-    this.persistBatchCallback(reduction.changed);
+    this.persistBatchCallback(reduction.changed, facts);
     await this.repairOutboxes();
     await this.armAlarm();
   }
@@ -2292,14 +2292,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
-  private persistBatchCallback(changed: readonly SessionMessage[]): void {
+  private persistBatchCallback(
+    changed: readonly SessionMessage[],
+    facts?: ControlPlaneReportFacts
+  ): void {
     try {
       const newlyTerminal = new Set(
         changed
           .filter(message => isTerminalMessage(message.state))
           .map(message => message.messageId)
       );
-      this.messageCallbacks.persistDrainedBatchCallback(this.messages, newlyTerminal);
+      this.messageCallbacks.persistDrainedBatchCallback(
+        this.messages,
+        newlyTerminal,
+        undefined,
+        facts
+      );
     } catch {
       logger.withFields({ sessionId: this.sessionId }).warn('Cloud Agent callback write failed');
     }

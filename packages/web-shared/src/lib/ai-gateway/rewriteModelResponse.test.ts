@@ -21,7 +21,7 @@ import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 
-jest.mock('@kilocode/web-shared/lib/r2/client', () =>
+jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest
     .requireActual<{
       createFakeR2ClientModule: () => FakeR2ClientModule;
@@ -1473,7 +1473,9 @@ describe('rewriteModelResponse', () => {
 });
 
 describe('api_request_log storage', () => {
-  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@kilocode/web-shared/lib/r2/client');
+  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+    '@kilocode/web-shared/lib/r2/create-client'
+  );
   const vercelRequestId = 'api-request-log-r2-storage-test';
   const bucket = 'test-api-request-log';
 

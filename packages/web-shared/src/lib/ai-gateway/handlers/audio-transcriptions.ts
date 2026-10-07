@@ -41,9 +41,10 @@ import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
+  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
@@ -244,6 +245,7 @@ export async function handleAudioTranscriptionsRequest(
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,
@@ -277,7 +279,7 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
-  const { balance, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+  const { balance, plan, balanceLimitedByUserAllowance, payer } = await getBalanceAndOrgSettings(
     organizationId,
     user
   );
@@ -302,15 +304,16 @@ export async function handleAudioTranscriptionsRequest(
     if (!decision.allowed) return modelNotAllowedResponse();
   }
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited just before the upstream call within its 500 ms
+  // budget. Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
       tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
     },
   });
 
@@ -336,6 +339,11 @@ export async function handleAudioTranscriptionsRequest(
     parsedRequest.body.user = parsedRequest.body.safety_identifier;
     upstreamBody = buildUpstreamBody(parsedRequest.body);
   }
+
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const response = await transcriptionProxyRequest({
     body: upstreamBody,

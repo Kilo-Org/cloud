@@ -1,5 +1,4 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
-process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 const mockLimit = jest.fn();
 const mockUpdateSet = jest.fn();

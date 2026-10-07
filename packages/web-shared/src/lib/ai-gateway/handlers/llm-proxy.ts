@@ -48,6 +48,7 @@ import {
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   invalidPathResponse,
+  extractReasoningSetting,
   invalidRequestResponse,
   malformedJsonResponse,
   invalidTokenResponse,
@@ -130,10 +131,11 @@ import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/prov
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
-  bouncerDecide,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
+  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 
@@ -595,32 +597,27 @@ export async function handleLlmProxyRequest(
   // decide, usage, and the classifier-overhead billing below share one read.
   const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
-  // Start the report-only verdict alongside balance and provider work. Register
-  // it with after() now so early returns do not end its lifetime. The event id is
-  // generated server-side so decide and usage share one identity for this request.
+  // Start the one decide alongside balance and provider work; it is awaited just before the
+  // upstream call. The event id is generated server-side so decide and usage share one identity
+  // for this request.
   const bouncerRequestId = randomUUID();
-  after(
-    (isAnonymousContext(user)
-      ? bouncerDecide({
+  const bouncerVerdictPromise = startBouncerDecide(
+    isAnonymousContext(user)
+      ? {
           requestId: bouncerRequestId,
           ip: clientIp,
           ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-        })
-      : balanceAndSettingsPromise.then(({ balance, plan }) =>
-          bouncerDecide({
-            requestId: bouncerRequestId,
-            ip: clientIp,
-            ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-            account: {
-              accountId: bouncerAccountId(user.id, organizationId),
-              tier: bouncerDecideTier(organizationId, plan, balance),
-            },
-          })
-        )
-    ).then(
-      () => undefined,
-      () => undefined
-    )
+        }
+      : balanceAndSettingsPromise.then(({ balance, plan, payer }) => ({
+          requestId: bouncerRequestId,
+          ip: clientIp,
+          ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
+          account: {
+            accountId: bouncerAccountId(user.id, organizationId),
+            tier: bouncerDecideTier(organizationId, plan, balance),
+            payer,
+          },
+        }))
   );
 
   // Bill the classifier overhead as soon as the cost is known and we have an
@@ -671,6 +668,7 @@ export async function handleLlmProxyRequest(
             },
             max_tokens: null,
             has_middle_out_transform: null,
+            reasoning_setting: null,
             isStreaming: false,
             prior_microdollar_usage: priorMicrodollarUsage,
             // No posthog_distinct_id: this internal overhead row must not emit
@@ -876,6 +874,7 @@ export async function handleLlmProxyRequest(
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
+    reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
     organizationId,
@@ -952,6 +951,13 @@ export async function handleLlmProxyRequest(
     signal: request.signal,
     vercelRequestId,
   };
+
+  // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
+  // rejects; every other outcome sends the request.
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
+  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,

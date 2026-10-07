@@ -30,6 +30,7 @@ function summary(
     cases: 10,
     errors: 0,
     timeouts: 0,
+    routeAccuracy: null,
   };
 }
 

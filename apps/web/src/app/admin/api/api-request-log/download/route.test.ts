@@ -19,7 +19,7 @@ jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/r2/client', () =>
+jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest
     .requireActual<{
       createFakeR2ClientModule: () => FakeR2ClientModule;
@@ -27,7 +27,9 @@ jest.mock('@kilocode/web-shared/lib/r2/client', () =>
     .createFakeR2ClientModule()
 );
 
-const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@kilocode/web-shared/lib/r2/client');
+const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+  '@kilocode/web-shared/lib/r2/create-client'
+);
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const TEST_USER_ID = 'api-request-log-download-test-user';
 const TEST_MODEL = 'poolside/laguna-s-2.1:free';

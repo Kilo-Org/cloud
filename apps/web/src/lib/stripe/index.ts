@@ -329,7 +329,10 @@ async function reportSeatChangeAttempt(params: {
     return;
   }
   const [organization] = await db
-    .select({ createdAt: organizations.created_at })
+    .select({
+      createdAt: organizations.created_at,
+      usedMicrodollars: organizations.microdollars_used,
+    })
     .from(organizations)
     .where(eq(organizations.id, organizationId))
     .limit(1);
@@ -342,6 +345,7 @@ async function reportSeatChangeAttempt(params: {
     orgId: organizationId,
     amountCents: params.amountCents,
     accountCreatedAt: organization.createdAt,
+    accountUsedMicrodollars: organization.usedMicrodollars,
     ip: params.ip,
     ipCountry: params.ipCountry,
     ja4: params.ja4,
@@ -1999,6 +2003,7 @@ export async function getStripeTopUpCheckoutUrl(
       orgId: organizationId,
       amountCents: principalMinor,
       accountCreatedAt: attempt.accountCreatedAt,
+      accountUsedMicrodollars: attempt.accountUsedMicrodollars,
       ip: attempt.ip,
       ipCountry: attempt.ipCountry,
       cardFingerprint: attempt.cardFingerprint,
@@ -2164,6 +2169,7 @@ export async function getStripeSeatsCheckoutUrl(
             (billingCycle === 'annual' ? annualTotal(plan) : seatPrice(plan, billingCycle)) * 100
           ) * quantity,
         accountCreatedAt: props.attempt.accountCreatedAt,
+        accountUsedMicrodollars: props.attempt.accountUsedMicrodollars,
         ip: props.attempt.ip,
         ipCountry: props.attempt.ipCountry,
         ja4: props.attempt.ja4,

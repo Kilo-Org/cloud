@@ -10,7 +10,8 @@ Generally speaking, you only need a new dev build if making dependency/native ch
 
 Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
 The camera and photo library prompts explain AI agent attachments and include specific examples.
-Background location and motion descriptions are disabled because the app does not request those permissions.
+Background location descriptions remain disabled because the app does not request background location.
+Apple requires a localized motion description for the location library's linked APIs, even though Kilo does not use or collect motion activity.
 Development builds also localize the local-network prompt; production builds exclude that development-only translation and retain Expo's release stripping.
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 

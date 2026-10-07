@@ -395,8 +395,7 @@ const config: ExpoConfig = {
         locationAlwaysAndWhenInUsePermission: false,
         locationAlwaysPermission: false,
         // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
-        motionUsagePermission:
-          'Kilo’s location library includes motion activity support. Kilo does not use or collect your motion activity.',
+        motionUsagePermission: PERMISSION_PROMPT_COPY.en.NSMotionUsageDescription,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
         isAndroidForegroundServiceEnabled: false,

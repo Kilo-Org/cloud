@@ -10,5 +10,5 @@ export const VERCEL_AI_GATEWAY = {
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'messages', 'responses'],
   responseTransforms: null,
-  transformRequest() {},
+  async transformRequest() {},
 } as const satisfies Provider;

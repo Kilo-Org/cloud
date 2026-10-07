@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { WorkerDb } from '@kilocode/db/client';
+import type { SQL } from 'drizzle-orm';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   assertContainerCapacity,
+  countLiveContainers,
   ContainerConcurrencyLimitError,
   isContainerConcurrencyLimitError,
   ORGANIZATION_CONTAINER_LIMIT,
@@ -20,6 +24,30 @@ function request(overrides: Partial<ContainerCapacityRequest> = {}): ContainerCa
     ...overrides,
   };
 }
+
+describe('countLiveContainers', () => {
+  it('excludes code reviews by service and instance ID, including the shared Sandbox pool', async () => {
+    const where = vi.fn(async (_condition: SQL) => [{ live: 19 }]);
+    const db = {
+      select: () => ({ from: () => ({ where }) }),
+    } as unknown as WorkerDb;
+
+    await expect(countLiveContainers(db, request())).resolves.toBe(19);
+
+    const query = new PgDialect().sqlToQuery(where.mock.calls[0][0]);
+    expect(query.sql).toContain('"container_usage_interval"."service" not like $5');
+    expect(query.sql).toContain('"container_usage_interval"."instance_id" not like $6');
+    expect(query.params).toEqual([
+      'user',
+      'user_1',
+      'open',
+      'cloud-agent-next-%',
+      '%code-review%',
+      'crv-%',
+      'ses-abcdef',
+    ]);
+  });
+});
 
 describe('assertContainerCapacity', () => {
   it('admits a personal start below the personal limit', async () => {

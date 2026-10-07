@@ -166,7 +166,7 @@ describe('classifyControlPlaneFailure', () => {
       code: 'container_limit_reached',
       reportStatus: 'failed',
       responsibility: 'user',
-      failureReason: 'admission_capacity',
+      failureReason: 'container_limit_reached',
     });
   });
   it('attributes Vercel billing credit denial to the user and admission outage to the platform', () => {

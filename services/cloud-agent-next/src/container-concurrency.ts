@@ -89,6 +89,7 @@ export async function countLiveContainers(
         gt(container_usage_interval.last_seen_at, LIVE_INTERVAL_WINDOW),
         like(container_usage_interval.service, CLOUD_AGENT_SERVICE_PATTERN),
         notLike(container_usage_interval.service, CODE_REVIEW_SERVICE_PATTERN),
+        notLike(container_usage_interval.instance_id, 'crv-%'),
         ne(container_usage_interval.instance_id, request.instanceId)
       )
     );

@@ -6587,6 +6587,7 @@ export type CloudAgentFailureReason =
   | 'session_import_timeout'
   | 'session_import_failed'
   | 'setup_command_timeout'
+  | 'container_limit_reached'
   | 'admission_capacity'
   | 'admission_not_found'
   | 'admission_internal'

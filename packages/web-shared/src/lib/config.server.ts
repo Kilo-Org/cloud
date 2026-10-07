@@ -480,12 +480,3 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
 
 export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET') || '';
-
-// Pipe-delimited list of TLDs to block from new signups, each with a leading dot (e.g. ".shop|.top|.co.uk")
-const blacklistTldsEnv = getEnvVariable('BLACKLIST_TLDS');
-export const BLACKLIST_TLDS = blacklistTldsEnv
-  ? blacklistTldsEnv
-      .split('|')
-      .map((tld: string) => tld.trim().toLowerCase())
-      .filter(Boolean)
-  : [];

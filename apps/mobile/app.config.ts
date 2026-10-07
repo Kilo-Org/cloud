@@ -394,7 +394,9 @@ const config: ExpoConfig = {
         // The app requests only foreground location for weather setup.
         locationAlwaysAndWhenInUsePermission: false,
         locationAlwaysPermission: false,
-        motionUsagePermission: false,
+        // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
+        motionUsagePermission:
+          'Kilo’s location library includes motion activity support. Kilo does not use or collect your motion activity.',
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
         isAndroidForegroundServiceEnabled: false,

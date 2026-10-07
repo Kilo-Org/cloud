@@ -90,7 +90,6 @@ test('context donut shows usage after a reply', async () => {
     await sidePanel.reload();
 
     await sidePanel.getByLabel('Message agent').fill('Show me usage');
-    // Wait for send to be enabled (model + target tab ready)
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Donut reply.')).toBeVisible();

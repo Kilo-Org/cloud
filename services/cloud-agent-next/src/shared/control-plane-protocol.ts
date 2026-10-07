@@ -1,3 +1,8 @@
+import {
+  RuntimeSkillsSchema,
+  RuntimeAgentsSchema,
+  RuntimeKiloCommandsSchema,
+} from './runtime-profile.js';
 import type {
   CloudAgentAssistantFailureReason,
   CloudAgentProviderOwnership,
@@ -239,7 +244,7 @@ export const controlPlaneRouteSpecSchema = z
     branchMode: z.literal('working').optional(),
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
-    env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    env: z.record(z.string().max(256), z.string().max(10000)).optional(),
     /**
      * Materialized (plaintext) MCP servers for `KILO_CONFIG_CONTENT.mcp`. Only
      * the Sandbox DO adds this to the `session.prepare` frame; it is never stored
@@ -248,6 +253,9 @@ export const controlPlaneRouteSpecSchema = z
      */
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    runtimeSkills: RuntimeSkillsSchema.optional(),
+    runtimeAgents: RuntimeAgentsSchema.optional(),
+    kiloCommands: RuntimeKiloCommandsSchema.optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
     /**
@@ -264,7 +272,19 @@ export const controlPlaneRouteSpecSchema = z
      */
     secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((spec, context) => {
+    if (
+      (spec.runtimeSkills?.length || spec.runtimeAgents?.length || spec.kiloCommands?.length) &&
+      spec.runtimeIsolation !== 'per-session'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['runtimeIsolation'],
+        message: 'Runtime profiles require per-session isolation',
+      });
+    }
+  });
 
 /**
  * Route spec accepted at the registration boundary. `secretEnvKeys` is
@@ -348,6 +368,15 @@ export const controlPlaneCredentialSourceSchema = z
      * the wrapper bundle) never imports the worker persistence schema.
      */
     mcpServers: z.record(z.string().min(1).max(100), z.unknown()).optional(),
+    /**
+     * Worker-encrypted `profile.encryptedSecrets` snapshot. Same contract as
+     * `mcpServers`: persisted only inside this DO-private source, re-validated and
+     * decrypted by the Sandbox DO only when building a `session.prepare` frame,
+     * and never serialized into a wrapper frame or a route spec. Opaque here so
+     * the shared schema never imports the worker persistence schema. Secret names
+     * may be up to 128 characters (`EncryptedSecretsSchema`).
+     */
+    encryptedSecrets: z.record(z.string().min(1).max(128), z.unknown()).optional(),
     /** Credential scope (worktree id); defaults to the route's session id. */
     scopeId: z.string().min(1).max(256).optional(),
   })
@@ -642,6 +671,7 @@ const controlPlaneHelloFrameSchema = z
     /**
      * Optional capability: the wrapper redacts a value by each named secret key
      * from `session.prepare`, not only names matching the `SECRET_NAME` heuristic.
+     * A secret-bearing prepare is not sent to a wrapper that did not advertise it.
      */
     redactsNamedSecrets: z.literal(true).optional(),
   })

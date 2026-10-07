@@ -1,3 +1,4 @@
+import { writeRuntimeSkills } from './runtime-skills.js';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -689,35 +690,6 @@ async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promis
   );
 }
 
-function isSafeSkillFilePath(relativePath: string): boolean {
-  if (relativePath.length === 0 || relativePath.length > 200) return false;
-  if (relativePath.startsWith('/')) return false;
-  if (relativePath.includes('..')) return false;
-  if (relativePath.includes('\\') || relativePath.includes('\0')) return false;
-  if (relativePath.toLowerCase() === 'skill.md') return false;
-  return /^[a-zA-Z0-9._\-/]+$/.test(relativePath);
-}
-
-async function writeRuntimeSkills(request: WrapperSessionReadyRequest): Promise<void> {
-  const skills = request.materialized.runtimeSkills;
-  if (!skills?.length) return;
-
-  const baseDir = path.join(request.workspace.sessionHome, '.kilocode/skills');
-  await fs.mkdir(baseDir, { recursive: true });
-
-  for (const skill of skills) {
-    const skillDir = path.join(baseDir, skill.name);
-    await fs.mkdir(skillDir, { recursive: true });
-    await fs.writeFile(path.join(skillDir, 'SKILL.md'), skill.rawMarkdown);
-    for (const [relativePath, content] of Object.entries(skill.files ?? {})) {
-      if (!isSafeSkillFilePath(relativePath)) continue;
-      const targetPath = path.join(skillDir, relativePath);
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      await fs.writeFile(targetPath, content);
-    }
-  }
-}
-
 async function bootstrapEmptyKiloSession(
   request: WrapperSessionReadyRequest,
   restore: typeof restoreSession
@@ -1297,7 +1269,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
 
-      await writeRuntimeSkills(request);
+      await writeRuntimeSkills(request.workspace.sessionHome, request.materialized.runtimeSkills);
 
       progress?.(
         'kilo_session',

@@ -48,6 +48,14 @@ function gitFromMetadata(
   };
 }
 
+export function isReadOnlyBitbucketReview(
+  metadata: Pick<SessionMetadata, 'identity' | 'repository' | 'callback'>
+): boolean {
+  if (metadata.identity.createdOnPlatform !== 'code-review') return false;
+  if (metadata.repository?.type !== 'bitbucket') return false;
+  return codeReviewIdFromCallbackTarget(metadata.callback?.target) !== null;
+}
+
 export function buildSessionAttachPayload(
   metadata: SessionMetadata,
   preparation?: SessionAttachPayload['preparation'],
@@ -67,14 +75,10 @@ export function buildSessionAttachPayload(
       ? 'working'
       : undefined;
   const profile = readProfileBundle(metadata);
-  const bitbucketReviewId =
-    metadata.identity.createdOnPlatform === 'code-review' &&
-    metadata.repository?.type === 'bitbucket'
-      ? codeReviewIdFromCallbackTarget(metadata.callback?.target)
-      : null;
+  const readOnlyBitbucketReview = isReadOnlyBitbucketReview(metadata);
   validateControlSessionOptions(metadata);
   const env = {
-    ...(profile.envVars ?? {}),
+    ...(!readOnlyBitbucketReview ? (profile.envVars ?? {}) : {}),
     ...(metadata.auth.kilocodeToken ? { KILOCODE_TOKEN: metadata.auth.kilocodeToken } : {}),
   };
   rejectReservedControlRuntimeEnvironment(env);
@@ -85,9 +89,7 @@ export function buildSessionAttachPayload(
     ...(metadata.auth.kiloSessionId ? { snapshotIdentity: metadata.auth.kiloSessionId } : {}),
     ...(git ? { git } : {}),
     ...(Object.keys(env).length > 0 ? { env } : {}),
-    ...(bitbucketReviewId === null &&
-    profile.mcpServers &&
-    Object.keys(profile.mcpServers).length > 0
+    ...(!readOnlyBitbucketReview && profile.mcpServers && Object.keys(profile.mcpServers).length > 0
       ? { mcp: materializeMcpServers(profile.mcpServers, mcpPrivateKey) }
       : {}),
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),

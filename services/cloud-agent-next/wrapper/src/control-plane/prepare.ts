@@ -1,3 +1,4 @@
+import { materializeRuntimeProfile, withRuntimeProfileEnvironment } from './runtime-profile.js';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -933,13 +934,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // Built inside the failure scope: an over-limit CLI config must surface as
       // `session.failed`, not reject the prepare promise (which the caller
       // swallows while the route waits out its timeout).
-      const env = buildWorktreeKiloEnvironment(
-        directory,
-        home,
-        kiloAuth,
-        spec.env ?? {},
-        inheritedEnv,
-        spec.mcp
+      const env = withRuntimeProfileEnvironment(
+        buildWorktreeKiloEnvironment(
+          directory,
+          home,
+          kiloAuth,
+          spec.env ?? {},
+          inheritedEnv,
+          spec.mcp
+        ),
+        spec
       );
       const redact = createSecretRedactor(
         inheritedEnv,
@@ -966,6 +970,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (owner.released) return;
       currentStep = 'kilo_runtime';
       emitProgress(sessionId, 'kilo_runtime');
+      if (spec.runtimeIsolation === 'per-session') await materializeRuntimeProfile(home, spec);
       const client = await withRuntimeStartRetry(
         key,
         () =>
@@ -1016,17 +1021,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<void> {
     const route = prepared.get(credentials.sessionId);
     if (!route) return;
-    const nextEnv = buildWorktreeKiloEnvironment(
-      route.directory,
-      route.home,
-      {
-        ...route.kilo,
-        token: credentials.proxy?.handle ?? credentials.kilo.token,
-        targets: credentials.proxy?.targets ?? route.kilo.targets,
-      },
-      route.spec.env ?? {},
-      inheritedEnv,
-      route.spec.mcp
+    const nextEnv = withRuntimeProfileEnvironment(
+      buildWorktreeKiloEnvironment(
+        route.directory,
+        route.home,
+        {
+          ...route.kilo,
+          token: credentials.proxy?.handle ?? credentials.kilo.token,
+          targets: credentials.proxy?.targets ?? route.kilo.targets,
+        },
+        route.spec.env ?? {},
+        inheritedEnv,
+        route.spec.mcp
+      ),
+      route.spec
     );
     route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv);

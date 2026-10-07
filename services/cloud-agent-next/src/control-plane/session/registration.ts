@@ -1,3 +1,4 @@
+import { readProfileBundle } from '../../session-profile.js';
 import { z } from 'zod';
 import type { SessionAttachPayload } from '../../shared/sandbox-control-protocol.js';
 import {
@@ -11,7 +12,10 @@ import {
   type ControlPlaneSandboxSelection,
 } from './sandbox-selection.js';
 import { credentialSourceFromMetadata } from '../../sandbox-control/session-credentials.js';
-import { buildSessionAttachPayload } from '../../sandbox-session/attach-payload.js';
+import {
+  buildSessionAttachPayload,
+  isReadOnlyBitbucketReview,
+} from '../../sandbox-session/attach-payload.js';
 import {
   McpAttachValidationError,
   McpConfigurationError,
@@ -212,13 +216,33 @@ export function buildControlPlaneSessionRegistration(
     const validated = parseSessionAttachMcpServers(payload.mcp);
     if (!validated.success) throw new McpAttachValidationError(validated.reason);
   }
-  const spec = controlPlaneRouteSpecSchema.parse(
-    controlPlaneRouteSpecFromAttachPayload(
+  // A read-only Bitbucket review runs with worker-owned env only, so its
+  // encrypted profile secrets are withheld, mirroring the legacy plane and the
+  // withheld MCP snapshot.
+  const encryptedSecrets = isReadOnlyBitbucketReview(metadata)
+    ? undefined
+    : metadata.profile?.encryptedSecrets;
+  const hasEncryptedSecrets =
+    encryptedSecrets !== undefined && Object.keys(encryptedSecrets).length > 0;
+  const profile = isReadOnlyBitbucketReview(metadata) ? {} : readProfileBundle(metadata);
+  const runtimeProfile = {
+    ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
+    ...(profile.runtimeAgents?.length ? { runtimeAgents: profile.runtimeAgents } : {}),
+    ...(profile.kiloCommands?.length ? { kiloCommands: profile.kiloCommands } : {}),
+  };
+  const spec = controlPlaneRouteSpecSchema.parse({
+    ...runtimeProfile,
+    ...controlPlaneRouteSpecFromAttachPayload(
       payload,
       { sessionId: metadata.identity.sessionId, kiloSessionId },
-      hasModernRuntimeAuthorization(metadata) ? { runtimeIsolation: 'per-session' } : undefined
-    )
-  );
+      hasModernRuntimeAuthorization(metadata) ||
+        hasEncryptedSecrets ||
+        Object.keys(payload.env ?? {}).some(key => key !== 'KILOCODE_TOKEN') ||
+        Object.keys(runtimeProfile).length > 0
+        ? { runtimeIsolation: 'per-session' }
+        : undefined
+    ),
+  });
   // `payload.mcp` is present only when materialization was not omitted for a
   // read-only Bitbucket review, so the encrypted snapshot is gated on it too.
   const encryptedMcpServers = payload.mcp === undefined ? undefined : metadata.profile?.mcpServers;
@@ -226,6 +250,7 @@ export function buildControlPlaneSessionRegistration(
     ...credentialSourceFromMetadata(metadata),
     scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
     ...(encryptedMcpServers === undefined ? {} : { mcpServers: encryptedMcpServers }),
+    ...(encryptedSecrets === undefined ? {} : { encryptedSecrets }),
   };
   return { sandboxId, spec, credentials, sandboxSelection: { ...sandboxSelection, containment } };
 }

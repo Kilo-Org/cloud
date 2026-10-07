@@ -237,10 +237,13 @@ export type DecideFlag = DecideResponse['flags'][number];
 const signupRequestSchema = z.strictObject({
   operationId: z.string().min(1).max(MAX_ID_LENGTH),
   ip: z.union([z.ipv4(), z.ipv6()]),
+  ja4: z.string().nullable().optional().transform(normalizeJa4),
 });
 
+export type SignupDecideRequest = z.input<typeof signupRequestSchema>;
+
 const signupFlagSchema = z.strictObject({
-  name: z.enum(['signup:burst', 'signup:sustained', 'signup:saturated']),
+  name: z.enum(['signup:burst', 'signup:sustained', 'signup:ja4', 'signup:saturated']),
   decision: z.enum(['review', 'throttle', 'block']),
   enforced: z.boolean(),
   until: z.number().nonnegative().nullable(),
@@ -251,7 +254,7 @@ const signupFlagSchema = z.strictObject({
 const signupResponseSchema = z.discriminatedUnion('enforced', [
   z.strictObject({
     enforced: z.literal(false),
-    flags: z.array(signupFlagSchema).max(3),
+    flags: z.array(signupFlagSchema).max(5),
   }),
   z.strictObject({
     enforced: z.literal(true),
@@ -262,7 +265,7 @@ const signupResponseSchema = z.discriminatedUnion('enforced', [
       .nonnegative()
       // Allow clock and request-order skew beyond the longest supported window.
       .max(31 * 24 * 60 * 60 * 1000),
-    flags: z.array(signupFlagSchema).max(3),
+    flags: z.array(signupFlagSchema).max(5),
   }),
 ]);
 
@@ -648,7 +651,7 @@ export async function decide(
 
 /** Best-effort signup admission, using the same internal key as inference decide. Never retries. */
 export async function signupDecide(
-  request: { operationId: string; ip: string },
+  request: SignupDecideRequest,
   { timeoutMs = SIGNUP_TIMEOUT_MS, signal }: { timeoutMs?: number; signal?: AbortSignal } = {}
 ): Promise<SignupDecideResponse | null> {
   const parsedRequest = signupRequestSchema.safeParse(request);

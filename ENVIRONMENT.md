@@ -272,27 +272,29 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
 - `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Every inference endpoint awaits one decide immediately before its provider request. [SERVER]
   - Decide has a 500 ms budget. Only a verdict with `enforced: true` rejects: `rate_limited` and `spend_limited` return 429 `rate_limit_exceeded` with `retry-after` and `retry-after-ms`, `restricted` returns 403 `account_restricted`. A timeout, error, non-2xx, unknown shape, or any other verdict sends the request. Verdict flags are logged server-side and never returned to the client.
-  - Signup calls `/api/v1/signup-decide` only for new users, after account resolution and before Stripe customer creation. The call uses `INTERNAL_API_SECRET` and a 500 ms budget.
+  - Signup calls `/api/v1/signup-decide` only for new users, after account resolution and before Stripe customer creation. Existing sign-in and provider linking never consume signup quotas. The call uses `INTERNAL_API_SECRET` and a 500 ms budget.
   - Development skips admission. Missing or invalid IPs, missing configuration, timeouts, transport errors, HTTP errors, invalid JSON, and unknown response shapes fail open.
-  - Only a validated enforced `signup_rate_limited` response returns `SIGNUP-RATE-LIMITED`. Cloud never exposes internal flags to the user.
-  - Signup sends `{ operationId, ip }`. `signupOperationId` hashes the existing normalized email with SHA-256 and prefixes the digest with `signup:`.
+  - Only a validated enforced `signup_rate_limited` response returns `SIGNUP-RATE-LIMITED`. Cloud accepts at most five merged IP/JA4 flags, including `signup:ja4`, and never exposes internal flags to the user.
+  - Signup sends `{ operationId, ip, ja4? }`. JA4 comes only from the original request's `x-vercel-ja4-digest` header, not the Cloud-to-Bouncer TLS fingerprint. It is trimmed, lowercased, and bounded to `^[a-z0-9_]{1,128}$`; missing or invalid values are omitted whole, never truncated, and IP admission still runs. `signupOperationId` hashes the existing normalized email with SHA-256 and prefixes the digest with `signup:`.
   - The identity helper lives in `packages/web-shared/src/lib/bouncer/signup.ts`. Live admission and historical import must use the same helper.
   - Cloud validates the forwarded first-hop IP. Bouncer canonicalizes addresses and groups IPv6 by /64.
   - Bouncer defaults to 3 admissions per canonical IP per rolling 30 days. The shorter 24-hour limit is also 3.
+  - JA4 defaults to 10 admissions per fingerprint per rolling 720 hours (30 days), independently of the IP limits. A shared TLS/HTTP fingerprint can cover unrelated people behind proxies or common clients: JA4 throttling risks false positives and must be evaluated separately from IP enforcement.
   - The Bouncer Exemptions tab accepts user IDs and IPs. Exempt requests bypass all Bouncer rules, not Cloud authentication or billing.
   - Signed-in decisions carry the actual actor's `userId` separately from the payer's `accountId`, including organization-paid requests.
-  - IP exemptions cover signup and inference; IPv6 covers the whole /64. Signup has no user ID before account creation.
+  - IP exemptions cover signup and inference; IPv6 covers the whole /64. An exempt signup IP bypasses both IP and JA4 counters. Signup has no user ID before account creation; no JA4 exemption or user fingerprint field is added.
   - Admission and creation logs share the operation ID. They exclude raw email and distinguish completed creation, rejection, and Stripe or transaction failure.
   - Bouncer owns signup admission. Cloud keeps `signup_ip` as evidence and retains all authentication and identity guards.
-  - Deploy Bouncer first with `enforcement.signup=false`. Both `enforcement.signup` and the global `enforcement.enabled` switch must be on to reject signups.
-  - Bouncer counts admissions, including failed creations. Imported history counts completed accounts. Limits and window lengths are configurable in the Bouncer admin panel.
+  - Deploy Bouncer first with `enforcement.signup=false` and `enforcement.signupJa4=false`; all signup enforcement ships off. The existing `enforcement.signup` switch governs IP rejection, and `enforcement.signupJa4` independently governs JA4 rejection. The global `enforcement.enabled` switch gates both; no production switch is changed by deployment.
+  - Bouncer evaluates IP first and skips JA4 if IP rejects. It counts admissions, including failed creations: an IP admission remains counted if JA4 later rejects, just as it remains counted after a later Cloud transaction or Stripe failure. There are no refunds. Stable operation IDs deduplicate each bucket independently. Limits and window lengths are configurable in the Bouncer admin panel.
+  - Historical import counts completed accounts for IP only; never reconstruct historical signup JA4 from usage or payment fingerprints. JA4 coverage starts with live signup reports.
   - Deploy the first integration PR fully before this ownership cutover. Its existing Cloud limiter protects the historical import.
   - From this checked-out cutover branch, run `pnpm --filter web script:run db import-signup-history` with the production script environment.
   - The importer reads completed accounts from the last 30 days through a fixed time bound in 100-row pages. It changes no Cloud users.
   - Each page requires a full Bouncer acknowledgement. Duplicate admissions are safe. Missing or empty IPs match the old limiter's exclusions.
   - Invalid nonempty IPs, partial acknowledgement, HTTP errors, and saturation stop the import with a nonzero exit.
   - Run the importer again after all first-PR instances deploy. For an incremental catch-up, append the previous run's `through` timestamp.
-  - After full acknowledgement and catch-up, only Igor enables both signup enforcement switches. Check shadow flags before enabling enforcement.
+  - After full acknowledgement and catch-up, only Igor enables IP signup enforcement and the global switch. Check shadow flags before independently enabling JA4 enforcement.
   - Verify allowed and rejected signups with live configuration before merging and deploying the ownership cutover PR.
   - After the cutover, Bouncer failure deliberately fails open. Revert the cutover PR to restore the old Cloud limiter.
   - Signed-in decide requests carry the payer's `created_at`, `microdollars_used`, and `total_microdollars_acquired` (the organization's for an org request); `charge.attempted` carries the payer's `microdollars_used`.

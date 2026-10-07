@@ -253,6 +253,21 @@ describe('signupDecide', () => {
     expect((await signupDecide({ ...request, ip: '2001:db8::1' }))?.enforced).toBe(false);
   });
 
+  it.each([undefined, null, '', 'has space', 'a'.repeat(129)])(
+    'preserves an enforceable IP rejection when JA4 is absent or invalid: %s',
+    async ja4 => {
+      mockFetch.mockResolvedValue(
+        Response.json({
+          enforced: true,
+          code: 'signup_rate_limited',
+          retryAfterMs: 2_000,
+          flags: [flag],
+        })
+      );
+      expect((await signupDecide({ ...request, ja4 }))?.enforced).toBe(true);
+    }
+  );
+
   it.each([
     ['unknown code', { enforced: true, code: 'restricted', retryAfterMs: 1, flags: [] }],
     ['missing code', { enforced: true, retryAfterMs: 1, flags: [] }],
@@ -278,7 +293,6 @@ describe('signupDecide', () => {
     ['unknown flag', { enforced: false, flags: [{ ...flag, name: 'other:flag' }] }],
     ['unknown field', { enforced: false, flags: [], spendWatch: false }],
     ['shadow rejection code', { enforced: false, code: 'signup_rate_limited', flags: [] }],
-    ['too many flags', { enforced: false, flags: [flag, flag, flag, flag] }],
     ['non-object response', 'allow'],
   ])('fails open on %s', async (_name, verdict) => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);

@@ -1,4 +1,7 @@
-import { classifyAssistantFailure } from '../../../src/shared/assistant-failure.js';
+import {
+  classifyAssistantFailure,
+  isAssistantInterrupt,
+} from '../../../src/shared/assistant-failure.js';
 import {
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
   controlPlaneFailureReasonSchema,
@@ -21,9 +24,15 @@ import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js'
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
-import type { KiloRestartReason } from './kilo-runtime.js';
+import type { KiloRestartInfo } from './kilo-runtime.js';
+import type {
+  SessionSupervisor,
+  ExecutionIdentity,
+  ExecutionFailure,
+} from './session-supervisor.js';
 import { runtimeKey } from './prepare.js';
 
+const PROMPT_DELIVERY_TIMEOUT_MS = 120_000;
 const SYNTHETIC_KILO_EVENTS = new Set(['server.connected', 'server.heartbeat']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,6 +51,8 @@ export type TurnKiloRuntime = {
   isRestarting(): boolean;
   isUnavailable(): boolean;
   isRetiredClient(client: WrapperKiloClient): boolean;
+  sessionState(id: string): ReturnType<SessionSupervisor['state']>;
+  refreshActivity(): Promise<void>;
   applyPendingCredentials?(canRestart: () => boolean): Promise<boolean>;
 };
 
@@ -75,9 +86,19 @@ export type TurnManagerDeps = {
 
 export type TurnPhase = 'busy' | 'finalizing';
 
+type DeferredCompletion = {
+  nativeRuntimeId: string;
+  execution: number;
+  lastMessageId: string;
+};
+
 type MaterializedPrompt = Awaited<ReturnType<typeof materializeMessageAttachments>>;
 type PendingPrompt = {
   payload: ControlPlanePromptPayload;
+  receivedAt: number;
+  nativeObserved?: boolean;
+  acknowledged?: boolean;
+  abort: AbortController;
   message?: Promise<MaterializedPrompt>;
   /** The prompt, compact or command call has been made to Kilo. */
   dispatched?: boolean;
@@ -99,38 +120,15 @@ export type Turn = {
   submittedSinceIdle: boolean;
   /** A root idle was observed while finalizing and has not been consumed yet. */
   idleWhileFinalizing: boolean;
-  started: boolean;
-  startedAt: number;
-  lastProgressAt: number;
-  waitingSince: number | null;
-  pausedMs: number;
+  /**
+   * A completed native close seen while its execution was still recorded. The
+   * supervisor may clear the execution later from a reconciling idle snapshot,
+   * so the completion is held until that ends the same execution and batch.
+   */
+  deferredCompletion?: DeferredCompletion;
+  /** Latched from the native supervisor for the one-time restart resubmission rule. */
   progressed: boolean;
   resubmitted: boolean;
-  /**
-   * Tool parts currently `running` in this turn's routed root session or its
-   * resolved descendant tree, keyed by `<kilo session id>\0<part id>`. Kilo owns
-   * each tool's own timeout, so a nonempty set holds the no-progress clock, but
-   * never the hard cap. Diagnostic `lastTool` is not decision state.
-   */
-  runningParts: Set<string>;
-  /**
-   * Diagnostic only: real-progress events seen from descendant sessions in this
-   * turn's tree, counted alongside the root progress they mark. This count is
-   * reported at expiry to distinguish "descendant progress arrived" from "no
-   * descendant progress arrived at all". It never affects any accounting.
-   */
-  descendantProgressEvents: number;
-  lastProgressSessionId?: string;
-  lastProgressEventType?: string;
-  lastTool?: {
-    sessionId: string;
-    messageId: string;
-    partId: string;
-    status: string;
-    observedAt: number;
-    outputBytes?: number;
-  };
-  preDeadlineProbedAt?: number;
   /** Aborts the running finalization step (timeout or Stop). */
   stepAbort?: AbortController;
   submitting: Promise<void>;
@@ -143,69 +141,11 @@ type TurnRoute = {
   runtimeKey: string;
   createdOnPlatform?: string;
   automaticPermissions: Set<string>;
+  /** Suppresses cancellation aftershocks until this route starts another native execution. */
+  deadlineRuntimeId?: string;
 };
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
-
-/** Time the turn spent paused because it was waiting on the user. */
-export function turnPausedMs(turn: Pick<Turn, 'pausedMs' | 'waitingSince'>, now: number): number {
-  return turn.waitingSince === null
-    ? turn.pausedMs
-    : turn.pausedMs + Math.max(0, now - turn.waitingSince);
-}
-
-/** Time since the last real progress, excluding time waiting on the user. */
-export function noProgressElapsedMs(
-  turn: Pick<Turn, 'lastProgressAt' | 'pausedMs' | 'waitingSince'>,
-  now: number
-): number {
-  return Math.max(0, now - turn.lastProgressAt - turnPausedMs(turn, now));
-}
-
-export type TurnDeadlineAction = 'no_progress' | 'execution_limit';
-
-/**
- * The pure outcome clock. The 7-minute real-progress clock pauses while the
- * turn waits on the user; a nonempty running set holds no-progress failure; the
- * 120-minute cap does not.
- */
-export function turnDeadlineAction(
-  turn: Pick<Turn, 'startedAt' | 'lastProgressAt' | 'pausedMs' | 'waitingSince' | 'runningParts'>,
-  now: number,
-  timers: TurnTimers
-): TurnDeadlineAction | null {
-  if (now - turn.startedAt >= timers.turnHardCapMs) return 'execution_limit';
-  if (turn.runningParts.size > 0) return null;
-  if (noProgressElapsedMs(turn, now) >= timers.noProgressMs) return 'no_progress';
-  return null;
-}
-
-function eventMessageId(properties: Record<string, unknown>): string | undefined {
-  if (typeof properties.messageID === 'string') return properties.messageID;
-  const part = properties.part;
-  if (isRecord(part) && typeof part.messageID === 'string') return part.messageID;
-  return undefined;
-}
-
-function isRealProgress(
-  turn: Pick<Turn, 'prompts'>,
-  type: string,
-  properties: Record<string, unknown>
-): boolean {
-  // Kilo stores the user's own prompt as a text part, which is not progress.
-  const messageId = eventMessageId(properties);
-  if (
-    messageId !== undefined &&
-    turn.prompts.some(entry => entry.payload.messageId === messageId)
-  ) {
-    return false;
-  }
-  if (type === 'message.part.delta') return true;
-  if (type !== 'message.part.updated') return false;
-  const part = properties.part;
-  if (!isRecord(part)) return false;
-  return part.type === 'text' || part.type === 'reasoning' || part.type === 'tool';
-}
 
 /** A prompt was received (and kept) but not yet handed to Kilo. */
 function hasUndispatchedPrompt(turn: Pick<Turn, 'prompts'>): boolean {
@@ -228,7 +168,6 @@ function markDispatched(
 export type TurnManager = ReturnType<typeof createTurnManager>;
 
 export function createTurnManager(deps: TurnManagerDeps) {
-  const timers = deps.timers.wrapper;
   const now = deps.now ?? Date.now;
   const scheduler = deps.scheduler ?? {
     setInterval: (handler, ms) => setInterval(handler, ms),
@@ -252,7 +191,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
   const turns = new Map<string, Turn>();
   const turnByKiloSession = new Map<string, string>();
   const childRoots = new Map<string, string>();
-  const tickMs = Math.max(500, Math.floor(timers.noProgressMs / 7));
+  const tickMs = 1_000;
   let tickHandle: ReturnType<typeof setInterval> | undefined;
 
   function log(message: string): void {
@@ -315,6 +254,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   function resetTurn(sessionId: string): void {
     if (!turns.has(sessionId)) return;
+    for (const pending of turns.get(sessionId)?.prompts ?? []) pending.abort.abort();
     turns.delete(sessionId);
     stopTickIfIdle();
   }
@@ -341,7 +281,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
   function queueState(route: TurnRoute): QueueState {
     const runtime = deps.runtimes.get(route.runtimeKey);
     if (runtime === undefined || runtime.isUnavailable()) return 'unavailable';
-    if (runtime.isRestarting() || runtime.isSuspected()) return 'queue';
+    if (
+      runtime.isRestarting() ||
+      runtime.isSuspected() ||
+      runtime.sessionState(route.kiloSessionId)?.activity === 'stopping'
+    )
+      return 'queue';
     return 'ready';
   }
 
@@ -358,7 +303,6 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   function createTurn(route: TurnRoute): Turn {
-    const at = now();
     const turn: Turn = {
       route,
       phase: 'busy',
@@ -366,15 +310,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
       prompts: [],
       submittedSinceIdle: false,
       idleWhileFinalizing: false,
-      started: false,
-      startedAt: at,
-      lastProgressAt: at,
-      waitingSince: null,
-      pausedMs: 0,
       progressed: false,
       resubmitted: false,
-      runningParts: new Set(),
-      descendantProgressEvents: 0,
       submitting: Promise.resolve(),
     };
     turns.set(route.sessionId, turn);
@@ -382,47 +319,33 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return turn;
   }
 
-  function beginWaiting(turn: Turn): void {
-    if (turn.waitingSince === null) turn.waitingSince = now();
-  }
-
-  function endWaiting(turn: Turn): void {
-    if (turn.waitingSince === null) return;
-    turn.pausedMs += Math.max(0, now() - turn.waitingSince);
-    turn.waitingSince = null;
-  }
-
-  function applyInteraction(turn: Turn, type: string): boolean {
-    if (type === 'question.asked' || type === 'permission.asked') {
-      beginWaiting(turn);
-      return true;
+  function refreshActivity(key: string): void {
+    const runtime = deps.runtimes.get(key);
+    if (!runtime) return;
+    for (const turn of turnsForRuntimeKey(key)) {
+      const state = runtime.sessionState(turn.route.kiloSessionId);
+      if (state?.progressed) turn.progressed = true;
+      if (state) {
+        for (const pending of turn.prompts) {
+          if (pending.dispatched && (pending.acknowledged || state.startedAt >= pending.receivedAt))
+            pending.nativeObserved = true;
+        }
+      }
+      const deferred = turn.deferredCompletion;
+      if (deferred === undefined) continue;
+      if (state !== undefined) {
+        // A newer execution owns the native slot; the held close belongs to the
+        // retired one and must not settle it.
+        if (
+          state.nativeRuntimeId !== deferred.nativeRuntimeId ||
+          state.execution !== deferred.execution
+        )
+          turn.deferredCompletion = undefined;
+        continue;
+      }
+      turn.deferredCompletion = undefined;
+      if (lastReceivedMessageId(turn) === deferred.lastMessageId) void finalize(turn);
     }
-    if (
-      type === 'question.replied' ||
-      type === 'question.rejected' ||
-      type === 'permission.replied'
-    ) {
-      endWaiting(turn);
-      return true;
-    }
-    return false;
-  }
-
-  // Real progress only moves the progress clock. It must not end a user wait:
-  // the pending question's own tool part is a tool event, so ending the wait here
-  // resumes the no-progress clock and reports the waiting turn as active, which
-  // pins the sandbox. A wait ends only on `question.replied`/`question.rejected`/
-  // `permission.replied` or a delivered answer (spec §7 "waiting on the user
-  // pauses the clock").
-  function markProgress(turn: Turn, sessionId: string | undefined, eventType: string): void {
-    turn.progressed = true;
-    turn.lastProgressAt = now();
-    turn.lastProgressSessionId = sessionId;
-    turn.lastProgressEventType = eventType;
-    // Pause credit belongs to the interval since the last progress, so a wait
-    // that fully elapsed before this progress cannot be spent as credit after it.
-    turn.pausedMs = 0;
-    if (turn.waitingSince !== null) turn.waitingSince = turn.lastProgressAt;
   }
 
   function chainSubmit(turn: Turn, pending: PendingPrompt): void {
@@ -465,7 +388,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           parts: pending.payload.turn.parts,
           attachments: pending.payload.attachments,
         },
-        {}
+        { signal: pending.abort.signal }
       );
       message = await pending.message;
     }
@@ -489,6 +412,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         await client.sendPromptAsync({
           sessionId: route.kiloSessionId,
           directory: route.directory,
+          signal: pending.abort.signal,
           messageId: pending.payload.messageId,
           agent: pending.payload.agent.mode,
           ...(pending.payload.agent.variant === undefined
@@ -504,6 +428,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         const summarized = await client.summarizeSession({
           sessionId: route.kiloSessionId,
           directory: route.directory,
+          signal: pending.abort.signal,
           model: { modelID: model },
         });
         if (!summarized) throw new Error('Session summarization failed');
@@ -512,6 +437,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         await client.sendCommand({
           sessionId: route.kiloSessionId,
           directory: route.directory,
+          signal: pending.abort.signal,
           command: pending.payload.turn.command,
           args: pending.payload.turn.arguments,
           messageId: pending.payload.messageId,
@@ -526,19 +452,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (runtime.isRetiredClient(client) && isKiloServerUnreachableError(error)) return;
       throw error;
     }
-    if (isCurrent()) recordSubmitted(turn, pending);
-  }
-
-  function recordSubmitted(turn: Turn, pending: PendingPrompt): void {
-    if (!turn.prompts.some(entry => entry.payload.messageId === pending.payload.messageId)) {
-      turn.prompts.push(pending);
-    }
-    if (!turn.started) {
-      // The batch clock starts at its first successful submission.
-      turn.started = true;
-      const at = now();
-      turn.startedAt = at;
-      turn.lastProgressAt = at;
+    if (isCurrent()) {
+      pending.acknowledged = true;
+      refreshActivity(route.runtimeKey);
     }
   }
 
@@ -552,7 +468,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     // A delivery retry (spec §12) repeats the same messageId; it must not
     // double-count or be dispatched again.
     if (turn.prompts.some(entry => entry.payload.messageId === payload.messageId)) return;
-    const pending: PendingPrompt = { payload };
+    const pending: PendingPrompt = { payload, receivedAt: now(), abort: new AbortController() };
     turn.prompts.push(pending);
     const state = queueState(route);
     if (state === 'unavailable') {
@@ -585,6 +501,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       await runtime.client.abortSession({
         sessionId: route.kiloSessionId,
         directory: route.directory,
+        signal: AbortSignal.timeout(10_000),
       });
     } catch {
       log(`turn: Kilo abort failed session=${route.kiloSessionId}`);
@@ -636,79 +553,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       log(`turn: answer failed - ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
-    const turn = turns.get(sessionId);
-    if (turn !== undefined) endWaiting(turn);
-  }
-
-  function probeLastTool(turn: Turn, stage: 'pre_deadline' | 'deadline'): void {
-    const tool = turn.lastTool;
-    if (tool === undefined) return;
-    const fields = {
-      phase: 'freshness',
-      probeStage: stage,
-      sessionId: turn.route.sessionId,
-      kiloSessionId: tool.sessionId,
-      messageId: tool.messageId,
-      partId: tool.partId,
-    };
-    let probe: WrapperKiloClient['probeMessagePart'];
-    try {
-      probe = deps.runtimes.get(turn.route.runtimeKey)?.client.probeMessagePart;
-    } catch {
-      deps.onDiagnostic?.('session.execution', { ...fields, probeStatus: 'unavailable' });
-      return;
-    }
-    if (probe === undefined) return;
-    // The pre-deadline sample can finish before cancellation. Neither probe
-    // delays nor refreshes the seven-minute no-progress clock.
-    try {
-      void probe(
-        tool.sessionId,
-        turn.route.directory,
-        tool.messageId,
-        tool.partId,
-        AbortSignal.timeout(1_500)
-      ).then(
-        part =>
-          deps.onDiagnostic?.('session.execution', {
-            ...fields,
-            probeStatus: part === null ? 'missing' : 'found',
-            toolStatus: part?.status,
-            outputBytes: part?.outputBytes,
-          }),
-        () => deps.onDiagnostic?.('session.execution', { ...fields, probeStatus: 'unavailable' })
-      );
-    } catch {
-      deps.onDiagnostic?.('session.execution', { ...fields, probeStatus: 'unavailable' });
-    }
-  }
-
-  function failDeadline(turn: Turn, action: TurnDeadlineAction): void {
-    const reason = action === 'execution_limit' ? 'execution_limit' : 'no_progress';
-    const lastTool = turn.lastTool;
-    deps.onDiagnostic?.('session.execution', {
-      phase: 'deadline_expired',
-      reason,
-      sessionId: turn.route.sessionId,
-      rootKiloSessionId: turn.route.kiloSessionId,
-      kiloSessionId: turn.lastProgressSessionId,
-      eventType: turn.lastProgressEventType,
-      lastEventAt: turn.lastProgressAt,
-      elapsedMs: noProgressElapsedMs(turn, now()),
-      descendantProgressEvents: turn.descendantProgressEvents,
-      messageId: lastTool?.messageId,
-      partId: lastTool?.partId,
-      toolStatus: lastTool?.status,
-      toolObservedAt: lastTool?.observedAt,
-      outputBytes: lastTool?.outputBytes,
-    });
-    probeLastTool(turn, 'deadline');
-    log(
-      `turn: ${reason} aborting session ${turn.route.kiloSessionId} descendantProgressEvents=${turn.descendantProgressEvents}`
-    );
-    turn.stepAbort?.abort(new Error(reason));
-    void abortKilo(turn.route);
-    sendOutcome(turn, 'failed', reason);
+    await runtime.refreshActivity();
   }
 
   async function finalize(turn: Turn): Promise<void> {
@@ -863,26 +708,19 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   function tick(): void {
-    const at = now();
     for (const turn of [...turns.values()]) {
-      if (turns.get(turn.route.sessionId) !== turn) continue;
-      const state = queueState(turn.route);
-      if (state === 'queue') continue;
-      if (state === 'unavailable') {
+      if (queueState(turn.route) === 'unavailable') {
         sendOutcome(turn, 'failed', 'agent_unavailable');
         continue;
       }
-      const action = turnDeadlineAction(turn, at, timers);
-      if (
-        action === null &&
-        turn.runningParts.size === 0 &&
-        noProgressElapsedMs(turn, at) >= timers.noProgressMs - 60_000 &&
-        turn.preDeadlineProbedAt !== turn.lastProgressAt
-      ) {
-        turn.preDeadlineProbedAt = turn.lastProgressAt;
-        probeLastTool(turn, 'pre_deadline');
+      drainInbox(turn);
+      const pending = turn.prompts.find(
+        entry => !entry.nativeObserved && now() - entry.receivedAt >= PROMPT_DELIVERY_TIMEOUT_MS
+      );
+      if (pending && turn.phase !== 'finalizing') {
+        pending.abort.abort(new Error('Prompt delivery timed out'));
+        sendOutcome(turn, 'failed', 'prompt_failed');
       }
-      if (action !== null) failDeadline(turn, action);
     }
   }
 
@@ -934,7 +772,6 @@ export function createTurnManager(deps: TurnManagerDeps) {
           return;
         }
         emitEvents(route.sessionId, [{ type: event.type, properties: event.properties }]);
-        if (turn !== undefined && turns.get(route.sessionId) === turn) beginWaiting(turn);
       }
     }
   }
@@ -981,11 +818,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return matched;
   }
 
-  /** Turns not waiting on the user; the heartbeat and the status line share it. */
+  /** UI status projection only. Native activity independently owns compute lifetime. */
   function activeTurnCount(): number {
     let count = 0;
     for (const turn of turns.values()) {
-      if (turn.waitingSince !== null) continue;
+      if (
+        deps.runtimes.get(turn.route.runtimeKey)?.sessionState(turn.route.kiloSessionId)
+          ?.activity === 'waiting'
+      )
+        continue;
       count += 1;
     }
     return count;
@@ -1059,6 +900,18 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (sessionId === undefined) return;
       const route = routes.get(sessionId);
       if (route === undefined) return;
+      if (
+        event.type === 'session.turn.open' &&
+        eventSessionId === root &&
+        deps.runtimes.get(route.runtimeKey)?.sessionState(root)?.activity !== 'stopping'
+      )
+        route.deadlineRuntimeId = undefined;
+      if (
+        event.type === 'session.error' &&
+        route.deadlineRuntimeId === event.nativeRuntimeId &&
+        isAssistantInterrupt(event.properties.error)
+      )
+        return;
       if (event.type === 'permission.replied' && typeof event.properties.requestID === 'string') {
         if (route.automaticPermissions.delete(event.properties.requestID)) return;
       }
@@ -1081,48 +934,37 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
       const turn = turns.get(sessionId);
       if (turn === undefined) return;
-      if (
-        event.type === 'session.deleted' &&
-        eventSessionId !== undefined &&
-        eventSessionId !== root
-      ) {
-        for (const partKey of turn.runningParts) {
-          if (partKey.startsWith(`${eventSessionId}\0`)) turn.runningParts.delete(partKey);
+      if (event.type === 'session.turn.open' && eventSessionId === root)
+        turn.deferredCompletion = undefined;
+      refreshActivity(route.runtimeKey);
+      if (eventSessionId !== root) return;
+      const info = event.properties.info;
+      for (const pending of turn.prompts) {
+        if (!pending.dispatched) continue;
+        if (
+          event.type === 'session.turn.open' ||
+          (event.type === 'message.updated' &&
+            isRecord(info) &&
+            info.id === pending.payload.messageId)
+        ) {
+          pending.nativeObserved = true;
         }
       }
-      // A subagent's question still pauses the root turn (spec §6).
-      applyInteraction(turn, event.type);
-      const realProgress = isRealProgress(turn, event.type, event.properties);
-      if (realProgress) markProgress(turn, eventSessionId, event.type);
-      if (event.type === 'message.part.updated') {
-        const part = event.properties.part;
-        if (isRecord(part) && part.type === 'tool' && eventSessionId !== undefined) {
-          const state = part.state;
-          if (isRecord(state) && typeof state.status === 'string' && typeof part.id === 'string') {
-            const partKey = `${eventSessionId}\0${part.id}`;
-            if (state.status === 'running') turn.runningParts.add(partKey);
-            else turn.runningParts.delete(partKey);
-            if (typeof part.messageID === 'string') {
-              turn.lastTool = {
-                sessionId: eventSessionId,
-                messageId: part.messageID,
-                partId: part.id,
-                status: state.status,
-                observedAt: now(),
-                ...(typeof state.output === 'string'
-                  ? { outputBytes: Buffer.byteLength(state.output, 'utf8') }
-                  : {}),
-              };
-            }
+      // A previous execution's cancellation can arrive after abort's HTTP reply
+      // and after the next prompt was dispatched. Wait for evidence of that prompt.
+      if (turn.prompts.every(entry => !entry.nativeObserved)) return;
+      if (event.type === 'session.turn.close') {
+        const nativeState = deps.runtimes.get(route.runtimeKey)?.sessionState(root);
+        if (nativeState !== undefined) {
+          if (event.properties.reason === 'completed') {
+            turn.deferredCompletion = {
+              nativeRuntimeId: nativeState.nativeRuntimeId,
+              execution: nativeState.execution,
+              lastMessageId: lastReceivedMessageId(turn),
+            };
           }
+          return;
         }
-      }
-      if (eventSessionId !== root) {
-        // Diagnostic only: count the descendant progress that was marked above,
-        // so a no-progress expiry can report whether descendant progress reached
-        // the manager.
-        if (realProgress) turn.descendantProgressEvents += 1;
-        return;
       }
       if (event.type === 'message.updated') {
         const info = event.properties.info;
@@ -1133,11 +975,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
       observeRootEvent(turn, event.type, event.properties);
     },
 
-    onRuntimeRestart(info: { directory: string; reason: KiloRestartReason; key: string }): void {
+    onRuntimeRestart(info: KiloRestartInfo & { key: string }): void {
+      const ownedTurns = new Set(turnsForRuntimeKey(info.key).map(turn => turn.route.sessionId));
       void publishCommandsForRuntimeKey(info.key);
       for (const turn of turnsForRuntimeKey(info.key)) {
-        // Kilo is replaced, so no part it reported can still be running.
-        turn.runningParts.clear();
+        turn.deferredCompletion = undefined;
         if (turn.phase === 'finalizing') {
           if (turn.submittedSinceIdle || hasUndispatchedPrompt(turn)) {
             // A follow-up was received or dispatched after finalization
@@ -1156,13 +998,47 @@ export function createTurnManager(deps: TurnManagerDeps) {
           // effects, and the resubmission carries the same messageIDs.
           turn.resubmitted = turn.prompts.some(pending => pending.dispatched === true);
           turn.prompts = [...turn.prompts];
-          for (const pending of turn.prompts) pending.dispatched = false;
+          for (const pending of turn.prompts) {
+            // Attachment materialization is runtime-independent. Only a prompt
+            // already handed to the retired Kilo is cancelled; an unfinished
+            // materialization keeps its controller so it can still be dispatched,
+            // and Stop or the delivery deadline can abort it as usual.
+            if (pending.dispatched === true) {
+              pending.abort.abort();
+              pending.abort = new AbortController();
+            }
+            pending.dispatched = false;
+            pending.nativeObserved = false;
+            pending.acknowledged = false;
+            pending.receivedAt = now();
+          }
           turn.submitting = Promise.resolve();
           turn.inbox = [...turn.prompts];
           drainInbox(turn);
           continue;
         }
         sendOutcome(turn, 'failed', 'agent_restarted');
+      }
+      const reported = new Set<string>();
+      for (const execution of info.interruptedExecutions ?? []) {
+        const root = [execution.sessionId, ...(execution.ancestorSessionIds ?? [])]
+          .map(resolveRootKiloSession)
+          .find(id => id !== undefined);
+        const sessionId = root === undefined ? undefined : turnByKiloSession.get(root);
+        if (!sessionId || ownedTurns.has(sessionId) || reported.has(sessionId)) continue;
+        if (routes.get(sessionId)?.runtimeKey !== info.key) continue;
+        reported.add(sessionId);
+        emitEvents(sessionId, [
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: execution.sessionId,
+              reason: 'agent_restarted',
+              error:
+                'Execution stopped because the agent restarted. You can continue in this chat.',
+            },
+          },
+        ]);
       }
     },
 
@@ -1186,8 +1062,52 @@ export function createTurnManager(deps: TurnManagerDeps) {
       return publishCommandsFor(sessionId);
     },
 
-    isActive(): boolean {
-      return activeTurnCount() > 0;
+    refreshActivity,
+
+    onNativeDeadline(identity: ExecutionIdentity, reason: ExecutionFailure, key: string): void {
+      const root = [identity.sessionId, ...(identity.ancestorSessionIds ?? [])]
+        .map(resolveRootKiloSession)
+        .find(id => id !== undefined);
+      const sessionId = root === undefined ? undefined : turnByKiloSession.get(root);
+      const route = sessionId === undefined ? undefined : routes.get(sessionId);
+      deps.onDiagnostic?.('session.execution', {
+        phase: 'deadline_expired',
+        nativeRuntimeId: identity.nativeRuntimeId,
+        reason,
+        kiloSessionId: identity.sessionId,
+        ...(route ? { sessionId: route.sessionId, rootKiloSessionId: route.kiloSessionId } : {}),
+      });
+      if (!route || route.runtimeKey !== key) return;
+      route.deadlineRuntimeId = identity.nativeRuntimeId;
+      const turn = turns.get(route.sessionId);
+      if (turn) {
+        turn.stepAbort?.abort(new Error(reason));
+        sendOutcome(turn, 'failed', reason);
+      } else {
+        emitEvents(route.sessionId, [
+          {
+            type: 'session.error',
+            properties: {
+              sessionID: identity.sessionId,
+              reason,
+              error:
+                reason === 'no_progress'
+                  ? 'Execution stopped because it made no progress. You can continue in this chat.'
+                  : 'Execution stopped because it reached its time limit. You can continue in this chat.',
+            },
+          },
+        ]);
+      }
+    },
+
+    hasPendingWork(): boolean {
+      return [...turns.values()].some(
+        turn =>
+          turn.phase === 'finalizing' ||
+          turn.prompts.some(
+            entry => !entry.nativeObserved && now() - entry.receivedAt < PROMPT_DELIVERY_TIMEOUT_MS
+          )
+      );
     },
 
     activeTurnCount,

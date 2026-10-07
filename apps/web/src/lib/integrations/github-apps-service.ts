@@ -315,7 +315,8 @@ export async function listBranches(
 export async function updateModel(
   owner: Owner,
   modelSlug: string,
-  integrationId?: string
+  integrationId?: string,
+  thinkingEffortInput?: string | null
 ): Promise<{ success: boolean; error?: string }> {
   const integration = integrationId
     ? await getGitHubIntegrationById(owner, integrationId)
@@ -332,10 +333,20 @@ export async function updateModel(
     }
   }
 
+  const thinkingEffort =
+    thinkingEffortInput === undefined
+      ? undefined
+      : thinkingEffortInput?.trim()
+        ? thinkingEffortInput.trim()
+        : null;
+
   await updateIntegrationMetadataForOwner(
     owner,
     PLATFORM.GITHUB,
-    { model_slug: modelSlug },
+    {
+      model_slug: modelSlug,
+      ...(thinkingEffort === undefined ? {} : { thinking_effort: thinkingEffort }),
+    },
     integration.id
   );
 

@@ -188,12 +188,27 @@ import {
   UserDeletionRequestStatus,
 } from '@kilocode/db/schema-types';
 
+import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
+import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'),
+  signupDecide: jest.fn(async () => null),
+}));
+
+const mockSignupDecide = jest.mocked(
+  jest.requireMock<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client').signupDecide
+);
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
     id: `cus_${metadata.kiloUserId}`,
   })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
+
+const { createStripeCustomer, deleteStripeCustomer } = jest.requireMock<typeof StripeClient>(
+  '@kilocode/web-shared/lib/stripe-client'
+);
 
 jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
@@ -838,6 +853,169 @@ describe('User', () => {
   describe('createOrUpdateUser', () => {
     beforeEach(() => {
       mockRecordAffiliateAttributionAndQueueParentEvent.mockResolvedValue(null);
+      mockSignupDecide.mockReset().mockResolvedValue(null);
+      jest.mocked(createStripeCustomer).mockClear();
+      jest.mocked(deleteStripeCustomer).mockClear();
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('rejects enforced Bouncer signup admission before creating a Stripe customer or user', async () => {
+      const email = 'bouncer-rejected@example.com';
+      mockSignupDecide.mockResolvedValue({
+        enforced: true,
+        code: 'signup_rate_limited',
+        retryAfterMs: 1_000,
+        flags: [
+          { name: 'signup:burst', decision: 'throttle', enforced: true, until: Date.now() + 1_000 },
+        ],
+      });
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Bouncer Rejected',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-bouncer-rejected',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.60, 10.0.0.1' })
+      );
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(deleteStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, 'google-bouncer-rejected'),
+        })
+      ).toBeUndefined();
+    });
+
+    it.each<{ name: string; verdict: BouncerClient.SignupDecideResponse | null }>([
+      { name: 'allow', verdict: { enforced: false, flags: [] } },
+      {
+        name: 'shadow review',
+        verdict: {
+          enforced: false,
+          flags: [{ name: 'signup:burst', decision: 'review', enforced: false, until: null }],
+        },
+      },
+      { name: 'unavailable or unknown response', verdict: null },
+    ])('creates the user after Bouncer $name', async ({ verdict }) => {
+      mockSignupDecide.mockResolvedValue(verdict);
+      const email = 'bouncer-allowed@example.com';
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Bouncer Allowed',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-bouncer-allowed',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '[2001:db8::1]:443' })
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
+      ).toBeDefined();
+    });
+
+    it('propagates a Stripe failure without creating a user', async () => {
+      const email = 'bouncer-stripe-failure@example.com';
+      const stripeError = new Error('Stripe unavailable');
+      mockSignupDecide.mockResolvedValue({ enforced: false, flags: [] });
+      jest.mocked(createStripeCustomer).mockRejectedValueOnce(stripeError);
+
+      await expect(
+        createOrUpdateUser(
+          {
+            google_user_email: email,
+            google_user_name: 'Stripe Failure',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-stripe-failure',
+          },
+          undefined,
+          false,
+          new Headers({ 'x-forwarded-for': '203.0.113.62' })
+        )
+      ).rejects.toBe(stripeError);
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+    });
+
+    it.each([undefined, 'not-an-ip', 'fe80::1%eth0'])(
+      'fails open without a usable signup IP: %s',
+      async ip => {
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: 'bouncer-missing-ip@example.com',
+            google_user_name: 'Missing IP',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-missing-ip',
+          },
+          undefined,
+          false,
+          ip ? new Headers({ 'x-forwarded-for': ip }) : undefined
+        );
+        expect(result.success).toBe(true);
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+      }
+    );
+
+    it('keeps provider linking outside signup admission even when Bouncer would reject', async () => {
+      const existing = await insertTestUser({
+        google_user_email: 'bouncer-link@example.com',
+        google_user_name: 'Existing Link',
+      });
+      mockSignupDecide.mockResolvedValue({
+        enforced: true,
+        code: 'signup_rate_limited',
+        retryAfterMs: 1_000,
+        flags: [],
+      });
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: existing.google_user_email,
+          google_user_name: existing.google_user_name,
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-bouncer-link',
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.60' })
+      );
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(false);
+      expect(result.user.id).toBe(existing.id);
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(createStripeCustomer).not.toHaveBeenCalled();
     });
 
     it('stores the signup IP for new users', async () => {
@@ -907,6 +1085,13 @@ describe('User', () => {
       expect(result.success).toBe(false);
       if (result.success) return;
       expect(result.error).toBe('SIGNUP-RATE-LIMITED');
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(deleteStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, 'limited@example.com'),
+        })
+      ).toBeUndefined();
     });
 
     it('allows up to 99 signups in 24h from a single IP (burst below threshold)', async () => {

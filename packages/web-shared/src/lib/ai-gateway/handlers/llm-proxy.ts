@@ -614,6 +614,7 @@ export async function handleLlmProxyRequest(
           ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
           account: {
             accountId: bouncerAccountId(user.id, organizationId),
+            userId: user.id,
             tier: bouncerDecideTier(organizationId, plan, balance),
             payer,
           },

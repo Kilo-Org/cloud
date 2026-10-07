@@ -686,6 +686,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         requestId: expect.any(String),
         tier: 'paid',
         accountId: 'user:user-123',
+        userId: 'user-123',
         ip: '127.0.0.1',
       },
       { timeoutMs: 500 }
@@ -713,7 +714,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledWith(
-      expect.objectContaining({ tier: 'team', accountId: 'org:org-1' }),
+      expect.objectContaining({ tier: 'team', accountId: 'org:org-1', userId: 'user-123' }),
       { timeoutMs: 500 }
     );
   });
@@ -794,7 +795,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
       expect(usageContext?.bouncer?.clientIp).toBeUndefined();
       expect(mockedDecide).toHaveBeenCalledWith(
-        expect.objectContaining({ tier: 'paid', accountId: 'user:user-123' }),
+        expect.objectContaining({
+          tier: 'paid',
+          accountId: 'user:user-123',
+          userId: 'user-123',
+        }),
         { timeoutMs: 500 }
       );
       expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();

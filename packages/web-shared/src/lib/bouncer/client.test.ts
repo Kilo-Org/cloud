@@ -11,6 +11,8 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 
 import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
 import { parseBouncerCreditEventBody } from '@kilocode/web-shared/lib/bouncer/credit-event-schema';
+import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id, so the client
 // is loaded after the config mock is registered (same convention as the store-completion tests).
@@ -20,6 +22,7 @@ let reportUsageEvent: typeof BouncerClient.reportUsageEvent;
 let creditEventWireBody: typeof BouncerClient.creditEventWireBody;
 let usageEventWireBody: typeof BouncerClient.usageEventWireBody;
 let normalizeJa4: typeof BouncerClient.normalizeJa4;
+let signupDecide: typeof BouncerClient.signupDecide;
 
 beforeAll(() => {
   ({
@@ -29,6 +32,7 @@ beforeAll(() => {
     creditEventWireBody,
     usageEventWireBody,
     normalizeJa4,
+    signupDecide,
   } = jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'));
 });
 
@@ -184,6 +188,7 @@ describe('decide', () => {
         requestId: 'r',
         tier: 'paid',
         accountId: 'org:o',
+        userId: 'actor-u',
         accountCreatedAt: '2026-04-29 01:16:12.945+00',
         usedMicrodollars: 5_000_000_000,
         acquiredMicrodollars: -1,
@@ -191,9 +196,148 @@ describe('decide', () => {
       { timeoutMs: 50 }
     );
     const body = lastRequestBody();
+    expect(body.accountId).toBe('org:o');
+    expect(body.userId).toBe('actor-u');
     expect(body.accountCreatedAt).toBe('2026-04-29T01:16:12.945Z');
     expect(body.usedMicrodollars).toBe(5_000_000_000);
     expect(body).not.toHaveProperty('acquiredMicrodollars');
+  });
+});
+
+describe('signupOperationId', () => {
+  it('uses the same privacy-safe identity for normalized aliases and provider retries', () => {
+    const operationId = signupOperationId(normalizeEmail(' First.Last+google@Googlemail.com '));
+    expect(operationId).toMatch(/^signup:[a-f0-9]{64}$/);
+    expect(operationId).toBe(signupOperationId(normalizeEmail('firstlast+github@gmail.com')));
+    expect(operationId).not.toContain('firstlast');
+    expect(operationId).not.toBe(signupOperationId(normalizeEmail('other@gmail.com')));
+  });
+});
+
+describe('signupDecide', () => {
+  const request = { operationId: 'signup:operation-1', ip: '203.0.113.7' };
+  const flag = {
+    name: 'signup:burst',
+    decision: 'throttle',
+    enforced: true,
+    until: 1_800_000_000_000,
+    source: 'ip',
+  };
+
+  it('accepts a complete known enforced rejection', async () => {
+    const verdict = {
+      enforced: true,
+      code: 'signup_rate_limited',
+      retryAfterMs: 2_000,
+      flags: [flag],
+    };
+    mockFetch.mockResolvedValue(Response.json(verdict));
+    expect((await signupDecide(request))?.enforced).toBe(true);
+  });
+
+  it('keeps rejection when request-order skew extends a 30-day deadline', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({
+        enforced: true,
+        code: 'signup_rate_limited',
+        retryAfterMs: 30 * 24 * 60 * 60 * 1000 + 1,
+        flags: [flag],
+      })
+    );
+    expect((await signupDecide(request))?.enforced).toBe(true);
+  });
+
+  it('preserves shadow flags without manufacturing enforcement', async () => {
+    const verdict = { enforced: false, flags: [{ ...flag, enforced: false, decision: 'review' }] };
+    mockFetch.mockResolvedValue(Response.json(verdict));
+    expect((await signupDecide({ ...request, ip: '2001:db8::1' }))?.enforced).toBe(false);
+  });
+
+  it.each([
+    ['unknown code', { enforced: true, code: 'restricted', retryAfterMs: 1, flags: [] }],
+    ['missing code', { enforced: true, retryAfterMs: 1, flags: [] }],
+    ['missing deadline', { enforced: true, code: 'signup_rate_limited', flags: [] }],
+    [
+      'negative deadline',
+      { enforced: true, code: 'signup_rate_limited', retryAfterMs: -1, flags: [] },
+    ],
+    [
+      'unbounded deadline',
+      {
+        enforced: true,
+        code: 'signup_rate_limited',
+        retryAfterMs: Number.MAX_SAFE_INTEGER,
+        flags: [],
+      },
+    ],
+    [
+      'fractional deadline',
+      { enforced: true, code: 'signup_rate_limited', retryAfterMs: 0.5, flags: [] },
+    ],
+    ['missing flags', { enforced: false }],
+    ['unknown flag', { enforced: false, flags: [{ ...flag, name: 'other:flag' }] }],
+    ['unknown field', { enforced: false, flags: [], spendWatch: false }],
+    ['shadow rejection code', { enforced: false, code: 'signup_rate_limited', flags: [] }],
+    ['too many flags', { enforced: false, flags: [flag, flag, flag, flag] }],
+    ['non-object response', 'allow'],
+  ])('fails open on %s', async (_name, verdict) => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockResolvedValue(Response.json(verdict));
+    await expect(signupDecide(request)).resolves.toBeNull();
+  });
+
+  it.each([
+    { ...request, operationId: '' },
+    { ...request, operationId: 'a'.repeat(129) },
+    { ...request, ip: 'not-an-ip' },
+    { ...request, ip: 'fe80::1%eth0' },
+  ])('fails open without sending an invalid request: %j', async body => {
+    await expect(signupDecide(body)).resolves.toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('accepts admission at the operation ID length boundary', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({ enforced: true, code: 'signup_rate_limited', retryAfterMs: 1, flags: [flag] })
+    );
+    expect((await signupDecide({ ...request, operationId: 'a'.repeat(128) }))?.enforced).toBe(true);
+  });
+
+  it('fails open on transport failure', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockRejectedValue(new TypeError('fetch failed'));
+    await expect(signupDecide(request)).resolves.toBeNull();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails open within the transport deadline and never retries', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockImplementation((_url, init) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+      return promise;
+    });
+    const started = Date.now();
+    await expect(signupDecide(request, { timeoutMs: 30 })).resolves.toBeNull();
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 401, 404, 500])('fails open on HTTP %s', async status => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetch.mockResolvedValue(new Response('bad', { status }));
+    await expect(signupDecide(request)).resolves.toBeNull();
+  });
+
+  it('fails open on non-JSON success', async () => {
+    mockFetch.mockResolvedValue(new Response('not-json'));
+    await expect(signupDecide(request)).resolves.toBeNull();
+  });
+
+  it('fails open without configuration', async () => {
+    mockConfigState.bouncerUrl = null;
+    await expect(signupDecide(request)).resolves.toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

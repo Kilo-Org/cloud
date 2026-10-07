@@ -272,6 +272,21 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
 - `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Every inference endpoint awaits one decide immediately before its provider request. [SERVER]
   - Decide has a 500 ms budget. Only a verdict with `enforced: true` rejects: `rate_limited` and `spend_limited` return 429 `rate_limit_exceeded` with `retry-after` and `retry-after-ms`, `restricted` returns 403 `account_restricted`. A timeout, error, non-2xx, unknown shape, or any other verdict sends the request. Verdict flags are logged server-side and never returned to the client.
+  - Signup calls `/api/v1/signup-decide` only for new users, after account resolution and before Stripe customer creation. The call uses `INTERNAL_API_SECRET` and a 500 ms budget.
+  - Development skips admission. Missing or invalid IPs, missing configuration, timeouts, transport errors, HTTP errors, invalid JSON, and unknown response shapes fail open.
+  - Only a validated enforced `signup_rate_limited` response returns `SIGNUP-RATE-LIMITED`. Cloud never exposes internal flags to the user.
+  - Signup sends `{ operationId, ip }`. `signupOperationId` hashes the existing normalized email with SHA-256 and prefixes the digest with `signup:`.
+  - The identity helper lives in `packages/web-shared/src/lib/bouncer/signup.ts`. Live admission and historical import must use the same helper.
+  - Cloud validates the forwarded first-hop IP. Bouncer canonicalizes addresses and groups IPv6 by /64.
+  - Bouncer defaults to 3 admissions per canonical IP per rolling 30 days. The shorter 24-hour limit is also 3.
+  - The Bouncer Exemptions tab accepts user IDs and IPs. Exempt requests bypass all Bouncer rules, not Cloud authentication or billing.
+  - Signed-in decisions carry the actual actor's `userId` separately from the payer's `accountId`, including organization-paid requests.
+  - IP exemptions cover signup and inference; IPv6 covers the whole /64. Signup has no user ID before account creation.
+  - Admission and creation logs share the operation ID. They exclude raw email and distinguish completed creation, rejection, and Stripe or transaction failure.
+  - Cloud retains its local limits: 100 accounts per IP in 24 hours and 150 in 30 days. Existing authentication and identity guards remain unchanged.
+  - Deploy Bouncer first with `enforcement.signup=false`. Both `enforcement.signup` and the global `enforcement.enabled` switch must be on to reject signups.
+  - Bouncer counts admissions, including failed creations. Imported history counts completed accounts. Limits and window lengths are configurable in the Bouncer admin panel.
+  - Import history and catch up overlapping traffic before the cutover. Only Igor enables signup enforcement. Verify enforced rejection before removing Cloud's local limiter.
   - Signed-in decide requests carry the payer's `created_at`, `microdollars_used`, and `total_microdollars_acquired` (the organization's for an org request); `charge.attempted` carries the payer's `microdollars_used`.
   - Usage reports have a 30-second transport budget and carry the request's charged `costMicrodollars`. Every inference endpoint reports its API kind, with the same request id as its decide.
   - When the decide verdict says `spendWatch`, the usage event enters the durable `bouncer_usage_event_outbox` in the usage-write transaction, is delivered immediately after commit, and is retried by the cron drainer (eight attempts; delivered rows kept 1 day, failed rows 7 days).

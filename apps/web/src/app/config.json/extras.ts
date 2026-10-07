@@ -156,5 +156,10 @@ export const kiloExtras = {
       default: true,
       type: 'boolean',
     },
+    chatMaxRetries: {
+      description: 'Number of retries for chat completions on failure',
+      type: 'integer',
+      exclusiveMinimum: 0,
+    },
   },
 } as const;

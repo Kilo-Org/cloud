@@ -39,7 +39,11 @@ import {
   dbSessionsAtom,
   deleteSessionFromStoreAtom,
 } from './store/db-session-atoms';
-import { invalidateSessionQueries, removeDeletedSession } from './session-deletion';
+import {
+  getWorktreeDeletionRedirect,
+  invalidateSessionQueries,
+  removeDeletedSession,
+} from './session-deletion';
 import { useManager } from './CloudAgentProvider';
 import {
   getCloudSessionCreationOperation,
@@ -677,12 +681,13 @@ export function CloudSidebarLayout({
           )
         );
         forgetWorktreeTabs(worktreeId, deletedSessionIds);
-        if (
-          selectedWorktreeId === worktreeId ||
-          (currentSessionId && deletedSessionIds.includes(currentSessionId))
-        ) {
-          router.push(organizationId ? `/organizations/${organizationId}/cloud` : '/cloud');
-        }
+        const redirect = getWorktreeDeletionRedirect(
+          new URL(window.location.href),
+          worktreeId,
+          deletedSessionIds,
+          organizationId
+        );
+        if (redirect) router.push(redirect);
         void invalidateSessionQueries({ queryClient, trpc });
         void queryClient.invalidateQueries(trpc.workspaceFolders.list.pathFilter());
         toast.success('Worktree deleted');
@@ -699,7 +704,6 @@ export function CloudSidebarLayout({
       }
     })();
   }, [
-    currentSessionId,
     deleteSessionFromStore,
     deleteWorktree,
     deletingWorktreeIds,
@@ -707,7 +711,6 @@ export function CloudSidebarLayout({
     organizationId,
     queryClient,
     router,
-    selectedWorktreeId,
     setDbSessions,
     trpc,
     worktreePendingDeletion,

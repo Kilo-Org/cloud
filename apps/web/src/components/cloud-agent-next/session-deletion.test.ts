@@ -6,7 +6,11 @@ import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createStore } from 'jotai/vanilla';
 import type { RootRouter } from '@/routers/root-router';
 import { apiSessionToDbSession, dbSessionsAtom } from './store/db-session-atoms';
-import { invalidateSessionQueries, removeDeletedSession } from './session-deletion';
+import {
+  getWorktreeDeletionRedirect,
+  invalidateSessionQueries,
+  removeDeletedSession,
+} from './session-deletion';
 
 type ApiSession = inferRouterOutputs<RootRouter>['cliSessionsV2']['list']['cliSessions'][number];
 
@@ -143,6 +147,40 @@ beforeEach(() => {
 afterEach(() => {
   fixture.context.queryClient.clear();
   jest.restoreAllMocks();
+});
+
+describe('worktree deletion navigation', () => {
+  it.each([
+    ['/cloud/chat?worktreeId=worktree_a', undefined, '/cloud'],
+    ['/cloud/chat?sessionId=ses_a', undefined, '/cloud'],
+    ['/cloud/chat?worktreeId=worktree_b', undefined, null],
+    ['/cloud/chat?sessionId=ses_b', undefined, null],
+    ['/cloud/chat?sessionId=ses_b&worktreeId=worktree_a', undefined, null],
+    ['/cloud/chat', undefined, null],
+    ['/cloud', undefined, null],
+    ['/settings?sessionId=ses_a', undefined, null],
+    [
+      '/organizations/org_a/cloud/chat?worktreeId=worktree_a',
+      'org_a',
+      '/organizations/org_a/cloud',
+    ],
+    ['/organizations/org_a/cloud/chat?sessionId=ses_a', 'org_a', '/organizations/org_a/cloud'],
+    ['/organizations/org_b/cloud/chat?sessionId=ses_a', 'org_a', null],
+    ['/cloud/chat?sessionId=ses_a', 'org_a', null],
+    ['/organizations/org_a/cloud/chat?sessionId=ses_a', undefined, null],
+  ] as const)(
+    'checks the current URL %s in scope %s before redirecting',
+    (path, organizationId, expected) => {
+      expect(
+        getWorktreeDeletionRedirect(
+          new URL(path, 'https://app.kilo.ai'),
+          'worktree_a',
+          ['ses_a'],
+          organizationId
+        )
+      ).toBe(expected);
+    }
+  );
 });
 
 describe('session deletion', () => {

@@ -3,7 +3,7 @@
  */
 
 /**
- * The integers from `start` to `end`, both included, `step` apart.
+ * The integers from `start` to `end`, both included, `step` apart; empty when `end` is below `start`.
  *
  * `step` must be a positive integer. A zero or negative step would never
  * advance toward `end`, so it is rejected instead of looping forever.

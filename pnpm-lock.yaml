@@ -949,6 +949,9 @@ importers:
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts
+      '@kilocode/usage-contracts':
+        specifier: workspace:*
+        version: link:../../packages/usage-contracts
       '@kilocode/web-shared':
         specifier: workspace:*
         version: link:../../packages/web-shared

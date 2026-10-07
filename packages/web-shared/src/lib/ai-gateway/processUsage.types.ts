@@ -1,7 +1,8 @@
 import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import type { GatewayApiKind, MicrodollarUsage, Organization } from '@kilocode/db';
+import type { MicrodollarUsage, Organization } from '@kilocode/db';
+import type { GatewayApiKind } from '@kilocode/usage-contracts';
 import type { OpenAI } from 'openai';
 
 export type OpenRouterUsage = {

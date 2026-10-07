@@ -8,10 +8,17 @@ design, invariants, and rollout/rollback.
 
 ## What it does
 
-- **Classifier benchmark** — replays 72 normalized classifier inputs through
-  OpenRouter using the exact production classifier code
-  (`@kilocode/auto-routing-contracts/classifier`), grades per-field, and derives
-  the cheapest above-threshold model as the classifier winner.
+- **Classifier benchmark** — replays the 72 golden classifier cases through the
+  production System One classifier (`classifyWithSystemOne` from
+  `@kilocode/auto-routing-contracts/classifier`, OpenRouter `POST
+  /api/v1/systemone`). Candidates are System One models (OpenRouter models whose
+  `output_modalities` include `decisions`, e.g. `typesafe/jev-1.13`). Each case
+  gets a weighted per-field score and a route hit (predicted
+  `taskType/subtaskType` equals the golden route key — the only axes the
+  decision engine reads); run summaries report both `accuracy` and
+  `routeAccuracy`. The classifier winner is the cheapest model whose weighted
+  `accuracy` meets `minAccuracy`. A failed call scores 0 and counts as a route
+  miss; there is no fallback classification.
 - **Decider benchmark** — runs 180 golden tasks per candidate through the real
   `kilo` CLI inside a Cloudflare Container and grades mechanically. Every result
   lands in the **global decider registry** (`benchmark_profiles`), keyed by exact

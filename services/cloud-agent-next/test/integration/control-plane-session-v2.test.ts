@@ -1660,7 +1660,14 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         expect(callbacks.filter(job => job.payload.messageId === 'retry-B')).toHaveLength(1);
         expect(callbacks.find(job => job.payload.messageId === 'retry-B')?.payload).toMatchObject({
           status: 'failed',
-          errorMessage: 'Workspace setup failed',
+          errorMessage: 'Repository authentication failed',
+          failureStage: 'pre_dispatch',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            subtype: 'git_authentication_failed',
+            message: 'Repository authentication failed',
+          },
         });
         await sessionStub.onRoute({ state: 'ready', attemptId: attemptA.attemptId });
         await sessionStub.onRoute({
@@ -1769,6 +1776,12 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           ? 'Sandbox billing requires additional credits'
           : 'Sandbox configuration is invalid or unsupported'
       );
+      // A settlement without facts still carries the structured failure.
+      expect(callbacks[0]?.payload.failureStage).toBe('pre_dispatch');
+      expect(callbacks[0]?.payload.failure).toMatchObject({
+        stage: 'pre_dispatch',
+        code,
+      });
       expect(provider.createCalls).toBe(1);
       await waitFor(async () =>
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')

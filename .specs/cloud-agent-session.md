@@ -144,6 +144,9 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+3. Open workspace tabs — the workspace terminal and file tabs, their order, and
+   the active tab — MUST survive refresh and navigation between worktrees, and
+   MUST remain scoped to the current user and personal or organization context.
 
 ### Shared Worktrees
 

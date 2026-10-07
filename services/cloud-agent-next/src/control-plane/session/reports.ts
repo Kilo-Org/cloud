@@ -12,14 +12,19 @@ import type {
 import { logger } from '../../logger.js';
 import {
   assistantFailureMessage,
+  projectSafeFailure,
   workspaceFailureMessage,
+  type SafeFailureProjection,
 } from '../../session/safe-failure-projection.js';
 import {
   FAILED_RUN_DIAGNOSTIC_MESSAGES,
   buildRunStateReport,
   type RunReportAnchor,
 } from '../../telemetry/queue-reports.js';
-import { classifyControlPlaneRunFailure } from '../../telemetry/control-plane-failure.js';
+import {
+  classifyControlPlaneRunFailure,
+  type ControlPlaneRunFailure,
+} from '../../telemetry/control-plane-failure.js';
 import type { ReportAnchor } from '../../sandbox-session/report-outbox.js';
 import type { SessionMessage } from './messages.js';
 
@@ -50,6 +55,55 @@ export function reportAnchorForQueue(anchor: ReportAnchor): RunReportAnchor {
     initialMessageId: anchor.initialMessageId,
     reportingCreatedAt: new Date(anchor.createdAt).toISOString(),
   };
+}
+
+/**
+ * Classifies a settled message with the one control-plane mapping owner. The
+ * report writer and the terminal callback both read the same classification, so
+ * the failure a receiver sees cannot drift from the failure telemetry records.
+ */
+export function classifySettledMessageFailure(
+  message: SessionMessage,
+  facts: ControlPlaneReportFacts
+): ControlPlaneRunFailure {
+  return classifyControlPlaneRunFailure({
+    reason: message.reason ?? undefined,
+    dispatchState: message.acceptedAt === null ? 'pre_dispatch' : 'accepted',
+    status: message.state === 'cancelled' ? 'interrupted' : 'failed',
+    ...(facts.assistantReason === undefined ? {} : { assistantReason: facts.assistantReason }),
+    ...(facts.providerOwnership === undefined
+      ? {}
+      : { providerOwnership: facts.providerOwnership }),
+    ...(facts.workspaceSubtype === undefined ? {} : { workspaceSubtype: facts.workspaceSubtype }),
+    ...(message.intent.agent.model === undefined
+      ? {}
+      : { admittedModel: message.intent.agent.model }),
+  });
+}
+
+/**
+ * The structured failure a terminal callback carries. It mirrors the legacy
+ * plane's `projectSafeFailure(state)` so a receiver can classify the failure
+ * from structure (stage, code, workspace subtype, assistant reason) rather than
+ * matching error text. Returns `undefined` for a non-terminal message.
+ */
+export function projectSettledMessageFailure(
+  message: SessionMessage,
+  facts: ControlPlaneReportFacts
+): SafeFailureProjection | undefined {
+  if (message.state !== 'failed' && message.state !== 'cancelled') return undefined;
+  const classification = classifySettledMessageFailure(message, facts);
+  return projectSafeFailure({
+    failureStage: classification.stage,
+    failureCode: classification.code,
+    ...(facts.workspaceSubtype === undefined ? {} : { failureSubtype: facts.workspaceSubtype }),
+    ...(facts.assistantReason === undefined
+      ? {}
+      : { assistantFailureReason: facts.assistantReason }),
+    ...(facts.providerOwnership === undefined
+      ? {}
+      : { providerOwnership: facts.providerOwnership }),
+  });
 }
 
 function timestamp(value: number): string {
@@ -100,21 +154,7 @@ export function buildControlPlaneMessageReport(params: {
       terminalAt: timestamp(message.settledAt),
     };
     if (message.state === 'failed' || message.state === 'cancelled') {
-      const classification = classifyControlPlaneRunFailure({
-        reason: message.reason ?? undefined,
-        dispatchState: message.acceptedAt === null ? 'pre_dispatch' : 'accepted',
-        status: message.state === 'cancelled' ? 'interrupted' : 'failed',
-        ...(facts.assistantReason === undefined ? {} : { assistantReason: facts.assistantReason }),
-        ...(facts.providerOwnership === undefined
-          ? {}
-          : { providerOwnership: facts.providerOwnership }),
-        ...(facts.workspaceSubtype === undefined
-          ? {}
-          : { workspaceSubtype: facts.workspaceSubtype }),
-        ...(message.intent.agent.model === undefined
-          ? {}
-          : { admittedModel: message.intent.agent.model }),
-      });
+      const classification = classifySettledMessageFailure(message, facts);
       // The report status is owned by the mapping, never re-derived here.
       run.status = classification.reportStatus;
       run.failureStage = classification.stage;

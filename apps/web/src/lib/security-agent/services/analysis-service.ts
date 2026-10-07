@@ -37,7 +37,7 @@ import { extractSandboxAnalysis } from './extraction-service';
 import { maybeAutoDismissAnalysis } from './auto-dismiss-service';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { CALLBACK_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { extractLastAssistantText } from '@/lib/cloud-agent-next/session-result';
 
 import {

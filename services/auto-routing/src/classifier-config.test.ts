@@ -14,7 +14,8 @@ type ClassifierEnvStub = Pick<
 >;
 
 const EXAMPLE_WINNER = {
-  model: 'google/gemini-2.5-flash-lite',
+  engine: 'system-one',
+  model: 'cloudflare/clef',
   runId: 'run-abc',
   accuracy: 0.95,
   generatedAt: '2026-06-11T00:00:00.000Z',
@@ -30,7 +31,7 @@ type EnvSetup = {
 function makeEnv(opts: {
   overrideModel?: string | null;
   winnerKvValue?: string | null;
-  originWinner?: typeof EXAMPLE_WINNER | null;
+  originWinner?: Record<string, unknown> | null;
   originStatus?: number;
   originThrow?: boolean;
   onPut?: (key: string, value: string, options: unknown) => void;
@@ -155,6 +156,22 @@ describe('classifier config', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { env } = makeEnv({ winnerKvValue: null, originThrow: true });
     await expect(getClassifierModel(env)).resolves.toBe(DEFAULT_CLASSIFIER_MODEL);
+    warn.mockRestore();
+  });
+
+  it('ignores and does not cache a winner from a benchmark worker that predates System One', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { engine: _engine, ...preCutoverWinner } = EXAMPLE_WINNER;
+    const { env, configPut } = makeEnv({
+      winnerKvValue: null,
+      originWinner: { ...preCutoverWinner, model: 'google/gemini-2.5-flash-lite' },
+    });
+
+    const info = await getClassifierModelInfo(env);
+
+    expect(info.benchmarkWinner).toBeNull();
+    expect(info.model).toBe(DEFAULT_CLASSIFIER_MODEL);
+    expect(configPut).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 

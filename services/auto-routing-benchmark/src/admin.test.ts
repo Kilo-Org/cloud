@@ -642,7 +642,8 @@ describe('GET /admin/classifier-winner', () => {
 
   it('returns the winner when a completed classifier run exists', async () => {
     const winner = {
-      model: 'google/gemini-2.5-flash-lite',
+      engine: 'system-one' as const,
+      model: 'typesafe/jev-1.13',
       runId: 'classifier-2026-06-01T00-00-00-000Z',
       accuracy: 0.92,
       p95LatencyMs: null,

@@ -17,6 +17,10 @@ describe('toBatches', () => {
     expect(() => toBatches([1], 0)).toThrow(RangeError);
     expect(() => toBatches([1], -1)).toThrow(RangeError);
   });
+
+  it('names the function in the error message', () => {
+    expect(() => toBatches([1], 0)).toThrow('toBatches: size must be at least 1, got 0');
+  });
 });
 
 describe('batchCount', () => {
@@ -30,5 +34,9 @@ describe('batchCount', () => {
 
   it('rejects a size below 1', () => {
     expect(() => batchCount(3, 0)).toThrow(RangeError);
+  });
+
+  it('names the function in the error message', () => {
+    expect(() => batchCount(3, 0)).toThrow('batchCount: size must be at least 1, got 0');
   });
 });

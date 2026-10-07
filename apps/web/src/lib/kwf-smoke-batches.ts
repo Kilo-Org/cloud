@@ -5,7 +5,7 @@
  */
 export function toBatches<T>(items: readonly T[], size: number): T[][] | null {
   if (size < 1) {
-    throw new RangeError(`size must be at least 1, got ${size}`);
+    throw new RangeError(`toBatches: size must be at least 1, got ${size}`);
   }
   if (items.length === 0) {
     return null;
@@ -20,7 +20,7 @@ export function toBatches<T>(items: readonly T[], size: number): T[][] | null {
 /** The number of batches that `toBatches` makes. */
 export function batchCount(total: number, size: number): number {
   if (size < 1) {
-    throw new RangeError(`size must be at least 1, got ${size}`);
+    throw new RangeError(`batchCount: size must be at least 1, got ${size}`);
   }
   return Math.ceil(total / size);
 }

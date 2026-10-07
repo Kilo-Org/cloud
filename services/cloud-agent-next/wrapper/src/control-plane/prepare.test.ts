@@ -1366,6 +1366,32 @@ describe('createPreparationManager', () => {
     });
   });
 
+  it('redacts a named non-heuristic secret from setup output', async () => {
+    const secret = 'postgres://user:pass@localhost:5432/prod';
+    const harness = createHarness();
+    const splitAt = Math.floor(secret.length / 2);
+    harness.setSetupOutput(onOutput => {
+      onOutput('stdout', `connecting ${secret.slice(0, splitAt)}`);
+      onOutput('stdout', `${secret.slice(splitAt)}\n`);
+      onOutput('stderr', `warning: ${secret}\n`);
+    });
+    const spec = routeSpec({
+      setupCommands: ['pnpm install'],
+      env: { DATABASE_URL: secret },
+      secretEnvKeys: ['DATABASE_URL'],
+    });
+
+    await harness.manager.prepare(spec);
+
+    const outputs = harness.frames
+      .flatMap(frame => (frame.type === 'session.events' ? frame.events : []))
+      .filter(event => event.type === 'session.setup.output')
+      .map(event => event.properties.output);
+    expect(outputs).toContain('connecting [REDACTED]\n');
+    expect(outputs).toContain('warning: [REDACTED]\n');
+    expect(outputs.join('')).not.toContain('localhost');
+  });
+
   describe('managed GitHub invocation options', () => {
     const url = 'https://github.com/acme/repo.git';
     const token = `kcp1.${Buffer.from('synthetic-sandbox').toString('base64url')}.github.${'ab12'.repeat(16)}`;

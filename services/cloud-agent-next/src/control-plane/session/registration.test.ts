@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
 import {
   controlPlanePrepareInputSchema,
+  controlPlaneRegistrationRouteSpecSchema,
   controlPlaneRouteSpecSchema,
 } from '../../shared/control-plane-protocol.js';
 import { encryptWithPublicKey } from '../../utils/encryption.js';
@@ -353,6 +354,18 @@ describe('controlPlaneRouteSpecSchema MCP boundaries', () => {
       },
     });
     expect(parsed.success).toBe(false);
+  });
+
+  it('rejects frame-only secretEnvKeys at the registration boundary', () => {
+    const routeSpec = {
+      sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      directory: '/tmp/worktree',
+      attemptId: 'attempt-1',
+      secretEnvKeys: ['DATABASE_URL'],
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(routeSpec).success).toBe(true);
+    expect(controlPlaneRegistrationRouteSpecSchema.safeParse(routeSpec).success).toBe(false);
   });
 
   it('rejects a UTF-8 payload over the 80 KiB byte limit', () => {

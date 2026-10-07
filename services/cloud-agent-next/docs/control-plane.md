@@ -421,6 +421,11 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
   the wrapper sends the original hello on the same socket. A legacy welcome enables periodic
   heartbeats without an acknowledgement deadline; old wrappers receive neither the optional field
   nor acknowledgement frames. Duplicate hello on a bound socket is ignored.
+- A wrapper that redacts named secrets advertises optional `redactsNamedSecrets: true` in `hello`. A
+  `session.prepare` frame may carry frame-only `secretEnvKeys`, the names of `env` entries whose
+  values the wrapper redacts in setup output and auto-commit diagnostics even when the name does not
+  look secret. The field is never stored in a route row, and a frame without it stays valid for a
+  version-3 wrapper.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the

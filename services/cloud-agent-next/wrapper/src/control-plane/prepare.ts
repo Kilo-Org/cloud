@@ -941,10 +941,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         inheritedEnv,
         spec.mcp
       );
-      const redact = createSecretRedactor(inheritedEnv, spec.env ?? {}, {
-        ...env,
-        ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
-      });
+      const redact = createSecretRedactor(
+        inheritedEnv,
+        [
+          spec.env ?? {},
+          {
+            ...env,
+            ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
+          },
+        ],
+        spec.secretEnvKeys ?? []
+      );
       const needsWorkspace = Boolean(spec.git) || (spec.setupCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
       // directory and inspect the stamp inside the lock, so a waiting session

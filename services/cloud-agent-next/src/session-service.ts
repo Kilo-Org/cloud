@@ -1098,10 +1098,13 @@ export class SessionService {
       bitbucketWorkspaceUuid: context.bitbucketWorkspaceUuid,
       bitbucketRepositoryUuid: context.bitbucketRepositoryUuid,
       profile: effectiveProfile,
-    });
+    }).env;
   }
 
-  private getSaferEnvVars(opts: GetSaferEnvVarsOptions): Record<string, string> {
+  private getSaferEnvVars(opts: GetSaferEnvVarsOptions): {
+    env: Record<string, string>;
+    secretEnvKeys: string[];
+  } {
     const {
       sessionHome,
       sessionId,
@@ -1159,6 +1162,8 @@ export class SessionService {
 
     // Bitbucket Code Reviewer sessions use only trusted worker-owned environment values.
     let baseEnvVars = isBitbucketCodeReview ? {} : { ...userEnvVars };
+    let decryptedSecretKeys: string[] = [];
+    let decryptedSecretValues: Record<string, string> = {};
 
     if (!isBitbucketCodeReview && encryptedSecrets && Object.keys(encryptedSecrets).length > 0) {
       const privateKey = env.AGENT_ENV_VARS_PRIVATE_KEY;
@@ -1167,7 +1172,12 @@ export class SessionService {
           'Encrypted secrets provided but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker'
         );
       }
-      baseEnvVars = mergeEnvVarsWithSecrets(baseEnvVars, encryptedSecrets, privateKey);
+      const mergedSecrets = mergeEnvVarsWithSecrets(baseEnvVars, encryptedSecrets, privateKey);
+      baseEnvVars = mergedSecrets;
+      decryptedSecretKeys = Object.keys(encryptedSecrets);
+      decryptedSecretValues = Object.fromEntries(
+        decryptedSecretKeys.map(key => [key, mergedSecrets[key]])
+      );
       logger
         .withTags({ secretCount: Object.keys(encryptedSecrets).length })
         .info('Decrypted and merged encrypted secrets');
@@ -1494,7 +1504,12 @@ export class SessionService {
       envVars.KILO_SESSION_INGEST_URL = env.KILO_SESSION_INGEST_URL;
     }
 
-    return envVars;
+    return {
+      env: envVars,
+      // A later grant step may have overwritten a decrypted secret; only what is
+      // still that secret's value is safe to advertise for redaction.
+      secretEnvKeys: decryptedSecretKeys.filter(key => envVars[key] === decryptedSecretValues[key]),
+    };
   }
 
   /**
@@ -2001,37 +2016,39 @@ export class SessionService {
       platform,
     });
 
-    const materializedEnv = this.getSaferEnvVars({
-      sessionHome,
-      sessionId,
-      workspacePath,
-      env,
-      kiloCapability,
-      kiloBackendBaseUrl,
-      kiloProviderBaseUrl,
-      kiloSessionIngestBaseUrl,
-      kilocodeModel: agent.model,
-      originalOrgId: orgId,
-      githubToken: resolvedTokens.githubToken,
-      githubRepo: github?.repo,
-      githubPullRequestNumber: github?.pullRequestNumber,
-      githubAppType: resolvedTokens.githubAppType,
-      createdOnPlatform: metadata.identity.createdOnPlatform,
-      callbackTarget: metadata.callback?.target,
-      appendSystemPrompt: metadata.agent?.appendSystemPrompt,
-      gitUrl:
-        resolvedTokens.gitlabCapabilityGitUrl ??
-        resolvedTokens.bitbucketCapabilityGitUrl ??
-        git?.url,
-      gitToken: resolvedTokens.gitToken,
-      gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
-      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
-      platform,
-      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
-      bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
-      bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
-      profile,
-    });
+    const { env: materializedEnv, secretEnvKeys: materializedSecretEnvKeys } = this.getSaferEnvVars(
+      {
+        sessionHome,
+        sessionId,
+        workspacePath,
+        env,
+        kiloCapability,
+        kiloBackendBaseUrl,
+        kiloProviderBaseUrl,
+        kiloSessionIngestBaseUrl,
+        kilocodeModel: agent.model,
+        originalOrgId: orgId,
+        githubToken: resolvedTokens.githubToken,
+        githubRepo: github?.repo,
+        githubPullRequestNumber: github?.pullRequestNumber,
+        githubAppType: resolvedTokens.githubAppType,
+        createdOnPlatform: metadata.identity.createdOnPlatform,
+        callbackTarget: metadata.callback?.target,
+        appendSystemPrompt: metadata.agent?.appendSystemPrompt,
+        gitUrl:
+          resolvedTokens.gitlabCapabilityGitUrl ??
+          resolvedTokens.bitbucketCapabilityGitUrl ??
+          git?.url,
+        gitToken: resolvedTokens.gitToken,
+        gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
+        glabIsOAuth2: resolvedTokens.glabIsOAuth2,
+        platform,
+        bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
+        bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
+        bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
+        profile,
+      }
+    );
 
     const ready = {
       workspacePath,
@@ -2094,6 +2111,7 @@ export class SessionService {
       ...(runtimeCredentialProxy ? { runtimeCredentialProxy } : {}),
       materialized: {
         env: materializedEnv,
+        ...(materializedSecretEnvKeys.length ? { secretEnvKeys: materializedSecretEnvKeys } : {}),
         ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
         ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
       },

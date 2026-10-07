@@ -543,11 +543,18 @@ async function branchExists(
 }
 
 function gitOutputRedactor(request: WrapperSessionReadyRequest): (text: string) => string {
-  return createSecretRedactor(process.env, request.materialized.env, {
-    ...(request.repo?.kind === 'git' && request.repo.token
-      ? { GIT_TOKEN: request.repo.token }
-      : {}),
-  });
+  return createSecretRedactor(
+    process.env,
+    [
+      request.materialized.env,
+      {
+        ...(request.repo?.kind === 'git' && request.repo.token
+          ? { GIT_TOKEN: request.repo.token }
+          : {}),
+      },
+    ],
+    request.materialized.secretEnvKeys ?? []
+  );
 }
 
 async function prepareBranch(
@@ -810,7 +817,11 @@ async function runSetupCommands(
   progress: BootstrapProgress | undefined
 ): Promise<void> {
   const setupCommands = request.materialized.setupCommands ?? [];
-  const redact = createSecretRedactor({ ...process.env, ...request.materialized.env });
+  const redact = createSecretRedactor(
+    { ...process.env, ...request.materialized.env },
+    [],
+    request.materialized.secretEnvKeys ?? []
+  );
   logToFile(
     `bootstrap setup commands starting kiloSessionId=${request.kiloSessionId} count=${setupCommands.length} workspacePath=${request.workspace.workspacePath}`
   );

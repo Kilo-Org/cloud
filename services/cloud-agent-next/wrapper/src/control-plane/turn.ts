@@ -140,6 +140,7 @@ type TurnRoute = {
   directory: string;
   runtimeKey: string;
   createdOnPlatform?: string;
+  secretEnvKeys?: readonly string[];
   automaticPermissions: Set<string>;
   /** Suppresses cancellation aftershocks until this route starts another native execution. */
   deadlineRuntimeId?: string;
@@ -626,6 +627,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
         messageId: turn.assistantMessageId ?? lastReceivedMessageId(turn),
         userMessageId: lastReceivedMessageId(turn),
         env: runtime.env,
+        ...(turn.route.secretEnvKeys === undefined
+          ? {}
+          : { secretEnvKeys: turn.route.secretEnvKeys }),
         signal,
         onEvent: event => {
           emitEvents(sessionId, [
@@ -864,6 +868,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         directory: spec.directory,
         runtimeKey: runtimeKey(spec),
         createdOnPlatform: spec.createdOnPlatform,
+        ...(spec.secretEnvKeys === undefined ? {} : { secretEnvKeys: spec.secretEnvKeys }),
         automaticPermissions: existing?.automaticPermissions ?? new Set(),
       };
       routes.set(spec.sessionId, route);

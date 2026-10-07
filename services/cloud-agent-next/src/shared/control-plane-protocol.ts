@@ -256,8 +256,32 @@ export const controlPlaneRouteSpecSchema = z
      * never stored in a route spec.
      */
     capture: z.literal(true).optional(),
+    /**
+     * Only the Sandbox DO adds this to the `session.prepare` frame, like `mcp`:
+     * the names of the profile secrets it decrypted into `env`, so the wrapper's
+     * output redactor remembers their values. Names only; it is never stored in a
+     * route spec, and the values stay in `env`.
+     */
+    secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
   .strict();
+
+/**
+ * Route spec accepted at the registration boundary. `secretEnvKeys` is
+ * frame-only, so a registration that carries it is rejected here rather than
+ * being stored and then failing every later `session.prepare`.
+ */
+export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSchema.superRefine(
+  (spec, context) => {
+    if (spec.secretEnvKeys !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['secretEnvKeys'],
+        message: 'registration spec must not carry secret env key names',
+      });
+    }
+  }
+);
 
 /**
  * DO-only credential source (plan "Clarification (2026-09-27, B3 credentials)").
@@ -368,6 +392,13 @@ export const controlPlanePrepareInputSchema = z
         code: 'custom',
         path: ['spec', 'capture'],
         message: 'prepare spec must not carry a snapshot capture request',
+      });
+    }
+    if (value.spec.secretEnvKeys !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'secretEnvKeys'],
+        message: 'prepare spec must not carry secret env key names',
       });
     }
   });
@@ -608,6 +639,11 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper redacts a value by each named secret key
+     * from `session.prepare`, not only names matching the `SECRET_NAME` heuristic.
+     */
+    redactsNamedSecrets: z.literal(true).optional(),
   })
   .strict();
 

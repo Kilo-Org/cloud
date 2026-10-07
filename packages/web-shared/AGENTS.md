@@ -1,6 +1,8 @@
 # web-shared
 
 Server code shared by `apps/web` and `apps/ai-gateway`, moved out of `apps/web/src`.
+The usage wire contract lives in `@kilocode/usage-contracts`. The existing
+usage-record contract module re-exports it and checks alignment with DB types.
 
 ## Module resolution
 

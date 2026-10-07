@@ -597,8 +597,6 @@
     "reviewPullRequest": "Pregledaj zahtjev za spajanje",
     "headLine": "{{counts}} · najnovija revizija {{sha}}",
     "entry": {
-      "eyebrow": "Otvori zahtjev za spajanje ili merge request putem URL-a",
-      "pastePrLink": "Zalijepi povezanicu na zahtjev za spajanje ili merge request",
       "noRecentPrs": "Nema nedavnih pregleda",
       "noRecentPrsDescription": "Da započnete pregled, zalijepite povezanicu gore — sljedeći put će se pojaviti ovdje.",
       "couldNotLoad": "Učitavanje nije uspjelo.",
@@ -820,7 +818,6 @@
     "liveUpdates": "Ažuriranja uživo",
     "liveUpdateSubtitle": "Prikaži aktivne agente u obavijestima",
     "push": "Obavijesti aplikacije",
-    "enabled": "Obavijesti uključene",
     "onDescription": "Obavijesti aplikacije su uključene na ovom uređaju.",
     "offDescription": "Obavijesti nisu dozvoljene ili uređaj nije registrovan za njih.",
     "retryPermission": "Pokušaj ponovo provjeriti dozvolu za obavijesti",

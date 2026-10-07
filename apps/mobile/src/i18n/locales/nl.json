@@ -316,7 +316,6 @@
     "liveUpdates": "Live-updates",
     "liveUpdateSubtitle": "Actieve agents in je meldingen tonen",
     "push": "Pushmeldingen",
-    "enabled": "Meldingen ingeschakeld",
     "onDescription": "Pushmeldingen staan aan voor dit apparaat.",
     "offDescription": "Toestemming voor meldingen ontbreekt of de apparaatregistratie is uitgeschakeld.",
     "retryPermission": "Toestemming voor meldingen opnieuw controleren",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "Deze opmerking kan niet worden verwijderd."
     },
     "entry": {
-      "eyebrow": "Open een PR of merge request via een URL",
-      "pastePrLink": "PR- of merge request-koppeling plakken",
       "noRecentPrs": "Geen recente beoordelingen",
       "noRecentPrsDescription": "Plak hierboven een koppeling om een beoordeling te starten — deze verschijnt de volgende keer hier.",
       "couldNotLoad": "Het laden is mislukt.",

@@ -291,7 +291,6 @@
     "liveUpdates": "即時更新",
     "liveUpdateSubtitle": "在通知中顯示執行中的智慧代理",
     "push": "推播",
-    "enabled": "已啟用通知",
     "onDescription": "此裝置的推播通知已開啟。",
     "offDescription": "尚未開啟通知權限或啟用裝置註冊。",
     "retryPermission": "重新檢查通知權限",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "無法刪除此留言。"
     },
     "entry": {
-      "eyebrow": "透過 URL 開啟提取請求或合併請求",
-      "pastePrLink": "貼上提取請求或合併請求連結",
       "noRecentPrs": "尚無最近審查",
       "noRecentPrsDescription": "在上方貼上連結即可開始審查，下次就會在這裡看到。",
       "couldNotLoad": "無法載入。",

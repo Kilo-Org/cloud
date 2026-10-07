@@ -285,7 +285,6 @@
     "liveUpdates": "Aggiornamenti in tempo reale",
     "liveUpdateSubtitle": "Mostra gli agenti attivi nelle notifiche",
     "push": "Notifiche push",
-    "enabled": "Notifiche attivate",
     "onDescription": "Le notifiche push sono attive per questo dispositivo.",
     "offDescription": "Le notifiche non sono autorizzate oppure il dispositivo non è registrato per riceverle.",
     "retryPermission": "Verifica di nuovo l'autorizzazione per le notifiche",
@@ -2674,8 +2673,6 @@
       "commentDeleteUnavailable": "Questo commento non può essere eliminato."
     },
     "entry": {
-      "eyebrow": "Apri una pull request o una merge request tramite URL",
-      "pastePrLink": "Incolla il collegamento a una pull request o merge request",
       "noRecentPrs": "Nessuna revisione recente",
       "noRecentPrsDescription": "Incolla qui sopra un collegamento per iniziare una revisione — la prossima volta comparirà qui.",
       "couldNotLoad": "Impossibile caricare i dati.",

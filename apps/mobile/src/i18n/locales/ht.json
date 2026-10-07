@@ -586,8 +586,6 @@
     "reviewPullRequest": "Revize demann fizyon an",
     "headLine": "{{counts}} · dènye komit {{sha}}",
     "entry": {
-      "eyebrow": "Louvri yon demann fizyon oswa yon merge request ak URL li",
-      "pastePrLink": "Kole yon lyen demann fizyon oswa merge request",
       "noRecentPrs": "Pa gen revizyon resan",
       "noRecentPrsDescription": "Kole yon lyen pi wo a pou kòmanse yon revizyon — l ap parèt isit la pwochen fwa a.",
       "couldNotLoad": "Pa t ka chaje.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Mizajou an dirèk",
     "liveUpdateSubtitle": "Montre ajan aktif yo nan notifikasyon ou yo",
     "push": "Notifikasyon otomatik",
-    "enabled": "Notifikasyon aktive",
     "onDescription": "Notifikasyon otomatik yo aktive sou aparèy sa a.",
     "offDescription": "Pèmisyon an oswa enskripsyon aparèy la dezaktive.",
     "retryPermission": "Eseye tcheke pèmisyon notifikasyon yo ankò",

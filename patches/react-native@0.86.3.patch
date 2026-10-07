@@ -1,3 +1,37 @@
+diff --git a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
+index cbda3771e97cfa375976621f30e4939988156a1f..39f38cfd36f0adfe0c736985b9c97857851a8fed 100644
+--- a/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
++++ b/Libraries/Text/TextInput/Multiline/RCTUITextView.mm
+@@ -134,7 +134,29 @@ static UIColor *defaultPlaceholderColor(void)
+     return;
+   }
+ 
++  UIColor *previousForegroundColor = _defaultTextAttributes[NSForegroundColorAttributeName];
++  UIColor *foregroundColor = defaultTextAttributes[NSForegroundColorAttributeName];
+   _defaultTextAttributes = defaultTextAttributes;
++  // typingAttributes only affects new input. Recolor the existing default-color
++  // runs without replacing text, selection, marked text, or other attributes.
++  if (foregroundColor != previousForegroundColor && ![foregroundColor isEqual:previousForegroundColor]) {
++    NSTextStorage *textStorage = self.textStorage;
++    [textStorage beginEditing];
++    [textStorage enumerateAttribute:NSForegroundColorAttributeName
++                           inRange:NSMakeRange(0, textStorage.length)
++                           options:0
++                        usingBlock:^(UIColor *color, NSRange range, __unused BOOL *stop) {
++                          if (color == nil || color == previousForegroundColor ||
++                              [color isEqual:previousForegroundColor]) {
++                            if (foregroundColor) {
++                              [textStorage addAttribute:NSForegroundColorAttributeName value:foregroundColor range:range];
++                            } else {
++                              [textStorage removeAttribute:NSForegroundColorAttributeName range:range];
++                            }
++                          }
++                        }];
++    [textStorage endEditing];
++  }
+   self.typingAttributes = defaultTextAttributes;
+   [self _updatePlaceholder];
+ }
 diff --git a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm b/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm
 index 226781f27bfff61ecd993be0b4937fb8e4c66465..bcb3e80b4209191b8f03bc46ca31944c22b40701 100644
 --- a/React/Fabric/Mounting/ComponentViews/LegacyViewManagerInterop/RCTLegacyViewManagerInteropComponentView.mm

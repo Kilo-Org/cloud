@@ -291,7 +291,6 @@
     "liveUpdates": "실시간 업데이트",
     "liveUpdateSubtitle": "알림에 실행 중인 에이전트 표시",
     "push": "푸시 알림",
-    "enabled": "알림 켜짐",
     "onDescription": "이 기기에서 푸시 알림이 켜져 있습니다.",
     "offDescription": "알림 권한이 없거나 기기가 등록되지 않았습니다.",
     "retryPermission": "알림 권한 확인 다시 시도",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "이 댓글은 삭제할 수 없습니다."
     },
     "entry": {
-      "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
-      "pastePrLink": "풀 리퀘스트 또는 머지 요청 링크 붙여넣기",
       "noRecentPrs": "최근 리뷰 없음",
       "noRecentPrsDescription": "위에 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
       "couldNotLoad": "불러오지 못했습니다.",

@@ -586,8 +586,6 @@
     "reviewPullRequest": "Gennemgå pull request",
     "headLine": "{{counts}} · seneste commit {{sha}}",
     "entry": {
-      "eyebrow": "Åbn en pull request eller merge request via dens URL",
-      "pastePrLink": "Indsæt et pull request- eller merge request-link",
       "noRecentPrs": "Ingen seneste gennemgange",
       "noRecentPrsDescription": "Indsæt et link ovenfor for at starte en gennemgang — den vises her næste gang.",
       "couldNotLoad": "Indholdet kunne ikke indlæses.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Liveopdateringer",
     "liveUpdateSubtitle": "Vis aktive agenter i dine notifikationer",
     "push": "Pushnotifikationer",
-    "enabled": "Notifikationer aktiveret",
     "onDescription": "Pushnotifikationer er slået til på denne enhed.",
     "offDescription": "Tilladelsen til notifikationer eller registreringen af enheden er slået fra.",
     "retryPermission": "Kontrollér tilladelsen til notifikationer igen",

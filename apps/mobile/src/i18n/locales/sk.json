@@ -608,8 +608,6 @@
     "reviewPullRequest": "Skontrolovať žiadosť o zlúčenie",
     "headLine": "{{counts}} · najnovší commit {{sha}}",
     "entry": {
-      "eyebrow": "Otvorte PR alebo merge request pomocou URL",
-      "pastePrLink": "Vložiť odkaz na PR alebo merge request",
       "noRecentPrs": "Žiadne nedávne recenzie",
       "noRecentPrsDescription": "Ak chcete začať recenziu, vložte vyššie odkaz — nabudúce sa zobrazí tu.",
       "couldNotLoad": "Nepodarilo sa načítať.",
@@ -836,7 +834,6 @@
     "liveUpdates": "Priebežné aktualizácie",
     "liveUpdateSubtitle": "Zobrazovať aktívnych agentov v upozorneniach",
     "push": "Upozornenia aplikácie",
-    "enabled": "Upozornenia zapnuté",
     "onDescription": "Upozornenia aplikácie sú na tomto zariadení zapnuté.",
     "offDescription": "Upozornenia nie sú povolené alebo zariadenie nie je zaregistrované.",
     "retryPermission": "Skúsiť znova skontrolovať povolenie upozornení",

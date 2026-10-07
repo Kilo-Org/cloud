@@ -586,8 +586,6 @@
     "reviewPullRequest": "Suriin ang pull request",
     "headLine": "{{counts}} · kasalukuyang commit {{sha}}",
     "entry": {
-      "eyebrow": "Buksan ang pull request o merge request gamit ang URL nito",
-      "pastePrLink": "I-paste ang link ng pull request o merge request",
       "noRecentPrs": "Walang kamakailang pagsusuri",
       "noRecentPrsDescription": "I-paste ang link sa itaas para magsimula ng pagsusuri — lalabas ito rito sa susunod.",
       "couldNotLoad": "Hindi ma-load.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Mga agarang update",
     "liveUpdateSubtitle": "Ipakita ang mga aktibong ahente sa iyong mga notipikasyon",
     "push": "Mga push na notipikasyon",
-    "enabled": "Pinagana ang mga notipikasyon",
     "onDescription": "Pinagana ang mga push na notipikasyon sa device na ito.",
     "offDescription": "Hindi pinagana ang pahintulot o ang pagpaparehistro ng device.",
     "retryPermission": "Suriin muli ang pahintulot sa notipikasyon",

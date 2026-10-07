@@ -26,6 +26,29 @@ Generally speaking, you only need a new dev build if making dependency/native ch
 4. `pnpm start`
 5. open installed app on your phone
 
+#### iPhone Duo and iOS 27
+
+- Use Xcode 27.1 or later to test native iPhone Duo layouts.
+- Keep `expo-build-properties.ios.enableSceneSupport` enabled in `app.config.ts` while the app uses Expo SDK 57.
+- Expo's scene delegate creates the window and forwards lifecycle events and links to the app delegate.
+- After a native config change, regenerate the iOS project and rebuild the app.
+- Do not edit the generated `ios/` files.
+- Check both displays, all three fold poses, and each orientation after the rebuild.
+- When the app moves to Expo SDK 58, remove the scene support option; its template includes scene support.
+
+#### Responsive layout checks
+
+- Shared tab and detail scroll views reserve the reported left and right safe areas.
+- Shared headers add corner clearance when a side status area leaves no top inset.
+- For a custom screen body, apply `useSideInsetStyle` outside its gutter container.
+- Do not reserve the same side inset in both the shared scroll view and its parent.
+- Keep the simulator font size and font scaling at their defaults on both Duo displays.
+- Compare hardware-masked screenshots; ordinary app screenshots omit the Duo curvature and camera cutout.
+- Run `xcrun simctl io <UDID> screenshot --display=<display-ID> --mask=black <path.png>` for each active display.
+- Use `--display=1` for the outer display and `--display=3` for the inner display.
+- An inactive display produces a black screenshot.
+- Type a draft, change the appearance in both directions, and verify the draft stays readable.
+
 ## App Store Kilo Pass Subscriptions
 
 App Store Kilo Pass subscriptions require an EAS development build or TestFlight

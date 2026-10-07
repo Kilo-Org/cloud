@@ -608,8 +608,6 @@
     "reviewPullRequest": "Zkontrolovat PR",
     "headLine": "{{counts}} · poslední commit {{sha}}",
     "entry": {
-      "eyebrow": "Otevři PR nebo merge request pomocí URL",
-      "pastePrLink": "Vložit odkaz na PR nebo merge request",
       "noRecentPrs": "Žádné nedávné revize",
       "noRecentPrsDescription": "Pro spuštění revize vlož nahoře odkaz — příště se zobrazí tady.",
       "couldNotLoad": "Načítání se nezdařilo.",
@@ -836,7 +834,6 @@
     "liveUpdates": "Průběžné aktualizace",
     "liveUpdateSubtitle": "Zobrazovat aktivní agenty v oznámeních",
     "push": "Oznámení ze serveru",
-    "enabled": "Oznámení povolena",
     "onDescription": "Oznámení ze serveru jsou na tomto zařízení zapnutá.",
     "offDescription": "Oznámení nejsou povolená nebo zařízení není zaregistrované k jejich příjmu.",
     "retryPermission": "Znovu zkontrolovat oprávnění k oznámením",

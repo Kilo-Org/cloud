@@ -291,7 +291,6 @@
     "liveUpdates": "Pembaruan langsung",
     "liveUpdateSubtitle": "Tampilkan agen aktif di notifikasimu",
     "push": "Notifikasi perangkat",
-    "enabled": "Notifikasi aktif",
     "onDescription": "Notifikasi aktif untuk perangkat ini.",
     "offDescription": "Notifikasi belum diizinkan atau perangkat belum terdaftar.",
     "retryPermission": "Coba periksa ulang izin notifikasi",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "Komentar ini tidak dapat dihapus."
     },
     "entry": {
-      "eyebrow": "Buka PR atau merge request melalui URL",
-      "pastePrLink": "Tempel tautan PR atau merge request",
       "noRecentPrs": "Belum ada riwayat tinjauan",
       "noRecentPrsDescription": "Tempel tautan di atas untuk mulai meninjau — akan muncul di sini saat kamu kembali.",
       "couldNotLoad": "Tidak dapat memuat data.",

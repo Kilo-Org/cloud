@@ -291,7 +291,6 @@
     "liveUpdates": "Canlı güncellemeler",
     "liveUpdateSubtitle": "Etkin ajanları bildirimlerinde göster",
     "push": "Anlık bildirimler",
-    "enabled": "Bildirimler etkin",
     "onDescription": "Anlık bildirimler bu cihaz için açık.",
     "offDescription": "Bildirim izni veya cihaz kaydı etkin değil.",
     "retryPermission": "Bildirim iznini kontrol etmeyi tekrar dene",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "Bu yorum silinemez."
     },
     "entry": {
-      "eyebrow": "URL ile bir çekme isteği veya birleştirme isteği aç",
-      "pastePrLink": "Bir çekme isteği veya birleştirme isteği bağlantısı yapıştır",
       "noRecentPrs": "Son inceleme yok",
       "noRecentPrsDescription": "İnceleme başlatmak için yukarıya bir bağlantı yapıştır — bir dahaki sefere burada görünecek.",
       "couldNotLoad": "Yüklenemedi.",

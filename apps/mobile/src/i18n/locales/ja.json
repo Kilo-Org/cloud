@@ -291,7 +291,6 @@
     "liveUpdates": "ライブアップデート",
     "liveUpdateSubtitle": "通知に稼働中のエージェントを表示",
     "push": "プッシュ通知",
-    "enabled": "通知は有効",
     "onDescription": "このデバイスではプッシュ通知がオンです。",
     "offDescription": "通知が許可されていないか、このデバイスの通知登録が無効になっています。",
     "retryPermission": "通知権限の確認を再試行",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "このコメントは削除できません。"
     },
     "entry": {
-      "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
-      "pastePrLink": "プルリクエストまたはマージリクエストのリンクを貼り付け",
       "noRecentPrs": "最近のレビューはありません",
       "noRecentPrsDescription": "上にリンクを貼り付けてレビューを始めると、次からはここに表示されます。",
       "couldNotLoad": "読み込めませんでした。",

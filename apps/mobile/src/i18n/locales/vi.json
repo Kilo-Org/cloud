@@ -291,7 +291,6 @@
     "liveUpdates": "Cập nhật trực tiếp",
     "liveUpdateSubtitle": "Hiển thị tác nhân đang hoạt động trong thông báo",
     "push": "Thông báo đẩy",
-    "enabled": "Đã bật thông báo",
     "onDescription": "Thông báo đẩy đang bật cho thiết bị này.",
     "offDescription": "Chưa cấp quyền thông báo hoặc chưa đăng ký thiết bị để nhận thông báo.",
     "retryPermission": "Thử kiểm tra lại quyền thông báo",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "Không thể xóa bình luận này."
     },
     "entry": {
-      "eyebrow": "Mở PR hoặc merge request bằng URL",
-      "pastePrLink": "Dán liên kết PR hoặc merge request",
       "noRecentPrs": "Chưa có đánh giá gần đây",
       "noRecentPrsDescription": "Dán liên kết ở trên để bắt đầu đánh giá — lần sau nó sẽ xuất hiện ở đây.",
       "couldNotLoad": "Không thể tải dữ liệu.",

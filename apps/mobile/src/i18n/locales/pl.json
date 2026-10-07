@@ -291,7 +291,6 @@
     "liveUpdates": "Aktualizacje na żywo",
     "liveUpdateSubtitle": "Pokazuj aktywnych agentów w powiadomieniach",
     "push": "Powiadomienia push",
-    "enabled": "Powiadomienia włączone",
     "onDescription": "Powiadomienia push są włączone na tym urządzeniu.",
     "offDescription": "Brakuje zgody na powiadomienia lub rejestracja urządzenia jest wyłączona.",
     "retryPermission": "Sprawdź ponownie uprawnienia do powiadomień",
@@ -2704,8 +2703,6 @@
       "commentDeleteUnavailable": "Tego komentarza nie można usunąć."
     },
     "entry": {
-      "eyebrow": "Otwórz PR lub merge request za pomocą adresu URL",
-      "pastePrLink": "Wklej odnośnik do PR lub merge requestu",
       "noRecentPrs": "Brak ostatnich recenzji",
       "noRecentPrsDescription": "Wklej powyżej odnośnik, aby rozpocząć recenzję — następnym razem pojawi się tutaj.",
       "couldNotLoad": "Nie udało się wczytać danych.",

@@ -316,7 +316,6 @@
     "liveUpdates": "Actualizaciones en tiempo real",
     "liveUpdateSubtitle": "Mostrar los agentes activos en tus notificaciones",
     "push": "Notificaciones automáticas",
-    "enabled": "Notificaciones activadas",
     "onDescription": "Las notificaciones automáticas están activadas en este dispositivo.",
     "offDescription": "Falta el permiso para recibir notificaciones o el dispositivo no está registrado.",
     "retryPermission": "Reintentar la comprobación del permiso de notificaciones",
@@ -2674,8 +2673,6 @@
       "commentDeleteUnavailable": "Este comentario no se puede eliminar."
     },
     "entry": {
-      "eyebrow": "Abre una PR o una merge request mediante su URL",
-      "pastePrLink": "Pegar un enlace de PR o de merge request",
       "noRecentPrs": "No hay revisiones recientes",
       "noRecentPrsDescription": "Pega un enlace arriba para iniciar una revisión — aparecerá aquí la próxima vez.",
       "couldNotLoad": "No se pudo cargar.",

@@ -291,7 +291,6 @@
     "liveUpdates": "实时更新",
     "liveUpdateSubtitle": "在通知中显示运行中的智能体",
     "push": "推送",
-    "enabled": "通知已启用",
     "onDescription": "此设备的推送通知已开启。",
     "offDescription": "尚未开启通知权限，或设备未注册推送通知。",
     "retryPermission": "重新检查通知权限",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "无法删除此评论。"
     },
     "entry": {
-      "eyebrow": "通过 URL 打开拉取请求或合并请求",
-      "pastePrLink": "粘贴拉取请求或合并请求链接",
       "noRecentPrs": "暂无最近审查",
       "noRecentPrsDescription": "在上方粘贴链接即可开始审查，下次就能在这里找到它。",
       "couldNotLoad": "无法加载。",

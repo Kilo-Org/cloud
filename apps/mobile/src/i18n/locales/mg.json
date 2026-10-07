@@ -586,8 +586,6 @@
     "reviewPullRequest": "Diniho ny fangatahana fampiraisana",
     "headLine": "{{counts}} · firaketana farany {{sha}}",
     "entry": {
-      "eyebrow": "Sokafy ny fangatahana fampiraisana amin'ny URL",
-      "pastePrLink": "Apetaho ny rohy fangatahana fampiraisana",
       "noRecentPrs": "Tsy misy fandinihana vao haingana",
       "noRecentPrsDescription": "Apetaho ny rohy ambony mba hanombohana fandinihana — hita eto izy amin'ny manaraka.",
       "couldNotLoad": "Tsy tafiditra ny angona.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Fanavaozana mivantana",
     "liveUpdateSubtitle": "Asehoy ao amin'ny fampandrenesanao ny mpanampy miasa",
     "push": "Fampandrenesana alefa mivantana",
-    "enabled": "Mandeha ny fampandrenesana",
     "onDescription": "Mandeha amin'ity fitaovana ity ny fampandrenesana alefa mivantana.",
     "offDescription": "Tsy nomena ny alalana na tsy mandeha ny fisoratana anaran'ny fitaovana.",
     "retryPermission": "Andramo hamarinina indray ny alalana handefa fampandrenesana",

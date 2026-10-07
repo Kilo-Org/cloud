@@ -597,8 +597,6 @@
     "reviewPullRequest": "Revizuiește PR-ul",
     "headLine": "{{counts}} · ultimul commit {{sha}}",
     "entry": {
-      "eyebrow": "Deschide un PR sau un merge request folosind adresa URL",
-      "pastePrLink": "Lipește o legătură către un PR sau un merge request",
       "noRecentPrs": "Nicio revizuire recentă",
       "noRecentPrsDescription": "Lipește o legătură mai sus pentru a începe o revizuire — va apărea aici data viitoare.",
       "couldNotLoad": "Nu s-au putut încărca datele.",
@@ -820,7 +818,6 @@
     "liveUpdates": "Actualizări în timp real",
     "liveUpdateSubtitle": "Afișează agenții activi în notificări",
     "push": "Notificări push",
-    "enabled": "Notificări activate",
     "onDescription": "Notificările push sunt activate pentru acest dispozitiv.",
     "offDescription": "Notificările nu au permisiunea necesară sau înregistrarea dispozitivului este dezactivată.",
     "retryPermission": "Reîncearcă verificarea permisiunii de notificare",

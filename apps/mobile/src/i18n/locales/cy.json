@@ -630,8 +630,6 @@
     "reviewPullRequest": "Adolygu cais tynnu",
     "headLine": "{{counts}} · ymrwymiad diweddaraf {{sha}}",
     "entry": {
-      "eyebrow": "Agorwch gais tynnu neu gais uno drwy URL",
-      "pastePrLink": "Gludo dolen cais tynnu neu gais uno",
       "noRecentPrs": "Dim adolygiadau diweddar",
       "noRecentPrsDescription": "Gludwch ddolen uchod i ddechrau adolygiad — bydd yn ymddangos yma y tro nesaf.",
       "couldNotLoad": "Ni lwyddwyd i lwytho.",
@@ -868,7 +866,6 @@
     "liveUpdates": "Diweddariadau byw",
     "liveUpdateSubtitle": "Dangos asiantau gweithredol yn eich hysbysiadau",
     "push": "Hysbysiadau gwthio",
-    "enabled": "Hysbysiadau wedi'u galluogi",
     "onDescription": "Mae hysbysiadau gwthio ymlaen ar gyfer y ddyfais hon.",
     "offDescription": "Nid yw'r caniatâd neu gofrestriad y ddyfais yn weithredol.",
     "retryPermission": "Ceisio gwirio'r caniatâd ar gyfer hysbysiadau eto",

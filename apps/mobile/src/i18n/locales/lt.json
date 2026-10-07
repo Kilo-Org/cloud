@@ -608,8 +608,6 @@
     "reviewPullRequest": "Peržiūrėti pakeitimų užklausą",
     "headLine": "{{counts}} · naujausias įrašas {{sha}}",
     "entry": {
-      "eyebrow": "Atidaryk pakeitimų užklausą arba merge request pagal URL",
-      "pastePrLink": "Įklijuoti pakeitimų užklausos arba merge request nuorodą",
       "noRecentPrs": "Nėra nesenių peržiūrų",
       "noRecentPrsDescription": "Įklijuok nuorodą viršuje ir pradėk peržiūrą — kitą kartą ji bus rodoma čia.",
       "couldNotLoad": "Nepavyko įkelti.",
@@ -836,7 +834,6 @@
     "liveUpdates": "Atnaujinimai realiuoju laiku",
     "liveUpdateSubtitle": "Rodyti aktyvius agentus pranešimuose",
     "push": "Tiesioginiai pranešimai",
-    "enabled": "Pranešimai įjungti",
     "onDescription": "Tiesioginiai pranešimai šiame įrenginyje įjungti.",
     "offDescription": "Pranešimai neleidžiami arba įrenginys neužregistruotas jiems gauti.",
     "retryPermission": "Dar kartą patikrinti leidimą siųsti pranešimus",

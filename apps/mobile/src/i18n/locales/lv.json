@@ -597,8 +597,6 @@
     "reviewPullRequest": "Pārskatīt izmaiņu pieprasījumu",
     "headLine": "{{counts}} · jaunākais komits {{sha}}",
     "entry": {
-      "eyebrow": "Atver izmaiņu pieprasījumu vai merge request, izmantojot URL",
-      "pastePrLink": "Ielīmēt izmaiņu pieprasījuma vai merge request saiti",
       "noRecentPrs": "Nav nesenu pārskatu",
       "noRecentPrsDescription": "Ielīmē saiti augšā, lai sāktu pārskatīšanu — nākamreiz tā būs redzama šeit.",
       "couldNotLoad": "Neizdevās ielādēt.",
@@ -820,7 +818,6 @@
     "liveUpdates": "Atjauninājumi reāllaikā",
     "liveUpdateSubtitle": "Rādīt aktīvos aģentus paziņojumos",
     "push": "Pašpiegādes paziņojumi",
-    "enabled": "Paziņojumi iespējoti",
     "onDescription": "Šajā ierīcē ir ieslēgti pašpiegādes paziņojumi.",
     "offDescription": "Nav piešķirta atļauja vai ierīce nav reģistrēta paziņojumu saņemšanai.",
     "retryPermission": "Mēģināt pārbaudīt paziņojumu atļauju vēlreiz",

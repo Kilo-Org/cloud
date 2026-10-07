@@ -586,8 +586,6 @@
     "reviewPullRequest": "Granska PR",
     "headLine": "{{counts}} · senaste incheckning {{sha}}",
     "entry": {
-      "eyebrow": "Öppna en PR eller merge request via en URL",
-      "pastePrLink": "Klistra in en PR- eller merge request-länk",
       "noRecentPrs": "Inga senaste granskningar",
       "noRecentPrsDescription": "Klistra in en länk ovan för att börja granska — den visas här nästa gång.",
       "couldNotLoad": "Kunde inte läsa in innehållet.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Liveuppdateringar",
     "liveUpdateSubtitle": "Visa aktiva agenter i dina aviseringar",
     "push": "Pushaviseringar",
-    "enabled": "Aviseringar aktiverade",
     "onDescription": "Pushaviseringar är aktiverade på den här enheten.",
     "offDescription": "Aviseringar är inte tillåtna eller enheten är inte registrerad.",
     "retryPermission": "Försök kontrollera aviseringsbehörigheten igen",

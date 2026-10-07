@@ -13,5 +13,6 @@ export function pageNumbers(total: number, size: number): number[] {
 
 /** The items on page `page` (1-based), with `size` items per page. */
 export function pageSlice<T>(items: readonly T[], page: number, size: number): T[] {
-  return items.slice(page * size, page * size + size);
+  const start = (page - 1) * size;
+  return items.slice(start, start + size);
 }

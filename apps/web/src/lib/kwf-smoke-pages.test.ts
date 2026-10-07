@@ -1,4 +1,4 @@
-import { pageNumbers } from './kwf-smoke-pages';
+import { pageNumbers, pageSlice } from './kwf-smoke-pages';
 
 describe('pageNumbers', () => {
   it('gives page 1 for zero items', () => {
@@ -7,5 +7,11 @@ describe('pageNumbers', () => {
 
   it('counts a partial last page', () => {
     expect(pageNumbers(21, 10)).toEqual([1, 2, 3]);
+  });
+});
+
+describe('pageSlice', () => {
+  it('reads page 1 from the first item', () => {
+    expect(pageSlice([1, 2, 3], 1, 2)).toEqual([1, 2]);
   });
 });

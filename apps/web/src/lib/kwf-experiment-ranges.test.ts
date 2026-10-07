@@ -8,4 +8,8 @@ describe('range', () => {
   it('gives an empty list when end is before start', () => {
     expect(range(3, 1)).toEqual([]);
   });
+
+  it('skips values by step', () => {
+    expect(range(0, 6, 3)).toEqual([0, 3, 6]);
+  });
 });

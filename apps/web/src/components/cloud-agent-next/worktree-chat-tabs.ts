@@ -1,4 +1,21 @@
 import { z } from 'zod';
+import type { StoredSession } from './types';
+
+export function getWorkspaceControlSession(
+  worktreeId: string | null,
+  chats: readonly StoredSession[],
+  deletingSessionIds: readonly string[]
+): StoredSession | null {
+  return (
+    chats.find(
+      chat =>
+        worktreeId !== null &&
+        chat.worktreeId === worktreeId &&
+        Boolean(chat.cloudAgentSessionId) &&
+        !deletingSessionIds.includes(chat.sessionId)
+    ) ?? null
+  );
+}
 
 const CLOSED_WORKTREE_CHAT_TABS_STORAGE_KEY_PREFIX = 'cloud-agent:closed-worktree-chat-tabs';
 

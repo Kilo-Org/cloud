@@ -94,7 +94,7 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
         'implementation/code_generation': [
           { model: 'meta/muse-spark-1.3-contributor' },
           { model: 'meta/muse-spark-1.3' },
-          { model: 'stepfun/step-3.7-flash:free' },
+          { model: 'stepfun/step-5-preview-free' },
           { model: 'kilo-auto/balanced' },
         ],
       },
@@ -105,7 +105,7 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
 
     await expect(collectDataCollectionRequiredAutoRoutingModelIds(owner)).resolves.toEqual([
       'meta/muse-spark-1.3-contributor',
-      'stepfun/step-3.7-flash:free',
+      'stepfun/step-5-preview-free',
     ]);
   });
 });

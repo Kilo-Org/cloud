@@ -8,8 +8,10 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
 
-The camera purpose string lives in the `expo-image-picker` options in `app.config.ts`.
-It explains photo attachments in AI agent chats and gives a design example.
+Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
+The camera and photo library prompts explain AI agent attachments and include specific examples.
+Background location and motion descriptions are disabled because the app does not request those permissions.
+Development builds also localize the local-network prompt; production builds exclude that development-only translation and retain Expo's release stripping.
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
 1. obtain Expo access

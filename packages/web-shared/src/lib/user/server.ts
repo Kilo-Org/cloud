@@ -22,7 +22,7 @@ import type { Organization, User } from '@kilocode/db/schema';
 import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { NEXTAUTH_SECRET, BLACKLIST_TLDS } from '@kilocode/web-shared/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
@@ -467,8 +467,10 @@ export async function isEmailBlacklistedByDomainAsync(email: string): Promise<bo
   return !!isEmailBlacklistedByDomain(email, domains);
 }
 
-export const isBlockedTLD = (email: string, blacklisted_tlds = BLACKLIST_TLDS) =>
-  blacklisted_tlds.some(tld => email.toLowerCase().endsWith(tld));
+export const isBlockedTLD = (email: string) => {
+  const lowercaseEmail = email.toLowerCase();
+  return lowercaseEmail.endsWith('.shop') || lowercaseEmail.endsWith('.top');
+};
 
 export function report_blocked_user(kiloUserId: string) {
   return authError(403, 'Access denied (R1)', kiloUserId);

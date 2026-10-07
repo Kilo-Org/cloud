@@ -187,6 +187,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null, // N/A for FIM
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: requestBody.stream === true,
     organizationId,

@@ -2807,6 +2807,7 @@ export const microdollar_usage_metadata = pgTable(
     session_id: text(),
     mode_id: integer(),
     auto_model_id: integer(),
+    reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),
@@ -2963,6 +2964,15 @@ export const auto_model = pgTable(
   table => [uniqueIndex('UQ_auto_model').on(table.auto_model)]
 );
 
+export const reasoning_setting = pgTable(
+  'reasoning_setting',
+  {
+    reasoning_setting_id: serial().notNull().primaryKey(),
+    reasoning_setting: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -3012,6 +3022,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   session_id: text(),
   mode: text(),
   auto_model: text(),
+  reasoning_setting: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
   abuse_delay: integer(),
@@ -3066,6 +3077,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
+    rs.reasoning_setting,
     meta.market_cost,
     meta.is_free,
     meta.abuse_delay,
@@ -3084,6 +3096,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
+  LEFT JOIN ${reasoning_setting} rs ON meta.reasoning_setting_id = rs.reasoning_setting_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;

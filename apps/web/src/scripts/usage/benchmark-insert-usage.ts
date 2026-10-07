@@ -205,6 +205,7 @@ function generateRandomRecord(
       pickRandom(['kilo-auto/frontier', 'kilo-auto/free', 'kilo-auto/small'], Math.random()),
       70
     ),
+    reasoning_setting: null,
     market_cost: core.cost,
     is_free: Math.random() < 0.1,
     abuse_delay: null,

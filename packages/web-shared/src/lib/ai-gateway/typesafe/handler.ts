@@ -248,6 +248,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
         max_tokens: null,
         has_middle_out_transform: null,
+        reasoning_setting: null,
         fraudHeaders,
         isStreaming: false,
         organizationId,

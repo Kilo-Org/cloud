@@ -169,6 +169,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     session_id: usageContext.session_id,
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
+    reasoning_setting: usageContext.reasoning_setting,
     ttfb_ms: usageContext.ttfb_ms,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -827,6 +828,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
           , ${createUpsertCTE(sql`mode`, metadataFields.mode)}
           , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
+          , ${createUpsertCTE(sql`reasoning_setting`, metadataFields.reasoning_setting)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -866,7 +868,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               api_kind_id,
               feature_id,
               mode_id,
-              auto_model_id
+              auto_model_id,
+              reasoning_setting_id
             )
             SELECT
               ${metadataFields.id},
@@ -906,7 +909,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT api_kind_id FROM api_kind_cte),
               (SELECT feature_id FROM feature_cte),
               (SELECT mode_id FROM mode_cte),
-              (SELECT auto_model_id FROM auto_model_cte)
+              (SELECT auto_model_id FROM auto_model_cte),
+              (SELECT reasoning_setting_id FROM reasoning_setting_cte)
           )
           , balance_update AS (
             UPDATE kilocode_users

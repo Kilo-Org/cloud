@@ -24,7 +24,6 @@ import {
 import { logger } from '../logger.js';
 import { repoSnapshotIndexKey } from './repo-snapshot-index.js';
 import {
-  ContainersAllocationConflictError,
   SandboxContainers,
   type ContainerInstanceSize,
   type ContainersObservation,
@@ -1021,23 +1020,65 @@ describe('SandboxContainers launch', () => {
     expect(container.startCalls).toHaveLength(2);
   });
 
-  it('serialises concurrent launches so one allocation wins without executing the loser', async () => {
+  it('serialises concurrent launches so the later allocation replaces the earlier one', async () => {
     const { instance, container, readRecord } = setup();
 
-    const results = await Promise.allSettled([launch(instance, REF_A), launch(instance, REF_B)]);
+    await expect(Promise.all([launch(instance, REF_A), launch(instance, REF_B)])).resolves.toEqual([
+      { started: true, startSource: 'image' },
+      { started: true, startSource: 'image' },
+    ]);
 
-    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
-    const rejected = results.filter(
-      (result): result is PromiseRejectedResult => result.status === 'rejected'
-    );
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0].reason).toBeInstanceOf(ContainersAllocationConflictError);
-    expect((rejected[0].reason as ContainersAllocationConflictError).code).toBe(
-      'allocation_conflict'
-    );
-    expect(container.startCalls).toHaveLength(1);
+    expect(container.calls).toEqual(['start', 'exec:cat', 'start', 'exec:cat']);
+    expect(container.runningAtDestroy).toEqual([true]);
     expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(0);
-    expect([REF_A, REF_B]).toContain(readRecord().allocationRef);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+  });
+
+  it('replaces a launch left behind by an abandoned allocation instead of refusing every later one', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'exec_pending',
+        startSource: 'repository',
+        instance: 'standard-2',
+      },
+      running: true,
+    });
+
+    await expect(launch(instance, REF_B)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+
+    expect(container.runningAtDestroy).toEqual([true]);
+    expect(container.startCalls).toEqual([nativeStartOptions('standard-2')]);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+    expect(readRecord().wrapperAttempt).toBeUndefined();
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+  });
+
+  it('fails a superseding launch without starting when the leftover cannot be destroyed, and recovers on the next launch', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+      running: true,
+    });
+    container.destroyBehavior = 'reject';
+
+    await expect(launch(instance, REF_B)).rejects.toThrow(
+      'Container from a superseded allocation could not be destroyed'
+    );
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
+
+    container.destroyBehavior = 'ok';
+    await expect(launch(instance, 'ref-c')).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: 'ref-c' });
   });
 });
 

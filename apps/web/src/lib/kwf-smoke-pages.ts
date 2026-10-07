@@ -10,3 +10,8 @@ export function pageNumbers(total: number, size: number): number[] {
   const last = Math.max(1, batchCount(total, size));
   return Array.from({ length: last }, (_, index) => index + 1);
 }
+
+/** The items on page `page` (1-based), with `size` items per page. */
+export function pageSlice<T>(items: readonly T[], page: number, size: number): T[] {
+  return items.slice(page * size, page * size + size);
+}

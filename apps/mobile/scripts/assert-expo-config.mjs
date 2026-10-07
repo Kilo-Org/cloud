@@ -103,6 +103,7 @@ const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSPhotoLibraryUsageDescription',
   ...(process.env.EAS_BUILD_PROFILE === 'production' ? [] : ['NSLocalNetworkUsageDescription']),
   'NSMicrophoneUsageDescription',
+  'NSMotionUsageDescription',
   'NSSpeechRecognitionUsageDescription',
   'NSFaceIDUsageDescription',
   'NSLocationWhenInUseUsageDescription',

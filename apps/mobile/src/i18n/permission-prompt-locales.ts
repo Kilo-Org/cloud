@@ -10,6 +10,7 @@ export const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSPhotoLibraryUsageDescription',
   'NSLocalNetworkUsageDescription',
   'NSMicrophoneUsageDescription',
+  'NSMotionUsageDescription',
   'NSSpeechRecognitionUsageDescription',
   'NSFaceIDUsageDescription',
   'NSLocationWhenInUseUsageDescription',
@@ -63,6 +64,7 @@ export function buildPermissionPromptLocales(copy: PermissionPromptCopy): Permis
           NSPhotoLibraryUsageDescription: readPrompt(entry, tag, 'NSPhotoLibraryUsageDescription'),
           NSLocalNetworkUsageDescription: readPrompt(entry, tag, 'NSLocalNetworkUsageDescription'),
           NSMicrophoneUsageDescription: readPrompt(entry, tag, 'NSMicrophoneUsageDescription'),
+          NSMotionUsageDescription: readPrompt(entry, tag, 'NSMotionUsageDescription'),
           NSSpeechRecognitionUsageDescription: readPrompt(
             entry,
             tag,

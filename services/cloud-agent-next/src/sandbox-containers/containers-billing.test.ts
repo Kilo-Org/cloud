@@ -25,11 +25,7 @@ import type {
 import type { Env } from '../types.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
-import {
-  ContainersAllocationConflictError,
-  SandboxContainers,
-  type ContainerInstanceSize,
-} from './SandboxContainers.js';
+import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
 
 const RECORD_KEY = 'containers:record:v1';
 const BILLING_CONTEXT_KEY = 'container-usage:billing-context:v1';
@@ -983,13 +979,16 @@ describe('ContainersBilling resumed launch activation', () => {
     expect(first.meter.recordStartInputs).toHaveLength(0);
   });
 
-  it('does not activate for a resumed launch with a different allocation ref', async () => {
+  it('settles a superseded allocation before metering the launch that replaces it', async () => {
     const first = setup();
     await admit(first.instance, 'standard-4');
+    await launch(first.instance, REF_A, 'standard-4');
+    await flushPending(first.pendingTasks);
+    const supersededGeneration = readGeneration(first.storage);
     first.storage.map.set(RECORD_KEY, {
       ...readRecord(first.storage),
       state: 'launching',
-      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
     });
 
     const resumed = setup({
@@ -1000,12 +999,14 @@ describe('ContainersBilling resumed launch activation', () => {
 
     await expect(
       resumed.instance.launchWrapper({ allocationRef: 'ref-b', env: {}, instance: 'standard-4' })
-    ).rejects.toBeInstanceOf(ContainersAllocationConflictError);
+    ).resolves.toEqual({ started: true, startSource: 'image' });
     await flushPending(resumed.pendingTasks);
 
-    expect(readMeasurementStarted(first.storage)).toBe(false);
-    expect(readSchedules(first.storage)).toBeUndefined();
-    expect(readRecord(first.storage).allocationRef).toBe(REF_A);
+    expect(first.container.destroyCalls).toBe(1);
+    expect(first.meter.recordStopInputs).toHaveLength(1);
+    expect(readGeneration(first.storage)).not.toBe(supersededGeneration);
+    expect(readMeasurementStarted(first.storage)).toBe(true);
+    expect(readRecord(first.storage)).toMatchObject({ state: 'running', allocationRef: 'ref-b' });
   });
 });
 

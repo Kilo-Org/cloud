@@ -286,6 +286,46 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 Stop, answers and permissions', () => {
+  it('retains an autonomous deadline error for replay without changing an earlier completed message', async () => {
+    const pair = await setupSiblingPair();
+    try {
+      await pair.stubA.onOutcome({
+        sessionId: pair.sessionA,
+        status: 'completed',
+        lastMessageId: pair.messageA,
+      });
+      const before = await pair.stubA.getSession();
+      const error = {
+        type: 'session.error',
+        properties: {
+          sessionID: kiloSessionId(),
+          reason: 'no_progress',
+          error: 'Execution stopped because it made no progress. You can continue in this chat.',
+        },
+      };
+      await pair.stubA.onEvents({ events: [error] });
+      const after = await pair.stubA.getSession();
+      expect(before.type).toBe('found');
+      expect(after.type).toBe('found');
+      if (before.type !== 'found' || after.type !== 'found') throw new Error('Session disappeared');
+      expect(after.messages).toEqual(before.messages);
+      expect(after.latestEventId).toBeGreaterThan(before.latestEventId);
+      const rows = await runInDurableObject(pair.stubA, (_instance, state) =>
+        state.storage.sql
+          .exec<{ payload: string; execution_id: string }>(
+            "SELECT payload, execution_id FROM events WHERE stream_event_type = 'kilocode' AND json_extract(payload, '$.type') = 'session.error'"
+          )
+          .toArray()
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].execution_id).toBe('');
+      expect(JSON.parse(rows[0].payload)).toMatchObject(error);
+      expect(await messageStatus(pair.stubA, pair.messageA)).toBe('completed');
+      expect(await messageStatus(pair.stubB, pair.messageB)).toBe('running');
+    } finally {
+      pair.stopPump();
+    }
+  });
   it('stops one session without affecting a sibling route on the same sandbox', async () => {
     const pair = await setupSiblingPair();
     try {

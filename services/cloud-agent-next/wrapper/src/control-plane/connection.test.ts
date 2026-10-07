@@ -432,6 +432,7 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
+        redactsNamedSecrets: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 

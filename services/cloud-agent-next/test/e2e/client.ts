@@ -395,7 +395,7 @@ export async function prepareBrowserSession(
       prompt: input.prompt,
       mode: 'code',
       model: config.model,
-      gitUrl: config.gitUrl,
+      ...(config.githubRepo ? { githubRepo: config.githubRepo } : { gitUrl: config.gitUrl }),
       shallow: true,
       createdOnPlatform: 'cloud-agent-web',
       clientProvenance: 'browser',
@@ -1196,9 +1196,9 @@ export function openStream(
         event =>
           messageId === undefined
             ? TERMINAL_STREAM_TYPES.has(event.streamEventType)
-            : isMessageCompleted(event, messageId) ||
-              (event.streamEventType === 'cloud.message.failed' &&
-                messageIdFromEvent(event) === messageId),
+            : (event.streamEventType === 'cloud.message.failed' &&
+                messageIdFromEvent(event) === messageId) ||
+              isMessageCompleted(event, messageId),
         timeoutMs
       ),
     get receivedCount() {

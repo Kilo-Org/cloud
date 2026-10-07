@@ -1,3 +1,8 @@
+import {
+  buildAgentEntryFromRuntimeAgent,
+  buildKiloCommandsConfiguration,
+} from './shared/runtime-profile-config.js';
+export { buildAgentEntryFromRuntimeAgent } from './shared/runtime-profile-config.js';
 import { dirname, relative } from 'node:path';
 import {
   parseManagedBitbucketCloneUrl,
@@ -56,12 +61,7 @@ import type {
   CreateSessionForCloudAgentResult,
 } from '@kilocode/session-ingest-contracts';
 import { timedExec } from './sandbox-timeout-logging.js';
-import type {
-  PersistenceEnv,
-  CloudAgentSessionState,
-  RuntimeSkill,
-  RuntimeAgent,
-} from './persistence/types.js';
+import type { PersistenceEnv, CloudAgentSessionState, RuntimeSkill } from './persistence/types.js';
 import {
   getEffectiveCredentialContainment,
   parseSessionMetadata,
@@ -778,26 +778,6 @@ function shortHash(input: string): string {
   return (hash >>> 0).toString(16);
 }
 
-export function buildAgentEntryFromRuntimeAgent(agent: RuntimeAgent): Record<string, unknown> {
-  const { config } = agent;
-  const entry: Record<string, unknown> = {
-    mode: config.mode ?? 'primary',
-  };
-  if (config.prompt !== undefined) entry.prompt = config.prompt;
-  if (config.description !== undefined) entry.description = config.description;
-  if (config.model != null) entry.model = normalizeKilocodeModel(config.model);
-  if (config.variant !== undefined) entry.variant = config.variant;
-  if (config.temperature !== undefined) entry.temperature = config.temperature;
-  if (config.top_p !== undefined) entry.top_p = config.top_p;
-  if (config.steps !== undefined) entry.steps = config.steps;
-  if (config.hidden !== undefined) entry.hidden = config.hidden;
-  if (config.disable !== undefined) entry.disable = config.disable;
-  if (config.color !== undefined) entry.color = config.color;
-  if (config.permission !== undefined) entry.permission = config.permission;
-  if (config.options !== undefined) entry.options = config.options;
-  return entry;
-}
-
 function isSafeSkillFilePath(relativePath: string): boolean {
   if (relativePath.length === 0 || relativePath.length > 200) return false;
   if (relativePath.startsWith('/')) return false;
@@ -1098,10 +1078,13 @@ export class SessionService {
       bitbucketWorkspaceUuid: context.bitbucketWorkspaceUuid,
       bitbucketRepositoryUuid: context.bitbucketRepositoryUuid,
       profile: effectiveProfile,
-    });
+    }).env;
   }
 
-  private getSaferEnvVars(opts: GetSaferEnvVarsOptions): Record<string, string> {
+  private getSaferEnvVars(opts: GetSaferEnvVarsOptions): {
+    env: Record<string, string>;
+    secretEnvKeys: string[];
+  } {
     const {
       sessionHome,
       sessionId,
@@ -1159,6 +1142,8 @@ export class SessionService {
 
     // Bitbucket Code Reviewer sessions use only trusted worker-owned environment values.
     let baseEnvVars = isBitbucketCodeReview ? {} : { ...userEnvVars };
+    let decryptedSecretKeys: string[] = [];
+    let decryptedSecretValues: Record<string, string> = {};
 
     if (!isBitbucketCodeReview && encryptedSecrets && Object.keys(encryptedSecrets).length > 0) {
       const privateKey = env.AGENT_ENV_VARS_PRIVATE_KEY;
@@ -1167,7 +1152,12 @@ export class SessionService {
           'Encrypted secrets provided but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker'
         );
       }
-      baseEnvVars = mergeEnvVarsWithSecrets(baseEnvVars, encryptedSecrets, privateKey);
+      const mergedSecrets = mergeEnvVarsWithSecrets(baseEnvVars, encryptedSecrets, privateKey);
+      baseEnvVars = mergedSecrets;
+      decryptedSecretKeys = Object.keys(encryptedSecrets);
+      decryptedSecretValues = Object.fromEntries(
+        decryptedSecretKeys.map(key => [key, mergedSecrets[key]])
+      );
       logger
         .withTags({ secretCount: Object.keys(encryptedSecrets).length })
         .info('Decrypted and merged encrypted secrets');
@@ -1363,18 +1353,7 @@ export class SessionService {
       configContent.agent = agentConfig;
     }
     if (!bitbucketInputPath && kiloCommands && kiloCommands.length > 0) {
-      configContent.command = Object.fromEntries(
-        kiloCommands.map(cmd => [
-          cmd.name,
-          {
-            template: cmd.template,
-            ...(cmd.description && { description: cmd.description }),
-            ...(cmd.agent && { agent: cmd.agent }),
-            ...(cmd.model && { model: normalizeKilocodeModel(cmd.model) }),
-            subtask: cmd.subtask ?? false,
-          },
-        ])
-      );
+      configContent.command = buildKiloCommandsConfiguration(kiloCommands);
       logger.info('Kilo commands merged into KILO_CONFIG_CONTENT', {
         kiloCommandNames: kiloCommands.map(c => c.name),
         kiloCommandCount: kiloCommands.length,
@@ -1494,7 +1473,12 @@ export class SessionService {
       envVars.KILO_SESSION_INGEST_URL = env.KILO_SESSION_INGEST_URL;
     }
 
-    return envVars;
+    return {
+      env: envVars,
+      // A later grant step may have overwritten a decrypted secret; only what is
+      // still that secret's value is safe to advertise for redaction.
+      secretEnvKeys: decryptedSecretKeys.filter(key => envVars[key] === decryptedSecretValues[key]),
+    };
   }
 
   /**
@@ -2001,37 +1985,39 @@ export class SessionService {
       platform,
     });
 
-    const materializedEnv = this.getSaferEnvVars({
-      sessionHome,
-      sessionId,
-      workspacePath,
-      env,
-      kiloCapability,
-      kiloBackendBaseUrl,
-      kiloProviderBaseUrl,
-      kiloSessionIngestBaseUrl,
-      kilocodeModel: agent.model,
-      originalOrgId: orgId,
-      githubToken: resolvedTokens.githubToken,
-      githubRepo: github?.repo,
-      githubPullRequestNumber: github?.pullRequestNumber,
-      githubAppType: resolvedTokens.githubAppType,
-      createdOnPlatform: metadata.identity.createdOnPlatform,
-      callbackTarget: metadata.callback?.target,
-      appendSystemPrompt: metadata.agent?.appendSystemPrompt,
-      gitUrl:
-        resolvedTokens.gitlabCapabilityGitUrl ??
-        resolvedTokens.bitbucketCapabilityGitUrl ??
-        git?.url,
-      gitToken: resolvedTokens.gitToken,
-      gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
-      glabIsOAuth2: resolvedTokens.glabIsOAuth2,
-      platform,
-      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
-      bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
-      bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
-      profile,
-    });
+    const { env: materializedEnv, secretEnvKeys: materializedSecretEnvKeys } = this.getSaferEnvVars(
+      {
+        sessionHome,
+        sessionId,
+        workspacePath,
+        env,
+        kiloCapability,
+        kiloBackendBaseUrl,
+        kiloProviderBaseUrl,
+        kiloSessionIngestBaseUrl,
+        kilocodeModel: agent.model,
+        originalOrgId: orgId,
+        githubToken: resolvedTokens.githubToken,
+        githubRepo: github?.repo,
+        githubPullRequestNumber: github?.pullRequestNumber,
+        githubAppType: resolvedTokens.githubAppType,
+        createdOnPlatform: metadata.identity.createdOnPlatform,
+        callbackTarget: metadata.callback?.target,
+        appendSystemPrompt: metadata.agent?.appendSystemPrompt,
+        gitUrl:
+          resolvedTokens.gitlabCapabilityGitUrl ??
+          resolvedTokens.bitbucketCapabilityGitUrl ??
+          git?.url,
+        gitToken: resolvedTokens.gitToken,
+        gitlabInstanceUrl: resolvedTokens.gitlabInstanceUrl,
+        glabIsOAuth2: resolvedTokens.glabIsOAuth2,
+        platform,
+        bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
+        bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
+        bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
+        profile,
+      }
+    );
 
     const ready = {
       workspacePath,
@@ -2094,6 +2080,7 @@ export class SessionService {
       ...(runtimeCredentialProxy ? { runtimeCredentialProxy } : {}),
       materialized: {
         env: materializedEnv,
+        ...(materializedSecretEnvKeys.length ? { secretEnvKeys: materializedSecretEnvKeys } : {}),
         ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
         ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
       },

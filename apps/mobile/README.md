@@ -8,6 +8,12 @@ Humans: follow instructions below or talk to [@iscekic](https://github.com/iscek
 
 Generally speaking, you only need a new dev build if making dependency/native changes.
 
+Native permission translations live in `plugins/permission-prompt-copy.json` for all 87 supported languages.
+The camera and photo library prompts explain AI agent attachments and include specific examples.
+Background location and motion descriptions are disabled because the app does not request those permissions.
+Development builds also localize the local-network prompt; production builds exclude that development-only translation and retain Expo's release stripping.
+Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
+
 1. obtain Expo access
 2. `pnpx eas-cli login -b`
 3. obtain Apple access (developer)

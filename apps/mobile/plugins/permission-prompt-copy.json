@@ -4,608 +4,869 @@
     "NSSpeechRecognitionUsageDescription": "Laat Kilo spraakherkenning gebruik om jou stem na teks te omskep.",
     "NSFaceIDUsageDescription": "Laat Kilo Face ID gebruik om die program te ontsluit.",
     "NSLocationWhenInUseUsageDescription": "Laat Kilo jou ligging gebruik om plaaslike weer op te stel.",
-    "NSUserTrackingUsageDescription": "Hierdie identifiseerder word gebruik om die doeltreffendheid van advertensieveldtogte te meet."
+    "NSUserTrackingUsageDescription": "Hierdie identifiseerder word gebruik om die doeltreffendheid van advertensieveldtogte te meet.",
+    "NSCameraUsageDescription": "Kilo gebruik jou kamera om foto's te neem wat jy by kletse met 'n KI-koderingsassistent aanheg. Deel byvoorbeeld 'n foto van 'n ontwerp sodat jou assistent kan help om dit te implementeer.",
+    "NSPhotoLibraryUsageDescription": "Kilo gebruik jou fotobiblioteek om beelde by kletse met 'n KI-koderingsassistent aan te heg. Deel byvoorbeeld 'n skermskoot sodat jou assistent kan help om 'n probleem met die gebruikerskoppelvlak op te los.",
+    "NSLocalNetworkUsageDescription": "Kilo gebruik jou plaaslike netwerk om aan ontwikkelingsbedieners op jou rekenaar te koppel wanneer jy 'n ontwikkelingsweergawe toets."
   },
   "am": {
     "NSMicrophoneUsageDescription": "ኪሎ ድምፅህን ወደ ጽሑፍ ለመቀየር ማይክራፎንህን እንዲጠቀም ፍቀድ።",
     "NSSpeechRecognitionUsageDescription": "ኪሎ ድምፅህን ወደ ጽሑፍ ለመቀየር የንግግር መለያ እንዲጠቀም ፍቀድ።",
     "NSFaceIDUsageDescription": "ኪሎ መተግበሪያውን ለመክፈት Face ID እንዲጠቀም ፍቀድ።",
     "NSLocationWhenInUseUsageDescription": "Kilo የአካባቢ የአየር ሁኔታን ለማዘጋጀት አካባቢህን እንዲጠቀም ፍቀድ።",
-    "NSUserTrackingUsageDescription": "ይህ መለያ የማስታወቂያ ዘመቻዎችን ውጤታማነት ለመለካት ይጠቅማል።"
+    "NSUserTrackingUsageDescription": "ይህ መለያ የማስታወቂያ ዘመቻዎችን ውጤታማነት ለመለካት ይጠቅማል።",
+    "NSCameraUsageDescription": "Kilo ከሰው ሠራሽ ብልህነት የኮድ ረዳት ጋር በሚያደርጉት ውይይት ላይ የሚያያይዟቸውን ፎቶዎች ለማንሳት ካሜራዎን ይጠቀማል። ለምሳሌ፣ ረዳትዎ ንድፍን በኮድ ለመተግበር እንዲያግዝዎ የንድፉን ፎቶ ያጋሩ።",
+    "NSPhotoLibraryUsageDescription": "Kilo ከሰው ሠራሽ ብልህነት የኮድ ረዳት ጋር በሚያደርጉት ውይይት ላይ ምስሎችን ለማያያዝ የፎቶ ቤተ መጻሕፍትዎን ይጠቀማል። ለምሳሌ፣ ረዳትዎ የተጠቃሚ በይነገጽ ችግርን ለማስተካከል እንዲያግዝዎ የማያ ገጽ ቅጽበታዊ ምስል ያጋሩ።",
+    "NSLocalNetworkUsageDescription": "Kilo የልማት ስሪትን ሲሞክሩ በኮምፒውተርዎ ላይ ካሉ የልማት አገልጋዮች ጋር ለመገናኘት የአካባቢ አውታረ መረብዎን ይጠቀማል።"
   },
   "ar": {
     "NSMicrophoneUsageDescription": "اسمح لـ Kilo باستخدام الميكروفون لتحويل الكلام إلى نص.",
     "NSSpeechRecognitionUsageDescription": "اسمح لـ Kilo باستخدام التعرف على الكلام لتحويل صوتك إلى نص.",
     "NSFaceIDUsageDescription": "اسمح لـ Kilo باستخدام Face ID لفتح التطبيق.",
     "NSLocationWhenInUseUsageDescription": "اسمح لـ Kilo باستخدام موقعك لإعداد الطقس المحلي.",
-    "NSUserTrackingUsageDescription": "يُستخدم هذا المعرّف لقياس فعالية الحملات الإعلانية."
+    "NSUserTrackingUsageDescription": "يُستخدم هذا المعرّف لقياس فعالية الحملات الإعلانية.",
+    "NSCameraUsageDescription": "يستخدم Kilo الكاميرا لالتقاط صور ترفقها بمحادثات مساعد البرمجة بالذكاء الاصطناعي. على سبيل المثال، شارك صورة لتصميم كي يتمكن مساعدك من مساعدتك في تنفيذه.",
+    "NSPhotoLibraryUsageDescription": "يستخدم Kilo مكتبة الصور لإرفاق صور بمحادثات مساعد البرمجة بالذكاء الاصطناعي. على سبيل المثال، شارك لقطة شاشة كي يتمكن مساعدك من مساعدتك في إصلاح مشكلة في واجهة المستخدم.",
+    "NSLocalNetworkUsageDescription": "يستخدم Kilo شبكتك المحلية للاتصال بخوادم التطوير على جهاز الكمبيوتر الخاص بك عند اختبار نسخة تطوير."
   },
   "az": {
     "NSMicrophoneUsageDescription": "Kilo-nun nitqi mətnə çevirmək üçün mikrofonunuzdan istifadə etməsinə icazə verin.",
     "NSSpeechRecognitionUsageDescription": "Kilo-nun səsinizi mətnə çevirmək üçün nitq tanımadan istifadə etməsinə icazə verin.",
     "NSFaceIDUsageDescription": "Kilo-nun tətbiqi açmaq üçün Face ID-dən istifadə etməsinə icazə verin.",
     "NSLocationWhenInUseUsageDescription": "Yerli hava proqnozunu qurmaq üçün Kilo-a yerinizdən istifadə etməyə icazə verin.",
-    "NSUserTrackingUsageDescription": "Bu identifikator reklam kampaniyalarının effektivliyini ölçmək üçün istifadə olunur."
+    "NSUserTrackingUsageDescription": "Bu identifikator reklam kampaniyalarının effektivliyini ölçmək üçün istifadə olunur.",
+    "NSCameraUsageDescription": "Kilo süni intellekt əsaslı proqramlaşdırma köməkçisi ilə söhbətlərə əlavə edəcəyiniz fotoları çəkmək üçün kameranızdan istifadə edir. Məsələn, köməkçinizin dizaynı həyata keçirməkdə sizə kömək etməsi üçün həmin dizaynın fotosunu paylaşın.",
+    "NSPhotoLibraryUsageDescription": "Kilo süni intellekt əsaslı proqramlaşdırma köməkçisi ilə söhbətlərə şəkillər əlavə etmək üçün foto kitabxananızdan istifadə edir. Məsələn, köməkçinizin istifadəçi interfeysindəki problemi həll etməkdə sizə kömək etməsi üçün ekran görüntüsü paylaşın.",
+    "NSLocalNetworkUsageDescription": "Kilo inkişaf mərhələsindəki versiyanı sınaqdan keçirərkən kompüterinizdəki proqram təminatı hazırlama serverlərinə qoşulmaq üçün yerli şəbəkənizdən istifadə edir."
   },
   "be": {
     "NSMicrophoneUsageDescription": "Дазвольце Kilo выкарыстоўваць ваш мікрафон для пераўтварэння гаворкі ў тэкст.",
     "NSSpeechRecognitionUsageDescription": "Дазвольце Kilo выкарыстоўваць распазнаванне гаворкі для пераўтварэння вашага голасу ў тэкст.",
     "NSFaceIDUsageDescription": "Дазвольце Kilo выкарыстоўваць Face ID для разблакіроўкі праграмы.",
     "NSLocationWhenInUseUsageDescription": "Дазвольце Kilo выкарыстоўваць ваша месцазнаходжанне для наладкі мясцовага надвор'я.",
-    "NSUserTrackingUsageDescription": "Гэты ідэнтыфікатар выкарыстоўваецца для вымярэння эфектыўнасці рэкламных кампаній."
+    "NSUserTrackingUsageDescription": "Гэты ідэнтыфікатар выкарыстоўваецца для вымярэння эфектыўнасці рэкламных кампаній.",
+    "NSCameraUsageDescription": "Kilo выкарыстоўвае вашу камеру, каб рабіць фота, якія вы далучаеце да чатаў з ШІ-памочнікам па праграмаванні. Напрыклад, падзяліцеся фота дызайну, каб ваш памочнік мог дапамагчы яго рэалізаваць.",
+    "NSPhotoLibraryUsageDescription": "Kilo выкарыстоўвае вашу фотатэку, каб далучаць выявы да чатаў з ШІ-памочнікам па праграмаванні. Напрыклад, падзяліцеся здымкам экрана, каб ваш памочнік мог дапамагчы выправіць праблему ў карыстальніцкім інтэрфейсе.",
+    "NSLocalNetworkUsageDescription": "Kilo выкарыстоўвае вашу лакальную сетку, каб падключацца да сервераў распрацоўкі на вашым камп'ютары падчас тэсціравання зборкі для распрацоўкі."
   },
   "bg": {
     "NSMicrophoneUsageDescription": "Разрешете на Kilo да използва микрофона ви, за да превръща речта в текст.",
     "NSSpeechRecognitionUsageDescription": "Разрешете на Kilo да използва разпознаване на реч, за да превръща гласа ви в текст.",
     "NSFaceIDUsageDescription": "Разрешете на Kilo да използва Face ID, за да отключи приложението.",
     "NSLocationWhenInUseUsageDescription": "Разрешете на Kilo да използва местоположението ви, за да настрои местното време.",
-    "NSUserTrackingUsageDescription": "Този идентификатор се използва за измерване на ефективността на рекламните кампании."
+    "NSUserTrackingUsageDescription": "Този идентификатор се използва за измерване на ефективността на рекламните кампании.",
+    "NSCameraUsageDescription": "Kilo използва камерата ви, за да прави снимки, които прикачвате към разговори с асистент за програмиране с ИИ. Например споделете снимка на дизайн, за да може асистентът ви да помогне с реализирането му.",
+    "NSPhotoLibraryUsageDescription": "Kilo използва библиотеката ви със снимки, за да прикачва изображения към разговори с асистент за програмиране с ИИ. Например споделете екранна снимка, за да може асистентът ви да помогне с отстраняването на проблем в потребителския интерфейс.",
+    "NSLocalNetworkUsageDescription": "Kilo използва локалната ви мрежа, за да се свързва със сървъри за разработка на компютъра ви при тестване на компилация за разработка."
   },
   "bn": {
     "NSMicrophoneUsageDescription": "কথা থেকে লেখায় রূপান্তর করতে Kilo-কে আপনার মাইক্রোফোন ব্যবহার করার অনুমতি দিন।",
     "NSSpeechRecognitionUsageDescription": "আপনার কণ্ঠস্বর লেখায় রূপান্তর করতে Kilo-কে বক্তৃতা শনাক্তকরণ ব্যবহার করার অনুমতি দিন।",
     "NSFaceIDUsageDescription": "অ্যাপটি আনলক করতে Kilo-কে Face ID ব্যবহার করার অনুমতি দিন।",
     "NSLocationWhenInUseUsageDescription": "স্থানীয় আবহাওয়া সেট আপ করতে Kilo-কে আপনার অবস্থান ব্যবহার করার অনুমতি দিন।",
-    "NSUserTrackingUsageDescription": "এই শনাক্তকারীটি বিজ্ঞাপন প্রচারণার কার্যকারিতা পরিমাপ করতে ব্যবহৃত হয়।"
+    "NSUserTrackingUsageDescription": "এই শনাক্তকারীটি বিজ্ঞাপন প্রচারণার কার্যকারিতা পরিমাপ করতে ব্যবহৃত হয়।",
+    "NSCameraUsageDescription": "Kilo আপনার ক্যামেরা ব্যবহার করে এমন ছবি তোলে, যা আপনি এআই কোডিং সহকারীর সঙ্গে চ্যাটে সংযুক্ত করেন। যেমন, কোনো ডিজাইনের ছবি শেয়ার করুন, যাতে আপনার সহকারী সেটি বাস্তবায়নে সাহায্য করতে পারে।",
+    "NSPhotoLibraryUsageDescription": "Kilo আপনার ফটো লাইব্রেরি ব্যবহার করে এআই কোডিং সহকারীর সঙ্গে চ্যাটে ছবি সংযুক্ত করে। যেমন, একটি স্ক্রিনশট শেয়ার করুন, যাতে আপনার সহকারী ব্যবহারকারী ইন্টারফেসের কোনো সমস্যা সমাধানে সাহায্য করতে পারে।",
+    "NSLocalNetworkUsageDescription": "Kilo ডেভেলপমেন্ট বিল্ড পরীক্ষা করার সময় আপনার কম্পিউটারের ডেভেলপমেন্ট সার্ভারগুলোর সঙ্গে সংযোগ করতে আপনার স্থানীয় নেটওয়ার্ক ব্যবহার করে।"
   },
   "bs": {
     "NSMicrophoneUsageDescription": "Dozvolite Kilo-u da koristi vaš mikrofon za pretvaranje govora u tekst.",
     "NSSpeechRecognitionUsageDescription": "Dozvolite Kilo-u da koristi prepoznavanje govora za pretvaranje vašeg glasa u tekst.",
     "NSFaceIDUsageDescription": "Dozvolite Kilo-u da koristi Face ID za otključavanje aplikacije.",
     "NSLocationWhenInUseUsageDescription": "Dozvolite Kilo-u da koristi vašu lokaciju za postavljanje lokalnog vremena.",
-    "NSUserTrackingUsageDescription": "Ovaj identifikator se koristi za mjerenje efikasnosti reklamnih kampanja."
+    "NSUserTrackingUsageDescription": "Ovaj identifikator se koristi za mjerenje efikasnosti reklamnih kampanja.",
+    "NSCameraUsageDescription": "Kilo koristi vašu kameru za snimanje fotografija koje prilažete razgovorima s AI asistentom za programiranje. Naprimjer, podijelite fotografiju dizajna kako bi vam asistent mogao pomoći da ga implementirate.",
+    "NSPhotoLibraryUsageDescription": "Kilo koristi vašu biblioteku fotografija za prilaganje slika razgovorima s AI asistentom za programiranje. Naprimjer, podijelite snimak ekrana kako bi vam asistent mogao pomoći da riješite problem s korisničkim interfejsom.",
+    "NSLocalNetworkUsageDescription": "Kilo koristi vašu lokalnu mrežu za povezivanje s razvojnim serverima na vašem računaru prilikom testiranja razvojne verzije."
   },
   "ca": {
     "NSMicrophoneUsageDescription": "Permet a en Kilo utilitzar el micròfon per convertir la parla en text.",
     "NSSpeechRecognitionUsageDescription": "Permet a en Kilo utilitzar el reconeixement de veu per convertir la teva veu en text.",
     "NSFaceIDUsageDescription": "Permet a en Kilo utilitzar Face ID per desbloquejar l'aplicació.",
     "NSLocationWhenInUseUsageDescription": "Permet que Kilo utilitzi la teva ubicació per configurar el temps local.",
-    "NSUserTrackingUsageDescription": "Aquest identificador s'utilitza per mesurar l'eficàcia de les campanyes publicitàries."
+    "NSUserTrackingUsageDescription": "Aquest identificador s'utilitza per mesurar l'eficàcia de les campanyes publicitàries.",
+    "NSCameraUsageDescription": "Kilo utilitza la càmera per fer fotos que adjuntes als xats amb un assistent de programació amb IA. Per exemple, comparteix una foto d'un disseny perquè el teu assistent et pugui ajudar a implementar-lo.",
+    "NSPhotoLibraryUsageDescription": "Kilo utilitza la fototeca per adjuntar imatges als xats amb un assistent de programació amb IA. Per exemple, comparteix una captura de pantalla perquè el teu assistent et pugui ajudar a solucionar un problema de la interfície d'usuari.",
+    "NSLocalNetworkUsageDescription": "Kilo utilitza la xarxa local per connectar-se als servidors de desenvolupament del teu ordinador quan proves una compilació de desenvolupament."
   },
   "ckb": {
     "NSMicrophoneUsageDescription": "ڕێگە بە Kilo بدە میکرۆفۆنەکەت بەکاربهێنێت بۆ گۆڕینی قسە بۆ دەق.",
     "NSSpeechRecognitionUsageDescription": "ڕێگە بە Kilo بدە ناسینەوەی قسە بەکاربهێنێت بۆ گۆڕینی دەنگت بۆ دەق.",
     "NSFaceIDUsageDescription": "ڕێگە بە Kilo بدە Face ID بەکاربهێنێت بۆ کردنەوەی ئەپەکە.",
     "NSLocationWhenInUseUsageDescription": "ڕێگە بە Kilo بدە شوێنەکەت بەکاربهێنێت بۆ ڕێکخستنی کەشوهەوای ناوخۆیی.",
-    "NSUserTrackingUsageDescription": "ئەم ناسەرە بەکاردێت بۆ پێوانەکردنی کارایی کەمپینەکانی ڕیکلام."
+    "NSUserTrackingUsageDescription": "ئەم ناسەرە بەکاردێت بۆ پێوانەکردنی کارایی کەمپینەکانی ڕیکلام.",
+    "NSCameraUsageDescription": "Kilo کامێراکەت بەکاردەهێنێت بۆ گرتنی ئەو وێنانەی کە هاوپێچی چاتەکانی یاریدەدەری کۆدنووسینی زیرەکی دەستکرد دەکەیت. بۆ نموونە، وێنەی دیزاینێک هاوبەش بکە تا یاریدەدەرەکەت بتوانێت لە جێبەجێکردنیدا یارمەتیت بدات.",
+    "NSPhotoLibraryUsageDescription": "Kilo کتێبخانەی وێنەکانت بەکاردەهێنێت بۆ هاوپێچکردنی وێنە بە چاتەکانی یاریدەدەری کۆدنووسینی زیرەکی دەستکرد. بۆ نموونە، وێنەیەکی شاشە هاوبەش بکە تا یاریدەدەرەکەت بتوانێت لە چارەسەرکردنی کێشەیەکی ڕووکاری بەکارهێنەر یارمەتیت بدات.",
+    "NSLocalNetworkUsageDescription": "Kilo تۆڕی ناوخۆییت بەکاردەهێنێت بۆ پەیوەستبوون بە ڕاژەکارەکانی گەشەپێدان لەسەر کۆمپیوتەرەکەت کاتێک وەشانێکی گەشەپێدان تاقی دەکەیتەوە."
   },
   "cs": {
     "NSMicrophoneUsageDescription": "Povolte aplikaci Kilo používat mikrofon k převodu řeči na text.",
     "NSSpeechRecognitionUsageDescription": "Povolte aplikaci Kilo používat rozpoznávání řeči k převodu hlasu na text.",
     "NSFaceIDUsageDescription": "Povolte aplikaci Kilo používat Face ID k odemknutí aplikace.",
     "NSLocationWhenInUseUsageDescription": "Povolte aplikaci Kilo používat vaši polohu k nastavení místního počasí.",
-    "NSUserTrackingUsageDescription": "Tento identifikátor se používá k měření účinnosti reklamních kampaní."
+    "NSUserTrackingUsageDescription": "Tento identifikátor se používá k měření účinnosti reklamních kampaní.",
+    "NSCameraUsageDescription": "Kilo používá váš fotoaparát k pořizování fotek, které přikládáte k chatům s AI asistentem pro programování. Například sdílejte fotku návrhu, aby vám ho asistent mohl pomoci implementovat.",
+    "NSPhotoLibraryUsageDescription": "Kilo používá vaši knihovnu fotek k přikládání obrázků k chatům s AI asistentem pro programování. Například sdílejte snímek obrazovky, aby vám asistent mohl pomoci opravit problém v uživatelském rozhraní.",
+    "NSLocalNetworkUsageDescription": "Kilo používá vaši místní síť k připojení k vývojovým serverům na vašem počítači při testování vývojového sestavení."
   },
   "cy": {
     "NSMicrophoneUsageDescription": "Caniatáu i Kilo ddefnyddio eich meicroffon i droi lleferydd yn destun.",
     "NSSpeechRecognitionUsageDescription": "Caniatáu i Kilo ddefnyddio adnabyddiaeth lleferydd i droi eich llais yn destun.",
     "NSFaceIDUsageDescription": "Caniatáu i Kilo ddefnyddio Face ID i ddatgloi'r ap.",
     "NSLocationWhenInUseUsageDescription": "Caniatáu i Kilo ddefnyddio eich lleoliad i osod y tywydd lleol.",
-    "NSUserTrackingUsageDescription": "Defnyddir y dynodwr hwn i fesur effeithiolrwydd ymgyrchoedd hysbysebu."
+    "NSUserTrackingUsageDescription": "Defnyddir y dynodwr hwn i fesur effeithiolrwydd ymgyrchoedd hysbysebu.",
+    "NSCameraUsageDescription": "Mae Kilo yn defnyddio eich camera i dynnu lluniau rydych yn eu hatodi i sgyrsiau gyda chynorthwyydd codio deallusrwydd artiffisial. Er enghraifft, rhannwch lun o ddyluniad fel y gall eich cynorthwyydd helpu i'w weithredu.",
+    "NSPhotoLibraryUsageDescription": "Mae Kilo yn defnyddio eich llyfrgell ffotograffau i atodi delweddau i sgyrsiau gyda chynorthwyydd codio deallusrwydd artiffisial. Er enghraifft, rhannwch sgrinlun fel y gall eich cynorthwyydd helpu i drwsio problem yn y rhyngwyneb defnyddiwr.",
+    "NSLocalNetworkUsageDescription": "Mae Kilo yn defnyddio eich rhwydwaith lleol i gysylltu â gweinyddion datblygu ar eich cyfrifiadur wrth brofi fersiwn ddatblygu."
   },
   "da": {
     "NSMicrophoneUsageDescription": "Tillad Kilo at bruge din mikrofon til at omdanne tale til tekst.",
     "NSSpeechRecognitionUsageDescription": "Tillad Kilo at bruge talegenkendelse til at omdanne din stemme til tekst.",
     "NSFaceIDUsageDescription": "Tillad Kilo at bruge Face ID til at låse appen op.",
     "NSLocationWhenInUseUsageDescription": "Tillad Kilo at bruge din placering til at konfigurere lokalt vejr.",
-    "NSUserTrackingUsageDescription": "Denne identifikator bruges til at måle effektiviteten af reklamekampagner."
+    "NSUserTrackingUsageDescription": "Denne identifikator bruges til at måle effektiviteten af reklamekampagner.",
+    "NSCameraUsageDescription": "Kilo bruger dit kamera til at tage billeder, som du vedhæfter i chats med en AI-kodningsassistent. Del for eksempel et billede af et design, så din assistent kan hjælpe med at implementere det.",
+    "NSPhotoLibraryUsageDescription": "Kilo bruger dit fotobibliotek til at vedhæfte billeder i chats med en AI-kodningsassistent. Del for eksempel et skærmbillede, så din assistent kan hjælpe med at løse et problem i brugergrænsefladen.",
+    "NSLocalNetworkUsageDescription": "Kilo bruger dit lokale netværk til at oprette forbindelse til udviklingsservere på din computer, når du tester et udviklingsbuild."
   },
   "de": {
     "NSMicrophoneUsageDescription": "Erlaube Kilo, dein Mikrofon zu verwenden, um Sprache in Text umzuwandeln.",
     "NSSpeechRecognitionUsageDescription": "Erlaube Kilo, die Spracherkennung zu verwenden, um deine Stimme in Text umzuwandeln.",
     "NSFaceIDUsageDescription": "Erlaube Kilo, Face ID zum Entsperren der App zu verwenden.",
     "NSLocationWhenInUseUsageDescription": "Erlaube Kilo, deinen Standort zu verwenden, um lokales Wetter einzurichten.",
-    "NSUserTrackingUsageDescription": "Diese Kennung wird verwendet, um die Wirksamkeit von Werbekampagnen zu messen."
+    "NSUserTrackingUsageDescription": "Diese Kennung wird verwendet, um die Wirksamkeit von Werbekampagnen zu messen.",
+    "NSCameraUsageDescription": "Kilo verwendet deine Kamera, um Fotos aufzunehmen, die du an Chats mit einem KI-Programmierassistenten anhängst. Teile zum Beispiel ein Foto eines Designs, damit dein Assistent dir bei der Umsetzung helfen kann.",
+    "NSPhotoLibraryUsageDescription": "Kilo verwendet deine Fotomediathek, um Bilder an Chats mit einem KI-Programmierassistenten anzuhängen. Teile zum Beispiel einen Screenshot, damit dein Assistent dir helfen kann, ein Problem mit der Benutzeroberfläche zu beheben.",
+    "NSLocalNetworkUsageDescription": "Kilo verwendet dein lokales Netzwerk, um beim Testen eines Entwicklungsbuilds eine Verbindung zu Entwicklungsservern auf deinem Computer herzustellen."
   },
   "el": {
     "NSMicrophoneUsageDescription": "Επιτρέψτε στο Kilo να χρησιμοποιεί το μικρόφωνό σας για να μετατρέπει την ομιλία σε κείμενο.",
     "NSSpeechRecognitionUsageDescription": "Επιτρέψτε στο Kilo να χρησιμοποιεί την αναγνώριση ομιλίας για να μετατρέπει τη φωνή σας σε κείμενο.",
     "NSFaceIDUsageDescription": "Επιτρέψτε στο Kilo να χρησιμοποιεί το Face ID για το ξεκλείδωμα της εφαρμογής.",
     "NSLocationWhenInUseUsageDescription": "Επιτρέψτε στο Kilo να χρησιμοποιεί την τοποθεσία σας για να ρυθμίσει τον τοπικό καιρό.",
-    "NSUserTrackingUsageDescription": "Αυτό το αναγνωριστικό χρησιμοποιείται για τη μέτρηση της αποτελεσματικότητας των διαφημιστικών εκστρατειών."
+    "NSUserTrackingUsageDescription": "Αυτό το αναγνωριστικό χρησιμοποιείται για τη μέτρηση της αποτελεσματικότητας των διαφημιστικών εκστρατειών.",
+    "NSCameraUsageDescription": "Το Kilo χρησιμοποιεί την κάμερά σας για να τραβάτε φωτογραφίες που επισυνάπτετε σε συνομιλίες με έναν βοηθό προγραμματισμού τεχνητής νοημοσύνης. Για παράδειγμα, μοιραστείτε μια φωτογραφία ενός σχεδίου, ώστε ο βοηθός σας να σας βοηθήσει να το υλοποιήσετε.",
+    "NSPhotoLibraryUsageDescription": "Το Kilo χρησιμοποιεί τη βιβλιοθήκη φωτογραφιών σας για να επισυνάπτει εικόνες σε συνομιλίες με έναν βοηθό προγραμματισμού τεχνητής νοημοσύνης. Για παράδειγμα, μοιραστείτε ένα στιγμιότυπο οθόνης, ώστε ο βοηθός σας να σας βοηθήσει να διορθώσετε ένα πρόβλημα στη διεπαφή χρήστη.",
+    "NSLocalNetworkUsageDescription": "Το Kilo χρησιμοποιεί το τοπικό σας δίκτυο για να συνδέεται με διακομιστές ανάπτυξης στον υπολογιστή σας όταν δοκιμάζετε μια έκδοση ανάπτυξης."
   },
   "en": {
     "NSMicrophoneUsageDescription": "Allow Kilo to use your microphone to turn speech into text.",
     "NSSpeechRecognitionUsageDescription": "Allow Kilo to use speech recognition to turn your voice into text.",
     "NSFaceIDUsageDescription": "Allow Kilo to use Face ID to unlock the app.",
     "NSLocationWhenInUseUsageDescription": "Allow Kilo to use your location to set up local weather.",
-    "NSUserTrackingUsageDescription": "This identifier is used to measure the effectiveness of advertising campaigns."
+    "NSUserTrackingUsageDescription": "This identifier is used to measure the effectiveness of advertising campaigns.",
+    "NSCameraUsageDescription": "Kilo uses your camera to take photos you attach to AI agent chats. For example, share a photo of a design so your agent can help implement it.",
+    "NSPhotoLibraryUsageDescription": "Kilo uses your photo library to attach images to AI agent chats. For example, share a screenshot so your agent can help fix a UI issue.",
+    "NSLocalNetworkUsageDescription": "Kilo uses your local network to connect to development servers on your computer when testing a development build."
   },
   "es": {
     "NSMicrophoneUsageDescription": "Permite que Kilo use tu micrófono para convertir el habla en texto.",
     "NSSpeechRecognitionUsageDescription": "Permite que Kilo use el reconocimiento de voz para convertir tu voz en texto.",
     "NSFaceIDUsageDescription": "Permite que Kilo use Face ID para desbloquear la app.",
     "NSLocationWhenInUseUsageDescription": "Permite que Kilo use tu ubicación para configurar el clima local.",
-    "NSUserTrackingUsageDescription": "Este identificador se usa para medir la eficacia de las campañas publicitarias."
+    "NSUserTrackingUsageDescription": "Este identificador se usa para medir la eficacia de las campañas publicitarias.",
+    "NSCameraUsageDescription": "Kilo usa tu cámara para hacer fotos que adjuntas a los chats con un asistente de programación con IA. Por ejemplo, comparte una foto de un diseño para que tu asistente pueda ayudarte a implementarlo.",
+    "NSPhotoLibraryUsageDescription": "Kilo usa tu fototeca para adjuntar imágenes a los chats con un asistente de programación con IA. Por ejemplo, comparte una captura de pantalla para que tu asistente pueda ayudarte a solucionar un problema de la interfaz de usuario.",
+    "NSLocalNetworkUsageDescription": "Kilo usa tu red local para conectarse a los servidores de desarrollo de tu ordenador cuando pruebas una compilación de desarrollo."
   },
   "et": {
     "NSMicrophoneUsageDescription": "Luba Kilol kasutada sinu mikrofoni kõne tekstiks muutmiseks.",
     "NSSpeechRecognitionUsageDescription": "Luba Kilol kasutada kõnetuvastust sinu hääle tekstiks muutmiseks.",
     "NSFaceIDUsageDescription": "Luba Kilol kasutada Face ID-d rakenduse avamiseks.",
     "NSLocationWhenInUseUsageDescription": "Luba Kilol kasutada sinu asukohta kohaliku ilma seadistamiseks.",
-    "NSUserTrackingUsageDescription": "Seda identifikaatorit kasutatakse reklaamikampaaniate tõhususe mõõtmiseks."
+    "NSUserTrackingUsageDescription": "Seda identifikaatorit kasutatakse reklaamikampaaniate tõhususe mõõtmiseks.",
+    "NSCameraUsageDescription": "Kilo kasutab sinu kaamerat fotode tegemiseks, mille lisad vestlustesse tehisintellektil põhineva programmeerimisabilisega. Näiteks jaga fotot kujundusest, et sinu abiline saaks aidata seda teostada.",
+    "NSPhotoLibraryUsageDescription": "Kilo kasutab sinu fototeeki piltide lisamiseks vestlustesse tehisintellektil põhineva programmeerimisabilisega. Näiteks jaga kuvatõmmist, et sinu abiline saaks aidata kasutajaliidese probleemi lahendada.",
+    "NSLocalNetworkUsageDescription": "Kilo kasutab sinu kohalikku võrku, et luua ühendus sinu arvuti arendusserveritega, kui testid arendusjärgus järku."
   },
   "eu": {
     "NSMicrophoneUsageDescription": "Eman baimena Kilori zure mikrofonoa erabiltzeko, hizketa testu bihurtzeko.",
     "NSSpeechRecognitionUsageDescription": "Eman baimena Kilori hizketa-ezagutza erabiltzeko, zure ahotsa testu bihurtzeko.",
     "NSFaceIDUsageDescription": "Eman baimena Kilori Face ID erabiltzeko aplikazioa desblokeatzeko.",
     "NSLocationWhenInUseUsageDescription": "Eman baimena Kilori zure kokapena erabiltzeko tokiko eguraldia konfiguratzeko.",
-    "NSUserTrackingUsageDescription": "Identifikatzaile hau iragarki-kanpainak eraginkorrak diren neurtzeko erabiltzen da."
+    "NSUserTrackingUsageDescription": "Identifikatzaile hau iragarki-kanpainak eraginkorrak diren neurtzeko erabiltzen da.",
+    "NSCameraUsageDescription": "Kilo aplikazioak zure kamera erabiltzen du AA bidezko programazio-laguntzailearekin dituzun txatetan erantsiko dituzun argazkiak ateratzeko. Adibidez, partekatu diseinu baten argazkia, zure laguntzaileak hura inplementatzen lagun diezazun.",
+    "NSPhotoLibraryUsageDescription": "Kilo aplikazioak zure argazki-liburutegia erabiltzen du AA bidezko programazio-laguntzailearekin dituzun txatetan irudiak eransteko. Adibidez, partekatu pantaila-argazki bat, zure laguntzaileak erabiltzaile-interfazeko arazo bat konpontzen lagun diezazun.",
+    "NSLocalNetworkUsageDescription": "Kilo aplikazioak zure sare lokala erabiltzen du ordenagailuko garapen-zerbitzarietara konektatzeko, garapen-konpilazio bat probatzen duzunean."
   },
   "fa": {
     "NSMicrophoneUsageDescription": "به Kilo اجازه دهید از میکروفون شما برای تبدیل گفتار به متن استفاده کند.",
     "NSSpeechRecognitionUsageDescription": "به Kilo اجازه دهید از تشخیص گفتار برای تبدیل صدای شما به متن استفاده کند.",
     "NSFaceIDUsageDescription": "به Kilo اجازه دهید برای باز کردن قفل برنامه از Face ID استفاده کند.",
     "NSLocationWhenInUseUsageDescription": "به Kilo اجازه دهید از موقعیت مکانی شما برای تنظیم آب‌وهوای محلی استفاده کند.",
-    "NSUserTrackingUsageDescription": "این شناسه برای سنجش اثربخشی کمپین‌های تبلیغاتی استفاده می‌شود."
+    "NSUserTrackingUsageDescription": "این شناسه برای سنجش اثربخشی کمپین‌های تبلیغاتی استفاده می‌شود.",
+    "NSCameraUsageDescription": "Kilo از دوربین شما برای گرفتن عکس‌هایی استفاده می‌کند که به گفتگوها با دستیار کدنویسی هوش مصنوعی پیوست می‌کنید. برای مثال، عکس یک طرح را به اشتراک بگذارید تا دستیار شما بتواند در پیاده‌سازی آن کمک کند.",
+    "NSPhotoLibraryUsageDescription": "Kilo از کتابخانهٔ عکس شما برای پیوست کردن تصاویر به گفتگوها با دستیار کدنویسی هوش مصنوعی استفاده می‌کند. برای مثال، یک تصویر از صفحه به اشتراک بگذارید تا دستیار شما بتواند در رفع مشکلی در رابط کاربری کمک کند.",
+    "NSLocalNetworkUsageDescription": "Kilo هنگام آزمایش یک نسخهٔ توسعه، از شبکهٔ محلی شما برای اتصال به سرورهای توسعه روی رایانهٔ شما استفاده می‌کند."
   },
   "fi": {
     "NSMicrophoneUsageDescription": "Salli Kilon käyttää mikrofonia puheen muuttamiseksi tekstiksi.",
     "NSSpeechRecognitionUsageDescription": "Salli Kilon käyttää puheentunnistusta äänesi muuttamiseksi tekstiksi.",
     "NSFaceIDUsageDescription": "Salli Kilon käyttää Face ID:tä sovelluksen avaamiseen.",
     "NSLocationWhenInUseUsageDescription": "Salli Kilon käyttää sijaintiasi paikallisen sään määrittämiseen.",
-    "NSUserTrackingUsageDescription": "Tätä tunnistetta käytetään mainoskampanjoiden tehokkuuden mittaamiseen."
+    "NSUserTrackingUsageDescription": "Tätä tunnistetta käytetään mainoskampanjoiden tehokkuuden mittaamiseen.",
+    "NSCameraUsageDescription": "Kilo käyttää kameraasi ottaakseen kuvia, jotka liität keskusteluihin tekoälypohjaisen ohjelmointiavustajan kanssa. Jaa esimerkiksi kuva suunnitelmasta, jotta avustajasi voi auttaa sen toteuttamisessa.",
+    "NSPhotoLibraryUsageDescription": "Kilo käyttää kuvakirjastoasi liittääkseen kuvia keskusteluihin tekoälypohjaisen ohjelmointiavustajan kanssa. Jaa esimerkiksi näyttökuva, jotta avustajasi voi auttaa käyttöliittymäongelman korjaamisessa.",
+    "NSLocalNetworkUsageDescription": "Kilo käyttää paikallisverkkoasi muodostaakseen yhteyden tietokoneesi kehityspalvelimiin, kun testaat kehitysversiota."
   },
   "fil": {
     "NSMicrophoneUsageDescription": "Payagan ang Kilo na gamitin ang iyong mikropono upang gawing teksto ang pagsasalita.",
     "NSSpeechRecognitionUsageDescription": "Payagan ang Kilo na gamitin ang speech recognition upang gawing teksto ang iyong boses.",
     "NSFaceIDUsageDescription": "Payagan ang Kilo na gamitin ang Face ID upang i-unlock ang app.",
     "NSLocationWhenInUseUsageDescription": "Payagan ang Kilo na gamitin ang iyong lokasyon upang i-set up ang lokal na panahon.",
-    "NSUserTrackingUsageDescription": "Ginagamit ang identifier na ito upang sukatin ang bisa ng mga kampanya sa advertising."
+    "NSUserTrackingUsageDescription": "Ginagamit ang identifier na ito upang sukatin ang bisa ng mga kampanya sa advertising.",
+    "NSCameraUsageDescription": "Ginagamit ng Kilo ang iyong camera para kumuha ng mga larawang ilalakip mo sa mga chat sa AI coding assistant. Halimbawa, magbahagi ng larawan ng isang disenyo para matulungan ka ng iyong assistant na ipatupad ito.",
+    "NSPhotoLibraryUsageDescription": "Ginagamit ng Kilo ang iyong library ng larawan para maglakip ng mga larawan sa mga chat sa AI coding assistant. Halimbawa, magbahagi ng screenshot para matulungan ka ng iyong assistant na ayusin ang isang problema sa user interface.",
+    "NSLocalNetworkUsageDescription": "Ginagamit ng Kilo ang iyong lokal na network para kumonekta sa mga development server sa iyong computer kapag sumusubok ng development build."
   },
   "fr": {
     "NSMicrophoneUsageDescription": "Autorisez Kilo à utiliser votre microphone pour convertir la parole en texte.",
     "NSSpeechRecognitionUsageDescription": "Autorisez Kilo à utiliser la reconnaissance vocale pour convertir votre voix en texte.",
     "NSFaceIDUsageDescription": "Autorisez Kilo à utiliser Face ID pour déverrouiller l'app.",
     "NSLocationWhenInUseUsageDescription": "Autorisez Kilo à utiliser votre position pour configurer la météo locale.",
-    "NSUserTrackingUsageDescription": "Cet identifiant sert à mesurer l'efficacité des campagnes publicitaires."
+    "NSUserTrackingUsageDescription": "Cet identifiant sert à mesurer l'efficacité des campagnes publicitaires.",
+    "NSCameraUsageDescription": "Kilo utilise votre appareil photo pour prendre des photos que vous joignez aux discussions avec un assistant de programmation IA. Par exemple, partagez une photo d’un design pour que votre assistant vous aide à le réaliser.",
+    "NSPhotoLibraryUsageDescription": "Kilo utilise votre photothèque pour joindre des images aux discussions avec un assistant de programmation IA. Par exemple, partagez une capture d’écran pour que votre assistant vous aide à résoudre un problème d’interface utilisateur.",
+    "NSLocalNetworkUsageDescription": "Kilo utilise votre réseau local pour se connecter aux serveurs de développement sur votre ordinateur lorsque vous testez une version de développement."
   },
   "ga": {
     "NSMicrophoneUsageDescription": "Ceadaigh do Kilo do mhicreafón a úsáid chun caint a iompú ina téacs.",
     "NSSpeechRecognitionUsageDescription": "Ceadaigh do Kilo aitheantas cainte a úsáid chun do ghlór a iompú ina téacs.",
     "NSFaceIDUsageDescription": "Ceadaigh do Kilo Face ID a úsáid chun an aip a dhíghlasáil.",
     "NSLocationWhenInUseUsageDescription": "Ceadaigh do Kilo do shuíomh a úsáid chun an aimsir áitiúil a shocrú.",
-    "NSUserTrackingUsageDescription": "Úsáidtear an t-aitheantóir seo chun éifeachtacht feachtais fógraíochta a thomhas."
+    "NSUserTrackingUsageDescription": "Úsáidtear an t-aitheantóir seo chun éifeachtacht feachtais fógraíochta a thomhas.",
+    "NSCameraUsageDescription": "Úsáideann Kilo do cheamara chun grianghraif a ghlacadh a cheanglaíonn tú le comhráite le cúntóir códaithe intleachta saorga. Mar shampla, roinn grianghraf de dhearadh ionas gur féidir le do chúntóir cabhrú lena chur i bhfeidhm.",
+    "NSPhotoLibraryUsageDescription": "Úsáideann Kilo do leabharlann grianghraf chun íomhánna a cheangal le comhráite le cúntóir códaithe intleachta saorga. Mar shampla, roinn gabháil scáileáin ionas gur féidir le do chúntóir cabhrú le fadhb sa chomhéadan úsáideora a réiteach.",
+    "NSLocalNetworkUsageDescription": "Úsáideann Kilo do líonra áitiúil chun ceangal le freastalaithe forbartha ar do ríomhaire agus leagan forbartha á thástáil agat."
   },
   "gl": {
     "NSMicrophoneUsageDescription": "Permite que Kilo use o teu micrófono para converter a fala en texto.",
     "NSSpeechRecognitionUsageDescription": "Permite que Kilo use o recoñecemento de voz para converter a túa voz en texto.",
     "NSFaceIDUsageDescription": "Permite que Kilo use Face ID para desbloquear a aplicación.",
     "NSLocationWhenInUseUsageDescription": "Permite que Kilo use a túa localización para configurar o tempo local.",
-    "NSUserTrackingUsageDescription": "Este identificador úsase para medir a eficacia das campañas publicitarias."
+    "NSUserTrackingUsageDescription": "Este identificador úsase para medir a eficacia das campañas publicitarias.",
+    "NSCameraUsageDescription": "Kilo usa a túa cámara para facer fotos que adxuntas aos chats cun asistente de programación con IA. Por exemplo, comparte unha foto dun deseño para que o teu asistente poida axudarche a implementalo.",
+    "NSPhotoLibraryUsageDescription": "Kilo usa a túa fototeca para adxuntar imaxes aos chats cun asistente de programación con IA. Por exemplo, comparte unha captura de pantalla para que o teu asistente poida axudarche a resolver un problema da interface de usuario.",
+    "NSLocalNetworkUsageDescription": "Kilo usa a túa rede local para conectarse aos servidores de desenvolvemento do teu ordenador cando probas unha compilación de desenvolvemento."
   },
   "gu": {
     "NSMicrophoneUsageDescription": "Kilo ને તમારા માઇક્રોફોનનો ઉપયોગ કરીને વાણીને લખાણમાં ફેરવવાની મંજૂરી આપો.",
     "NSSpeechRecognitionUsageDescription": "Kilo ને તમારા અવાજને લખાણમાં ફેરવવા માટે વાણી ઓળખનો ઉપયોગ કરવાની મંજૂરી આપો.",
     "NSFaceIDUsageDescription": "Kilo ને એપ અનલૉક કરવા માટે Face ID નો ઉપયોગ કરવાની મંજૂરી આપો.",
     "NSLocationWhenInUseUsageDescription": "Kilo ને સ્થાનિક હવામાન સેટ કરવા માટે તમારા સ્થાનનો ઉપયોગ કરવાની મંજૂરી આપો.",
-    "NSUserTrackingUsageDescription": "આ ઓળખકર્તા જાહેરાત ઝુંબેશની અસરકારકતા માપવા માટે વપરાય છે."
+    "NSUserTrackingUsageDescription": "આ ઓળખકર્તા જાહેરાત ઝુંબેશની અસરકારકતા માપવા માટે વપરાય છે.",
+    "NSCameraUsageDescription": "Kilo તમારા કૅમેરાનો ઉપયોગ એવા ફોટા લેવા માટે કરે છે જે તમે એઆઈ કોડિંગ સહાયક સાથેની ચૅટમાં જોડો છો. ઉદાહરણ તરીકે, કોઈ ડિઝાઇનનો ફોટો શેર કરો જેથી તમારો સહાયક તેને અમલમાં મૂકવામાં મદદ કરી શકે.",
+    "NSPhotoLibraryUsageDescription": "Kilo તમારી ફોટો લાઇબ્રેરીનો ઉપયોગ એઆઈ કોડિંગ સહાયક સાથેની ચૅટમાં છબીઓ જોડવા માટે કરે છે. ઉદાહરણ તરીકે, સ્ક્રીનશૉટ શેર કરો જેથી તમારો સહાયક વપરાશકર્તા ઇન્ટરફેસની કોઈ સમસ્યા ઉકેલવામાં મદદ કરી શકે.",
+    "NSLocalNetworkUsageDescription": "Kilo ડેવલપમેન્ટ બિલ્ડનું પરીક્ષણ કરતી વખતે તમારા કમ્પ્યુટર પરના ડેવલપમેન્ટ સર્વરો સાથે કનેક્ટ થવા માટે તમારા સ્થાનિક નેટવર્કનો ઉપયોગ કરે છે."
   },
   "ha": {
     "NSMicrophoneUsageDescription": "Ba Kilo damar amfani da makirufon ka don mayar da magana zuwa rubutu.",
     "NSSpeechRecognitionUsageDescription": "Ba Kilo damar amfani da gane magana don mayar da muryarka zuwa rubutu.",
     "NSFaceIDUsageDescription": "Ba Kilo damar amfani da Face ID don buɗe manhajar.",
     "NSLocationWhenInUseUsageDescription": "Ba Kilo damar amfani da wurinka don saita yanayin gida.",
-    "NSUserTrackingUsageDescription": "Ana amfani da wannan mai ganowa don auna tasirin kamfen ɗin talla."
+    "NSUserTrackingUsageDescription": "Ana amfani da wannan mai ganowa don auna tasirin kamfen ɗin talla.",
+    "NSCameraUsageDescription": "Kilo yana amfani da kyamararka don ɗaukar hotunan da kake haɗawa da tattaunawa da mataimakin rubuta lamba na basirar wucin gadi. Misali, raba hoton wani zane domin mataimakinka ya taimaka wajen aiwatar da shi.",
+    "NSPhotoLibraryUsageDescription": "Kilo yana amfani da ɗakin ajiyar hotunanka don haɗa hotuna da tattaunawa da mataimakin rubuta lamba na basirar wucin gadi. Misali, raba hoton allo domin mataimakinka ya taimaka wajen gyara matsala a fuskar mai amfani.",
+    "NSLocalNetworkUsageDescription": "Kilo yana amfani da hanyar sadarwarka ta gida don haɗawa da sabobin haɓaka manhaja a kwamfutarka yayin gwada sigar haɓaka manhaja."
   },
   "he": {
     "NSMicrophoneUsageDescription": "אפשר ל-Kilo להשתמש במיקרופון שלך כדי להמיר דיבור לטקסט.",
     "NSSpeechRecognitionUsageDescription": "אפשר ל-Kilo להשתמש בזיהוי דיבור כדי להמיר את הקול שלך לטקסט.",
     "NSFaceIDUsageDescription": "אפשר ל-Kilo להשתמש ב-Face ID כדי לפתוח את האפליקציה.",
     "NSLocationWhenInUseUsageDescription": "אפשר ל-Kilo להשתמש במיקום שלך כדי להגדיר מזג אוויר מקומי.",
-    "NSUserTrackingUsageDescription": "מזהה זה משמש למדידת האפקטיביות של קמפיינים פרסומיים."
+    "NSUserTrackingUsageDescription": "מזהה זה משמש למדידת האפקטיביות של קמפיינים פרסומיים.",
+    "NSCameraUsageDescription": "Kilo משתמש במצלמה שלך כדי לצלם תמונות לצירוף לשיחות עם עוזר תכנות מבוסס בינה מלאכותית. לדוגמה, אפשר לשתף תמונה של עיצוב כדי שהעוזר שלך יוכל לסייע במימושו.",
+    "NSPhotoLibraryUsageDescription": "Kilo משתמש בספריית התמונות שלך כדי לצרף תמונות לשיחות עם עוזר תכנות מבוסס בינה מלאכותית. לדוגמה, אפשר לשתף צילום מסך כדי שהעוזר שלך יוכל לסייע בתיקון בעיה בממשק המשתמש.",
+    "NSLocalNetworkUsageDescription": "Kilo משתמש ברשת המקומית שלך כדי להתחבר לשרתי פיתוח במחשב שלך בעת בדיקת גרסת פיתוח."
   },
   "hi": {
     "NSMicrophoneUsageDescription": "Kilo को आपके माइक्रोफ़ोन का उपयोग करके बोली को टेक्स्ट में बदलने की अनुमति दें।",
     "NSSpeechRecognitionUsageDescription": "Kilo को आपकी आवाज़ को टेक्स्ट में बदलने के लिए वाक् पहचान का उपयोग करने की अनुमति दें।",
     "NSFaceIDUsageDescription": "Kilo को ऐप अनलॉक करने के लिए Face ID का उपयोग करने की अनुमति दें।",
     "NSLocationWhenInUseUsageDescription": "Kilo को स्थानीय मौसम सेट करने के लिए आपके स्थान का उपयोग करने की अनुमति दें।",
-    "NSUserTrackingUsageDescription": "इस पहचानकर्ता का उपयोग विज्ञापन अभियानों की प्रभावशीलता मापने के लिए किया जाता है।"
+    "NSUserTrackingUsageDescription": "इस पहचानकर्ता का उपयोग विज्ञापन अभियानों की प्रभावशीलता मापने के लिए किया जाता है।",
+    "NSCameraUsageDescription": "Kilo आपके कैमरे का उपयोग ऐसी फ़ोटो लेने के लिए करता है जिन्हें आप एआई कोडिंग सहायक के साथ चैट में संलग्न करते हैं। उदाहरण के लिए, किसी डिज़ाइन की फ़ोटो साझा करें ताकि आपका सहायक उसे लागू करने में मदद कर सके।",
+    "NSPhotoLibraryUsageDescription": "Kilo आपकी फ़ोटो लाइब्रेरी का उपयोग एआई कोडिंग सहायक के साथ चैट में चित्र संलग्न करने के लिए करता है। उदाहरण के लिए, एक स्क्रीनशॉट साझा करें ताकि आपका सहायक उपयोगकर्ता इंटरफ़ेस की किसी समस्या को ठीक करने में मदद कर सके।",
+    "NSLocalNetworkUsageDescription": "Kilo डेवलपमेंट बिल्ड का परीक्षण करते समय आपके कंप्यूटर पर मौजूद डेवलपमेंट सर्वर से जुड़ने के लिए आपके स्थानीय नेटवर्क का उपयोग करता है।"
   },
   "hr": {
     "NSMicrophoneUsageDescription": "Dopustite Kilu da koristi vaš mikrofon za pretvaranje govora u tekst.",
     "NSSpeechRecognitionUsageDescription": "Dopustite Kilu da koristi prepoznavanje govora za pretvaranje vašeg glasa u tekst.",
     "NSFaceIDUsageDescription": "Dopustite Kilu da koristi Face ID za otključavanje aplikacije.",
     "NSLocationWhenInUseUsageDescription": "Dopustite Kilou da koristi vašu lokaciju za postavljanje lokalnog vremena.",
-    "NSUserTrackingUsageDescription": "Ovaj se identifikator koristi za mjerenje učinkovitosti reklamnih kampanja."
+    "NSUserTrackingUsageDescription": "Ovaj se identifikator koristi za mjerenje učinkovitosti reklamnih kampanja.",
+    "NSCameraUsageDescription": "Kilo upotrebljava vašu kameru za snimanje fotografija koje prilažete razgovorima s AI asistentom za programiranje. Primjerice, podijelite fotografiju dizajna kako bi vam asistent mogao pomoći da ga implementirate.",
+    "NSPhotoLibraryUsageDescription": "Kilo upotrebljava vašu medijateku fotografija za prilaganje slika razgovorima s AI asistentom za programiranje. Primjerice, podijelite snimku zaslona kako bi vam asistent mogao pomoći da riješite problem s korisničkim sučeljem.",
+    "NSLocalNetworkUsageDescription": "Kilo upotrebljava vašu lokalnu mrežu za povezivanje s razvojnim poslužiteljima na vašem računalu pri testiranju razvojne verzije."
   },
   "ht": {
     "NSMicrophoneUsageDescription": "Pèmèt Kilo sèvi ak mikwofòn ou pou konvèti lapawòl an tèks.",
     "NSSpeechRecognitionUsageDescription": "Pèmèt Kilo sèvi ak rekonesans vwa pou konvèti vwa ou an tèks.",
     "NSFaceIDUsageDescription": "Pèmèt Kilo sèvi ak Face ID pou debloke aplikasyon an.",
     "NSLocationWhenInUseUsageDescription": "Pèmèt Kilo sèvi ak kote ou ye a pou konfigire meteyo lokal la.",
-    "NSUserTrackingUsageDescription": "Yo sèvi ak idantifyan sa a pou mezire efikasite kanpay piblisite yo."
+    "NSUserTrackingUsageDescription": "Yo sèvi ak idantifyan sa a pou mezire efikasite kanpay piblisite yo.",
+    "NSCameraUsageDescription": "Kilo sèvi ak kamera ou pou pran foto ou mete kòm pyès ansanm nan konvèsasyon ak yon asistan kodaj ki sèvi ak entèlijans atifisyèl. Pa egzanp, pataje yon foto yon konsepsyon pou asistan ou a ka ede w aplike li.",
+    "NSPhotoLibraryUsageDescription": "Kilo sèvi ak bibliyotèk foto ou pou mete imaj kòm pyès ansanm nan konvèsasyon ak yon asistan kodaj ki sèvi ak entèlijans atifisyèl. Pa egzanp, pataje yon kaptire ekran pou asistan ou a ka ede w korije yon pwoblèm nan entèfas itilizatè a.",
+    "NSLocalNetworkUsageDescription": "Kilo sèvi ak rezo lokal ou pou konekte ak sèvè devlopman sou òdinatè ou lè w ap teste yon vèsyon devlopman."
   },
   "hu": {
     "NSMicrophoneUsageDescription": "Engedélyezze a Kilónak, hogy a mikrofonját beszéd szöveggé alakítására használja.",
     "NSSpeechRecognitionUsageDescription": "Engedélyezze a Kilónak, hogy a beszédfelismerést a hangja szöveggé alakítására használja.",
     "NSFaceIDUsageDescription": "Engedélyezze a Kilónak, hogy a Face ID-t az alkalmazás feloldására használja.",
     "NSLocationWhenInUseUsageDescription": "Engedélyezze a Kilo számára, hogy a helyzetét a helyi időjárás beállítására használja.",
-    "NSUserTrackingUsageDescription": "Ezt az azonosítót a hirdetési kampányok hatékonyságának mérésére használják."
+    "NSUserTrackingUsageDescription": "Ezt az azonosítót a hirdetési kampányok hatékonyságának mérésére használják.",
+    "NSCameraUsageDescription": "A Kilo a kameráddal készít fényképeket, amelyeket csatolhatsz az MI-alapú programozási asszisztenssel folytatott beszélgetésekhez. Például ossz meg egy fényképet egy tervről, hogy az asszisztensed segíthessen a megvalósításában.",
+    "NSPhotoLibraryUsageDescription": "A Kilo a fotókönyvtáradat használja, hogy képeket csatolhass az MI-alapú programozási asszisztenssel folytatott beszélgetésekhez. Például ossz meg egy képernyőképet, hogy az asszisztensed segíthessen kijavítani a felhasználói felület egyik hibáját.",
+    "NSLocalNetworkUsageDescription": "A Kilo a helyi hálózatodat használja a számítógépeden futó fejlesztői szerverekhez való csatlakozáshoz, amikor fejlesztői buildet tesztelsz."
   },
   "hy": {
     "NSMicrophoneUsageDescription": "Թույլատրեք Kilo-ին օգտագործել ձեր խոսափողը խոսքը տեքստի վերածելու համար։",
     "NSSpeechRecognitionUsageDescription": "Թույլատրեք Kilo-ին օգտագործել խոսքի ճանաչումը ձեր ձայնը տեքստի վերածելու համար։",
     "NSFaceIDUsageDescription": "Թույլատրեք Kilo-ին օգտագործել Face ID-ը՝ հավելվածն ապակողպելու համար։",
     "NSLocationWhenInUseUsageDescription": "Թույլատրեք Kilo-ին օգտագործել ձեր տեղադրությունը՝ տեղական եղանակը կարգավորելու համար։",
-    "NSUserTrackingUsageDescription": "Այս նույնացուցիչը օգտագործվում է գովազդային արշավների արդյունավետությունը չափելու համար։"
+    "NSUserTrackingUsageDescription": "Այս նույնացուցիչը օգտագործվում է գովազդային արշավների արդյունավետությունը չափելու համար։",
+    "NSCameraUsageDescription": "Kilo-ն օգտագործում է ձեր տեսախցիկը՝ լուսանկարներ անելու համար, որոնք կցում եք ԱԲ ծրագրավորման օգնականի հետ զրույցներին։ Օրինակ՝ կիսվեք դիզայնի լուսանկարով, որպեսզի ձեր օգնականը կարողանա օգնել այն իրականացնել։",
+    "NSPhotoLibraryUsageDescription": "Kilo-ն օգտագործում է ձեր լուսանկարների գրադարանը՝ պատկերներ կցելու համար ԱԲ ծրագրավորման օգնականի հետ զրույցներին։ Օրինակ՝ կիսվեք էկրանի պատկերով, որպեսզի ձեր օգնականը կարողանա օգնել շտկել օգտատիրոջ միջերեսի խնդիրը։",
+    "NSLocalNetworkUsageDescription": "Kilo-ն օգտագործում է ձեր տեղական ցանցը՝ ձեր համակարգչի մշակման սերվերներին միանալու համար, երբ փորձարկում եք մշակման տարբերակը։"
   },
   "id": {
     "NSMicrophoneUsageDescription": "Izinkan Kilo menggunakan mikrofon Anda untuk mengubah ucapan menjadi teks.",
     "NSSpeechRecognitionUsageDescription": "Izinkan Kilo menggunakan pengenalan suara untuk mengubah suara Anda menjadi teks.",
     "NSFaceIDUsageDescription": "Izinkan Kilo menggunakan Face ID untuk membuka aplikasi.",
     "NSLocationWhenInUseUsageDescription": "Izinkan Kilo menggunakan lokasi Anda untuk menyiapkan cuaca lokal.",
-    "NSUserTrackingUsageDescription": "Pengenal ini digunakan untuk mengukur efektivitas kampanye iklan."
+    "NSUserTrackingUsageDescription": "Pengenal ini digunakan untuk mengukur efektivitas kampanye iklan.",
+    "NSCameraUsageDescription": "Kilo menggunakan kamera Anda untuk mengambil foto yang Anda lampirkan ke chat dengan asisten pemrograman AI. Misalnya, bagikan foto sebuah desain agar asisten Anda dapat membantu mengimplementasikannya.",
+    "NSPhotoLibraryUsageDescription": "Kilo menggunakan perpustakaan foto Anda untuk melampirkan gambar ke chat dengan asisten pemrograman AI. Misalnya, bagikan tangkapan layar agar asisten Anda dapat membantu memperbaiki masalah antarmuka pengguna.",
+    "NSLocalNetworkUsageDescription": "Kilo menggunakan jaringan lokal Anda untuk terhubung ke server pengembangan di komputer Anda saat menguji build pengembangan."
   },
   "ig": {
     "NSMicrophoneUsageDescription": "Kwe ka Kilo jiri igwe okwu gị gbanwee okwu ka ọ bụrụ ederede.",
     "NSSpeechRecognitionUsageDescription": "Kwe ka Kilo jiri njirimara okwu gbanwee olu gị ka ọ bụrụ ederede.",
     "NSFaceIDUsageDescription": "Kwe ka Kilo jiri Face ID mepee ngwa ahụ.",
     "NSLocationWhenInUseUsageDescription": "Kwe ka Kilo jiri ọnọdụ gị guzobe ihu igwe mpaghara.",
-    "NSUserTrackingUsageDescription": "A na-eji njirimara a tụọ ịdị irè nke mkpọsa mgbasa ozi."
+    "NSUserTrackingUsageDescription": "A na-eji njirimara a tụọ ịdị irè nke mkpọsa mgbasa ozi.",
+    "NSCameraUsageDescription": "Kilo na-eji igwefoto gị ese foto ị na-etinye na nkata gị na onye enyemaka ide koodu nke ọgụgụ isi arụrụ arụ. Dịka ọmụmaatụ, kesaa foto nke otu nhazi ka onye enyemaka gị nwee ike inyere gị aka itinye ya n'ọrụ.",
+    "NSPhotoLibraryUsageDescription": "Kilo na-eji ọba foto gị etinye onyonyo na nkata gị na onye enyemaka ide koodu nke ọgụgụ isi arụrụ arụ. Dịka ọmụmaatụ, kesaa onyonyo ihuenyo ka onye enyemaka gị nwee ike inyere gị aka idozi nsogbu dị na ihu njirimara onye ọrụ.",
+    "NSLocalNetworkUsageDescription": "Kilo na-eji netwọkụ mpaghara gị jikọọ na sava mmepe dị na kọmputa gị mgbe ị na-anwale ụdị mmepe."
   },
   "is": {
     "NSMicrophoneUsageDescription": "Leyfðu Kilo að nota hljóðnemann þinn til að breyta tali í texta.",
     "NSSpeechRecognitionUsageDescription": "Leyfðu Kilo að nota talgreiningu til að breyta röddinni þinni í texta.",
     "NSFaceIDUsageDescription": "Leyfðu Kilo að nota Face ID til að opna appið.",
     "NSLocationWhenInUseUsageDescription": "Leyfðu Kilo að nota staðsetninguna þína til að setja upp staðbundið veður.",
-    "NSUserTrackingUsageDescription": "Þessi auðkenni eru notuð til að mæla árangur auglýsingaherferða."
+    "NSUserTrackingUsageDescription": "Þessi auðkenni eru notuð til að mæla árangur auglýsingaherferða.",
+    "NSCameraUsageDescription": "Kilo notar myndavélina þína til að taka myndir sem þú hengir við spjall við gervigreindaraðstoðarmann í forritun. Deildu til dæmis mynd af hönnun svo að aðstoðarmaðurinn þinn geti hjálpað við að útfæra hana.",
+    "NSPhotoLibraryUsageDescription": "Kilo notar myndasafnið þitt til að hengja myndir við spjall við gervigreindaraðstoðarmann í forritun. Deildu til dæmis skjámynd svo að aðstoðarmaðurinn þinn geti hjálpað við að laga vandamál í notendaviðmóti.",
+    "NSLocalNetworkUsageDescription": "Kilo notar staðarnetið þitt til að tengjast þróunarþjónum á tölvunni þinni þegar þú prófar þróunarútgáfu."
   },
   "it": {
     "NSMicrophoneUsageDescription": "Consenti a Kilo di usare il microfono per convertire il parlato in testo.",
     "NSSpeechRecognitionUsageDescription": "Consenti a Kilo di usare il riconoscimento vocale per convertire la tua voce in testo.",
     "NSFaceIDUsageDescription": "Consenti a Kilo di usare Face ID per sbloccare l'app.",
     "NSLocationWhenInUseUsageDescription": "Consenti a Kilo di usare la tua posizione per configurare il meteo locale.",
-    "NSUserTrackingUsageDescription": "Questo identificatore viene usato per misurare l'efficacia delle campagne pubblicitarie."
+    "NSUserTrackingUsageDescription": "Questo identificatore viene usato per misurare l'efficacia delle campagne pubblicitarie.",
+    "NSCameraUsageDescription": "Kilo usa la tua fotocamera per scattare foto che alleghi alle chat con un assistente di programmazione IA. Ad esempio, condividi una foto di un design così il tuo assistente può aiutarti a implementarlo.",
+    "NSPhotoLibraryUsageDescription": "Kilo usa la tua libreria foto per allegare immagini alle chat con un assistente di programmazione IA. Ad esempio, condividi uno screenshot così il tuo assistente può aiutarti a risolvere un problema dell’interfaccia utente.",
+    "NSLocalNetworkUsageDescription": "Kilo usa la tua rete locale per connettersi ai server di sviluppo sul tuo computer quando testi una build di sviluppo."
   },
   "ja": {
     "NSMicrophoneUsageDescription": "Kilo が音声をテキストに変換するためにマイクを使用することを許可します。",
     "NSSpeechRecognitionUsageDescription": "Kilo があなたの声をテキストに変換するために音声認識を使用することを許可します。",
     "NSFaceIDUsageDescription": "Kilo がアプリのロックを解除するために Face ID を使用することを許可します。",
     "NSLocationWhenInUseUsageDescription": "Kilo がローカルの天気を設定するためにあなたの位置情報を使用することを許可します。",
-    "NSUserTrackingUsageDescription": "この識別子は、広告キャンペーンの効果を測定するために使用されます。"
+    "NSUserTrackingUsageDescription": "この識別子は、広告キャンペーンの効果を測定するために使用されます。",
+    "NSCameraUsageDescription": "Kiloはカメラを使用して、AIコーディングアシスタントとのチャットに添付する写真を撮影します。例えば、デザインの写真を共有すると、アシスタントがその実装を手伝えます。",
+    "NSPhotoLibraryUsageDescription": "Kiloは写真ライブラリを使用して、AIコーディングアシスタントとのチャットに画像を添付します。例えば、スクリーンショットを共有すると、アシスタントがユーザーインターフェースの問題の修正を手伝えます。",
+    "NSLocalNetworkUsageDescription": "Kiloは開発用ビルドをテストする際に、ローカルネットワークを使用してコンピュータ上の開発サーバーに接続します。"
   },
   "ka": {
     "NSMicrophoneUsageDescription": "მისცი Kilo-ს უფლება გამოიყენოს შენი მიკროფონი მეტყველების ტექსტად გადასაქცევად.",
     "NSSpeechRecognitionUsageDescription": "მისცი Kilo-ს უფლება გამოიყენოს მეტყველების ამოცნობა შენი ხმის ტექსტად გადასაქცევად.",
     "NSFaceIDUsageDescription": "მისცი Kilo-ს უფლება გამოიყენოს Face ID აპის გასახსნელად.",
     "NSLocationWhenInUseUsageDescription": "მისცი Kilo-ს უფლება გამოიყენოს შენი მდებარეობა ადგილობრივი ამინდის დასაყენებლად.",
-    "NSUserTrackingUsageDescription": "ეს იდენტიფიკატორი გამოიყენება სარეკლამო კამპანიების ეფექტიანობის გასაზომად."
+    "NSUserTrackingUsageDescription": "ეს იდენტიფიკატორი გამოიყენება სარეკლამო კამპანიების ეფექტიანობის გასაზომად.",
+    "NSCameraUsageDescription": "Kilo იყენებს თქვენს კამერას იმ ფოტოების გადასაღებად, რომლებსაც ხელოვნური ინტელექტის პროგრამირების ასისტენტთან ჩატებში ურთავთ. მაგალითად, გააზიარეთ დიზაინის ფოტო, რათა თქვენი ასისტენტი მის განხორციელებაში დაგეხმაროთ.",
+    "NSPhotoLibraryUsageDescription": "Kilo იყენებს თქვენს ფოტობიბლიოთეკას ხელოვნური ინტელექტის პროგრამირების ასისტენტთან ჩატებში სურათების დასართავად. მაგალითად, გააზიარეთ ეკრანის ანაბეჭდი, რათა თქვენი ასისტენტი მომხმარებლის ინტერფეისის პრობლემის გამოსწორებაში დაგეხმაროთ.",
+    "NSLocalNetworkUsageDescription": "Kilo იყენებს თქვენს ლოკალურ ქსელს თქვენს კომპიუტერზე არსებულ განვითარების სერვერებთან დასაკავშირებლად, როდესაც განვითარების ბილდს ამოწმებთ."
   },
   "kk": {
     "NSMicrophoneUsageDescription": "Kilo-ға сөйлеуді мәтінге айналдыру үшін микрофоныңызды пайдалануға рұқсат етіңіз.",
     "NSSpeechRecognitionUsageDescription": "Kilo-ға дауысыңызды мәтінге айналдыру үшін сөйлеуді тануды пайдалануға рұқсат етіңіз.",
     "NSFaceIDUsageDescription": "Kilo-ға қолданбаны ашу үшін Face ID пайдалануға рұқсат етіңіз.",
     "NSLocationWhenInUseUsageDescription": "Жергілікті ауа райын орнату үшін Kilo-ға орналасқан жеріңізді пайдалануға рұқсат етіңіз.",
-    "NSUserTrackingUsageDescription": "Бұл идентификатор жарнама науқандарының тиімділігін өлшеу үшін пайдаланылады."
+    "NSUserTrackingUsageDescription": "Бұл идентификатор жарнама науқандарының тиімділігін өлшеу үшін пайдаланылады.",
+    "NSCameraUsageDescription": "Kilo ЖИ бағдарламалау көмекшісімен чаттарға тіркейтін фотоларды түсіру үшін камераңызды пайдаланады. Мысалы, көмекшіңіз дизайнды іске асыруға көмектесе алуы үшін оның фотосын бөлісіңіз.",
+    "NSPhotoLibraryUsageDescription": "Kilo ЖИ бағдарламалау көмекшісімен чаттарға суреттерді тіркеу үшін фотокітапханаңызды пайдаланады. Мысалы, көмекшіңіз пайдаланушы интерфейсіндегі мәселені түзетуге көмектесе алуы үшін скриншот бөлісіңіз.",
+    "NSLocalNetworkUsageDescription": "Kilo әзірлеу құрастырылымын сынау кезінде компьютеріңіздегі әзірлеу серверлеріне қосылу үшін жергілікті желіңізді пайдаланады."
   },
   "km": {
     "NSMicrophoneUsageDescription": "អនុញ្ញាតឱ្យ Kilo ប្រើមីក្រូហ្វូនរបស់អ្នកដើម្បីបំប្លែងសម្ដីទៅជាអក្សរ។",
     "NSSpeechRecognitionUsageDescription": "អនុញ្ញាតឱ្យ Kilo ប្រើការស្គាល់សម្ដីដើម្បីបំប្លែងសំឡេងរបស់អ្នកទៅជាអក្សរ។",
     "NSFaceIDUsageDescription": "អនុញ្ញាតឱ្យ Kilo ប្រើ Face ID ដើម្បីដោះសោកម្មវិធី។",
     "NSLocationWhenInUseUsageDescription": "អនុញ្ញាតឱ្យ Kilo ប្រើទីតាំងរបស់អ្នកដើម្បីកំណត់អាកាសធាតុក្នុងតំបន់។",
-    "NSUserTrackingUsageDescription": "លេខសម្គាល់នេះត្រូវបានប្រើដើម្បីវាស់ប្រសិទ្ធភាពនៃយុទ្ធនាការផ្សាយពាណិជ្ជកម្ម។"
+    "NSUserTrackingUsageDescription": "លេខសម្គាល់នេះត្រូវបានប្រើដើម្បីវាស់ប្រសិទ្ធភាពនៃយុទ្ធនាការផ្សាយពាណិជ្ជកម្ម។",
+    "NSCameraUsageDescription": "Kilo ប្រើកាមេរ៉ារបស់អ្នកដើម្បីថតរូបដែលអ្នកភ្ជាប់ទៅការជជែកជាមួយជំនួយការសរសេរកូដ AI។ ឧទាហរណ៍ ចែករំលែករូបថតនៃការរចនា ដើម្បីឱ្យជំនួយការរបស់អ្នកអាចជួយអនុវត្តការរចនានោះ។",
+    "NSPhotoLibraryUsageDescription": "Kilo ប្រើបណ្ណាល័យរូបថតរបស់អ្នកដើម្បីភ្ជាប់រូបភាពទៅការជជែកជាមួយជំនួយការសរសេរកូដ AI។ ឧទាហរណ៍ ចែករំលែករូបថតអេក្រង់ ដើម្បីឱ្យជំនួយការរបស់អ្នកអាចជួយដោះស្រាយបញ្ហានៅក្នុងចំណុចប្រទាក់អ្នកប្រើ។",
+    "NSLocalNetworkUsageDescription": "Kilo ប្រើបណ្តាញមូលដ្ឋានរបស់អ្នកដើម្បីភ្ជាប់ទៅម៉ាស៊ីនមេសម្រាប់ការអភិវឌ្ឍនៅលើកុំព្យូទ័ររបស់អ្នក នៅពេលសាកល្បងកំណែសម្រាប់ការអភិវឌ្ឍ។"
   },
   "kn": {
     "NSMicrophoneUsageDescription": "ಮಾತನ್ನು ಪಠ್ಯವಾಗಿ ಪರಿವರ್ತಿಸಲು Kilo ನಿಮ್ಮ ಮೈಕ್ರೊಫೋನ್ ಬಳಸಲು ಅನುಮತಿಸಿ.",
     "NSSpeechRecognitionUsageDescription": "ನಿಮ್ಮ ಧ್ವನಿಯನ್ನು ಪಠ್ಯವಾಗಿ ಪರಿವರ್ತಿಸಲು Kilo ಮಾತಿನ ಗುರುತಿಸುವಿಕೆ ಬಳಸಲು ಅನುಮತಿಸಿ.",
     "NSFaceIDUsageDescription": "ಆ್ಯಪ್ ಅನ್ನು ಅನ್‌ಲಾಕ್ ಮಾಡಲು Kilo Face ID ಬಳಸಲು ಅನುಮತಿಸಿ.",
     "NSLocationWhenInUseUsageDescription": "ಸ್ಥಳೀಯ ಹವಾಮಾನವನ್ನು ಸೆಟಪ್ ಮಾಡಲು Kilo ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ಬಳಸಲು ಅನುಮತಿಸಿ.",
-    "NSUserTrackingUsageDescription": "ಈ ಗುರುತಿಸುವಿಕೆಯನ್ನು ಜಾಹೀರಾತು ಪ್ರಚಾರಗಳ ಪರಿಣಾಮಕಾರಿತ್ವವನ್ನು ಅಳೆಯಲು ಬಳಸಲಾಗುತ್ತದೆ."
+    "NSUserTrackingUsageDescription": "ಈ ಗುರುತಿಸುವಿಕೆಯನ್ನು ಜಾಹೀರಾತು ಪ್ರಚಾರಗಳ ಪರಿಣಾಮಕಾರಿತ್ವವನ್ನು ಅಳೆಯಲು ಬಳಸಲಾಗುತ್ತದೆ.",
+    "NSCameraUsageDescription": "Kilo ನಿಮ್ಮ ಕ್ಯಾಮೆರಾವನ್ನು ಬಳಸಿ, ನೀವು ಎಐ ಕೋಡಿಂಗ್ ಸಹಾಯಕನೊಂದಿಗಿನ ಚಾಟ್‌ಗಳಿಗೆ ಲಗತ್ತಿಸುವ ಫೋಟೋಗಳನ್ನು ತೆಗೆಯುತ್ತದೆ. ಉದಾಹರಣೆಗೆ, ವಿನ್ಯಾಸದ ಫೋಟೋವನ್ನು ಹಂಚಿಕೊಳ್ಳಿ, ಇದರಿಂದ ನಿಮ್ಮ ಸಹಾಯಕ ಅದನ್ನು ಕಾರ್ಯಗತಗೊಳಿಸಲು ಸಹಾಯ ಮಾಡಬಹುದು.",
+    "NSPhotoLibraryUsageDescription": "Kilo ನಿಮ್ಮ ಫೋಟೋ ಲೈಬ್ರರಿಯನ್ನು ಬಳಸಿ ಎಐ ಕೋಡಿಂಗ್ ಸಹಾಯಕನೊಂದಿಗಿನ ಚಾಟ್‌ಗಳಿಗೆ ಚಿತ್ರಗಳನ್ನು ಲಗತ್ತಿಸುತ್ತದೆ. ಉದಾಹರಣೆಗೆ, ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ಹಂಚಿಕೊಳ್ಳಿ, ಇದರಿಂದ ನಿಮ್ಮ ಸಹಾಯಕ ಬಳಕೆದಾರ ಇಂಟರ್‌ಫೇಸ್‌ನ ಸಮಸ್ಯೆಯನ್ನು ಸರಿಪಡಿಸಲು ಸಹಾಯ ಮಾಡಬಹುದು.",
+    "NSLocalNetworkUsageDescription": "Kilo ಅಭಿವೃದ್ಧಿ ಬಿಲ್ಡ್ ಅನ್ನು ಪರೀಕ್ಷಿಸುವಾಗ ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿರುವ ಅಭಿವೃದ್ಧಿ ಸರ್ವರ್‌ಗಳಿಗೆ ಸಂಪರ್ಕಿಸಲು ನಿಮ್ಮ ಸ್ಥಳೀಯ ನೆಟ್‌ವರ್ಕ್ ಅನ್ನು ಬಳಸುತ್ತದೆ."
   },
   "ko": {
     "NSMicrophoneUsageDescription": "Kilo가 음성을 텍스트로 변환하기 위해 마이크를 사용하도록 허용합니다.",
     "NSSpeechRecognitionUsageDescription": "Kilo가 음성을 텍스트로 변환하기 위해 음성 인식을 사용하도록 허용합니다.",
     "NSFaceIDUsageDescription": "Kilo가 앱 잠금을 해제하기 위해 Face ID를 사용하도록 허용합니다.",
     "NSLocationWhenInUseUsageDescription": "Kilo가 현지 날씨를 설정하기 위해 위치를 사용하도록 허용합니다.",
-    "NSUserTrackingUsageDescription": "이 식별자는 광고 캠페인의 효과를 측정하는 데 사용됩니다."
+    "NSUserTrackingUsageDescription": "이 식별자는 광고 캠페인의 효과를 측정하는 데 사용됩니다.",
+    "NSCameraUsageDescription": "Kilo는 카메라를 사용하여 AI 코딩 도우미와의 채팅에 첨부할 사진을 촬영합니다. 예를 들어, 디자인 사진을 공유하면 도우미가 해당 디자인을 구현하는 데 도움을 줄 수 있습니다.",
+    "NSPhotoLibraryUsageDescription": "Kilo는 사진 보관함을 사용하여 AI 코딩 도우미와의 채팅에 이미지를 첨부합니다. 예를 들어, 스크린샷을 공유하면 도우미가 사용자 인터페이스 문제를 해결하는 데 도움을 줄 수 있습니다.",
+    "NSLocalNetworkUsageDescription": "Kilo는 개발 빌드를 테스트할 때 로컬 네트워크를 사용하여 컴퓨터의 개발 서버에 연결합니다."
   },
   "lo": {
     "NSMicrophoneUsageDescription": "ອະນຸຍາດໃຫ້ Kilo ໃຊ້ໄມໂຄຣໂຟນຂອງທ່ານເພື່ອປ່ຽນຄຳເວົ້າເປັນຂໍ້ຄວາມ.",
     "NSSpeechRecognitionUsageDescription": "ອະນຸຍາດໃຫ້ Kilo ໃຊ້ການຮັບຮູ້ສຽງເວົ້າເພື່ອປ່ຽນສຽງຂອງທ່ານເປັນຂໍ້ຄວາມ.",
     "NSFaceIDUsageDescription": "ອະນຸຍາດໃຫ້ Kilo ໃຊ້ Face ID ເພື່ອປົດລັອກແອັບ.",
     "NSLocationWhenInUseUsageDescription": "ອະນຸຍາດໃຫ້ Kilo ໃຊ້ທີ່ຕັ້ງຂອງທ່ານເພື່ອຕັ້ງຄ່າອາກາດທ້ອງຖິ່ນ.",
-    "NSUserTrackingUsageDescription": "ຕົວລະບຸນີ້ຖືກໃຊ້ເພື່ອວັດແທກປະສິດທິພາບຂອງແຄມເປນໂຄສະນາ."
+    "NSUserTrackingUsageDescription": "ຕົວລະບຸນີ້ຖືກໃຊ້ເພື່ອວັດແທກປະສິດທິພາບຂອງແຄມເປນໂຄສະນາ.",
+    "NSCameraUsageDescription": "Kilo ໃຊ້ກ້ອງຂອງທ່ານເພື່ອຖ່າຍຮູບທີ່ທ່ານແນບໃສ່ການສົນທະນາກັບຜູ້ຊ່ວຍຂຽນໂຄດ AI. ຕົວຢ່າງ, ແບ່ງປັນຮູບຖ່າຍຂອງແບບອອກແບບ ເພື່ອໃຫ້ຜູ້ຊ່ວຍຂອງທ່ານຊ່ວຍນຳແບບນັ້ນໄປປະຕິບັດໄດ້.",
+    "NSPhotoLibraryUsageDescription": "Kilo ໃຊ້ຄັງຮູບຂອງທ່ານເພື່ອແນບຮູບພາບໃສ່ການສົນທະນາກັບຜູ້ຊ່ວຍຂຽນໂຄດ AI. ຕົວຢ່າງ, ແບ່ງປັນຮູບຖ່າຍໜ້າຈໍ ເພື່ອໃຫ້ຜູ້ຊ່ວຍຂອງທ່ານຊ່ວຍແກ້ໄຂບັນຫາໃນສ່ວນຕິດຕໍ່ຜູ້ໃຊ້ໄດ້.",
+    "NSLocalNetworkUsageDescription": "Kilo ໃຊ້ເຄືອຂ່າຍທ້ອງຖິ່ນຂອງທ່ານເພື່ອເຊື່ອມຕໍ່ກັບເຊີບເວີພັດທະນາໃນຄອມພິວເຕີຂອງທ່ານ ເມື່ອທົດສອບບິວສຳລັບການພັດທະນາ."
   },
   "lt": {
     "NSMicrophoneUsageDescription": "Leiskite Kilo naudoti jūsų mikrofoną kalbai paversti tekstu.",
     "NSSpeechRecognitionUsageDescription": "Leiskite Kilo naudoti kalbos atpažinimą jūsų balsui paversti tekstu.",
     "NSFaceIDUsageDescription": "Leiskite Kilo naudoti Face ID programai atrakinti.",
     "NSLocationWhenInUseUsageDescription": "Leiskite Kilo naudoti jūsų vietą vietiniam orui nustatyti.",
-    "NSUserTrackingUsageDescription": "Šis identifikatorius naudojamas reklaminių kampanijų veiksmingumui matuoti."
+    "NSUserTrackingUsageDescription": "Šis identifikatorius naudojamas reklaminių kampanijų veiksmingumui matuoti.",
+    "NSCameraUsageDescription": "Kilo naudoja jūsų kamerą nuotraukoms daryti, kurias pridedate prie pokalbių su DI programavimo asistentu. Pavyzdžiui, pasidalykite dizaino nuotrauka, kad jūsų asistentas galėtų padėti jį įgyvendinti.",
+    "NSPhotoLibraryUsageDescription": "Kilo naudoja jūsų nuotraukų biblioteką vaizdams pridėti prie pokalbių su DI programavimo asistentu. Pavyzdžiui, pasidalykite ekrano kopija, kad jūsų asistentas galėtų padėti išspręsti naudotojo sąsajos problemą.",
+    "NSLocalNetworkUsageDescription": "Kilo naudoja jūsų vietinį tinklą prisijungti prie kūrimo serverių jūsų kompiuteryje, kai bandote kūrimui skirtą programos versiją."
   },
   "lv": {
     "NSMicrophoneUsageDescription": "Ļaujiet Kilo izmantot jūsu mikrofonu, lai pārvērstu runu tekstā.",
     "NSSpeechRecognitionUsageDescription": "Ļaujiet Kilo izmantot runas atpazīšanu, lai pārvērstu jūsu balsi tekstā.",
     "NSFaceIDUsageDescription": "Ļaujiet Kilo izmantot Face ID, lai atslēgtu lietotni.",
     "NSLocationWhenInUseUsageDescription": "Ļaujiet Kilo izmantot jūsu atrašanās vietu, lai iestatītu vietējos laikapstākļus.",
-    "NSUserTrackingUsageDescription": "Šis identifikators tiek izmantots, lai novērtētu reklāmas kampaņu efektivitāti."
+    "NSUserTrackingUsageDescription": "Šis identifikators tiek izmantots, lai novērtētu reklāmas kampaņu efektivitāti.",
+    "NSCameraUsageDescription": "Kilo izmanto jūsu kameru, lai uzņemtu fotoattēlus, ko pievienojat sarunām ar MI programmēšanas asistentu. Piemēram, kopīgojiet dizaina fotoattēlu, lai jūsu asistents varētu palīdzēt to īstenot.",
+    "NSPhotoLibraryUsageDescription": "Kilo izmanto jūsu fotoattēlu bibliotēku, lai pievienotu attēlus sarunām ar MI programmēšanas asistentu. Piemēram, kopīgojiet ekrānuzņēmumu, lai jūsu asistents varētu palīdzēt novērst lietotāja saskarnes problēmu.",
+    "NSLocalNetworkUsageDescription": "Kilo izmanto jūsu lokālo tīklu, lai savienotos ar izstrādes serveriem jūsu datorā, kad testējat izstrādes būvējumu."
   },
   "mg": {
     "NSMicrophoneUsageDescription": "Mamela an'i Kilo hampiasa ny mikrônao hamadika ny teny ho lahatsoratra.",
     "NSSpeechRecognitionUsageDescription": "Mamela an'i Kilo hampiasa ny fanekena feo hamadika ny feonao ho lahatsoratra.",
     "NSFaceIDUsageDescription": "Mamela an'i Kilo hampiasa Face ID hamahana ny fampiharana.",
     "NSLocationWhenInUseUsageDescription": "Mamela an'i Kilo hampiasa ny toeranao hananganana ny toetrandro eo an-toerana.",
-    "NSUserTrackingUsageDescription": "Ity famantarana ity dia ampiasaina handrefesana ny fahombiazan'ny fanentanana dokam-barotra."
+    "NSUserTrackingUsageDescription": "Ity famantarana ity dia ampiasaina handrefesana ny fahombiazan'ny fanentanana dokam-barotra.",
+    "NSCameraUsageDescription": "Mampiasa ny fakantsarinao ny Kilo mba haka sary izay ampidirinao amin'ny resaka miaraka amin'ny mpanampy manoratra kaody mampiasa faharanitan-tsaina artifisialy. Ohatra, mizara sarin'ny endrika iray mba hahafahan'ny mpanampinao manampy amin'ny fanatanterahana azy.",
+    "NSPhotoLibraryUsageDescription": "Mampiasa ny tahirin-tsarinao ny Kilo mba hampiditra sary amin’ny resaka miaraka amin’ny mpanampy manoratra kaody mampiasa faharanitan-tsaina artifisialy. Ohatra, mizara pikantsary mba hahafahan’ny mpanampinao manampy amin’ny fanitsiana olana amin’ny seha-pifandraisana ho an’ny mpampiasa.",
+    "NSLocalNetworkUsageDescription": "Mampiasa ny tambajotra eo an-toerana misy anao ny Kilo mba hifandray amin'ireo lohamilina fampandrosoana ao amin'ny solosainao rehefa mitsapa kinova fampandrosoana ianao."
   },
   "mi": {
     "NSMicrophoneUsageDescription": "Whakaaetia a Kilo ki te whakamahi i tō hopuoro ki te huri kōrero hei tuhinga.",
     "NSSpeechRecognitionUsageDescription": "Whakaaetia a Kilo ki te whakamahi i te āhukahuka reo ki te huri i tō reo hei tuhinga.",
     "NSFaceIDUsageDescription": "Whakaaetia a Kilo ki te whakamahi i te Face ID ki te wekana i te taupānga.",
     "NSLocationWhenInUseUsageDescription": "Whakaaetia a Kilo ki te whakamahi i tō wāhi ki te tautuhi i te huarere ā-rohe.",
-    "NSUserTrackingUsageDescription": "Ka whakamahia tēnei kaitautuhi ki te ine i te whaihua o ngā kaupapa whakatairanga."
+    "NSUserTrackingUsageDescription": "Ka whakamahia tēnei kaitautuhi ki te ine i te whaihua o ngā kaupapa whakatairanga.",
+    "NSCameraUsageDescription": "Ka whakamahi a Kilo i tō kāmera hei tango whakaahua ka āpitihia e koe ki ngā kōrerorero me tētahi kaiāwhina waehere atamai horihori. Hei tauira, tuarihia he whakaahua o tētahi hoahoa kia āwhina ai tō kaiāwhina ki te whakatinana.",
+    "NSPhotoLibraryUsageDescription": "Ka whakamahi a Kilo i tō puna whakaahua hei āpiti atahanga ki ngā kōrerorero me tētahi kaiāwhina waehere atamai horihori. Hei tauira, tuarihia he hopu mata kia āwhina ai tō kaiāwhina ki te whakatika i tētahi raruraru atanga kaiwhakamahi.",
+    "NSLocalNetworkUsageDescription": "Ka whakamahi a Kilo i tō whatunga paetata hei tūhono ki ngā tūmau whanaketanga i tō rorohiko i a koe e whakamātau ana i tētahi hanga whanaketanga."
   },
   "mk": {
     "NSMicrophoneUsageDescription": "Дозволете му на Kilo да го користи вашиот микрофон за претворање на говорот во текст.",
     "NSSpeechRecognitionUsageDescription": "Дозволете му на Kilo да користи препознавање на говор за претворање на вашиот глас во текст.",
     "NSFaceIDUsageDescription": "Дозволете му на Kilo да користи Face ID за отклучување на апликацијата.",
     "NSLocationWhenInUseUsageDescription": "Дозволете му на Kilo да ја користи вашата локација за поставување на локалното време.",
-    "NSUserTrackingUsageDescription": "Овој идентификатор се користи за мерење на ефективноста на рекламните кампањи."
+    "NSUserTrackingUsageDescription": "Овој идентификатор се користи за мерење на ефективноста на рекламните кампањи.",
+    "NSCameraUsageDescription": "Kilo ја користи вашата камера за да прави фотографии што ги прикачувате во разговори со асистент за програмирање со ВИ. На пример, споделете фотографија од дизајн за вашиот асистент да може да помогне во неговата реализација.",
+    "NSPhotoLibraryUsageDescription": "Kilo ја користи вашата библиотека со фотографии за да прикачува слики во разговори со асистент за програмирање со ВИ. На пример, споделете слика од екранот за вашиот асистент да може да помогне во решавањето проблем со корисничкиот интерфејс.",
+    "NSLocalNetworkUsageDescription": "Kilo ја користи вашата локална мрежа за да се поврзе со развојни сервери на вашиот компјутер кога тестирате развојна верзија."
   },
   "ml": {
     "NSMicrophoneUsageDescription": "സംസാരം ടെക്സ്റ്റാക്കി മാറ്റാൻ Kilo-നെ നിങ്ങളുടെ മൈക്രോഫോൺ ഉപയോഗിക്കാൻ അനുവദിക്കുക.",
     "NSSpeechRecognitionUsageDescription": "നിങ്ങളുടെ ശബ്ദം ടെക്സ്റ്റാക്കി മാറ്റാൻ Kilo-നെ സ്പീച്ച് റെക്കഗ്നിഷൻ ഉപയോഗിക്കാൻ അനുവദിക്കുക.",
     "NSFaceIDUsageDescription": "ആപ്പ് അൺലോക്ക് ചെയ്യാൻ Kilo-നെ Face ID ഉപയോഗിക്കാൻ അനുവദിക്കുക.",
     "NSLocationWhenInUseUsageDescription": "പ്രാദേശിക കാലാവസ്ഥ ക്രമീകരിക്കാൻ Kilo-നെ നിങ്ങളുടെ ലൊക്കേഷൻ ഉപയോഗിക്കാൻ അനുവദിക്കുക.",
-    "NSUserTrackingUsageDescription": "ഈ ഐഡന്റിഫയർ പരസ്യ കാമ്പെയ്‌നുകളുടെ ഫലപ്രാപ്തി അളക്കാൻ ഉപയോഗിക്കുന്നു."
+    "NSUserTrackingUsageDescription": "ഈ ഐഡന്റിഫയർ പരസ്യ കാമ്പെയ്‌നുകളുടെ ഫലപ്രാപ്തി അളക്കാൻ ഉപയോഗിക്കുന്നു.",
+    "NSCameraUsageDescription": "എഐ കോഡിങ് സഹായിയുമായുള്ള ചാറ്റുകളിൽ നിങ്ങൾ അറ്റാച്ച് ചെയ്യുന്ന ഫോട്ടോകൾ എടുക്കാൻ Kilo നിങ്ങളുടെ ക്യാമറ ഉപയോഗിക്കുന്നു. ഉദാഹരണത്തിന്, ഒരു ഡിസൈനിന്റെ ഫോട്ടോ പങ്കിടുക, അതുവഴി അത് നടപ്പിലാക്കാൻ നിങ്ങളുടെ സഹായിക്ക് സഹായിക്കാനാകും.",
+    "NSPhotoLibraryUsageDescription": "എഐ കോഡിങ് സഹായിയുമായുള്ള ചാറ്റുകളിൽ ചിത്രങ്ങൾ അറ്റാച്ച് ചെയ്യാൻ Kilo നിങ്ങളുടെ ഫോട്ടോ ലൈബ്രറി ഉപയോഗിക്കുന്നു. ഉദാഹരണത്തിന്, ഒരു സ്ക്രീൻഷോട്ട് പങ്കിടുക, അതുവഴി ഉപയോക്തൃ ഇന്റർഫേസിലെ പ്രശ്നം പരിഹരിക്കാൻ നിങ്ങളുടെ സഹായിക്ക് സഹായിക്കാനാകും.",
+    "NSLocalNetworkUsageDescription": "ഒരു ഡെവലപ്മെന്റ് ബിൽഡ് പരീക്ഷിക്കുമ്പോൾ നിങ്ങളുടെ കമ്പ്യൂട്ടറിലെ ഡെവലപ്മെന്റ് സെർവറുകളുമായി ബന്ധിപ്പിക്കാൻ Kilo നിങ്ങളുടെ ലോക്കൽ നെറ്റ്‌വർക്ക് ഉപയോഗിക്കുന്നു."
   },
   "mn": {
     "NSMicrophoneUsageDescription": "Kilo-д яриаг текст болгон хөрвүүлэхийн тулд микрофоныг тань ашиглахыг зөвшөөрөх.",
     "NSSpeechRecognitionUsageDescription": "Kilo-д таны дуу хоолойг текст болгон хөрвүүлэхийн тулд яриа танихыг ашиглахыг зөвшөөрөх.",
     "NSFaceIDUsageDescription": "Kilo-д аппыг нээхийн тулд Face ID ашиглахыг зөвшөөрөх.",
     "NSLocationWhenInUseUsageDescription": "Kilo-д орон нутгийн цаг агаарыг тохируулахын тулд байршлыг тань ашиглахыг зөвшөөрөх.",
-    "NSUserTrackingUsageDescription": "Энэ танигчийг сурталчилгааны кампанит ажлын үр дүнтэй байдлыг хэмжихэд ашигладаг."
+    "NSUserTrackingUsageDescription": "Энэ танигчийг сурталчилгааны кампанит ажлын үр дүнтэй байдлыг хэмжихэд ашигладаг.",
+    "NSCameraUsageDescription": "Kilo нь хиймэл оюунт код бичих туслахтай хийх чатад хавсаргах зургийг авахын тулд таны камерыг ашигладаг. Жишээлбэл, загварын зургийг хуваалцсанаар туслах тань уг загварыг хэрэгжүүлэхэд тусалж чадна.",
+    "NSPhotoLibraryUsageDescription": "Kilo нь хиймэл оюунт код бичих туслахтай хийх чатад зураг хавсаргахын тулд таны зургийн санг ашигладаг. Жишээлбэл, дэлгэцийн агшныг хуваалцсанаар туслах тань хэрэглэгчийн интерфэйсийн асуудлыг засахад тусалж чадна.",
+    "NSLocalNetworkUsageDescription": "Kilo нь хөгжүүлэлтийн бүтээцийг турших үед таны компьютер дээрх хөгжүүлэлтийн серверүүдтэй холбогдохын тулд таны дотоод сүлжээг ашигладаг."
   },
   "mr": {
     "NSMicrophoneUsageDescription": "बोलण्याचे मजकुरात रूपांतर करण्यासाठी Kilo ला तुमचा माइक्रोफोन वापरण्याची परवानगी द्या.",
     "NSSpeechRecognitionUsageDescription": "तुमचा आवाज मजकुरात रूपांतर करण्यासाठी Kilo ला वाक् ओळख वापरण्याची परवानगी द्या.",
     "NSFaceIDUsageDescription": "अ‍ॅप अनलॉक करण्यासाठी Kilo ला Face ID वापरण्याची परवानगी द्या.",
     "NSLocationWhenInUseUsageDescription": "स्थानिक हवामान सेट करण्यासाठी Kilo ला तुमचे स्थान वापरण्याची परवानगी द्या.",
-    "NSUserTrackingUsageDescription": "हा ओळखकर्ता जाहिरात मोहिमांची परिणामकारकता मोजण्यासाठी वापरला जातो."
+    "NSUserTrackingUsageDescription": "हा ओळखकर्ता जाहिरात मोहिमांची परिणामकारकता मोजण्यासाठी वापरला जातो.",
+    "NSCameraUsageDescription": "Kilo तुमच्या कॅमेऱ्याचा वापर असे फोटो काढण्यासाठी करते जे तुम्ही एआय कोडिंग सहाय्यकासोबतच्या चॅटमध्ये जोडता. उदाहरणार्थ, एखाद्या डिझाइनचा फोटो शेअर करा जेणेकरून तुमचा सहाय्यक ते अंमलात आणण्यात मदत करू शकेल.",
+    "NSPhotoLibraryUsageDescription": "Kilo तुमच्या फोटो लायब्ररीचा वापर एआय कोडिंग सहाय्यकासोबतच्या चॅटमध्ये प्रतिमा जोडण्यासाठी करते. उदाहरणार्थ, स्क्रीनशॉट शेअर करा जेणेकरून तुमचा सहाय्यक वापरकर्ता इंटरफेसमधील समस्या सोडवण्यात मदत करू शकेल.",
+    "NSLocalNetworkUsageDescription": "Kilo डेव्हलपमेंट बिल्डची चाचणी करताना तुमच्या संगणकावरील डेव्हलपमेंट सर्व्हरशी जोडण्यासाठी तुमचे स्थानिक नेटवर्क वापरते."
   },
   "ms": {
     "NSMicrophoneUsageDescription": "Benarkan Kilo menggunakan mikrofon anda untuk menukar pertuturan kepada teks.",
     "NSSpeechRecognitionUsageDescription": "Benarkan Kilo menggunakan pengecaman pertuturan untuk menukar suara anda kepada teks.",
     "NSFaceIDUsageDescription": "Benarkan Kilo menggunakan Face ID untuk membuka kunci aplikasi.",
     "NSLocationWhenInUseUsageDescription": "Benarkan Kilo menggunakan lokasi anda untuk menyediakan cuaca tempatan.",
-    "NSUserTrackingUsageDescription": "Pengecam ini digunakan untuk mengukur keberkesanan kempen pengiklanan."
+    "NSUserTrackingUsageDescription": "Pengecam ini digunakan untuk mengukur keberkesanan kempen pengiklanan.",
+    "NSCameraUsageDescription": "Kilo menggunakan kamera anda untuk mengambil foto yang anda lampirkan pada sembang dengan pembantu pengekodan AI. Contohnya, kongsikan foto suatu reka bentuk supaya pembantu anda dapat membantu melaksanakannya.",
+    "NSPhotoLibraryUsageDescription": "Kilo menggunakan pustaka foto anda untuk melampirkan imej pada sembang dengan pembantu pengekodan AI. Contohnya, kongsikan tangkapan skrin supaya pembantu anda dapat membantu membetulkan masalah antara muka pengguna.",
+    "NSLocalNetworkUsageDescription": "Kilo menggunakan rangkaian setempat anda untuk menyambung kepada pelayan pembangunan pada komputer anda semasa menguji binaan pembangunan."
   },
   "mt": {
     "NSMicrophoneUsageDescription": "Ippermetti lil Kilo juża l-mikrofonu tiegħek biex jibdel id-diskors f'test.",
     "NSSpeechRecognitionUsageDescription": "Ippermetti lil Kilo juża r-rikonoxximent tad-diskors biex jibdel leħnek f'test.",
     "NSFaceIDUsageDescription": "Ippermetti lil Kilo juża Face ID biex jiftaħ l-app.",
     "NSLocationWhenInUseUsageDescription": "Ippermetti lil Kilo juża l-post tiegħek biex jikkonfigura t-temp lokali.",
-    "NSUserTrackingUsageDescription": "Dan l-identifikatur jintuża biex jitkejjel l-effett tal-kampanji tar-reklamar."
+    "NSUserTrackingUsageDescription": "Dan l-identifikatur jintuża biex jitkejjel l-effett tal-kampanji tar-reklamar.",
+    "NSCameraUsageDescription": "Kilo juża l-kamera tiegħek biex jieħu ritratti li tehmeż maċ-chats ma’ assistent tal-ipprogrammar bl-IA. Pereżempju, aqsam ritratt ta’ disinn sabiex l-assistent tiegħek ikun jista’ jgħin biex jiġi implimentat.",
+    "NSPhotoLibraryUsageDescription": "Kilo juża l-librerija tar-ritratti tiegħek biex jehmeż immaġnijiet maċ-chats ma’ assistent tal-ipprogrammar bl-IA. Pereżempju, aqsam qbid tal-iskrin sabiex l-assistent tiegħek ikun jista’ jgħin biex tissewwa problema fl-interfaċċa tal-utent.",
+    "NSLocalNetworkUsageDescription": "Kilo juża n-network lokali tiegħek biex jikkonnettja ma’ servers tal-iżvilupp fuq il-kompjuter tiegħek meta tittestja build tal-iżvilupp."
   },
   "my": {
     "NSMicrophoneUsageDescription": "စကားပြောမှုကို စာသားအဖြစ် ပြောင်းလဲရန် Kilo ကို သင့်မိုက်ခရိုဖုန်း အသုံးပြုခွင့်ပြုပါ။",
     "NSSpeechRecognitionUsageDescription": "သင့်အသံကို စာသားအဖြစ် ပြောင်းလဲရန် Kilo ကို အသံဖမ်းမှတ်သားခြင်း အသုံးပြုခွင့်ပြုပါ။",
     "NSFaceIDUsageDescription": "အက်ပ်ကို လော့ခ်ဖွင့်ရန် Kilo ကို Face ID အသုံးပြုခွင့်ပြုပါ။",
     "NSLocationWhenInUseUsageDescription": "ဒေသခံရာသီဥတု သတ်မှတ်ရန် Kilo ကို သင့်တည်နေရာ အသုံးပြုခွင့်ပြုပါ။",
-    "NSUserTrackingUsageDescription": "ဤအမှတ်အသားကို ကြော်ငြာကမ်ပိန်းများ၏ ထိရောက်မှုကို တိုင်းတာရန် အသုံးပြုသည်။"
+    "NSUserTrackingUsageDescription": "ဤအမှတ်အသားကို ကြော်ငြာကမ်ပိန်းများ၏ ထိရောက်မှုကို တိုင်းတာရန် အသုံးပြုသည်။",
+    "NSCameraUsageDescription": "Kilo သည် AI ကုဒ်ရေးအကူနှင့် ချတ်များတွင် သင်ပူးတွဲမည့် ဓာတ်ပုံများကို ရိုက်ရန် သင့်ကင်မရာကို အသုံးပြုသည်။ ဥပမာ၊ ဒီဇိုင်းတစ်ခုကို အကောင်အထည်ဖော်ရာတွင် သင့်အကူက ကူညီနိုင်ရန် ထိုဒီဇိုင်း၏ ဓာတ်ပုံကို မျှဝေပါ။",
+    "NSPhotoLibraryUsageDescription": "Kilo သည် AI ကုဒ်ရေးအကူနှင့် ချတ်များတွင် ပုံများပူးတွဲရန် သင့်ဓာတ်ပုံစာကြည့်တိုက်ကို အသုံးပြုသည်။ ဥပမာ၊ အသုံးပြုသူမျက်နှာပြင်ဆိုင်ရာ ပြဿနာတစ်ခုကို ဖြေရှင်းရာတွင် သင့်အကူက ကူညီနိုင်ရန် စခရင်ရှော့တစ်ခုကို မျှဝေပါ။",
+    "NSLocalNetworkUsageDescription": "Kilo သည် ဖွံ့ဖြိုးရေးဘီလ်ဒ်တစ်ခုကို စမ်းသပ်ချိန်တွင် သင့်ကွန်ပျူတာပေါ်ရှိ ဖွံ့ဖြိုးရေးဆာဗာများနှင့် ချိတ်ဆက်ရန် သင့်ဒေသတွင်းကွန်ရက်ကို အသုံးပြုသည်။"
   },
   "nb": {
     "NSMicrophoneUsageDescription": "Tillat Kilo å bruke mikrofonen din til å gjøre tale om til tekst.",
     "NSSpeechRecognitionUsageDescription": "Tillat Kilo å bruke talegjenkjenning til å gjøre stemmen din om til tekst.",
     "NSFaceIDUsageDescription": "Tillat Kilo å bruke Face ID til å låse opp appen.",
     "NSLocationWhenInUseUsageDescription": "Tillat Kilo å bruke posisjonen din til å sette opp lokalt vær.",
-    "NSUserTrackingUsageDescription": "Denne identifikatoren brukes til å måle effektiviteten av annonsekampanjer."
+    "NSUserTrackingUsageDescription": "Denne identifikatoren brukes til å måle effektiviteten av annonsekampanjer.",
+    "NSCameraUsageDescription": "Kilo bruker kameraet ditt til å ta bilder som du legger ved i chatter med en KI-kodeassistent. Del for eksempel et bilde av et design, slik at assistenten din kan hjelpe med å implementere det.",
+    "NSPhotoLibraryUsageDescription": "Kilo bruker bildebiblioteket ditt til å legge ved bilder i chatter med en KI-kodeassistent. Del for eksempel et skjermbilde, slik at assistenten din kan hjelpe med å løse et problem i brukergrensesnittet.",
+    "NSLocalNetworkUsageDescription": "Kilo bruker det lokale nettverket ditt til å koble til utviklingsservere på datamaskinen din når du tester en utviklingsversjon."
   },
   "ne": {
     "NSMicrophoneUsageDescription": "बोलीलाई पाठमा बदल्न Kilo लाई तपाईंको माइक्रोफोन प्रयोग गर्न अनुमति दिनुहोस्।",
     "NSSpeechRecognitionUsageDescription": "तपाईंको आवाजलाई पाठमा बदल्न Kilo लाई वाणी पहिचान प्रयोग गर्न अनुमति दिनुहोस्।",
     "NSFaceIDUsageDescription": "एप अनलक गर्न Kilo लाई Face ID प्रयोग गर्न अनुमति दिनुहोस्।",
     "NSLocationWhenInUseUsageDescription": "स्थानीय मौसम सेट गर्न Kilo लाई तपाईंको स्थान प्रयोग गर्न अनुमति दिनुहोस्।",
-    "NSUserTrackingUsageDescription": "यो पहिचानकर्ता विज्ञापन अभियानहरूको प्रभावकारिता मापन गर्न प्रयोग गरिन्छ।"
+    "NSUserTrackingUsageDescription": "यो पहिचानकर्ता विज्ञापन अभियानहरूको प्रभावकारिता मापन गर्न प्रयोग गरिन्छ।",
+    "NSCameraUsageDescription": "Kilo ले एआई कोडिङ सहायकसँगको च्याटमा तपाईंले संलग्न गर्ने फोटोहरू खिच्न तपाईंको क्यामेरा प्रयोग गर्छ। उदाहरणका लागि, कुनै डिजाइनको फोटो साझा गर्नुहोस् ताकि तपाईंको सहायकले त्यसलाई कार्यान्वयन गर्न मद्दत गर्न सकोस्।",
+    "NSPhotoLibraryUsageDescription": "Kilo ले एआई कोडिङ सहायकसँगको च्याटमा तस्बिरहरू संलग्न गर्न तपाईंको फोटो लाइब्रेरी प्रयोग गर्छ। उदाहरणका लागि, स्क्रिनसट साझा गर्नुहोस् ताकि तपाईंको सहायकले प्रयोगकर्ता इन्टरफेसको समस्या समाधान गर्न मद्दत गर्न सकोस्।",
+    "NSLocalNetworkUsageDescription": "Kilo ले डेभलपमेन्ट बिल्ड परीक्षण गर्दा तपाईंको कम्प्युटरमा रहेका डेभलपमेन्ट सर्भरहरूसँग जडान गर्न तपाईंको स्थानीय नेटवर्क प्रयोग गर्छ।"
   },
   "nl": {
     "NSMicrophoneUsageDescription": "Sta Kilo toe je microfoon te gebruiken om spraak naar tekst om te zetten.",
     "NSSpeechRecognitionUsageDescription": "Sta Kilo toe spraakherkenning te gebruiken om je stem naar tekst om te zetten.",
     "NSFaceIDUsageDescription": "Sta Kilo toe Face ID te gebruiken om de app te ontgrendelen.",
     "NSLocationWhenInUseUsageDescription": "Sta Kilo toe je locatie te gebruiken om lokaal weer in te stellen.",
-    "NSUserTrackingUsageDescription": "Deze identificatie wordt gebruikt om de effectiviteit van advertentiecampagnes te meten."
+    "NSUserTrackingUsageDescription": "Deze identificatie wordt gebruikt om de effectiviteit van advertentiecampagnes te meten.",
+    "NSCameraUsageDescription": "Kilo gebruikt je camera om foto's te maken die je toevoegt aan chats met een AI-programmeerassistent. Deel bijvoorbeeld een foto van een ontwerp, zodat je assistent kan helpen het te implementeren.",
+    "NSPhotoLibraryUsageDescription": "Kilo gebruikt je fotobibliotheek om afbeeldingen toe te voegen aan chats met een AI-programmeerassistent. Deel bijvoorbeeld een schermafbeelding, zodat je assistent kan helpen een probleem met de gebruikersinterface op te lossen.",
+    "NSLocalNetworkUsageDescription": "Kilo gebruikt je lokale netwerk om verbinding te maken met ontwikkelservers op je computer wanneer je een ontwikkelbuild test."
   },
   "om": {
     "NSMicrophoneUsageDescription": "Kilo sagalee kee gara barruutti jijjiiruuf maayikrofoonii kee akka itti fayyadamu hayyami.",
     "NSSpeechRecognitionUsageDescription": "Kilo sagalee kee gara barruutti jijjiiruuf beekumsa sagalee akka itti fayyadamu hayyami.",
     "NSFaceIDUsageDescription": "Kilo appii banuuf Face ID akka itti fayyadamu hayyami.",
     "NSLocationWhenInUseUsageDescription": "Kilo haala qilleensa naannoo qindeessuuf bakka jirtu akka itti fayyadamu hayyami.",
-    "NSUserTrackingUsageDescription": "Eenyummeessi kun bu'aa campaanyaa beeksisaa safaruuf itti fayyadama."
+    "NSUserTrackingUsageDescription": "Eenyummeessi kun bu'aa campaanyaa beeksisaa safaruuf itti fayyadama.",
+    "NSCameraUsageDescription": "Kilo suuraalee ati marii gargaaraa koodii barreessuu sammuu namtolchee waliin gootutti dabaltu kaasuuf kaameraa kee fayyadama. Fakkeenyaaf, gargaaraan kee dizaayinii tokko hojiirra oolchuu akka si gargaaruuf suuraa dizaayinii sanaa qoodi.",
+    "NSPhotoLibraryUsageDescription": "Kilo suuraalee marii gargaaraa koodii barreessuu sammuu namtolchee waliin gootutti dabaluuf kuusaa suuraa kee fayyadama. Fakkeenyaaf, gargaaraan kee rakkoo walqunnamtii fayyadamaa sirreessuu akka si gargaaruuf suuraa iskiriinii qoodi.",
+    "NSLocalNetworkUsageDescription": "Kilo yeroo ijaarsa misoomaa qorattu sarvaroota misoomaa kompiitara kee irra jiranitti walqunnamuuf neetworkii naannoo kee fayyadama."
   },
   "or": {
     "NSMicrophoneUsageDescription": "କଥାକୁ ପାଠ୍ୟରେ ରୂପାନ୍ତର କରିବାକୁ Kilo କୁ ଆପଣଙ୍କ ମାଇକ୍ରୋଫୋନ୍ ବ୍ୟବହାର କରିବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
     "NSSpeechRecognitionUsageDescription": "ଆପଣଙ୍କ ସ୍ୱରକୁ ପାଠ୍ୟରେ ରୂପାନ୍ତର କରିବାକୁ Kilo କୁ ବାକ୍ ଚିହ୍ନଟ ବ୍ୟବହାର କରିବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
     "NSFaceIDUsageDescription": "ଆପ୍ ଅନଲକ୍ କରିବାକୁ Kilo କୁ Face ID ବ୍ୟବହାର କରିବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
     "NSLocationWhenInUseUsageDescription": "ସ୍ଥାନୀୟ ପାଗ ସେଟ୍ କରିବାକୁ Kilo କୁ ଆପଣଙ୍କ ସ୍ଥାନ ବ୍ୟବହାର କରିବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ।",
-    "NSUserTrackingUsageDescription": "ଏହି ପରିଚାୟକ ବିଜ୍ଞାପନ ଅଭିଯାନର ପ୍ରଭାବକାରିତା ମାପିବାକୁ ବ୍ୟବହୃତ ହୁଏ।"
+    "NSUserTrackingUsageDescription": "ଏହି ପରିଚାୟକ ବିଜ୍ଞାପନ ଅଭିଯାନର ପ୍ରଭାବକାରିତା ମାପିବାକୁ ବ୍ୟବହୃତ ହୁଏ।",
+    "NSCameraUsageDescription": "Kilo ଆପଣଙ୍କ କ୍ୟାମେରା ବ୍ୟବହାର କରି ସେହି ଫଟୋଗୁଡ଼ିକ ଉଠାଏ ଯାହା ଆପଣ ଏଆଇ କୋଡିଂ ସହାୟକଙ୍କ ସହ ଚାଟ୍‌ରେ ସଂଲଗ୍ନ କରନ୍ତି। ଉଦାହରଣ ସ୍ୱରୂପ, କୌଣସି ଡିଜାଇନ୍‌ର ଫଟୋ ସେୟାର କରନ୍ତୁ ଯାହାଦ୍ୱାରା ଆପଣଙ୍କ ସହାୟକ ତାହାକୁ କାର୍ଯ୍ୟକାରୀ କରିବାରେ ସାହାଯ୍ୟ କରିପାରିବେ।",
+    "NSPhotoLibraryUsageDescription": "Kilo ଆପଣଙ୍କ ଫଟୋ ଲାଇବ୍ରେରୀ ବ୍ୟବହାର କରି ଏଆଇ କୋଡିଂ ସହାୟକଙ୍କ ସହ ଚାଟ୍‌ରେ ଛବି ସଂଲଗ୍ନ କରେ। ଉଦାହରଣ ସ୍ୱରୂପ, ଏକ ସ୍କ୍ରିନ୍‌ସଟ୍ ସେୟାର କରନ୍ତୁ ଯାହାଦ୍ୱାରା ଆପଣଙ୍କ ସହାୟକ ବ୍ୟବହାରକାରୀ ଇଣ୍ଟରଫେସ୍‌ର କୌଣସି ସମସ୍ୟା ସମାଧାନ କରିବାରେ ସାହାଯ୍ୟ କରିପାରିବେ।",
+    "NSLocalNetworkUsageDescription": "Kilo ଡେଭଲପମେଣ୍ଟ ବିଲ୍ଡ ପରୀକ୍ଷା କରିବା ସମୟରେ ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ ଥିବା ଡେଭଲପମେଣ୍ଟ ସର୍ଭରଗୁଡ଼ିକ ସହ ସଂଯୋଗ କରିବା ପାଇଁ ଆପଣଙ୍କ ସ୍ଥାନୀୟ ନେଟୱର୍କ ବ୍ୟବହାର କରେ।"
   },
   "pa": {
     "NSMicrophoneUsageDescription": "ਭਾਸ਼ਣ ਨੂੰ ਟੈਕਸਟ ਵਿੱਚ ਬਦਲਣ ਲਈ Kilo ਨੂੰ ਤੁਹਾਡੇ ਮਾਈਕ੍ਰੋਫ਼ੋਨ ਦੀ ਵਰਤੋਂ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ।",
     "NSSpeechRecognitionUsageDescription": "ਤੁਹਾਡੀ ਆਵਾਜ਼ ਨੂੰ ਟੈਕਸਟ ਵਿੱਚ ਬਦਲਣ ਲਈ Kilo ਨੂੰ ਭਾਸ਼ਣ ਪਛਾਣ ਦੀ ਵਰਤੋਂ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ।",
     "NSFaceIDUsageDescription": "ਐਪ ਨੂੰ ਅਨਲੌਕ ਕਰਨ ਲਈ Kilo ਨੂੰ Face ID ਦੀ ਵਰਤੋਂ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ।",
     "NSLocationWhenInUseUsageDescription": "ਸਥਾਨਕ ਮੌਸਮ ਸੈੱਟ ਕਰਨ ਲਈ Kilo ਨੂੰ ਤੁਹਾਡੇ ਟਿਕਾਣੇ ਦੀ ਵਰਤੋਂ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ।",
-    "NSUserTrackingUsageDescription": "ਇਹ ਪਛਾਣਕਰਤਾ ਇਸ਼ਤਿਹਾਰ ਮੁਹਿੰਮਾਂ ਦੀ ਪ੍ਰਭਾਵਸ਼ੀਲਤਾ ਮਾਪਣ ਲਈ ਵਰਤਿਆ ਜਾਂਦਾ ਹੈ।"
+    "NSUserTrackingUsageDescription": "ਇਹ ਪਛਾਣਕਰਤਾ ਇਸ਼ਤਿਹਾਰ ਮੁਹਿੰਮਾਂ ਦੀ ਪ੍ਰਭਾਵਸ਼ੀਲਤਾ ਮਾਪਣ ਲਈ ਵਰਤਿਆ ਜਾਂਦਾ ਹੈ।",
+    "NSCameraUsageDescription": "Kilo ਤੁਹਾਡੇ ਕੈਮਰੇ ਦੀ ਵਰਤੋਂ ਉਹ ਫੋਟੋਆਂ ਖਿੱਚਣ ਲਈ ਕਰਦਾ ਹੈ ਜੋ ਤੁਸੀਂ ਏਆਈ ਕੋਡਿੰਗ ਸਹਾਇਕ ਨਾਲ ਚੈਟਾਂ ਵਿੱਚ ਨੱਥੀ ਕਰਦੇ ਹੋ। ਉਦਾਹਰਨ ਲਈ, ਕਿਸੇ ਡਿਜ਼ਾਈਨ ਦੀ ਫੋਟੋ ਸਾਂਝੀ ਕਰੋ ਤਾਂ ਜੋ ਤੁਹਾਡਾ ਸਹਾਇਕ ਉਸ ਨੂੰ ਲਾਗੂ ਕਰਨ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕੇ।",
+    "NSPhotoLibraryUsageDescription": "Kilo ਤੁਹਾਡੀ ਫੋਟੋ ਲਾਇਬ੍ਰੇਰੀ ਦੀ ਵਰਤੋਂ ਏਆਈ ਕੋਡਿੰਗ ਸਹਾਇਕ ਨਾਲ ਚੈਟਾਂ ਵਿੱਚ ਤਸਵੀਰਾਂ ਨੱਥੀ ਕਰਨ ਲਈ ਕਰਦਾ ਹੈ। ਉਦਾਹਰਨ ਲਈ, ਸਕ੍ਰੀਨਸ਼ਾਟ ਸਾਂਝਾ ਕਰੋ ਤਾਂ ਜੋ ਤੁਹਾਡਾ ਸਹਾਇਕ ਵਰਤੋਂਕਾਰ ਇੰਟਰਫੇਸ ਦੀ ਕਿਸੇ ਸਮੱਸਿਆ ਨੂੰ ਠੀਕ ਕਰਨ ਵਿੱਚ ਮਦਦ ਕਰ ਸਕੇ।",
+    "NSLocalNetworkUsageDescription": "Kilo ਡਿਵੈਲਪਮੈਂਟ ਬਿਲਡ ਦੀ ਜਾਂਚ ਕਰਦੇ ਸਮੇਂ ਤੁਹਾਡੇ ਕੰਪਿਊਟਰ ਉੱਤੇ ਮੌਜੂਦ ਡਿਵੈਲਪਮੈਂਟ ਸਰਵਰਾਂ ਨਾਲ ਜੁੜਨ ਲਈ ਤੁਹਾਡੇ ਸਥਾਨਕ ਨੈੱਟਵਰਕ ਦੀ ਵਰਤੋਂ ਕਰਦਾ ਹੈ।"
   },
   "pl": {
     "NSMicrophoneUsageDescription": "Zezwól aplikacji Kilo na używanie mikrofonu do zamiany mowy na tekst.",
     "NSSpeechRecognitionUsageDescription": "Zezwól aplikacji Kilo na używanie rozpoznawania mowy do zamiany głosu na tekst.",
     "NSFaceIDUsageDescription": "Zezwól aplikacji Kilo na używanie Face ID do odblokowywania aplikacji.",
     "NSLocationWhenInUseUsageDescription": "Zezwól aplikacji Kilo na używanie Twojej lokalizacji do skonfigurowania lokalnej pogody.",
-    "NSUserTrackingUsageDescription": "Ten identyfikator służy do pomiaru skuteczności kampanii reklamowych."
+    "NSUserTrackingUsageDescription": "Ten identyfikator służy do pomiaru skuteczności kampanii reklamowych.",
+    "NSCameraUsageDescription": "Kilo używa aparatu do robienia zdjęć, które dołączasz do rozmów z asystentem programowania AI. Na przykład udostępnij zdjęcie projektu, aby asystent mógł pomóc go wdrożyć.",
+    "NSPhotoLibraryUsageDescription": "Kilo używa Twojej biblioteki zdjęć do dołączania obrazów do rozmów z asystentem programowania AI. Na przykład udostępnij zrzut ekranu, aby asystent mógł pomóc naprawić problem z interfejsem użytkownika.",
+    "NSLocalNetworkUsageDescription": "Kilo używa Twojej sieci lokalnej do łączenia się z serwerami deweloperskimi na Twoim komputerze podczas testowania kompilacji deweloperskiej."
   },
   "ps": {
     "NSMicrophoneUsageDescription": "Kilo ته اجازه ورکړئ چې ستاسو مایکروفون د وینا متن ته د اړولو لپاره وکاروي.",
     "NSSpeechRecognitionUsageDescription": "Kilo ته اجازه ورکړئ چې ستاسو غږ متن ته د اړولو لپاره د وینا پېژندنه وکاروي.",
     "NSFaceIDUsageDescription": "Kilo ته اجازه ورکړئ چې د اپلیکیشن خلاصولو لپاره Face ID وکاروي.",
     "NSLocationWhenInUseUsageDescription": "Kilo ته اجازه ورکړئ چې ستاسو موقعیت د سیمه‌ایز هوا د تنظیم لپاره وکاروي.",
-    "NSUserTrackingUsageDescription": "دا پېژندونکی د اعلاناتو کمپاینونو اغیزمنتوب اندازه کولو لپاره کارول کیږي."
+    "NSUserTrackingUsageDescription": "دا پېژندونکی د اعلاناتو کمپاینونو اغیزمنتوب اندازه کولو لپاره کارول کیږي.",
+    "NSCameraUsageDescription": "Kilo ستاسو کامره د هغو عکسونو اخیستلو لپاره کاروي چې تاسو یې د مصنوعي ځیرکتیا د کوډ لیکلو مرستیال سره خبرو اترو ته نښلوئ. د بېلګې په توګه، د یوې طرحې عکس شریک کړئ څو ستاسو مرستیال یې په پلي کولو کې مرسته وکړای شي.",
+    "NSPhotoLibraryUsageDescription": "Kilo ستاسو د عکسونو کتابتون د مصنوعي ځیرکتیا د کوډ لیکلو مرستیال سره خبرو اترو ته د انځورونو نښلولو لپاره کاروي. د بېلګې په توګه، د سکرین عکس شریک کړئ څو ستاسو مرستیال د کارن مخ په یوه ستونزه حل کولو کې مرسته وکړای شي.",
+    "NSLocalNetworkUsageDescription": "Kilo د پراختیايي نسخې د ازموینې پر مهال ستاسو په کمپیوټر کې د پراختیا له سرورونو سره د نښلېدو لپاره ستاسو سیمه ییزه شبکه کاروي."
   },
   "pt": {
     "NSMicrophoneUsageDescription": "Permita que o Kilo use o seu microfone para converter a fala em texto.",
     "NSSpeechRecognitionUsageDescription": "Permita que o Kilo use o reconhecimento de voz para converter a sua voz em texto.",
     "NSFaceIDUsageDescription": "Permita que o Kilo use o Face ID para desbloquear a aplicação.",
     "NSLocationWhenInUseUsageDescription": "Permita que o Kilo use a sua localização para configurar o tempo local.",
-    "NSUserTrackingUsageDescription": "Este identificador é usado para medir a eficácia das campanhas publicitárias."
+    "NSUserTrackingUsageDescription": "Este identificador é usado para medir a eficácia das campanhas publicitárias.",
+    "NSCameraUsageDescription": "O Kilo utiliza a tua câmara para tirar fotografias que anexas às conversas com um assistente de programação com IA. Por exemplo, partilha uma fotografia de um design para que o teu assistente possa ajudar a implementá-lo.",
+    "NSPhotoLibraryUsageDescription": "O Kilo utiliza a tua fototeca para anexar imagens às conversas com um assistente de programação com IA. Por exemplo, partilha uma captura de ecrã para que o teu assistente possa ajudar a corrigir um problema na interface de utilizador.",
+    "NSLocalNetworkUsageDescription": "O Kilo utiliza a tua rede local para se ligar aos servidores de desenvolvimento no teu computador quando testas uma compilação de desenvolvimento."
   },
   "pt-BR": {
     "NSMicrophoneUsageDescription": "Permita que o Kilo use seu microfone para converter fala em texto.",
     "NSSpeechRecognitionUsageDescription": "Permita que o Kilo use o reconhecimento de fala para converter sua voz em texto.",
     "NSFaceIDUsageDescription": "Permita que o Kilo use o Face ID para desbloquear o app.",
     "NSLocationWhenInUseUsageDescription": "Permita que o Kilo use sua localização para configurar o clima local.",
-    "NSUserTrackingUsageDescription": "Este identificador é usado para medir a eficácia das campanhas de publicidade."
+    "NSUserTrackingUsageDescription": "Este identificador é usado para medir a eficácia das campanhas de publicidade.",
+    "NSCameraUsageDescription": "O Kilo usa sua câmera para tirar fotos que você anexa às conversas com um assistente de programação com IA. Por exemplo, compartilhe uma foto de um design para que seu assistente possa ajudar a implementá-lo.",
+    "NSPhotoLibraryUsageDescription": "O Kilo usa sua biblioteca de fotos para anexar imagens às conversas com um assistente de programação com IA. Por exemplo, compartilhe uma captura de tela para que seu assistente possa ajudar a corrigir um problema na interface do usuário.",
+    "NSLocalNetworkUsageDescription": "O Kilo usa sua rede local para se conectar aos servidores de desenvolvimento no seu computador quando você testa uma compilação de desenvolvimento."
   },
   "ro": {
     "NSMicrophoneUsageDescription": "Permiteți-i Kilo să folosească microfonul pentru a transforma vorbirea în text.",
     "NSSpeechRecognitionUsageDescription": "Permiteți-i Kilo să folosească recunoașterea vocală pentru a transforma vocea în text.",
     "NSFaceIDUsageDescription": "Permiteți-i Kilo să folosească Face ID pentru a debloca aplicația.",
     "NSLocationWhenInUseUsageDescription": "Permiteți-i Kilo să folosească locația dvs. pentru a configura vremea locală.",
-    "NSUserTrackingUsageDescription": "Acest identificator este folosit pentru a măsura eficacitatea campaniilor publicitare."
+    "NSUserTrackingUsageDescription": "Acest identificator este folosit pentru a măsura eficacitatea campaniilor publicitare.",
+    "NSCameraUsageDescription": "Kilo folosește camera pentru a face fotografii pe care le atașezi conversațiilor cu un asistent de programare cu IA. De exemplu, partajează o fotografie a unui design, astfel încât asistentul tău să te poată ajuta să îl implementezi.",
+    "NSPhotoLibraryUsageDescription": "Kilo folosește biblioteca ta foto pentru a atașa imagini conversațiilor cu un asistent de programare cu IA. De exemplu, partajează o captură de ecran, astfel încât asistentul tău să te poată ajuta să remediezi o problemă a interfeței cu utilizatorul.",
+    "NSLocalNetworkUsageDescription": "Kilo folosește rețeaua ta locală pentru a se conecta la serverele de dezvoltare de pe computerul tău când testezi un build de dezvoltare."
   },
   "ru": {
     "NSMicrophoneUsageDescription": "Разрешите Kilo использовать микрофон для преобразования речи в текст.",
     "NSSpeechRecognitionUsageDescription": "Разрешите Kilo использовать распознавание речи для преобразования вашего голоса в текст.",
     "NSFaceIDUsageDescription": "Разрешите Kilo использовать Face ID для разблокировки приложения.",
     "NSLocationWhenInUseUsageDescription": "Разрешите Kilo использовать ваше местоположение для настройки местной погоды.",
-    "NSUserTrackingUsageDescription": "Этот идентификатор используется для оценки эффективности рекламных кампаний."
+    "NSUserTrackingUsageDescription": "Этот идентификатор используется для оценки эффективности рекламных кампаний.",
+    "NSCameraUsageDescription": "Kilo использует вашу камеру, чтобы делать фотографии, которые вы прикрепляете к чатам с ИИ-помощником по программированию. Например, поделитесь фотографией дизайна, чтобы ваш помощник мог помочь его реализовать.",
+    "NSPhotoLibraryUsageDescription": "Kilo использует вашу медиатеку фотографий, чтобы прикреплять изображения к чатам с ИИ-помощником по программированию. Например, поделитесь снимком экрана, чтобы ваш помощник мог помочь исправить проблему в пользовательском интерфейсе.",
+    "NSLocalNetworkUsageDescription": "Kilo использует вашу локальную сеть для подключения к серверам разработки на вашем компьютере при тестировании сборки для разработки."
   },
   "si": {
     "NSMicrophoneUsageDescription": "කථනය පෙළ බවට පත් කිරීමට Kilo ට ඔබේ මයික්‍රොෆෝනය භාවිත කිරීමට ඉඩ දෙන්න.",
     "NSSpeechRecognitionUsageDescription": "ඔබේ හඬ පෙළ බවට පත් කිරීමට Kilo ට කථන හඳුනා ගැනීම භාවිත කිරීමට ඉඩ දෙන්න.",
     "NSFaceIDUsageDescription": "යෙදුම අගුළු හැරීමට Kilo ට Face ID භාවිත කිරීමට ඉඩ දෙන්න.",
     "NSLocationWhenInUseUsageDescription": "දේශීය කාලගුණය සැකසීමට Kilo ට ඔබේ ස්ථානය භාවිත කිරීමට ඉඩ දෙන්න.",
-    "NSUserTrackingUsageDescription": "මෙම හඳුනා ගැනුම දැන්වීම් ව්‍යාපාරවල සාර්ථකත්වය මැනීමට භාවිත වේ."
+    "NSUserTrackingUsageDescription": "මෙම හඳුනා ගැනුම දැන්වීම් ව්‍යාපාරවල සාර්ථකත්වය මැනීමට භාවිත වේ.",
+    "NSCameraUsageDescription": "Kilo ඔබේ කැමරාව භාවිත කරන්නේ ඔබ AI කේත ලිවීමේ සහායකයා සමඟ කරන කතාබහට අමුණන ඡායාරූප ගැනීමටයි. උදාහරණයක් ලෙස, සැලසුමක් ක්‍රියාත්මක කිරීමට ඔබේ සහායකයාට උදව් කළ හැකි වන පරිදි එම සැලසුමේ ඡායාරූපයක් බෙදාගන්න.",
+    "NSPhotoLibraryUsageDescription": "Kilo ඔබේ ඡායාරූප පුස්තකාලය භාවිත කරන්නේ AI කේත ලිවීමේ සහායකයා සමඟ කරන කතාබහට රූප ඇමිණීමටයි. උදාහරණයක් ලෙස, පරිශීලක අතුරුමුහුණතේ ගැටලුවක් විසඳීමට ඔබේ සහායකයාට උදව් කළ හැකි වන පරිදි තිර රුවක් බෙදාගන්න.",
+    "NSLocalNetworkUsageDescription": "Kilo සංවර්ධන බිල්ඩ් එකක් පරීක්ෂා කරන විට ඔබේ පරිගණකයේ ඇති සංවර්ධන සේවාදායකයන්ට සම්බන්ධ වීමට ඔබේ දේශීය ජාලය භාවිත කරයි."
   },
   "sk": {
     "NSMicrophoneUsageDescription": "Povoľte aplikácii Kilo používať mikrofón na prevod reči na text.",
     "NSSpeechRecognitionUsageDescription": "Povoľte aplikácii Kilo používať rozpoznávanie reči na prevod hlasu na text.",
     "NSFaceIDUsageDescription": "Povoľte aplikácii Kilo používať Face ID na odomknutie aplikácie.",
     "NSLocationWhenInUseUsageDescription": "Povoľte aplikácii Kilo používať vašu polohu na nastavenie miestneho počasia.",
-    "NSUserTrackingUsageDescription": "Tento identifikátor sa používa na meranie účinnosti reklamných kampaní."
+    "NSUserTrackingUsageDescription": "Tento identifikátor sa používa na meranie účinnosti reklamných kampaní.",
+    "NSCameraUsageDescription": "Kilo používa váš fotoaparát na fotenie fotografií, ktoré prikladáte k chatom s AI asistentom na programovanie. Napríklad zdieľajte fotografiu návrhu, aby vám ho asistent mohol pomôcť implementovať.",
+    "NSPhotoLibraryUsageDescription": "Kilo používa vašu knižnicu fotografií na prikladanie obrázkov k chatom s AI asistentom na programovanie. Napríklad zdieľajte snímku obrazovky, aby vám asistent mohol pomôcť opraviť problém v používateľskom rozhraní.",
+    "NSLocalNetworkUsageDescription": "Kilo používa vašu lokálnu sieť na pripojenie k vývojovým serverom na vašom počítači pri testovaní vývojového zostavenia."
   },
   "sl": {
     "NSMicrophoneUsageDescription": "Dovolite Kilu, da uporabi vaš mikrofon za pretvorbo govora v besedilo.",
     "NSSpeechRecognitionUsageDescription": "Dovolite Kilu, da uporabi prepoznavanje govora za pretvorbo vašega glasu v besedilo.",
     "NSFaceIDUsageDescription": "Dovolite Kilu, da uporabi Face ID za odklep aplikacije.",
     "NSLocationWhenInUseUsageDescription": "Dovolite Kilou, da uporabi vašo lokacijo za nastavitev lokalnega vremena.",
-    "NSUserTrackingUsageDescription": "Ta identifikator se uporablja za merjenje učinkovitosti oglaševalskih kampanj."
+    "NSUserTrackingUsageDescription": "Ta identifikator se uporablja za merjenje učinkovitosti oglaševalskih kampanj.",
+    "NSCameraUsageDescription": "Kilo uporablja vašo kamero za fotografiranje slik, ki jih prilagate klepetom z asistentom za programiranje z umetno inteligenco. Na primer, delite fotografijo zasnove, da vam lahko asistent pomaga pri njeni izvedbi.",
+    "NSPhotoLibraryUsageDescription": "Kilo uporablja vašo knjižnico fotografij za prilaganje slik klepetom z asistentom za programiranje z umetno inteligenco. Na primer, delite posnetek zaslona, da vam lahko asistent pomaga odpraviti težavo z uporabniškim vmesnikom.",
+    "NSLocalNetworkUsageDescription": "Kilo uporablja vaše lokalno omrežje za povezavo z razvojnimi strežniki v vašem računalniku, ko preizkušate razvojno različico."
   },
   "so": {
     "NSMicrophoneUsageDescription": "U oggolow Kilo inuu isticmaalo makarafoonkaaga si uu hadalka u beddelo qoraal.",
     "NSSpeechRecognitionUsageDescription": "U oggolow Kilo inuu isticmaalo aqoonsiga hadalka si uu codkaaga u beddelo qoraal.",
     "NSFaceIDUsageDescription": "U oggolow Kilo inuu isticmaalo Face ID si uu u furo abka.",
     "NSLocationWhenInUseUsageDescription": "U oggolow Kilo inuu isticmaalo goobtaada si uu u dejiyo cimilada deegaanka.",
-    "NSUserTrackingUsageDescription": "Aqoonsigan waxaa loo isticmaalaa in lagu cabbiro waxtarka ololaha xayeysiiska."
+    "NSUserTrackingUsageDescription": "Aqoonsigan waxaa loo isticmaalaa in lagu cabbiro waxtarka ololaha xayeysiiska.",
+    "NSCameraUsageDescription": "Kilo wuxuu kaamiradaada u isticmaalaa inuu qaado sawirro aad ku lifaaqdo wada sheekaysiyada kaaliyaha qorista koodhka ee garaadka macmalka ah. Tusaale ahaan, wadaag sawir naqshad si kaaliyahaagu kaaga caawiyo hirgelinteeda.",
+    "NSPhotoLibraryUsageDescription": "Kilo wuxuu maktabadda sawirradaada u isticmaalaa inuu sawirro ku lifaaqo wada sheekaysiyada kaaliyaha qorista koodhka ee garaadka macmalka ah. Tusaale ahaan, wadaag sawirka shaashadda si kaaliyahaagu kaaga caawiyo hagaajinta cilad ku jirta isdhexgalka isticmaalaha.",
+    "NSLocalNetworkUsageDescription": "Kilo wuxuu shabakaddaada maxalliga ah u isticmaalaa inuu ku xirmo adeegayaasha horumarinta ee kombiyuutarkaaga marka aad tijaabinayso nooc horumarineed."
   },
   "sq": {
     "NSMicrophoneUsageDescription": "Lejo Kilo të përdorë mikrofonin tënd për ta kthyer të folurin në tekst.",
     "NSSpeechRecognitionUsageDescription": "Lejo Kilo të përdorë njohjen e të folurit për ta kthyer zërin tënd në tekst.",
     "NSFaceIDUsageDescription": "Lejo Kilo të përdorë Face ID për të shkyçur aplikacionin.",
     "NSLocationWhenInUseUsageDescription": "Lejo Kilo të përdorë vendndodhjen tënde për të konfiguruar motin lokal.",
-    "NSUserTrackingUsageDescription": "Ky identifikues përdoret për të matur efektivitetin e fushatave reklamuese."
+    "NSUserTrackingUsageDescription": "Ky identifikues përdoret për të matur efektivitetin e fushatave reklamuese.",
+    "NSCameraUsageDescription": "Kilo përdor kamerën tënde për të bërë foto që i bashkëngjit në bisedat me një asistent programimi me IA. Për shembull, ndaj një foto të një dizajni që asistenti yt të mund të ndihmojë në zbatimin e tij.",
+    "NSPhotoLibraryUsageDescription": "Kilo përdor bibliotekën tënde të fotove për të bashkëngjitur imazhe në bisedat me një asistent programimi me IA. Për shembull, ndaj një pamje ekrani që asistenti yt të mund të ndihmojë në rregullimin e një problemi në ndërfaqen e përdoruesit.",
+    "NSLocalNetworkUsageDescription": "Kilo përdor rrjetin tënd lokal për t’u lidhur me serverët e zhvillimit në kompjuterin tënd kur teston një version zhvillimi."
   },
   "sr": {
     "NSMicrophoneUsageDescription": "Dozvolite Kilo-u da koristi vaš mikrofon za pretvaranje govora u tekst.",
     "NSSpeechRecognitionUsageDescription": "Dozvolite Kilo-u da koristi prepoznavanje govora za pretvaranje vašeg glasa u tekst.",
     "NSFaceIDUsageDescription": "Dozvolite Kilo-u da koristi Face ID za otključavanje aplikacije.",
     "NSLocationWhenInUseUsageDescription": "Dozvolite Kilo-u da koristi vašu lokaciju za podešavanje lokalnog vremena.",
-    "NSUserTrackingUsageDescription": "Ovaj identifikator se koristi za merenje efikasnosti reklamnih kampanja."
+    "NSUserTrackingUsageDescription": "Ovaj identifikator se koristi za merenje efikasnosti reklamnih kampanja.",
+    "NSCameraUsageDescription": "Kilo користи вашу камеру за снимање фотографија које прилажете разговорима са АИ асистентом за програмирање. На пример, поделите фотографију дизајна како би вам асистент могао помоћи да га имплементирате.",
+    "NSPhotoLibraryUsageDescription": "Kilo користи вашу библиотеку фотографија за прилагање слика разговорима са АИ асистентом за програмирање. На пример, поделите снимак екрана како би вам асистент могао помоћи да решите проблем са корисничким интерфејсом.",
+    "NSLocalNetworkUsageDescription": "Kilo користи вашу локалну мрежу за повезивање са развојним серверима на вашем рачунару приликом тестирања развојне верзије."
   },
   "sv": {
     "NSMicrophoneUsageDescription": "Tillåt Kilo att använda din mikrofon för att omvandla tal till text.",
     "NSSpeechRecognitionUsageDescription": "Tillåt Kilo att använda taligenkänning för att omvandla din röst till text.",
     "NSFaceIDUsageDescription": "Tillåt Kilo att använda Face ID för att låsa upp appen.",
     "NSLocationWhenInUseUsageDescription": "Tillåt Kilo att använda din plats för att ställa in lokalt väder.",
-    "NSUserTrackingUsageDescription": "Denna identifierare används för att mäta effektiviteten hos reklamkampanjer."
+    "NSUserTrackingUsageDescription": "Denna identifierare används för att mäta effektiviteten hos reklamkampanjer.",
+    "NSCameraUsageDescription": "Kilo använder din kamera för att ta foton som du bifogar i chattar med en AI-kodningsassistent. Dela till exempel ett foto av en design så att din assistent kan hjälpa till att implementera den.",
+    "NSPhotoLibraryUsageDescription": "Kilo använder ditt bildbibliotek för att bifoga bilder i chattar med en AI-kodningsassistent. Dela till exempel en skärmbild så att din assistent kan hjälpa till att åtgärda ett problem i användargränssnittet.",
+    "NSLocalNetworkUsageDescription": "Kilo använder ditt lokala nätverk för att ansluta till utvecklingsservrar på din dator när du testar ett utvecklingsbygge."
   },
   "sw": {
     "NSMicrophoneUsageDescription": "Ruhusu Kilo itumie maikrofoni yako kubadilisha usemi kuwa maandishi.",
     "NSSpeechRecognitionUsageDescription": "Ruhusu Kilo itumie utambuzi wa usemi kubadilisha sauti yako kuwa maandishi.",
     "NSFaceIDUsageDescription": "Ruhusu Kilo itumie Face ID kufungua programu.",
     "NSLocationWhenInUseUsageDescription": "Ruhusu Kilo itumie eneo lako kusanidi hali ya hewa ya eneo lako.",
-    "NSUserTrackingUsageDescription": "Kitambulisho hiki kinatumika kupima ufanisi wa kampeni za utangazaji."
+    "NSUserTrackingUsageDescription": "Kitambulisho hiki kinatumika kupima ufanisi wa kampeni za utangazaji.",
+    "NSCameraUsageDescription": "Kilo hutumia kamera yako kupiga picha unazoambatisha kwenye mazungumzo na msaidizi wa uandishi wa msimbo wa akili bandia. Kwa mfano, shiriki picha ya muundo ili msaidizi wako aweze kusaidia kuutekeleza.",
+    "NSPhotoLibraryUsageDescription": "Kilo hutumia maktaba yako ya picha kuambatisha picha kwenye mazungumzo na msaidizi wa uandishi wa msimbo wa akili bandia. Kwa mfano, shiriki picha ya skrini ili msaidizi wako aweze kusaidia kurekebisha tatizo la kiolesura cha mtumiaji.",
+    "NSLocalNetworkUsageDescription": "Kilo hutumia mtandao wako wa ndani kuunganisha kwenye seva za uendelezaji zilizo kwenye kompyuta yako unapojaribu toleo la uendelezaji."
   },
   "ta": {
     "NSMicrophoneUsageDescription": "பேச்சை உரையாக மாற்ற Kilo உங்கள் மைக்ரோஃபோனைப் பயன்படுத்த அனுமதிக்கவும்.",
     "NSSpeechRecognitionUsageDescription": "உங்கள் குரலை உரையாக மாற்ற Kilo பேச்சு அங்கீகாரத்தைப் பயன்படுத்த அனுமதிக்கவும்.",
     "NSFaceIDUsageDescription": "ஆப்ஸைத் திறக்க Kilo Face ID பயன்படுத்த அனுமதிக்கவும்.",
     "NSLocationWhenInUseUsageDescription": "உள்ளூர் வானிலையை அமைக்க Kilo உங்கள் இருப்பிடத்தைப் பயன்படுத்த அனுமதிக்கவும்.",
-    "NSUserTrackingUsageDescription": "இந்த அடையாளங்காட்டி விளம்பர பிரச்சாரங்களின் செயல்திறனை அளவிடப் பயன்படுகிறது."
+    "NSUserTrackingUsageDescription": "இந்த அடையாளங்காட்டி விளம்பர பிரச்சாரங்களின் செயல்திறனை அளவிடப் பயன்படுகிறது.",
+    "NSCameraUsageDescription": "AI நிரலாக்க உதவியாளருடனான அரட்டைகளில் நீங்கள் இணைக்கும் புகைப்படங்களை எடுக்க Kilo உங்கள் கேமராவைப் பயன்படுத்துகிறது. எடுத்துக்காட்டாக, ஒரு வடிவமைப்பின் புகைப்படத்தைப் பகிருங்கள், இதனால் அதைச் செயல்படுத்த உங்கள் உதவியாளர் உதவ முடியும்.",
+    "NSPhotoLibraryUsageDescription": "AI நிரலாக்க உதவியாளருடனான அரட்டைகளில் படங்களை இணைக்க Kilo உங்கள் புகைப்பட நூலகத்தைப் பயன்படுத்துகிறது. எடுத்துக்காட்டாக, ஒரு திரைப்பிடிப்பைப் பகிருங்கள், இதனால் பயனர் இடைமுகத்தில் உள்ள சிக்கலைச் சரிசெய்ய உங்கள் உதவியாளர் உதவ முடியும்.",
+    "NSLocalNetworkUsageDescription": "உருவாக்கப் பதிப்பைச் சோதிக்கும்போது உங்கள் கணினியில் உள்ள உருவாக்க சேவையகங்களுடன் இணைக்க Kilo உங்கள் உள்ளூர் நெட்வொர்க்கைப் பயன்படுத்துகிறது."
   },
   "te": {
     "NSMicrophoneUsageDescription": "మాటను టెక్స్ట్‌గా మార్చడానికి Kilo మీ మైక్రోఫోన్‌ను ఉపయోగించడానికి అనుమతించండి.",
     "NSSpeechRecognitionUsageDescription": "మీ ధ్వనిని టెక్స్ట్‌గా మార్చడానికి Kilo స్పీచ్ రికగ్నిషన్‌ను ఉపయోగించడానికి అనుమతించండి.",
     "NSFaceIDUsageDescription": "యాప్‌ను అన్‌లాక్ చేయడానికి Kilo Face IDని ఉపయోగించడానికి అనుమతించండి.",
     "NSLocationWhenInUseUsageDescription": "స్థానిక వాతావరణాన్ని సెటప్ చేయడానికి Kilo మీ స్థానాన్ని ఉపయోగించడానికి అనుమతించండి.",
-    "NSUserTrackingUsageDescription": "ఈ ఐడెంటిఫైయర్ ప్రకటన ప్రచారాల ప్రభావాన్ని కొలవడానికి ఉపయోగించబడుతుంది."
+    "NSUserTrackingUsageDescription": "ఈ ఐడెంటిఫైయర్ ప్రకటన ప్రచారాల ప్రభావాన్ని కొలవడానికి ఉపయోగించబడుతుంది.",
+    "NSCameraUsageDescription": "మీరు ఏఐ కోడింగ్ సహాయకుడితో చేసే చాట్‌లకు జోడించే ఫోటోలను తీయడానికి Kilo మీ కెమెరాను ఉపయోగిస్తుంది. ఉదాహరణకు, ఒక డిజైన్ ఫోటోను పంచుకోండి, తద్వారా మీ సహాయకుడు దాన్ని అమలు చేయడంలో సహాయపడగలడు.",
+    "NSPhotoLibraryUsageDescription": "ఏఐ కోడింగ్ సహాయకుడితో చేసే చాట్‌లకు చిత్రాలను జోడించడానికి Kilo మీ ఫోటో లైబ్రరీని ఉపయోగిస్తుంది. ఉదాహరణకు, ఒక స్క్రీన్‌షాట్‌ను పంచుకోండి, తద్వారా మీ సహాయకుడు వినియోగదారు ఇంటర్‌ఫేస్ సమస్యను పరిష్కరించడంలో సహాయపడగలడు.",
+    "NSLocalNetworkUsageDescription": "డెవలప్‌మెంట్ బిల్డ్‌ను పరీక్షించేటప్పుడు మీ కంప్యూటర్‌లోని డెవలప్‌మెంట్ సర్వర్‌లకు కనెక్ట్ కావడానికి Kilo మీ స్థానిక నెట్‌వర్క్‌ను ఉపయోగిస్తుంది."
   },
   "th": {
     "NSMicrophoneUsageDescription": "อนุญาตให้ Kilo ใช้ไมโครโฟนของคุณเพื่อเปลี่ยนคำพูดเป็นข้อความ",
     "NSSpeechRecognitionUsageDescription": "อนุญาตให้ Kilo ใช้การรู้จำเสียงเพื่อเปลี่ยนเสียงของคุณเป็นข้อความ",
     "NSFaceIDUsageDescription": "อนุญาตให้ Kilo ใช้ Face ID เพื่อปลดล็อกแอป",
     "NSLocationWhenInUseUsageDescription": "อนุญาตให้ Kilo ใช้ตำแหน่งของคุณเพื่อตั้งค่าสภาพอากาศในพื้นที่",
-    "NSUserTrackingUsageDescription": "ตัวระบุนี้ใช้เพื่อวัดประสิทธิภาพของแคมเปญโฆษณา"
+    "NSUserTrackingUsageDescription": "ตัวระบุนี้ใช้เพื่อวัดประสิทธิภาพของแคมเปญโฆษณา",
+    "NSCameraUsageDescription": "Kilo ใช้กล้องของคุณเพื่อถ่ายภาพที่คุณแนบในแชตกับผู้ช่วยเขียนโค้ด AI ตัวอย่างเช่น แชร์ภาพถ่ายของงานออกแบบเพื่อให้ผู้ช่วยของคุณช่วยนำงานออกแบบนั้นไปพัฒนาได้",
+    "NSPhotoLibraryUsageDescription": "Kilo ใช้คลังรูปภาพของคุณเพื่อแนบรูปภาพในแชตกับผู้ช่วยเขียนโค้ด AI ตัวอย่างเช่น แชร์ภาพหน้าจอเพื่อให้ผู้ช่วยของคุณช่วยแก้ปัญหาในส่วนติดต่อผู้ใช้ได้",
+    "NSLocalNetworkUsageDescription": "Kilo ใช้เครือข่ายภายในของคุณเพื่อเชื่อมต่อกับเซิร์ฟเวอร์สำหรับการพัฒนาบนคอมพิวเตอร์ของคุณเมื่อทดสอบบิลด์สำหรับการพัฒนา"
   },
   "tr": {
     "NSMicrophoneUsageDescription": "Kilo'nun konuşmayı metne dönüştürmek için mikrofonunuzu kullanmasına izin verin.",
     "NSSpeechRecognitionUsageDescription": "Kilo'nun sesinizi metne dönüştürmek için konuşma tanımayı kullanmasına izin verin.",
     "NSFaceIDUsageDescription": "Kilo'nun uygulamanın kilidini açmak için Face ID kullanmasına izin verin.",
     "NSLocationWhenInUseUsageDescription": "Yerel hava durumunu ayarlamak için Kilo uygulamasının konumunuzu kullanmasına izin verin.",
-    "NSUserTrackingUsageDescription": "Bu tanımlayıcı, reklam kampanyalarının etkinliğini ölçmek için kullanılır."
+    "NSUserTrackingUsageDescription": "Bu tanımlayıcı, reklam kampanyalarının etkinliğini ölçmek için kullanılır.",
+    "NSCameraUsageDescription": "Kilo, yapay zekâ kodlama asistanıyla sohbetlere eklediğiniz fotoğrafları çekmek için kameranızı kullanır. Örneğin, asistanınızın bir tasarımı hayata geçirmenize yardımcı olabilmesi için tasarımın fotoğrafını paylaşın.",
+    "NSPhotoLibraryUsageDescription": "Kilo, yapay zekâ kodlama asistanıyla sohbetlere görsel eklemek için fotoğraf arşivinizi kullanır. Örneğin, asistanınızın bir kullanıcı arayüzü sorununu düzeltmenize yardımcı olabilmesi için ekran görüntüsü paylaşın.",
+    "NSLocalNetworkUsageDescription": "Kilo, bir geliştirme derlemesini test ederken bilgisayarınızdaki geliştirme sunucularına bağlanmak için yerel ağınızı kullanır."
   },
   "uk": {
     "NSMicrophoneUsageDescription": "Дозвольте Kilo використовувати ваш мікрофон для перетворення мовлення на текст.",
     "NSSpeechRecognitionUsageDescription": "Дозвольте Kilo використовувати розпізнавання мовлення для перетворення вашого голосу на текст.",
     "NSFaceIDUsageDescription": "Дозвольте Kilo використовувати Face ID для розблокування програми.",
     "NSLocationWhenInUseUsageDescription": "Дозвольте Kilo використовувати ваше місцеположення для налаштування місцевої погоди.",
-    "NSUserTrackingUsageDescription": "Цей ідентифікатор використовується для вимірювання ефективності рекламних кампаній."
+    "NSUserTrackingUsageDescription": "Цей ідентифікатор використовується для вимірювання ефективності рекламних кампаній.",
+    "NSCameraUsageDescription": "Kilo використовує вашу камеру, щоб робити фотографії, які ви додаєте до чатів із ШІ-помічником із програмування. Наприклад, поділіться фотографією дизайну, щоб ваш помічник міг допомогти його реалізувати.",
+    "NSPhotoLibraryUsageDescription": "Kilo використовує вашу фототеку, щоб додавати зображення до чатів із ШІ-помічником із програмування. Наприклад, поділіться знімком екрана, щоб ваш помічник міг допомогти виправити проблему в інтерфейсі користувача.",
+    "NSLocalNetworkUsageDescription": "Kilo використовує вашу локальну мережу для підключення до серверів розробки на вашому комп’ютері під час тестування збірки для розробки."
   },
   "ur": {
     "NSMicrophoneUsageDescription": "Kilo کو اجازت دیں کہ وہ تقریر کو متن میں بدلنے کے لیے آپ کا مائیکروفون استعمال کرے۔",
     "NSSpeechRecognitionUsageDescription": "Kilo کو اجازت دیں کہ وہ آپ کی آواز کو متن میں بدلنے کے لیے تقریر کی شناخت استعمال کرے۔",
     "NSFaceIDUsageDescription": "Kilo کو اجازت دیں کہ وہ ایپ کو کھولنے کے لیے Face ID استعمال کرے۔",
     "NSLocationWhenInUseUsageDescription": "Kilo کو اجازت دیں کہ وہ مقامی موسم ترتیب دینے کے لیے آپ کا مقام استعمال کرے۔",
-    "NSUserTrackingUsageDescription": "یہ شناخت کنندہ اشتہاری مہمات کی تاثیر ماپنے کے لیے استعمال ہوتا ہے۔"
+    "NSUserTrackingUsageDescription": "یہ شناخت کنندہ اشتہاری مہمات کی تاثیر ماپنے کے لیے استعمال ہوتا ہے۔",
+    "NSCameraUsageDescription": "Kilo آپ کا کیمرا ایسی تصاویر لینے کے لیے استعمال کرتا ہے جو آپ اے آئی کوڈنگ معاون کے ساتھ چیٹس میں منسلک کرتے ہیں۔ مثال کے طور پر، کسی ڈیزائن کی تصویر شیئر کریں تاکہ آپ کا معاون اسے عملی شکل دینے میں مدد کر سکے۔",
+    "NSPhotoLibraryUsageDescription": "Kilo آپ کی فوٹو لائبریری اے آئی کوڈنگ معاون کے ساتھ چیٹس میں تصاویر منسلک کرنے کے لیے استعمال کرتا ہے۔ مثال کے طور پر، اسکرین شاٹ شیئر کریں تاکہ آپ کا معاون صارف انٹرفیس کے کسی مسئلے کو ٹھیک کرنے میں مدد کر سکے۔",
+    "NSLocalNetworkUsageDescription": "Kilo ڈیولپمنٹ بلڈ کی جانچ کرتے وقت آپ کے کمپیوٹر پر موجود ڈیولپمنٹ سرورز سے منسلک ہونے کے لیے آپ کا مقامی نیٹ ورک استعمال کرتا ہے۔"
   },
   "uz": {
     "NSMicrophoneUsageDescription": "Kiloga nutqni matnga aylantirish uchun mikrofondan foydalanishga ruxsat bering.",
     "NSSpeechRecognitionUsageDescription": "Kiloga ovozingizni matnga aylantirish uchun nutqni aniqlashdan foydalanishga ruxsat bering.",
     "NSFaceIDUsageDescription": "Kiloga ilovani qulfdan chiqarish uchun Face ID-dan foydalanishga ruxsat bering.",
     "NSLocationWhenInUseUsageDescription": "Mahalliy ob-havoni sozlash uchun Kiloga joylashuvingizdan foydalanishga ruxsat bering.",
-    "NSUserTrackingUsageDescription": "Bu identifikator reklama kampaniyalarining samaradorligini o'lchash uchun ishlatiladi."
+    "NSUserTrackingUsageDescription": "Bu identifikator reklama kampaniyalarining samaradorligini o'lchash uchun ishlatiladi.",
+    "NSCameraUsageDescription": "Kilo sunʼiy intellekt asosidagi dasturlash yordamchisi bilan chatlarga biriktiradigan suratlarni olish uchun kamerangizdan foydalanadi. Masalan, yordamchingiz dizaynni amalga oshirishga yordam bera olishi uchun uning suratini ulashing.",
+    "NSPhotoLibraryUsageDescription": "Kilo sunʼiy intellekt asosidagi dasturlash yordamchisi bilan chatlarga rasmlar biriktirish uchun foto kutubxonangizdan foydalanadi. Masalan, yordamchingiz foydalanuvchi interfeysidagi muammoni tuzatishga yordam bera olishi uchun skrinshot ulashing.",
+    "NSLocalNetworkUsageDescription": "Kilo ishlab chiqish uchun yigʻilgan versiyani sinashda kompyuteringizdagi ishlab chiqish serverlariga ulanish uchun mahalliy tarmogʻingizdan foydalanadi."
   },
   "vi": {
     "NSMicrophoneUsageDescription": "Cho phép Kilo sử dụng micrô của bạn để chuyển giọng nói thành văn bản.",
     "NSSpeechRecognitionUsageDescription": "Cho phép Kilo sử dụng nhận dạng giọng nói để chuyển giọng của bạn thành văn bản.",
     "NSFaceIDUsageDescription": "Cho phép Kilo sử dụng Face ID để mở khóa ứng dụng.",
     "NSLocationWhenInUseUsageDescription": "Cho phép Kilo sử dụng vị trí của bạn để thiết lập thời tiết địa phương.",
-    "NSUserTrackingUsageDescription": "Mã nhận dạng này được dùng để đo lường hiệu quả của các chiến dịch quảng cáo."
+    "NSUserTrackingUsageDescription": "Mã nhận dạng này được dùng để đo lường hiệu quả của các chiến dịch quảng cáo.",
+    "NSCameraUsageDescription": "Kilo sử dụng camera của bạn để chụp ảnh mà bạn đính kèm vào cuộc trò chuyện với trợ lý lập trình AI. Ví dụ, hãy chia sẻ ảnh chụp một thiết kế để trợ lý của bạn có thể giúp triển khai thiết kế đó.",
+    "NSPhotoLibraryUsageDescription": "Kilo sử dụng thư viện ảnh của bạn để đính kèm hình ảnh vào cuộc trò chuyện với trợ lý lập trình AI. Ví dụ, hãy chia sẻ ảnh chụp màn hình để trợ lý của bạn có thể giúp khắc phục vấn đề về giao diện người dùng.",
+    "NSLocalNetworkUsageDescription": "Kilo sử dụng mạng cục bộ của bạn để kết nối với các máy chủ phát triển trên máy tính của bạn khi kiểm thử bản dựng phát triển."
   },
   "yo": {
     "NSMicrophoneUsageDescription": "Gba Kilo laaye lati lo gbohungbohun rẹ lati yi ọrọ pada si ọrọ kikọ.",
     "NSSpeechRecognitionUsageDescription": "Gba Kilo laaye lati lo idanimọ ọrọ lati yi ohun rẹ pada si ọrọ kikọ.",
     "NSFaceIDUsageDescription": "Gba Kilo laaye lati lo Face ID lati ṣi app naa.",
     "NSLocationWhenInUseUsageDescription": "Gba Kilo laaye lati lo ipo rẹ lati ṣeto oju-ọjọ agbegbe.",
-    "NSUserTrackingUsageDescription": "A lo idanimọ yii lati wọn ipa ti awọn ipolongo ipolowo."
+    "NSUserTrackingUsageDescription": "A lo idanimọ yii lati wọn ipa ti awọn ipolongo ipolowo.",
+    "NSCameraUsageDescription": "Kilo ń lo kámẹ́rà rẹ láti ya àwọn fọ́tò tí o fi kún ìjíròrò pẹ̀lú olùrànlọ́wọ́ kíkọ kóòdù ti ọgbọ́n àtọwọ́dá. Fún àpẹẹrẹ, pín fọ́tò àpẹrẹ kan kí olùrànlọ́wọ́ rẹ lè ṣèrànwọ́ láti ṣe é ní kóòdù.",
+    "NSPhotoLibraryUsageDescription": "Kilo ń lo ibi ìkójọpọ̀ fọ́tò rẹ láti fi àwọn àwòrán kún ìjíròrò pẹ̀lú olùrànlọ́wọ́ kíkọ kóòdù ti ọgbọ́n àtọwọ́dá. Fún àpẹẹrẹ, pín àwòrán ojú ìbojú kí olùrànlọ́wọ́ rẹ lè ṣèrànwọ́ láti ṣàtúnṣe ìṣòro ní ojú ìṣàkóso oníṣe.",
+    "NSLocalNetworkUsageDescription": "Kilo ń lo nẹ́tíwọ́ọ̀kì agbègbè rẹ láti sopọ̀ mọ́ àwọn sáfà ìdàgbàsókè lórí kọ̀ǹpútà rẹ nígbà tí o bá ń dán ẹ̀yà ìdàgbàsókè wò."
   },
   "zh-Hans": {
     "NSMicrophoneUsageDescription": "允许 Kilo 使用你的麦克风将语音转换为文字。",
     "NSSpeechRecognitionUsageDescription": "允许 Kilo 使用语音识别将你的声音转换为文字。",
     "NSFaceIDUsageDescription": "允许 Kilo 使用 Face ID 解锁应用。",
     "NSLocationWhenInUseUsageDescription": "允许 Kilo 使用你的位置来设置本地天气。",
-    "NSUserTrackingUsageDescription": "此标识符用于衡量广告活动的效果。"
+    "NSUserTrackingUsageDescription": "此标识符用于衡量广告活动的效果。",
+    "NSCameraUsageDescription": "Kilo使用你的相机拍摄照片，以便你将照片附加到与AI编程助手的聊天中。例如，分享一张设计照片，让助手帮助你实现该设计。",
+    "NSPhotoLibraryUsageDescription": "Kilo使用你的照片图库，将图片附加到与AI编程助手的聊天中。例如，分享一张屏幕截图，让助手帮助你修复用户界面问题。",
+    "NSLocalNetworkUsageDescription": "Kilo在测试开发版本时使用你的本地网络，连接到你电脑上的开发服务器。"
   },
   "zh-Hant": {
     "NSMicrophoneUsageDescription": "允許 Kilo 使用你的麥克風將語音轉換為文字。",
     "NSSpeechRecognitionUsageDescription": "允許 Kilo 使用語音辨識將你的聲音轉換為文字。",
     "NSFaceIDUsageDescription": "允許 Kilo 使用 Face ID 解鎖應用程式。",
     "NSLocationWhenInUseUsageDescription": "允許 Kilo 使用你的位置來設定本地天氣。",
-    "NSUserTrackingUsageDescription": "此識別碼用於衡量廣告活動的成效。"
+    "NSUserTrackingUsageDescription": "此識別碼用於衡量廣告活動的成效。",
+    "NSCameraUsageDescription": "Kilo使用你的相機拍攝照片，讓你將照片附加到與AI程式設計助理的聊天中。例如，分享一張設計照片，讓助理協助你實作該設計。",
+    "NSPhotoLibraryUsageDescription": "Kilo使用你的照片圖庫，將圖片附加到與AI程式設計助理的聊天中。例如，分享一張螢幕截圖，讓助理協助你修正使用者介面問題。",
+    "NSLocalNetworkUsageDescription": "Kilo在測試開發版本時使用你的區域網路，連線到你電腦上的開發伺服器。"
   },
   "zu": {
     "NSMicrophoneUsageDescription": "Vumela i-Kilo ukuthi isebenzise imakrofoni yakho ukuguqula inkulumo ibe umbhalo.",
     "NSSpeechRecognitionUsageDescription": "Vumela i-Kilo ukuthi isebenzise ukubonwa kwenkulumo ukuguqula izwi lakho libe umbhalo.",
     "NSFaceIDUsageDescription": "Vumela i-Kilo ukuthi isebenzise i-Face ID ukuvula uhlelo lokusebenza.",
     "NSLocationWhenInUseUsageDescription": "Vumela i-Kilo ukuthi isebenzise indawo yakho ukusetha isimo sezulu sasendaweni.",
-    "NSUserTrackingUsageDescription": "Lesi sikhombisi sisetshenziselwa ukukala ukusebenza kahle kwemikhankaso yokukhangisa."
+    "NSUserTrackingUsageDescription": "Lesi sikhombisi sisetshenziselwa ukukala ukusebenza kahle kwemikhankaso yokukhangisa.",
+    "NSCameraUsageDescription": "I-Kilo isebenzisa ikhamera yakho ukuthatha izithombe ozinamathisela ezingxoxweni nomsizi wokubhala ikhodi osebenzisa ubuhlakani bokwenziwa. Isibonelo, yabelana ngesithombe somklamo ukuze umsizi wakho akusize ukuwusebenzisa.",
+    "NSPhotoLibraryUsageDescription": "I-Kilo isebenzisa umtapo wakho wezithombe ukunamathisela izithombe ezingxoxweni nomsizi wokubhala ikhodi osebenzisa ubuhlakani bokwenziwa. Isibonelo, yabelana ngesithombe-skrini ukuze umsizi wakho akusize ukulungisa inkinga kusixhumi esibonakalayo somsebenzisi.",
+    "NSLocalNetworkUsageDescription": "I-Kilo isebenzisa inethiwekhi yakho yasendaweni ukuxhuma kumaseva okuthuthukisa akukhompyutha yakho lapho uhlola inguqulo yokuthuthukisa."
   }
 }

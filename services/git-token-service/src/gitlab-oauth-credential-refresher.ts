@@ -13,6 +13,7 @@ import {
 } from './gitlab-credential-crypto.js';
 import type { GitLabOAuthCredentialRefresher as GitLabOAuthCredentialRefresherContract } from './gitlab-credential-service.js';
 import { normalizeGitLabInstanceUrl } from './gitlab-url.js';
+import { readBoundedJsonBody } from './lib/bounded-read.js';
 
 type Secret = SecretsStoreSecret | string | undefined;
 type GitLabOAuthCredentialRefresherEnv = GitLabCredentialCryptoEnv & {
@@ -64,7 +65,8 @@ async function resolveSecret(secret: Secret): Promise<string | null> {
 }
 
 async function readBoundedJson(response: Response): Promise<unknown> {
-  if (!response.body) throw new Error('invalid_response');
+  const stream = response.body;
+  if (!stream) throw new Error('invalid_response');
   const contentLength = response.headers.get('Content-Length');
   if (
     contentLength &&
@@ -72,31 +74,7 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   ) {
     throw new Error('invalid_response');
   }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_response');
-      totalBytes += chunk.value.byteLength;
-      if (totalBytes > MAX_REFRESH_RESPONSE_BYTES) {
-        await reader.cancel();
-        throw new Error('invalid_response');
-      }
-      chunks.push(chunk.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
+  return readBoundedJsonBody(stream, MAX_REFRESH_RESPONSE_BYTES);
 }
 
 function ownsParent(

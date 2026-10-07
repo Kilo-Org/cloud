@@ -822,23 +822,19 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return childRoots.get(kiloSessionId);
   }
 
-  /**
-   * The route whose runtime emitted an event. A per-session runtime key is its
-   * route's session id; a directory-shared key is the directory, resolved to
-   * the route with an active turn on that runtime. Descendants are attributed
-   * to this route so a reported parent in another worktree route cannot steal
-   * their events.
-   */
   function emittingRoute(event: KiloFeedEvent): TurnRoute | undefined {
     const key = event.runtimeKey;
     if (key === undefined) return undefined;
     const direct = routes.get(key);
     if (direct !== undefined) return direct;
+    let matched: TurnRoute | undefined;
     for (const turn of turns.values()) {
       const route = routes.get(turn.route.sessionId);
-      if (route !== undefined && route.runtimeKey === key) return route;
+      if (route === undefined || route.runtimeKey !== key) continue;
+      if (matched !== undefined) return undefined;
+      matched = route;
     }
-    return undefined;
+    return matched;
   }
 
   function onKiloError(turn: Turn, properties: Record<string, unknown>): void {

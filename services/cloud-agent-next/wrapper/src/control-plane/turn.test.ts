@@ -800,15 +800,14 @@ describe('turn resubmission', () => {
     const routeB = routeSpec({
       sessionId: 'workspace_b',
       kiloSessionId: 'ses_cccccccccccccccccccccccccc',
+      runtimeIsolation: 'per-session',
     });
     const h = createHarness();
-    h.registerRoute(routeSpec());
+    h.registerRoute(routeSpec({ runtimeIsolation: 'per-session' }));
     h.registerRoute(routeB);
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     h.manager.submit(routeB.sessionId, promptPayload('m2'));
     await settle();
-    // The subagent's reported parent names route A, but route B's runtime
-    // emitted the event (both routes share the worktree directory).
     h.manager.observeKiloEvent(
       kiloEvent(
         'session.created',
@@ -827,6 +826,61 @@ describe('turn resubmission', () => {
     const frames = h.frames.filter(frame => frame.type === 'session.events');
     expect(frames).toHaveLength(1);
     expect(frames[0]).toMatchObject({ sessionId: routeB.sessionId });
+  });
+
+  it('preserves the reported parent when sibling turns share a runtime', async () => {
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const routeB = routeSpec({
+      sessionId: 'workspace_b',
+      kiloSessionId: 'ses_cccccccccccccccccccccccccc',
+    });
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.registerRoute(routeB);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.submit(routeB.sessionId, promptPayload('m2'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'session.created',
+        { info: { id: childId, parentID: routeB.kiloSessionId } },
+        DIRECTORY
+      )
+    );
+    h.frames.length = 0;
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'message.updated',
+        { info: { id: 'child-message', sessionID: childId, role: 'assistant' } },
+        DIRECTORY
+      )
+    );
+    const frames = h.frames.filter(frame => frame.type === 'session.events');
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({ sessionId: routeB.sessionId });
+  });
+
+  it('attributes an unknown descendant to the only active turn in a shared runtime', async () => {
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.registerRoute(routeSpec({ sessionId: 'workspace_b', kiloSessionId: 'ses_other' }));
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: 'ses_unknown' } }, DIRECTORY)
+    );
+    h.frames.length = 0;
+    h.manager.observeKiloEvent(
+      kiloEvent(
+        'message.updated',
+        { info: { id: 'child-message', sessionID: childId, role: 'assistant' } },
+        DIRECTORY
+      )
+    );
+    const frames = h.frames.filter(frame => frame.type === 'session.events');
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({ sessionId: SESSION_ID });
   });
 
   it('fails agent_restarted after real tool progress', async () => {

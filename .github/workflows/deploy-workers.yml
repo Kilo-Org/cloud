@@ -49,7 +49,7 @@ jobs:
   deploy-manual:
     if: inputs.worker != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     name: Deploy ${{ inputs.worker }}
     environment: ${{ inputs.target_environment }}
     steps:
@@ -213,7 +213,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.matrix != '[]' && needs.detect-changes.outputs.matrix != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     environment: ${{ inputs.target_environment }}
     strategy:
       fail-fast: false

@@ -1018,9 +1018,6 @@ importers:
       '@pierre/diffs':
         specifier: 1.3.6
         version: 1.3.6(@shikijs/themes@4.4.3)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@qdrant/js-client-rest':
-        specifier: 1.17.0
-        version: 1.17.0(typescript@5.9.3)
       '@radix-ui/react-accordion':
         specifier: 1.2.12
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -7933,16 +7930,6 @@ packages:
 
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
-
-  '@qdrant/js-client-rest@1.17.0':
-    resolution: {integrity: sha512-aZFQeirWVqWAa1a8vJ957LMzcXkFHGbsoRhzc8AkGfg6V0jtK8PlG8/eyyc2xhYsR961FDDx1Tx6nyE0K7lS+A==}
-    engines: {node: '>=18.17.0', pnpm: '>=8'}
-    peerDependencies:
-      typescript: '>=4.7'
-
-  '@qdrant/openapi-typescript-fetch@1.2.6':
-    resolution: {integrity: sha512-oQG/FejNpItrxRHoyctYvT3rwGZOnK4jr3JdppO/c78ktDvkWiPXPHNsrDf33K9sZdRb6PR7gi4noIapu5q4HA==}
-    engines: {node: '>=18.0.0', pnpm: '>=8'}
 
   '@radix-ui/colors@3.0.0':
     resolution: {integrity: sha512-FUOsGBkHrYJwCSEtWRCIfQbZG7q1e6DgxCIOe1SUQzDe/7rXXeA47s8yCn6fuTNQAj1Zq4oTFi9Yjp3wzElcxg==}
@@ -25445,14 +25432,6 @@ snapshots:
   '@protobufjs/pool@1.1.0': {}
 
   '@protobufjs/utf8@1.1.1': {}
-
-  '@qdrant/js-client-rest@1.17.0(typescript@5.9.3)':
-    dependencies:
-      '@qdrant/openapi-typescript-fetch': 1.2.6
-      typescript: 5.9.3
-      undici: 6.28.1
-
-  '@qdrant/openapi-typescript-fetch@1.2.6': {}
 
   '@radix-ui/colors@3.0.0': {}
 

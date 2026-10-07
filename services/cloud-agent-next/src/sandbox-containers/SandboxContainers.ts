@@ -27,6 +27,7 @@ import {
 import {
   createRepoSnapshotIndex,
   repoSnapshotIndexKey,
+  repoSnapshotLogIdentity,
   type RepoSnapshotIndex,
 } from './repo-snapshot-index.js';
 import type { Env } from '../types.js';
@@ -168,12 +169,14 @@ type RepositoryCaptureOutcome = 'stored' | 'index_unavailable' | 'abandoned' | '
 function logRepositoryCapture(
   outcome: RepositoryCaptureOutcome,
   durationMs: number,
-  error?: unknown
+  error?: unknown,
+  identity?: { indexKey: string; image: string }
 ): void {
   const fields = logger.withFields({
     outcome,
     durationMs,
     ...(error === undefined ? {} : { error: error instanceof Error ? error.message : 'unknown' }),
+    ...(identity === undefined ? {} : repoSnapshotLogIdentity(identity.indexKey, identity.image)),
   });
   if (outcome === 'stored') fields.info('Repository snapshot captured');
   else fields.warn('Repository snapshot not saved');
@@ -399,22 +402,24 @@ export class SandboxContainers extends DurableObject<Env> {
       this.logSnapshotLookup('image', 'no_repo_key');
       return imageStart;
     }
-    const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
+    const image = this.containerImage();
+    const indexKey = await repoSnapshotIndexKey(input.repoKey, image);
+    const identity = repoSnapshotLogIdentity(indexKey, image);
     if (input.discardRepository === true) {
       await index.remove(indexKey);
-      this.logSnapshotLookup('image', 'discarded');
+      this.logSnapshotLookup('image', 'discarded', identity);
       return imageStart;
     }
     if (!allowRepository) {
-      this.logSnapshotLookup('image', 'not_allowed');
+      this.logSnapshotLookup('image', 'not_allowed', identity);
       return imageStart;
     }
     const entry = await index.lookup(indexKey);
     if (entry === null) {
-      this.logSnapshotLookup('image', 'index_miss');
+      this.logSnapshotLookup('image', 'index_miss', identity);
       return imageStart;
     }
-    this.logSnapshotLookup('repository', 'index_hit');
+    this.logSnapshotLookup('repository', 'index_hit', identity);
     return {
       source: 'repository',
       options: this.startOptions(
@@ -430,11 +435,16 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.ctx.id.name ?? this.ctx.id.toString();
   }
 
-  private logSnapshotLookup(source: ContainersStartSource, reason: string): void {
+  private logSnapshotLookup(
+    source: ContainersStartSource,
+    reason: string,
+    identity?: { indexKey: string; image: string }
+  ): void {
     logControlDiagnostic('snapshot_lookup', {
       sandboxId: this.sandboxNameForLog(),
       source,
       reason,
+      ...(identity ?? {}),
     });
   }
 
@@ -1105,12 +1115,16 @@ export class SandboxContainers extends DurableObject<Env> {
         logRepositoryCapture('abandoned', snapshotMs);
         return false;
       }
-      const key = await repoSnapshotIndexKey(repoKey, this.containerImage());
+      const image = this.containerImage();
+      const key = await repoSnapshotIndexKey(repoKey, image);
       const stored = await index.store(key, {
         snapshotId: snapshot.id,
         ...(commit === undefined ? {} : { commit }),
       });
-      logRepositoryCapture(stored ? 'stored' : 'index_unavailable', snapshotMs);
+      logRepositoryCapture(stored ? 'stored' : 'index_unavailable', snapshotMs, undefined, {
+        indexKey: key,
+        image,
+      });
       return stored;
     } catch (error) {
       logRepositoryCapture('failed', Date.now() - startedAt, error);

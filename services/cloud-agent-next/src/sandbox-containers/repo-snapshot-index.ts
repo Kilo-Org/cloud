@@ -32,6 +32,26 @@ export async function repoSnapshotIndexKey(repoKey: string, image: string): Prom
   return KEY_PREFIX + Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+const LOG_KEY_DIGEST_CHARS = 16;
+const LOG_IMAGE_MAX_CHARS = 96;
+
+/**
+ * The bounded, log-safe identity of an index key: a digest prefix to compare the
+ * store and lookup keys, plus the image, sanitized to the diagnostic charset so
+ * it survives `logControlDiagnostic` instead of being redacted. `repoKey` stays
+ * out of it; the digest prefix already stands in for the whole key.
+ */
+export function repoSnapshotLogIdentity(
+  indexKey: string,
+  image: string
+): { indexKey: string; image: string } {
+  const digest = indexKey.startsWith(KEY_PREFIX) ? indexKey.slice(KEY_PREFIX.length) : indexKey;
+  return {
+    indexKey: digest.slice(0, LOG_KEY_DIGEST_CHARS),
+    image: image.replace(/[^a-zA-Z0-9_.:-]+/g, '-').slice(0, LOG_IMAGE_MAX_CHARS),
+  };
+}
+
 /**
  * The repository snapshot index. Every operation is best effort: an unavailable
  * store is a miss, never a failed start, so a snapshot is an optimisation only.

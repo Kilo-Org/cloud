@@ -22,7 +22,7 @@ import {
   CONTROL_WRAPPER_LOG_PATH,
 } from '../sandbox-control/container-paths.js';
 import { logger } from '../logger.js';
-import { repoSnapshotIndexKey } from './repo-snapshot-index.js';
+import { repoSnapshotIndexKey, repoSnapshotLogIdentity } from './repo-snapshot-index.js';
 import {
   ContainersAllocationConflictError,
   SandboxContainers,
@@ -1931,6 +1931,25 @@ function launchFromRepo(instance: SandboxContainers, ref: string, extra = {}) {
     ...extra,
   });
 }
+
+describe('repository snapshot log identity', () => {
+  it('drops the namespace prefix and keeps a bounded, charset-safe pair', async () => {
+    const key = await indexKeyFor(REPO_KEY, IMAGE);
+    const identity = repoSnapshotLogIdentity(key, IMAGE);
+
+    expect(identity.indexKey).toMatch(/^[0-9a-f]{16}$/);
+    expect(identity.image).toBe('registry.example-kilo-app:test');
+    expect(identity.image).not.toContain('/');
+  });
+
+  it('is equal for the same key and image and differs for another image', async () => {
+    const key = await indexKeyFor(REPO_KEY, IMAGE);
+    const other = await indexKeyFor(REPO_KEY, 'registry.example/kilo/app:next');
+
+    expect(repoSnapshotLogIdentity(key, IMAGE)).toEqual(repoSnapshotLogIdentity(key, IMAGE));
+    expect(repoSnapshotLogIdentity(other, IMAGE)).not.toEqual(repoSnapshotLogIdentity(key, IMAGE));
+  });
+});
 
 describe('SandboxContainers repository snapshots', () => {
   it('starts from the repository snapshot stored for the repo key and the current image', async () => {

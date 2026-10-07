@@ -80,7 +80,6 @@ test('successful main CI selects the tested deployment SHA', () => {
     'run-migrations',
     'deploy-app',
     'deploy-global-app',
-    'deploy-workers',
   ]) {
     assert.match(staging.jobs[job].if, /should_deploy == 'true'/);
     assert.ok([staging.jobs[job].needs].flat().includes('check-changes'));
@@ -136,40 +135,26 @@ test('ai-gateway deploys only on demand, from the last completed release', () =>
   }
 });
 
-test('staging and production Worker changes use independent deployment baselines', () => {
-  assert.equal(workers.concurrency.group, 'deploy-workers-${{ inputs.target_environment }}');
-  assert.equal(
-    production.jobs['deploy-workers'].with.base_sha,
-    '${{ needs.check-changes.outputs.base_sha }}'
-  );
-  assert.equal(
-    staging.jobs['deploy-workers'].with.base_sha,
-    '${{ needs.check-changes.outputs.base_sha }}'
-  );
-  assert.equal(staging.jobs['deploy-workers'].with.target_environment, 'staging');
-  assert.equal(
-    staging.jobs['deploy-workers'].with.source_sha,
-    '${{ needs.check-changes.outputs.target_sha }}'
-  );
-  assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
-  const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
-  assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
-  assert.match(
-    detect.run,
-    /git diff --quiet "\$BASE_SHA" HEAD -- "\$dir\/" packages pnpm-lock\.yaml/
-  );
-  assert.equal(
-    production.jobs['deploy-kiloclaw'].if,
-    "needs.check-changes.outputs.deploy_kiloclaw == 'true'"
-  );
+test('Worker and KiloClaw deploys are manual-only via workflow_dispatch', () => {
+  const kiloclaw = workflow('deploy-kiloclaw');
+  const kiloMcpRelease = workflow('kilo-mcp-release');
+
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
   ]) {
+    for (const job of ['deploy-workers', 'deploy-kiloclaw', 'kilo-mcp-release']) {
+      assert.equal(
+        deployment.jobs[job],
+        undefined,
+        `${name} must not run ${job} on the schedule: dispatch it manually`
+      );
+    }
     assert.equal(deployment.jobs['record-deployment'].permissions.deployments, 'write');
-    assert.match(
+    assert.doesNotMatch(
       deployment.jobs['record-deployment'].if,
-      /needs\.deploy-workers\.result == 'success'/
+      /deploy-workers|deploy-kiloclaw/,
+      `${name} record-deployment must not wait on the manual deploy workflows`
     );
     assert.match(
       deployment.jobs['record-deployment'].steps[0].run,
@@ -180,6 +165,25 @@ test('staging and production Worker changes use independent deployment baselines
       '${{ needs.check-changes.outputs.target_sha }}'
     );
   }
+
+  assert.equal(workers.concurrency.group, 'deploy-workers-${{ inputs.target_environment }}');
+  for (const input of ['worker', 'base_sha', 'source_sha', 'target_environment']) {
+    assert.ok(
+      Object.hasOwn(workers.on.workflow_dispatch.inputs, input),
+      `deploy-workers workflow_dispatch needs the ${input} input`
+    );
+  }
+  assert.match(workers.jobs['deploy-manual'].if, /inputs.worker != ''/);
+  assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
+  const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
+  assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
+  assert.match(
+    detect.run,
+    /git diff --quiet "\$BASE_SHA" HEAD -- "\$dir\/" packages pnpm-lock\.yaml/
+  );
+
+  assert.ok(Object.hasOwn(kiloclaw.on.workflow_dispatch.inputs, 'source_sha'));
+  assert.ok(Object.hasOwn(kiloMcpRelease.on, 'workflow_dispatch'));
 });
 
 test('deployment gate only deploys changes since the last complete run', () => {

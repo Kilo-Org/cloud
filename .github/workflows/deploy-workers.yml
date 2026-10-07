@@ -1,11 +1,25 @@
 name: Deploy Cloudflare Workers
 
+# Manual-only deploy: run from the Actions tab. The scheduled production and
+# staging pipelines (deploy-production.yml, deploy-staging.yml) no longer call
+# this workflow.
 on:
   workflow_dispatch:
     inputs:
       worker:
-        description: 'Worker folder to deploy (e.g. services/app-builder)'
-        required: true
+        description: 'Worker folder to deploy (e.g. services/app-builder). Leave empty with base_sha set to deploy every worker changed since that SHA.'
+        required: false
+        default: ''
+        type: string
+      base_sha:
+        description: 'Base SHA to diff against when detecting changed workers (used when worker is empty)'
+        required: false
+        default: ''
+        type: string
+      source_sha:
+        description: 'Exact commit to deploy (defaults to the selected ref)'
+        required: false
+        default: ''
         type: string
       target_environment:
         description: 'Worker environment to deploy to'
@@ -165,7 +179,7 @@ jobs:
 
           # Workers excluded from this workflow (they have custom deploy pipelines):
           EXCLUDED=(
-            services/kiloclaw  # Docker-based deploy in deploy-production.yml
+            services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
             services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker

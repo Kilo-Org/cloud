@@ -11,10 +11,10 @@ queue.
 
 ## Deploy
 
-The existing `.github/workflows/deploy-workers.yml` discovers this service for
-production and staging deployments. To deploy it individually, dispatch that
-workflow with `worker: services/usage-ingest` and `target_environment: production`
-or `staging`.
+`.github/workflows/deploy-workers.yml` deploys this service. Worker deploys are
+manual: dispatch that workflow with `worker: services/usage-ingest` and
+`target_environment: production` or `staging`. Leaving `worker` empty and setting
+`base_sha` deploys every worker changed since that SHA instead.
 
 Wrangler 4.135.0 automatically provisions the configured producer queue if it
 does not already exist, then deploys the Worker with its `USAGE_INGEST_QUEUE` binding.

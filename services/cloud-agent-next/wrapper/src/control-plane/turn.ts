@@ -147,6 +147,16 @@ type TurnRoute = {
 
 type QueueState = 'ready' | 'queue' | 'unavailable';
 
+/** The client may wrap the fetch abort as the `cause` of its own error. */
+function isCancelledBy(error: unknown, signal: AbortSignal): boolean {
+  let current: unknown = error;
+  for (let depth = 0; signal.aborted && depth < 5 && current instanceof Error; depth++) {
+    if (current === signal.reason || current.name === 'AbortError') return true;
+    current = current.cause;
+  }
+  return false;
+}
+
 /** A prompt was received (and kept) but not yet handed to Kilo. */
 function hasUndispatchedPrompt(turn: Pick<Turn, 'prompts'>): boolean {
   return turn.prompts.some(entry => entry.dispatched !== true);
@@ -403,6 +413,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (!turn.inbox.includes(pending)) turn.inbox.push(pending);
       return;
     }
+    const dispatchSignal = pending.abort.signal;
     try {
       if (pending.payload.turn.type === 'prompt') {
         if (message === undefined) throw new Error('Prompt attachments were not materialized');
@@ -449,6 +460,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
         });
       }
     } catch (error) {
+      // A restart cancels the retired dispatch and resubmits the batch; that
+      // cancellation must not fail the resubmitted turn.
+      if (!isCurrent() && isCancelledBy(error, dispatchSignal)) return;
       if (runtime.isRetiredClient(client) && isKiloServerUnreachableError(error)) return;
       throw error;
     }

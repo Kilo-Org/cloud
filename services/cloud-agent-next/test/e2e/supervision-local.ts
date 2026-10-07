@@ -62,6 +62,7 @@ const config: DriverConfig = {
   githubRepo: 'na2-org/hi-how-are-you',
   skipBalanceCheck: false,
 };
+await mkdir(path.dirname(outputDirectory), { recursive: true, mode: 0o700 });
 await mkdir(outputDirectory, { mode: 0o700 });
 const startedAt = Date.now();
 const signal = AbortSignal.timeout(45 * 60_000);

@@ -75,6 +75,8 @@ type Session = {
   parentID?: string;
   revision: number;
   roles: Map<string, string>;
+  /** Assistant messages Kilo reported complete; snapshots need not re-read them. */
+  completed: Set<string>;
   execution?: Execution;
 };
 
@@ -101,7 +103,15 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       options.onObservationFailure('activity_capacity');
       throw new Error('Session activity capacity exceeded');
     }
-    const next: Session = { id, directory, revision, roles: new Map() };
+    // A native event stamps its own revision. A snapshot-only session has none, so
+    // unrelated feed events during the read cannot fence it out of reconciliation.
+    const next: Session = {
+      id,
+      directory,
+      revision: -1,
+      roles: new Map(),
+      completed: new Set(),
+    };
     sessions.set(id, next);
     return next;
   }
@@ -134,7 +144,18 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
   function finish(record: Session): void {
     record.execution = undefined;
     record.roles.clear();
+    record.completed.clear();
     if (snapshot !== undefined) tombstones.set(record.id, revision);
+  }
+
+  function remember(record: Session, id: string, role: string, completed: boolean): boolean {
+    if (record.roles.size >= MAX_MESSAGE_ROLES && !record.roles.has(id)) {
+      options.onObservationFailure('activity_capacity');
+      return false;
+    }
+    record.roles.set(id, role);
+    if (completed) record.completed.add(id);
+    return true;
   }
 
   function prune(): void {
@@ -331,11 +352,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       typeof info?.id === 'string' &&
       typeof info.role === 'string'
     ) {
-      if (record.roles.size >= MAX_MESSAGE_ROLES && !record.roles.has(info.id)) {
-        options.onObservationFailure('activity_capacity');
-        return;
-      }
-      record.roles.set(info.id, info.role);
+      const time = isRecord(info.time) ? info.time : {};
+      if (!remember(record, info.id, info.role, time.completed !== undefined)) return;
     } else if (event.type === 'message.part.updated') {
       if (observePart(record, properties.part) !== 'unchanged') progress(record);
     } else if (
@@ -396,7 +414,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
     try {
       for (const item of observations) {
         if (
-          (tombstones.get(item.id) ?? -1) > observedThrough ||
+          // finish() tombstones at the current revision without advancing it.
+          (tombstones.get(item.id) ?? -1) >= observedThrough ||
           (sessions.get(item.id)?.revision ?? -1) > observedThrough
         )
           continue;
@@ -423,7 +442,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
         execution.interactions = new Map(item.interactions.map(request => [request.id, request]));
         const partIds = new Set<string>();
         for (const message of item.messages) {
-          record.roles.set(message.info.id, message.info.role);
+          const { id, role, time } = message.info;
+          if (!remember(record, id, role, time?.completed !== undefined)) return;
           for (const part of message.parts) {
             if (isRecord(part) && typeof part.id === 'string') partIds.add(part.id);
             const change = observePart(record, part);
@@ -542,6 +562,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
               {
                 id: record.id,
                 directory: record.directory,
+                // Only in-flight messages: re-reading completed history makes every
+                // snapshot slower as a long execution accumulates steps.
                 messageIds: [
                   ...new Set([
                     ...[...record.execution.parts.values()].map(part => part.messageID),
@@ -549,7 +571,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
                       role === 'assistant' ? [id] : []
                     ),
                   ]),
-                ],
+                ].filter(id => !record.completed.has(id)),
               },
             ]
           : []

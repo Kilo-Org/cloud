@@ -56,6 +56,7 @@ type PromptCall = {
   prompt?: string;
   parts?: unknown[];
   model?: { providerID?: string; modelID: string };
+  signal?: AbortSignal;
 };
 type SummaryCall = { sessionId: string; model: { modelID: string }; auto?: boolean };
 type CommandCall = { sessionId: string; command: string; messageId?: string; args?: string };
@@ -631,6 +632,39 @@ describe('turn resubmission', () => {
       ]);
     }
   );
+
+  it('resubmits a prompt whose in-flight dispatch the restart cancelled, without prompt_failed', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    h.client(spec).setPromptImpl(
+      opts =>
+        new Promise<void>((_resolve, reject) => {
+          opts.signal?.addEventListener(
+            'abort',
+            () => reject(new Error('Async prompt failed', { cause: opts.signal?.reason })),
+            { once: true }
+          );
+        })
+    );
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.retireClient(spec);
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(h.client(spec).prompts.map(call => call.messageId)).toEqual(['m1']);
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([
+      {
+        type: 'session.outcome',
+        sessionId: SESSION_ID,
+        status: 'completed',
+        lastMessageId: 'm1',
+      },
+    ]);
+  });
 
   it.each(['hang', 'credentials'] as const)(
     'does not spend recovery on the first dispatch of a prompt received during %s restart',

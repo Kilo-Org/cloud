@@ -159,7 +159,7 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       port: 0,
       fetch(request) {
         query = new URL(request.url);
-        header = request.headers.get('x-opencode-directory');
+        header = request.headers.get('x-kilo-directory');
         return Response.json([
           {
             id: 'ses_child',

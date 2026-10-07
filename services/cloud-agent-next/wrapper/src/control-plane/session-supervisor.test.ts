@@ -304,6 +304,62 @@ describe('native session supervision', () => {
     expect(f.supervisor.state('root')?.activity).toBe('running');
   });
 
+  it('applies a snapshot-only session although another session emitted events during the read', () => {
+    const f = fixture();
+    f.open('other');
+    const token = f.supervisor.beginSnapshot();
+    f.text('other');
+    f.supervisor.reconcile([observation('unrouted')], token);
+    expect(f.supervisor.state('unrouted')?.activity).toBe('running');
+  });
+
+  it('a busy snapshot read before cancellation was confirmed cannot resurrect the execution', async () => {
+    const f = fixture();
+    f.open();
+    f.advance(20 * MINUTE);
+    f.supervisor.tick();
+    const token = f.supervisor.beginSnapshot();
+    await f.confirmed();
+    f.supervisor.reconcile([observation()], token);
+    expect(f.supervisor.state('root')).toBeUndefined();
+    expect(f.supervisor.needsCompute()).toBe(false);
+  });
+
+  it('asks snapshots to re-read only in-flight assistant messages and bounds snapshot roles', () => {
+    const f = fixture();
+    f.open();
+    f.event('message.updated', {
+      info: {
+        id: 'done',
+        sessionID: 'root',
+        role: 'assistant',
+        time: { created: 1, completed: 2 },
+      },
+    });
+    const completed = (id: string) => ({
+      info: { id, role: 'assistant', time: { created: 1, completed: 2 } },
+      parts: [{ id: `${id}-text`, messageID: id, type: 'text', text: 'old' }],
+    });
+    f.supervisor.reconcile(
+      [{ ...observation(), messages: [completed('history')] }],
+      f.supervisor.beginSnapshot()
+    );
+    expect(f.supervisor.observedSessions()).toEqual([
+      { id: 'root', directory: '/workspace', messageIds: ['assistant-root'] },
+    ]);
+    expect(f.recovery).toEqual([]);
+    f.supervisor.reconcile(
+      [
+        {
+          ...observation(),
+          messages: Array.from({ length: 1_000 }, (_, index) => completed(`m${index}`)),
+        },
+      ],
+      f.supervisor.beginSnapshot()
+    );
+    expect(f.recovery).toEqual(['activity_capacity']);
+  });
+
   it('new progress recovered after a feed gap counts once; old or empty text never resets the deadline', () => {
     const f = fixture();
     f.open();

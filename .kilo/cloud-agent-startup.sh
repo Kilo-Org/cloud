@@ -25,7 +25,7 @@ if (( EUID != 0 )); then
   root=(sudo -n)
 fi
 
-"${root[@]}" apt-get update
+"${root[@]}" timeout --foreground 5m apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
 docker_packages=(docker.io)
 for package in docker-cli docker-buildx; do
   if apt-cache show "$package" >/dev/null 2>&1; then
@@ -37,7 +37,7 @@ if apt-cache show docker-compose-v2 >/dev/null 2>&1; then
 else
   docker_packages+=(docker-compose)
 fi
-"${root[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+"${root[@]}" env DEBIAN_FRONTEND=noninteractive timeout --foreground 10m apt-get install -y --no-install-recommends \
   ca-certificates chromium curl git git-lfs openssl sudo unzip tmux "${docker_packages[@]}"
 
 if ! command -v node >/dev/null || [[ $(node -p 'process.versions.node.split(".")[0]') != 24 ]]; then
@@ -105,7 +105,7 @@ if (!stdinDockerfile) {
   process.stdin.on('end', () => {
     const cert = fs.readFileSync(process.env.NODE_EXTRA_CA_CERTS).toString('base64');
     // Trust the sandbox's HTTPS interception CA inside development images, not production sources.
-    const trust = `RUN mkdir -p /usr/local/share/ca-certificates && printf '%s' '${cert}' | base64 -d > /usr/local/share/ca-certificates/kilo-sandbox.crt && (command -v update-ca-certificates || (apt-get update && apt-get install -y --no-install-recommends ca-certificates)) && update-ca-certificates\nENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/kilo-sandbox.crt`;
+    const trust = `RUN mkdir -p /usr/local/share/ca-certificates && printf '%s' '${cert}' | base64 -d > /usr/local/share/ca-certificates/kilo-sandbox.crt && (if command -v apt-get >/dev/null; then printf 'Acquire::http::Timeout "30";\\nAcquire::https::Timeout "30";\\nAcquire::Retries "2";\\n' > /etc/apt/apt.conf.d/99-kilo-startup-timeouts; fi) && (command -v update-ca-certificates || (apt-get update && apt-get install -y --no-install-recommends ca-certificates)) && update-ca-certificates\nENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/kilo-sandbox.crt`;
     dockerfile = dockerfile.replace(/^FROM (?:docker.io\/library\/)?(docker:dind-rootless|debian:trixie-slim)([^\n]*)/gm,
       (_, image, suffix) => `FROM mirror.gcr.io/library/${image}${suffix}\nUSER root\n${trust}`);
     dockerfile = dockerfile.replace(/^FROM (?:docker.io\/)?cloudflare\/sandbox:[^\n]+/m, from =>
@@ -126,7 +126,7 @@ if tmux list-sessions >/dev/null 2>&1; then
   fi
 fi
 
-pnpm install --frozen-lockfile
+timeout --foreground 15m pnpm install --frozen-lockfile
 if [[ ! -s .env.local ]]; then
   (umask 077; pnpm dev:setup-env --ci)
   printf 'Created local-only credentials. Real payment, model, and Git integrations require supplied secrets.\n'
@@ -164,10 +164,11 @@ if node -e 'process.exit(JSON.parse(process.argv[1]).services.length ? 0 : 1)' "
   fi
   printf 'Reusing this sandbox startup script\x27s existing dev stack.\n'
 else
-  pnpm dev:start --no-attach "$@"
+  timeout --foreground 5m pnpm dev:start --no-attach "$@"
   printf '%s\n' "$selection" > .wrangler/kilo-startup/selection
 fi
-pnpm test:db
+printf 'Preparing the local database (up to 5 minutes).\n'
+timeout --foreground 5m pnpm test:db
 
 web_port=$(node -e '
   const fs = require("node:fs");
@@ -192,6 +193,7 @@ if [[ $ready != true ]]; then
 fi
 
 if node -e 'const m = require("./dev/logs/manifest.json"); process.exit(m.services.some(s => s.name === "cloud-agent-next") ? 0 : 1)'; then
+  printf 'Waiting for Cloud Agent images (up to 15 minutes). Build output: dev/logs/cloud-agent-next.log\n'
   ready=false
   for (( attempt=0; attempt<450; attempt++ )); do
     if grep -Fq 'Container image(s) ready' dev/logs/cloud-agent-next.log; then
@@ -201,6 +203,9 @@ if node -e 'const m = require("./dev/logs/manifest.json"); process.exit(m.servic
     if grep -Fq '[ERROR]' dev/logs/cloud-agent-next.log; then
       printf 'Cloud Agent image preparation failed. See dev/logs/cloud-agent-next.log.\n' >&2
       exit 1
+    fi
+    if (( attempt > 0 && attempt % 30 == 0 )); then
+      printf 'Cloud Agent image preparation is still running (%s seconds).\n' "$(( attempt * 2 ))"
     fi
     sleep 2
   done

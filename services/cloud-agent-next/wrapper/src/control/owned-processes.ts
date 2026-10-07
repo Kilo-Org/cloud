@@ -43,6 +43,7 @@ import {
   CGROUP_FS_MAGIC,
   classifyWorkloadMembers,
   createWorkloadReporter,
+  decideWorkloadStatsEmission,
   KILO_OOM_SCORE_ADJ,
   readWorkloadStats,
   TOOL_OOM_SCORE_ADJ,
@@ -52,6 +53,7 @@ import {
   writeOomScoreAdj,
   type WorkloadPlacement,
   type WorkloadProcessEntry,
+  type WorkloadStatsEmissionState,
 } from './workload-cgroup.js';
 
 export type DirectProcessState = 'absent' | 'reused' | 'alive' | 'unknown';
@@ -643,6 +645,10 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
   let sweeping = false;
   let lastOomKills = 0;
   let lastOomGroupKills = 0;
+  let statsEmission: WorkloadStatsEmissionState = {
+    lastEmittedAtMs: 0,
+    highPressure: false,
+  };
   const children = new Set<OwnedChild>();
   const baseline = new Set<string>();
   const observations = new Set<Deadline>();
@@ -750,6 +756,14 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           serverOomKills: serverStats.oomKills,
         });
       }
+      const decision = decideWorkloadStatsEmission({
+        nowMs: Date.now(),
+        stats,
+        limitBytes: activePlacement?.aggregateMaxBytes,
+        state: statsEmission,
+      });
+      statsEmission = decision.state;
+      if (!decision.emit) return;
       workloadReporter?.emit(scopeId, {
         phase: 'completed',
         workloadPhase: 'stats',

@@ -31,6 +31,13 @@ export const KILO_SERVER_HEADROOM_BYTES = 1536 * 1024 * 1024;
 export const MIN_WORKLOAD_CAP_BYTES = 1024 * 1024 * 1024;
 export const WORKLOAD_CPU_WEIGHT = 50;
 export const WORKLOAD_SWEEP_INTERVAL_MS = 1000;
+/**
+ * Stats are observation only, so they sample far slower than the containment
+ * sweep. The sweep still runs every second to migrate new processes; emitting
+ * its monotonic cpu/io/memory counters at that rate floods the diagnostic stream.
+ */
+export const WORKLOAD_STATS_INTERVAL_MS = 30_000;
+export const WORKLOAD_MEMORY_PRESSURE_FRACTION = 0.9;
 export const WORKLOAD_PARENT_NAME = 'kilo-workloads';
 export const WORKLOAD_SERVER_NAME = 'server';
 export const WORKLOAD_TOOLS_NAME = 'tools';
@@ -104,6 +111,82 @@ export type WorkloadStats = {
   ioReadBytes?: number;
   ioWriteBytes?: number;
 };
+
+export type WorkloadStatsEmissionState = {
+  lastEmittedAtMs: number;
+  lastThrottleCount?: number;
+  lastMemoryMaxEvents?: number;
+  lastMemoryOomEvents?: number;
+  highPressure: boolean;
+};
+
+export type WorkloadStatsEmissionReason =
+  | 'interval'
+  | 'throttle_increase'
+  | 'memory_events'
+  | 'memory_pressure'
+  | 'none';
+
+export type WorkloadStatsEmissionDecision = {
+  emit: boolean;
+  reason: WorkloadStatsEmissionReason;
+  state: WorkloadStatsEmissionState;
+};
+
+/**
+ * Periodic stats are capped to `WORKLOAD_STATS_INTERVAL_MS`, but an actionable
+ * change (a new throttle or memory-event counter, or the first crossing into
+ * high memory pressure) emits immediately so the signal is not delayed to the
+ * next sample. Emission baselines advance only when a record is emitted, so an
+ * increase observed between samples still surfaces on the next decision.
+ */
+export function decideWorkloadStatsEmission(input: {
+  nowMs: number;
+  stats: WorkloadStats;
+  limitBytes?: number;
+  state: WorkloadStatsEmissionState;
+}): WorkloadStatsEmissionDecision {
+  const { nowMs, stats, limitBytes, state } = input;
+  const highPressure =
+    limitBytes !== undefined &&
+    stats.currentBytes !== undefined &&
+    stats.currentBytes >= limitBytes * WORKLOAD_MEMORY_PRESSURE_FRACTION;
+  const throttleIncreased =
+    stats.cpuThrottleCount !== undefined &&
+    state.lastThrottleCount !== undefined &&
+    stats.cpuThrottleCount > state.lastThrottleCount;
+  const memoryEventsIncreased =
+    (stats.memoryMaxEvents !== undefined &&
+      state.lastMemoryMaxEvents !== undefined &&
+      stats.memoryMaxEvents > state.lastMemoryMaxEvents) ||
+    (stats.memoryOomEvents !== undefined &&
+      state.lastMemoryOomEvents !== undefined &&
+      stats.memoryOomEvents > state.lastMemoryOomEvents);
+  const reason: WorkloadStatsEmissionReason =
+    nowMs - state.lastEmittedAtMs >= WORKLOAD_STATS_INTERVAL_MS
+      ? 'interval'
+      : throttleIncreased
+        ? 'throttle_increase'
+        : memoryEventsIncreased
+          ? 'memory_events'
+          : highPressure && !state.highPressure
+            ? 'memory_pressure'
+            : 'none';
+  if (reason === 'none') {
+    return { emit: false, reason, state: { ...state, highPressure } };
+  }
+  return {
+    emit: true,
+    reason,
+    state: {
+      lastEmittedAtMs: nowMs,
+      lastThrottleCount: stats.cpuThrottleCount,
+      lastMemoryMaxEvents: stats.memoryMaxEvents,
+      lastMemoryOomEvents: stats.memoryOomEvents,
+      highPressure,
+    },
+  };
+}
 
 export class WorkloadUnavailableError extends Error {
   constructor(readonly failure: WorkloadFailure) {

@@ -4,9 +4,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   decideWorkloadStatsEmission,
+  formatWorkloadOutOfMemoryReason,
   readWorkloadStats,
+  WORKLOAD_AT_CAP_FRACTION,
   WORKLOAD_MEMORY_PRESSURE_FRACTION,
   WORKLOAD_STATS_INTERVAL_MS,
+  type WorkloadSnapshot,
   type WorkloadStats,
   type WorkloadStatsEmissionState,
 } from './workload-cgroup.js';
@@ -29,6 +32,10 @@ describe('readWorkloadStats', () => {
       'max 4\noom 2\noom_kill 1\noom_group_kill 0\n'
     );
     writeFileSync(
+      path.join(directory, 'memory.stat'),
+      'anon 700\nfile 300\nshmem 50\ninactive_file 200\n'
+    );
+    writeFileSync(
       path.join(directory, 'memory.pressure'),
       'some avg10=0 total=50\nfull avg10=0 total=20\n'
     );
@@ -44,10 +51,14 @@ describe('readWorkloadStats', () => {
     expect(readWorkloadStats(directory)).toEqual({
       currentBytes: 1024,
       peakBytes: 2048,
+      anonBytes: 700,
+      fileBytes: 300,
+      shmemBytes: 50,
       memoryMaxEvents: 4,
       memoryOomEvents: 2,
       oomKills: 1,
       oomGroupKills: 0,
+      pressureAvailable: true,
       pressureSomeTotal: 50,
       pressureFullTotal: 20,
       cpuUsageUsec: 900,
@@ -57,10 +68,23 @@ describe('readWorkloadStats', () => {
       ioWriteBytes: 240,
     });
   });
+
+  it('reports absent PSI as unavailable and omits the split without memory.stat', () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'workload-stats-'));
+    directories.push(directory);
+    writeFileSync(path.join(directory, 'memory.current'), '512\n');
+
+    expect(readWorkloadStats(directory)).toEqual({
+      currentBytes: 512,
+      oomKills: 0,
+      oomGroupKills: 0,
+      pressureAvailable: false,
+    });
+  });
 });
 
 describe('decideWorkloadStatsEmission', () => {
-  const baseStats: WorkloadStats = { oomKills: 0, oomGroupKills: 0 };
+  const baseStats: WorkloadStats = { oomKills: 0, oomGroupKills: 0, pressureAvailable: false };
   const emitted: WorkloadStatsEmissionState = {
     lastEmittedAtMs: 1_000_000,
     lastThrottleCount: 0,
@@ -138,5 +162,47 @@ describe('decideWorkloadStatsEmission', () => {
       state: emitted,
     });
     expect(decision).toMatchObject({ emit: false, reason: 'none' });
+  });
+});
+
+describe('formatWorkloadOutOfMemoryReason', () => {
+  const gib = 1024 ** 3;
+  const snapshot: WorkloadSnapshot = {
+    aggregateMaxBytes: 11 * gib,
+    toolsMaxBytes: 8 * gib,
+    containerLimitBytes: 12 * gib,
+    currentBytes: 11 * gib,
+    pressureAvailable: false,
+    oomKills: 0,
+    oomGroupKills: 0,
+    toolOomKills: 0,
+    serverOomKills: 0,
+  };
+
+  it('names the exhausted range when the group is at its cap', () => {
+    expect(formatWorkloadOutOfMemoryReason(snapshot)).toBe('sandbox out of memory: 11.0/11.0 GiB');
+  });
+
+  it('treats the cap threshold as exhausted and steps just below it as not', () => {
+    const max = 1000;
+    const atThreshold: WorkloadSnapshot = {
+      ...snapshot,
+      aggregateMaxBytes: max,
+      currentBytes: Math.ceil(max * WORKLOAD_AT_CAP_FRACTION),
+    };
+    expect(formatWorkloadOutOfMemoryReason(atThreshold)).toContain('sandbox out of memory:');
+    expect(
+      formatWorkloadOutOfMemoryReason({
+        ...atThreshold,
+        currentBytes: Math.floor(max * WORKLOAD_AT_CAP_FRACTION) - 1,
+      })
+    ).toBeUndefined();
+  });
+
+  it('returns no reason below the cap or without a reading', () => {
+    expect(formatWorkloadOutOfMemoryReason({ ...snapshot, currentBytes: 5 * gib })).toBeUndefined();
+    expect(
+      formatWorkloadOutOfMemoryReason({ ...snapshot, currentBytes: undefined })
+    ).toBeUndefined();
   });
 });

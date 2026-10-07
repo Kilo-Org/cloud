@@ -86,12 +86,14 @@ export type WorkloadPlacement = {
   cpuController: boolean;
   sweepIntervalMs: number;
   report?: ControlDiagnosticReporter;
+  onSnapshot?: (snapshot: WorkloadSnapshot) => void;
 };
 
 export type ControlWorkload = {
   enabled: boolean;
   placement?: WorkloadPlacement;
   failure?: WorkloadFailure;
+  latestSnapshot?: () => WorkloadSnapshot | undefined;
 };
 
 export type WorkloadProcessEntry = { pid: number; ppid: number; argv: string[] };
@@ -99,10 +101,15 @@ export type WorkloadProcessEntry = { pid: number; ppid: number; argv: string[] }
 export type WorkloadStats = {
   currentBytes?: number;
   peakBytes?: number;
+  anonBytes?: number;
+  fileBytes?: number;
+  shmemBytes?: number;
   memoryMaxEvents?: number;
   memoryOomEvents?: number;
   oomKills: number;
   oomGroupKills: number;
+  /** Whether the kernel exposes cgroup v2 `memory.pressure` (PSI). */
+  pressureAvailable: boolean;
   pressureSomeTotal?: number;
   pressureFullTotal?: number;
   cpuUsageUsec?: number;
@@ -111,6 +118,52 @@ export type WorkloadStats = {
   ioReadBytes?: number;
   ioWriteBytes?: number;
 };
+
+/**
+ * The last observed workload state for one scope. Unlike an emitted stats
+ * record it is updated on every sweep, so a restart decision made between
+ * samples still sees the current attribution.
+ */
+export type WorkloadSnapshot = {
+  scopeId?: string;
+  aggregateMaxBytes: number;
+  toolsMaxBytes: number;
+  containerLimitBytes: number;
+  currentBytes?: number;
+  peakBytes?: number;
+  anonBytes?: number;
+  fileBytes?: number;
+  shmemBytes?: number;
+  toolCurrentBytes?: number;
+  toolPeakBytes?: number;
+  serverCurrentBytes?: number;
+  serverPeakBytes?: number;
+  pressureAvailable: boolean;
+  memoryMaxEvents?: number;
+  memoryOomEvents?: number;
+  oomKills: number;
+  oomGroupKills: number;
+  toolOomKills: number;
+  serverOomKills: number;
+};
+
+/**
+ * A workload at this share of its cap is treated as memory-exhausted: the group
+ * cannot grow further without reclaim, so a restart at this point is attributed
+ * to the user's workload rather than an unexplained platform fault.
+ */
+export const WORKLOAD_AT_CAP_FRACTION = 0.95;
+
+function gibibytes(bytes: number): string {
+  return (bytes / 1024 ** 3).toFixed(1);
+}
+
+export function formatWorkloadOutOfMemoryReason(snapshot: WorkloadSnapshot): string | undefined {
+  const current = snapshot.currentBytes;
+  if (current === undefined) return undefined;
+  if (current < snapshot.aggregateMaxBytes * WORKLOAD_AT_CAP_FRACTION) return undefined;
+  return `sandbox out of memory: ${gibibytes(current)}/${gibibytes(snapshot.aggregateMaxBytes)} GiB`;
+}
 
 export type WorkloadStatsEmissionState = {
   lastEmittedAtMs: number;
@@ -235,19 +288,27 @@ export function createWorkloadReporter(report?: ControlDiagnosticReporter): Work
         fields.serverOomKills ?? '',
         fields.currentBytes ?? '',
         fields.peakBytes ?? '',
-        fields.pressureSomeTotal ?? '',
-        fields.pressureFullTotal ?? '',
+        fields.anonBytes ?? '',
+        fields.fileBytes ?? '',
+        fields.shmemBytes ?? '',
         fields.memoryMaxEvents ?? '',
         fields.memoryOomEvents ?? '',
+        fields.pressureSomeTotal ?? '',
+        fields.pressureFullTotal ?? '',
         fields.cpuUsageUsec ?? '',
         fields.cpuThrottledUsec ?? '',
         fields.cpuThrottleCount ?? '',
         fields.ioReadBytes ?? '',
         fields.ioWriteBytes ?? '',
+        fields.toolCurrentBytes ?? '',
+        fields.toolPeakBytes ?? '',
+        fields.serverCurrentBytes ?? '',
+        fields.serverPeakBytes ?? '',
         fields.toolCpuUsageUsec ?? '',
         fields.serverCpuUsageUsec ?? '',
         fields.toolIoReadBytes ?? '',
         fields.toolIoWriteBytes ?? '',
+        fields.pressureAvailable ?? '',
         fields.toolCount ?? '',
         fields.serverCount ?? '',
         fields.migratedCount ?? '',
@@ -365,11 +426,12 @@ export function parsePressureTotal(
 }
 
 export function readWorkloadStats(reference: string): WorkloadStats {
-  const stats: WorkloadStats = { oomKills: 0, oomGroupKills: 0 };
+  const stats: WorkloadStats = { oomKills: 0, oomGroupKills: 0, pressureAvailable: false };
   const current = readControl(path.join(reference, 'memory.current'));
   const peak = readControl(path.join(reference, 'memory.peak'));
   const pressure = readControl(path.join(reference, 'memory.pressure'));
   const events = readControl(path.join(reference, 'memory.events'));
+  const memoryStat = readControl(path.join(reference, 'memory.stat'));
   const cpu = readControl(path.join(reference, 'cpu.stat'));
   const io = readControl(path.join(reference, 'io.stat'));
   if (current.ok) {
@@ -380,10 +442,21 @@ export function readWorkloadStats(reference: string): WorkloadStats {
     const parsed = Number.parseInt(peak.text.trim(), 10);
     if (Number.isSafeInteger(parsed) && parsed >= 0) stats.peakBytes = parsed;
   }
+  stats.pressureAvailable = pressure.ok;
   const some = parsePressureTotal(pressure.ok ? pressure.text : undefined, 'some');
   const full = parsePressureTotal(pressure.ok ? pressure.text : undefined, 'full');
   if (some !== undefined) stats.pressureSomeTotal = some;
   if (full !== undefined) stats.pressureFullTotal = full;
+  if (memoryStat.ok) {
+    for (const line of memoryStat.text.split('\n')) {
+      const [key, value] = line.trim().split(/\s+/);
+      const parsed = Number.parseInt(value ?? '', 10);
+      if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+      if (key === 'anon') stats.anonBytes = parsed;
+      if (key === 'file') stats.fileBytes = parsed;
+      if (key === 'shmem') stats.shmemBytes = parsed;
+    }
+  }
   if (events.ok) {
     for (const line of events.text.split('\n')) {
       const [key, value] = line.trim().split(/\s+/);
@@ -658,6 +731,7 @@ function probeWorkloadParent(input: {
   };
   handlePath: (descriptor: number, directory: string) => string;
   report?: ControlDiagnosticReporter;
+  onSnapshot?: (snapshot: WorkloadSnapshot) => void;
 }): ProbeResult {
   const parentDirectory = path.join(input.usable.directory, WORKLOAD_PARENT_NAME);
   let parentFd: number | undefined;
@@ -765,6 +839,7 @@ function probeWorkloadParent(input: {
       cpuController,
       sweepIntervalMs: WORKLOAD_SWEEP_INTERVAL_MS,
       ...(input.report ? { report: input.report } : {}),
+      ...(input.onSnapshot ? { onSnapshot: input.onSnapshot } : {}),
     };
     retained = true;
     return { ok: true, placement };
@@ -873,6 +948,7 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
   const platform = options.platform ?? process.platform;
   const enabled = env[CONTROL_WORKLOAD_CGROUP_ENV] !== '0';
   const reporter = createWorkloadReporter(options.report);
+  let latestSnapshot: WorkloadSnapshot | undefined;
   if (platform !== 'linux') {
     if (!enabled) return { enabled: false };
     reporter.emit(undefined, {
@@ -973,6 +1049,9 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
     budget,
     handlePath,
     ...(options.report ? { report: options.report } : {}),
+    onSnapshot: snapshot => {
+      latestSnapshot = snapshot;
+    },
   });
   if (!probe.ok) {
     reporter.emit(undefined, {
@@ -996,7 +1075,11 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
     siblingProtection: false,
     workloadLimitSource: budget.source,
   });
-  return { enabled: true, placement: probe.placement };
+  return {
+    enabled: true,
+    placement: probe.placement,
+    latestSnapshot: () => latestSnapshot,
+  };
 }
 
 export function applyManagedWorkloadLimits(input: {

@@ -13,7 +13,12 @@ import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timer
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
-import { admitControlWorkload, type ControlWorkload } from '../control/workload-cgroup.js';
+import {
+  admitControlWorkload,
+  formatWorkloadOutOfMemoryReason,
+  type ControlWorkload,
+  type WorkloadSnapshot,
+} from '../control/workload-cgroup.js';
 import {
   createKiloEventFeed,
   type KiloEventFeed,
@@ -154,6 +159,7 @@ export type KiloRestartInfo = {
   directory: string;
   reason: KiloRestartReason;
   interruptedExecutions?: ExecutionIdentity[];
+  outcomeReason?: string;
 };
 
 /**
@@ -263,6 +269,11 @@ export type KiloRuntimeOptions = {
   readSnapshot?: typeof readSessionSnapshot;
   /** Fired after Kilo comes back with a fresh process; B8 hands over busy turns. */
   onRestart?: (info: KiloRestartInfo) => void;
+  /**
+   * The latest workload stats snapshot, used to attribute a restart to the
+   * user's workload (memory exhausted) instead of an unexplained fault.
+   */
+  latestWorkloadSnapshot?: () => WorkloadSnapshot | undefined;
   /** Fired once when the 3-in-10-minutes budget is spent (spec §7 "Kilo supervision"). */
   onUnavailable?: (directory: string) => void;
   scheduler?: KiloRuntimeScheduler;
@@ -884,6 +895,10 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const interruptedExecutions =
       activity?.executions().filter(execution => execution.activity !== 'stopping') ?? [];
     phase = 'restarting';
+    const restartWorkload =
+      reason !== 'credentials' ? options.latestWorkloadSnapshot?.() : undefined;
+    const outcomeReason =
+      restartWorkload !== undefined ? formatWorkloadOutOfMemoryReason(restartWorkload) : undefined;
     let diagnostic = '';
     if (reason !== 'credentials') {
       const observation = trigger === 'health_probe_false' ? healthObservation : undefined;
@@ -905,6 +920,20 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         sseSilenceMs: bound(silence),
         sseSilenceClamped: bound(silence) !== silence,
         reconnectCount: Math.min(6, reconnects.length),
+        ...(trigger === 'health_probe_false' && restartWorkload !== undefined
+          ? {
+              workload: {
+                currentBytes: restartWorkload.currentBytes,
+                aggregateMaxBytes: restartWorkload.aggregateMaxBytes,
+                anonBytes: restartWorkload.anonBytes,
+                fileBytes: restartWorkload.fileBytes,
+                shmemBytes: restartWorkload.shmemBytes,
+                toolCurrentBytes: restartWorkload.toolCurrentBytes,
+                serverCurrentBytes: restartWorkload.serverCurrentBytes,
+                pressureAvailable: restartWorkload.pressureAvailable,
+              },
+            }
+          : {}),
       })}`;
     }
     log(
@@ -961,7 +990,12 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       });
     }
     try {
-      options.onRestart?.({ directory: options.directory, reason, interruptedExecutions });
+      options.onRestart?.({
+        directory: options.directory,
+        reason,
+        interruptedExecutions,
+        ...(outcomeReason === undefined ? {} : { outcomeReason }),
+      });
     } catch (error) {
       log(
         `control-plane kilo restart handler failed directory=${options.directory} error=${

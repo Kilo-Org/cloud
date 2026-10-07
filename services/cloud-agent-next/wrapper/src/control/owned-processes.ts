@@ -744,6 +744,40 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       const stats = readWorkloadStats(group.reference);
       const toolStats = readWorkloadStats(managed.toolsReference);
       const serverStats = readWorkloadStats(managed.serverReference);
+      if (placement !== undefined) {
+        placement.onSnapshot?.({
+          scopeId,
+          aggregateMaxBytes: placement.aggregateMaxBytes,
+          toolsMaxBytes: placement.toolsMaxBytes,
+          containerLimitBytes: placement.containerLimitBytes,
+          oomKills: stats.oomKills,
+          oomGroupKills: stats.oomGroupKills,
+          toolOomKills: toolStats.oomKills,
+          serverOomKills: serverStats.oomKills,
+          pressureAvailable: stats.pressureAvailable,
+          ...(stats.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
+          ...(stats.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
+          ...(stats.anonBytes !== undefined ? { anonBytes: stats.anonBytes } : {}),
+          ...(stats.fileBytes !== undefined ? { fileBytes: stats.fileBytes } : {}),
+          ...(stats.shmemBytes !== undefined ? { shmemBytes: stats.shmemBytes } : {}),
+          ...(toolStats.currentBytes !== undefined
+            ? { toolCurrentBytes: toolStats.currentBytes }
+            : {}),
+          ...(toolStats.peakBytes !== undefined ? { toolPeakBytes: toolStats.peakBytes } : {}),
+          ...(serverStats.currentBytes !== undefined
+            ? { serverCurrentBytes: serverStats.currentBytes }
+            : {}),
+          ...(serverStats.peakBytes !== undefined
+            ? { serverPeakBytes: serverStats.peakBytes }
+            : {}),
+          ...(stats.memoryMaxEvents !== undefined
+            ? { memoryMaxEvents: stats.memoryMaxEvents }
+            : {}),
+          ...(stats.memoryOomEvents !== undefined
+            ? { memoryOomEvents: stats.memoryOomEvents }
+            : {}),
+        });
+      }
       if (stats.oomKills > lastOomKills || stats.oomGroupKills > lastOomGroupKills) {
         lastOomKills = Math.max(lastOomKills, stats.oomKills);
         lastOomGroupKills = Math.max(lastOomGroupKills, stats.oomGroupKills);
@@ -777,6 +811,10 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         cpuController: managed.cpuController,
         ...(stats.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
         ...(stats.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
+        ...(stats.anonBytes !== undefined ? { anonBytes: stats.anonBytes } : {}),
+        ...(stats.fileBytes !== undefined ? { fileBytes: stats.fileBytes } : {}),
+        ...(stats.shmemBytes !== undefined ? { shmemBytes: stats.shmemBytes } : {}),
+        pressureAvailable: stats.pressureAvailable,
         ...(stats.pressureSomeTotal !== undefined
           ? { pressureSomeTotal: stats.pressureSomeTotal }
           : {}),
@@ -804,6 +842,14 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         ...(toolStats.ioWriteBytes !== undefined
           ? { toolIoWriteBytes: toolStats.ioWriteBytes }
           : {}),
+        ...(toolStats.currentBytes !== undefined
+          ? { toolCurrentBytes: toolStats.currentBytes }
+          : {}),
+        ...(toolStats.peakBytes !== undefined ? { toolPeakBytes: toolStats.peakBytes } : {}),
+        ...(serverStats.currentBytes !== undefined
+          ? { serverCurrentBytes: serverStats.currentBytes }
+          : {}),
+        ...(serverStats.peakBytes !== undefined ? { serverPeakBytes: serverStats.peakBytes } : {}),
       });
     } catch {
       workloadReporter?.emit(path.basename(group.directory), {

@@ -934,6 +934,30 @@ describe('turn resubmission', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'agent_restarted' });
   });
 
+  it('reports the runtime-supplied memory reason instead of agent_restarted', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const client = h.client(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: KILO_SESSION, messageID: 'assistant-1', type: 'tool', tool: 'bash' },
+      })
+    );
+    h.manager.onRuntimeRestart({
+      directory: DIRECTORY,
+      reason: 'hang',
+      key: DIRECTORY,
+      outcomeReason: 'sandbox out of memory: 11.0/11.0 GiB',
+    });
+    await settle();
+    expect(client.prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      reason: 'sandbox out of memory: 11.0/11.0 GiB',
+    });
+  });
+
   it('resubmits only the restarted per-session runtime, not its sibling', async () => {
     const h = createHarness();
     const specA = routeSpec({

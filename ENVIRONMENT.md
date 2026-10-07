@@ -288,6 +288,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
   - Deploy Bouncer first with `enforcement.signup=false` and `enforcement.signupJa4=false`; all signup enforcement ships off. The existing `enforcement.signup` switch governs IP rejection, and `enforcement.signupJa4` independently governs JA4 rejection. The global `enforcement.enabled` switch gates both; no production switch is changed by deployment.
   - Bouncer evaluates IP first and skips JA4 if IP rejects. It counts admissions, including failed creations: an IP admission remains counted if JA4 later rejects, just as it remains counted after a later Cloud transaction or Stripe failure. There are no refunds. Stable operation IDs deduplicate each bucket independently. Limits and window lengths are configurable in the Bouncer admin panel.
   - Historical import counts completed accounts for IP only; never reconstruct historical signup JA4 from usage or payment fingerprints. JA4 coverage starts with live signup reports.
+  - If the IP is valid, missing or invalid JA4 does not skip IP admission. JA4 enforcement requires a valid fingerprint.
   - Deploy the first integration PR fully before this ownership cutover. Its existing Cloud limiter protects the historical import.
   - From this checked-out cutover branch, run `pnpm --filter web script:run db import-signup-history` with the production script environment.
   - The importer reads completed accounts from the last 30 days through a fixed time bound in 100-row pages. It changes no Cloud users.

@@ -940,6 +940,7 @@ describe('turn resubmission', () => {
     const client = h.client(routeSpec());
     h.manager.submit(SESSION_ID, promptPayload('m1'));
     await settle();
+    h.setState(KILO_SESSION, runningState);
     h.manager.observeKiloEvent(
       kiloEvent('message.part.updated', {
         part: { sessionID: KILO_SESSION, messageID: 'assistant-1', type: 'tool', tool: 'bash' },
@@ -949,13 +950,11 @@ describe('turn resubmission', () => {
       directory: DIRECTORY,
       reason: 'hang',
       key: DIRECTORY,
-      outcomeReason: 'sandbox out of memory: 11.0/11.0 GiB',
+      outcomeReason: 'sandbox_out_of_memory',
     });
     await settle();
     expect(client.prompts).toHaveLength(1);
-    expect(outcomeFrames(h.frames)[0]).toMatchObject({
-      reason: 'sandbox out of memory: 11.0/11.0 GiB',
-    });
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'sandbox_out_of_memory' });
   });
 
   it('resubmits only the restarted per-session runtime, not its sibling', async () => {

@@ -4,10 +4,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   decideWorkloadStatsEmission,
-  formatWorkloadOutOfMemoryReason,
+  isWorkloadAtCap,
   readWorkloadStats,
   WORKLOAD_AT_CAP_FRACTION,
   WORKLOAD_MEMORY_PRESSURE_FRACTION,
+  WORKLOAD_MEMORY_PRESSURE_RELEASE_FRACTION,
+  WORKLOAD_STATS_EVENT_COOLDOWN_MS,
   WORKLOAD_STATS_INTERVAL_MS,
   type WorkloadSnapshot,
   type WorkloadStats,
@@ -118,16 +120,39 @@ describe('decideWorkloadStatsEmission', () => {
 
   it('emits as soon as a throttle counter increases', () => {
     const decision = decideWorkloadStatsEmission({
-      nowMs: emitted.lastEmittedAtMs + 1000,
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS,
       stats: { ...baseStats, cpuThrottleCount: 4 },
       state: emitted,
     });
     expect(decision).toMatchObject({ emit: true, reason: 'throttle_increase' });
   });
 
+  it('holds immediate triggers to the cooldown under sustained pressure', () => {
+    const first = decideWorkloadStatsEmission({
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS,
+      stats: { ...baseStats, cpuThrottleCount: 4 },
+      state: emitted,
+    });
+    expect(first).toMatchObject({ emit: true, reason: 'throttle_increase' });
+
+    const tooSoon = decideWorkloadStatsEmission({
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS + 1000,
+      stats: { ...baseStats, cpuThrottleCount: 9 },
+      state: first.state,
+    });
+    expect(tooSoon).toMatchObject({ emit: false, reason: 'none' });
+
+    const later = decideWorkloadStatsEmission({
+      nowMs: emitted.lastEmittedAtMs + 2 * WORKLOAD_STATS_EVENT_COOLDOWN_MS,
+      stats: { ...baseStats, cpuThrottleCount: 9 },
+      state: tooSoon.state,
+    });
+    expect(later).toMatchObject({ emit: true, reason: 'throttle_increase' });
+  });
+
   it('emits as soon as a memory-event counter increases', () => {
     const decision = decideWorkloadStatsEmission({
-      nowMs: emitted.lastEmittedAtMs + 1000,
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS,
       stats: { ...baseStats, memoryMaxEvents: 2 },
       state: emitted,
     });
@@ -138,7 +163,7 @@ describe('decideWorkloadStatsEmission', () => {
     const limitBytes = 1_000_000;
     const pressured = Math.ceil(limitBytes * WORKLOAD_MEMORY_PRESSURE_FRACTION);
     const crossed = decideWorkloadStatsEmission({
-      nowMs: emitted.lastEmittedAtMs + 1000,
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS,
       stats: { ...baseStats, currentBytes: pressured },
       limitBytes,
       state: emitted,
@@ -147,17 +172,42 @@ describe('decideWorkloadStatsEmission', () => {
     expect(crossed.state.highPressure).toBe(true);
 
     const held = decideWorkloadStatsEmission({
-      nowMs: emitted.lastEmittedAtMs + 2000,
+      nowMs: emitted.lastEmittedAtMs + 2 * WORKLOAD_STATS_EVENT_COOLDOWN_MS,
       stats: { ...baseStats, currentBytes: pressured + 1000 },
       limitBytes,
       state: crossed.state,
     });
     expect(held).toMatchObject({ emit: false, reason: 'none' });
+    expect(held.state.highPressure).toBe(true);
+  });
+
+  it('releases pressure only below the release fraction before it can re-arm', () => {
+    const limitBytes = 1_000_000;
+    const pressured = Math.ceil(limitBytes * WORKLOAD_MEMORY_PRESSURE_FRACTION);
+    const released = Math.floor(limitBytes * WORKLOAD_MEMORY_PRESSURE_RELEASE_FRACTION) - 1;
+    const latched: WorkloadStatsEmissionState = { ...emitted, highPressure: true };
+
+    const below = decideWorkloadStatsEmission({
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS,
+      stats: { ...baseStats, currentBytes: released },
+      limitBytes,
+      state: latched,
+    });
+    expect(below).toMatchObject({ emit: false, reason: 'none' });
+    expect(below.state.highPressure).toBe(false);
+
+    const rearmed = decideWorkloadStatsEmission({
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS,
+      stats: { ...baseStats, currentBytes: pressured },
+      limitBytes,
+      state: below.state,
+    });
+    expect(rearmed).toMatchObject({ emit: true, reason: 'memory_pressure' });
   });
 
   it('does not treat elevated memory as pressure without a known limit', () => {
     const decision = decideWorkloadStatsEmission({
-      nowMs: emitted.lastEmittedAtMs + 1000,
+      nowMs: emitted.lastEmittedAtMs + WORKLOAD_STATS_EVENT_COOLDOWN_MS,
       stats: { ...baseStats, currentBytes: Number.MAX_SAFE_INTEGER },
       state: emitted,
     });
@@ -165,7 +215,7 @@ describe('decideWorkloadStatsEmission', () => {
   });
 });
 
-describe('formatWorkloadOutOfMemoryReason', () => {
+describe('isWorkloadAtCap', () => {
   const gib = 1024 ** 3;
   const snapshot: WorkloadSnapshot = {
     aggregateMaxBytes: 11 * gib,
@@ -179,8 +229,8 @@ describe('formatWorkloadOutOfMemoryReason', () => {
     serverOomKills: 0,
   };
 
-  it('names the exhausted range when the group is at its cap', () => {
-    expect(formatWorkloadOutOfMemoryReason(snapshot)).toBe('sandbox out of memory: 11.0/11.0 GiB');
+  it('treats the group at its cap as exhausted', () => {
+    expect(isWorkloadAtCap(snapshot)).toBe(true);
   });
 
   it('treats the cap threshold as exhausted and steps just below it as not', () => {
@@ -190,19 +240,17 @@ describe('formatWorkloadOutOfMemoryReason', () => {
       aggregateMaxBytes: max,
       currentBytes: Math.ceil(max * WORKLOAD_AT_CAP_FRACTION),
     };
-    expect(formatWorkloadOutOfMemoryReason(atThreshold)).toContain('sandbox out of memory:');
+    expect(isWorkloadAtCap(atThreshold)).toBe(true);
     expect(
-      formatWorkloadOutOfMemoryReason({
+      isWorkloadAtCap({
         ...atThreshold,
         currentBytes: Math.floor(max * WORKLOAD_AT_CAP_FRACTION) - 1,
       })
-    ).toBeUndefined();
+    ).toBe(false);
   });
 
-  it('returns no reason below the cap or without a reading', () => {
-    expect(formatWorkloadOutOfMemoryReason({ ...snapshot, currentBytes: 5 * gib })).toBeUndefined();
-    expect(
-      formatWorkloadOutOfMemoryReason({ ...snapshot, currentBytes: undefined })
-    ).toBeUndefined();
+  it('is false below the cap or without a reading', () => {
+    expect(isWorkloadAtCap({ ...snapshot, currentBytes: 5 * gib })).toBe(false);
+    expect(isWorkloadAtCap({ ...snapshot, currentBytes: undefined })).toBe(false);
   });
 });

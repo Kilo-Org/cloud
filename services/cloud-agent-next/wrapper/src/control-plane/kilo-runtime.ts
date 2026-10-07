@@ -15,7 +15,7 @@ import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owne
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
   admitControlWorkload,
-  formatWorkloadOutOfMemoryReason,
+  isWorkloadAtCap,
   type ControlWorkload,
   type WorkloadSnapshot,
 } from '../control/workload-cgroup.js';
@@ -270,8 +270,8 @@ export type KiloRuntimeOptions = {
   /** Fired after Kilo comes back with a fresh process; B8 hands over busy turns. */
   onRestart?: (info: KiloRestartInfo) => void;
   /**
-   * The latest workload stats snapshot, used to attribute a restart to the
-   * user's workload (memory exhausted) instead of an unexplained fault.
+   * Overrides the workload snapshot source. Production reads the runtime's own
+   * process scope; tests that cannot spawn one inject a snapshot here.
    */
   latestWorkloadSnapshot?: () => WorkloadSnapshot | undefined;
   /** Fired once when the 3-in-10-minutes budget is spent (spec §7 "Kilo supervision"). */
@@ -489,6 +489,11 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       }));
 
   let kiloProcess: KiloProcess | undefined;
+  let latestScope: OwnedProcessScope | undefined;
+  // This runtime's own scope, never a sibling's: a restart must be attributed to
+  // the memory this runtime's Kilo and tools actually used.
+  const latestWorkloadSnapshot = (): WorkloadSnapshot | undefined =>
+    latestScope?.latestSnapshot() ?? options.latestWorkloadSnapshot?.();
   let pidfilePath: string | undefined;
   let client: WrapperKiloClient | undefined;
   let feed: KiloEventFeed | undefined;
@@ -771,6 +776,9 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         env,
         signal: controller.signal,
         ...(options.workload ? { workload: options.workload } : {}),
+        onProcessScope: scope => {
+          latestScope = scope;
+        },
       });
     } catch (error) {
       clearTimeout(deadline);
@@ -895,10 +903,11 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const interruptedExecutions =
       activity?.executions().filter(execution => execution.activity !== 'stopping') ?? [];
     phase = 'restarting';
-    const restartWorkload =
-      reason !== 'credentials' ? options.latestWorkloadSnapshot?.() : undefined;
+    const restartWorkload = trigger === 'health_probe_false' ? latestWorkloadSnapshot() : undefined;
     const outcomeReason =
-      restartWorkload !== undefined ? formatWorkloadOutOfMemoryReason(restartWorkload) : undefined;
+      restartWorkload !== undefined && isWorkloadAtCap(restartWorkload)
+        ? ('sandbox_out_of_memory' as const)
+        : undefined;
     let diagnostic = '';
     if (reason !== 'credentials') {
       const observation = trigger === 'health_probe_false' ? healthObservation : undefined;

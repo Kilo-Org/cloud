@@ -53,6 +53,7 @@ import {
   writeOomScoreAdj,
   type WorkloadPlacement,
   type WorkloadProcessEntry,
+  type WorkloadSnapshot,
   type WorkloadStatsEmissionState,
 } from './workload-cgroup.js';
 
@@ -77,6 +78,7 @@ export type OwnedProcessScope = {
   captureBaseline(allowed: (argv: string[]) => boolean, deadlineAt?: number): Promise<void>;
   verify(baseline?: boolean, deadlineAt?: number): Promise<boolean>;
   stop(deadlineAt: number): Promise<boolean>;
+  latestSnapshot(): WorkloadSnapshot | undefined;
 };
 
 type ProcessIdentity = {
@@ -649,6 +651,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
     lastEmittedAtMs: 0,
     highPressure: false,
   };
+  let workloadSnapshot: WorkloadSnapshot | undefined;
   const children = new Set<OwnedChild>();
   const baseline = new Set<string>();
   const observations = new Set<Deadline>();
@@ -745,7 +748,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       const toolStats = readWorkloadStats(managed.toolsReference);
       const serverStats = readWorkloadStats(managed.serverReference);
       if (placement !== undefined) {
-        placement.onSnapshot?.({
+        workloadSnapshot = {
           scopeId,
           aggregateMaxBytes: placement.aggregateMaxBytes,
           toolsMaxBytes: placement.toolsMaxBytes,
@@ -776,7 +779,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           ...(stats.memoryOomEvents !== undefined
             ? { memoryOomEvents: stats.memoryOomEvents }
             : {}),
-        });
+        };
       }
       if (stats.oomKills > lastOomKills || stats.oomGroupKills > lastOomGroupKills) {
         lastOomKills = Math.max(lastOomKills, stats.oomKills);
@@ -1111,6 +1114,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
     },
     run: operation => current.run(scope, operation),
     observesOccupancy: occupancyObservable,
+    latestSnapshot: () => workloadSnapshot,
     seal() {
       sealed = true;
     },

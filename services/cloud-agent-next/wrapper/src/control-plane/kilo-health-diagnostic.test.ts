@@ -663,7 +663,7 @@ describe('default SDK health diagnostics', () => {
         pressureAvailable: true,
       });
       expect(test.restartInfos).toEqual([
-        { reason: 'hang', outcomeReason: 'sandbox out of memory: 11.0/11.0 GiB' },
+        { reason: 'hang', outcomeReason: 'sandbox_out_of_memory' },
       ]);
     } finally {
       await test.runtime.shutdown();

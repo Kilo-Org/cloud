@@ -37,7 +37,20 @@ export const WORKLOAD_SWEEP_INTERVAL_MS = 1000;
  * its monotonic cpu/io/memory counters at that rate floods the diagnostic stream.
  */
 export const WORKLOAD_STATS_INTERVAL_MS = 30_000;
+/**
+ * Bounds the immediate triggers (throttle/memory-event increases, first
+ * pressure crossing). Those counters are monotonic and can increase on
+ * consecutive one-second sweeps, so without a cooldown a scope parked at its
+ * limit would emit on almost every sweep.
+ */
+export const WORKLOAD_STATS_EVENT_COOLDOWN_MS = 10_000;
 export const WORKLOAD_MEMORY_PRESSURE_FRACTION = 0.9;
+/**
+ * Pressure latches at `WORKLOAD_MEMORY_PRESSURE_FRACTION` and only releases
+ * below this fraction, so `memory.current` oscillating around the threshold
+ * cannot re-arm the trigger every sweep.
+ */
+export const WORKLOAD_MEMORY_PRESSURE_RELEASE_FRACTION = 0.8;
 export const WORKLOAD_PARENT_NAME = 'kilo-workloads';
 export const WORKLOAD_SERVER_NAME = 'server';
 export const WORKLOAD_TOOLS_NAME = 'tools';
@@ -86,14 +99,12 @@ export type WorkloadPlacement = {
   cpuController: boolean;
   sweepIntervalMs: number;
   report?: ControlDiagnosticReporter;
-  onSnapshot?: (snapshot: WorkloadSnapshot) => void;
 };
 
 export type ControlWorkload = {
   enabled: boolean;
   placement?: WorkloadPlacement;
   failure?: WorkloadFailure;
-  latestSnapshot?: () => WorkloadSnapshot | undefined;
 };
 
 export type WorkloadProcessEntry = { pid: number; ppid: number; argv: string[] };
@@ -154,15 +165,10 @@ export type WorkloadSnapshot = {
  */
 export const WORKLOAD_AT_CAP_FRACTION = 0.95;
 
-function gibibytes(bytes: number): string {
-  return (bytes / 1024 ** 3).toFixed(1);
-}
-
-export function formatWorkloadOutOfMemoryReason(snapshot: WorkloadSnapshot): string | undefined {
+export function isWorkloadAtCap(snapshot: WorkloadSnapshot): boolean {
   const current = snapshot.currentBytes;
-  if (current === undefined) return undefined;
-  if (current < snapshot.aggregateMaxBytes * WORKLOAD_AT_CAP_FRACTION) return undefined;
-  return `sandbox out of memory: ${gibibytes(current)}/${gibibytes(snapshot.aggregateMaxBytes)} GiB`;
+  if (current === undefined) return false;
+  return current >= snapshot.aggregateMaxBytes * WORKLOAD_AT_CAP_FRACTION;
 }
 
 export type WorkloadStatsEmissionState = {
@@ -189,9 +195,11 @@ export type WorkloadStatsEmissionDecision = {
 /**
  * Periodic stats are capped to `WORKLOAD_STATS_INTERVAL_MS`, but an actionable
  * change (a new throttle or memory-event counter, or the first crossing into
- * high memory pressure) emits immediately so the signal is not delayed to the
- * next sample. Emission baselines advance only when a record is emitted, so an
- * increase observed between samples still surfaces on the next decision.
+ * high memory pressure) emits sooner so the signal is not delayed to the next
+ * sample. Immediate emissions share `WORKLOAD_STATS_EVENT_COOLDOWN_MS` because
+ * the underlying counters are monotonic and would otherwise fire on every
+ * one-second sweep. Emission baselines advance only when a record is emitted,
+ * so an increase observed between samples still surfaces on the next decision.
  */
 export function decideWorkloadStatsEmission(input: {
   nowMs: number;
@@ -200,10 +208,17 @@ export function decideWorkloadStatsEmission(input: {
   state: WorkloadStatsEmissionState;
 }): WorkloadStatsEmissionDecision {
   const { nowMs, stats, limitBytes, state } = input;
-  const highPressure =
+  const current = stats.currentBytes;
+  const abovePressure =
     limitBytes !== undefined &&
-    stats.currentBytes !== undefined &&
-    stats.currentBytes >= limitBytes * WORKLOAD_MEMORY_PRESSURE_FRACTION;
+    current !== undefined &&
+    current >= limitBytes * WORKLOAD_MEMORY_PRESSURE_FRACTION;
+  const highPressure =
+    abovePressure ||
+    (state.highPressure &&
+      limitBytes !== undefined &&
+      current !== undefined &&
+      current >= limitBytes * WORKLOAD_MEMORY_PRESSURE_RELEASE_FRACTION);
   const throttleIncreased =
     stats.cpuThrottleCount !== undefined &&
     state.lastThrottleCount !== undefined &&
@@ -215,16 +230,19 @@ export function decideWorkloadStatsEmission(input: {
     (stats.memoryOomEvents !== undefined &&
       state.lastMemoryOomEvents !== undefined &&
       stats.memoryOomEvents > state.lastMemoryOomEvents);
+  const sinceEmittedMs = nowMs - state.lastEmittedAtMs;
   const reason: WorkloadStatsEmissionReason =
-    nowMs - state.lastEmittedAtMs >= WORKLOAD_STATS_INTERVAL_MS
+    sinceEmittedMs >= WORKLOAD_STATS_INTERVAL_MS
       ? 'interval'
-      : throttleIncreased
-        ? 'throttle_increase'
-        : memoryEventsIncreased
-          ? 'memory_events'
-          : highPressure && !state.highPressure
-            ? 'memory_pressure'
-            : 'none';
+      : sinceEmittedMs < WORKLOAD_STATS_EVENT_COOLDOWN_MS
+        ? 'none'
+        : throttleIncreased
+          ? 'throttle_increase'
+          : memoryEventsIncreased
+            ? 'memory_events'
+            : abovePressure && !state.highPressure
+              ? 'memory_pressure'
+              : 'none';
   if (reason === 'none') {
     return { emit: false, reason, state: { ...state, highPressure } };
   }
@@ -731,7 +749,6 @@ function probeWorkloadParent(input: {
   };
   handlePath: (descriptor: number, directory: string) => string;
   report?: ControlDiagnosticReporter;
-  onSnapshot?: (snapshot: WorkloadSnapshot) => void;
 }): ProbeResult {
   const parentDirectory = path.join(input.usable.directory, WORKLOAD_PARENT_NAME);
   let parentFd: number | undefined;
@@ -839,7 +856,6 @@ function probeWorkloadParent(input: {
       cpuController,
       sweepIntervalMs: WORKLOAD_SWEEP_INTERVAL_MS,
       ...(input.report ? { report: input.report } : {}),
-      ...(input.onSnapshot ? { onSnapshot: input.onSnapshot } : {}),
     };
     retained = true;
     return { ok: true, placement };
@@ -948,7 +964,6 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
   const platform = options.platform ?? process.platform;
   const enabled = env[CONTROL_WORKLOAD_CGROUP_ENV] !== '0';
   const reporter = createWorkloadReporter(options.report);
-  let latestSnapshot: WorkloadSnapshot | undefined;
   if (platform !== 'linux') {
     if (!enabled) return { enabled: false };
     reporter.emit(undefined, {
@@ -1049,9 +1064,6 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
     budget,
     handlePath,
     ...(options.report ? { report: options.report } : {}),
-    onSnapshot: snapshot => {
-      latestSnapshot = snapshot;
-    },
   });
   if (!probe.ok) {
     reporter.emit(undefined, {
@@ -1075,11 +1087,7 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
     siblingProtection: false,
     workloadLimitSource: budget.source,
   });
-  return {
-    enabled: true,
-    placement: probe.placement,
-    latestSnapshot: () => latestSnapshot,
-  };
+  return { enabled: true, placement: probe.placement };
 }
 
 export function applyManagedWorkloadLimits(input: {

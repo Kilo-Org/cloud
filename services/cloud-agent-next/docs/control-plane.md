@@ -381,7 +381,9 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
   stopped it), the next launch discards the entry and starts from the image. A broken snapshot
   costs one attempt.
 - **Capture.** `session.prepare` carries `capture: true` when the route has a key and the provider
-  can capture. The wrapper decides whether to capture (a fresh clone, or an adopted snapshot that is
+  can capture. A route with setup commands has no key: capture runs after setup, so the snapshot
+  would publish the whole container under a key that names only the user and the repository. The
+  wrapper decides whether to capture (a fresh clone, or an adopted snapshot that is
   due for a refresh) and then sends `workspace.capture` after setup, with origin bare. The Sandbox DO
   calls the provider off its serial queue, bounded at 5 min 5 s, and answers `workspace.captured`
   (`ok: false` at once when nothing can be saved). `SandboxContainers` snapshots the running
@@ -413,11 +415,16 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
   the wrapper sends the original hello on the same socket. A legacy welcome enables periodic
   heartbeats without an acknowledgement deadline; old wrappers receive neither the optional field
   nor acknowledgement frames. Duplicate hello on a bound socket is ignored.
-- A wrapper that redacts named secrets advertises optional `redactsNamedSecrets: true` in `hello`. A
-  `session.prepare` frame may carry frame-only `secretEnvKeys`, the names of `env` entries whose
-  values the wrapper redacts in setup output and auto-commit diagnostics even when the name does not
-  look secret. The field is never stored in a route row, and a frame without it stays valid for a
-  version-3 wrapper.
+- A wrapper that redacts named secrets advertises optional `redactsNamedSecrets: true` in `hello`; the
+  Sandbox DO stores it on the socket attachment like `heartbeatAck`. Encrypted secrets ride only the
+  DO-private credential source (`encryptedSecrets`) and are decrypted into the frame. A secret-bearing
+  `session.prepare` carries the names as frame-only `secretEnvKeys`, never written to the route row; a
+  frame with no secrets omits the field and stays valid for a version-3 wrapper. A secret-bearing
+  prepare is never sent to a wrapper that did not advertise the capability: the attempt fails
+  `workspace_setup_failed`. A secret-bearing spec forces `runtimeIsolation: 'per-session'` so a
+  sibling sharing its worktree directory cannot reuse a runtime whose env already holds another
+  session's secrets; read-only Bitbucket reviews carry no profile secrets, like the withheld MCP
+  snapshot.
 
 - Connect, send `hello` (`wrapperId`, `allocationId`, protocol version), wait for `welcome` or
   `shutdown`. On `shutdown`, permanently close the connection and exit with code 0, even when the
@@ -486,6 +493,15 @@ Any failure empties the directory and clones. The Kilo session step is unchanged
 no Kilo home, so nothing stale shadows the restore from session-ingest. `session.ready` reports
 `workspace: 'cloned' | 'same' | 'adopted'`.
 
+Before starting Kilo, materialize the session's profile skills (including companion files) into
+`HOME/.kilocode/skills`. Custom agents and Kilo commands use a session-owned config file selected
+by `KILO_CONFIG`, so large prompts and templates do not enlarge the process environment.
+Registration requires per-session runtime isolation for these collections and for plain
+profile environment variables, so a sibling cannot inherit another session's configuration.
+Preparation replaces stale profile artifacts from restored homes, and credential refresh retains
+the same profile config path. Read-only Bitbucket reviews withhold these collections, matching
+the legacy profile restrictions.
+
 #### Capture
 
 A route captures only when `session.prepare` carries `capture: true`, and then when it cloned
@@ -501,8 +517,8 @@ setup the wrapper writes the stamp (before the snapshot, so a restored container
 allocation's stamp), sets `origin` to the bare URL, clears the reflogs and `FETCH_HEAD`, sends
 `workspace.capture` and waits for `workspace.captured`. It then restores the authenticated URL,
 whatever the outcome, and continues to the Kilo runtime. A snapshot therefore holds no agent edits,
-no Kilo home and no git credential. Process env never reaches the disk. Files setup wrote from env stay in
-the snapshot; setup re-runs on every start and rewrites them.
+no Kilo home and no git credential. Process env never reaches the disk. A route with setup commands
+has no key, so it restores and captures nothing: setup output is never published to a snapshot.
 
 ### Prompts and turn outcome
 

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
 import {
+  controlPlaneCredentialSourceSchema,
   controlPlanePrepareInputSchema,
   controlPlaneRegistrationRouteSpecSchema,
   controlPlaneRouteSpecSchema,
@@ -276,6 +277,92 @@ describe('buildControlPlaneSessionRegistration MCP materialization', () => {
   });
 });
 
+describe('buildControlPlaneSessionRegistration encrypted secrets', () => {
+  it('forces per-session isolation for a secret-bearing spec and keeps secrets out of env', () => {
+    const envelope = encryptWithPublicKey('secret-value', publicKey);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { encryptedSecrets: { DATABASE_URL: envelope } } }),
+      selection
+    );
+
+    expect(registration.credentials.encryptedSecrets).toEqual({ DATABASE_URL: envelope });
+    // Secrets never enter the persisted spec env, and a secret-bearing spec owns
+    // its Kilo runtime so a sibling in the same directory cannot reuse its env.
+    expect(registration.spec.env?.DATABASE_URL).toBeUndefined();
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(JSON.stringify(registration)).not.toContain('secret-value');
+  });
+
+  it('withholds profile env and secrets from a read-only Bitbucket review', () => {
+    const envelope = encryptWithPublicKey('secret-value', publicKey);
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+          createdOnPlatform: 'code-review',
+        },
+        repository: {
+          type: 'bitbucket',
+          url: 'https://bitbucket.org/acme/widgets',
+          workspaceUuid: '11111111-1111-4111-8111-111111111111',
+          repositoryUuid: '22222222-2222-4222-8222-222222222222',
+        },
+        callback: {
+          target: { url: 'https://worker.test/api/internal/code-review-status/12345' },
+        },
+        profile: {
+          envVars: { USER_SETTING: 'private-profile-env' },
+          encryptedSecrets: { DATABASE_URL: envelope },
+          runtimeSkills: [{ name: 'review', rawMarkdown: 'Review' }],
+          runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: {} }],
+          kiloCommands: [{ name: 'review-now', template: 'Review' }],
+        },
+      }),
+      selection
+    );
+
+    expect(registration.spec.env?.USER_SETTING).toBeUndefined();
+    expect(registration.credentials.kiloToken).toBe('native-kilo-token');
+    expect(registration.credentials.encryptedSecrets).toBeUndefined();
+    expect(registration.spec.runtimeSkills).toBeUndefined();
+    expect(registration.spec.runtimeAgents).toBeUndefined();
+    expect(registration.spec.kiloCommands).toBeUndefined();
+    expect(registration.spec.runtimeIsolation).toBeUndefined();
+  });
+
+  it('accepts a stored credential source that predates the encryptedSecrets field', () => {
+    const parsed = controlPlaneCredentialSourceSchema.safeParse({
+      userId: 'usr_1',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      kiloToken: 'native-kilo-token',
+      scopeId: 'usr_1',
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('carries secretEnvKeys on the frame-only spec and rejects it on the prepare input', () => {
+    const spec = {
+      sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'ses_12345678901234567890123456',
+      directory: '/tmp/worktree',
+      attemptId: 'attempt-1',
+      secretEnvKeys: ['DATABASE_URL'],
+    };
+    expect(controlPlaneRouteSpecSchema.safeParse(spec).success).toBe(true);
+    expect(
+      controlPlanePrepareInputSchema.safeParse({
+        spec,
+        credentials: {
+          userId: 'usr_1',
+          kiloSessionId: 'ses_12345678901234567890123456',
+          kiloToken: 'native-kilo-token',
+        },
+      }).success
+    ).toBe(false);
+  });
+});
+
 describe('controlPlaneRouteSpecSchema MCP boundaries', () => {
   function spec(mcp: unknown): unknown {
     return {
@@ -507,5 +594,87 @@ describe('buildControlPlaneSessionRegistration session directory', () => {
     // the identity worktree path must survive on the caller's object.
     expect(firstInput.workspace?.workspacePath).toBe(worktreePath);
     expect(secondInput.workspace?.workspacePath).toBe(worktreePath);
+  });
+});
+
+describe('profile runtime delivery', () => {
+  const profile = {
+    runtimeSkills: [
+      {
+        name: 'review',
+        rawMarkdown: '---\nname: review\ndescription: Review\n---\nReview changes',
+        files: { 'scripts/check.sh': 'echo checked' },
+      },
+    ],
+    runtimeAgents: [
+      {
+        slug: 'reviewer',
+        name: 'Reviewer',
+        config: { prompt: 'Review the diff', model: 'test-model' },
+      },
+    ],
+    kiloCommands: [{ name: 'review-now', template: 'Review $ARGUMENTS', agent: 'reviewer' }],
+  };
+
+  it.each(['runtimeSkills', 'runtimeAgents', 'kiloCommands'] as const)(
+    'delivers %s and isolates its runtime even without modern auth',
+    key => {
+      const registration = buildControlPlaneSessionRegistration(
+        metadata({ profile: { [key]: profile[key] } }),
+        selection
+      );
+      expect(registration.spec[key]).toEqual(profile[key]);
+      expect(registration.spec.runtimeIsolation).toBe('per-session');
+      expect(
+        controlPlanePrepareInputSchema.parse({
+          spec: registration.spec,
+          credentials: registration.credentials,
+        }).spec[key]
+      ).toEqual(profile[key]);
+    }
+  );
+
+  it('isolates a profile with only plain environment variables', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({ profile: { envVars: { PROJECT: 'demo' } } }),
+      selection
+    );
+    expect(registration.spec.env).toEqual({ PROJECT: 'demo' });
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+  });
+
+  it('delivers the full runtime profile without changing setup commands or env', () => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        profile: { ...profile, envVars: { PROJECT: 'demo' }, setupCommands: ['echo setup'] },
+      }),
+      selection
+    );
+    expect(registration.spec).toMatchObject({
+      ...profile,
+      env: { PROJECT: 'demo' },
+      setupCommands: ['echo setup'],
+      runtimeIsolation: 'per-session',
+    });
+  });
+
+  it('rejects a runtime profile without per-session isolation', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata({ profile }), selection);
+    expect(
+      controlPlaneRouteSpecSchema.safeParse({ ...registration.spec, runtimeIsolation: undefined })
+        .success
+    ).toBe(false);
+  });
+
+  it('rejects unsafe companion paths at the wrapper protocol boundary', () => {
+    const registration = buildControlPlaneSessionRegistration(metadata({ profile }), selection);
+    expect(
+      controlPlaneRouteSpecSchema.safeParse({
+        ...registration.spec,
+        runtimeSkills: [
+          { name: 'review', rawMarkdown: 'Review', files: { '../escape': 'unsafe' } },
+        ],
+      }).success
+    ).toBe(false);
   });
 });

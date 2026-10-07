@@ -33,7 +33,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'balance-test-secret',
-  BLACKLIST_TLDS: [],
   isResourceTokenIssuanceEnabled: () => true,
 }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({

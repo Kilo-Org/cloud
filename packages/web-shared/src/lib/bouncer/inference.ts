@@ -24,7 +24,7 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
  * The gateway awaits decide immediately before the upstream call, so this bounds the latency it
  * can add. A slower verdict resolves to null and the request is sent.
  */
-export const BOUNCER_DECIDE_TIMEOUT_MS = 500;
+export const BOUNCER_DECIDE_TIMEOUT_MS = 1_000;
 
 const logBouncerVerdict = sentryLogger('bouncer', 'info');
 

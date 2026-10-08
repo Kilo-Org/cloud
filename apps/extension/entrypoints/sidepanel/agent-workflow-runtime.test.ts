@@ -195,7 +195,6 @@ describe('workflow navigateTab', () => {
 
     const navPromise = navigateTab(7, 'https://example.com/dest?x=1');
 
-    // Wait for the listener to be registered.
     await vi.waitFor(() => {
       expect(mocks.addListener).toHaveBeenCalledTimes(1);
     });
@@ -519,7 +518,6 @@ describe('workflow navigateTab', () => {
 
     const navPromise = navigateTab(7, 'https://example.com/dest');
 
-    // Wait for the listener to be registered and tabs.update to be called.
     await vi.waitFor(() => {
       expect(mocks.addListener).toHaveBeenCalledTimes(1);
       expect(mocks.tabsUpdate).toHaveBeenCalledTimes(1);

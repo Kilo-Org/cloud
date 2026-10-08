@@ -149,7 +149,6 @@ function sessionPlaneForCreate(
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
   if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
@@ -167,16 +166,6 @@ function assertSupportedSandboxAllocation(
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Sandbox allocations cannot be combined with specialized sandbox routing',
-    });
-  }
-  // Isolated Standard predates the selectable allocations and remains legacy-plane only.
-  if (
-    allocation === 'isolated-standard' &&
-    sessionPlaneForCreate(input, ctx, options) === 'control'
-  ) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Isolated Standard allocation is not supported for control-plane sessions',
     });
   }
 }
@@ -1170,7 +1159,7 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
+  assertSupportedSandboxAllocation(input, options);
   const allocation = await allocateNewSession(input, ctx, options);
   const stub = resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
   let registerResult: { success: boolean; error?: string };
@@ -1485,7 +1474,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  assertSupportedSandboxAllocation(input, ctx, options);
+  assertSupportedSandboxAllocation(input, options);
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
   return registerAndAdmitInitialTurn(input, ctx, options, allocation, ledger);
 }
@@ -1704,7 +1693,7 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(input, ctx, { billingOrigin: options.billingOrigin });
+  assertSupportedSandboxAllocation(input, { billingOrigin: options.billingOrigin });
   await assertSandboxAllocationMembership(input, ctx);
   const db = getPgDb(ctx.env);
   const allocation = input.runtime?.sandboxAllocation;

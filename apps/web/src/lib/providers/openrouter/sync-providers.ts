@@ -38,6 +38,14 @@ import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavaila
 import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  fetchCustomLlmsFromDatabase,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  buildPublicCustomLlmSnapshotModels,
+  type SnapshotExtraModel,
+} from '@/lib/providers/openrouter/public-custom-llm-snapshot';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -137,8 +145,9 @@ async function syncProviders(params: {
   openRouterModels: Record<string, StoredModel>;
   openRouterCatalogModels: CatalogModel[];
   vercelModels: Record<string, StoredModel>;
+  customLlms: CustomLlm[];
 }) {
-  const { providers, openRouterModels, openRouterCatalogModels, vercelModels } = params;
+  const { providers, openRouterModels, openRouterCatalogModels, vercelModels, customLlms } = params;
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -171,7 +180,13 @@ async function syncProviders(params: {
 
   injectExtraProviderModels(vercelModels, providerModelData);
 
-  const mappedExtraModels = kiloExclusiveModels
+  // A custom LLM takes precedence over a Kilo-exclusive model with the same id.
+  const customLlmIds = new Set(customLlms.map(customLlm => customLlm.public_id.toLowerCase()));
+  const unshadowedKiloExclusiveModels = kiloExclusiveModels.filter(
+    kfm => !customLlmIds.has(kfm.public_id.toLowerCase())
+  );
+
+  const mappedKiloExclusiveModels: SnapshotExtraModel[] = unshadowedKiloExclusiveModels
     .flatMap(kfm => {
       if (kfm.status !== 'public') return [];
       const inferenceProvider = getInferenceProvider(kfm);
@@ -207,6 +222,9 @@ async function syncProviders(params: {
         provider: inferenceProvider,
       };
     });
+  const mappedExtraModels = mappedKiloExclusiveModels.concat(
+    buildPublicCustomLlmSnapshotModels(customLlms, new Date().toISOString())
+  );
 
   for (const extraModel of mappedExtraModels) {
     const providerData = providerModelData.find(
@@ -225,7 +243,7 @@ async function syncProviders(params: {
   applyFreeEndpointDataPolicy({
     providerModelData,
     openRouterFreeEndpoints,
-    kiloExclusiveModels,
+    kiloExclusiveModels: unshadowedKiloExclusiveModels,
   });
 
   injectVirtualModels({
@@ -269,7 +287,7 @@ async function syncProviders(params: {
 
   const allProviders = [...normalizedProviders];
 
-  // Auto-detect providers referenced by extra models that aren't already present
+  // Synthesize providers referenced by extra models that aren't already present
   const missingProviders = new Map(
     mappedExtraModels
       .map(m => m.provider)
@@ -396,6 +414,7 @@ export async function syncAndStoreProviders() {
     openRouterModels: openrouter_data,
     openRouterCatalogModels: openRouterCatalog.data,
     vercelModels: vercel_data,
+    customLlms: await fetchCustomLlmsFromDatabase(),
   });
 
   if (providers.total_providers < 10) {

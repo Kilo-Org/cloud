@@ -7,6 +7,17 @@ import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encrypti
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { eq } from 'drizzle-orm';
 import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type { StoredModel } from '@kilocode/db/schema-types';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<typeof GatewayModelsCache>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+}));
 
 let admin: User;
 let nonAdmin: User;
@@ -21,7 +32,20 @@ const validDefinition: CustomLlmDefinition = {
   group_ids: ['00000000-0000-4000-8000-000000000123'],
 };
 
+const publicDefinition: CustomLlmDefinition = {
+  internal_id: 'upstream-model',
+  display_name: 'Public model',
+  description: 'A public custom model',
+  context_length: 128000,
+  max_completion_tokens: 4096,
+  base_url: 'https://upstream.example.com/v1',
+  public: { inference_providers: ['acme'] },
+};
+
 beforeEach(async () => {
+  jest
+    .mocked(getOpenRouterModelsMetadataFromDatabase)
+    .mockResolvedValue({ 'openai/gpt-4o': {} as StoredModel });
   await cleanupDbForTest();
   admin = await insertTestUser({
     google_user_email: `custom-llm-admin-${Math.random()}@admin.example.com`,
@@ -406,6 +430,182 @@ describe('adminCustomLlmRouter', () => {
         .from(custom_llm2)
         .where(eq(custom_llm2.public_id, copiedPublicId));
       expect(copiedRow).toBeUndefined();
+    });
+  });
+
+  describe('public_id rules', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+
+    it('accepts an id without the kilo-internal/ prefix', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/model',
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.public_id).toBe('acme/model');
+    });
+
+    it('rejects an OpenRouter model id', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'openai/gpt-4o',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('OpenRouter'),
+      });
+    });
+
+    it.each([
+      ['Acme/Model', 'lowercase letters'],
+      ['acme/my model', 'lowercase letters'],
+      ['acme/model:free', 'must not contain ":" or "~"'],
+      ['~acme/model', 'must not contain ":" or "~"'],
+      ['acme/model~latest', 'must not contain ":" or "~"'],
+      ['kilo/model', 'must not start with'],
+      ['kilo-auto/model', 'must not start with'],
+      ['kilocode/model', 'must not start with'],
+    ])('rejects the malformed or reserved id %s', async (publicId, message) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
+    });
+
+    it('trims a new id before storing it', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: '  acme/trimmed-model  ',
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.public_id).toBe('acme/trimmed-model');
+    });
+
+    it('rejects an id with a direct BYOK provider prefix', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'kimi-coding/my-model',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('kimi-coding/'),
+      });
+    });
+
+    it('accepts a Kilo-exclusive model id even when OpenRouter lists it', async () => {
+      const exclusiveModelId = kiloExclusiveModels.find(
+        model => !model.public_id.includes(':')
+      )?.public_id;
+      if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
+      jest
+        .mocked(getOpenRouterModelsMetadataFromDatabase)
+        .mockResolvedValue({ [exclusiveModelId]: {} as StoredModel });
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: exclusiveModelId,
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.public_id).toBe(exclusiveModelId);
+    });
+
+    it('rejects copying to an OpenRouter model id', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: 'acme/copy-source',
+        definition: validDefinition,
+        credentials,
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: 'acme/copy-source',
+          public_id: 'openai/gpt-4o',
+          display_name: 'Copy',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: 'acme/copy-source',
+          public_id: 'kilo/copy',
+          display_name: 'Copy',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+  });
+
+  describe('public definitions', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+
+    it('creates a public custom LLM', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/public-model',
+        definition: publicDefinition,
+        credentials,
+      });
+
+      expect(result.definition.public).toEqual({ inference_providers: ['acme'] });
+    });
+
+    it.each([
+      ['organization_ids', { organization_ids: [] }],
+      ['group_ids', { group_ids: ['00000000-0000-4000-8000-000000000123'] }],
+      ['pricing', { pricing: { prompt: '0.000001', completion: '0.000002' } }],
+      ['description', { description: undefined }],
+    ])('rejects a public definition with an invalid %s', async (_field, overrides) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/invalid-public-model',
+          definition: { ...publicDefinition, ...overrides },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('requires organization_ids on a private definition', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const { organization_ids: _organizationIds, ...definition } = validDefinition;
+
+      await expect(
+        caller.admin.customLlm.upsert({ public_id: 'acme/private-model', definition, credentials })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('rejects an inference provider that is not a lowercase slug', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/public-model',
+          definition: { ...publicDefinition, public: { inference_providers: ['Acme AI'] } },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
   });
 

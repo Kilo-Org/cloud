@@ -1,16 +1,32 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  privateCustomLlmDefinition,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
 }
 
 describe('model access predicates', () => {
+  beforeAll(async () => {
+    await insertCustomLlmForTest('acme/private-model', privateCustomLlmDefinition());
+    await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
+  });
+
+  afterAll(async () => {
+    await deleteCustomLlmForTest('acme/private-model');
+    await deleteCustomLlmForTest('acme/public-model');
+  });
+
   test('undefined provider allow list only applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       ['openai/gpt-4o'],
@@ -112,7 +128,7 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
-  test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  test.each(['kilo-auto/balanced', 'acme/private-model', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from Enterprise model restrictions',
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(
@@ -127,6 +143,35 @@ describe('model access predicates', () => {
       await expect(isAllowed(modelId)).resolves.toBe(true);
     }
   );
+
+  test('does not exempt a kilo-internal/ id without a custom LLM', async () => {
+    const isAllowed = createAllowPredicateFromRestrictions(
+      { requireModelInCurrentSnapshot: true, providerAllowList: [], modelDenyList: [] },
+      lookup({})
+    );
+
+    await expect(isAllowed('kilo-internal/missing-model')).resolves.toBe(false);
+  });
+
+  test('applies provider allow lists to the providers of a public custom LLM', async () => {
+    const restrictions = { requireModelInCurrentSnapshot: true, modelDenyList: [] };
+    const allowsAcme = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['acme'] },
+      lookup({})
+    );
+    const allowsOpenAi = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['openai'] },
+      lookup({ 'acme/public-model': ['openai'] })
+    );
+    const deniesModel = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['acme'], modelDenyList: ['acme/public-model'] },
+      lookup({})
+    );
+
+    await expect(allowsAcme('acme/public-model')).resolves.toBe(true);
+    await expect(allowsOpenAi('acme/public-model')).resolves.toBe(false);
+    await expect(deniesModel('acme/public-model')).resolves.toBe(false);
+  });
 
   test('provider allow list still applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(

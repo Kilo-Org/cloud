@@ -739,10 +739,10 @@ describe('isDirectByokOnlyModel / isEligiblePoolModel', () => {
     ).toBe(true);
   });
 
-  it('still excludes virtual and custom ids', () => {
+  it('still excludes virtual ids and private custom LLMs', () => {
     expect(isEligiblePoolModel({ id: 'anthropic/claude' })).toBe(true);
     expect(isEligiblePoolModel({ id: 'kilo-auto/efficient' })).toBe(false);
-    expect(isEligiblePoolModel({ id: 'kilo-internal/x' })).toBe(false);
+    expect(isEligiblePoolModel({ id: 'acme/private', isPrivateCustomLlm: true })).toBe(false);
   });
 });
 
@@ -751,7 +751,7 @@ describe('toEligibleModelOptions', () => {
     const options = toEligibleModelOptions(
       [
         { id: 'kilo-auto/efficient', name: 'Efficient' },
-        { id: 'kilo-internal/custom', name: 'Custom' },
+        { id: 'acme/custom', name: 'Custom', isPrivateCustomLlm: true },
         {
           id: 'chutes-byok/direct-only',
           name: 'Direct BYOK',

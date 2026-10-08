@@ -9,8 +9,10 @@
  *
  * The names look swapped but are intentional: Kilo Code (the extension) selects
  * Kilo-hosted models under `kilo/`, while KiloClaw selects them under
- * `kilocode/`. `kilo-internal/` is the custom LLM (`custom_llm2`) namespace,
- * while `kilo-auto/` contains virtual routing models.
+ * `kilocode/`. `kilo-internal/` is the historical custom LLM (`custom_llm2`)
+ * namespace; custom LLMs are no longer required to use it, so look them up in
+ * the custom LLM catalog instead of matching this prefix. `kilo-auto/` contains
+ * virtual routing models.
  */
 export const KILOCODE_KILO_PROVIDER_PREFIX = 'kilo/';
 export const KILOCLAW_KILO_PROVIDER_PREFIX = 'kilocode/';

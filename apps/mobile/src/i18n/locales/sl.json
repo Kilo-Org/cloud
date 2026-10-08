@@ -608,8 +608,6 @@
     "reviewPullRequest": "Preglej zahtevek za združitev",
     "headLine": "{{counts}} · zadnja potrditev {{sha}}",
     "entry": {
-      "eyebrow": "Odpri zahtevek za združitev ali merge request z naslovom URL",
-      "pastePrLink": "Prilepi povezavo do zahtevka za združitev ali merge requesta",
       "noRecentPrs": "Ni nedavnih pregledov",
       "noRecentPrsDescription": "Za začetek pregleda zgoraj prilepite povezavo — naslednjič se pojavi tukaj.",
       "couldNotLoad": "Vsebine ni bilo mogoče naložiti.",
@@ -836,7 +834,6 @@
     "liveUpdates": "Posodobitve v živo",
     "liveUpdateSubtitle": "Prikaži aktivne agente v obvestilih",
     "push": "Potisna obvestila",
-    "enabled": "Obvestila omogočena",
     "onDescription": "Potisna obvestila so vklopljena za to napravo.",
     "offDescription": "Obvestila niso dovoljena ali pa naprava ni registrirana za njihovo prejemanje.",
     "retryPermission": "Poskusi znova preveriti dovoljenje za obvestila",
@@ -3348,7 +3345,6 @@
   },
   "spendAlerts": {
     "subtitle": "Pošlji opozorilo po e-pošti ali push sporočilu obračunskim stikom, ko poraba tega obsega preseže omejitev ali skoči nad običajno urno stopnjo.",
-    "enable": "Omogoči opozorila o porabi",
     "thresholdTitle": "Preseganje praga",
     "thresholdSubtitle": "Tekoča poraba presega tvojo omejitev",
     "anomalyTitle": "Urni skok",

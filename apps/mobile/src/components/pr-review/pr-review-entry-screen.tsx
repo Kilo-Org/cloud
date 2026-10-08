@@ -108,10 +108,6 @@ export function PrReviewEntryScreen() {
     handleSubmit();
   };
 
-  const focusInput = () => {
-    inputRef.current?.focus();
-  };
-
   const handleRecentPress = (entry: RecentPr) => {
     // Navigate only. The review screen's backfill effect updates
     // `lastOpenedAt` (and `lastResult`) once an authorized payload loads.
@@ -154,11 +150,6 @@ export function PrReviewEntryScreen() {
         title={t('prReview.entry.noRecentPrs')}
         description={t('prReview.entry.noRecentPrsDescription')}
         placement="top"
-        action={
-          <Button variant="outline" onPress={focusInput}>
-            <Text>{t('prReview.entry.pastePrLink')}</Text>
-          </Button>
-        }
       />
     );
   } else {
@@ -335,7 +326,7 @@ export function PrReviewEntryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.prReview')} eyebrow={t('prReview.entry.eyebrow')} />
+      <ScreenHeader title={t('common.prReview')} />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
     </View>
   );

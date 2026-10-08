@@ -586,8 +586,6 @@
     "reviewPullRequest": "Kagua ombi la kuunganisha",
     "headLine": "{{counts}} · rekodi ya mwisho {{sha}}",
     "entry": {
-      "eyebrow": "Fungua ombi la kuunganisha kwa URL",
-      "pastePrLink": "Bandika kiungo cha ombi la kuunganisha",
       "noRecentPrs": "Hakuna ukaguzi wa hivi karibuni",
       "noRecentPrsDescription": "Bandika kiungo hapo juu kuanza ukaguzi — kitaonekana hapa mara ijayo.",
       "couldNotLoad": "Imeshindikana kupakia.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Masasisho ya moja kwa moja",
     "liveUpdateSubtitle": "Onyesha mawakala wanaofanya kazi kwenye arifa zako",
     "push": "Arifa zinazotumwa",
-    "enabled": "Arifa zimewashwa",
     "onDescription": "Arifa zinazotumwa zimewashwa kwenye kifaa hiki.",
     "offDescription": "Ruhusa ya arifa au usajili wa kifaa haujawezeshwa.",
     "retryPermission": "Jaribu tena kuangalia ruhusa ya arifa",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Tuma tahadhari kwa barua pepe au push kwa anwani za bili wakati matumizi ya wigo huu yanapita kikomo au yanapanda juu ya kiwango chake cha kawaida cha saa.",
-    "enable": "Washa tahadhari za matumizi",
     "thresholdTitle": "Kuvuka kizingiti",
     "thresholdSubtitle": "Matumizi yanayoendelea yanapita kikomo chako",
     "anomalyTitle": "Kuongezeka kwa saa",

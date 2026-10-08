@@ -586,8 +586,6 @@
     "reviewPullRequest": "Review pull request",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "eyebrow": "Open a pull request or merge request by URL",
-      "pastePrLink": "Paste a pull request or merge request link",
       "noRecentPrs": "No recent reviews",
       "noRecentPrsDescription": "Paste a link above to start a review — it'll show up here next time.",
       "couldNotLoad": "Couldn't load",
@@ -804,7 +802,6 @@
     "liveUpdates": "Live Updates",
     "liveUpdateSubtitle": "Show active agents in your notifications",
     "push": "Push",
-    "enabled": "Notifications enabled",
     "onDescription": "Push notifications are on for this device.",
     "offDescription": "Permission or device registration is off.",
     "retryPermission": "Retry checking notification permission",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Email or push an alert to the billing contacts when this scope's own spend crosses a limit or spikes above its usual hourly rate.",
-    "enable": "Enable spend alerts",
     "thresholdTitle": "Threshold crossing",
     "thresholdSubtitle": "This scope's rolling spend over the chosen window crosses your limit",
     "anomalyTitle": "Hourly spike",

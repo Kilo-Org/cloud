@@ -597,8 +597,6 @@
     "reviewPullRequest": "Revisa la sol·licitud d'integració",
     "headLine": "{{counts}} · última comissió {{sha}}",
     "entry": {
-      "eyebrow": "Obre una sol·licitud d'integració o de fusió amb el seu URL",
-      "pastePrLink": "Enganxa l'enllaç d'una sol·licitud d'integració o de fusió",
       "noRecentPrs": "Cap revisió recent",
       "noRecentPrsDescription": "Enganxa un enllaç a dalt per començar una revisió — la propera vegada apareixerà aquí.",
       "couldNotLoad": "No s'ha pogut carregar.",
@@ -820,7 +818,6 @@
     "liveUpdates": "Actualitzacions en directe",
     "liveUpdateSubtitle": "Mostra els agents actius a les notificacions",
     "push": "Notificacions automàtiques",
-    "enabled": "Notificacions activades",
     "onDescription": "Les notificacions automàtiques estan activades en aquest dispositiu.",
     "offDescription": "No s'ha concedit el permís o no s'ha registrat el dispositiu.",
     "retryPermission": "Torna a comprovar el permís de notificacions",
@@ -3305,7 +3302,6 @@
   },
   "spendAlerts": {
     "subtitle": "Envia una alerta per correu o notificació push als contactes de facturació quan la despesa d'aquest àmbit superi un límit o augmenti per sobre de la seva taxa horària habitual.",
-    "enable": "Activa les alertes de despesa",
     "thresholdTitle": "Superació del llindar",
     "thresholdSubtitle": "La despesa acumulada supera el teu límit",
     "anomalyTitle": "Pic horari",

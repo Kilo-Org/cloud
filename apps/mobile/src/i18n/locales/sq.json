@@ -586,8 +586,6 @@
     "reviewPullRequest": "Rishiko kërkesën për bashkim",
     "headLine": "{{counts}} · depozitimi i fundit {{sha}}",
     "entry": {
-      "eyebrow": "Hap një kërkesë për bashkim ose kërkesë integrimi përmes URL-së",
-      "pastePrLink": "Ngjit lidhjen e një kërkeze për bashkim ose kërkeze integrimi",
       "noRecentPrs": "Asnjë rishikim i fundit",
       "noRecentPrsDescription": "Ngjit një lidhje më sipër për të filluar një rishikim — do të shfaqet këtu herën tjetër.",
       "couldNotLoad": "Ngarkimi dështoi.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Përditësimet në kohë reale",
     "liveUpdateSubtitle": "Shfaq agjentët aktivë në njoftimet e tua",
     "push": "Njoftimet e drejtpërdrejta",
-    "enabled": "Njoftimet janë të aktivizuara",
     "onDescription": "Njoftimet e drejtpërdrejta janë të aktivizuara për këtë pajisje.",
     "offDescription": "Leja për njoftime ose regjistrimi i pajisjes është i çaktivizuar.",
     "retryPermission": "Kontrollo përsëri lejen për njoftime",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Dërgo një njoftim me email ose push te kontaktet e faturimit kur shpenzimet e këtij fushëveprimi kalojnë një kufi ose hidhen mbi ritmin e zakonshëm për orë.",
-    "enable": "Aktivizo njoftimet për shpenzimet",
     "thresholdTitle": "Tejkalimi i pragut",
     "thresholdSubtitle": "Shpenzimet rrjedhëse tejkalojnë kufirin tënd",
     "anomalyTitle": "Rritje për orë",

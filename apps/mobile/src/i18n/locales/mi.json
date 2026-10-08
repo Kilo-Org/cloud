@@ -586,8 +586,6 @@
     "reviewPullRequest": "Arotakehia te tono kume",
     "headLine": "{{counts}} · tāpaetanga hou rawa {{sha}}",
     "entry": {
-      "eyebrow": "Whakatuwheratia he tono kume, he tono whakakotahi rānei mā te URL",
-      "pastePrLink": "Whakapirihia he hono tono kume, tono whakakotahi rānei",
       "noRecentPrs": "Kāore he arotake o nā tata nei",
       "noRecentPrsDescription": "Whakapirihia he hono ki runga hei tīmata i te arotake — ka kitea i konei ā muri ake.",
       "couldNotLoad": "Kāore i taea te uta.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Ngā whakahoutanga mataora",
     "liveUpdateSubtitle": "Whakaaturia ngā māngai e mahi ana ki ō pānui",
     "push": "Ngā pānui pana",
-    "enabled": "Kua whakahohea ngā pānui",
     "onDescription": "Kei te kā ngā pānui pana mō tēnei pūrere.",
     "offDescription": "Kua weto te whakaaetanga, te rēhitatanga pūrere rānei.",
     "retryPermission": "Whakamātau anō ki te tirotiro i te whakaaetanga pānui",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Tukuna he matohi mā te īmēra, mā te push rānei ki ngā hoapā nama ina whiti te whakapaunga o tēnei rohe i tētahi paepae, ina piki rānei ki runga ake i tōna tere ia hāora.",
-    "enable": "Whakahohea ngā matohi whakapaunga",
     "thresholdTitle": "Whitinga paepae",
     "thresholdSubtitle": "Kei te whiti te whakapaunga haere tonu i tō paepae",
     "anomalyTitle": "Pikinga ia hāora",

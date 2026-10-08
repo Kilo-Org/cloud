@@ -2,8 +2,9 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
-import { Pressable, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -36,7 +37,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
+  const [availableWidth, setAvailableWidth] = useState<number | null>(null);
+  // Reserve room for the amount, visibility toggle and purchase action in
+  // scaled text units, using the card's width rather than the display's.
+  const stackBalance = availableWidth === null || availableWidth / fontScale < 320;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
   // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
@@ -131,7 +136,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
   return (
-    <View className="gap-3">
+    <View
+      className="gap-3"
+      onLayout={event => {
+        setAvailableWidth(event.nativeEvent.layout.width);
+      }}
+    >
       <View
         className={cn(
           'min-h-11 gap-3',
@@ -217,15 +227,25 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         />
       )}
       {!showBalanceSkeleton && !balanceFailed && (
-        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
+        <View
+          className={cn(
+            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
+            stackBalance ? 'items-stretch' : 'flex-row items-center'
+          )}
+        >
+          <Animated.View
+            className={cn('min-w-0 justify-center', !stackBalance && 'flex-1')}
+            layout={LinearTransition.duration(200)}
+          >
             <View className="flex-row items-center gap-1">
-              <Text
-                className="text-2xl font-bold tabular-nums"
-                accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
-              >
-                {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
-              </Text>
+              <ScrollView horizontal className="min-w-0 flex-1">
+                <Text
+                  className="text-2xl font-bold tabular-nums"
+                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+                >
+                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+                </Text>
+              </ScrollView>
               <Pressable
                 className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
                 onPress={() => {
@@ -264,10 +284,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                 )
               ))}
           </Animated.View>
-          <View className="flex-row items-center gap-2">
+          <View className="max-w-full flex-row flex-wrap items-center gap-2">
             {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
             {selectedOrgId == null && (
               <AddCreditsButton
+                className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
                 onPress={() => {
                   router.push('/(app)/credits' as Href);
                 }}

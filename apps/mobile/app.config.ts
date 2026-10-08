@@ -293,6 +293,8 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // SDK 27 requires the scene lifecycle, including scene-based window and link handling.
+          enableSceneSupport: true,
           // iOS consumes React Native Core prebuilt by default, so the pnpm patch
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'

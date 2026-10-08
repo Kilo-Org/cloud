@@ -597,8 +597,6 @@
     "reviewPullRequest": "Rever PR",
     "headLine": "{{counts}} · commit mais recente: {{sha}}",
     "entry": {
-      "eyebrow": "Abre um PR ou um merge request através do URL",
-      "pastePrLink": "Colar uma ligação de PR ou de merge request",
       "noRecentPrs": "Sem revisões recentes",
       "noRecentPrsDescription": "Cola uma ligação acima para iniciar uma revisão — aparecerá aqui na próxima vez.",
       "couldNotLoad": "Não foi possível carregar os dados.",
@@ -820,7 +818,6 @@
     "liveUpdates": "Atualizações em tempo real",
     "liveUpdateSubtitle": "Mostrar agentes ativos nas suas notificações",
     "push": "Notificações push",
-    "enabled": "Notificações ativadas",
     "onDescription": "As notificações push estão ativadas neste dispositivo.",
     "offDescription": "A permissão ou o registo do dispositivo está desativado.",
     "retryPermission": "Tentar verificar a permissão de notificações novamente",
@@ -3305,7 +3302,6 @@
   },
   "spendAlerts": {
     "subtitle": "Envie um alerta por e-mail ou notificação push aos contactos de faturação quando os gastos deste âmbito ultrapassarem um limite ou subirem acima do seu ritmo horário habitual.",
-    "enable": "Ativar os alertas de gastos",
     "thresholdTitle": "Ultrapassagem do limite",
     "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
     "anomalyTitle": "Pico horário",

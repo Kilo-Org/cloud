@@ -586,8 +586,6 @@
     "reviewPullRequest": "Ṣe àtúnyẹ̀wò ìbéèrè ìṣọ̀kan",
     "headLine": "{{counts}} · àkọsílẹ̀ ìyípadà tuntun {{sha}}",
     "entry": {
-      "eyebrow": "Ṣí ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan nípa URL",
-      "pastePrLink": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
       "noRecentPrs": "Kò sí àtúnyẹ̀wò àìpẹ́",
       "noRecentPrsDescription": "Lẹ̀ mọ́ ọ̀nà àsopọ̀ lókè láti bẹ̀rẹ̀ àtúnyẹ̀wò — yóò fara hàn níbí nígbà mìíràn.",
       "couldNotLoad": "A kò lè ṣàkójọ rẹ̀.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Àwọn ìmúdójúìwọ̀n lẹ́sẹ̀kẹsẹ̀",
     "liveUpdateSubtitle": "Fi àwọn aṣojú tó ń ṣiṣẹ́ hàn nínú àwọn ìfitónilétí rẹ",
     "push": "Ìfitónilétí sí ẹ̀rọ",
-    "enabled": "Ìfitónilétí ti tàn",
     "onDescription": "Ìfitónilétí sí ẹ̀rọ ti tàn fún ẹ̀rọ yìí.",
     "offDescription": "Ìyọ̀ǹda tàbí ìforúkọsílẹ̀ ẹ̀rọ ti wà ní pípa.",
     "retryPermission": "Gbìyànjú láti tún ìyọ̀ǹda ìfitónilétí ṣàyẹ̀wò",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Fi ìkìlọ̀ ránṣẹ́ nípasẹ̀ ímeèlì tàbí push sí àwọn olùbáṣepọ̀ ìsanwó nígbà tí ìnáwó ẹ̀ka yìí bá kọjá ààlà tàbí gòkè ju ìwọ̀n wákàtí tó máa ń ṣe lọ.",
-    "enable": "Tan àwọn ìkìlọ̀ ìnáwó",
     "thresholdTitle": "Ìkọjá ààlà",
     "thresholdSubtitle": "Ìnáwó tí ń lọ kọjá ààlà rẹ",
     "anomalyTitle": "Ìgbésókè lójú wákàtí",

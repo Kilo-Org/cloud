@@ -291,7 +291,6 @@
     "liveUpdates": "Live-Updates",
     "liveUpdateSubtitle": "Aktive Agenten in deinen Benachrichtigungen anzeigen",
     "push": "Push-Benachrichtigungen",
-    "enabled": "Benachrichtigungen aktiviert",
     "onDescription": "Push-Benachrichtigungen sind für dieses Gerät aktiviert.",
     "offDescription": "Die Berechtigung für Benachrichtigungen oder die Geräteregistrierung ist deaktiviert.",
     "retryPermission": "Berechtigung für Benachrichtigungen erneut prüfen",
@@ -2644,8 +2643,6 @@
       "commentDeleteUnavailable": "Dieser Kommentar kann nicht gelöscht werden."
     },
     "entry": {
-      "eyebrow": "Öffne einen Pull-Request oder Merge-Request über seine URL",
-      "pastePrLink": "Pull-Request- oder Merge-Request-Link einfügen",
       "noRecentPrs": "Noch keine aktuellen Reviews",
       "noRecentPrsDescription": "Füge oben einen Link ein, um ein Review zu starten — es erscheint beim nächsten Mal hier.",
       "couldNotLoad": "Die Daten konnten nicht geladen werden.",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Sende den Abrechnungskontakten eine E-Mail- oder Push-Warnung, wenn die Ausgaben dieses Bereichs ein Limit überschreiten oder über ihre übliche Stundenrate steigen.",
-    "enable": "Ausgaben-Warnungen aktivieren",
     "thresholdTitle": "Schwellenwertüberschreitung",
     "thresholdSubtitle": "Laufende Ausgaben überschreiten dein Limit",
     "anomalyTitle": "Stündliche Spitze",

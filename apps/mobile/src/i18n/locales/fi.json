@@ -586,8 +586,6 @@
     "reviewPullRequest": "Katselmoi muutospyyntö",
     "headLine": "{{counts}} · uusin muutostallennus {{sha}}",
     "entry": {
-      "eyebrow": "Avaa muutospyyntö tai yhdistämispyyntö URL-osoitteella",
-      "pastePrLink": "Liitä muutospyynnön tai yhdistämispyynnön linkki",
       "noRecentPrs": "Ei viimeaikaisia katselmointeja",
       "noRecentPrsDescription": "Aloita katselmointi liittämällä linkki yllä olevaan kenttään — se näkyy tässä seuraavalla kerralla.",
       "couldNotLoad": "Lataus epäonnistui.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Reaaliaikaiset päivitykset",
     "liveUpdateSubtitle": "Näytä aktiiviset agentit ilmoituksissa",
     "push": "Push-ilmoitukset",
-    "enabled": "Ilmoitukset käytössä",
     "onDescription": "Push-ilmoitukset ovat käytössä tässä laitteessa.",
     "offDescription": "Ilmoituslupa puuttuu tai laitteen rekisteröinti ei ole käytössä.",
     "retryPermission": "Yritä tarkistaa ilmoituslupa uudelleen",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Lähetä laskutusyhteyshenkilöille sähköposti- tai push-varoitus, kun tämän alueen kulutus ylittää rajan tai nousee tavanomaisen tuntitahdin yläpuolelle.",
-    "enable": "Ota kulutusvaroitukset käyttöön",
     "thresholdTitle": "Rajan ylitys",
     "thresholdSubtitle": "Juokseva kulutus ylittää rajasi",
     "anomalyTitle": "Tunneittainen piikki",

@@ -77,12 +77,6 @@ export type SharedScenario = {
   defaultTimeoutMs?: number;
   /** API surface the scenario must use; callers default to `unified`. */
   defaultApi?: ApiVersion;
-  /**
-   * Worktree-creation enrollment only: the local e2e user must be in
-   * `CONTROL_PLANE_IDS` and `WORKTREE_CREATION_ENABLED_IDS`. This is not a
-   * capability and must not gate a scenario's execution.
-   */
-  requiresWorktreeCreation?: boolean;
   run(args: LifecycleArgs, env: ScenarioEnvironment): Promise<LifecycleResult>;
 };
 
@@ -465,7 +459,7 @@ async function runColdHot(args: LifecycleArgs, env: ScenarioEnvironment): Promis
     if (env.requireControlPlaneSession && !session.cloudAgentSessionId.startsWith('workspace_')) {
       return fail(
         `cold turn: expected a control-plane workspace_* session, got ${session.cloudAgentSessionId}; ` +
-          'enroll the driver owner in the deployed Worker CONTROL_PLANE_IDS'
+          'the Worker must route cloud-agent-web creates to the control plane'
       );
     }
 

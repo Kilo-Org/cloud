@@ -271,7 +271,6 @@ function fixture(options?: {
   metadata?: SessionMetadata;
   ownershipResults?: OwnershipFixture[][];
   internalSecret?: string;
-  controlPlaneIds?: string;
   runtimeIsolationEnabled?: string;
   botId?: string;
   authToken?: string;
@@ -316,8 +315,6 @@ function fixture(options?: {
     env: {
       INTERNAL_API_SECRET: INTERNAL_SECRET,
       NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
-      CONTROL_PLANE_IDS: options?.controlPlaneIds ?? '*',
-      WORKTREE_CREATION_ENABLED_IDS: '',
       RUNTIME_ISOLATION_ENABLED: options?.runtimeIsolationEnabled ?? 'true',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
@@ -584,8 +581,8 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
-  it('creates a sibling for a grouped owner no longer enrolled in the control plane', async () => {
-    const { caller, input } = fixture({ controlPlaneIds: 'another-owner' });
+  it('creates a sibling for a grouped owner', async () => {
+    const { caller, input } = fixture();
 
     await expect(caller.createWorktreeChat(input)).resolves.toEqual({
       cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
@@ -606,7 +603,6 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
         organizationId: ORGANIZATION_ID,
       });
       context.env.SANDBOX_SELECTION_IDS = '';
-      context.env.CONTROL_PLANE_IDS = '';
       context.env.PER_SESSION_SANDBOX_ORG_IDS =
         sandboxAllocation === 'cloudflare-shared' ? '*' : '';
       context.env.VERCEL_SANDBOX_ORG_IDS = sandboxAllocation.startsWith('vercel-') ? '' : '*';
@@ -773,7 +769,6 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     await caller.createWorktreeChat(input);
     const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
     context.env.SANDBOX_SELECTION_IDS = '';
-    context.env.CONTROL_PLANE_IDS = '';
     context.env.VERCEL_TOKEN = '';
     admitOperationMock.mockResolvedValueOnce({
       admission: 'duplicate_settled',

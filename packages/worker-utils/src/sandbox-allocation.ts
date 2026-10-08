@@ -198,9 +198,8 @@ export function getSandboxAllocationProvider(
 
 /**
  * Vercel and DO-managed Cloudflare containers exist only on the control plane, so
- * their allocations force a control-plane session regardless of `CONTROL_PLANE_IDS`.
- * Cloudflare allocations pick the sandbox shape only and leave the plane decision to
- * that allowlist.
+ * their allocations force a control-plane session. Cloudflare allocations pick the
+ * sandbox shape only and leave the plane decision to the session origin.
  */
 export function sandboxAllocationRequiresControlPlane(
   allocation: SandboxAllocation | undefined

@@ -1022,7 +1022,6 @@ describe('selectSandboxForNewSession', () => {
   it('defaults an enforced owner to containers instead of Vercel', () => {
     const destination = getDefaultSandboxDestination(
       {
-        CONTROL_PLANE_IDS: '*',
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
         VERCEL_SANDBOX_ORG_IDS: '*',

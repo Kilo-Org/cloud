@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-trap 'status=$?; printf "Setup failed at line %s (exit %s).\n" "$LINENO" "$status" >&2; exit "$status"' ERR
+on_error() {
+  local status=$?
+  printf 'Setup failed at line %s (exit %s).\n' "$1" "$status" >&2
+  exit "$status"
+}
+trap 'on_error "$LINENO"' ERR
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 repo=$PWD
@@ -221,19 +226,25 @@ JS
 chmod +x "$state_dir/sandbox-docker.cjs"
 ln -sf "$state_dir/sandbox-docker.cjs" "$startup_bin/docker"
 
+env_default() {
+  printf '[[ -n ${%s:-} ]] || %s=%q; export %s\n' "$1" "$1" "$2" "$1"
+}
 {
   printf 'case ":$PATH:" in *:%q:*) ;; *) export PATH=%q:"$PATH" ;; esac\n' "$startup_bin" "$startup_bin"
-  for name in NEXT_TELEMETRY_DISABLED SKIP_STRIPE_API KILO_PORT_OFFSET KILO_ENV_SYNC_CONCURRENCY KILO_STARTUP_CGROUP; do
-    printf 'export %s=%q\n' "$name" "${!name}"
-  done
-  printf 'export KILO_STARTUP_REAL_DOCKER=%q KILO_STARTUP_BUILDER=%q\n' "$real_docker" "$KILO_STARTUP_BUILDER"
-  printf 'export WRANGLER_DOCKER_BIN=%q WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST=1\n' "$state_dir/sandbox-docker.cjs"
   printf 'export SHELL=%q\n' "$startup_bin/kilo-shell"
-  printf 'export AGENT_BROWSER_ENGINE=chrome AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium\n'
-  printf 'export AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q AGENT_BROWSER_DEFAULT_TIMEOUT=%q\n' \
-    "${AGENT_BROWSER_SOCKET_DIR:-/tmp/kilo-browser}" "${AGENT_BROWSER_ARGS:---disable-gpu}" "${AGENT_BROWSER_DEFAULT_TIMEOUT:-120000}"
+  for name in NEXT_TELEMETRY_DISABLED SKIP_STRIPE_API KILO_PORT_OFFSET KILO_ENV_SYNC_CONCURRENCY KILO_STARTUP_CGROUP KILO_STARTUP_BUILDER; do
+    env_default "$name" "${!name}"
+  done
+  env_default KILO_STARTUP_REAL_DOCKER "$real_docker"
+  env_default WRANGLER_DOCKER_BIN "$state_dir/sandbox-docker.cjs"
+  env_default WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST 1
+  env_default AGENT_BROWSER_ENGINE chrome
+  env_default AGENT_BROWSER_EXECUTABLE_PATH /usr/bin/chromium
+  env_default AGENT_BROWSER_SOCKET_DIR /tmp/kilo-browser
+  env_default AGENT_BROWSER_ARGS --disable-gpu
+  env_default AGENT_BROWSER_DEFAULT_TIMEOUT 120000
   if [[ -n ${NODE_EXTRA_CA_CERTS:-} ]]; then
-    printf 'export NODE_EXTRA_CA_CERTS=%q\n' "$NODE_EXTRA_CA_CERTS"
+    env_default NODE_EXTRA_CA_CERTS "$NODE_EXTRA_CA_CERTS"
   fi
 } > "$env_file"
 
@@ -380,7 +391,7 @@ INSERT INTO kilocode_users (
 SQL
 )
 pnpm dev:seed app:add-credits "$test_user_id" 100 --free
-printf 'export KILO_TEST_USER_EMAIL=%q\n' "$test_email" >> "$env_file"
+env_default KILO_TEST_USER_EMAIL "$test_email" >> "$env_file"
 
 printf '\nSetup complete. Dev workload memory peak so far: %s MiB / %s MiB.\n' \
   "$(( $(< "$KILO_STARTUP_CGROUP/memory.peak") / 1048576 ))" "$KILO_STARTUP_MEMORY_MB"

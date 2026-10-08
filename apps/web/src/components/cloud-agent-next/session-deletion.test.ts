@@ -90,6 +90,7 @@ function createFixture() {
           sessionId: session.session_id,
           sessionStatus: session.status,
           sessionStatusUpdatedAt: session.status_updated_at,
+          updatedAt: session.updated_at,
         })),
       },
     },

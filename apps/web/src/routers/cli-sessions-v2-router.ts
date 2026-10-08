@@ -663,6 +663,7 @@ type WorktreeDetail = {
     sessionId: string;
     sessionStatus: string | null;
     sessionStatusUpdatedAt: string | null;
+    updatedAt: string;
   }[];
   prSession:
     | (Pick<CliSessionV2, keyof typeof commonSessionFields | 'total_cost_microdollars'> & {
@@ -1022,7 +1023,8 @@ export const cliSessionsV2Router = createTRPCRouter({
           sessions: sql<WorktreeDetail['sessions']>`json_agg(json_build_object(
             'sessionId', ${cli_sessions_v2.session_id},
             'sessionStatus', ${cli_sessions_v2.status},
-            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at}
+            'sessionStatusUpdatedAt', ${cli_sessions_v2.status_updated_at},
+            'updatedAt', ${cli_sessions_v2.updated_at}
           ) ORDER BY ${cli_sessions_v2.session_id})`,
         })
         .from(cli_sessions_v2)
@@ -1036,6 +1038,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         row.worktreeId,
         row.sessions.map(session => ({
           ...session,
+          updatedAt: new Date(session.updatedAt).toISOString(),
           sessionStatusUpdatedAt: session.sessionStatusUpdatedAt
             ? new Date(session.sessionStatusUpdatedAt).toISOString()
             : null,

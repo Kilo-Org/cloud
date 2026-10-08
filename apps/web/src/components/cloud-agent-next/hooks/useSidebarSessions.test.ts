@@ -937,6 +937,108 @@ describe('useSidebarSessions live update helpers', () => {
       });
     });
 
+    it.each(['busy', 'retry'])(
+      'expires stored %s at twenty minutes for visible and hidden sessions',
+      status => {
+        const now = new Date('2026-01-03T12:20:00.000Z').getTime();
+        const stale = makeStoredSession('ses_stale', '2026-01-03T12:00:00.000Z', {
+          sessionStatus: status,
+          sessionStatusUpdatedAt: '2026-01-03T12:19:00.000Z',
+        });
+        expect(getSidebarWorktreeActivity([stale], new Map(), [stale], null, now)).toEqual({
+          status: null,
+          statusUpdatedAt: null,
+          isLive: false,
+        });
+        expect(getSidebarWorktreeActivity([], new Map(), [stale], null, now).status).toBeNull();
+        expect(getSidebarWorktreeActivity([stale], new Map(), [stale], null, now - 1).status).toBe(
+          status
+        );
+        expect(
+          getSidebarWorktreeActivity([], new Map([['ses_stale', status]]), [stale], null, now)
+            .status
+        ).toBe(status);
+        expect(
+          getSidebarWorktreeActivity(
+            [],
+            new Map(),
+            [stale],
+            { sessionId: 'ses_stale', status },
+            now
+          ).status
+        ).toBe(status);
+      }
+    );
+
+    it('keeps recently updated sessions running even when the status timestamp is old', () => {
+      const session = makeStoredSession('ses_running', '2026-01-03T12:19:00.000Z', {
+        sessionStatus: 'busy',
+        sessionStatusUpdatedAt: '2026-01-03T10:00:00.000Z',
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [session],
+          new Map(),
+          [session],
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe('busy');
+    });
+
+    it.each(['question', 'permission'])('preserves stale stored %s attention', status => {
+      const session = makeStoredSession('ses_attention', '2026-01-03T10:00:00.000Z', {
+        sessionStatus: status,
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [],
+          new Map(),
+          [session],
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe(status);
+    });
+
+    it.each([false, true])(
+      'uses the freshest session update when status timestamps match (fresh visible=%s)',
+      freshVisible => {
+        const stale = makeStoredSession('ses_same', '2026-01-03T10:00:00.000Z', {
+          sessionStatus: 'busy',
+          sessionStatusUpdatedAt: '2026-01-03T10:00:00.000Z',
+        });
+        const fresh = { ...stale, updatedAt: '2026-01-03T12:19:00.000Z' };
+        expect(
+          getSidebarWorktreeActivity(
+            [freshVisible ? fresh : stale],
+            new Map(),
+            [freshVisible ? stale : fresh],
+            null,
+            new Date('2026-01-03T12:20:00.000Z').getTime()
+          ).status
+        ).toBe('busy');
+      }
+    );
+
+    it('ignores an expired sibling without hiding another recently running sibling', () => {
+      const stale = makeStoredSession('ses_stale', '2026-01-03T10:00:00.000Z', {
+        sessionStatus: 'busy',
+      });
+      const fresh = makeStoredSession('ses_fresh', '2026-01-03T12:19:00.000Z', {
+        sessionStatus: 'retry',
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [stale, fresh],
+          new Map(),
+          [stale, fresh],
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe('retry');
+    });
+
     it('reflects live running status even before a stored status update arrives', () => {
       const sessions = [makeStoredSession('ses_live', '2026-01-03T12:00:00.000Z')];
 
@@ -951,12 +1053,20 @@ describe('useSidebarSessions live update helpers', () => {
       'includes a hidden sibling with %s status outside the displayed slice',
       status => {
         const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
-        const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
+        const hidden = makeStoredSession('ses_hidden', '2026-01-03T12:00:00.000Z', {
           sessionStatus: status,
           sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
         });
 
-        expect(getSidebarWorktreeActivity([visible], new Map(), [visible, hidden])).toEqual({
+        expect(
+          getSidebarWorktreeActivity(
+            [visible],
+            new Map(),
+            [visible, hidden],
+            null,
+            new Date('2026-01-03T12:01:00.000Z').getTime()
+          )
+        ).toEqual({
           status,
           statusUpdatedAt: hidden.sessionStatusUpdatedAt,
           isLive: false,
@@ -1034,7 +1144,13 @@ describe('useSidebarSessions live update helpers', () => {
 
       expect(getSidebarWorktreeActivity([], active, [foreground], completed).status).toBeNull();
       expect(
-        getSidebarWorktreeActivity([background], active, [foreground, background], completed).status
+        getSidebarWorktreeActivity(
+          [background],
+          active,
+          [foreground, background],
+          completed,
+          new Date('2026-01-03T12:01:00.000Z').getTime()
+        ).status
       ).toBe('busy');
       expect(
         getSidebarWorktreeActivity([], active, [foreground], {
@@ -1157,11 +1273,28 @@ describe('useSidebarSessions live update helpers', () => {
               sessionId: 'ses_hidden',
               sessionStatus: 'busy',
               sessionStatusUpdatedAt: '2026-01-03T12:00:00.000Z',
+              updatedAt: '2026-01-03T12:00:00.000Z',
             },
           ],
         },
       },
     } satisfies Parameters<typeof patchSidebarWorktreeSessionStatus>[0];
+
+    it('refreshes activity recency even when the stored status has not changed', () => {
+      const updated = patchSidebarWorktreeSessionStatus(initial, {
+        ...initial.worktrees.worktree_shared.sessions[0],
+        updatedAt: '2026-01-03T12:19:00.000Z',
+      });
+      expect(
+        getSidebarWorktreeActivity(
+          [],
+          new Map(),
+          updated.worktrees.worktree_shared.sessions,
+          null,
+          new Date('2026-01-03T12:20:00.000Z').getTime()
+        ).status
+      ).toBe('busy');
+    });
 
     it('updates a hidden member through attention and completion without changing membership', () => {
       const waiting = patchSidebarWorktreeSessionStatus(initial, {

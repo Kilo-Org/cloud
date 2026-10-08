@@ -368,7 +368,14 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           name: null,
           defaultTitle: ownershipRow.title,
           prSession: null,
-          sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+          sessions: [
+            {
+              sessionId: SESSION_ID,
+              sessionStatus: null,
+              sessionStatusUpdatedAt: null,
+              updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+            },
+          ],
         },
       },
     });
@@ -379,6 +386,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
     const sibling = await insertSession({
       status: 'busy',
       status_updated_at: '2026-04-29 01:16:12.945+00',
+      updated_at: '2026-04-29 01:17:12.945+00',
     });
     await insertSession({ kilo_user_id: OTHER_USER_ID, status: 'question' });
     await insertSession({ organization_id: ORGANIZATION_ID, status: 'permission' });
@@ -397,11 +405,17 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
 
     expect(details.worktrees[WORKTREE_ID].sessions).toEqual(
       [
-        { sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null },
+        {
+          sessionId: SESSION_ID,
+          sessionStatus: null,
+          sessionStatusUpdatedAt: null,
+          updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+        },
         {
           sessionId: sibling.session_id,
           sessionStatus: 'busy',
           sessionStatusUpdatedAt: '2026-04-29T01:16:12.945Z',
+          updatedAt: '2026-04-29T01:17:12.945Z',
         },
       ].sort((a, b) => a.sessionId.localeCompare(b.sessionId))
     );
@@ -410,6 +424,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         sessionId: otherWorktreeSession.session_id,
         sessionStatus: 'retry',
         sessionStatusUpdatedAt: null,
+        updatedAt: new Date(otherWorktreeSession.updated_at).toISOString(),
       },
     ]);
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
@@ -465,6 +480,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       sessionId: SESSION_ID,
       sessionStatus: 'question',
       sessionStatusUpdatedAt: '2020-01-01T00:00:00.000Z',
+      updatedAt: '2020-01-01T00:00:00.000Z',
     });
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
   });
@@ -742,7 +758,14 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         name: null,
         defaultTitle: ownershipRow.title,
         prSession: null,
-        sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+        sessions: [
+          {
+            sessionId: SESSION_ID,
+            sessionStatus: null,
+            sessionStatusUpdatedAt: null,
+            updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+          },
+        ],
       },
     });
     expect(

@@ -39,6 +39,7 @@ describe('getFallbackModelVariants', () => {
     ['openai/gpt-5.6-sol', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
     ['qwen/qwen3.8', ['minimal', 'low', 'medium', 'high', 'xhigh']],
     ['stepfun/step-3.7-flash', ['low', 'medium', 'high']],
+    ['stealth/glyph-cluster', ['low', 'medium', 'high', 'xhigh']],
   ])('orders fallback variants from least to most intensive for %s', (model, expected) => {
     expect(Object.keys(getFallbackModelVariants(model) ?? {})).toEqual(expected);
   });

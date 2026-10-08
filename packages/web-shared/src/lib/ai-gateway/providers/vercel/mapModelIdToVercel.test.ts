@@ -152,6 +152,12 @@ describe('mapModelIdToVercel', () => {
       );
     });
 
+    it('maps the Vercel-served Glyph Cluster stealth model to its gateway id', async () => {
+      await expect(mapModelIdToVercel('stealth/glyph-cluster')).resolves.toBe(
+        'stealth/glyph-cluster'
+      );
+    });
+
     it('does not use internal_id for disabled exclusives even when vercel-routed', async () => {
       // minimax_m25_free_model has the 'vercel-routing' flag but status
       // 'disabled', so it must not be substituted by internal_id and instead

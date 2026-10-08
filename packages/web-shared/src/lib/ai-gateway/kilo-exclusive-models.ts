@@ -18,6 +18,7 @@ import type {
 import { type ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 const CLAUDE_OPUS_STEALTH_PRICING: PricingTiers = [
   {
@@ -213,6 +214,21 @@ export const stepfun_37_flash_free_model: KiloExclusiveModel = {
   inference_provider_restriction: ['stepfun'],
 };
 
+export const glyph_cluster_stealth_free_model: KiloExclusiveModel = {
+  public_id: 'stealth/glyph-cluster',
+  display_name: 'Stealth: Glyph Cluster (free)',
+  description:
+    "Your prompts and completions may be retained and used to train or improve the provider's services. Glyph Cluster is a reasoning model for coding and long-context analysis, served through Vercel AI Gateway during its stealth period at no cost. It supports function calling and streaming, takes text input only, and does not support structured outputs. Zero Data Retention is not available for this model.",
+  context_length: 256_000,
+  max_completion_tokens: 256_000,
+  status: 'public',
+  flags: ['reasoning', 'stealth', 'requires-data-collection'],
+  provider: VERCEL_AI_GATEWAY,
+  internal_id: 'stealth/glyph-cluster',
+  pricing: null,
+  inference_provider_restriction: [],
+};
+
 export function isKiloExclusiveFreeModel(model: string): boolean {
   return kiloExclusiveModels.some(
     m => m.public_id === model && m.status !== 'disabled' && !m.pricing
@@ -237,6 +253,7 @@ export const kiloExclusiveModels = [
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
   stepfun_37_flash_free_model,
+  glyph_cluster_stealth_free_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

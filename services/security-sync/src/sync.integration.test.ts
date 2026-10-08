@@ -8,11 +8,13 @@ import {
   platform_integrations,
   security_findings,
 } from '@kilocode/db/schema';
+import type { PlatformRepository } from '@kilocode/db/schema-types';
 import { and, eq } from 'drizzle-orm';
 import {
   advanceOwnerSyncFreshness,
   claimOwnerSyncLease,
   clearSyncRunProgress,
+  getOwnerConfig,
   releaseOwnerSyncLease,
   syncOwner,
   writeSyncRunProgress,
@@ -87,10 +89,10 @@ const relinkAlert = {
   url: 'https://api.github.com/repos/acme/relink/dependabot/alerts/4242',
 };
 
-function stubRelinkFetch(): void {
+function stubRelinkFetch(alerts: unknown = [relinkAlert]): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify([relinkAlert]), { status: 200 }))
+    vi.fn(async () => new Response(JSON.stringify(alerts), { status: 200 }))
   );
 }
 
@@ -109,6 +111,43 @@ async function insertSyncIntegration(repoFullName: string): Promise<string> {
     github_connection_role: 'workflow',
   });
   return id;
+}
+
+async function insertCanonicalInstallation(params: {
+  installationId: string;
+  repoFullName: string;
+  permissions: Record<string, string>;
+  lifecycleState?: 'active' | 'suspended';
+  repositories?: PlatformRepository[];
+}): Promise<string> {
+  const id = randomUUID();
+  const [, repoName] = params.repoFullName.split('/');
+  await client.db.insert(github_app_installations).values({
+    id,
+    installation_id: params.installationId,
+    github_app_type: 'standard',
+    lifecycle_state: params.lifecycleState ?? 'active',
+    permissions: params.permissions,
+    repositories: params.repositories ?? [
+      { id: 1, name: repoName ?? 'relink', full_name: params.repoFullName, private: true },
+    ],
+  });
+  return id;
+}
+
+async function attachCanonicalInstallation(
+  integrationId: string,
+  canonicalId: string,
+  installationId: string
+): Promise<void> {
+  await client.db
+    .update(platform_integrations)
+    .set({
+      github_installation_id: canonicalId,
+      platform_installation_id: installationId,
+      github_app_type: 'standard',
+    })
+    .where(eq(platform_integrations.id, integrationId));
 }
 
 async function readRelinkFinding(repoFullName: string) {
@@ -570,6 +609,139 @@ describe('security sync owner lease in PostgreSQL', () => {
       expect(new Date(after.last_synced_at).getTime()).toBe(new Date(sentinel).getTime());
     } finally {
       await cleanupRelink(repo, [integrationId]);
+    }
+  });
+
+  it.each([
+    ['empty canonical repositories', 'empty-repositories'],
+    ['revoked canonical permissions', 'permissions'],
+    ['unhealthy canonical lifecycle', 'lifecycle'],
+    ['mismatched canonical identity', 'mismatched'],
+    ['legacy integration shadowed by canonical metadata', 'legacy-shadowed'],
+  ] as const)('rejects an integration with %s before fetching', async (_label, condition) => {
+    const repo = `acme/ineligible-${randomUUID()}`;
+    const integrationId = await insertSyncIntegration(repo);
+    const installationId = randomInt(1, 2 ** 48 - 1).toString();
+    let canonicalId: string | null = null;
+    try {
+      canonicalId = await insertCanonicalInstallation({
+        installationId,
+        repoFullName: repo,
+        permissions: condition === 'permissions' ? {} : { vulnerability_alerts: 'read' },
+        lifecycleState: condition === 'lifecycle' ? 'suspended' : 'active',
+        repositories: condition === 'empty-repositories' ? [] : undefined,
+      });
+      if (condition === 'legacy-shadowed') {
+        await client.db
+          .update(platform_integrations)
+          .set({ platform_installation_id: installationId, github_app_type: 'standard' })
+          .where(eq(platform_integrations.id, integrationId));
+      } else {
+        await attachCanonicalInstallation(
+          integrationId,
+          canonicalId,
+          condition === 'mismatched' ? randomInt(1, 2 ** 48 - 1).toString() : installationId
+        );
+      }
+
+      await expect(getOwnerConfig(client.db as never, owner)).resolves.toEqual({
+        unavailable: 'GITHUB_TOKEN_UNAVAILABLE',
+      });
+      const getToken = vi.fn(async () => 'github-token');
+      const fetchStub = vi.fn();
+      vi.stubGlobal('fetch', fetchStub);
+
+      await expect(
+        syncOwner({
+          db: client.db as never,
+          gitTokenService: { getToken } as never,
+          owner,
+          runId: `ineligible-${condition}`,
+          chunkIndex: 0,
+        })
+      ).resolves.toMatchObject({ commandResultCode: 'GITHUB_TOKEN_UNAVAILABLE' });
+      expect(getToken).not.toHaveBeenCalled();
+      expect(fetchStub).not.toHaveBeenCalled();
+    } finally {
+      await cleanupRelink(repo, [integrationId]);
+      if (canonicalId) {
+        await client.db
+          .delete(github_app_installations)
+          .where(eq(github_app_installations.id, canonicalId));
+      }
+    }
+  });
+
+  it('selects a healthy canonical alternative and applies a fixed alert status', async () => {
+    const repo = `acme/canonical-alternative-${randomUUID()}`;
+    const invalidIntegrationId = await insertSyncIntegration(repo);
+    const invalidInstallationId = randomInt(1, 2 ** 48 - 1).toString();
+    const invalidCanonicalId = await insertCanonicalInstallation({
+      installationId: invalidInstallationId,
+      repoFullName: repo,
+      permissions: { vulnerability_alerts: 'read' },
+      repositories: [],
+    });
+    let healthyIntegrationId: string | null = null;
+    let healthyCanonicalId: string | null = null;
+    try {
+      stubRelinkFetch();
+      await syncOwner({
+        ...createSyncOwnerDeps(),
+        runId: 'canonical-alternative-open',
+        chunkIndex: 0,
+      });
+      expect((await readRelinkFinding(repo)).status).toBe('open');
+
+      await attachCanonicalInstallation(
+        invalidIntegrationId,
+        invalidCanonicalId,
+        invalidInstallationId
+      );
+      healthyIntegrationId = await insertSyncIntegration(repo);
+      const healthyInstallationId = randomInt(1, 2 ** 48 - 1).toString();
+      healthyCanonicalId = await insertCanonicalInstallation({
+        installationId: healthyInstallationId,
+        repoFullName: repo,
+        permissions: { vulnerability_alerts: 'read' },
+      });
+      await attachCanonicalInstallation(
+        healthyIntegrationId,
+        healthyCanonicalId,
+        healthyInstallationId
+      );
+
+      stubRelinkFetch([
+        {
+          ...relinkAlert,
+          state: 'fixed',
+          updated_at: '2026-02-15T00:00:00Z',
+          fixed_at: '2026-02-15T00:00:00Z',
+        },
+      ]);
+      await syncOwner({
+        ...createSyncOwnerDeps(),
+        runId: 'canonical-alternative-fixed',
+        chunkIndex: 0,
+      });
+
+      expect(await readRelinkFinding(repo)).toMatchObject({
+        platform_integration_id: healthyIntegrationId,
+        status: 'fixed',
+      });
+    } finally {
+      await cleanupRelink(repo, [
+        invalidIntegrationId,
+        ...(healthyIntegrationId ? [healthyIntegrationId] : []),
+      ]);
+      await client.db
+        .delete(github_app_installations)
+        .where(eq(github_app_installations.id, invalidCanonicalId));
+      if (healthyCanonicalId) {
+        await client.db
+          .delete(github_app_installations)
+          .where(eq(github_app_installations.id, healthyCanonicalId));
+      }
     }
   });
 

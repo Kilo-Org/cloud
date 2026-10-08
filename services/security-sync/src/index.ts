@@ -448,6 +448,9 @@ function syncCommandTerminalState(result: Awaited<ReturnType<typeof syncOwner>>)
   if (result.commandResultCode === 'CONFIG_DISABLED') {
     return { status: 'no_op', resultCode: 'CONFIG_DISABLED' };
   }
+  if (result.commandResultCode === 'GITHUB_TOKEN_UNAVAILABLE') {
+    return { status: 'failed', resultCode: 'GITHUB_TOKEN_UNAVAILABLE' };
+  }
   if (result.commandResultCode === 'REPOSITORY_UNAVAILABLE' || result.staleRepos.length > 0) {
     return { status: 'failed', resultCode: 'REPOSITORY_UNAVAILABLE' };
   }

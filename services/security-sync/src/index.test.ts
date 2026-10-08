@@ -670,6 +670,38 @@ describe('manual sync lease dispositions', () => {
     } as unknown as CloudflareEnv;
   }
 
+  it('fails an unavailable GitHub integration without presenting it as disabled configuration or retrying', async () => {
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+    vi.mocked(syncOwner).mockResolvedValue({
+      synced: 0,
+      errors: 0,
+      skipped: 0,
+      authInvalid: 0,
+      reauthRequired: false,
+      staleRepos: [],
+      commandResultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+      authInvalidRepos: [],
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+    });
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const sendBatch = vi.fn();
+
+    await worker.queue(
+      { messages: [{ attempts: 1, body: manualSyncBody(), ack, retry }] } as never,
+      leaseEnv(sendBatch)
+    );
+
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'failed', resultCode: 'GITHUB_TOKEN_UNAVAILABLE' })
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(sendBatch).not.toHaveBeenCalled();
+  });
+
   it('acks a stale chunk delivery without failing, settling, or enqueueing', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());

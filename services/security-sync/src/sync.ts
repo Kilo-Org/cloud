@@ -27,6 +27,7 @@ import {
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
+  type IntegrationPermissions,
   type PlatformRepository,
 } from '@kilocode/db/schema-types';
 import {
@@ -715,6 +716,44 @@ function integrationOwnerFilter(owner: SecurityReviewOwner) {
   return eq(platform_integrations.owned_by_user_id, owner.userId);
 }
 
+function eligibleSecuritySyncIntegration(owner: SecurityReviewOwner) {
+  const canonicalInstallationMatchesIntegration = sql`
+    ${github_app_installations.lifecycle_state} = 'active'
+    AND ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+    AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+    AND ${github_app_installations.suspended_at} IS NULL
+    AND ${github_app_installations.deleted_at} IS NULL
+  `;
+  const legacyInstallationHasNoCanonicalRecord = sql`
+    ${platform_integrations.github_installation_id} IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM ${github_app_installations}
+      WHERE ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+        AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+    )
+  `;
+
+  return and(
+    integrationOwnerFilter(owner),
+    eq(platform_integrations.platform, 'github'),
+    eq(platform_integrations.github_connection_role, 'workflow'),
+    eq(platform_integrations.integration_type, 'app'),
+    eq(platform_integrations.integration_status, 'active'),
+    isNull(platform_integrations.suspended_at),
+    isNull(platform_integrations.github_disconnected_at),
+    isNotNull(platform_integrations.platform_installation_id),
+    or(legacyInstallationHasNoCanonicalRecord, canonicalInstallationMatchesIntegration),
+    sql`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})->>'vulnerability_alerts' IN ('read', 'write')`,
+    sql`EXISTS (
+      SELECT 1
+      FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
+      WHERE jsonb_typeof(repository->'id') = 'number'
+        AND jsonb_typeof(repository->'full_name') = 'string'
+        AND repository->>'full_name' <> ''
+    )`
+  );
+}
+
 function analysisOwnerStateFilter(owner: SecurityReviewOwner) {
   if (isOrgOwner(owner)) {
     return eq(security_analysis_owner_state.owned_by_organization_id, owner.organizationId);
@@ -760,7 +799,7 @@ type EnabledOwnerConfig = {
 export async function getOwnerConfig(
   db: WorkerDb,
   owner: SecurityReviewOwner
-): Promise<EnabledOwnerConfig | null> {
+): Promise<EnabledOwnerConfig | { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' } | null> {
   // Get agent config
   const configs = await db
     .select({
@@ -782,42 +821,35 @@ export async function getOwnerConfig(
   if (configs.length === 0) return null;
   const agentConfig = configs[0];
 
-  // Get platform integration
   const integrations = await db
     .select({
       id: platform_integrations.id,
       platform_installation_id: platform_integrations.platform_installation_id,
-      permissions: platform_integrations.permissions,
-      repositories: platform_integrations.repositories,
+      permissions: sql<IntegrationPermissions | null>`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})`,
+      repositories: sql<
+        PlatformRepository[] | null
+      >`COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories})`,
       authInvalidAt: platform_integrations.auth_invalid_at,
       githubAppType: platform_integrations.github_app_type,
     })
     .from(platform_integrations)
-    .where(
-      and(
-        integrationOwnerFilter(owner),
-        eq(platform_integrations.platform, 'github'),
-        eq(platform_integrations.github_connection_role, 'workflow'),
-        eq(platform_integrations.integration_type, 'app'),
-        eq(platform_integrations.integration_status, 'active'),
-        isNull(platform_integrations.suspended_at),
-        isNull(platform_integrations.github_disconnected_at),
-        isNotNull(platform_integrations.platform_installation_id)
-      )
+    .leftJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
     )
+    .where(eligibleSecuritySyncIntegration(owner))
     .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
     .limit(1);
 
-  if (integrations.length === 0) return null;
+  if (integrations.length === 0) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
   const integration = integrations[0];
 
-  if (!integration.platform_installation_id) return null;
+  if (!integration.platform_installation_id) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
 
-  // Check vulnerability_alerts permission
   const perms = integration.permissions;
   if (!perms || (perms.vulnerability_alerts !== 'read' && perms.vulnerability_alerts !== 'write')) {
     console.warn(`Integration ${integration.id} missing vulnerability_alerts permission, skipping`);
-    return null;
+    return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
   }
 
   // Filter repositories
@@ -827,7 +859,7 @@ export async function getOwnerConfig(
       typeof repository.full_name === 'string' &&
       repository.full_name.length > 0
   );
-  if (allRepos.length === 0) return null;
+  if (allRepos.length === 0) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
 
   const repoNameToId = new Map(allRepos.map(r => [r.full_name, r.id]));
 
@@ -1190,32 +1222,7 @@ async function upsertSecurityFinding(
       LEFT JOIN ${github_app_installations}
         ON ${platform_integrations.github_installation_id} = ${github_app_installations.id}
       WHERE ${platform_integrations.id} = ${platformIntegrationId}
-        AND ${integrationOwnerFilter(owner)}
-        AND ${platform_integrations.platform} = 'github'
-        AND ${platform_integrations.github_connection_role} = 'workflow'
-        AND ${platform_integrations.integration_type} = 'app'
-        AND ${platform_integrations.integration_status} = 'active'
-        AND ${platform_integrations.suspended_at} IS NULL
-        AND ${platform_integrations.github_disconnected_at} IS NULL
-        AND ${platform_integrations.platform_installation_id} IS NOT NULL
-        AND (
-          (
-            ${platform_integrations.github_installation_id} IS NULL
-            AND NOT EXISTS (
-              SELECT 1 FROM ${github_app_installations}
-              WHERE ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
-                AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
-            )
-          )
-          OR (
-            ${github_app_installations.lifecycle_state} = 'active'
-            AND ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
-            AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
-            AND ${github_app_installations.suspended_at} IS NULL
-            AND ${github_app_installations.deleted_at} IS NULL
-          )
-        )
-        AND COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})->>'vulnerability_alerts' IN ('read', 'write')
+        AND ${eligibleSecuritySyncIntegration(owner)}
         AND EXISTS (
           SELECT 1
           FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
@@ -2272,13 +2279,14 @@ export async function syncOwner(params: {
   }
 
   const config = await getOwnerConfig(database, owner);
-  if (!config) {
-    console.info(`No enabled config for owner, skipping`, { runId, owner });
+  if (!config || 'unavailable' in config) {
+    const resultCode = config?.unavailable ?? 'CONFIG_DISABLED';
+    console.info('Skipping security sync before fetching', { runId, owner, resultCode });
     if (leaseHeld) {
       const teardown = await teardownOwnerLease(database, owner, runId, chunkIndex, 'abandoned');
       if (teardown) return teardown;
     }
-    return { ...createEmptySyncResult(), commandResultCode: 'CONFIG_DISABLED' };
+    return { ...createEmptySyncResult(), commandResultCode: resultCode };
   }
 
   const repositories = selectRepositoriesForSync(config, repoFullName);

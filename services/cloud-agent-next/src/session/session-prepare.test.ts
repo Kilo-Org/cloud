@@ -4168,32 +4168,51 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     );
   });
 
-  it('rejects isolated Standard allocation for workspace sessions before external effects', async () => {
-    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
-    const doStub = makeDoStub();
-    const ctx = makeContext(doStub);
+  it.each(['webhook', 'scheduled'])(
+    'creates a %s workspace session with isolated Standard allocation',
+    async createdOnPlatform => {
+      const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+      const sandboxId = `istd-${'a'.repeat(48)}` as const;
+      generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+      generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      ctx.env.SANDBOX_SELECTION_IDS = orgId;
+      getPgDbMock.mockReturnValue(
+        makeDb([[{ id: 'member' }], [{ id: 'member' }], [{ email: 'test@example.com' }]])
+      );
+      admitOperationMock.mockResolvedValue({
+        admission: 'admitted',
+        row: makeLedgerRow({ organization_id: orgId }),
+      });
 
-    await expect(
-      runCreate(
+      await runCreate(
         ctx,
         makeRequest({
           runtime: { sandboxAllocation: 'isolated-standard' },
           options: {
             operationKey: OPERATION_KEY,
-            createdOnPlatform: 'cloud-agent-web',
-            clientProvenance: 'browser',
+            createdOnPlatform,
+            kilocodeOrganizationId: orgId,
           },
         })
-      )
-    ).rejects.toMatchObject({
-      code: 'BAD_REQUEST',
-      message: 'Isolated Standard allocation is not supported for control-plane sessions',
-    });
+      );
 
-    expect(createCliSessionMock).not.toHaveBeenCalled();
-    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(admitOperationMock).not.toHaveBeenCalled();
-  });
+      expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+      const command = createdMetadata(doStub);
+      const metadata = parseSessionMetadata({
+        ...command,
+        metadataSchemaVersion: 2,
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      expect(metadata.identity.sessionId).toBe(WORKSPACE_SESSION_ID);
+      expect(metadata.workspace).toMatchObject({
+        sandboxId,
+        sandboxProvider: 'cloudflare',
+        sandboxAllocation: 'isolated-standard',
+      });
+    }
+  );
 
   it('allows isolated Standard allocation for non-interactive legacy sessions', async () => {
     const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';

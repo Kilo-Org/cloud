@@ -98,7 +98,7 @@ if (( ${#tools[@]} )); then
 fi
 export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 export AGENT_BROWSER_SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-/tmp/kilo-browser}"
-export AGENT_BROWSER_ARGS="${AGENT_BROWSER_ARGS:---disable-gpu,--renderer-process-limit=2,--js-flags=--max-old-space-size=256}"
+export AGENT_BROWSER_ARGS="${AGENT_BROWSER_ARGS:---disable-gpu}"
 export AGENT_BROWSER_DEFAULT_TIMEOUT="${AGENT_BROWSER_DEFAULT_TIMEOUT:-120000}"
 
 if ! docker info >/dev/null 2>&1; then

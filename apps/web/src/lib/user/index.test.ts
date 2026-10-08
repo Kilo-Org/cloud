@@ -862,7 +862,7 @@ describe('User', () => {
   describe('createOrUpdateUser', () => {
     beforeEach(() => {
       mockRecordAffiliateAttributionAndQueueParentEvent.mockResolvedValue(null);
-      mockSignupDecide.mockReset().mockResolvedValue(null);
+      mockSignupDecide.mockReset().mockResolvedValue({ enforced: false, flags: [] });
       jest.mocked(createStripeCustomer).mockClear();
       jest.mocked(deleteStripeCustomer).mockClear();
     });
@@ -950,22 +950,6 @@ describe('User', () => {
           ],
         },
       },
-      {
-        name: 'invalid six-flag rejection',
-        verdict: {
-          enforced: true,
-          code: 'signup_rate_limited',
-          retryAfterMs: 1_000,
-          flags: Array.from({ length: 6 }, () => ({
-            name: 'signup:ja4',
-            source: 'ja4',
-            decision: 'throttle',
-            enforced: true,
-            until: null,
-          })),
-        },
-      },
-      { name: 'unavailable or unknown response', verdict: null },
     ])('creates the user after Bouncer $name', async ({ verdict }) => {
       mockSignupDecide.mockImplementation(actualSignupDecide);
       jest.spyOn(global, 'fetch').mockResolvedValue(Response.json(verdict));
@@ -990,6 +974,93 @@ describe('User', () => {
       expect(createStripeCustomer).toHaveBeenCalledTimes(1);
       expect(
         await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
+      ).toBeDefined();
+    });
+    it.each([
+      'unknown response',
+      'invalid six-flag rejection',
+      'transport failure',
+      'HTTP failure',
+      'invalid JSON',
+      'timeout',
+    ])('prevents Stripe and user creation after Bouncer %s', async mode => {
+      mockSignupDecide.mockImplementation(request =>
+        actualSignupDecide(request, { timeoutMs: 30 })
+      );
+      const fetchMock = jest.spyOn(global, 'fetch');
+      switch (mode) {
+        case 'unknown response':
+          fetchMock.mockResolvedValue(Response.json(null));
+          break;
+        case 'invalid six-flag rejection':
+          fetchMock.mockResolvedValue(
+            Response.json({
+              enforced: true,
+              code: 'signup_rate_limited',
+              retryAfterMs: 1_000,
+              flags: Array.from({ length: 6 }, () => ({
+                name: 'signup:ja4',
+                source: 'ja4',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              })),
+            })
+          );
+          break;
+        case 'transport failure':
+          fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+          break;
+        case 'HTTP failure':
+          fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
+          break;
+        case 'invalid JSON':
+          fetchMock.mockResolvedValue(new Response('not-json'));
+          break;
+        case 'timeout':
+          fetchMock.mockImplementation(
+            (_url, init) =>
+              new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+              })
+          );
+          break;
+      }
+      const email = 'bouncer-unavailable@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Bouncer Unavailable',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'google' as const,
+        provider_account_id: 'google-bouncer-unavailable',
+      };
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.63' });
+      const result = await createOrUpdateUser(args, undefined, false, headers);
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(deleteStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, args.provider_account_id),
+        })
+      ).toBeUndefined();
+
+      // Retrying after admission recovers must create one account, not a partial duplicate.
+      fetchMock.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+      const retry = await createOrUpdateUser(args, undefined, false, headers);
+      expect(retry.success).toBe(true);
+      if (!retry.success) return;
+      expect(retry.isNew).toBe(true);
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, retry.user.id) })
       ).toBeDefined();
     });
 
@@ -1069,7 +1140,7 @@ describe('User', () => {
     });
 
     it.each([undefined, 'not-an-ip', 'fe80::1%eth0'])(
-      'fails open without a usable signup IP: %s',
+      'rejects signup without a usable signup IP: %s',
       async ip => {
         const result = await createOrUpdateUser(
           {
@@ -1084,7 +1155,8 @@ describe('User', () => {
           false,
           ip ? new Headers({ 'x-forwarded-for': ip }) : undefined
         );
-        expect(result.success).toBe(true);
+        expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
         expect(mockSignupDecide).not.toHaveBeenCalled();
       }
     );
@@ -1185,7 +1257,8 @@ describe('User', () => {
           provider_account_id: 'google-new-admin-candidate',
         },
         undefined,
-        false
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.64' })
       );
 
       expect(result.success).toBe(true);
@@ -1212,7 +1285,8 @@ describe('User', () => {
           provider_account_id: 'github-dedup',
         },
         undefined,
-        false
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.65' })
       );
 
       expect(result.success).toBe(false);
@@ -1240,7 +1314,7 @@ describe('User', () => {
         },
         undefined,
         false,
-        undefined,
+        new Headers({ 'x-forwarded-for': '203.0.113.66' }),
         'impact-click-123'
       );
 

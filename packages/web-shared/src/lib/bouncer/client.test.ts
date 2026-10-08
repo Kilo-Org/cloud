@@ -294,7 +294,7 @@ describe('signupDecide', () => {
     ['unknown field', { enforced: false, flags: [], spendWatch: false }],
     ['shadow rejection code', { enforced: false, code: 'signup_rate_limited', flags: [] }],
     ['non-object response', 'allow'],
-  ])('fails open on %s', async (_name, verdict) => {
+  ])('returns unavailable on %s', async (_name, verdict) => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFetch.mockResolvedValue(Response.json(verdict));
     await expect(signupDecide(request)).resolves.toBeNull();
@@ -305,7 +305,7 @@ describe('signupDecide', () => {
     { ...request, operationId: 'a'.repeat(129) },
     { ...request, ip: 'not-an-ip' },
     { ...request, ip: 'fe80::1%eth0' },
-  ])('fails open without sending an invalid request: %j', async body => {
+  ])('returns unavailable without sending an invalid request: %j', async body => {
     await expect(signupDecide(body)).resolves.toBeNull();
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -317,14 +317,14 @@ describe('signupDecide', () => {
     expect((await signupDecide({ ...request, operationId: 'a'.repeat(128) }))?.enforced).toBe(true);
   });
 
-  it('fails open on transport failure', async () => {
+  it('returns unavailable on transport failure', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFetch.mockRejectedValue(new TypeError('fetch failed'));
     await expect(signupDecide(request)).resolves.toBeNull();
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it('fails open within the transport deadline and never retries', async () => {
+  it('returns unavailable within the transport deadline and never retries', async () => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFetch.mockImplementation((_url, init) => {
       const { promise, reject } = Promise.withResolvers<Response>();
@@ -337,18 +337,18 @@ describe('signupDecide', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
-  it.each([400, 401, 404, 500])('fails open on HTTP %s', async status => {
+  it.each([400, 401, 404, 500])('returns unavailable on HTTP %s', async status => {
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockFetch.mockResolvedValue(new Response('bad', { status }));
     await expect(signupDecide(request)).resolves.toBeNull();
   });
 
-  it('fails open on non-JSON success', async () => {
+  it('returns unavailable on non-JSON success', async () => {
     mockFetch.mockResolvedValue(new Response('not-json'));
     await expect(signupDecide(request)).resolves.toBeNull();
   });
 
-  it('fails open without configuration', async () => {
+  it('returns unavailable without configuration', async () => {
     mockConfigState.bouncerUrl = null;
     await expect(signupDecide(request)).resolves.toBeNull();
     expect(mockFetch).not.toHaveBeenCalled();

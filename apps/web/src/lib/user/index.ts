@@ -590,19 +590,29 @@ export async function createOrUpdateUser(
   const normalizedEmail = normalizeEmail(args.google_user_email);
   const operationId = signupOperationId(normalizedEmail);
   const bouncerIp = bareIpLiteral(signupIp ?? undefined);
-  if (!IS_DEVELOPMENT && bouncerIp) {
-    const verdict = await signupDecide({
-      operationId,
-      ip: bouncerIp,
-      ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
-    });
+  if (!IS_DEVELOPMENT) {
+    const verdict = bouncerIp
+      ? await signupDecide({
+          operationId,
+          ip: bouncerIp,
+          ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
+        })
+      : null;
     console.info('[auth] Bouncer signup admission', {
       operationId,
       enforced: verdict?.enforced ?? false,
       available: verdict !== null,
       flags: verdict?.flags ?? [],
     });
-    if (verdict?.enforced) {
+    if (verdict === null) {
+      console.info('[auth] Signup creation outcome', {
+        operationId,
+        outcome: 'rejected',
+        reason: 'bouncer_unavailable',
+      });
+      return failureResult('SIGNUP-UNAVAILABLE');
+    }
+    if (verdict.enforced) {
       console.info('[auth] Signup creation outcome', {
         operationId,
         outcome: 'rejected',

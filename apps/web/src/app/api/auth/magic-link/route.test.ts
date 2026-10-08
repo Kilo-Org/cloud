@@ -246,6 +246,20 @@ describe('POST /api/auth/magic-link', () => {
     expect(mockVerifyTurnstileJWT).not.toHaveBeenCalled();
   });
 
+  it('should return 400 for malformed JSON body', async () => {
+    const request = new NextRequest('http://localhost:3000/api/auth/magic-link', {
+      method: 'POST',
+      body: 'not-json{',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ success: false, error: 'Invalid request data' });
+    expect(mockVerifyTurnstileJWT).not.toHaveBeenCalled();
+  });
+
   it('should validate email format before checking Turnstile', async () => {
     // This test verifies the current behavior: email validation happens first
     // This is correct - we should fail fast on invalid request format

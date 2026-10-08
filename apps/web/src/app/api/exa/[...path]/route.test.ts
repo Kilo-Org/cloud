@@ -62,6 +62,14 @@ function makeRequest(
   });
 }
 
+function makeRawRequest(path: string, rawBody: string) {
+  return new Request(`http://localhost:3000/api/exa${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: rawBody,
+  });
+}
+
 function setUserAuth(id = 'user-123', organizationId?: string) {
   mockedGetUserFromAuth.mockResolvedValue({
     user: { id } as User,
@@ -136,6 +144,28 @@ describe('POST /api/exa/[...path]', () => {
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.error).toContain('Invalid path');
+      expect(mockedFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('request body validation', () => {
+    it.each([
+      ['not-json{'],
+      ['null'],
+      ['"just-a-string"'],
+      ['[1,2,3]'],
+      ['42'],
+      ['true'],
+      [''],
+      [' '],
+    ])('returns 400 for invalid body %s', async rawBody => {
+      setUserAuth();
+
+      const { POST } = await import('./route');
+      const response = await POST(makeRawRequest('/search', rawBody) as never);
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: 'Invalid JSON body' });
       expect(mockedFetch).not.toHaveBeenCalled();
     });
   });

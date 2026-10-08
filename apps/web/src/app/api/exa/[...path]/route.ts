@@ -70,6 +70,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 
+  // Parse body before DB work. Bad body returns 400 with no DB cost,
+  // and a DB error cannot turn a bad body into 500.
+  let requestBody: unknown;
+  try {
+    requestBody = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  if (typeof requestBody !== 'object' || requestBody === null || Array.isArray(requestBody)) {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const body = requestBody as Record<string, unknown>;
+  delete body.stream;
+
   // Check monthly allowance and balance.
   // freeAllowance is the stored value from the first request of the month;
   // null means no row yet, so we compute from the helper.
@@ -96,12 +110,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Strip `stream` to guarantee JSON responses with costDollars for billing
-  const requestBody: Record<string, unknown> = await request.json();
-  delete requestBody.stream;
-
+  // `stream` is stripped to guarantee JSON responses with costDollars for billing.
   const featureId = validateFeatureHeader(request.headers.get(FEATURE_HEADER)) ?? undefined;
-  const type = typeof requestBody.type === 'string' ? requestBody.type : undefined;
+  const type = typeof body.type === 'string' ? body.type : undefined;
 
   const response = await fetch(`${EXA_BASE_URL}${exaPath}`, {
     method: 'POST',
@@ -109,7 +120,7 @@ export async function POST(request: NextRequest) {
       'Content-Type': 'application/json',
       'x-api-key': EXA_API_KEY,
     },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify(body),
     signal: request.signal,
   });
 

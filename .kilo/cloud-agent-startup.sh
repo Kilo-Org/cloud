@@ -165,17 +165,21 @@ YAML
 cat > .wrangler/kilo-startup/bin/pnpm <<SH
 #!/usr/bin/env bash
 export NODE_OPTIONS=--max-old-space-size=512
+web=false
 if [[ \$PWD == */apps/web ]]; then
-  export NODE_OPTIONS=--max-old-space-size=2048
-  if [[ \${1:-} == run && \${2:-} == dev ]]; then
-    set -- "\$@" --webpack
-  fi
+  web=true
 fi
 for arg in "\$@"; do
   if [[ \$arg == *apps/web* ]]; then
-    export NODE_OPTIONS=--max-old-space-size=2048
+    web=true
   fi
 done
+if [[ \$web == true ]]; then
+  export NODE_OPTIONS=--max-old-space-size=2048
+  if [[ " \$* " == *" run dev "* ]]; then
+    set -- "\$@" --webpack
+  fi
+fi
 exec "$real_pnpm" "\$@"
 SH
 cat > .wrangler/kilo-startup/bin/kilo-shell <<'SH'

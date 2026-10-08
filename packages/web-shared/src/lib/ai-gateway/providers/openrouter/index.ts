@@ -27,6 +27,7 @@ import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-g
 import { getPreferredProviderOrder } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
+  getTerminalBenchLatestSummaries,
   getTerminalBenchSummaries,
   terminalBenchFor,
 } from '@kilocode/web-shared/lib/model-stats/terminal-bench';
@@ -132,6 +133,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
+  const latestSummaries = await getTerminalBenchLatestSummaries();
   const enhancedModels = await Promise.all(
     models
       .filter(
@@ -156,10 +158,12 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             )?.pricing);
         const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
+        const terminalBenchLatest = terminalBenchFor(latestSummaries, model.id);
         return {
           ...model,
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
+          ...(terminalBenchLatest && { terminalBenchLatest }),
         };
       })
       .concat(

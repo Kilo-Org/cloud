@@ -161,6 +161,7 @@ jest.mock('@kilocode/web-shared/lib/model-stats/terminal-bench', () => ({
   getTerminalBenchSummaries: jest.fn(
     async () => new Map([['some-other-model', { overallScore: 0.551, avgAttemptCostUsd: 53.37 }]])
   ),
+  getTerminalBenchLatestSummaries: jest.fn(async () => new Map()),
   terminalBenchFor: jest.fn((summaries: Map<string, unknown>, id: string) => summaries.get(id)),
 }));
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
-import { summarizeTerminalBench, terminalBenchFor } from './terminal-bench';
+import {
+  summarizeTerminalBench,
+  summarizeTerminalBenchLatest,
+  terminalBenchFor,
+} from './terminal-bench';
 
 const summary = { overallScore: 0.551, avgAttemptCostUsd: 53.37 };
 
@@ -67,6 +71,53 @@ describe('summarizeTerminalBench', () => {
         ['openai/model', summary],
         ['stealth/model', summary],
         ['nullable/model', summary],
+      ])
+    );
+  });
+});
+
+describe('summarizeTerminalBenchLatest', () => {
+  it('populates terminalBenchLatest from the highest eligible Hub revision', () => {
+    const legacy = benchmarks().kiloBench.evals['terminal-bench'];
+    const revisioned = (revision: string, overallScore: number, nAttempts = 5) => ({
+      ...legacy,
+      taskSource: `terminal-bench/terminal-bench@${revision}`,
+      datasetName: 'terminal-bench/terminal-bench',
+      benchmarkRelease: `${revision}.0.0`,
+      benchmarkRevision: revision,
+      scope: 'cpu-only',
+      overallScore,
+      nAttempts,
+    });
+    const summaries = summarizeTerminalBenchLatest([
+      row({
+        benchmarks: {
+          kiloBench: {
+            overallScore: 0.4,
+            evals: {
+              'terminal-bench': legacy,
+              'terminal-bench/terminal-bench@3': revisioned('3', 0.3),
+              'terminal-bench/terminal-bench@4': revisioned('4', 0.6),
+              'terminal-bench/terminal-bench@5': revisioned('5', 0.9, 4),
+            },
+          },
+        },
+      }),
+      row({ openrouterId: 'legacy/model' }),
+    ]);
+
+    expect(summaries).toEqual(
+      new Map([
+        [
+          'openai/model',
+          {
+            overallScore: 0.6,
+            avgAttemptCostUsd: summary.avgAttemptCostUsd,
+            release: '4.0.0',
+            revision: '4',
+            scope: 'cpu-only',
+          },
+        ],
       ])
     );
   });

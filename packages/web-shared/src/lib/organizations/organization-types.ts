@@ -347,6 +347,15 @@ const OpenRouterModelSchema = z.object({
       avgAttemptCostUsd: z.number(),
     })
     .optional(),
+  terminalBenchLatest: z
+    .object({
+      overallScore: z.number(),
+      avgAttemptCostUsd: z.number(),
+      release: z.string().nullable(),
+      revision: z.string(),
+      scope: z.string().nullable(),
+    })
+    .optional(),
   enkrypt: EnkryptPublishedBenchmarkSchema.optional(),
   opencode: OpenCodeSettingsSchema.optional(),
 

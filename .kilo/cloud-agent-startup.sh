@@ -19,7 +19,7 @@ cloud_agents=false
 if [[ "$*" != app ]]; then
   cloud_agents=true
 fi
-export KILO_STARTUP_MEMORY_MB="${KILO_STARTUP_MEMORY_MB:-$([[ $cloud_agents == true ]] && printf 6144 || printf 4096)}"
+export KILO_STARTUP_MEMORY_MB="${KILO_STARTUP_MEMORY_MB:-$([[ $cloud_agents == true ]] && printf 6144 || printf 5120)}"
 
 if [[ $(uname -s) != Linux ]] || ! command -v apt-get >/dev/null; then
   printf 'This startup script requires a Debian/Ubuntu Linux sandbox.\n' >&2
@@ -97,6 +97,7 @@ if (( ${#tools[@]} )); then
     --global-bin-dir /usr/local/bin "${tools[@]}"
 fi
 export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+export AGENT_BROWSER_ENGINE=chromium
 export AGENT_BROWSER_SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-/tmp/kilo-browser}"
 export AGENT_BROWSER_ARGS="${AGENT_BROWSER_ARGS:---disable-gpu}"
 export AGENT_BROWSER_DEFAULT_TIMEOUT="${AGENT_BROWSER_DEFAULT_TIMEOUT:-120000}"
@@ -357,16 +358,17 @@ node -e '
 printf '%s\n' "$status"
 export KILO_DEV_WEB_URL="$web_url"
 export KILO_TEST_LOGIN_URL="$web_url/users/sign_in?fakeUser=$test_email&callbackPath=/profile"
-printf 'export AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q AGENT_BROWSER_DEFAULT_TIMEOUT=%q KILO_DEV_WEB_URL=%q KILO_TEST_LOGIN_URL=%q PATH=%q KILO_STARTUP_REAL_DOCKER=%q KILO_STARTUP_REAL_PNPM=%q KILO_STARTUP_BUILDER=%q NODE_OPTIONS=%q\n' \
+printf 'export AGENT_BROWSER_ENGINE=%q AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q AGENT_BROWSER_DEFAULT_TIMEOUT=%q KILO_DEV_WEB_URL=%q KILO_TEST_LOGIN_URL=%q PATH=%q KILO_STARTUP_REAL_DOCKER=%q KILO_STARTUP_REAL_PNPM=%q KILO_STARTUP_BUILDER=%q NODE_OPTIONS=%q\n' \
+  "$AGENT_BROWSER_ENGINE" \
   "$AGENT_BROWSER_EXECUTABLE_PATH" "$AGENT_BROWSER_SOCKET_DIR" "$AGENT_BROWSER_ARGS" \
   "$AGENT_BROWSER_DEFAULT_TIMEOUT" "$KILO_DEV_WEB_URL" "$KILO_TEST_LOGIN_URL" \
   "$PATH" "$KILO_STARTUP_REAL_DOCKER" "$KILO_STARTUP_REAL_PNPM" "$KILO_STARTUP_BUILDER" "$NODE_OPTIONS" \
   > .wrangler/kilo-startup/browser.env
 if [[ ${KILO_STARTUP_BROWSER_SMOKE:-true} == true ]]; then
-  agent-browser --session kilo-startup open "$KILO_TEST_LOGIN_URL"
-  agent-browser --session kilo-startup wait --fn 'window.location.pathname === "/profile"'
-  agent-browser --session kilo-startup snapshot -i
-  agent-browser --session kilo-startup close
+  agent-browser --session kilo-startup batch --bail \
+    "open $KILO_TEST_LOGIN_URL" \
+    "wait --fn 'window.location.pathname === \"/profile\"'" \
+    'snapshot -i' 'close'
 fi
 printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=%s&callbackPath=/profile\n' \
   "$web_url" "$web_url" "$test_email"

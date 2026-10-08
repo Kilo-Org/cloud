@@ -444,6 +444,8 @@ promo or Kilo Pass referral conversion.
 - Updated subscription offers, ramp previews, and KiloClaw upsells to show the new schedule.
 - Kept yearly upsell text at 50% every month and limited welcome callouts to the applicable promo window.
 - Kept the selected welcome month in ramp totals after the welcome callout disappears.
+- Pending referral rewards skip the welcome-month issuance and apply to the next eligible issuance
+  (`.specs/impact-referrals.md` Rule 123).
 
 ### 2026-06-08 -- Yearly duplicate-card enforcement
 

@@ -123,9 +123,9 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
   after the referral reward was earned. Annual subscription issuances and already-created issuances are not eligible.
 - **Kilo Pass bonus-like issuance item**: Kilo Pass issuance item of kind `bonus`, `promo_first_month_50pct`, or
   `referral_bonus`. At most one bonus-like item may exist for an issuance.
-- **Referral launch cutoff**: UTC instant configured for the Kilo Pass referral launch. First-time monthly subscribers
-  who started before the cutoff keep legacy month-2 welcome promo behavior; subscribers starting at or after the cutoff
-  receive only the first-month welcome promo.
+- **Kilo Pass welcome-month issuance**: Monthly base issuance that receives the 50% welcome promo under the
+  subscription-start schedule in `.specs/kilo-pass.md`. It is streak month 1 for starts before `2026-10-09T00:00:00Z`
+  and streak month 2 for starts at or after that cutoff.
 
 ## Overview
 
@@ -535,8 +535,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 114.  A qualified Kilo Pass referral conversion MUST grant one Kilo Pass referral bonus reward to the referrer unless
       cap-limited or disqualified.
 
-115.  Kilo Pass first-time monthly subscribers MUST keep the first-month welcome promo when otherwise eligible. Referral
-      rewards MUST NOT replace, reduce, or retroactively alter the source conversion's first-month welcome issuance.
+115.  Kilo Pass first-time monthly subscribers MUST keep the welcome promo when otherwise eligible. Referral rewards MUST
+      NOT replace, reduce, or retroactively alter the beneficiary's welcome-month issuance.
 
 116.  Kilo Pass referral reward value MUST be snapshotted at conversion as 50% of the referee's eligible monthly tier.
       Later tier changes by either beneficiary MUST NOT change the reward amount.
@@ -563,6 +563,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 123.  A Kilo Pass referral reward MUST apply only to an eligible monthly base issuance after the reward is earned. It MUST
       NOT apply retroactively to the source conversion's base issuance or to any already-created issuance.
+      If the issuance is the beneficiary's welcome-month issuance, the reward MUST stay pending for a later issuance.
+      This applies to referee and referrer rewards.
 
 124.  A consumed Kilo Pass referral reward MUST create a distinct `referral_bonus` Kilo Pass issuance item.
 
@@ -813,6 +815,12 @@ application, and Kilo Pass redeems after local referral bonus allocation.
     retry unchanged payloads, except an already-redeemed response MAY be treated as idempotent success.
 
 ## Changelog
+
+### 2026-10-08 -- Keep the welcome month free of referral rewards
+
+Defined the welcome-month issuance from the Kilo Pass subscription-start schedule. A pending referral reward now waits
+for the next eligible issuance when the current issuance is the beneficiary's welcome month, for both referees and
+referrers. This keeps the month-2 welcome promo for subscribers starting at or after `2026-10-09T00:00:00Z`.
 
 ### 2026-08-19 -- Retire the KiloClaw referral program
 

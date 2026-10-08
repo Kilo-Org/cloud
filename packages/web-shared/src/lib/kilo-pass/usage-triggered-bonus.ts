@@ -4,7 +4,6 @@ import {
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
-  kilo_pass_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
@@ -33,11 +32,10 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
 import {
-  getInitialWelcomePromoContextForSubscription,
-  getKiloPassWelcomePromoPolicy,
+  getMonthlyWelcomePromoAccountContext,
   type KiloPassWelcomePromoPolicy,
 } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
-import { and, desc, eq, inArray, like, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, like } from 'drizzle-orm';
 
 type Db = typeof defaultDb;
 type Tx = Parameters<Db['transaction']>[0] extends (tx: infer T) => unknown ? T : never;
@@ -272,35 +270,16 @@ async function maybeIssueBonusFromUsageThreshold(
       };
     }
 
-    const otherSubscription = await tx
-      .select({ id: kilo_pass_subscriptions.id })
-      .from(kilo_pass_subscriptions)
-      .where(
-        and(
-          eq(kilo_pass_subscriptions.kilo_user_id, kiloUserId),
-          ne(kilo_pass_subscriptions.id, subscription.subscriptionId)
-        )
-      )
-      .limit(1);
-
-    const isFirstTimeSubscriberEver = otherSubscription.length === 0;
-    const initialWelcomePromoContext =
-      subscription.paymentProvider === KiloPassPaymentProvider.Stripe
-        ? await getInitialWelcomePromoContextForSubscription(tx, {
-            subscriptionId: subscription.subscriptionId,
-          })
-        : null;
-    const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
+    const welcomePromoAccountContext = await getMonthlyWelcomePromoAccountContext(tx, {
+      kiloUserId,
+      subscriptionId: subscription.subscriptionId,
       paymentProvider: subscription.paymentProvider,
-      initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
     });
     const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
       tier: subscription.tier,
       startedAtIso: subscription.startedAt,
       currentStreakMonths: subscription.currentStreakMonths,
-      isFirstTimeSubscriberEver,
-      welcomePromoPolicy,
-      welcomePromoEligibilityReason: initialWelcomePromoContext?.eligibilityReason ?? null,
+      ...welcomePromoAccountContext,
       issueMonth: issuance.issueMonth,
     });
 

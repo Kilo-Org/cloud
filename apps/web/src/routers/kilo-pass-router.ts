@@ -99,7 +99,6 @@ import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
-import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import { getPurchasePresentationForUser } from '@/lib/kilo-pass/purchase-presentation';
 import {
   PURCHASE_PLATFORMS,
@@ -107,18 +106,7 @@ import {
   PURCHASE_PRODUCTS,
   PURCHASE_STATUS_CLASSES,
   PURCHASE_STOREFRONTS,
-  isNativeIapMutationAllowed,
 } from '@kilocode/app-shared/commerce';
-import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
-import { verifyGooglePlayKiloPassPurchase } from '@/lib/kilo-pass/google-play-verifier';
-import { acknowledgeGooglePlaySubscriptionPurchase } from '@/lib/kilo-pass/google-play-sdk';
-import { reconcileGooglePlaySubscriptionState } from '@/lib/kilo-pass/google-play-subscription-state';
-import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
-import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
-import {
-  assertAppStoreAccountTokenMatchesUser,
-  assertGooglePlayAccountTokenMatchesUser,
-} from '@/lib/credits/store-account-token';
 import {
   getInitialWelcomePromoContextForSubscription,
   getKiloPassWelcomePromoPolicy,
@@ -268,13 +256,6 @@ const KiloPassReferralRewardSummaryOutputSchema = z.object({
   ),
 });
 
-const CompleteStorePurchaseOutputSchema = z.object({
-  subscriptionId: z.string(),
-  tier: KiloPassTierSchema,
-  cadence: KiloPassCadenceSchema,
-  alreadyProcessed: z.boolean(),
-});
-
 type KiloPassSubscriptionStateResponse = z.infer<typeof KiloPassSubscriptionStateSchema>;
 
 type KiloPassCreditHistoryRow = {
@@ -294,106 +275,6 @@ const KILO_PASS_PENDING_REFERRAL_REWARD_STATUSES = new Set<string>([
   ImpactReferralRewardStatus.Pending,
   ImpactReferralRewardStatus.Earned,
 ]);
-
-function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
-  if (error instanceof TRPCError) {
-    if (error.code === 'CONFLICT') {
-      return new TRPCError({
-        code: 'CONFLICT',
-        message: 'Purchase is still being processed — try again in a moment.',
-      });
-    }
-    return error;
-  }
-
-  captureException(error, {
-    tags: {
-      area: 'kilo-pass',
-      operation: 'complete-app-store-purchase',
-    },
-    extra: {
-      kiloUserId: userId,
-    },
-  });
-
-  const message = error instanceof Error ? error.message : '';
-  const isVerifierFailure =
-    message.startsWith('Apple ') || message.includes('transaction') || message.includes('product');
-  const isDomainFailure =
-    message.includes('already belongs') ||
-    message.includes('already have an active Kilo Pass subscription') ||
-    message.includes('previous period expiration');
-
-  if (isVerifierFailure) {
-    return new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'We could not verify this App Store purchase. Please try again.',
-    });
-  }
-
-  if (isDomainFailure) {
-    return new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'This App Store purchase cannot be used for your account.',
-    });
-  }
-
-  return new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: 'We could not finish this App Store purchase. Please try again.',
-  });
-}
-
-function mapPlayCompletionError(error: unknown, userId: string): TRPCError {
-  if (error instanceof TRPCError) {
-    if (error.code === 'CONFLICT') {
-      return new TRPCError({
-        code: 'CONFLICT',
-        message: 'Purchase is still being processed — try again in a moment.',
-      });
-    }
-    return error;
-  }
-
-  captureException(error, {
-    tags: {
-      area: 'kilo-pass',
-      operation: 'complete-play-purchase',
-    },
-    extra: {
-      kiloUserId: userId,
-    },
-  });
-
-  const message = error instanceof Error ? error.message : '';
-  const isVerifierFailure =
-    message.startsWith('Google Play ') ||
-    message.includes('transaction') ||
-    message.includes('product');
-  const isDomainFailure =
-    message.includes('already belongs') ||
-    message.includes('already have an active Kilo Pass subscription') ||
-    message.includes('previous period expiration');
-
-  if (isVerifierFailure) {
-    return new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'We could not verify this Google Play purchase. Please try again.',
-    });
-  }
-
-  if (isDomainFailure) {
-    return new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'This Google Play purchase cannot be used for your account.',
-    });
-  }
-
-  return new TRPCError({
-    code: 'INTERNAL_SERVER_ERROR',
-    message: 'We could not finish this Google Play purchase. Please try again.',
-  });
-}
 
 function roundToCents(usd: number): number {
   return Math.round(usd * 100) / 100;
@@ -1321,11 +1202,6 @@ export async function createPersonalKiloPassCheckoutSession(params: {
 export type CreatePersonalKiloPassCheckoutSession = typeof createPersonalKiloPassCheckoutSession;
 
 export const kiloPassRouter = createTRPCRouter({
-  getMobileStoreProducts: baseProcedure.query(({ ctx }) => ({
-    appAccountToken: ctx.user.app_store_account_token,
-    products: getAllMobileStoreKiloPassProducts(),
-  })),
-
   getPurchasePresentation: baseProcedure
     .input(GetPurchasePresentationInputSchema)
     .output(GetPurchasePresentationOutputSchema)
@@ -1336,123 +1212,6 @@ export const kiloPassRouter = createTRPCRouter({
         product: input.product,
         program: input.program,
       });
-    }),
-
-  completeAppStorePurchase: baseProcedure
-    .input(
-      z.object({
-        signedTransactionJws: z.string().min(1),
-        platform: PurchasePlatformSchema,
-        storefront: PurchaseStorefrontSchema,
-        product: PurchaseProductSchema,
-        program: z.string().max(64).nullable().optional(),
-      })
-    )
-    .output(CompleteStorePurchaseOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      // `isNativeIapMutationAllowed` now also admits Android Play. This mutation stays
-      // App Store, so require the exact App Store combination.
-      if (
-        input.platform !== 'ios' ||
-        input.storefront !== 'app_store' ||
-        input.product !== 'kilo_pass'
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'commerce_not_available',
-        });
-      }
-      try {
-        const purchase = await verifyAppleKiloPassTransactionJws(input.signedTransactionJws);
-        assertAppStoreAccountTokenMatchesUser({
-          appAccountToken: purchase.appAccountToken,
-          userAppStoreAccountToken: ctx.user.app_store_account_token,
-        });
-        const result = await completeStoreKiloPassPurchase({
-          user: ctx.user,
-          purchase,
-        });
-        if (!result.alreadyProcessed) {
-          trackKiloPassPurchaseCompleted({
-            channel: 'app_store',
-            distinctId: ctx.user.google_user_email,
-            userId: ctx.user.id,
-            tier: result.tier,
-            cadence: result.cadence,
-            purchaseKind: result.purchaseKind,
-            providerTransactionId: purchase.providerTransactionId,
-            productId: purchase.productId,
-            environment: purchase.environment,
-          });
-        }
-        return result;
-      } catch (error) {
-        throw mapAppStoreCompletionError(error, ctx.user.id);
-      }
-    }),
-
-  completePlayPurchase: baseProcedure
-    .input(
-      z.object({
-        purchaseToken: z.string().min(1),
-        platform: PurchasePlatformSchema,
-        storefront: PurchaseStorefrontSchema,
-        product: PurchaseProductSchema,
-        program: z.string().max(64).nullable().optional(),
-      })
-    )
-    .output(CompleteStorePurchaseOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      // Play completion is Android-only. The shared helper also admits App Store,
-      // so require an Android platform in addition to its checks.
-      if (
-        !isNativeIapMutationAllowed({
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-        }) ||
-        input.platform !== 'android'
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'commerce_not_available',
-        });
-      }
-      try {
-        const purchase = await verifyGooglePlayKiloPassPurchase(input.purchaseToken);
-        assertGooglePlayAccountTokenMatchesUser({
-          appAccountToken: purchase.appAccountToken,
-          userAppStoreAccountToken: ctx.user.app_store_account_token,
-        });
-        const result = await completeStoreKiloPassPurchase({
-          user: ctx.user,
-          purchase,
-        });
-        await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, purchase));
-        if (purchase.rawPayload.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {
-          await acknowledgeGooglePlaySubscriptionPurchase(
-            purchase.productId,
-            input.purchaseToken,
-            purchase.rawPayload.outOfAppPurchaseContext ? purchase.appAccountToken : undefined
-          );
-        }
-        if (!result.alreadyProcessed) {
-          trackKiloPassPurchaseCompleted({
-            channel: 'google_play',
-            distinctId: ctx.user.google_user_email,
-            userId: ctx.user.id,
-            tier: result.tier,
-            cadence: result.cadence,
-            purchaseKind: result.purchaseKind,
-            providerTransactionId: purchase.providerTransactionId,
-            productId: purchase.productId,
-            environment: purchase.environment,
-          });
-        }
-        return result;
-      } catch (error) {
-        throw mapPlayCompletionError(error, ctx.user.id);
-      }
     }),
 
   getAverageMonthlyUsageLast3Months: baseProcedure

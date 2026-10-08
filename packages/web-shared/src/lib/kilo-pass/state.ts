@@ -159,10 +159,8 @@ export async function getKiloPassStateForUser(
     });
     const nowIso = dayjs().utc().toISOString();
 
-    // Apple's EXPIRED server notification is best-effort and can be dropped, so we
-    // derive the canceled status here when the latest store purchase has lapsed.
-    // The DB row is reconciled asynchronously by the
-    // `/api/cron/kilo-pass-store-subscription-reconcile` cron — this read path is pure.
+    // Store subscriptions are historical: notifications no longer change their
+    // rows, so derive canceled from the last recorded expiry without writing.
     if (isExpiredAtOrBeforeNow(latestStorePurchase?.expires_at ?? null, nowIso)) {
       return {
         subscriptionId: selected.subscriptionId,

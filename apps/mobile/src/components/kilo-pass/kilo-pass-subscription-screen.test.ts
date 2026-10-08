@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Covers read-only states, provider/platform pairings, and store management without sales or steering. */
 import { createElement } from 'react';
+import { type Purchase, type PurchaseIOS } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, TestRenderer } from '@/test/renderer';
 import { KiloPassSubscriptionScreen } from './kilo-pass-subscription-screen';
@@ -8,10 +9,14 @@ const mocks = vi.hoisted(() => ({
   platform: { OS: 'ios' },
   state: { data: undefined as unknown, isPending: false, isError: false, refetch: vi.fn() },
   catalog: {
-    data: { products: [] as { tier: string; googleProductId: string }[] },
+    data: {
+      products: [] as { tier: string; googleProductId: string }[],
+      appAccountToken: undefined as string | undefined,
+    },
     isPending: false,
     isError: false,
   },
+  native: { data: [] as Purchase[] },
   invalidate: vi.fn(),
   appleManagement: vi.fn(),
   playManagement: vi.fn(),
@@ -45,7 +50,14 @@ vi.mock('./kilo-pass-play-manage', () => ({
   openPlaySubscriptionManagement: mocks.playManagement,
 }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: mocks.externalLink }));
-vi.mock('expo-iap', () => ({ requestPurchase: mocks.requestPurchase }));
+vi.mock('expo-iap', () => ({
+  requestPurchase: mocks.requestPurchase,
+  initConnection: vi.fn(),
+  getAvailablePurchases: vi.fn(),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({
+  useAuth: () => ({ token: 'session', isLoading: false, isSigningOut: false }),
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     kiloPass: {
@@ -62,7 +74,15 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: { name: string }) => (options.name === 'state' ? mocks.state : mocks.catalog),
+  useQuery: (options: { name?: string }) => {
+    if (options.name === 'state') {
+      return mocks.state;
+    }
+    if (options.name === 'catalog') {
+      return mocks.catalog;
+    }
+    return mocks.native;
+  },
   useQueryClient: () => ({ invalidateQueries: mocks.invalidate }),
 }));
 
@@ -105,15 +125,32 @@ function manageButtons(renderer: TestRenderer.ReactTestRenderer) {
   );
 }
 
+function ownedApple(overrides: Partial<PurchaseIOS> = {}): PurchaseIOS {
+  return {
+    id: 'legacy',
+    productId: 'kilopass.tier19.monthly.v1',
+    store: 'apple',
+    purchaseState: 'purchased',
+    purchaseToken: 'jws',
+    quantity: 1,
+    transactionDate: Date.now(),
+    transactionId: 'legacy-transaction',
+    isAutoRenewing: false,
+    appAccountToken: 'account-a',
+    expirationDateIOS: Date.now() + 60_000,
+    ...overrides,
+  };
+}
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.platform.OS = 'ios';
   mocks.state.data = { subscription: active };
   mocks.state.isPending = false;
   mocks.state.isError = false;
-  mocks.catalog.data = { products: [] };
+  mocks.catalog.data = { products: [], appAccountToken: 'account-a' };
   mocks.catalog.isPending = false;
   mocks.catalog.isError = false;
+  mocks.native.data = [];
 });
 afterEach(() => {
   act(() => {
@@ -181,6 +218,97 @@ describe('read-only Kilo Pass status', () => {
       expect(mocks.externalLink).not.toHaveBeenCalled();
     }
   );
+
+  it('keeps owned paid Apple management reachable when Stripe is primary', async () => {
+    mocks.state.data = { subscription: { ...active, paymentProvider: 'stripe' } };
+    mocks.native.data = [ownedApple({ appAccountToken: 'ACCOUNT-A' })];
+    const renderer = await renderScreen();
+    expect(text(renderer)).toContain('kiloPass.managedOnWeb');
+    expect(manageButtons(renderer)).toHaveLength(1);
+    expect(mocks.externalLink).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { appAccountToken: 'another-account' },
+    { appAccountToken: null },
+    { expirationDateIOS: Date.now() - 1 },
+    { expirationDateIOS: null },
+    { purchaseState: 'pending' as const },
+    { productId: 'credits.usd10' },
+  ])('does not manage an unowned or unpaid Apple receipt: %o', async overrides => {
+    mocks.state.data = { subscription: { ...active, paymentProvider: 'stripe' } };
+    mocks.native.data = [ownedApple(overrides)];
+    expect(manageButtons(await renderScreen())).toHaveLength(0);
+  });
+
+  it('keeps management reachable for an owned active receipt before backend recovery succeeds', async () => {
+    mocks.state.data = { subscription: null };
+    mocks.native.data = [ownedApple()];
+    expect(manageButtons(await renderScreen())).toHaveLength(1);
+  });
+
+  it('uses the owned Play product, not the primary web tier, after native renewal stops', async () => {
+    mocks.platform.OS = 'android';
+    mocks.state.data = { subscription: { ...active, tier: 'tier_49', paymentProvider: 'stripe' } };
+    mocks.native.data = [
+      {
+        id: 'legacy-play',
+        productId: 'kilopass_tier19',
+        store: 'google',
+        purchaseState: 'purchased',
+        purchaseToken: 'token',
+        quantity: 1,
+        transactionDate: Date.now(),
+        isAutoRenewing: false,
+        autoRenewingAndroid: false,
+        obfuscatedAccountIdAndroid: 'account-a',
+      },
+    ];
+    const renderer = await renderScreen();
+    expect(text(renderer)).toContain('kiloPass.managedOnWeb');
+    expect(text(renderer)).toContain('kiloPass.managedOnGooglePlay');
+    const props = manageButtons(renderer)[0]?.props as { onPress: () => void } | undefined;
+    if (!props) {
+      throw new Error('Missing owned native management');
+    }
+    await act(async () => {
+      props.onPress();
+      const gate = Promise.withResolvers<undefined>();
+      setImmediate(gate.resolve, undefined);
+      await gate.promise;
+    });
+    expect(mocks.playManagement).toHaveBeenCalledWith({
+      skuAndroid: 'kilopass_tier19',
+      invalidateAfter: expect.any(Function),
+    });
+    expect(mocks.externalLink).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { obfuscatedAccountIdAndroid: 'another-account' },
+    { obfuscatedAccountIdAndroid: null },
+    { purchaseState: 'pending' as const },
+    { isSuspendedAndroid: true },
+    { productId: 'credits_usd10' },
+  ])('does not manage an unowned or unpaid Play receipt: %o', async overrides => {
+    mocks.platform.OS = 'android';
+    mocks.state.data = { subscription: { ...active, paymentProvider: 'stripe' } };
+    mocks.native.data = [
+      {
+        id: 'legacy-play',
+        productId: 'kilopass_tier19',
+        store: 'google',
+        purchaseState: 'purchased',
+        purchaseToken: 'token',
+        quantity: 1,
+        transactionDate: Date.now(),
+        isAutoRenewing: false,
+        obfuscatedAccountIdAndroid: 'account-a',
+        ...overrides,
+      },
+    ];
+    expect(manageButtons(await renderScreen())).toHaveLength(0);
+  });
 
   it('shows canceled-but-unexpired paid benefits and native management', async () => {
     mocks.state.data = { subscription: { ...active, cancelAtPeriodEnd: true } };

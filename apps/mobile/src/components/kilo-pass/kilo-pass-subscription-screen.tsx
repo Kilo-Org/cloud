@@ -18,6 +18,7 @@ import {
   type KiloPassSubscription,
 } from '@/lib/kilo-pass/subscription-card-state';
 import { RestorePurchasesButton } from './restore-purchases-button';
+import { useOwnedNativeKiloPass } from '@/lib/kilo-pass/use-owned-native-kilo-pass';
 
 export function KiloPassSubscriptionScreen() {
   const { t, i18n } = useTranslation();
@@ -27,14 +28,20 @@ export function KiloPassSubscriptionScreen() {
   const catalog = useQuery(trpc.kiloPass.getMobileStoreProducts.queryOptions());
   const subscription: KiloPassSubscription | null | undefined = state.data?.subscription;
   const paidThrough = subscription ? getKiloPassPaidThrough(subscription) : null;
-  const canManage =
-    subscription &&
+  const ownedNative = useOwnedNativeKiloPass({
+    appAccountToken: catalog.data?.appAccountToken,
+    products: catalog.data?.products ?? [],
+  });
+  const canManagePrimary =
+    subscription != null &&
     isLiveKiloPassSubscription(subscription) &&
     ((Platform.OS === 'ios' && subscription.paymentProvider === 'app_store') ||
       (Platform.OS === 'android' && subscription.paymentProvider === 'google_play'));
+  const canManage = canManagePrimary || ownedNative.purchase !== null;
   const invalidateAfterManagement = async () => {
     await Promise.all([
       queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
+      queryClient.invalidateQueries({ queryKey: ['owned-native-kilo-pass'] }),
       queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
       queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
     ]);
@@ -45,11 +52,12 @@ export function KiloPassSubscriptionScreen() {
     if (Platform.OS === 'ios') {
       const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
       await openAppStoreManagement({ invalidateAfter: invalidateAfterManagement });
-    } else if (subscription) {
-      const product = catalog.data?.products.find(item => item.tier === subscription.tier);
+    } else if (Platform.OS === 'android') {
+      const product = catalog.data?.products.find(item => item.tier === subscription?.tier);
+      const skuAndroid = ownedNative.purchase?.productId ?? product?.googleProductId;
       const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
       await openPlaySubscriptionManagement({
-        ...(product ? { skuAndroid: product.googleProductId } : {}),
+        ...(skuAndroid ? { skuAndroid } : {}),
         invalidateAfter: invalidateAfterManagement,
       });
     }
@@ -113,21 +121,6 @@ export function KiloPassSubscriptionScreen() {
             })}
           </Text>
         ) : null}
-        {canManage ? (
-          <Button
-            variant="outline"
-            accessibilityHint={t(
-              Platform.OS === 'ios'
-                ? 'kiloPass.opensAppStoreManagement'
-                : 'kiloPass.opensPlayManagement'
-            )}
-            onPress={() => {
-              void manage();
-            }}
-          >
-            <Text>{t('kiloPass.manage')}</Text>
-          </Button>
-        ) : null}
       </View>
     );
   } else {
@@ -147,6 +140,30 @@ export function KiloPassSubscriptionScreen() {
           contentContainerClassName="gap-4 px-1 pb-6"
         >
           {statusContent}
+          {canManage && !canManagePrimary ? (
+            <Text className="text-sm text-muted-foreground">
+              {t(
+                Platform.OS === 'ios'
+                  ? 'kiloPass.managedInAppStore'
+                  : 'kiloPass.managedOnGooglePlay'
+              )}
+            </Text>
+          ) : null}
+          {canManage ? (
+            <Button
+              variant="outline"
+              accessibilityHint={t(
+                Platform.OS === 'ios'
+                  ? 'kiloPass.opensAppStoreManagement'
+                  : 'kiloPass.opensPlayManagement'
+              )}
+              onPress={() => {
+                void manage();
+              }}
+            >
+              <Text>{t('kiloPass.manage')}</Text>
+            </Button>
+          ) : null}
           <RestorePurchasesButton />
         </DetailScreenScrollView>
       </View>

@@ -42,6 +42,8 @@ provides it. The screen contains no web checkout or billing-management links.
 The organization hub also shows read-only Kilo Pass state without checkout or
 web subscription-management actions.
 Active legacy subscriptions retain access to their platform's store-management sheet.
+An owned active SDK receipt also keeps store management reachable when web state
+is primary or recovery is incomplete. SDK evidence does not grant benefits.
 Native one-off credit packs, localized prices, legal links, and recovery remain enabled.
 
 The forced-upgrade build itself completes already-paid, unfinished subscriptions:

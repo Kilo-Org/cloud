@@ -425,14 +425,14 @@ function SpendAlertsForm({
       </Text>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label={scopeLabel} value={scopeName} />
-        <KvRow label={t('spendAlerts.spend24h')} value={spendValue} last />
+        <KvRow label={scopeLabel} value={scopeName} selectable />
+        <KvRow label={t('spendAlerts.spend24h')} value={spendValue} last selectable />
       </View>
 
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('common.enabled')}</Text>
+        <Text className="text-sm font-medium">{t('notifications.channel.spend')}</Text>
         <Switch
-          accessibilityLabel={t('spendAlerts.enable')}
+          accessibilityLabel={t('notifications.channel.spend')}
           value={enabled}
           onValueChange={value => {
             void Haptics.selectionAsync();

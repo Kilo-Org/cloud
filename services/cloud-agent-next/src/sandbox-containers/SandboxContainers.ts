@@ -270,15 +270,34 @@ export class SandboxContainers extends DurableObject<Env> {
   async launchWrapper(input: ContainersLaunchInput): Promise<ContainersLaunchResult> {
     return this.runExclusive(async () => {
       const ref = input.allocationRef;
-      const stored = await this.readRecord();
-      if (stored.allocationRef !== null && stored.allocationRef !== ref) {
-        throw new ContainersAllocationConflictError(ref);
-      }
+      let stored = await this.readRecord();
       if (stored.allocationRef === ref && stored.state === 'stopping') {
         throw new ContainersAllocationConflictError(ref);
       }
+      if (stored.allocationRef !== null && stored.allocationRef !== ref) {
+        stored = await this.releaseSupersededAllocation(stored);
+      }
       return this.launchEntry(stored, ref, input);
     });
+  }
+
+  /**
+   * The Sandbox DO is this container's only caller and launches a new allocation
+   * only after it has given up on the previous one. A record still held by an
+   * older allocation is therefore a leftover (a lost cleanup, an abandoned
+   * create), and the new launch destroys it. Refusing instead would reject every
+   * later allocation, because none of them can name the leftover ref.
+   */
+  private async releaseSupersededAllocation(stored: ContainersRecord): Promise<ContainersRecord> {
+    logControlDiagnostic(
+      'container_superseded',
+      { sandboxId: this.sandboxNameForLog(), previousState: stored.state },
+      'warn'
+    );
+    if ((await this.stopRecord(stored)) === 'retryable') {
+      throw new Error('Container from a superseded allocation could not be destroyed');
+    }
+    return this.readRecord();
   }
 
   /**
@@ -372,6 +391,11 @@ export class SandboxContainers extends DurableObject<Env> {
    * the launch's `repoKey` and this image when the index has one, and the image
    * otherwise. `discard` forgets the stored entry first, so a start that follows a
    * failed repository start cannot use it again.
+   *
+   * Emits one `snapshot_lookup` diagnostic per start so `image` vs `repository`
+   * and the reason (no key, no index, miss, discarded, not allowed) are visible.
+   * Like the capture line it carries no repository key; the key is logged by the
+   * Sandbox DO, which owns it.
    */
   private async resolveStart(
     input: ContainersLaunchInput,
@@ -386,15 +410,30 @@ export class SandboxContainers extends DurableObject<Env> {
       indexKey: null,
     };
     const index = this.repoSnapshotIndex();
-    if (index === null || input.repoKey === undefined) return imageStart;
+    if (index === null) {
+      this.logSnapshotLookup('image', 'index_unavailable');
+      return imageStart;
+    }
+    if (input.repoKey === undefined) {
+      this.logSnapshotLookup('image', 'no_repo_key');
+      return imageStart;
+    }
     const indexKey = await repoSnapshotIndexKey(input.repoKey, this.containerImage());
     if (input.discardRepository === true) {
       await index.remove(indexKey);
+      this.logSnapshotLookup('image', 'discarded');
       return imageStart;
     }
-    if (!allowRepository) return imageStart;
+    if (!allowRepository) {
+      this.logSnapshotLookup('image', 'not_allowed');
+      return imageStart;
+    }
     const entry = await index.lookup(indexKey);
-    if (entry === null) return imageStart;
+    if (entry === null) {
+      this.logSnapshotLookup('image', 'index_miss');
+      return imageStart;
+    }
+    this.logSnapshotLookup('repository', 'index_hit');
     return {
       source: 'repository',
       options: this.startOptions(
@@ -404,6 +443,18 @@ export class SandboxContainers extends DurableObject<Env> {
       ),
       indexKey,
     };
+  }
+
+  private sandboxNameForLog(): string {
+    return this.ctx.id.name ?? this.ctx.id.toString();
+  }
+
+  private logSnapshotLookup(source: ContainersStartSource, reason: string): void {
+    logControlDiagnostic('snapshot_lookup', {
+      sandboxId: this.sandboxNameForLog(),
+      source,
+      reason,
+    });
   }
 
   /**
@@ -416,6 +467,10 @@ export class SandboxContainers extends DurableObject<Env> {
     } catch (error) {
       if (start.source === 'repository' && start.indexKey !== null) {
         await this.repoSnapshotIndex()?.remove(start.indexKey);
+        logControlDiagnostic('snapshot_discard', {
+          sandboxId: this.sandboxNameForLog(),
+          reason: 'repository_start_failed',
+        });
       }
       throw error;
     }
@@ -564,18 +619,25 @@ export class SandboxContainers extends DurableObject<Env> {
         return stopPath('other_allocation', 'terminal');
       }
       if (record.allocationRef !== ref) return stopPath('other_allocation_stopping', 'retryable');
-      if (record.state === 'stopping') {
-        const stopOpId = record.stopOpId ?? crypto.randomUUID();
-        if (record.stopOpId === null) {
-          await this.writeRecord({ ...record, stopOpId });
-        }
-        return this.finishStop(record);
-      }
-      const stopOpId = crypto.randomUUID();
-      const stopping: ContainersRecord = { ...record, state: 'stopping', stopOpId };
-      await this.writeRecord(stopping);
-      return this.finishStop(stopping);
+      return this.stopRecord(record);
     });
+  }
+
+  /** Persist `stopping` for the record's allocation, then destroy the container. */
+  private async stopRecord(record: ContainersRecord): Promise<'terminal' | 'retryable'> {
+    if (record.state === 'stopping') {
+      if (record.stopOpId === null) {
+        await this.writeRecord({ ...record, stopOpId: crypto.randomUUID() });
+      }
+      return this.finishStop(record);
+    }
+    const stopping: ContainersRecord = {
+      ...record,
+      state: 'stopping',
+      stopOpId: crypto.randomUUID(),
+    };
+    await this.writeRecord(stopping);
+    return this.finishStop(stopping);
   }
 
   async ensureLeaseAtLeast(allocationRef: string, ms: number): Promise<void> {

@@ -24,7 +24,7 @@ import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
  * The gateway awaits decide immediately before the upstream call, so this bounds the latency it
  * can add. A slower verdict resolves to null and the request is sent.
  */
-export const BOUNCER_DECIDE_TIMEOUT_MS = 500;
+export const BOUNCER_DECIDE_TIMEOUT_MS = 1_000;
 
 const logBouncerVerdict = sentryLogger('bouncer', 'info');
 
@@ -99,6 +99,8 @@ export type BouncerDecideParams = {
   ja4?: string | undefined;
   account?: {
     accountId: string;
+    /** The authenticated actor, independently of the paying account. */
+    userId: string;
     tier: Exclude<DecideTier, 'anonymous'>;
     /** The paying user's or organization's row, as the balance check read it. */
     payer?: BalancePayer;
@@ -127,6 +129,7 @@ export function startBouncerDecide(
             requestId,
             tier: account.tier,
             accountId: account.accountId,
+            userId: account.userId,
             ip,
             ja4,
             accountCreatedAt: account.payer?.createdAt,

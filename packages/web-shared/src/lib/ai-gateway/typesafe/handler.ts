@@ -141,6 +141,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
       payer,
     },
@@ -248,6 +249,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
         max_tokens: null,
         has_middle_out_transform: null,
+        reasoning_setting: null,
         fraudHeaders,
         isStreaming: false,
         organizationId,

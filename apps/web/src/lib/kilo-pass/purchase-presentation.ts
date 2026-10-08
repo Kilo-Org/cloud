@@ -35,7 +35,6 @@ export type PurchasePresentationInput = {
   storefront: PurchaseStorefront | null | undefined;
   product: PurchaseProduct;
   program?: string | null;
-  supportsNativePlayKiloPass?: boolean;
 };
 
 type SubscriptionForPresentation = {
@@ -71,7 +70,6 @@ export function buildPurchasePresentation(params: {
     product: input.product,
     program: input.program,
     hasStripeManagedPass,
-    supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
   });
 
   const cta =

@@ -734,13 +734,14 @@ describe('POST /api/auth/native/token', () => {
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
     });
 
-    it('retry after DIFFERENT-OAUTH release reserves and settles the same code', async () => {
-      // First call: DIFFERENT-OAUTH triggers release. The second call must
-      // re-reserve the same code and settle successfully, proving the release.
+    it.each([
+      { error: 'DIFFERENT-OAUTH' as const, status: 403 },
+      { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+    ])('retry after $error reserves and settles the same code', async ({ error, status }) => {
       mockCreateOrUpdateUser
         .mockResolvedValueOnce({
           success: false,
-          error: 'DIFFERENT-OAUTH',
+          error,
         } as never)
         // Second call falls back to the beforeEach success default.
         .mockResolvedValueOnce({
@@ -752,10 +753,9 @@ describe('POST /api/auth/native/token', () => {
       const email = 'retry-oauth@example.com';
       const code = '654321';
 
-      // First attempt: DIFFERENT-OAUTH → release.
       const first = await POST(createRequest({ provider: 'email', email, code }));
-      expect(first.status).toBe(403);
-      expect(await first.json()).toEqual({ error: 'DIFFERENT-OAUTH' });
+      expect(first.status).toBe(status);
+      expect(await first.json()).toEqual({ error });
       expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
       expect(mockCommitSignInCode).not.toHaveBeenCalled();
       expect(mockConsumeSignInCode).not.toHaveBeenCalled();
@@ -875,18 +875,21 @@ describe('POST /api/auth/native/token', () => {
     });
   });
 
-  it('returns 403 with the AuthErrorType when createOrUpdateUser fails', async () => {
+  it.each([
+    { error: 'BLOCKED' as const, status: 403 },
+    { error: 'SIGNUP-UNAVAILABLE' as const, status: 503 },
+  ])('returns $status for $error without credentials', async ({ error, status }) => {
     mockVerifyNativeGoogleIdToken.mockResolvedValue({
       sub: 'google-sub-1',
       email: 'googleuser@example.com',
     });
-    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'BLOCKED' } as never);
+    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error });
 
     const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
     const data = await response.json();
 
-    expect(response.status).toBe(403);
-    expect(data).toEqual({ error: 'BLOCKED' });
+    expect(response.status).toBe(status);
+    expect(data).toEqual({ error });
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
   });
 

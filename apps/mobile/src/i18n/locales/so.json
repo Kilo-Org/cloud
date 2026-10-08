@@ -586,8 +586,6 @@
     "reviewPullRequest": "Dib u eeg codsiga isku-darka",
     "headLine": "{{counts}} · diiwaanka isbeddelka ugu dambeeya {{sha}}",
     "entry": {
-      "eyebrow": "Ku fur PR ama merge request URL-ka",
-      "pastePrLink": "Ku dheji xiriiriye PR ama merge request ah",
       "noRecentPrs": "Ma jiraan dib-u-eegisyo dhowaan la sameeyay",
       "noRecentPrsDescription": "Kor ku dheji xiriiriye si aad u bilowdo dib-u-eegis — marka xigta halkan ayuu ka soo muuqan doonaa.",
       "couldNotLoad": "Lama soo rari karin.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Cusboonaysiinta tooska ah",
     "liveUpdateSubtitle": "Ku muuji wakiillada firfircoon ogeysiisyadaada",
     "push": "Ogeysiisyada la soo diro",
-    "enabled": "Ogeysiisyadu waa daaran yihiin",
     "onDescription": "Ogeysiisyada la soo diro waa u daaran yihiin aaladdan.",
     "offDescription": "Oggolaanshaha ama diiwaangelinta aaladda waa dansan yahay.",
     "retryPermission": "Mar kale hubi oggolaanshaha ogeysiisyada",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "U dir digniin iimayl ama push xiriirka biilasha marka kharashka goobtan uu dhaafo xad ama uu ka sarreeyo heerka saacadlaha caadiga ah.",
-    "enable": "Daar digniinaha kharashka",
     "thresholdTitle": "Dhaafitaanka xadka",
     "thresholdSubtitle": "Kharashka socda ayaa dhaafaya xadkaaga",
     "anomalyTitle": "Kor u kaca saacadlaha",

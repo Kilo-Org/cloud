@@ -15,8 +15,6 @@ import {
   savePendingWorkflowDraft,
 } from '@/src/shared/agent-workflows-storage';
 
-// ---------- helpers ----------
-
 interface TestStorage {
   values: Map<string, unknown>;
   failRemoveItem: boolean;
@@ -106,13 +104,10 @@ const autoApproveMemorySettings = (): Record<string, unknown> => ({
   autoApproveMemorySaves: true,
 });
 
-// Clear the atom and lock between tests.
 const clearAtom = (): void => {
   getDefaultStore().set(pendingApprovalAtom, undefined);
   getDefaultStore().set(pendingLockAtom, false);
 };
-
-// ---------- tests ----------
 
 describe(applyApprovalDecision, () => {
   it('reject clears the stored draft and returns rejected', async () => {
@@ -137,15 +132,12 @@ describe(applyApprovalDecision, () => {
     const storage = createStorage();
     const draft = memoryDraft({ note: 'my note' });
 
-    // Seed empty memory store.
     storage.values.set('local:kiloAgentMemories', []);
 
     const outcome = await applyApprovalDecision(storage, 'memory', draft, true);
     expect(outcome.status).toBe('approved');
     expect(typeof (outcome as { savedId: string }).savedId).toBe('string');
-    // Draft should be cleared.
     expect(storage.values.has('local:kiloPendingAgentMemoryDraft')).toBe(false);
-    // Memory should be persisted.
     const memories = storage.values.get('local:kiloAgentMemories') as Record<string, unknown>[];
     expect(memories).toHaveLength(1);
     expect(memories[0]?.['note']).toBe('my note');
@@ -182,7 +174,6 @@ describe(applyApprovalDecision, () => {
   it('persist failure (store full) keeps draft and returns failed with reason', async () => {
     const storage = createStorage();
 
-    // Pre-fill memory store to max.
     const fullMemories = Array.from({ length: 200 }, (_unused, index) => ({
       createdAt: index,
       id: `mem-${index}`,
@@ -301,9 +292,7 @@ describe(applyApprovalDecision, () => {
     expect(outcome.status).toBe('approved');
 
     const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
-    // PathPrefix must be cleared — not present on the stored workflow.
     expect(workflows[0]).not.toHaveProperty('pathPrefix');
-    // StartUrl was provided as a real value, so keep it.
     expect(workflows[0]?.['startUrl']).toBe('https://example.com/start');
   });
 
@@ -338,9 +327,7 @@ describe(applyApprovalDecision, () => {
     expect(outcome.status).toBe('approved');
 
     const workflows = storage.values.get('local:kiloAgentWorkflows') as Record<string, unknown>[];
-    // StartUrl must be cleared.
     expect(workflows[0]).not.toHaveProperty('startUrl');
-    // PathPrefix was not explicitly cleared, so keep existing.
     expect(workflows[0]?.['pathPrefix']).toBe('/old-prefix');
   });
 
@@ -462,7 +449,6 @@ describe(requestApproval, () => {
     // Start approval but don't await — requestApproval persists before returning the inner Promise.
     const promise = requestApproval(storage, 'memory', draft, abortSignal());
 
-    // Wait for requestApproval to complete persistDraft and set the atom.
     // The test storage's setItem is async, so the await persistDraft yields to microtasks.
     await new Promise(resolve => {
       setTimeout(resolve, 0);
@@ -493,7 +479,6 @@ describe(requestApproval, () => {
     // Abort first.
     controller.abort();
 
-    // Then try to settle via atom.
     const atomStore = getDefaultStore();
     const entry = atomStore.get(pendingApprovalAtom);
     // After abort, the entry may already be cleared or still being cleared.
@@ -547,7 +532,6 @@ describe(requestApproval, () => {
 
     const promise = requestApproval(storage, 'memory', draft, abortSignal());
 
-    // Wait for requestApproval to complete persistDraft and set the atom.
     await new Promise(resolve => {
       setTimeout(resolve, 0);
     });
@@ -816,7 +800,6 @@ describe(requestApproval, () => {
 
     const promise = requestApproval(storage, 'workflow', workflowDraft(), abortSignal());
 
-    // Wait for requestApproval to persist the draft and set the atom.
     await new Promise(resolve => {
       setTimeout(resolve, 0);
     });

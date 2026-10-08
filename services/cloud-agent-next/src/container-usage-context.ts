@@ -6,6 +6,7 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
+import { isContainerConcurrencyLimitError } from './container-concurrency.js';
 import {
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
@@ -381,6 +382,7 @@ export async function ensureSandboxBillingAdmissionInput(
   try {
     return await (sandbox as MeteredSandboxInstance).ensureBillingAdmission(input);
   } catch (error) {
+    if (isContainerConcurrencyLimitError(error)) throw error;
     return {
       success: false,
       code: 'meter_unavailable',
@@ -494,11 +496,5 @@ export async function configureSandboxBillingInput(
     logger.warn('Container usage shadow metering is unavailable for sandbox');
     return;
   }
-  try {
-    await (sandbox as MeteredSandboxInstance).configureBilling(input);
-  } catch (error) {
-    logger
-      .withFields({ error: error instanceof Error ? error.message : String(error) })
-      .warn('Container usage shadow configuration deferred');
-  }
+  await (sandbox as MeteredSandboxInstance).configureBilling(input);
 }

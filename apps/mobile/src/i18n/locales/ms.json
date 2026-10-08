@@ -586,8 +586,6 @@
     "reviewPullRequest": "Semak permintaan tarik",
     "headLine": "{{counts}} · komit terkini {{sha}}",
     "entry": {
-      "eyebrow": "Buka permintaan tarik atau permintaan gabungan melalui URL",
-      "pastePrLink": "Tampal pautan permintaan tarik atau permintaan gabungan",
       "noRecentPrs": "Tiada semakan terkini",
       "noRecentPrsDescription": "Tampal pautan di atas untuk memulakan semakan — ia akan muncul di sini pada kali berikutnya.",
       "couldNotLoad": "Tidak dapat memuatkan data.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Kemas kini langsung",
     "liveUpdateSubtitle": "Paparkan ejen aktif dalam pemberitahuan anda",
     "push": "Pemberitahuan tolak",
-    "enabled": "Pemberitahuan didayakan",
     "onDescription": "Pemberitahuan tolak didayakan pada peranti ini.",
     "offDescription": "Kebenaran pemberitahuan atau pendaftaran peranti tidak aktif.",
     "retryPermission": "Cuba semak semula kebenaran pemberitahuan",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Hantar amaran melalui e-mel atau push kepada kenalan pengebilan apabila perbelanjaan skop ini melepasi had atau melonjak melebihi kadar setiap jam biasanya.",
-    "enable": "Dayakan amaran perbelanjaan",
     "thresholdTitle": "Melepasi ambang",
     "thresholdSubtitle": "Perbelanjaan berjalan melepasi had anda",
     "anomalyTitle": "Lonjakan setiap jam",

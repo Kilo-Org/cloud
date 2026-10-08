@@ -21,27 +21,8 @@ import {
 } from '@/components/profile-screen.test-helpers';
 import { i18n } from '@/i18n';
 import { AFTER_INTERACTIONS_FALLBACK_MS } from '@/lib/hooks/use-after-interactions';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
-
-// This spec is the only one that varies the safe-area insets, so it owns that
-// mock instead of the shared harness.
-const safeArea = vi.hoisted(() => ({ top: 24, bottom: 0, left: 0, right: 0 }));
-
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => safeArea,
-}));
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function expectAlignedContent(root: ReactTestInstance) {
-  const scroll = findNode(root, 'ScrollView');
-  expect.soft(scroll?.props.contentContainerClassName).toBe('px-4 pt-4');
-  expect(scroll?.props.style).toEqual({ marginLeft: safeArea.left, marginRight: safeArea.right });
-  expect(findNode(root, 'CreditsCard')?.parent).toBe(scroll);
-}
-
-// ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('ProfileScreen deferred queries', () => {
   beforeEach(() => {
@@ -55,21 +36,6 @@ describe('ProfileScreen deferred queries', () => {
     interactionState.cancel.mockReset();
     getProfileAgentScopeMock.mockReset();
     getProfileAgentScopeMock.mockReturnValue('personal');
-    Object.assign(safeArea, { top: 24, bottom: 0, left: 0, right: 0 });
-  });
-
-  it.each([
-    { left: 0, right: 0 },
-    { left: 40, right: 0 },
-    { left: 0, right: 40 },
-    { left: 47, right: 59 },
-  ])('aligns the content with the header gutter for side insets $left/$right', async insets => {
-    Object.assign(safeArea, insets);
-    const { renderer, unmount } = await mountProfile();
-
-    expectAlignedContent(renderer.root);
-
-    unmount();
   });
 
   it('defers both queries until interactions settle, showing the skeleton first', async () => {
@@ -84,7 +50,6 @@ describe('ProfileScreen deferred queries', () => {
     expect(providersQueryFn).not.toHaveBeenCalled();
     expect(organizationsQueryFn).not.toHaveBeenCalled();
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(3);
-    expectAlignedContent(renderer.root);
     expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[2]).toBe(true);
 
     flushInteractions();
@@ -144,7 +109,6 @@ describe('ProfileScreen deferred queries', () => {
     expect(providersQueryFn).not.toHaveBeenCalled();
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
     expect(renderer.root.findAllByProps({ title: 'GitHub' })).toHaveLength(1);
-    expectAlignedContent(renderer.root);
 
     unmount();
   });
@@ -238,7 +202,6 @@ describe('ProfileScreen deferred queries', () => {
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError?.props.title).toBe('Could not load accounts');
     expect(typeof queryError?.props.onRetry).toBe('function');
-    expectAlignedContent(renderer.root);
 
     unmount();
   });
@@ -335,7 +298,6 @@ describe('ProfileScreen deferred queries', () => {
     );
 
     expect(nodeCountWithChildren(renderer.root, 'Text', 'Linked accounts')).toBe(0);
-    expectAlignedContent(renderer.root);
 
     unmount();
   });

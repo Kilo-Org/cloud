@@ -49,6 +49,12 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     );
   });
 
+  it('does not treat container concurrency denial as a wrapper or model provider failure', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'container_limit_reached' })).toBe(
+      'delivery_failed'
+    );
+  });
+
   it('splits rate limiting by whose key was throttled', () => {
     const rateLimited = { code: 'assistant_error', assistantReason: 'rate_limited' } as const;
 

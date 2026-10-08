@@ -1,4 +1,5 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import { generateKeyPairSync } from 'node:crypto';
 import { resolveSecret } from '../../src/auth.js';
 import {
   mintSandboxLaunchCredential,
@@ -27,6 +28,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
+import { ContainerConcurrencyLimitError } from '../../src/container-concurrency.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import {
@@ -35,7 +37,13 @@ import {
 } from '../../src/sandbox-control/billing-schedule.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { logger } from '../../src/logger.js';
+import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import {
+  createFakeCredentialBroker,
+  installFakeCredentialEnv,
+} from './helpers/fake-credentials.js';
+import { FakeSessionPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
 
@@ -368,6 +376,31 @@ async function captureAllocationTransitions(
   });
 }
 
+/**
+ * Captures `route_failed` diagnostics emitted while `action` runs, so a test can
+ * assert the diagnostic stage of a materialization failure.
+ */
+async function captureRouteFailures<T>(
+  action: () => Promise<T>
+): Promise<{ result: T; failures: Record<string, unknown>[] }> {
+  const failures: Record<string, unknown>[] = [];
+  const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+    const bounded = fields as unknown as Record<string, unknown>;
+    if (bounded.diagnosticEvent === 'route_failed') failures.push(bounded);
+    return logger;
+  });
+  const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+  try {
+    const result = await action();
+    return { result, failures };
+  } finally {
+    withFields.mockRestore();
+    info.mockRestore();
+    warn.mockRestore();
+  }
+}
+
 afterEach(async () => {
   await reset();
 });
@@ -516,6 +549,25 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(provider.stopCalls).toEqual(
       Array.from({ length: TIMERS.providerStopLadderMs.length + 1 }, () => provider.refs[0])
     );
+  });
+
+  it('fails a container limit denial from the sandbox start without retrying the create', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () =>
+      provider.launchGates[0](
+        new Error(`remote: ${new ContainerConcurrencyLimitError('personal', 20).message}`)
+      )
+    );
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'container_limit_reached',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).not.toBe('creating'));
+    expect(provider.createCalls).toBe(1);
   });
 
   it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {
@@ -2642,4 +2694,234 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       }
     }
   );
+});
+
+describe('SandboxControlV2 prepare frame secrets', () => {
+  const SECRET_VALUE = 'framed-secret-value';
+
+  function generateSecretsKeyPair() {
+    return generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+  }
+
+  function secretsPrepareInput(
+    sessionId: string,
+    encryptedSecrets: Record<string, unknown>
+  ): Parameters<DurableObjectStub<SandboxControlV2>['prepare']>[0] {
+    // `containedKiloSessionIdSchema` requires exactly 26 alphanumerics.
+    const kiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+    return {
+      spec: {
+        sessionId,
+        kiloSessionId,
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-requested`,
+        env: { DATABASE_URL: 'plaintext-db' },
+      },
+      credentials: {
+        userId: 'owner-1',
+        kiloSessionId,
+        kiloToken: 'native-kilo-token',
+        orgId: 'org-1',
+        repository: { type: 'github', repo: 'acme/widgets' },
+        scopeId: sessionId,
+        encryptedSecrets,
+      },
+    };
+  }
+
+  async function startSecrets(
+    provider: FakeProvider,
+    privateKey: string | undefined,
+    peer: FakeSessionPeer
+  ): Promise<DurableObjectStub<SandboxControlV2>> {
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
+        AGENT_ENV_VARS_PRIVATE_KEY: privateKey,
+      });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+      });
+    });
+    return stub;
+  }
+
+  async function connectHello(
+    provider: FakeProvider,
+    redactsNamedSecrets: boolean
+  ): Promise<FakeWrapper> {
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const { credential, allocationId } = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const reply = await wrapper.hello({
+      wrapperId: 'wr_secrets',
+      allocationId,
+      ...(redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+    });
+    expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+    return wrapper;
+  }
+
+  function readRouteRow(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+    return runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+      return rows[0] ?? null;
+    });
+  }
+
+  it.each([{ secretValue: SECRET_VALUE }, { secretValue: 'x'.repeat(10000) }])(
+    'delivers profile collections and secrets without persisting plaintext',
+    async ({ secretValue }) => {
+      const { publicKey, privateKey } = generateSecretsKeyPair();
+      const envelope = encryptWithPublicKey(secretValue, publicKey);
+      const provider = createFakeProvider();
+      const peer = new FakeSessionPeer();
+      const stub = await startSecrets(provider, privateKey, peer);
+      const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+      const input = secretsPrepareInput(sessionId, { DATABASE_URL: envelope });
+      const profile = {
+        runtimeSkills: [
+          { name: 'review', rawMarkdown: '# Review', files: { 'guide.txt': 'guide' } },
+        ],
+        runtimeAgents: [{ slug: 'reviewer', name: 'Reviewer', config: { prompt: 'Review' } }],
+        kiloCommands: [{ name: 'review-now', template: 'Review now' }],
+      };
+      await stub.prepare({
+        ...input,
+        spec: { ...input.spec, ...profile, runtimeIsolation: 'per-session' },
+      });
+
+      const wrapper = await connectHello(provider, true);
+      const frame = await wrapper.next();
+      if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+      expect(frame.spec.env?.DATABASE_URL).toBe(secretValue);
+      expect(frame.spec.secretEnvKeys).toEqual(['DATABASE_URL']);
+      expect(frame.spec).toMatchObject(profile);
+      expect(frame.spec.runtimeIsolation).toBe('per-session');
+
+      const row = await readRouteRow(stub, sessionId);
+      expect(row?.spec ?? '').not.toContain(secretValue);
+      expect(row?.spec ?? '').not.toContain('secretEnvKeys');
+      expect(row?.credential_source ?? '').toContain(envelope.encryptedData);
+      expect(row?.credential_source ?? '').not.toContain(secretValue);
+    }
+  );
+
+  it('fails without sending when the wrapper did not advertise named-secret redaction', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, privateKey, peer);
+    const sessionId = 'workspace_22222222-2222-4222-8222-222222222222';
+    await stub.prepare(secretsPrepareInput(sessionId, { DATABASE_URL: envelope }));
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, false);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'wrapper_redaction_unsupported',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+    expect(await readRouteRow(stub, sessionId)).toMatchObject({
+      state: 'failed',
+      reason: 'workspace_setup_failed',
+    });
+  });
+
+  it('sends a frame without redaction when every secret key is restored or dropped', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, privateKey, peer);
+    const sessionId = 'workspace_66666666-6666-4666-8666-666666666666';
+    // The grant does not project this key, so the overlay drops it and no secret
+    // value reaches the frame; a wrapper without named-secret redaction can still
+    // receive the frame.
+    await stub.prepare(secretsPrepareInput(sessionId, { KILOCODE_ORGANIZATION_ID: envelope }));
+
+    const wrapper = await connectHello(provider, false);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.secretEnvKeys).toBeUndefined();
+    expect(frame.spec.env?.KILOCODE_ORGANIZATION_ID).toBeUndefined();
+    expect(JSON.stringify(peer.routeUpdatesFor(sessionId))).not.toContain(SECRET_VALUE);
+  });
+
+  it('fails without sending when secrets cannot be decrypted, leaking no value', async () => {
+    const { publicKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, undefined, peer);
+    const sessionId = 'workspace_33333333-3333-4333-8333-333333333333';
+    await stub.prepare(secretsPrepareInput(sessionId, { DATABASE_URL: envelope }));
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, true);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'frame_materialization_failed',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+    expect(JSON.stringify(peer.routeUpdatesFor(sessionId))).not.toContain(SECRET_VALUE);
+    expect(JSON.stringify(await readRouteRow(stub, sessionId))).not.toContain(SECRET_VALUE);
+  });
+
+  it('fails without sending when the merged frame env exceeds the schema', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey('x'.repeat(10001), publicKey);
+    const provider = createFakeProvider();
+    const peer = new FakeSessionPeer();
+    const stub = await startSecrets(provider, privateKey, peer);
+    const sessionId = 'workspace_44444444-4444-4444-8444-444444444444';
+    await stub.prepare(secretsPrepareInput(sessionId, { DATABASE_URL: envelope }));
+
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      const wrapper = await connectHello(provider, true);
+      await waitFor(() =>
+        expect(peer.routeUpdatesFor(sessionId)).toContainEqual(
+          expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+        )
+      );
+      return wrapper;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'frame_materialization_failed',
+      })
+    );
+    expect(await wrapper.next(250)).toBeNull();
+  });
 });

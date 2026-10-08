@@ -619,8 +619,6 @@
     "reviewPullRequest": "Athbhreithnigh an t-iarratas tarraingthe",
     "headLine": "{{counts}} · taifead athruithe reatha {{sha}}",
     "entry": {
-      "eyebrow": "Oscail iarratas tarraingthe nó iarratas cumaisc trí URL",
-      "pastePrLink": "Greamaigh nasc d’iarratas tarraingthe nó d’iarratas cumaisc",
       "noRecentPrs": "Gan aon athbhreithniú le déanaí",
       "noRecentPrsDescription": "Greamaigh nasc thuas chun athbhreithniú a thosú — taispeánfar é anseo an chéad uair eile.",
       "couldNotLoad": "Níorbh fhéidir an t-ábhar a lódáil.",
@@ -852,7 +850,6 @@
     "liveUpdates": "Nuashonruithe beo",
     "liveUpdateSubtitle": "Taispeáin gníomhairí gníomhacha i d'fhógraí",
     "push": "Brúfhógraí",
-    "enabled": "Fógraí cumasaithe",
     "onDescription": "Tá brúfhógraí ar siúl don ghléas seo.",
     "offDescription": "Níl cead fógraí nó clárú an ghléis cumasaithe.",
     "retryPermission": "Bain triail as cead fógraí a sheiceáil arís",
@@ -3391,7 +3388,6 @@
   },
   "spendAlerts": {
     "subtitle": "Seol foláireamh trí ríomhphost nó trí push chuig na teagmhálaithe billeála nuair a sháraíonn caiteachas an raoin seo teorainn nó nuair a ardaíonn sé os cionn a ghnáthráta uaire.",
-    "enable": "Cumasaigh foláirimh chaiteachais",
     "thresholdTitle": "Sárú tairsí",
     "thresholdSubtitle": "Sáraíonn caiteachas reatha do theorainn",
     "anomalyTitle": "Spuaic uaire",

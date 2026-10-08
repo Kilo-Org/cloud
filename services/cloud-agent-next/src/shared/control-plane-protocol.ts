@@ -1,3 +1,8 @@
+import {
+  RuntimeSkillsSchema,
+  RuntimeAgentsSchema,
+  RuntimeKiloCommandsSchema,
+} from './runtime-profile.js';
 import type {
   CloudAgentAssistantFailureReason,
   CloudAgentProviderOwnership,
@@ -97,6 +102,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
+  'container_limit_reached',
   'invalid_configuration',
   'connection_lost',
   'sandbox_lost',
@@ -239,7 +245,7 @@ export const controlPlaneRouteSpecSchema = z
     branchMode: z.literal('working').optional(),
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
-    env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    env: z.record(z.string().max(256), z.string().max(10000)).optional(),
     /**
      * Materialized (plaintext) MCP servers for `KILO_CONFIG_CONTENT.mcp`. Only
      * the Sandbox DO adds this to the `session.prepare` frame; it is never stored
@@ -248,6 +254,9 @@ export const controlPlaneRouteSpecSchema = z
      */
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    runtimeSkills: RuntimeSkillsSchema.optional(),
+    runtimeAgents: RuntimeAgentsSchema.optional(),
+    kiloCommands: RuntimeKiloCommandsSchema.optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
     /**
@@ -256,8 +265,44 @@ export const controlPlaneRouteSpecSchema = z
      * never stored in a route spec.
      */
     capture: z.literal(true).optional(),
+    /**
+     * Only the Sandbox DO adds this to the `session.prepare` frame, like `mcp`:
+     * the names of the profile secrets it decrypted into `env`, so the wrapper's
+     * output redactor remembers their values. Names only; it is never stored in a
+     * route spec, and the values stay in `env`.
+     */
+    secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((spec, context) => {
+    if (
+      (spec.runtimeSkills?.length || spec.runtimeAgents?.length || spec.kiloCommands?.length) &&
+      spec.runtimeIsolation !== 'per-session'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['runtimeIsolation'],
+        message: 'Runtime profiles require per-session isolation',
+      });
+    }
+  });
+
+/**
+ * Route spec accepted at the registration boundary. `secretEnvKeys` is
+ * frame-only, so a registration that carries it is rejected here rather than
+ * being stored and then failing every later `session.prepare`.
+ */
+export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSchema.superRefine(
+  (spec, context) => {
+    if (spec.secretEnvKeys !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['secretEnvKeys'],
+        message: 'registration spec must not carry secret env key names',
+      });
+    }
+  }
+);
 
 /**
  * DO-only credential source (plan "Clarification (2026-09-27, B3 credentials)").
@@ -324,6 +369,15 @@ export const controlPlaneCredentialSourceSchema = z
      * the wrapper bundle) never imports the worker persistence schema.
      */
     mcpServers: z.record(z.string().min(1).max(100), z.unknown()).optional(),
+    /**
+     * Worker-encrypted `profile.encryptedSecrets` snapshot. Same contract as
+     * `mcpServers`: persisted only inside this DO-private source, re-validated and
+     * decrypted by the Sandbox DO only when building a `session.prepare` frame,
+     * and never serialized into a wrapper frame or a route spec. Opaque here so
+     * the shared schema never imports the worker persistence schema. Secret names
+     * may be up to 128 characters (`EncryptedSecretsSchema`).
+     */
+    encryptedSecrets: z.record(z.string().min(1).max(128), z.unknown()).optional(),
     /** Credential scope (worktree id); defaults to the route's session id. */
     scopeId: z.string().min(1).max(256).optional(),
   })
@@ -368,6 +422,13 @@ export const controlPlanePrepareInputSchema = z
         code: 'custom',
         path: ['spec', 'capture'],
         message: 'prepare spec must not carry a snapshot capture request',
+      });
+    }
+    if (value.spec.secretEnvKeys !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'secretEnvKeys'],
+        message: 'prepare spec must not carry secret env key names',
       });
     }
   });
@@ -608,6 +669,12 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper redacts a value by each named secret key
+     * from `session.prepare`, not only names matching the `SECRET_NAME` heuristic.
+     * A secret-bearing prepare is not sent to a wrapper that did not advertise it.
+     */
+    redactsNamedSecrets: z.literal(true).optional(),
   })
   .strict();
 

@@ -99,7 +99,11 @@ const DEV_CLIENT_PLUGIN_OPTIONS = {
   skipOnboarding: true,
 };
 const PERMISSION_PROMPT_PLIST_KEYS = [
+  'NSCameraUsageDescription',
+  'NSPhotoLibraryUsageDescription',
+  ...(process.env.EAS_BUILD_PROFILE === 'production' ? [] : ['NSLocalNetworkUsageDescription']),
   'NSMicrophoneUsageDescription',
+  'NSMotionUsageDescription',
   'NSSpeechRecognitionUsageDescription',
   'NSFaceIDUsageDescription',
   'NSLocationWhenInUseUsageDescription',

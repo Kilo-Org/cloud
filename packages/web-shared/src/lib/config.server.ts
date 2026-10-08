@@ -300,7 +300,7 @@ export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THRE
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');
 
-// Bouncer: report-only fraud, distillation, and rate verdicts (Kilo-Org/bouncer).
+// Bouncer: configurable signup and inference admission, plus payment and usage evidence.
 export const BOUNCER_URL =
   getEnvVariable('BOUNCER_URL') ||
   (process.env.NODE_ENV === 'production' ? 'https://bouncer.kiloapps.io' : null);
@@ -480,12 +480,3 @@ export const O11Y_KILO_GATEWAY_CLIENT_SECRET = getEnvVariable('O11Y_KILO_GATEWAY
 export const PYLON_IDENTITY_SECRET = getEnvVariable('PYLON_IDENTITY_SECRET') || '';
 
 export const SUPPORT_API_SECRET = getEnvVariable('SUPPORT_API_SECRET') || '';
-
-// Pipe-delimited list of TLDs to block from new signups, each with a leading dot (e.g. ".shop|.top|.co.uk")
-const blacklistTldsEnv = getEnvVariable('BLACKLIST_TLDS');
-export const BLACKLIST_TLDS = blacklistTldsEnv
-  ? blacklistTldsEnv
-      .split('|')
-      .map((tld: string) => tld.trim().toLowerCase())
-      .filter(Boolean)
-  : [];

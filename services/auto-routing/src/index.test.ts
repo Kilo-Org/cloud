@@ -302,6 +302,156 @@ describe('auto routing worker', () => {
     vi.restoreAllMocks();
   });
 
+  describe.each([false, true])('classifier overlap (cached=%s)', cacheHit => {
+    it.each(['settings', 'capabilities', 'routing-table'])(
+      'prepares classification while %s is pending',
+      async slowHop => {
+        const blocked = Promise.withResolvers<void>();
+        modeConfigGet.mockImplementation(() => ({
+          getSettings: vi.fn(async () => {
+            if (slowHop === 'settings') await blocked.promise;
+            return { mode: 'cost_per_accuracy', pool: null };
+          }),
+        }));
+        getModelCapabilitiesMock.mockImplementation(async () => {
+          if (slowHop === 'capabilities') await blocked.promise;
+          return new Map();
+        });
+        benchmarkFetch.mockImplementation(async (url: string) => {
+          if (String(url).includes('/admin/classifier-winner')) {
+            return { ok: true, status: 200, json: async () => ({ winner: null }) };
+          }
+          if (slowHop === 'routing-table') await blocked.promise;
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              table: benchmarkRoutingTable,
+              publishedAt: benchmarkRoutingTable.generatedAt,
+            }),
+          };
+        });
+        if (cacheHit) cacheGetEntry.mockResolvedValueOnce(mockClassification);
+
+        let finished = false;
+        const pending = Promise.resolve(
+          decideRequest(mirrorPayload({ constraints: { promptTokensEstimate: 100 } }))
+        ).then(response => {
+          finished = true;
+          return response;
+        });
+        try {
+          await vi.waitFor(() => {
+            expect(cacheGetEntry).toHaveBeenCalledTimes(2);
+            if (!cacheHit) expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+          });
+          await new Promise<void>(resolve => setImmediate(resolve));
+          expect(finished).toBe(false);
+          expect(classifyNormalizedInput).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
+        } finally {
+          blocked.resolve();
+          await pending;
+        }
+
+        const response = await pending;
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({
+          cost: cacheHit ? 0 : mockClassifierResult.cost,
+          decision: {
+            model: 'google/gemini-2.5-flash-lite',
+            reasoningEffort: null,
+            source: 'benchmark',
+            sticky: false,
+          },
+          classifierResult: { classification: mockClassification, normalized: normalizedInput },
+        });
+        expect(cacheGetEntry).toHaveBeenCalledTimes(2);
+        expect(classifyNormalizedInput).toHaveBeenCalledTimes(cacheHit ? 0 : 1);
+      }
+    );
+  });
+
+  it('preserves billing and routing when concurrent settings loading fails', async () => {
+    const settings = Promise.withResolvers<{
+      mode: AutoRoutingMode | null;
+      pool: EfficientModelPool | null;
+    }>();
+    modeConfigGet.mockImplementation(() => ({ getSettings: () => settings.promise }));
+    const pending = decideRequest(mirrorPayload());
+    try {
+      await vi.waitFor(() => expect(classifyNormalizedInput).toHaveBeenCalledTimes(1));
+    } finally {
+      settings.reject(new Error('settings unavailable'));
+    }
+    const response = await pending;
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cost: mockClassifierResult.cost,
+      decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
+      classifierResult: { classification: mockClassification },
+    });
+  });
+
+  it.each([false, true])(
+    'waits for constrained coding-plan eligibility before classifying (eligible=%s)',
+    async eligible => {
+      configGet.mockImplementation(async (key: string) =>
+        key.startsWith('coding_plan_preference:v2:')
+          ? JSON.stringify({
+              active: true,
+              planId: 'minimax-token-plan-plus',
+              providerId: 'minimax',
+              modelId: 'minimax/minimax-m3',
+            })
+          : null
+      );
+      const capabilities = Promise.withResolvers<ModelCapabilitiesModule.ModelCapabilitiesMap>();
+      getModelCapabilitiesMock.mockReturnValueOnce(capabilities.promise);
+      const pending = decideRequest(
+        mirrorPayload({ constraints: { promptTokensEstimate: 50_000 } })
+      );
+      try {
+        await vi.waitFor(() => expect(getModelCapabilitiesMock).toHaveBeenCalledTimes(1));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(classifyNormalizedInput).not.toHaveBeenCalled();
+        expect(cacheGetEntry).not.toHaveBeenCalled();
+      } finally {
+        capabilities.resolve(
+          new Map([
+            [
+              'minimax/minimax-m3',
+              {
+                inputModalities: new Set<string>(),
+                contextLength: eligible ? 1_000_000 : 8_000,
+                isActive: true,
+              },
+            ],
+          ])
+        );
+        await pending;
+      }
+
+      const response = await pending;
+      expect(response.status).toBe(200);
+      if (eligible) {
+        await expect(response.json()).resolves.toMatchObject({
+          cost: 0,
+          decision: { model: 'minimax/minimax-m3', source: 'coding_plan_default' },
+          classifierResult: null,
+        });
+        expect(classifyNormalizedInput).not.toHaveBeenCalled();
+        expect(cacheGetEntry).not.toHaveBeenCalled();
+      } else {
+        await expect(response.json()).resolves.toMatchObject({
+          cost: mockClassifierResult.cost,
+          decision: { model: 'google/gemini-2.5-flash-lite', source: 'benchmark' },
+          classifierResult: { classification: mockClassification, normalized: normalizedInput },
+        });
+        expect(classifyNormalizedInput).toHaveBeenCalledTimes(1);
+      }
+    }
+  );
+
   describe('capability-aware routing', () => {
     // A two-candidate route where the cheaper model is text-only and the
     // second is image-capable. This lets a single fixture exercise both
@@ -1896,7 +2046,26 @@ describe('auto routing worker', () => {
       })
     );
 
-    const response = await decideRequest(mirrorPayload({ sessionId: null, machineId: null }));
+    const settings = Promise.withResolvers<void>();
+    modeConfigGet.mockImplementation(() => ({
+      getSettings: vi.fn(async () => {
+        await settings.promise;
+        return { mode: null, pool: null };
+      }),
+    }));
+    const onUnhandled = vi.fn();
+    process.on('unhandledRejection', onUnhandled);
+    const pending = decideRequest(mirrorPayload({ sessionId: null, machineId: null }));
+    try {
+      await vi.waitFor(() => expect(classifyNormalizedInput).toHaveBeenCalledTimes(1));
+      await new Promise<void>(resolve => setImmediate(resolve));
+      expect(onUnhandled).not.toHaveBeenCalled();
+    } finally {
+      settings.resolve();
+      await pending;
+      process.off('unhandledRejection', onUnhandled);
+    }
+    const response = await pending;
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({

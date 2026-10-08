@@ -560,6 +560,7 @@ async function main() {
       }
 
       const bootstrapLogUploader = state.logUploader;
+      state.setSecretEnvKeys(request.materialized.secretEnvKeys);
       serverConfig.workspacePath = request.workspace.workspacePath;
       serverConfig.sessionId = request.kiloSessionId;
       serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;

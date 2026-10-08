@@ -586,8 +586,6 @@
     "reviewPullRequest": "Hersien trekversoek",
     "headLine": "{{counts}} · jongste vaslegging {{sha}}",
     "entry": {
-      "eyebrow": "Maak 'n trekversoek of merge request met sy URL oop",
-      "pastePrLink": "Plak 'n trekversoek- of merge request-skakel",
       "noRecentPrs": "Geen onlangse hersieninge nie",
       "noRecentPrsDescription": "Plak hierbo 'n skakel om 'n hersiening te begin — dit sal volgende keer hier verskyn.",
       "couldNotLoad": "Kon nie laai nie.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Intydse opdaterings",
     "liveUpdateSubtitle": "Wys aktiewe agente in jou kennisgewings",
     "push": "Stootkennisgewings",
-    "enabled": "Kennisgewings geaktiveer",
     "onDescription": "Stootkennisgewings is aan vir hierdie toestel.",
     "offDescription": "Toestemming is nie gegee nie, of toestelregistrasie is afgeskakel.",
     "retryPermission": "Gaan kennisgewingstoestemming weer na",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "E-pos of stoot 'n waarskuwing na die faktuurkontakte wanneer hierdie omvang se besteding 'n limiet oorskry of bo sy gewone uurlikse tempo styg.",
-    "enable": "Aktiveer bestedingswaarskuwings",
     "thresholdTitle": "Oorskryding van drempel",
     "thresholdSubtitle": "Lopende besteding oorskry jou limiet",
     "anomalyTitle": "Uurlikse piek",

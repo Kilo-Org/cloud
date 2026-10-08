@@ -586,8 +586,6 @@
     "reviewPullRequest": "Berrikusi bateratze-eskaera",
     "headLine": "{{counts}} · azken egikaritzea: {{sha}}",
     "entry": {
-      "eyebrow": "Ireki bateratze-eskaera edo merge-eskaera bat URL bidez",
-      "pastePrLink": "Itsatsi bateratze-eskaera edo merge-eskaera baten esteka",
       "noRecentPrs": "Ez dago azkenaldiko berrikuspenik",
       "noRecentPrsDescription": "Itsatsi esteka bat goian berrikuspena hasteko — hemen agertuko da hurrengoan.",
       "couldNotLoad": "Ezin izan da kargatu.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Zuzeneko eguneratzeak",
     "liveUpdateSubtitle": "Erakutsi agente aktiboak zure jakinarazpenetan",
     "push": "Jakinarazpen automatikoak",
-    "enabled": "Jakinarazpenak gaituta",
     "onDescription": "Jakinarazpen automatikoak gaituta daude gailu honetan.",
     "offDescription": "Baimena edo gailuaren erregistroa desgaituta dago.",
     "retryPermission": "Saiatu jakinarazpenen baimena berriro egiaztatzen",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Bidali alerta bat posta elektronikoz edo push bidez fakturatze-kontaktuei, eremu honen gastuak muga bat gainditzen duenean edo bere ohiko ordu-tasaren gainetik igotzen denean.",
-    "enable": "Gaitu gastu-alertak",
     "thresholdTitle": "Atalasaren gainditzea",
     "thresholdSubtitle": "Metatutako gastuak zure muga gainditzen du",
     "anomalyTitle": "Orduko gorakada",

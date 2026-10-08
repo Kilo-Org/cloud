@@ -91,7 +91,7 @@ export async function handleAllocationInspect(c: Context<HonoContext>): Promise<
       userId,
       metadata.identity.sessionId,
       metadata.identity.botId,
-      { createdOnPlatform: metadata.identity.createdOnPlatform }
+      { createdOnPlatform: metadata.identity.createdOnPlatform, legacyFallback: true }
     ));
 
   const state = await withDORetry(

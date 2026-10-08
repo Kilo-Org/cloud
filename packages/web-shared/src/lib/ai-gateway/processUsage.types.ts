@@ -1,7 +1,8 @@
 import type { FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import type { GatewayApiKind, MicrodollarUsage, Organization } from '@kilocode/db';
+import type { MicrodollarUsage, Organization } from '@kilocode/db';
+import type { GatewayApiKind } from '@kilocode/usage-contracts';
 import type { OpenAI } from 'openai';
 
 export type OpenRouterUsage = {
@@ -146,6 +147,8 @@ export type MicrodollarUsageContext = {
   mode: string | null;
   /** The auto model ID when one was requested (e.g. 'kilo-auto/free'). */
   auto_model: string | null;
+  /** Bounded labels for the reasoning configuration requested by the client. */
+  reasoning_setting: string | null;
   /** Time to first byte from the upstream provider, in milliseconds. Set after the upstream request returns. */
   ttfb_ms: number | null;
   /**
@@ -260,6 +263,7 @@ export type UsageMetaData = {
   session_id: string | null;
   mode: string | null;
   auto_model: string | null;
+  reasoning_setting: string | null;
   market_cost: number | null;
   is_free: boolean | null;
   abuse_delay: number | null;

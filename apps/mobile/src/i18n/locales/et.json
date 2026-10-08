@@ -586,8 +586,6 @@
     "reviewPullRequest": "Vaata tõmbetaotlus üle",
     "headLine": "{{counts}} · uusim kommit: {{sha}}",
     "entry": {
-      "eyebrow": "Ava tõmbetaotlus või liitmistaotlus URL-i kaudu",
-      "pastePrLink": "Kleebi tõmbetaotluse või liitmistaotluse link",
       "noRecentPrs": "Hiljutisi ülevaatusi pole",
       "noRecentPrsDescription": "Ülevaatuse alustamiseks kleebi link ülalpool — järgmisel korral ilmub see siin.",
       "couldNotLoad": "Laadimine ebaõnnestus.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Reaalajas värskendused",
     "liveUpdateSubtitle": "Näita aktiivseid agente teavitustes",
     "push": "Tõuketeavitused",
-    "enabled": "Teavitused on lubatud",
     "onDescription": "Tõuketeavitused on selles seadmes sisse lülitatud.",
     "offDescription": "Teavituste luba puudub või seade pole teavituste saamiseks registreeritud.",
     "retryPermission": "Kontrolli teavituste luba uuesti",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Saada faktureerimiskontaktidele e-posti või push-teavitus, kui selle piirkonna kulutus ületab limiidi või tõuseb üle tavapärase tunnimäära.",
-    "enable": "Luba kulutushoiatused",
     "thresholdTitle": "Lävendi ületamine",
     "thresholdSubtitle": "Jooksev kulutus ületab sinu limiidi",
     "anomalyTitle": "Tunnipõhine tõus",

@@ -24,7 +24,7 @@ import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 /**
  * The profile override the new-session screen adds to the shared contract: the
@@ -133,6 +133,7 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   // The form is edge-to-edge and the window never resizes for the IME on
   // either platform, so the screen needs two floors. The first is the
   // navigation-bar inset, which the pinned footer reserves itself
@@ -398,7 +399,7 @@ export function NewSessionConfigureForm({
   // (`bottomClearance`), so `contentReservesBottomInset` keeps the
   // screen-bottom-anchored occlusion from counting that inset a second time.
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={sideInsetStyle}>
       {body}
       <AppAwareKeyboardPaddingView contentReservesBottomInset>{footer}</AppAwareKeyboardPaddingView>
     </View>

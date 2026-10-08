@@ -586,8 +586,6 @@
     "reviewPullRequest": "Gaaffii walitti makuu gamaaggami",
     "headLine": "{{counts}} · galmee dhumaa {{sha}}",
     "entry": {
-      "eyebrow": "Gaaffii walitti makuu URL dhaan bani",
-      "pastePrLink": "Liinkii gaaffii walitti makuu maxxansi",
       "noRecentPrs": "Gamaaggawwan dhiyeenya kanaa hin jiran",
       "noRecentPrsDescription": "Gamaaggama jalqabuuf liinkii olitti maxxansi — yeroo itti aanu asitti ni mul'ata.",
       "couldNotLoad": "Fe'uu hin danda'amne.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Haaromsa yeroo ammaa",
     "liveUpdateSubtitle": "Ergamtoota hojjechaa jiran beeksisoota kee keessatti agarsiisi",
     "push": "Beeksisoota ergaman",
-    "enabled": "Beeksisoonni banamaniiru",
     "onDescription": "Beeksisoonni ergaman meeshaa kana irratti banamaniiru.",
     "offDescription": "Hayyamni yookaan galmeen meeshaa cufameera.",
     "retryPermission": "Hayyama beeksisaa ilaaluuf deebi'ii yaali",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Yeroo baasiin naannoo kanaa daangaa darbu ykn sadarkaa sa'aatii baramaa isaa ol ka'u, qunnamtiiwwan kaffaltiitti imeelii ykn push ergaa.",
-    "enable": "Akeekkachiisa baasii dandeessisi",
     "thresholdTitle": "Daangaa darbuu",
     "thresholdSubtitle": "Baasiin yeroo ammaa daangaa kee darbaa jira",
     "anomalyTitle": "Olka'iinsa sa'aatii",

@@ -48,6 +48,7 @@ import {
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   invalidPathResponse,
+  extractReasoningSetting,
   invalidRequestResponse,
   malformedJsonResponse,
   invalidTokenResponse,
@@ -613,6 +614,7 @@ export async function handleLlmProxyRequest(
           ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
           account: {
             accountId: bouncerAccountId(user.id, organizationId),
+            userId: user.id,
             tier: bouncerDecideTier(organizationId, plan, balance),
             payer,
           },
@@ -667,6 +669,7 @@ export async function handleLlmProxyRequest(
             },
             max_tokens: null,
             has_middle_out_transform: null,
+            reasoning_setting: null,
             isStreaming: false,
             prior_microdollar_usage: priorMicrodollarUsage,
             // No posthog_distinct_id: this internal overhead row must not emit
@@ -872,6 +875,7 @@ export async function handleLlmProxyRequest(
     promptInfo,
     max_tokens: getMaxTokens(requestBodyParsed),
     has_middle_out_transform: hasMiddleOutTransform(requestBodyParsed),
+    reasoning_setting: extractReasoningSetting(requestBodyParsed.body),
     fraudHeaders,
     isStreaming: requestBodyParsed.body.stream === true,
     organizationId,

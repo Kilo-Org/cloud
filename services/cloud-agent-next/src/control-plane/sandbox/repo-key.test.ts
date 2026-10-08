@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeRepoKey, repoSnapshotEligible, type RepoSnapshotGate } from './repo-key.js';
+import {
+  computeRepoKey,
+  repoSnapshotEligible,
+  repoSnapshotEligibility,
+  type RepoSnapshotGate,
+} from './repo-key.js';
 import { ISOLATED_CONTAINER_WORKSPACE_PATH } from '../../workspace.js';
 
 const USER = 'user_123';
@@ -48,6 +53,37 @@ describe('repoSnapshotEligible', () => {
         directory: '/workspace/org/user/sessions/s1',
       })
     ).toBe(false);
+  });
+
+  it('excludes a route with setup commands and treats empty or absent the same', () => {
+    const enrolled = gate({ enrolledIds: '*' });
+    expect(repoSnapshotEligible(enrolled, { ...route, setupCommands: ['pnpm install'] })).toBe(
+      false
+    );
+    expect(repoSnapshotEligible(enrolled, { ...route, setupCommands: [] })).toBe(true);
+    expect(repoSnapshotEligible(enrolled, route)).toBe(true);
+  });
+});
+
+describe('repoSnapshotEligibility', () => {
+  it('names the gate that rejected the route', () => {
+    expect(repoSnapshotEligibility(gate({ enrolledIds: 'user_other,org_other' }), route)).toEqual({
+      eligible: false,
+      reason: 'not_enrolled',
+    });
+    expect(
+      repoSnapshotEligibility(gate({ enrolledIds: '*' }), { ...route, repoUrl: undefined })
+    ).toEqual({ eligible: false, reason: 'no_repo_url' });
+    expect(
+      repoSnapshotEligibility(gate({ enrolledIds: '*' }), {
+        ...route,
+        directory: '/workspace/org/user/sessions/s1',
+      })
+    ).toEqual({ eligible: false, reason: 'directory_not_isolated' });
+  });
+
+  it('reports an enrolled route with a repository at the isolated path as eligible', () => {
+    expect(repoSnapshotEligibility(gate({ enrolledIds: '*' }), route)).toEqual({ eligible: true });
   });
 });
 

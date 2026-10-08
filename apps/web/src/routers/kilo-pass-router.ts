@@ -102,11 +102,7 @@ import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
-import {
-  getAllMobileStoreKiloPassProducts,
-  getMobileStoreKiloPassProductByAppleProductId,
-  getMobileStoreKiloPassProductByGoogleProductId,
-} from '@/lib/kilo-pass/mobile-store-products';
+import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
 import {
   buildPurchasePresentation,
   getPurchasePresentationForUser,
@@ -1090,13 +1086,15 @@ const GetPurchasePresentationInputSchema = z.object({
   storefront: PurchaseStorefrontSchema.nullable().optional(),
   product: PurchaseProductSchema,
   program: z.string().max(64).nullable().optional(),
-  /**
-   * Old clients omit it. Omit or false keeps today's Android presentation.
-   * Remove when every Android client mounts Play IAP.
-   */
+  /** Ignored. Shipped mobile clients still send it. */
   supportsNativePlayKiloPass: z.boolean().optional(),
 });
 
+/**
+ * The server refuses every in-app Kilo Pass purchase, so only `platform`, `storefront`,
+ * `product`, and `program` are read. The other fields keep the input that shipped mobile
+ * clients send.
+ */
 const PreflightPurchaseInputSchema = z.object({
   platform: PurchasePlatformSchema,
   storefront: PurchaseStorefrontSchema,
@@ -1126,11 +1124,7 @@ const GetPurchasePresentationOutputSchema = z.object({
   kind: z.enum(PURCHASE_PRESENTATION_KINDS),
   statusClass: z.enum(PURCHASE_STATUS_CLASSES),
   reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
-      'unsupported_combination',
-    ])
+    .enum(['credits_not_sold_on_ios', 'kilo_pass_not_sold_in_app', 'unsupported_combination'])
     .nullable(),
   cta: PurchasePresentationCtaOutputSchema,
   webUrl: z.string().nullable(),
@@ -1143,7 +1137,7 @@ const PreflightPurchaseOutputSchema = z.object({
   reason: z
     .enum([
       'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
+      'kilo_pass_not_sold_in_app',
       'unsupported_combination',
       'unknown_product',
       'already_subscribed',
@@ -1393,7 +1387,6 @@ export const kiloPassRouter = createTRPCRouter({
         storefront: input.storefront,
         product: input.product,
         program: input.program,
-        supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
       });
     }),
 
@@ -1409,77 +1402,16 @@ export const kiloPassRouter = createTRPCRouter({
           storefront: input.storefront,
           product: input.product,
           program: input.program,
-          supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
         },
       });
 
-      if (presentation.kind !== 'native_iap') {
-        return {
-          allowed: false,
-          statusClass: presentation.statusClass,
-          reason: presentation.reason,
-        };
-      }
-
-      if (input.storefront === 'play') {
-        if (
-          !input.googleProductId ||
-          !getMobileStoreKiloPassProductByGoogleProductId(input.googleProductId)
-        ) {
-          return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
-        }
-      } else if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
-        return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
-      }
-
-      // Refuse before StoreKit is invoked when this device's subscription belongs to
-      // another Kilo account. The client-side check races the StoreKit purchase list,
-      // and losing that race charges the user for a purchase the server then rejects.
-      if (input.appleOriginalTransactionId) {
-        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
-          columns: { kilo_user_id: true },
-          where: and(
-            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.AppStore),
-            eq(kilo_pass_store_purchases.provider_subscription_id, input.appleOriginalTransactionId)
-          ),
-        });
-        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
-          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
-        }
-      }
-
-      // Same ownership guard for a Play purchase this device already owns.
-      if (input.googlePurchaseToken) {
-        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
-          columns: { kilo_user_id: true },
-          where: and(
-            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
-            eq(kilo_pass_store_purchases.provider_subscription_id, input.googlePurchaseToken)
-          ),
-        });
-        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
-          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
-        }
-      }
-
-      // Exclude the native provider for this storefront. Old iOS excluded App Store
-      // only. Play storefront excludes GooglePlay so a Play-owned pass is not treated
-      // as another provider. A live Stripe sub still returns `already_subscribed`.
-      const nativeStoreProvider =
-        input.storefront === 'play'
-          ? KiloPassPaymentProvider.GooglePlay
-          : KiloPassPaymentProvider.AppStore;
-
-      const hasLiveOtherProviderSub =
-        subscription != null &&
-        !isStripeSubscriptionEnded(subscription.status) &&
-        subscription.paymentProvider !== nativeStoreProvider;
-
-      if (hasLiveOtherProviderSub) {
-        return { allowed: false, statusClass: 'terminal', reason: 'already_subscribed' };
-      }
-
-      return { allowed: true, statusClass: 'healthy', reason: null };
+      // No presentation is `native_iap` any more, so every in-app purchase is refused
+      // before the store sheet opens.
+      return {
+        allowed: false,
+        statusClass: presentation.statusClass,
+        reason: presentation.reason,
+      };
     }),
 
   completeAppStorePurchase: baseProcedure

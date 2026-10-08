@@ -15,6 +15,7 @@ export type FakeWrapperHelloInput = {
   wrapperId: string;
   allocationId: string;
   protocolVersion?: number;
+  redactsNamedSecrets?: boolean;
 };
 
 /**
@@ -118,6 +119,7 @@ export class FakeWrapper {
       wrapperId: input.wrapperId,
       allocationId: input.allocationId,
       protocolVersion: input.protocolVersion ?? CONTROL_PLANE_PROTOCOL_VERSION,
+      ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
     });
     return this.next();
   }

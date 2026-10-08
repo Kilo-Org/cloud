@@ -19,11 +19,3 @@ export function variantFromStorage(stored: string | null | undefined): string | 
   if (stored == null || stored === '') return null;
   return stored;
 }
-
-/**
- * Platform runs still select one reasoningEffort per model. Map that effort
- * key to the canonical stored variant value (today's CLI --variant value).
- */
-export function variantFromReasoningEffort(effort: string | null | undefined): string | null {
-  return effort ?? null;
-}

@@ -27,10 +27,11 @@ import {
   cleanupStaleKiloPidfiles,
   createKiloRuntimes,
   defaultKiloPidfileDirectory,
+  type KiloRuntimesOptions,
 } from './kilo-runtime.js';
 import { createPreparationManager, runtimeKey } from './prepare.js';
 import { createWorkspaceCapture, type WorkspaceCapture } from './workspace-capture.js';
-import { createTurnManager, type TurnManager } from './turn.js';
+import { createTurnManager, type TurnManager, type TurnManagerDeps } from './turn.js';
 import { createControlPlaneTerminals } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
@@ -157,6 +158,40 @@ export function createControlPlaneLifecycle(
   };
 }
 
+/** The production composition of native supervision, Cloud turns and heartbeat activity. */
+export function createControlPlaneSessionHost(options: {
+  runtime: Omit<
+    KiloRuntimesOptions,
+    'onEvent' | 'onRestart' | 'onUnavailable' | 'onDeadline' | 'onActivityChange'
+  >;
+  turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
+  isPreparing(): boolean;
+  hasRecentTerminalInput(): boolean;
+}) {
+  const runtimes = createKiloRuntimes({
+    ...options.runtime,
+    onEvent: event => turns?.observeKiloEvent(event),
+    onActivityChange: key => turns?.refreshActivity(key),
+    onDeadline: (identity, reason, key) => turns?.onNativeDeadline(identity, reason, key),
+    onRestart: info => turns?.onRuntimeRestart(info),
+    onUnavailable: (directory, key) => turns?.onRuntimeUnavailable(directory, key),
+  });
+  const turns = createTurnManager({ ...options.turn, timers: options.runtime.timers, runtimes });
+  const manager = turns;
+  return {
+    runtimes,
+    turns: manager,
+    getHeartbeat: () => ({
+      active:
+        options.isPreparing() ||
+        runtimes.needsCompute() ||
+        manager.hasPendingWork() ||
+        options.hasRecentTerminalInput(),
+      degraded: runtimes.suspected(),
+    }),
+  };
+}
+
 /**
  * Process entry for the control-plane wrapper. Runs forever until `shutdown`
  * frame, SIGTERM or an uncaught exception; a disconnect never exits.
@@ -231,15 +266,19 @@ export async function runControlPlaneWrapper(
   const worktreeDeletionRef: {
     current?: ReturnType<typeof createControlPlaneWorktreeDeletion>;
   } = {};
-  const runtimes = createKiloRuntimes({
-    timers,
-    log: logToFile,
-    workload,
-    onNativeDiagnostic: projector,
-    onEvent: event => turnsRef.current?.observeKiloEvent(event),
-    onRestart: info => turnsRef.current?.onRuntimeRestart(info),
-    onUnavailable: (directory, key) => turnsRef.current?.onRuntimeUnavailable(directory, key),
+  const host = createControlPlaneSessionHost({
+    runtime: { timers, log: logToFile, workload, onNativeDiagnostic: projector },
+    turn: {
+      emit: frame => connection.send(frame),
+      log: logToFile,
+      onDiagnostic: diagnostics.onDiagnostic,
+      onNativeDiagnostic: projector,
+    },
+    isPreparing: () => preparationRef.current?.isPreparing() ?? false,
+    hasRecentTerminalInput: () => terminalsRef.current?.hasRecentInput() ?? false,
   });
+  const { runtimes } = host;
+  turnsRef.current = host.turns;
   const connection = createControlPlaneConnection({
     url,
     credential,
@@ -247,13 +286,7 @@ export async function runControlPlaneWrapper(
     timers,
     log: logToFile,
     onNativeDiagnostic: projector,
-    getHeartbeat: () => ({
-      active:
-        (preparationRef.current?.isPreparing() ?? false) ||
-        (turnsRef.current?.isActive() ?? false) ||
-        (terminalsRef.current?.hasRecentInput() ?? false),
-      degraded: runtimes.suspected(),
-    }),
+    getHeartbeat: host.getHeartbeat,
     onFrame: (frame: ControlPlaneWrapperFrame) => {
       switch (frame.type) {
         case 'session.prepare':
@@ -329,14 +362,6 @@ export async function runControlPlaneWrapper(
     controlUrl: url,
     wrapperId: connection.wrapperId,
     runtimes,
-  });
-  turnsRef.current = createTurnManager({
-    timers,
-    emit: frame => connection.send(frame),
-    runtimes: { get: key => runtimes.get(key) },
-    log: logToFile,
-    onDiagnostic: diagnostics.onDiagnostic,
-    onNativeDiagnostic: projector,
   });
   captureRef.current = createWorkspaceCapture({ send: frame => connection.send(frame) });
   preparationRef.current = createPreparationManager({

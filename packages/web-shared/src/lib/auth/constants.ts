@@ -11,6 +11,7 @@ export type AuthErrorType =
   | 'INVALID_VERIFICATION'
   | 'IP_MISMATCH'
   | 'SIGNUP-RATE-LIMITED'
+  | 'SIGNUP-UNAVAILABLE'
   | 'EMAIL-ALREADY-USED'
   | 'SSO_ERROR';
 

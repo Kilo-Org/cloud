@@ -1,7 +1,8 @@
-import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from '@kilocode/db/schema-types';
-import type { MicrodollarUsage } from '@kilocode/db/schema';
+import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 import { z } from 'zod';
-import type { UsageMetaData } from './processUsage.types';
+
+export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
+export type { AbuseClassification, GatewayApiKind } from './schema-types';
 
 /**
  * Wire contract for `POST /api/internal/usage/record`.
@@ -16,12 +17,11 @@ import type { UsageMetaData } from './processUsage.types';
  *
  * Invariants this schema deliberately encodes:
  *
- * - Nullable fields use `.nullable()`, never `.optional()`. `JSON.stringify`
- *   drops `undefined`-valued keys, and `null` is load-bearing here: for
- *   organization usage `toInsertableDbUsageRecord` explicitly sets
- *   `user_prompt_prefix` and `system_prompt_prefix` to `null` so prompt text is
- *   never persisted. A dropped key must be a 400, not a silent write of the
- *   wrong value.
+ * - Nullable fields use `.nullable()`. Except for additive rollout fields that
+ *   default to null, missing keys are rejected: `JSON.stringify` drops
+ *   `undefined`-valued keys, and `null` is load-bearing here. For organization
+ *   usage `toInsertableDbUsageRecord` explicitly sets `user_prompt_prefix` and
+ *   `system_prompt_prefix` to `null` so prompt text is never persisted.
  * - `created_at` is validated as strict ISO 8601. Both `core.created_at` and
  *   `metadata.created_at` come from `new Date().toISOString()` on the sender, so
  *   this holds by construction. It would NOT hold for a value read back out of
@@ -94,6 +94,9 @@ const UsageMetadataSchema = z.object({
   session_id: z.string().nullable(),
   mode: z.string().nullable(),
   auto_model: z.string().nullable(),
+  // Like bouncer_usage_event, older gateway senders omit this additive field.
+  // Default it to null so parsed metadata still satisfies UsageMetaData.
+  reasoning_setting: z.string().nullable().default(null),
   market_cost: z.number().nullable(),
   is_free: z.boolean().nullable(),
   abuse_delay: z.number().nullable(),
@@ -144,28 +147,3 @@ export const UsageRecordResponseSchema = z.object({
 });
 
 export type UsageRecordResponse = z.infer<typeof UsageRecordResponseSchema>;
-
-/**
- * Compile-time proof that the wire schemas stay aligned with the database types.
- * If a column is added to `microdollar_usage` or a field to `UsageMetaData`
- * without updating the schemas above, these assignments stop type-checking.
- */
-type AssertExact<Actual, Expected> = [Actual] extends [Expected]
-  ? [Expected] extends [Actual]
-    ? true
-    : never
-  : never;
-
-export type CoreUsageContractMatchesDb = AssertExact<
-  z.infer<typeof CoreUsageSchema>,
-  MicrodollarUsage
->;
-export type UsageMetadataContractMatchesType = AssertExact<
-  z.infer<typeof UsageMetadataSchema>,
-  UsageMetaData
->;
-
-const _coreContractIsExact: CoreUsageContractMatchesDb = true;
-const _metadataContractIsExact: UsageMetadataContractMatchesType = true;
-void _coreContractIsExact;
-void _metadataContractIsExact;

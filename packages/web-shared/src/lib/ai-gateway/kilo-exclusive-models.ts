@@ -18,6 +18,7 @@ import type {
 import { type ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 const CLAUDE_OPUS_STEALTH_PRICING: PricingTiers = [
   {
@@ -198,19 +199,34 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   inference_provider_restriction: [],
 };
 
-export const stepfun_37_flash_free_model: KiloExclusiveModel = {
-  public_id: 'stepfun/step-3.7-flash:free',
-  display_name: 'StepFun: Step 3.7 Flash (free)',
+export const stepfun_5_preview_free_model: KiloExclusiveModel = {
+  public_id: 'stepfun/step-5-preview-free',
+  display_name: 'StepFun: Step 5 Preview (free)',
   description:
-    "Step 3.7 Flash is StepFun's latest high-efficiency multimodal Mixture-of-Experts model. It pairs a 196B-parameter language backbone with a vision encoder for native image and video understanding, activating roughly 11B parameters per token. The model supports a 256K context window and exposes selectable reasoning levels (high/medium/low), letting callers trade off speed, cost, and depth of reasoning.\n\nDesigned for coding, agentic workflows, structured outputs, and long-context productivity tasks.",
-  context_length: 262_144,
-  max_completion_tokens: 262_144,
+    "Step 5 Preview is StepFun's flagship model for agentic work, with strong capabilities in software engineering, professional knowledge work, and finance. It natively supports text, image, and video input with a 1M-token context window and up to 64K output tokens. The model supports tool calling, structured outputs, and selectable reasoning levels (low/medium/high) for long-context research, coding, and multi-step workflows.",
+  context_length: 1_000_000,
+  max_completion_tokens: 64_000,
   status: 'public',
-  flags: ['reasoning', 'vision', 'vercel-routing'],
+  flags: ['reasoning', 'vision'],
   provider: OPENROUTER,
-  internal_id: 'stepfun/step-3.7-flash',
+  internal_id: 'stepfun/step-5-preview',
   pricing: null,
   inference_provider_restriction: ['stepfun'],
+};
+
+export const glyph_cluster_stealth_free_model: KiloExclusiveModel = {
+  public_id: 'stealth/glyph-cluster',
+  display_name: 'Stealth: Glyph Cluster (free)',
+  description:
+    "Your prompts and completions may be retained and used to train or improve the provider's services. Glyph Cluster is a reasoning model for coding and long-context analysis, served through Vercel AI Gateway during its stealth period at no cost. It supports function calling and streaming, takes text input only, and does not support structured outputs. Zero Data Retention is not available for this model.",
+  context_length: 256_000,
+  max_completion_tokens: 256_000,
+  status: 'public',
+  flags: ['reasoning', 'stealth', 'requires-data-collection'],
+  provider: VERCEL_AI_GATEWAY,
+  internal_id: 'stealth/glyph-cluster',
+  pricing: null,
+  inference_provider_restriction: [],
 };
 
 export function isKiloExclusiveFreeModel(model: string): boolean {
@@ -236,7 +252,8 @@ export const kiloExclusiveModels = [
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-  stepfun_37_flash_free_model,
+  stepfun_5_preview_free_model,
+  glyph_cluster_stealth_free_model,
 ] as KiloExclusiveModel[];
 
 export function isKiloStealthModel(model: string): boolean {

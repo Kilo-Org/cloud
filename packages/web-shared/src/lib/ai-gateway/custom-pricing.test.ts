@@ -2,6 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import {
   QWEN37_MAX_MODEL_ID,
   QWEN37_PLUS_MODEL_ID,
@@ -66,6 +67,32 @@ describe('custom model pricing', () => {
         makeUsage({ inputTokens: 100, cost_mUsd: 999 })
       )
     ).toBe(Math.round(100 * 0.75));
+  });
+
+  test('replaces upstream Mistral Large 4 pricing with the discounted OpenRouter rates', () => {
+    const model = applyCustomPricingToModel({
+      ...makeModel(MISTRAL_LARGE_4_MODEL_ID),
+      name: 'Mistral: Mistral Large 4',
+    });
+
+    expect(model.name).toBe('Mistral: Mistral Large 4 (50% off)');
+    expect(model.pricing).toEqual({
+      prompt: '0.000000680000',
+      completion: '0.000002090000',
+      input_cache_read: '0.000000070000',
+      input_cache_write: undefined,
+    });
+    expect(
+      calculateCustomCost_mUsd(
+        MISTRAL_LARGE_4_MODEL_ID,
+        makeUsage({
+          inputTokens: 1_000,
+          outputTokens: 100,
+          cacheHitTokens: 200,
+          cost_mUsd: 999,
+        })
+      )
+    ).toBe(Math.round(800 * 0.68 + 100 * 2.09 + 200 * 0.07));
   });
 
   test.each([QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID])(

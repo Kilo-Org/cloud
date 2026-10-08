@@ -4,10 +4,7 @@ import type { NextRequest } from 'next/server';
 
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
-import {
-  UsageRecordRequestSchema,
-  type UsageRecordResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/usage-record-contract';
+import { UsageRecordRequestSchema, type UsageRecordResponse } from '@kilocode/usage-contracts';
 import {
   createPhaseTimer,
   emitUsageRecordTiming,

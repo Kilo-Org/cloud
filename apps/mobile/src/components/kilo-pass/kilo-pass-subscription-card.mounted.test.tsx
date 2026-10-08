@@ -38,10 +38,6 @@ const devRefund = vi.hoisted(() => ({ value: null as string | null }));
 // the mocked tRPC `queryOptions` carries, so the card's three queries each get
 // a stable shape regardless of hook-call order across renders.
 const queryState = vi.hoisted(() => ({
-  presentation: vi.fn(),
-  presentationData: undefined as unknown,
-  presentationIsError: false,
-  presentationIsPending: false,
   state: vi.fn(),
   stateData: undefined as unknown,
   stateIsError: false,
@@ -56,7 +52,6 @@ const trpc = vi.hoisted(() => ({
     getMobileStoreProducts: {
       queryOptions: () => ({ __name: 'mobileStoreProducts' }),
     },
-    getPurchasePresentation: { queryOptions: () => ({ __name: 'presentation' }) },
     getState: {
       pathFilter: () => ({ queryKey: [['kiloPass']] }),
       queryOptions: () => ({ __name: 'state' }),
@@ -114,14 +109,6 @@ vi.mock('@/lib/kilo-pass/dev-storekit-refund', () => ({
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: (options: { __name?: string }) => {
-    if (options.__name === 'presentation') {
-      return {
-        data: queryState.presentationData,
-        isError: queryState.presentationIsError,
-        isPending: queryState.presentationIsPending,
-        refetch: queryState.presentation,
-      };
-    }
     if (options.__name === 'state') {
       return {
         data: queryState.stateData,
@@ -191,12 +178,8 @@ describe('KiloPassSubscriptionCard mounted', () => {
     appState.listeners.clear();
     haptics.selectionAsync.mockClear();
     devRefund.value = null;
-    queryState.presentation.mockClear();
     queryState.state.mockClear();
     queryState.productsRefetch.mockClear();
-    queryState.presentationData = undefined;
-    queryState.presentationIsError = false;
-    queryState.presentationIsPending = false;
     queryState.stateData = undefined;
     queryState.stateIsError = false;
     queryState.stateIsPending = false;
@@ -215,7 +198,6 @@ describe('KiloPassSubscriptionCard mounted', () => {
   });
 
   it('never registers an AppState listener while rendering', async () => {
-    queryState.presentationIsPending = true;
     queryState.stateIsPending = true;
 
     const renderer = await renderCard();
@@ -228,7 +210,6 @@ describe('KiloPassSubscriptionCard mounted', () => {
   });
 
   it('an active foreground transition triggers no refetch on either query', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
     queryState.stateData = { subscription: null };
 
     await renderCard();
@@ -242,12 +223,12 @@ describe('KiloPassSubscriptionCard mounted', () => {
     });
     await flush();
 
-    expect(queryState.presentation).not.toHaveBeenCalled();
+    expect(queryState.productsRefetch).not.toHaveBeenCalled();
     expect(queryState.state).not.toHaveBeenCalled();
   });
 
   it('renders the error state and keeps Retry reachable', async () => {
-    queryState.presentationIsError = true;
+    queryState.stateIsError = true;
 
     const renderer = await renderCard();
     const retry = renderer.root.findByProps({ accessibilityHint: 'kiloPass.retryHint' });
@@ -259,20 +240,17 @@ describe('KiloPassSubscriptionCard mounted', () => {
 
     expect(haptics.selectionAsync).toHaveBeenCalledTimes(1);
     expect(queryState.state).toHaveBeenCalledTimes(1);
-    expect(queryState.presentation).toHaveBeenCalledTimes(1);
   });
 
-  it('renders the card presentation state', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
+  it('opens read-only status even when no subscription is present', async () => {
     queryState.stateData = { subscription: null };
 
     const renderer = await renderCard();
 
-    expect(renderer.root.findAllByProps({ testID: 'kilo-pass-unavailable-card' })).toHaveLength(1);
+    expect(collectText(renderer.toJSON())).toContain('organization.kiloPass.notSubscribed');
   });
 
   it('hides the dev-refund control when no refundable product is present', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
     queryState.stateData = { subscription: null };
     devRefund.value = null;
 
@@ -282,7 +260,6 @@ describe('KiloPassSubscriptionCard mounted', () => {
   });
 
   it('shows the dev-refund control when a refundable product is present', async () => {
-    queryState.presentationData = { kind: 'unavailable' };
     queryState.stateData = { subscription: null };
     devRefund.value = 'kilo_pass_apple_monthly';
 

@@ -2,7 +2,6 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
-import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -26,7 +25,6 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { agentColor, type Tint, toneColor } from '@/lib/agent-color';
 import { WEB_BASE_URL } from '@/lib/config';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useOrganizationMutations } from '@/lib/hooks/use-organization-mutations';
 import {
@@ -88,8 +86,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   const kiloPassRowState = showKiloPass
     ? getOrgKiloPassRowState({ data: kiloPassSummary.data, isError: kiloPassSummary.isError })
     : null;
-  const kiloPassManagementUrl = `${WEB_BASE_URL}/organizations/${organizationId}/subscriptions/kilo-pass`;
-  const kiloPassSetupUrl = `${kiloPassManagementUrl}/setup`;
   // A missing `withMembers` payload is not "off": the query can be paused
   // offline or have errored with no persisted copy, so an org with the alert
   // enabled must never read as disabled. Only a loaded payload with no stored
@@ -188,16 +184,6 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               {kiloPassRowState != null && (
                 <OrgKiloPassRow
                   state={kiloPassRowState}
-                  onManage={() => {
-                    void openExternalUrl(kiloPassManagementUrl, {
-                      label: t('kiloPass.kiloPassManagement'),
-                    });
-                  }}
-                  onSetup={() => {
-                    void openExternalUrl(kiloPassSetupUrl, {
-                      label: t('kiloPass.kiloPassSetup'),
-                    });
-                  }}
                   onRetry={() => {
                     void kiloPassSummary.refetch();
                   }}
@@ -246,32 +232,15 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
 
 type OrgKiloPassRowProps = Readonly<{
   state: OrgKiloPassRowState;
-  onManage: () => void;
-  onSetup: () => void;
   onRetry: () => void;
 }>;
 
-/**
- * Compact Kilo Pass for Orgs row in the billing configuration group. Mirrors
- * ConfigureRow's layout and divider, but renders KiloPassIcon directly (it is
- * a plain function component, not a LucideIcon) and sets explicit
- * accessibility roles/labels for the manage, setup, and retry actions. Never
- * the last row — "Low balance alert" always follows it — so the divider is
- * permanent.
- */
-function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowProps) {
+/** Read-only organization subscription status with a retry action for query failures. */
+function OrgKiloPassRow({ state, onRetry }: OrgKiloPassRowProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const tint: Tint = state.attention ? toneColor('warn') : agentColor('Kilo Pass');
-  let onPress: (() => void) | null = null;
-  if (state.action === 'manage') {
-    onPress = onManage;
-  } else if (state.action === 'setup') {
-    onPress = onSetup;
-  } else if (state.action === 'retry') {
-    onPress = onRetry;
-  }
-  const opensWeb = state.action === 'manage' || state.action === 'setup';
+  const onPress = state.action === 'retry' ? onRetry : null;
   const accessibilityLabel = state.actionLabel
     ? `${t('kiloPass.title')}. ${state.subtitle}. ${state.actionLabel}`
     : `${t('kiloPass.title')}. ${state.subtitle}`;
@@ -294,7 +263,6 @@ function OrgKiloPassRow({ state, onManage, onSetup, onRetry }: OrgKiloPassRowPro
       {state.action === 'retry' ? (
         <Text className="shrink-0 text-xs font-medium text-primary">{state.actionLabel}</Text>
       ) : null}
-      {opensWeb ? <DirectionalChevronRight size={14} color={colors.mutedForeground} /> : null}
     </View>
   );
 

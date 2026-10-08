@@ -403,10 +403,6 @@ vi.mock('@/lib/last-active-instance', () => ({
 // regression test must observe the real gate closing before any await and
 // blocking a late persist from calling SecureStore.setItem.
 
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
-  resetPurchaseErrorToastDedup: vi.fn(),
-}));
-
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
@@ -1065,9 +1061,6 @@ describe('stale sign-in continuation', () => {
     });
 
     expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(1);
-    const { resetPurchaseErrorToastDedup } =
-      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
-    expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(1);
     // The sign-out won the race to the final state.
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
@@ -1093,9 +1086,6 @@ describe('stale sign-in continuation', () => {
     });
 
     expect(hoisted.appsflyer.trackEvent).toHaveBeenCalledTimes(2);
-    const { resetPurchaseErrorToastDedup } =
-      await import('@/lib/kilo-pass/use-store-kilo-pass-purchase');
-    expect(resetPurchaseErrorToastDedup).toHaveBeenCalledTimes(2);
     expect(getCtx().token).toBe('second-token');
 
     unmount();

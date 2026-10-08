@@ -66,7 +66,6 @@ import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-owners
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
-import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   isSignOutActive,
   setSignOutActive,
@@ -402,7 +401,6 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // reactive `isSigningOut` follows the same flag.
         setSignOutActive(false);
         trackEvent('login');
-        resetPurchaseErrorToastDedup();
         // A direct account switch must not keep the prior account's query
         // cache: the org list is keyed account-independently, so a stale list
         // would otherwise drive a false lost-org blank in the org fence.

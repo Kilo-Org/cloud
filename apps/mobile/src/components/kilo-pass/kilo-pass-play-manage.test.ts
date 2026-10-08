@@ -42,6 +42,14 @@ describe('openPlaySubscriptionManagement', () => {
     expect(invalidateAfter).toHaveBeenCalledTimes(2);
   });
 
+  it('opens account subscription management when retired products are absent from the catalog', async () => {
+    vi.mocked(deepLinkToSubscriptions).mockResolvedValue(undefined);
+    await openPlaySubscriptionManagement({ invalidateAfter: vi.fn() });
+    expect(deepLinkToSubscriptions).toHaveBeenCalledWith({
+      packageNameAndroid: 'com.kilocode.kiloapp',
+    });
+  });
+
   it('shows the Play management failure toast when the deeplink fails', async () => {
     vi.mocked(deepLinkToSubscriptions).mockRejectedValue(new Error('deeplink failed'));
 

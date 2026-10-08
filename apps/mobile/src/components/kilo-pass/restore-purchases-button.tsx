@@ -6,27 +6,22 @@ import { toast } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type StoreKiloPassRestorePurchasesResult } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
-import { useKiloPassNativeIap } from './kilo-pass-native-iap-owner';
+import { useStoreKiloPassRecovery } from '@/lib/kilo-pass/use-store-kilo-pass-recovery';
+import { View } from 'react-native';
 
-type RestorePurchasesButtonProps = {
-  /** Called with the outcome instead of the default toast — for callers that render feedback inline. */
-  onResult?: (result: StoreKiloPassRestorePurchasesResult) => void;
-};
-
-export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesButtonProps> = {}) {
+export function RestorePurchasesButton() {
   const colors = useThemeColors();
-  const { isPending, isRestoringPurchases, restorePurchases } = useKiloPassNativeIap();
+  const { signedIn, errorMessage, isRestoringPurchases, restorePurchases } =
+    useStoreKiloPassRecovery();
   const { t } = useTranslation();
 
-  const disabled = isPending || isRestoringPurchases;
+  const disabled = !signedIn || isRestoringPurchases;
 
   const handlePress = () => {
     void Haptics.selectionAsync();
     void (async () => {
       const result = await restorePurchases();
-      if (onResult) {
-        onResult(result);
+      if (result === null) {
         return;
       }
       if (result === 'restored') {
@@ -39,18 +34,25 @@ export function RestorePurchasesButton({ onResult }: Readonly<RestorePurchasesBu
   };
 
   return (
-    <Button
-      accessibilityLabel={t('kiloPass.restorePurchases')}
-      accessibilityState={{ busy: isRestoringPurchases, disabled }}
-      className="self-center px-3"
-      disabled={disabled}
-      onPress={handlePress}
-      variant="link"
-    >
-      {isRestoringPurchases && <ActivityIndicator size="small" color={colors.primary} />}
-      <Text>
-        {isRestoringPurchases ? t('kiloPass.restoringPurchases') : t('kiloPass.restorePurchases')}
-      </Text>
-    </Button>
+    <View className="gap-2">
+      <Button
+        accessibilityLabel={t('kiloPass.restorePurchases')}
+        accessibilityState={{ busy: isRestoringPurchases, disabled }}
+        className="self-center px-3"
+        disabled={disabled}
+        onPress={handlePress}
+        variant="link"
+      >
+        {isRestoringPurchases && <ActivityIndicator size="small" color={colors.primary} />}
+        <Text>
+          {isRestoringPurchases ? t('kiloPass.restoringPurchases') : t('kiloPass.restorePurchases')}
+        </Text>
+      </Button>
+      {errorMessage ? (
+        <Text accessibilityRole="alert" className="text-sm text-destructive">
+          {errorMessage}
+        </Text>
+      ) : null}
+    </View>
   );
 }

@@ -90,9 +90,6 @@ vi.mock('@/lib/last-active-instance', () => ({
 // `expo`, which needs `__DEV__` and cannot load in the node test environment.
 vi.mock('@/lib/last-opened-session', () => ({ clearLastOpenedSession: vi.fn() }));
 vi.mock('@/lib/native-launcher-surfaces', () => ({ clearLauncherSurfaces: vi.fn() }));
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
-  resetPurchaseErrorToastDedup: vi.fn(),
-}));
 vi.mock('@/lib/persist/read-cache', () => ({
   clearCacheScopeForSignOut: vi.fn().mockResolvedValue(undefined),
   readCachedUserId: vi.fn().mockReturnValue(null),

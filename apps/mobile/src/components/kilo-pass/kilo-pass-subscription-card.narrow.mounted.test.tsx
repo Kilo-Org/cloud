@@ -19,9 +19,9 @@ const cardState = vi.hoisted(() => {
     kind: 'card',
     state: {
       title: 'Kilo Pass',
-      description: 'Monthly credits with bonus progress.',
-      action: 'open-web',
-      actionLabel: 'Subscribe',
+      description: 'Not subscribed.',
+      action: 'open-native',
+      actionLabel: 'Details',
     },
   };
   return { content: card };
@@ -31,18 +31,15 @@ const CARD_CONTENT: CardContent = {
   kind: 'card',
   state: {
     title: 'Kilo Pass',
-    description: 'Monthly credits with bonus progress.',
-    action: 'open-web',
-    actionLabel: 'Subscribe',
+    description: 'Not subscribed.',
+    action: 'open-native',
+    actionLabel: 'Details',
   },
 };
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     kiloPass: {
-      getPurchasePresentation: {
-        queryOptions: () => ({ queryKey: ['kiloPass', 'presentation'] as const }),
-      },
       getMobileStoreProducts: {
         queryOptions: () => ({ queryKey: ['kiloPass', 'products'] as const }),
       },
@@ -74,12 +71,6 @@ vi.mock('@/lib/kilo-pass/subscription-card-state', () => ({
 
 vi.mock('@/lib/kilo-pass/dev-storekit-refund', () => ({
   getDevStoreKitRefundAppleProductId: () => null,
-}));
-
-vi.mock('./kilo-pass-ios-manage', () => ({
-  openAppStoreManagement: vi.fn(async (params: { invalidateAfter: () => Promise<void> }) => {
-    await params.invalidateAfter();
-  }),
 }));
 
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -148,7 +139,7 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
 
   it('stacks the icon tile above the copy in a narrow window', () => {
     // The 160 dp window of the e1 round left the fixed icon tile plus the
-    // fixed Subscribe label wider than the card, so the flexible text block
+    // fixed Details label wider than the card, so the flexible text block
     // collapsed to zero width and the wrapped copy stretched the card into an
     // empty slab (Profile, 2026-09-21). A narrow window must stack instead,
     // the same presentation ConfigureRow takes on these screens.
@@ -173,39 +164,8 @@ describe('KiloPassSubscriptionCard mounted layout', () => {
     const card = root.findByProps({ accessibilityRole: 'button' });
     expect(card.props.accessibilityLabel).toBe('Kilo Pass');
     expect(
-      root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Subscribe')
+      root.findAll(node => Object.is(node.type, 'Text') && node.props.children === 'Details')
     ).toHaveLength(1);
-  });
-});
-
-describe('KiloPassSubscriptionCard store management', () => {
-  it('invalidates every credit query the store-management path reads', async () => {
-    // The card's invalidateKiloPassState reads four path filters. A mock that
-    // omits one throws `Cannot read properties of undefined (reading
-    // 'pathFilter')` as soon as a test presses an open-store-management card
-    // (review, PR 6481, 2026-09-21).
-    cardState.content = {
-      kind: 'card',
-      state: {
-        title: 'Kilo Pass',
-        description: 'Manage your subscription.',
-        action: 'open-store-management',
-        actionLabel: 'Manage',
-      },
-    };
-    const card = renderCard().findByProps({ accessibilityRole: 'button' });
-    await act(async () => {
-      (card.props.onPress as () => void)();
-      await new Promise(resolve => {
-        setImmediate(resolve);
-      });
-    });
-    expect(invalidateQueries.mock.calls.map(([filter]) => filter)).toEqual([
-      ['kiloPass', 'state'],
-      ['user', 'getContextBalance'],
-      ['user', 'getCreditBlocks'],
-      ['kiloPass', 'history'],
-    ]);
   });
 });
 

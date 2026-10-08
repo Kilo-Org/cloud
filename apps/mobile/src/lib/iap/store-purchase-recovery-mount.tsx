@@ -15,6 +15,7 @@ import { createStoreCreditPurchaseActions } from '@/lib/credits/use-store-credit
 import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
 import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import { createAppStoreKiloPassPurchaseActions } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { getHistoricalKiloPassProductIds } from '@/lib/kilo-pass/historical-store-products';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -97,14 +98,11 @@ export function StorePurchaseRecoveryMount(): null {
     () => creditsCatalog.data?.products.map(product => product.googleProductId) ?? [],
     [creditsCatalog.data]
   );
-  const kiloPassAppleProductIds = useMemo(
-    () => kiloPassCatalog.data?.products.map(product => product.appleProductId) ?? [],
-    [kiloPassCatalog.data]
-  );
-  const kiloPassGoogleProductIds = useMemo(
-    () => kiloPassCatalog.data?.products.map(product => product.googleProductId) ?? [],
-    [kiloPassCatalog.data]
-  );
+  const { appleProductIds: kiloPassAppleProductIds, googleProductIds: kiloPassGoogleProductIds } =
+    useMemo(
+      () => getHistoricalKiloPassProductIds(kiloPassCatalog.data?.products ?? []),
+      [kiloPassCatalog.data]
+    );
 
   const invalidateAfterCreditCompletion = useCallback(async () => {
     await Promise.all([
@@ -152,9 +150,7 @@ export function StorePurchaseRecoveryMount(): null {
   const kiloPassActions = useMemo(
     () =>
       createAppStoreKiloPassPurchaseActions({
-        storefront,
         appAccountToken: kiloPassCatalog.data?.appAccountToken ?? '',
-        requestPurchase: requestStorePurchase,
         getAvailablePurchases: async () => {
           const pendingPurchases = await withStoreDeadline(
             fetchPendingStorePurchases(storefront),
@@ -218,10 +214,8 @@ export function StorePurchaseRecoveryMount(): null {
       if (!isCurrentAuthEpoch(authEpochRef.current)) {
         return;
       }
-      // Each flow completes only the purchases it sells and ignores the rest, so
-      // one list serves both. Neither reports on screen: a recovery that cannot
-      // finish now is retried on the next pass, and the balance the queries
-      // refresh is the signal that it did.
+      // Recognition includes retired subscription identifiers independently of
+      // current sale availability. Failed completions remain unfinished for retry.
       await Promise.all([
         creditActions.recoverPurchases(pendingPurchases, { notifyErrors: false }),
         kiloPassActions.recoverPurchases(pendingPurchases, { notifyErrors: false }),
@@ -263,7 +257,7 @@ export function StorePurchaseRecoveryMount(): null {
     if (signedIn && (hasCreditProducts || hasKiloPassProducts)) {
       void recoverRef.current();
     }
-  }, [hasCreditProducts, hasKiloPassProducts, signedIn]);
+  }, [hasCreditProducts, hasKiloPassProducts, signedIn, kiloPassCatalog.data?.appAccountToken]);
 
   // Foreground regain: the background -> active edge only, so an active -> active
   // echo never re-runs the pass. The app keeps one `AppState` listener, in

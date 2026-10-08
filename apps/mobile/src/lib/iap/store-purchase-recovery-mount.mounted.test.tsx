@@ -81,7 +81,7 @@ describe('StorePurchaseRecoveryMount', () => {
     });
   });
 
-  it('never posts an expired Pass transaction, and leaves it unfinished', async () => {
+  it('recovers an expired paid Pass transaction and finishes it as non-consumable', async () => {
     mockedIap.getPendingTransactionsIOS.mockResolvedValue([
       createPurchase({
         productId: KILO_PASS_PRODUCT_ID,
@@ -93,14 +93,15 @@ describe('StorePurchaseRecoveryMount', () => {
     await mountRecovery();
     await flushPromises();
 
-    // The completion path rejects an expired transaction on purpose, so the pass must
-    // not ask: the store keeps the transaction, and the next pass would ask again.
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
+    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(1);
     expect(completionsNamed('credits.completeAppStorePurchase')).toHaveLength(0);
-    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({ transactionId: 'tx-expired' }),
+      isConsumable: false,
+    });
   });
 
-  it('skips only the expired Pass transaction, and still grants the fresh credit pack', async () => {
+  it('recovers an expired paid Pass transaction and a fresh credit pack independently', async () => {
     mockedIap.getPendingTransactionsIOS.mockResolvedValue([
       createPurchase({
         productId: KILO_PASS_PRODUCT_ID,
@@ -113,13 +114,13 @@ describe('StorePurchaseRecoveryMount', () => {
     await mountRecovery();
     await flushPromises();
 
-    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
-    expect(completionsNamed('credits.completeAppStorePurchase')).toEqual([
-      {
-        procedure: 'credits.completeAppStorePurchase',
-        input: { signedTransactionJws: 'signed-jws' },
-      },
-    ]);
+    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(1);
+    expect(completionsNamed('credits.completeAppStorePurchase')).toHaveLength(1);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(2);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({ transactionId: 'tx-expired' }),
+      isConsumable: false,
+    });
     expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
       purchase: expect.objectContaining({ productId: CREDIT_PRODUCT_ID }),
       isConsumable: true,

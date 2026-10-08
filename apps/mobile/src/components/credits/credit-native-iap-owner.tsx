@@ -120,9 +120,8 @@ type InFlightOwnedRecovery = { epoch: number; promise: Promise<boolean> };
  * The single `useIAP` call site for the credits route.
  *
  * expo-iap registers its purchase listeners at module scope, so the app must
- * never mount two owners at once. The Kilo Pass route is popped before the
- * credits route can be pushed, so `KiloPassNativeIapOwner` and this owner never
- * coexist; a future route that mounts both would double-handle every purchase.
+ * never mount two owners at once. Subscription restoration uses value-returning
+ * store calls, leaving this as the app's only purchase-listener owner.
  */
 export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   const trpc = useTRPC();

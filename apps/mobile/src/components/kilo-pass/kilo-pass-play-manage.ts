@@ -8,12 +8,12 @@ import { i18n } from '@/i18n';
  * an Android branch so iOS never reaches for the Play deeplink.
  */
 export async function openPlaySubscriptionManagement(params: {
-  skuAndroid: string;
+  skuAndroid?: string;
   invalidateAfter: () => Promise<void> | void;
 }): Promise<void> {
   try {
     await deepLinkToSubscriptions({
-      skuAndroid: params.skuAndroid,
+      ...(params.skuAndroid ? { skuAndroid: params.skuAndroid } : {}),
       packageNameAndroid: 'com.kilocode.kiloapp',
     });
     await params.invalidateAfter();

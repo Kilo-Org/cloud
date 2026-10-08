@@ -33,17 +33,37 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 4. `pnpm start`
 5. open installed app on your phone
 
-## App Store Kilo Pass Subscriptions
+## Kilo Pass status and legacy purchase recovery
 
-App Store Kilo Pass subscriptions require an EAS development build or TestFlight
-build with the in-app purchase capability enabled. Expo Go is not supported for
-this feature.
+Version 1.0.15 removes native Kilo Pass subscription sales and upgrades on both
+platforms. Profile opens a read-only status screen for store and web subscriptions,
+with streak, bonus credits, and paid-period end where the current backend state
+provides it. The screen contains no web checkout or billing-management links.
+The organization hub also shows read-only Kilo Pass state without checkout or
+web subscription-management actions.
+Active legacy subscriptions retain access to their platform's store-management sheet.
+Native one-off credit packs, localized prices, legal links, and recovery remain enabled.
 
-Configured auto-renewable subscription product IDs:
+The forced-upgrade build itself completes already-paid, unfinished subscriptions:
+`StorePurchaseRecoveryMount` reconnects and submits verified receipts on launch and
+foreground regain, without opening a sales screen. Explicit Restore Purchases is
+also available on the status screen. Account epochs fence submission and feedback;
+pending payments wait for approval; the store transaction finishes only after
+backend completion succeeds. Historical subscription identifiers are retained
+independently of current sale availability or store product lookup.
 
-- `kilopass.tier19.monthly.v1`
-- `kilopass.tier49.monthly.v1`
-- `kilopass.tier199.monthly.v1`
+Store recovery requires an EAS development or release build with billing enabled;
+Expo Go cannot verify it. Legacy identifiers retained for reconciliation:
+
+- Apple: `kilopass.tier19.monthly.v1`, `kilopass.tier49.monthly.v1`,
+  `kilopass.tier199.monthly.v1`
+- Play: `kilopass_tier19`, `kilopass_tier49`, `kilopass_tier199`
+
+Release notes for 1.0.15: remove subscription sales while preserving paid benefits,
+legacy receipt recovery, and one-off credit purchases. `CHANGELOG.md` remains
+release-generated: `scripts/kilo-app-release-notes.mjs` adds this merged PR after an
+actual store submission supplies its build identity. This change does not submit
+a release, raise minimum versions, or retire store renewals.
 
 Use App Store Connect sandbox tester accounts for local and TestFlight sandbox
 verification. Configure App Store Server Notifications V2 to post to

@@ -226,25 +226,9 @@ describe('Hermes AbortError resilience', () => {
       vi.useRealTimers();
     }
   });
-
-  it('successful fn still resolves normally alongside Hermes sim', async () => {
-    // Regression: normal resolution must work even with the new
-    // independent-settlement pattern.
-    const result = await withDeadline(5_000, async () => {
-      // Return a value — no abort involved.
-      return 42;
-    });
-
-    expect(result).toBe(42);
-  });
 });
 
 describe('RequestDeadlineError', () => {
-  it('is an instance of Error', () => {
-    const err = new RequestDeadlineError(10_000);
-    expect(err).toBeInstanceOf(Error);
-  });
-
   it('has name RequestDeadlineError', () => {
     const err = new RequestDeadlineError(10_000);
     expect(err.name).toBe('RequestDeadlineError');

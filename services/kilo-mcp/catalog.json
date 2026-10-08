@@ -12324,9 +12324,6 @@
               "type": "null"
             }
           ]
-        },
-        "supportsNativePlayKiloPass": {
-          "type": "boolean"
         }
       },
       "required": [
@@ -12339,10 +12336,9 @@
       "platform",
       "storefront",
       "product",
-      "program",
-      "supportsnativeplaykilopass"
+      "program"
     ],
-    "searchBlob": "kiloPass.getPurchasePresentation Get the purchase presentation details (pricing, terms) for a Kilo Pass product on a given platform, storefront, and program. kilopass getpurchasepresentation platform storefront product program supportsnativeplaykilopass platform storefront product program supportsNativePlayKiloPass"
+    "searchBlob": "kiloPass.getPurchasePresentation Get the purchase presentation details (pricing, terms) for a Kilo Pass product on a given platform, storefront, and program. kilopass getpurchasepresentation platform storefront product program platform storefront product program"
   },
   "kiloPass.getReferralRewardSummary": {
     "path": "kiloPass.getReferralRewardSummary",
@@ -12387,105 +12383,6 @@
       "getstate"
     ],
     "searchBlob": "kiloPass.getState Get the user's current Kilo Pass subscription state, including billing period, next billing date, spend window, and whether they qualify for a first-month promo. kilopass getstate"
-  },
-  "kiloPass.preflightPurchase": {
-    "path": "kiloPass.preflightPurchase",
-    "kind": "mutation",
-    "summary": "Check whether a user can buy a Kilo Pass subscription through a mobile app store before the purchase starts, and return the reason if the purchase is blocked.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "platform": {
-          "type": "string",
-          "enum": [
-            "ios",
-            "android"
-          ]
-        },
-        "storefront": {
-          "type": "string",
-          "enum": [
-            "app_store",
-            "play",
-            "web"
-          ]
-        },
-        "product": {
-          "type": "string",
-          "enum": [
-            "kilo_pass",
-            "credits"
-          ]
-        },
-        "program": {
-          "anyOf": [
-            {
-              "type": "string",
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "supportsNativePlayKiloPass": {
-          "type": "boolean"
-        },
-        "googleProductId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "googlePurchaseToken": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "appleProductId": {
-          "type": "string",
-          "minLength": 1
-        },
-        "appleOriginalTransactionId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "platform",
-        "storefront",
-        "product",
-        "appleProductId"
-      ]
-    },
-    "tags": [
-      "kilopass",
-      "preflightpurchase",
-      "platform",
-      "storefront",
-      "product",
-      "program",
-      "supportsnativeplaykilopass",
-      "googleproductid",
-      "googlepurchasetoken",
-      "appleproductid",
-      "appleoriginaltransactionid"
-    ],
-    "searchBlob": "kiloPass.preflightPurchase Check whether a user can buy a Kilo Pass subscription through a mobile app store before the purchase starts, and return the reason if the purchase is blocked. kilopass preflightpurchase platform storefront product program supportsnativeplaykilopass googleproductid googlepurchasetoken appleproductid appleoriginaltransactionid platform storefront product program supportsNativePlayKiloPass googleProductId googlePurchaseToken appleProductId appleOriginalTransactionId"
   },
   "kiloPass.resumeCancelledSubscription": {
     "path": "kiloPass.resumeCancelledSubscription",

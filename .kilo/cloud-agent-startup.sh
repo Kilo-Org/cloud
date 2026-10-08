@@ -19,7 +19,7 @@ cloud_agents=false
 if [[ "$*" != app ]]; then
   cloud_agents=true
 fi
-export KILO_STARTUP_MEMORY_MB="${KILO_STARTUP_MEMORY_MB:-6912}"
+KILO_STARTUP_RESERVE_MB=2048
 
 if [[ $(uname -s) != Linux ]] || ! command -v apt-get >/dev/null; then
   printf 'This startup script requires a Debian/Ubuntu Linux sandbox.\n' >&2
@@ -35,35 +35,42 @@ if (( EUID != 0 )); then
   root=(sudo -n)
 fi
 
-if [[ ! $KILO_STARTUP_MEMORY_MB =~ ^[0-9]+$ ]] || (( KILO_STARTUP_MEMORY_MB < 3072 )); then
-  printf 'KILO_STARTUP_MEMORY_MB must be an integer of at least 3072 MiB.\n' >&2
-  exit 1
-fi
 KILO_STARTUP_CGROUP="/sys/fs/cgroup/kilo-workloads/kilo-dev-$(basename "$PWD")"
-export KILO_STARTUP_CGROUP
+export KILO_STARTUP_CGROUP KILO_STARTUP_RESERVE_MB
 if [[ ! -f /sys/fs/cgroup/kilo-workloads/memory.max ]]; then
   printf 'Memory-safe startup requires the sandbox\x27s delegated cgroup v2 memory controller. No workloads were started.\n' >&2
   exit 1
 fi
-node -e '
+KILO_STARTUP_MEMORY_MB=$(node -e '
   const fs = require("node:fs");
+  const MiB = 1048576;
   const parent = "/sys/fs/cgroup/kilo-workloads";
+  function fail(message) {
+    console.error(message + " No workloads were started.");
+    process.exit(1);
+  }
   function protectedMemory(directory) {
     const stat = Object.fromEntries(fs.readFileSync(directory + "/memory.stat", "utf8").trim().split("\n").map(line => line.split(" ")));
     const current = Number(fs.readFileSync(directory + "/memory.current", "utf8"));
     return current - Number(stat.inactive_file || 0) + Number(stat.file_dirty || 0) + Number(stat.file_writeback || 0);
   }
-  const maximum = Number(fs.readFileSync(parent + "/memory.max", "utf8"));
-  const available = Number(fs.readFileSync("/proc/meminfo", "utf8").match(/^MemAvailable:\s+(\d+)/m)[1]) * 1024;
-  const protectedBytes = protectedMemory(parent);
+  const meminfo = fs.readFileSync("/proc/meminfo", "utf8");
+  const meminfoBytes = key => Number(meminfo.match(new RegExp("^" + key + ":\\s+(\\d+)", "m"))[1]) * 1024;
+  const parentMax = Number(fs.readFileSync(parent + "/memory.max", "utf8"));
+  const total = Math.min(meminfoBytes("MemTotal"), Number.isFinite(parentMax) ? parentMax : Infinity);
+  const reserve = Number(process.env.KILO_STARTUP_RESERVE_MB) * MiB;
+  const requested = process.env.KILO_STARTUP_MEMORY_MB;
+  if (requested !== undefined && !/^[0-9]+$/.test(requested)) fail("KILO_STARTUP_MEMORY_MB must be an integer number of MiB.");
+  const limit = requested === undefined ? Math.floor((total - reserve) / MiB) * MiB : Number(requested) * MiB;
+  if (limit < 3072 * MiB) fail("The startup workload needs at least 3072 MiB, but its cap is " + Math.floor(limit / MiB) + " MiB (" + Math.floor(total / MiB) + " MiB total, " + Math.floor(reserve / MiB) + " MiB reserve).");
   const existing = fs.existsSync(process.env.KILO_STARTUP_CGROUP + "/memory.current") ? protectedMemory(process.env.KILO_STARTUP_CGROUP) : 0;
-  const additional = Math.max(0, Number(process.env.KILO_STARTUP_MEMORY_MB) * 1048576 - existing);
-  const safeBytes = Math.min(available, Number.isFinite(maximum) ? maximum - protectedBytes : available) - 2048 * 1048576;
-  if (additional > safeBytes) {
-    const mib = bytes => Math.floor(bytes / 1048576);
-    throw new Error("Insufficient memory headroom: " + Math.ceil(additional / 1048576) + " MiB additional capacity required, " + mib(Math.max(0, safeBytes)) + " MiB available after the 2048 MiB reserve (" + mib(protectedBytes) + " MiB parent protected memory). No workloads were started. Stop other workloads or use a larger sandbox; do not lower the reserve.");
-  }
-'
+  const others = Math.max(0, protectedMemory(parent) - existing);
+  if (limit + others > total) fail("Insufficient memory headroom: other sandbox workloads hold " + Math.ceil(others / MiB) + " MiB, so a " + Math.floor(limit / MiB) + " MiB startup cap exceeds the " + Math.floor(total / MiB) + " MiB total. Stop other workloads or use a larger sandbox.");
+  const additional = Math.max(0, limit - existing);
+  if (additional > meminfoBytes("MemAvailable")) fail("Insufficient host memory: " + Math.ceil(additional / MiB) + " MiB additional capacity required, " + Math.floor(meminfoBytes("MemAvailable") / MiB) + " MiB available.");
+  console.log(Math.floor(limit / MiB));
+')
+export KILO_STARTUP_MEMORY_MB
 "${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP"
 printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.max" >/dev/null
 printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 * 95 / 100 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.high" >/dev/null
@@ -72,7 +79,7 @@ printf '1\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.oom.group" >/dev/nu
 printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/cgroup.subtree_control" >/dev/null
 "${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP/processes" "$KILO_STARTUP_CGROUP/containers"
 printf '%s\n' "$$" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/processes/cgroup.procs" >/dev/null
-printf 'Startup workload capped at %s MiB, with 2048 MiB reserved for other sandbox workloads.\n' "$KILO_STARTUP_MEMORY_MB"
+printf 'Startup workload capped at %s MiB, with %s MiB reserved for other sandbox workloads.\n' "$KILO_STARTUP_MEMORY_MB" "$KILO_STARTUP_RESERVE_MB"
 
 "${root[@]}" timeout --foreground 5m apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
 docker_packages=(docker.io)

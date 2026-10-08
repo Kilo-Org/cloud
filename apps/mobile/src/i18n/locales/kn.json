@@ -935,7 +935,6 @@
       "cantUpload": "ಈ ಫೈಲ್ ಅನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "networkError": "ನೆಟ್‌ವರ್ಕ್ ದೋಷ ಉಂಟಾಗಿದೆ.",
       "uploadFailed": "ಅಪ್‌ಲೋಡ್ ವಿಫಲವಾಗಿದೆ.",
-      "failedToUploadFile": "ಫೈಲ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ: {{reason}}.",
       "nothingToPaste": "ಅಂಟಿಸಲು ಏನೂ ಇಲ್ಲ.",
       "metadataStripFailed": "ಫೋಟೋದ ಮೆಟಾಡೇಟಾವನ್ನು ತೆಗೆದುಹಾಕಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "limit_one": "ನೀವು ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್ ಲಗತ್ತಿಸಬಹುದು.",
@@ -2097,7 +2096,6 @@
       "readOnly": "ಈ ಸೆಶನ್ ಅನ್ನು ಓದಲು ಮಾತ್ರ ಸಾಧ್ಯ.",
       "continueInNewSession": "ಹೊಸ ಸೆಶನ್ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
       "emptyDescription": "ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗೆ ಸಂದೇಶ ಕಳುಹಿಸಿ.",
-      "emptyTranscriptDescription": "ಈ ಸೆಶನ್‌ನಲ್ಲಿ ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ.",
       "scrollToBottom": "ಕೊನೆಯವರೆಗೆ ಸ್ಕ್ರಾಲ್ ಮಾಡಿ",
       "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
       "renameAccessibility": "{{title}} ಸೆಶನ್‌ನ ಹೆಸರು ಬದಲಾಯಿಸಿ",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "ಸಂಸ್ಥೆಯ ಪ್ರೊಫೈಲ್ಗಳು",
       "personalProfiles": "ವೈಯಕ್ತಿಕ ಪ್ರೊಫೈಲ್ಗಳು",
       "yourProfiles": "ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ಗಳು",
-      "failedToLoadProfiles": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ",
       "nameTooLong": "ಪ್ರೊಫೈಲ್ ಹೆಸರು ತುಂಬಾ ಉದ್ದವಾಗಿದೆ",
       "descriptionTooLong": "ವಿವರಣೆ ತುಂಬಾ ಉದ್ದವಾಗಿದೆ",
       "secretsEncrypted": "ಸಂಗ್ರಹಣೆಯ ಮೊದಲು ರಹಸ್ಯಗಳನ್ನು ಎನ್‌ಕ್ರಿಪ್ಟ್ ಮಾಡಲಾಗುತ್ತದೆ.",
@@ -2476,20 +2473,6 @@
       "unavailable": "ಹಿಂದಿನ ಸಂದೇಶಗಳು ಲಭ್ಯವಿಲ್ಲ.",
       "tooLarge": "ಹಿಂದಿನ ಸಂದೇಶಗಳ ಗಾತ್ರ ತುಂಬಾ ದೊಡ್ಡದಿರುವುದರಿಂದ ಅವುಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ."
     },
-    "markdownTable": {
-      "viewTable": "ಕೋಷ್ಟಕ ನೋಡಿ",
-      "title": "ಕೋಷ್ಟಕ",
-      "close": "ಕೋಷ್ಟಕ ಮುಚ್ಚಿ",
-      "loading": "ಕೋಷ್ಟಕ ಲೋಡ್ ಆಗುತ್ತಿದೆ",
-      "empty": "ಈ ಕೋಷ್ಟಕದಲ್ಲಿ ಸಾಲುಗಳಿಲ್ಲ.",
-      "columnCount_one": "ಅಂಕಣ",
-      "columnCount": "ಅಂಕಣಗಳು",
-      "columnCount_other": "ಅಂಕಣಗಳು",
-      "rowCount_one": "ಸಾಲು",
-      "rowCount": "ಸಾಲುಗಳು",
-      "rowCount_other": "ಸಾಲುಗಳು",
-      "opensFullScreen": "ಪೂರ್ಣ ಪರದೆಯಲ್ಲಿ ತೆರೆಯುತ್ತದೆ"
-    },
     "sessionFilter": {
       "title": "ಸೆಶನ್‌ಗಳನ್ನು ಫಿಲ್ಟರ್ ಮಾಡಿ",
       "platformCloud": "ಕ್ಲೌಡ್",
@@ -2583,7 +2566,6 @@
       "linkActions": "ಲಿಂಕ್ ಕ್ರಿಯೆಗಳು",
       "couldNotCopyLink": "ಲಿಂಕ್ ನಕಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotShareLink": "ಲಿಂಕ್ ಹಂಚಿಕೊಳ್ಳಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "opensInBrowser": "ಬ್ರೌಸರ್‌ನಲ್ಲಿ ತೆರೆಯುತ್ತದೆ",
       "showLinkActions": "ಲಿಂಕ್ ಕ್ರಿಯೆಗಳನ್ನು ತೋರಿಸಿ"
     },
     "compaction": {

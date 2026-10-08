@@ -935,7 +935,6 @@
       "cantUpload": "ឯកសារនេះមិនអាចផ្ទុកឡើងបានទេ។",
       "networkError": "មានកំហុសបណ្តាញ។",
       "uploadFailed": "ការផ្ទុកឡើងបានបរាជ័យ។",
-      "failedToUploadFile": "មិនអាចផ្ទុកឯកសារឡើងបានទេ៖ {{reason}}។",
       "nothingToPaste": "គ្មានអ្វីសម្រាប់បិទភ្ជាប់ទេ។",
       "metadataStripFailed": "មិនអាចដកទិន្នន័យមេតារូបថតចេញបានទេ។",
       "limit_one": "អ្នកអាចភ្ជាប់ឯកសារបានរហូតដល់ {{displayCount}}។",
@@ -2097,7 +2096,6 @@
       "readOnly": "វគ្គនេះអាចបានត្រឹមតែអានប៉ុណ្ណោះ។",
       "continueInNewSession": "បន្តនៅក្នុងវគ្គថ្មី",
       "emptyDescription": "ផ្ញើសារខាងក្រោម ដើម្បីចាប់ផ្តើម។",
-      "emptyTranscriptDescription": "វគ្គនេះមិនទាន់មានសារទេ។",
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
       "renameAccessibility": "ប្តូរឈ្មោះវគ្គ: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "ទម្រង់អង្គការ",
       "personalProfiles": "ប្រវត្តិរូបផ្ទាល់ខ្លួន",
       "yourProfiles": "ប្រវត្តិរូបរបស់អ្នក។",
-      "failedToLoadProfiles": "បរាជ័យក្នុងការផ្ទុកទម្រង់",
       "nameTooLong": "ឈ្មោះកម្រងព័ត៌មានវែងពេក",
       "descriptionTooLong": "ការពិពណ៌នាគឺវែងពេក",
       "secretsEncrypted": "អាថ៌កំបាំងត្រូវបានអ៊ិនគ្រីបមុនពេលផ្ទុក។",
@@ -2476,20 +2473,6 @@
       "unavailable": "មិនអាចចូលមើលសារមុនៗបានទេ។",
       "tooLarge": "សារមុនៗមានទំហំធំពេក មិនអាចផ្ទុកបានទេ។"
     },
-    "markdownTable": {
-      "viewTable": "មើលតារាង",
-      "title": "តារាង",
-      "close": "បិទតារាង",
-      "loading": "កំពុងផ្ទុកតារាង",
-      "empty": "តារាងនេះគ្មានជួរដេកទេ។",
-      "columnCount_one": "ជួរឈរ",
-      "columnCount": "ជួរឈរ",
-      "columnCount_other": "ជួរឈរ",
-      "rowCount_one": "ជួរដេក",
-      "rowCount": "ជួរដេក",
-      "rowCount_other": "ជួរដេក",
-      "opensFullScreen": "បើកពេញអេក្រង់"
-    },
     "sessionFilter": {
       "title": "ត្រងវគ្គ",
       "platformCloud": "ក្លោដ",
@@ -2583,7 +2566,6 @@
       "linkActions": "សកម្មភាពតំណ",
       "couldNotCopyLink": "មិនអាចចម្លងតំណបានទេ។",
       "couldNotShareLink": "មិនអាចចែករំលែកតំណបានទេ។",
-      "opensInBrowser": "បើកក្នុងកម្មវិធីរុករក",
       "showLinkActions": "បង្ហាញសកម្មភាពតំណ"
     },
     "compaction": {

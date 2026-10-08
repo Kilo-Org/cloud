@@ -11,7 +11,8 @@ import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Haptics from 'expo-haptics';
-import { Alert, KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import { Platform, type Text as RNText, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -44,7 +45,6 @@ import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-sel
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import {
   type ContextSheetIdentity,
   getContextSheetMountState,
@@ -111,7 +111,6 @@ import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch'
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
   resolveLoadedCliSessionPresenceId,
   useCliSessionPresence,
@@ -173,6 +172,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import {
   type AnalyticsSurface,
@@ -269,6 +269,7 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  const { confirm, dialog } = useConfirmDialog();
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
   const sessionRouter = useStackSafeReplace();
@@ -1918,7 +1919,6 @@ export function SessionDetailContent({
     }
     return t('common.message');
   }, [cloudStatus, t]);
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
@@ -2036,26 +2036,20 @@ export function SessionDetailContent({
           return;
         }
         if (action === 'remove') {
-          Alert.alert(
-            t('agentChat.goal.removeConfirmTitle'),
-            t('agentChat.goal.removeConfirmMessage'),
-            [
-              { text: t('common.cancel'), style: 'cancel' },
-              {
-                text: t('agentChat.goal.remove'),
-                style: 'destructive',
-                onPress: () => {
-                  void runGoalAction('remove');
-                },
-              },
-            ]
-          );
+          confirm({
+            title: t('agentChat.goal.removeConfirmTitle'),
+            message: t('agentChat.goal.removeConfirmMessage'),
+            confirmLabel: t('agentChat.goal.remove'),
+            onConfirm: () => {
+              void runGoalAction('remove');
+            },
+          });
           return;
         }
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction, confirm]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {
@@ -2267,17 +2261,13 @@ export function SessionDetailContent({
           ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-          {keyboardContainerKind === 'app-aware-padding' ? (
-            // The trailing bottom-chrome spacer below reserves the navigation-
-            // bar inset outside this view, so the view must not add it again.
-            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
-              {renderKeyboardBody()}
-            </AppAwareKeyboardPaddingView>
-          ) : (
-            <KeyboardAvoidingView className="flex-1" behavior="padding">
-              {renderKeyboardBody()}
-            </KeyboardAvoidingView>
-          )}
+          {/* The trailing bottom-chrome spacer below reserves the navigation-bar
+              inset outside this view. The native lift measures the keyboard
+              against this view's own bottom edge, so that inset is never
+              counted twice — the correction the app-aware padding needed. */}
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {renderKeyboardBody()}
+          </KeyboardAvoidingView>
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">
@@ -2408,6 +2398,7 @@ export function SessionDetailContent({
           ) : null}
         </View>
       </ToolRunSheetHost>
+      {dialog}
     </PartDetailSheetHost>
   );
 
@@ -2722,7 +2713,7 @@ export function SessionDetailContent({
         <EmptyState
           icon={MessageSquare}
           title={t('agentChat.session.emptyTitle')}
-          description={t('agentChat.session.emptyDescription')}
+          description={isReadOnly ? undefined : t('agentChat.session.emptyDescription')}
         />
       );
     }

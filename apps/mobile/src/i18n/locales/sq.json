@@ -935,7 +935,6 @@
       "cantUpload": "Ky skedar nuk mund të ngarkohet.",
       "networkError": "Ndodhi një gabim në rrjet.",
       "uploadFailed": "Ngarkimi dështoi.",
-      "failedToUploadFile": "Ngarkimi i skedarit dështoi: {{reason}}.",
       "nothingToPaste": "Nuk ka asgjë për të ngjitur.",
       "metadataStripFailed": "Nuk u hoqën të dhënat shtesë të fotos.",
       "limit_one": "Mund të bashkëngjitësh deri në {{displayCount}} skedar.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Kjo seancë është vetëm për lexim.",
       "continueInNewSession": "Vazhdo në një seancë të re",
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
-      "emptyTranscriptDescription": "Kjo seancë ende nuk ka mesazhe.",
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
       "renameAccessibility": "Riemërto seancën: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Profilet e Organizatës",
       "personalProfiles": "Profilet Personale",
       "yourProfiles": "Profilet tuaja",
-      "failedToLoadProfiles": "Ngarkimi i profileve dështoi",
       "nameTooLong": "Emri i profilit është shumë i gjatë",
       "descriptionTooLong": "Përshkrimi është shumë i gjatë",
       "secretsEncrypted": "Sekretet janë të koduara para ruajtjes.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Mesazhet e mëparshme nuk janë të disponueshme.",
       "tooLarge": "Mesazhet e mëparshme janë shumë të mëdha për t'u ngarkuar."
     },
-    "markdownTable": {
-      "viewTable": "Shiko tabelën",
-      "title": "Tabela",
-      "close": "Mbyll tabelën",
-      "loading": "Duke ngarkuar tabelën",
-      "empty": "Kjo tabelë nuk ka rreshta.",
-      "columnCount_one": "kolonë",
-      "columnCount": "kolona",
-      "columnCount_other": "kolona",
-      "rowCount_one": "rresht",
-      "rowCount": "rreshta",
-      "rowCount_other": "rreshta",
-      "opensFullScreen": "hapet në ekran të plotë"
-    },
     "sessionFilter": {
       "title": "Filtro seancat",
       "platformCloud": "Reja",
@@ -2583,7 +2566,6 @@
       "linkActions": "Veprimet për lidhjen",
       "couldNotCopyLink": "Nuk u kopjua lidhja.",
       "couldNotShareLink": "Nuk u nda lidhja.",
-      "opensInBrowser": "Hapet në shfletues",
       "showLinkActions": "Shfaq veprimet e lidhjes"
     },
     "compaction": {

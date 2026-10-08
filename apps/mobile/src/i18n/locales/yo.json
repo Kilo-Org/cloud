@@ -935,7 +935,6 @@
       "cantUpload": "A kò lè gbé fáìlì yìí sókè.",
       "networkError": "Àṣìṣe kan wà nínú nẹ́tíwọ́ọ̀kì.",
       "uploadFailed": "Gbígbé sókè kùnà.",
-      "failedToUploadFile": "A kò lè gbé fáìlì sókè: {{reason}}.",
       "nothingToPaste": "Kò sí ohun tí a lè lẹ̀ mọ́ ọn.",
       "metadataStripFailed": "A kò lè yọ dátà àpèjúwe fọ́tò kúrò.",
       "limit_one": "O lè so fáìlì tó pọ̀ jù {{displayCount}} mọ́ ọn.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Kíkà nìkan ni o lè ṣe nínú ìgbà iṣẹ́ yìí.",
       "continueInNewSession": "Tẹ̀síwájú nínú ìgbà iṣẹ́ tuntun",
       "emptyDescription": "Fi ìfiránṣẹ́ ránṣẹ́ ní ìsàlẹ̀ láti bẹ̀rẹ̀.",
-      "emptyTranscriptDescription": "Ìgbà iṣẹ́ yìí kò tíì ní ìfiránṣẹ́ kankan.",
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
       "renameAccessibility": "Yí orúkọ ìgbà iṣẹ́ padà: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Awọn profaili Ajo",
       "personalProfiles": "Awọn profaili ti ara ẹni",
       "yourProfiles": "Awọn profaili rẹ",
-      "failedToLoadProfiles": "Kuna lati kojọpọ awọn profaili",
       "nameTooLong": "Orukọ profaili ti gun ju",
       "descriptionTooLong": "Apejuwe ti gun ju",
       "secretsEncrypted": "Awọn asiri ti wa ni ti paroko ṣaaju ibi ipamọ.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Àwọn ìfiránṣẹ́ tó ṣáájú kò sí lárọ̀ọ́wọ́tó.",
       "tooLarge": "Àwọn ìfiránṣẹ́ tó ṣáájú tóbi jù láti gbé wọlé."
     },
-    "markdownTable": {
-      "viewTable": "Wo tábìlì",
-      "title": "Tábìlì",
-      "close": "Pa tábìlì dé",
-      "loading": "Ń gbé tábìlì wọlé",
-      "empty": "Tábìlì yìí kò ní ìlà kankan.",
-      "columnCount_one": "òpó",
-      "columnCount": "ìlà ináró",
-      "columnCount_other": "ìlà ináró",
-      "rowCount_one": "ìlà",
-      "rowCount": "ìlà pẹ̀tẹ́lẹ̀",
-      "rowCount_other": "ìlà pẹ̀tẹ́lẹ̀",
-      "opensFullScreen": "ó ṣí láti kún ojú iboju"
-    },
     "sessionFilter": {
       "title": "Ṣàlẹ̀mọ́ àwọn ìgbà iṣẹ́",
       "platformCloud": "Àwọsánmà",
@@ -2583,7 +2566,6 @@
       "linkActions": "Àwọn ìṣe fún ọ̀nà àsopọ̀",
       "couldNotCopyLink": "A kò lè ṣe àdàkọ ọ̀nà àsopọ̀.",
       "couldNotShareLink": "A kò lè pín ọ̀nà àsopọ̀.",
-      "opensInBrowser": "Ó ṣí nínú aṣàwákiri",
       "showLinkActions": "Fi àwọn ìṣe fún ọ̀nà àsopọ̀ hàn"
     },
     "compaction": {

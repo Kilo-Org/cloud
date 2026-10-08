@@ -935,7 +935,6 @@
       "cantUpload": "یہ فائل اپ لوڈ نہیں کی جا سکتی۔",
       "networkError": "نیٹ ورک میں خرابی ہے۔",
       "uploadFailed": "اپ لوڈ ناکام ہو گیا۔",
-      "failedToUploadFile": "فائل اپ لوڈ نہیں ہو سکی: {{reason}}۔",
       "nothingToPaste": "چسپاں کرنے کے لیے کچھ نہیں ہے۔",
       "metadataStripFailed": "تصویر کا میٹاڈیٹا نہیں ہٹایا جا سکا۔",
       "limit_one": "آپ زیادہ سے زیادہ {{displayCount}} فائل منسلک کر سکتے ہیں۔",
@@ -2097,7 +2096,6 @@
       "readOnly": "اس سیشن کو صرف پڑھا جا سکتا ہے۔",
       "continueInNewSession": "نئے سیشن میں جاری رکھیں",
       "emptyDescription": "شروع کرنے کے لیے نیچے پیغام بھیجیں۔",
-      "emptyTranscriptDescription": "اس سیشن میں ابھی کوئی پیغام نہیں۔",
       "scrollToBottom": "آخر تک اسکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
       "renameAccessibility": "سیشن کا نام تبدیل کریں: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "تنظیمی پروفائلز",
       "personalProfiles": "ذاتی پروفائلز",
       "yourProfiles": "آپ کے پروفائلز",
-      "failedToLoadProfiles": "پروفائلز لوڈ کرنے میں ناکام",
       "nameTooLong": "پروفائل کا نام بہت لمبا ہے۔",
       "descriptionTooLong": "تفصیل بہت لمبی ہے۔",
       "secretsEncrypted": "رازوں کو ذخیرہ کرنے سے پہلے خفیہ کیا جاتا ہے۔",
@@ -2476,20 +2473,6 @@
       "unavailable": "پہلے کے پیغامات دستیاب نہیں ہیں۔",
       "tooLarge": "پہلے کے پیغامات کا حجم اتنا زیادہ ہے کہ انہیں لوڈ نہیں کیا جا سکتا۔"
     },
-    "markdownTable": {
-      "viewTable": "جدول دیکھیں",
-      "title": "جدول",
-      "close": "جدول بند کریں",
-      "loading": "جدول لوڈ ہو رہا ہے",
-      "empty": "اس جدول میں کوئی قطار نہیں ہے۔",
-      "columnCount_one": "کالم",
-      "columnCount": "کالم",
-      "columnCount_other": "کالم",
-      "rowCount_one": "قطار",
-      "rowCount": "قطاریں",
-      "rowCount_other": "قطاریں",
-      "opensFullScreen": "پوری اسکرین پر کھلتا ہے"
-    },
     "sessionFilter": {
       "title": "سیشن فلٹر کریں",
       "platformCloud": "کلاؤڈ",
@@ -2583,7 +2566,6 @@
       "linkActions": "لنک کے اختیارات",
       "couldNotCopyLink": "لنک کاپی نہیں ہو سکا۔",
       "couldNotShareLink": "لنک شیئر نہیں ہو سکا۔",
-      "opensInBrowser": "براؤزر میں کھلتا ہے",
       "showLinkActions": "لنک کے اختیارات دکھائیں"
     },
     "compaction": {

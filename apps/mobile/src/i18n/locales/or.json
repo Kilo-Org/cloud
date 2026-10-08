@@ -935,7 +935,6 @@
       "cantUpload": "ଏହି ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିବ ନାହିଁ।",
       "networkError": "ନେଟୱର୍କରେ ତ୍ରୁଟି ଘଟିଛି।",
       "uploadFailed": "ଅପଲୋଡ୍ ବିଫଳ ହେଲା।",
-      "failedToUploadFile": "ଫାଇଲ୍ ଅପଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। କାରଣ: {{reason}}",
       "nothingToPaste": "ପେଷ୍ଟ କରିବାକୁ କିଛି ନାହିଁ।",
       "metadataStripFailed": "ଫଟୋର ମେଟାଡାଟା ହଟାଯାଇପାରିଲା ନାହିଁ।",
       "limit_one": "ଆପଣ ଅତି ବେଶୀରେ {{displayCount}}ଟି ଫାଇଲ୍ ସଂଲଗ୍ନ କରିପାରିବେ।",
@@ -2097,7 +2096,6 @@
       "readOnly": "ଏହି ସେସନ୍ କେବଳ ପଢ଼ିପାରିବେ।",
       "continueInNewSession": "ନୂଆ ସେସନରେ ଜାରି ରଖନ୍ତୁ",
       "emptyDescription": "ଆରମ୍ଭ କରିବାକୁ ନିମ୍ନରେ ଏକ ବାର୍ତ୍ତା ପଠାନ୍ତୁ।",
-      "emptyTranscriptDescription": "ଏହି ସେସନ୍‌ରେ ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ।",
       "scrollToBottom": "ସବୁଠାରୁ ତଳକୁ ସ୍କ୍ରୋଲ୍ କରନ୍ତୁ",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
       "renameAccessibility": "{{title}} ସେସନର ନାମ ବଦଳାନ୍ତୁ",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "ସଂଗଠନ ପ୍ରୋଫାଇଲ୍।",
       "personalProfiles": "ବ୍ୟକ୍ତିଗତ ପ୍ରୋଫାଇଲ୍।",
       "yourProfiles": "ତୁମର ପ୍ରୋଫାଇଲ୍",
-      "failedToLoadProfiles": "ପ୍ରୋଫାଇଲ୍ ଲୋଡ୍ କରିବାରେ ବିଫଳ।",
       "nameTooLong": "ପ୍ରୋଫାଇଲ୍ ନାମ ବହୁତ ଲମ୍ବା ଅଟେ।",
       "descriptionTooLong": "ବର୍ଣ୍ଣନା ବହୁତ ଲମ୍ବା ଅଟେ।",
       "secretsEncrypted": "ଷ୍ଟୋରେଜ୍ ପୂର୍ବରୁ ରହସ୍ୟ ଏନକ୍ରିପ୍ଟ କରାଯାଏ।",
@@ -2476,20 +2473,6 @@
       "unavailable": "ପୂର୍ବ ବାର୍ତ୍ତାଗୁଡ଼ିକ ଉପଲବ୍ଧ ନାହିଁ।",
       "tooLarge": "ପୁରୁଣା ବାର୍ତ୍ତାଗୁଡ଼ିକ ଏତେ ବଡ଼ ଯେ ଲୋଡ୍ କରିହେଉନାହିଁ।"
     },
-    "markdownTable": {
-      "viewTable": "ଟେବୁଲ ଦେଖନ୍ତୁ",
-      "title": "ଟେବୁଲ",
-      "close": "ଟେବୁଲ ବନ୍ଦ କରନ୍ତୁ",
-      "loading": "ଟେବୁଲ ଲୋଡ୍ ହେଉଛି",
-      "empty": "ଏହି ଟେବୁଲରେ କୌଣସି ଧାଡ଼ି ନାହିଁ।",
-      "columnCount_one": "ସ୍ତମ୍ଭ",
-      "columnCount": "ସ୍ତମ୍ଭ",
-      "columnCount_other": "ସ୍ତମ୍ଭ",
-      "rowCount_one": "ଧାଡ଼ି",
-      "rowCount": "ଧାଡ଼ି",
-      "rowCount_other": "ଧାଡ଼ି",
-      "opensFullScreen": "ପୂରା ସ୍କ୍ରିନରେ ଖୋଲେ"
-    },
     "sessionFilter": {
       "title": "ସେସନ୍ ଫିଲ୍ଟର କରନ୍ତୁ",
       "platformCloud": "କ୍ଲାଉଡ୍",
@@ -2583,7 +2566,6 @@
       "linkActions": "ଲିଙ୍କ ପାଇଁ ବିକଳ୍ପ",
       "couldNotCopyLink": "ଲିଙ୍କ କପି ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotShareLink": "ଲିଙ୍କ ସେୟାର କରି ହେଲା ନାହିଁ।",
-      "opensInBrowser": "ବ୍ରାଉଜରରେ ଖୋଲେ",
       "showLinkActions": "ଲିଙ୍କ ପାଇଁ ବିକଳ୍ପ ଦେଖାନ୍ତୁ"
     },
     "compaction": {

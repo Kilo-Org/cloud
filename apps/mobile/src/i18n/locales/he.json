@@ -424,7 +424,6 @@
       "cantUpload": "לא ניתן להעלות את הקובץ הזה.",
       "networkError": "אירעה שגיאת רשת.",
       "uploadFailed": "ההעלאה נכשלה.",
-      "failedToUploadFile": "העלאת הקובץ נכשלה: {{reason}}.",
       "nothingToPaste": "אין תוכן להדבקה.",
       "metadataStripFailed": "לא ניתן להסיר את נתוני המטא של התמונה.",
       "limit_one": "ניתן לצרף עד {{displayCount}} קובץ.",
@@ -1598,7 +1597,6 @@
       "readOnly": "הסשן הזה מיועד לקריאה בלבד.",
       "continueInNewSession": "המשך בסשן חדש",
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
-      "emptyTranscriptDescription": "בסשן הזה אין עדיין הודעות.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
       "renameAccessibility": "שינוי שם הסשן: {{title}}",
@@ -1720,7 +1718,6 @@
       "organizationProfiles": "פרופילי ארגון",
       "personalProfiles": "פרופילים אישיים",
       "yourProfiles": "הפרופילים שלך",
-      "failedToLoadProfiles": "טעינת הפרופילים נכשלה",
       "nameTooLong": "שם הפרופיל ארוך מדי",
       "descriptionTooLong": "התיאור ארוך מדי",
       "secretsEncrypted": "הסודות מוצפנים לפני האחסון.",
@@ -1982,22 +1979,6 @@
       "tooLarge": "ההודעות הקודמות גדולות מדי לטעינה.",
       "omitted_two": "לא ניתן היה להציג {{displayCount}} פריטים קודמים מהסשן הזה."
     },
-    "markdownTable": {
-      "viewTable": "הצגת הטבלה",
-      "title": "טבלה",
-      "close": "סגירת הטבלה",
-      "loading": "טוען טבלה",
-      "empty": "אין שורות בטבלה הזו.",
-      "columnCount_one": "עמודה",
-      "columnCount": "עמודות",
-      "columnCount_other": "עמודות",
-      "rowCount_one": "שורה",
-      "rowCount": "שורות",
-      "rowCount_other": "שורות",
-      "opensFullScreen": "נפתח במסך מלא",
-      "columnCount_two": "עמודות",
-      "rowCount_two": "שורות"
-    },
     "sessionFilter": {
       "title": "סינון סשנים",
       "platformCloud": "ענן",
@@ -2094,7 +2075,6 @@
       "linkActions": "פעולות לקישור",
       "couldNotCopyLink": "לא ניתן היה להעתיק את הקישור.",
       "couldNotShareLink": "לא ניתן היה לשתף את הקישור.",
-      "opensInBrowser": "נפתח בדפדפן",
       "showLinkActions": "הצגת פעולות לקישור"
     },
     "compaction": {

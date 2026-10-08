@@ -951,7 +951,6 @@
       "cantUpload": "Não é possível enviar este ficheiro.",
       "networkError": "Ocorreu um erro de rede.",
       "uploadFailed": "Não foi possível enviar o anexo.",
-      "failedToUploadFile": "Não foi possível enviar o ficheiro: {{reason}}",
       "nothingToPaste": "Não há nada para colar.",
       "metadataStripFailed": "Não foi possível remover os metadados da fotografia.",
       "limit_one": "Podes anexar até {{displayCount}} ficheiro.",
@@ -2125,7 +2124,6 @@
       "readOnly": "Esta sessão é apenas de leitura.",
       "continueInNewSession": "Continuar numa nova sessão",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
-      "emptyTranscriptDescription": "Esta sessão ainda não tem mensagens.",
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
       "renameAccessibility": "Renomear sessão: {{title}}",
@@ -2247,7 +2245,6 @@
       "organizationProfiles": "Perfis da organização",
       "personalProfiles": "Perfis pessoais",
       "yourProfiles": "Os teus perfis",
-      "failedToLoadProfiles": "Não foi possível carregar os perfis",
       "nameTooLong": "O nome do perfil é demasiado longo",
       "descriptionTooLong": "A descrição é demasiado longa",
       "secretsEncrypted": "Os segredos são encriptados antes de serem guardados.",
@@ -2509,22 +2506,6 @@
       "tooLarge": "As mensagens anteriores são demasiado grandes para serem carregadas.",
       "omitted_many": "{{displayCount}} itens anteriores desta sessão não puderam ser apresentados."
     },
-    "markdownTable": {
-      "viewTable": "Ver tabela",
-      "title": "Tabela",
-      "close": "Fechar tabela",
-      "loading": "A carregar a tabela",
-      "empty": "Esta tabela não tem linhas.",
-      "columnCount_one": "coluna",
-      "columnCount": "colunas",
-      "columnCount_other": "colunas",
-      "rowCount_one": "linha",
-      "rowCount": "linhas",
-      "rowCount_other": "linhas",
-      "opensFullScreen": "abre em ecrã inteiro",
-      "columnCount_many": "colunas",
-      "rowCount_many": "linhas"
-    },
     "sessionFilter": {
       "title": "Filtrar sessões",
       "platformCloud": "Nuvem",
@@ -2621,7 +2602,6 @@
       "linkActions": "Ações da ligação",
       "couldNotCopyLink": "Não foi possível copiar a ligação.",
       "couldNotShareLink": "Não foi possível partilhar a ligação.",
-      "opensInBrowser": "Abre no navegador",
       "showLinkActions": "Mostrar ações da ligação"
     },
     "compaction": {

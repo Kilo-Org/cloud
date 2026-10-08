@@ -1,7 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import {
@@ -19,6 +19,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { FormField } from '@/components/ui/form-field';
 import {
   Bot,
@@ -161,6 +162,7 @@ export function ProfileOverviewScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { update, deleteProfile, setAsDefault, clearDefault } =
@@ -195,16 +197,14 @@ export function ProfileOverviewScreen({
   };
 
   const confirmDelete = (profileName: string) => {
-    Alert.alert(t('profiles.deleteTitle'), t('profiles.deleteMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void runDelete(profileName);
-        },
+    confirm({
+      title: t('profiles.deleteTitle'),
+      message: t('profiles.deleteMessage'),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        void runDelete(profileName);
       },
-    ]);
+    });
   };
 
   const defaultPending = setAsDefault.isPending || clearDefault.isPending;
@@ -294,6 +294,8 @@ export function ProfileOverviewScreen({
           </>
         ) : null}
       </TabScreenScrollView>
+
+      {dialog}
     </View>
   );
 }

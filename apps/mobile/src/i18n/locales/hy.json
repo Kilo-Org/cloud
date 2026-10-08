@@ -935,7 +935,6 @@
       "cantUpload": "Այս ֆայլը հնարավոր չէ վերբեռնել։",
       "networkError": "Ցանցային սխալ է տեղի ունեցել։",
       "uploadFailed": "Վերբեռնումը ձախողվեց։",
-      "failedToUploadFile": "Չհաջողվեց վերբեռնել ֆայլը՝ {{reason}}։",
       "nothingToPaste": "Տեղադրելու բան չկա։",
       "metadataStripFailed": "Չհաջողվեց հեռացնել լուսանկարի մետատվյալները։",
       "limit_one": "Կարող ես կցել մինչև {{displayCount}} ֆայլ։",
@@ -2097,7 +2096,6 @@
       "readOnly": "Այս նիստը հասանելի է միայն կարդալու համար։",
       "continueInNewSession": "Շարունակել նոր նիստում",
       "emptyDescription": "Սկսելու համար ներքևում հաղորդագրություն ուղարկեք։",
-      "emptyTranscriptDescription": "Այս նիստում դեռևս հաղորդագրություններ չկան։",
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
       "renameAccessibility": "Վերանվանել նիստը՝ {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Կազմակերպության պրոֆիլներ",
       "personalProfiles": "Անձնական պրոֆիլներ",
       "yourProfiles": "Ձեր պրոֆիլները",
-      "failedToLoadProfiles": "Չհաջողվեց բեռնել պրոֆիլները",
       "nameTooLong": "Պրոֆիլի անունը չափազանց երկար է",
       "descriptionTooLong": "Նկարագրությունը չափազանց երկար է",
       "secretsEncrypted": "Գաղտնիքները կոդավորված են պահեստավորումից առաջ:",
@@ -2476,20 +2473,6 @@
       "unavailable": "Նախորդ հաղորդագրությունները հասանելի չեն։",
       "tooLarge": "Նախորդ հաղորդագրությունների ծավալը չափազանց մեծ է դրանք բեռնելու համար։"
     },
-    "markdownTable": {
-      "viewTable": "Դիտել աղյուսակը",
-      "title": "Աղյուսակ",
-      "close": "Փակել աղյուսակը",
-      "loading": "Բեռնվում է աղյուսակը",
-      "empty": "Այս աղյուսակում տողեր չկան։",
-      "columnCount_one": "սյունակ",
-      "columnCount": "սյունակ",
-      "columnCount_other": "սյունակ",
-      "rowCount_one": "տող",
-      "rowCount": "տող",
-      "rowCount_other": "տող",
-      "opensFullScreen": "բացվում է լիաէկրան ռեժիմում"
-    },
     "sessionFilter": {
       "title": "Նիստերի զտում",
       "platformCloud": "Ամպային",
@@ -2583,7 +2566,6 @@
       "linkActions": "Հղման գործողություններ",
       "couldNotCopyLink": "Չհաջողվեց պատճենել հղումը։",
       "couldNotShareLink": "Չհաջողվեց տարածել հղումը։",
-      "opensInBrowser": "Բացվում է զննարկչում",
       "showLinkActions": "Ցուցադրել հղման գործողությունները"
     },
     "compaction": {

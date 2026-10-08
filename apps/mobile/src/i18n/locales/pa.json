@@ -935,7 +935,6 @@
       "cantUpload": "ਇਹ ਫਾਈਲ ਅੱਪਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
       "networkError": "ਨੈੱਟਵਰਕ ਵਿੱਚ ਗਲਤੀ ਆਈ।",
       "uploadFailed": "ਅੱਪਲੋਡ ਅਸਫਲ ਰਿਹਾ।",
-      "failedToUploadFile": "ਫਾਈਲ ਅੱਪਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ: {{reason}}।",
       "nothingToPaste": "ਪੇਸਟ ਕਰਨ ਲਈ ਕੁਝ ਨਹੀਂ ਹੈ।",
       "metadataStripFailed": "ਫੋਟੋ ਦਾ ਮੈਟਾਡੇਟਾ ਹਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "limit_one": "ਤੁਸੀਂ ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲ ਨੱਥੀ ਕਰ ਸਕਦੇ ਹੋ।",
@@ -2097,7 +2096,6 @@
       "readOnly": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਸਿਰਫ਼ ਪੜ੍ਹਿਆ ਜਾ ਸਕਦਾ ਹੈ।",
       "continueInNewSession": "ਨਵੇਂ ਸੈਸ਼ਨ ਵਿੱਚ ਜਾਰੀ ਰੱਖੋ",
       "emptyDescription": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਹੇਠਾਂ ਇੱਕ ਸੁਨੇਹਾ ਭੇਜੋ।",
-      "emptyTranscriptDescription": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ।",
       "scrollToBottom": "ਸਭ ਤੋਂ ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
       "renameAccessibility": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ",
       "personalProfiles": "ਨਿੱਜੀ ਪ੍ਰੋਫਾਈਲਾਂ",
       "yourProfiles": "ਤੁਹਾਡੇ ਪ੍ਰੋਫਾਈਲ",
-      "failedToLoadProfiles": "ਪ੍ਰੋਫਾਈਲਾਂ ਨੂੰ ਲੋਡ ਕਰਨਾ ਅਸਫਲ ਰਿਹਾ",
       "nameTooLong": "ਪ੍ਰੋਫਾਈਲ ਨਾਮ ਬਹੁਤ ਲੰਮਾ ਹੈ",
       "descriptionTooLong": "ਵਰਣਨ ਬਹੁਤ ਲੰਮਾ ਹੈ",
       "secretsEncrypted": "ਭੇਦ ਸਟੋਰੇਜ ਤੋਂ ਪਹਿਲਾਂ ਏਨਕ੍ਰਿਪਟ ਕੀਤੇ ਜਾਂਦੇ ਹਨ।",
@@ -2476,20 +2473,6 @@
       "unavailable": "ਪੁਰਾਣੇ ਸੁਨੇਹੇ ਉਪਲਬਧ ਨਹੀਂ ਹਨ।",
       "tooLarge": "ਪੁਰਾਣੇ ਸੁਨੇਹਿਆਂ ਦਾ ਆਕਾਰ ਇੰਨਾ ਵੱਡਾ ਹੈ ਕਿ ਉਨ੍ਹਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।"
     },
-    "markdownTable": {
-      "viewTable": "ਸਾਰਣੀ ਵੇਖੋ",
-      "title": "ਸਾਰਣੀ",
-      "close": "ਸਾਰਣੀ ਬੰਦ ਕਰੋ",
-      "loading": "ਸਾਰਣੀ ਲੋਡ ਹੋ ਰਹੀ ਹੈ",
-      "empty": "ਇਸ ਸਾਰਣੀ ਵਿੱਚ ਕੋਈ ਕਤਾਰ ਨਹੀਂ ਹੈ।",
-      "columnCount_one": "ਕਾਲਮ",
-      "columnCount": "ਕਾਲਮ",
-      "columnCount_other": "ਕਾਲਮ",
-      "rowCount_one": "ਕਤਾਰ",
-      "rowCount": "ਕਤਾਰਾਂ",
-      "rowCount_other": "ਕਤਾਰਾਂ",
-      "opensFullScreen": "ਪੂਰੀ ਸਕ੍ਰੀਨ 'ਤੇ ਖੁੱਲ੍ਹਦੀ ਹੈ"
-    },
     "sessionFilter": {
       "title": "ਸੈਸ਼ਨ ਫਿਲਟਰ ਕਰੋ",
       "platformCloud": "ਕਲਾਉਡ",
@@ -2583,7 +2566,6 @@
       "linkActions": "ਲਿੰਕ ਲਈ ਕਾਰਵਾਈਆਂ",
       "couldNotCopyLink": "ਲਿੰਕ ਕਾਪੀ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "couldNotShareLink": "ਲਿੰਕ ਸਾਂਝਾ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-      "opensInBrowser": "ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਖੁੱਲ੍ਹਦਾ ਹੈ",
       "showLinkActions": "ਲਿੰਕ ਲਈ ਕਾਰਵਾਈਆਂ ਦਿਖਾਓ"
     },
     "compaction": {

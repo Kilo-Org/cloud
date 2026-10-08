@@ -403,11 +403,7 @@ export function useAgentAttachmentUpload(
           });
           // Single announced toast per failed chip (D19). Terminal surfaces
           // its own chip copy so the toast only needs to echo the same intent.
-          announcingToast.error(
-            retryable
-              ? i18n.t('chat.attachment.failedToUploadFile', { reason })
-              : describeTerminalReason(reason)
-          );
+          announcingToast.error(retryable ? reason : describeTerminalReason(reason));
           return { id: attachment.id, failed: true };
         } finally {
           // The upload settled (success or failure): drop the cancel handle so

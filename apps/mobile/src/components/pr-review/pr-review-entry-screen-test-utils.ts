@@ -17,7 +17,9 @@ import '@/i18n';
 
 const harnessMocks = vi.hoisted(() => ({
   push: vi.fn(),
-  alert: vi.fn(),
+  // The screen renders `{dialog}` from `useConfirmDialog`; the stub below
+  // records the request the screen hands it (cleared by `vi.clearAllMocks`).
+  confirm: vi.fn(),
   toastError: vi.fn(),
   clipboard: { current: '' as string },
 }));
@@ -81,11 +83,17 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Alert: { alert: harnessMocks.alert },
   Platform: { OS: 'android' },
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   View: 'View',
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: harnessMocks.confirm,
+    dialog: null,
+  }),
 }));
 
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));

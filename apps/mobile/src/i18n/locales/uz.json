@@ -935,7 +935,6 @@
       "cantUpload": "Bu faylni yuklab bo‘lmaydi.",
       "networkError": "Tarmoqda xato yuz berdi.",
       "uploadFailed": "Yuklash amalga oshmadi.",
-      "failedToUploadFile": "Faylni yuklab bo'lmadi: {{reason}}.",
       "nothingToPaste": "Joylashtirish uchun hech narsa yo'q.",
       "metadataStripFailed": "Surat metama'lumotlarini olib tashlab bo'lmadi.",
       "limit_one": "Siz {{displayCount}} tagacha fayl biriktira olasiz.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Bu sessiyani faqat o'qish mumkin.",
       "continueInNewSession": "Yangi sessiyada davom etish",
       "emptyDescription": "Boshlash uchun quyida xabar yuboring.",
-      "emptyTranscriptDescription": "Bu sessiyada hali xabarlar yo'q.",
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Tashkilot profillari",
       "personalProfiles": "Shaxsiy profillar",
       "yourProfiles": "Profillaringiz",
-      "failedToLoadProfiles": "Profillarni yuklab bo‘lmadi",
       "nameTooLong": "Profil nomi juda uzun",
       "descriptionTooLong": "Tavsif juda uzun",
       "secretsEncrypted": "Sirlar saqlashdan oldin shifrlangan.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Oldingi xabarlar mavjud emas.",
       "tooLarge": "Oldingi xabarlarning hajmi yuklash uchun juda katta."
     },
-    "markdownTable": {
-      "viewTable": "Jadvalni ko'rish",
-      "title": "Jadval",
-      "close": "Jadvalni yopish",
-      "loading": "Jadval yuklanmoqda",
-      "empty": "Bu jadvalda qatorlar yo'q.",
-      "columnCount_one": "ustun",
-      "columnCount": "ustun",
-      "columnCount_other": "ustun",
-      "rowCount_one": "qator",
-      "rowCount": "qator",
-      "rowCount_other": "qator",
-      "opensFullScreen": "to'liq ekranda ochiladi"
-    },
     "sessionFilter": {
       "title": "Sessiyalarni filtrlash",
       "platformCloud": "Bulut",
@@ -2583,7 +2566,6 @@
       "linkActions": "Havola bilan amallar",
       "couldNotCopyLink": "Havolani nusxalab bo'lmadi.",
       "couldNotShareLink": "Havolani ulashib bo'lmadi.",
-      "opensInBrowser": "Brauzerda ochiladi",
       "showLinkActions": "Havola bilan amallarni ko'rsatish"
     },
     "compaction": {

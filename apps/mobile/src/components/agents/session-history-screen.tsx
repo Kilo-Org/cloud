@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { AppState, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
@@ -13,7 +13,6 @@ import { SessionListSearchHeader } from '@/components/agents/session-list-search
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { ScreenHeader } from '@/components/screen-header';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
@@ -35,7 +34,6 @@ const noopCreateSession = () => {
 export function SessionHistoryScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -238,15 +236,9 @@ export function SessionHistoryScreen() {
           inputKey={searchInputKey}
         />
       ) : null}
-      {keyboardContainerKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">
-          {sessionListBody}
-        </AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {sessionListBody}
-        </KeyboardAvoidingView>
-      )}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
+        {sessionListBody}
+      </KeyboardAvoidingView>
       {showFilterModal && (
         <SessionFilterModal
           selectedPlatforms={platformFilter}

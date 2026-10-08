@@ -23,6 +23,10 @@ config.resolver.nodeModulesPaths = [
 // `drizzle/migrations.js` imports and babel-plugin-inline-import inlines.
 config.resolver.sourceExts.push('sql');
 
+// Bundle vendored text assets (the Mermaid script in `assets/vendor/`) as files,
+// not as modules: the diagram page reads and inlines it at runtime.
+config.resolver.assetExts.push('txt');
+
 // Keep colocated tests out of the app bundle. Expo Router's require.context matches
 // every `.tsx` under `src/app`, so a `*.test.tsx` next to a route registers as a route
 // and drags vitest (and vite) into the bundle, which Metro cannot transform.

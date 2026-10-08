@@ -393,7 +393,6 @@
       "cantUpload": "Ce fichier ne peut pas être envoyé.",
       "networkError": "Une erreur réseau s'est produite.",
       "uploadFailed": "L'envoi a échoué.",
-      "failedToUploadFile": "Impossible d'envoyer le fichier : {{reason}}.",
       "nothingToPaste": "Aucun contenu à coller.",
       "metadataStripFailed": "Impossible de supprimer les métadonnées de la photo.",
       "limit_one": "Vous pouvez joindre jusqu'à {{displayCount}} fichier.",
@@ -1499,7 +1498,6 @@
       "readOnly": "Cette session est en lecture seule.",
       "continueInNewSession": "Continuer dans une nouvelle session",
       "emptyDescription": "Envoyez un message ci-dessous pour commencer.",
-      "emptyTranscriptDescription": "Cette session ne contient encore aucun message.",
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
       "renameAccessibility": "Renommer la session : {{title}}",
@@ -1621,7 +1619,6 @@
       "organizationProfiles": "Profils d'organisation",
       "personalProfiles": "Profils personnels",
       "yourProfiles": "Vos profils",
-      "failedToLoadProfiles": "Échec du chargement des profils",
       "nameTooLong": "Le nom du profil est trop long",
       "descriptionTooLong": "La description est trop longue",
       "secretsEncrypted": "Les secrets sont cryptés avant stockage.",
@@ -1883,22 +1880,6 @@
       "tooLarge": "Les messages précédents sont trop volumineux pour être chargés.",
       "omitted_many": "{{displayCount}} éléments antérieurs de cette session n’ont pas pu être affichés."
     },
-    "markdownTable": {
-      "viewTable": "Voir le tableau",
-      "title": "Tableau",
-      "close": "Fermer le tableau",
-      "loading": "Chargement du tableau",
-      "empty": "Ce tableau ne contient aucune ligne.",
-      "columnCount_one": "colonne",
-      "columnCount": "colonnes",
-      "columnCount_other": "colonnes",
-      "rowCount_one": "ligne",
-      "rowCount": "lignes",
-      "rowCount_other": "lignes",
-      "opensFullScreen": "s'ouvre en plein écran",
-      "columnCount_many": "colonnes",
-      "rowCount_many": "lignes"
-    },
     "sessionFilter": {
       "title": "Filtrer les sessions",
       "platformCloud": "En ligne",
@@ -1995,7 +1976,6 @@
       "linkActions": "Actions sur le lien",
       "couldNotCopyLink": "Impossible de copier le lien.",
       "couldNotShareLink": "Impossible de partager le lien.",
-      "opensInBrowser": "S'ouvre dans le navigateur",
       "showLinkActions": "Afficher les actions sur le lien"
     },
     "compaction": {

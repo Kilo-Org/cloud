@@ -424,7 +424,6 @@
       "cantUpload": "Không thể tải lên tệp này.",
       "networkError": "Đã xảy ra lỗi mạng.",
       "uploadFailed": "Không thể tải lên.",
-      "failedToUploadFile": "Không thể tải tệp lên: {{reason}}.",
       "nothingToPaste": "Không có nội dung để dán.",
       "metadataStripFailed": "Không thể xóa siêu dữ liệu ảnh.",
       "limit_one": "Bạn có thể đính kèm tối đa {{displayCount}} tệp.",
@@ -1586,7 +1585,6 @@
       "readOnly": "Bạn chỉ có thể xem phiên này.",
       "continueInNewSession": "Tiếp tục trong phiên mới",
       "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
-      "emptyTranscriptDescription": "Phiên này chưa có tin nhắn.",
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
       "renameAccessibility": "Đổi tên phiên: {{title}}",
@@ -1708,7 +1706,6 @@
       "organizationProfiles": "Hồ sơ tổ chức",
       "personalProfiles": "Hồ sơ cá nhân",
       "yourProfiles": "Hồ sơ của bạn",
-      "failedToLoadProfiles": "Không tải được hồ sơ",
       "nameTooLong": "Tên hồ sơ quá dài",
       "descriptionTooLong": "Mô tả quá dài",
       "secretsEncrypted": "Bí mật được mã hóa trước khi lưu trữ.",
@@ -1965,20 +1962,6 @@
       "unavailable": "Không thể truy cập các tin nhắn trước đó.",
       "tooLarge": "Các tin nhắn trước đó có dung lượng quá lớn nên không thể tải."
     },
-    "markdownTable": {
-      "viewTable": "Xem bảng",
-      "title": "Bảng",
-      "close": "Đóng bảng",
-      "loading": "Đang tải bảng",
-      "empty": "Bảng này không có hàng nào.",
-      "columnCount_one": "cột",
-      "columnCount": "cột",
-      "columnCount_other": "cột",
-      "rowCount_one": "hàng",
-      "rowCount": "hàng",
-      "rowCount_other": "hàng",
-      "opensFullScreen": "mở toàn màn hình"
-    },
     "sessionFilter": {
       "title": "Lọc phiên",
       "platformCloud": "Đám mây",
@@ -2072,7 +2055,6 @@
       "linkActions": "Thao tác với liên kết",
       "couldNotCopyLink": "Không thể sao chép liên kết.",
       "couldNotShareLink": "Không thể chia sẻ liên kết.",
-      "opensInBrowser": "Mở trong trình duyệt",
       "showLinkActions": "Hiển thị các thao tác với liên kết"
     },
     "compaction": {

@@ -935,7 +935,6 @@
       "cantUpload": "यो फाइल अपलोड गर्न सकिँदैन।",
       "networkError": "नेटवर्कमा त्रुटि भयो।",
       "uploadFailed": "अपलोड गर्न सकिएन।",
-      "failedToUploadFile": "फाइल अपलोड गर्न सकिएन: {{reason}}।",
       "nothingToPaste": "टाँस्न केही छैन।",
       "metadataStripFailed": "फोटोको मेटाडेटा हटाउन सकिएन।",
       "limit_one": "तपाईं बढीमा {{displayCount}} वटा फाइल संलग्न गर्न सक्नुहुन्छ।",
@@ -2097,7 +2096,6 @@
       "readOnly": "यो सत्र पढ्न मात्र मिल्छ।",
       "continueInNewSession": "नयाँ सत्रमा जारी राख्नुहोस्",
       "emptyDescription": "सुरु गर्न तल सन्देश पठाउनुहोस्।",
-      "emptyTranscriptDescription": "यो सत्रमा अहिलेसम्म कुनै सन्देश छैन।",
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देश छैन",
       "renameAccessibility": "सत्रको नाम बदल्नुहोस्: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "संगठन प्रोफाइल",
       "personalProfiles": "व्यक्तिगत प्रोफाइलहरू",
       "yourProfiles": "तपाईंको प्रोफाइलहरू",
-      "failedToLoadProfiles": "प्रोफाइलहरू लोड गर्न असफल भयो",
       "nameTooLong": "प्रोफाइल नाम धेरै लामो छ",
       "descriptionTooLong": "वर्णन धेरै लामो छ",
       "secretsEncrypted": "गोप्यहरू भण्डारण गर्नु अघि गुप्तिकरण गरिएका छन्।",
@@ -2476,20 +2473,6 @@
       "unavailable": "पहिलेका सन्देशहरू उपलब्ध छैनन्।",
       "tooLarge": "पहिलेका सन्देशहरू लोड गर्न धेरै ठूला छन्।"
     },
-    "markdownTable": {
-      "viewTable": "तालिका हेर्नुहोस्",
-      "title": "तालिका",
-      "close": "तालिका बन्द गर्नुहोस्",
-      "loading": "तालिका लोड गर्दै",
-      "empty": "यो तालिकामा कुनै पङ्क्ति छैन।",
-      "columnCount_one": "स्तम्भ",
-      "columnCount": "स्तम्भ",
-      "columnCount_other": "स्तम्भ",
-      "rowCount_one": "पङ्क्ति",
-      "rowCount": "पङ्क्ति",
-      "rowCount_other": "पङ्क्ति",
-      "opensFullScreen": "पूर्ण स्क्रिनमा खुल्छ"
-    },
     "sessionFilter": {
       "title": "सत्र फिल्टर",
       "platformCloud": "क्लाउड",
@@ -2583,7 +2566,6 @@
       "linkActions": "लिङ्कका विकल्पहरू",
       "couldNotCopyLink": "लिङ्क प्रतिलिपि गर्न सकिएन।",
       "couldNotShareLink": "लिङ्क साझा गर्न सकिएन।",
-      "opensInBrowser": "ब्राउजरमा खुल्छ",
       "showLinkActions": "लिङ्कका विकल्पहरू देखाउनुहोस्"
     },
     "compaction": {

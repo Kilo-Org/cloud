@@ -27,10 +27,10 @@ export type TestProfileDetail = {
   agents: unknown[];
 };
 
-type TestAlertButton = { style: string; onPress?: () => void };
+type TestConfirmRequest = { onConfirm?: () => void };
 
-/** The mock surface `Alert.alert` exposes to the harness. */
-export type TestAlertMock = { mock: { calls: unknown[][] } };
+/** The mock surface `useConfirmDialog().confirm` exposes to the harness. */
+export type TestConfirmMock = { mock: { calls: unknown[][] } };
 
 export function testProfile(overrides: Partial<TestProfileDetail> = {}): TestProfileDetail {
   return {
@@ -93,14 +93,13 @@ export function changeText(root: ReactTestInstance, label: string, value: string
   });
 }
 
-/** Confirm the destructive Alert button the screen raised. */
-function confirmAlert(alert: TestAlertMock): void {
-  const buttons = alert.mock.calls[0]?.[2] as TestAlertButton[] | undefined;
-  const destructive = buttons?.find(button => button.style === 'destructive');
-  if (!destructive?.onPress) {
-    throw new Error('destructive alert button was not registered');
+/** Fire the last confirm request the screen raised through the in-app dialog. */
+function confirmRequest(confirm: TestConfirmMock): void {
+  const request = confirm.mock.calls.at(-1)?.[0] as TestConfirmRequest | undefined;
+  if (!request?.onConfirm) {
+    throw new Error('the destructive confirm request was not registered');
   }
-  destructive.onPress();
+  request.onConfirm();
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
@@ -132,10 +131,13 @@ export async function pressSave(root: ReactTestInstance): Promise<void> {
   });
 }
 
-export async function pressDelete(root: ReactTestInstance, alert: TestAlertMock): Promise<void> {
+export async function pressDelete(
+  root: ReactTestInstance,
+  confirm: TestConfirmMock
+): Promise<void> {
   await act(async () => {
     pressButton(root, 1);
-    confirmAlert(alert);
+    confirmRequest(confirm);
     await Promise.resolve();
   });
 }

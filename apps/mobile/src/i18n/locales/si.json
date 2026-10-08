@@ -935,7 +935,6 @@
       "cantUpload": "මෙම ගොනුව උඩුගත කළ නොහැක.",
       "networkError": "ජාල දෝෂයක් ඇති විය.",
       "uploadFailed": "උඩුගත කිරීම අසාර්ථක විය.",
-      "failedToUploadFile": "ගොනුව උඩුගත කළ නොහැකි විය: {{reason}}",
       "nothingToPaste": "ඇලවීමට කිසිවක් නැත.",
       "metadataStripFailed": "ඡායාරූපයේ පාරදත්ත ඉවත් කළ නොහැකි විය.",
       "limit_one": "ඔබට ගොනු {{displayCount}} ක් දක්වා ඇමිණිය හැක.",
@@ -2097,7 +2096,6 @@
       "readOnly": "මෙම සැසිය කියවීමට පමණි.",
       "continueInNewSession": "නව සැසියක ඉදිරියට යන්න",
       "emptyDescription": "ආරම්භ කිරීමට පහත කොටුවෙන් පණිවිඩයක් යවන්න.",
-      "emptyTranscriptDescription": "මෙම සැසියේ තවම පණිවිඩ නැත.",
       "scrollToBottom": "අවසානය දක්වා පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
       "renameAccessibility": "{{title}} සැසියේ නම වෙනස් කරන්න",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "සංවිධානයේ පැතිකඩ",
       "personalProfiles": "පුද්ගලික පැතිකඩ",
       "yourProfiles": "ඔබේ පැතිකඩ",
-      "failedToLoadProfiles": "පැතිකඩ පූරණය කිරීමට අසමත් විය",
       "nameTooLong": "පැතිකඩ නම දිග වැඩියි",
       "descriptionTooLong": "විස්තරය දිග වැඩියි",
       "secretsEncrypted": "ගබඩා කිරීමට පෙර රහස් සංකේතනය කර ඇත.",
@@ -2476,20 +2473,6 @@
       "unavailable": "පෙර පණිවිඩ ලබා ගත නොහැක.",
       "tooLarge": "පෙර පණිවිඩ පූරණය කළ නොහැකි තරම් විශාලයි."
     },
-    "markdownTable": {
-      "viewTable": "වගුව බලන්න",
-      "title": "වගුව",
-      "close": "වගුව වසන්න",
-      "loading": "වගුව පූරණය වෙමින්",
-      "empty": "මෙම වගුවේ පේළි නොමැත.",
-      "columnCount_one": "තීරුව",
-      "columnCount": "තීරු",
-      "columnCount_other": "තීරු",
-      "rowCount_one": "පේළිය",
-      "rowCount": "පේළි",
-      "rowCount_other": "පේළි",
-      "opensFullScreen": "සම්පූර්ණ තිරයෙන් විවෘත වේ"
-    },
     "sessionFilter": {
       "title": "සැසි පෙරහන් කරන්න",
       "platformCloud": "ක්ලවුඩ්",
@@ -2583,7 +2566,6 @@
       "linkActions": "සබැඳි ක්‍රියා",
       "couldNotCopyLink": "සබැඳිය පිටපත් කළ නොහැකි විය.",
       "couldNotShareLink": "සබැඳිය බෙදාගත නොහැකි විය.",
-      "opensInBrowser": "බ්‍රවුසරයේ විවෘත වේ",
       "showLinkActions": "සබැඳි ක්‍රියා පෙන්වන්න"
     },
     "compaction": {

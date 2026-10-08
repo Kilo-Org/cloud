@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- notification wiring: foreground/background handlers, channels, and push-token plumbing are kept together. */
+import * as BackgroundTask from 'expo-background-task';
 import expoConstants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
@@ -42,6 +43,7 @@ import {
   type GlanceableSink,
   registerGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import { publishTrayOnce } from '@/lib/glanceable/tray-refresh';
 import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { getDndAccessGranted } from '@/glanceable-android/live-update';
@@ -464,16 +466,11 @@ async function handleBackgroundNotificationTask(
 }
 
 /**
- * Executor entry for the background notification task, exported for
- * `notification-background-task.ts`, whose task executor lazy-loads this module
- * when a task fires (a headless start evaluates only the app entry, so this
- * graph must not load at entry). Applies the stored language, loads the
- * glanceable sinks — a fresh headless process has none registered — creates the
- * Android channels, then dispatches.
+ * The setup every headless glanceable run needs before it touches a sink:
+ * the stored language, the glanceable sinks — a fresh headless process has none
+ * registered — the Android channels, and the notification permission read.
  */
-export async function runBackgroundNotificationTask(
-  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
-): Promise<Notifications.BackgroundNotificationTaskResult> {
+async function prepareHeadlessGlanceableRun(): Promise<void> {
   // A killed process starts on the bundled English catalog, and nothing else on
   // this path applies the stored language. Apply it before the channels are
   // written, or the names below revert the user's notification settings to
@@ -494,7 +491,46 @@ export async function runBackgroundNotificationTask(
   } catch {
     // An unknown answer stays "not granted": the next foreground reads again.
   }
+}
+
+/**
+ * Executor entry for the background notification task, exported for
+ * `notification-background-task.ts`, whose task executor lazy-loads this module
+ * when a task fires (a headless start evaluates only the app entry, so this
+ * graph must not load at entry).
+ */
+export async function runBackgroundNotificationTask(
+  body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
+): Promise<Notifications.BackgroundNotificationTaskResult> {
+  await prepareHeadlessGlanceableRun();
   return handleBackgroundNotificationTask(body);
+}
+
+/**
+ * Executor entry for the periodic glanceable refresh, exported for
+ * `glanceable-refresh-task.ts`, which lazy-loads this module like the
+ * notification task does. It is the fallback for a data-only push the OS
+ * dropped or throttled: it reads the tray once and republishes the surfaces.
+ * Signed out, it does nothing. A failed read or native write reports `Failed`
+ * and leaves the last published snapshot in place.
+ */
+export async function runGlanceableBackgroundRefresh(): Promise<BackgroundTask.BackgroundTaskResult> {
+  await prepareHeadlessGlanceableRun();
+  // The same durable state the push path restores: the persisted snapshot
+  // seeds the revision, and the sinks read the recorded ask synchronously.
+  await restorePersistedGlanceable();
+  await readWaitingAsk();
+  const userId = await getActiveUserId();
+  if (userId === null) {
+    return BackgroundTask.BackgroundTaskResult.Success;
+  }
+  const organizationId = await getSelectedOrganizationId();
+  try {
+    await publishTrayOnce({ userId, organizationId });
+  } catch {
+    return BackgroundTask.BackgroundTaskResult.Failed;
+  }
+  return BackgroundTask.BackgroundTaskResult.Success;
 }
 
 async function registerBackgroundNotificationTask(): Promise<void> {

@@ -424,7 +424,6 @@
       "cantUpload": "无法上传此文件。",
       "networkError": "网络出错。",
       "uploadFailed": "上传失败。",
-      "failedToUploadFile": "上传文件失败：{{reason}}。",
       "nothingToPaste": "没有可粘贴的内容。",
       "metadataStripFailed": "无法移除照片元数据。",
       "limit_one": "最多可附加 {{displayCount}} 个文件。",
@@ -1586,7 +1585,6 @@
       "readOnly": "此会话为只读模式。",
       "continueInNewSession": "在新会话中继续",
       "emptyDescription": "在下方发送消息，开始对话。",
-      "emptyTranscriptDescription": "此会话还没有消息。",
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
       "renameAccessibility": "重命名会话：{{title}}",
@@ -1708,7 +1706,6 @@
       "organizationProfiles": "组织简介",
       "personalProfiles": "个人简介",
       "yourProfiles": "您的个人资料",
-      "failedToLoadProfiles": "无法加载配置文件",
       "nameTooLong": "个人资料名称太长",
       "descriptionTooLong": "描述太长",
       "secretsEncrypted": "秘密在存储之前被加密。",
@@ -1965,20 +1962,6 @@
       "unavailable": "无法查看较早的消息。",
       "tooLarge": "较早的消息数据量过大，无法加载。"
     },
-    "markdownTable": {
-      "viewTable": "查看表格",
-      "title": "表格",
-      "close": "关闭表格",
-      "loading": "正在加载表格",
-      "empty": "此表格没有任何行。",
-      "columnCount_one": "列",
-      "columnCount": "列",
-      "columnCount_other": "列",
-      "rowCount_one": "行",
-      "rowCount": "行",
-      "rowCount_other": "行",
-      "opensFullScreen": "全屏打开"
-    },
     "sessionFilter": {
       "title": "筛选会话",
       "platformCloud": "云端",
@@ -2072,7 +2055,6 @@
       "linkActions": "链接操作",
       "couldNotCopyLink": "无法复制链接。",
       "couldNotShareLink": "无法分享链接。",
-      "opensInBrowser": "在浏览器中打开",
       "showLinkActions": "显示链接操作"
     },
     "compaction": {

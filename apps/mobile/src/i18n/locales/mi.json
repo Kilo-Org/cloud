@@ -935,7 +935,6 @@
       "cantUpload": "Kāore e taea te tuku ake i tēnei kōnae.",
       "networkError": "He hapa whatunga.",
       "uploadFailed": "I rahua te tuku ake.",
-      "failedToUploadFile": "I rahua te tuku ake i te kōnae: {{reason}}",
       "nothingToPaste": "Kāore he mea hei whakapiri.",
       "metadataStripFailed": "Kāore i taea te tango i ngā raraungameta o te whakaahua.",
       "limit_one": "Ka taea e koe te āpiti i ngā kōnae, kia {{displayCount}} te mōrahi.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Ka taea tēnei wātū te pānui anake.",
       "continueInNewSession": "Haere tonu i tētahi wātū hou",
       "emptyDescription": "Tukuna he karere ki raro nei hei tīmata.",
-      "emptyTranscriptDescription": "Kāore anō he karere i tēnei wātū.",
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
       "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Ngā Kōtaha Whakahaere",
       "personalProfiles": "Whaiaro Whaiaro",
       "yourProfiles": "Ō Kōtaha",
-      "failedToLoadProfiles": "I rahua te uta i nga korero",
       "nameTooLong": "He roa rawa te ingoa kōtaha",
       "descriptionTooLong": "He roa rawa te whakaahuatanga",
       "secretsEncrypted": "Ka whakamunatia nga mea ngaro i mua i te rokiroki.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Kāore ngā karere o mua e wātea ana.",
       "tooLarge": "He nui rawa ngā karere o mua kia utaina."
     },
-    "markdownTable": {
-      "viewTable": "Tirohia te ripanga",
-      "title": "Ripanga",
-      "close": "Katia te ripanga",
-      "loading": "Kei te uta i te ripanga",
-      "empty": "Kāore he rārangi o tēnei ripanga.",
-      "columnCount_one": "tīwae",
-      "columnCount": "tīwae",
-      "columnCount_other": "tīwae",
-      "rowCount_one": "rārangi",
-      "rowCount": "rārangi",
-      "rowCount_other": "rārangi",
-      "opensFullScreen": "ka tuwhera ki te mata katoa"
-    },
     "sessionFilter": {
       "title": "Tātarihia ngā wātū",
       "platformCloud": "Kapua",
@@ -2583,7 +2566,6 @@
       "linkActions": "Ngā mahi hononga",
       "couldNotCopyLink": "Kāore i taea te tārua i te hononga.",
       "couldNotShareLink": "Kāore i taea te tuari i te hononga.",
-      "opensInBrowser": "Ka tuwhera ki te pūtirotiro",
       "showLinkActions": "Whakaaturia ngā mahi mō te hononga"
     },
     "compaction": {

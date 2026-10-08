@@ -935,7 +935,6 @@
       "cantUpload": "Оваа датотека не може да се прикачи.",
       "networkError": "Се појави грешка во мрежата.",
       "uploadFailed": "Испраќањето не успеа.",
-      "failedToUploadFile": "Не успеа испраќањето на датотеката: {{reason}}.",
       "nothingToPaste": "Нема што да се залепи.",
       "metadataStripFailed": "Метаподатоците на фотографијата не можеа да се отстранат.",
       "limit_one": "Можеш да прикачиш најмногу {{displayCount}} датотека.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Оваа сесија е само за читање.",
       "continueInNewSession": "Продолжи во нова сесија",
       "emptyDescription": "Испрати порака подолу за да започнеш.",
-      "emptyTranscriptDescription": "Оваа сесија сè уште нема пораки.",
       "scrollToBottom": "Движи се до крајот",
       "emptyTitle": "Сè уште нема пораки",
       "renameAccessibility": "Преименувај ја сесијата: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Профили на организацијата",
       "personalProfiles": "Лични профили",
       "yourProfiles": "Вашите профили",
-      "failedToLoadProfiles": "Не успеа да се вчитаат профилите",
       "nameTooLong": "Името на профилот е предолго",
       "descriptionTooLong": "Описот е предолг",
       "secretsEncrypted": "Тајните се шифрираат пред складирањето.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Постарите пораки не се достапни.",
       "tooLarge": "Постарите пораки се преголеми за да се вчитаат."
     },
-    "markdownTable": {
-      "viewTable": "Прикажи табела",
-      "title": "Табела",
-      "close": "Затвори табела",
-      "loading": "Вчитување табела",
-      "empty": "Оваа табела нема редови.",
-      "columnCount_one": "колона",
-      "columnCount": "колони",
-      "columnCount_other": "колони",
-      "rowCount_one": "ред",
-      "rowCount": "редови",
-      "rowCount_other": "редови",
-      "opensFullScreen": "се отвора на цел екран"
-    },
     "sessionFilter": {
       "title": "Филтри за сесии",
       "platformCloud": "Облак",
@@ -2583,7 +2566,6 @@
       "linkActions": "Дејства за линк",
       "couldNotCopyLink": "Не успеа копирањето на линкот.",
       "couldNotShareLink": "Не успеа споделувањето на линкот.",
-      "opensInBrowser": "Се отвора во прелистувач",
       "showLinkActions": "Прикажи дејства за линк"
     },
     "compaction": {

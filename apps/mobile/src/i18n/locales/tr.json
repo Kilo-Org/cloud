@@ -424,7 +424,6 @@
       "cantUpload": "Bu dosya yüklenemiyor.",
       "networkError": "Bir ağ hatası oluştu.",
       "uploadFailed": "Yükleme başarısız oldu.",
-      "failedToUploadFile": "Dosya yüklenemedi: {{reason}}.",
       "nothingToPaste": "Yapıştırılacak bir şey yok.",
       "metadataStripFailed": "Fotoğrafın meta verileri kaldırılamadı.",
       "limit_one": "En fazla {{displayCount}} dosya ekleyebilirsin.",
@@ -1586,7 +1585,6 @@
       "readOnly": "Bu oturum salt okunur.",
       "continueInNewSession": "Yeni oturumda devam et",
       "emptyDescription": "Başlamak için aşağıdan bir mesaj gönder.",
-      "emptyTranscriptDescription": "Bu oturumda henüz mesaj yok.",
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
       "renameAccessibility": "Oturumu yeniden adlandır: {{title}}",
@@ -1708,7 +1706,6 @@
       "organizationProfiles": "Organizasyon Profilleri",
       "personalProfiles": "Kişisel Profiller",
       "yourProfiles": "Profilleriniz",
-      "failedToLoadProfiles": "Profiller yüklenemedi",
       "nameTooLong": "Profil adı çok uzun",
       "descriptionTooLong": "Açıklama çok uzun",
       "secretsEncrypted": "Sırlar saklanmadan önce şifrelenir.",
@@ -1965,20 +1962,6 @@
       "unavailable": "Önceki mesajlar kullanılamıyor.",
       "tooLarge": "Önceki mesajlar yüklenemeyecek kadar büyük."
     },
-    "markdownTable": {
-      "viewTable": "Tabloyu görüntüle",
-      "title": "Tablo",
-      "close": "Tabloyu kapat",
-      "loading": "Tablo yükleniyor",
-      "empty": "Bu tabloda hiç satır yok.",
-      "columnCount_one": "sütun",
-      "columnCount": "sütun",
-      "columnCount_other": "sütun",
-      "rowCount_one": "satır",
-      "rowCount": "satır",
-      "rowCount_other": "satır",
-      "opensFullScreen": "tam ekranda açılır"
-    },
     "sessionFilter": {
       "title": "Oturum filtresi",
       "platformCloud": "Bulut",
@@ -2072,7 +2055,6 @@
       "linkActions": "Bağlantı işlemleri",
       "couldNotCopyLink": "Bağlantı kopyalanamadı.",
       "couldNotShareLink": "Bağlantı paylaşılamadı.",
-      "opensInBrowser": "Tarayıcıda açılır",
       "showLinkActions": "Bağlantı işlemlerini göster"
     },
     "compaction": {

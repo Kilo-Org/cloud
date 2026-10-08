@@ -935,7 +935,6 @@
       "cantUpload": "ဒီဖိုင်ကို တင်၍မရပါ။",
       "networkError": "ကွန်ရက်တွင် အမှားဖြစ်ပေါ်သည်။",
       "uploadFailed": "ဖိုင်တင်၍ မရပါ။",
-      "failedToUploadFile": "ဖိုင်တင်၍ မရပါ: {{reason}}။",
       "nothingToPaste": "ကူးထည့်စရာ မရှိပါ။",
       "metadataStripFailed": "ဓာတ်ပုံ၏ နောက်ခံအချက်အလက်များကို ဖယ်ရှား၍မရခဲ့ပါ။",
       "limit_one": "ဖိုင် {{displayCount}} ခုအထိ တွဲနိုင်သည်။",
@@ -2097,7 +2096,6 @@
       "readOnly": "ဤစက်ရှင်ကို ဖတ်ရှုရုံသာ လုပ်နိုင်ပါသည်။",
       "continueInNewSession": "စက်ရှင်အသစ်တွင် ဆက်လုပ်ပါ",
       "emptyDescription": "စတင်ရန် အောက်တွင် မက်ဆေ့ခ်ျတစ်ခု ပို့ပါ။",
-      "emptyTranscriptDescription": "ဤစက်ရှင်တွင် မက်ဆေ့ခ်ျ မရှိသေးပါ။",
       "scrollToBottom": "အောက်ခြေသို့ ဆွဲချပါ",
       "emptyTitle": "မက်ဆေ့ခ်ျ မရှိသေးပါ",
       "renameAccessibility": "{{title}} စက်ရှင်ကို အမည်ပြောင်းပါ",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "အဖွဲ့အစည်းပရိုဖိုင်များ",
       "personalProfiles": "ကိုယ်ရေးကိုယ်တာ ပရိုဖိုင်များ",
       "yourProfiles": "သင်၏ပရိုဖိုင်များ",
-      "failedToLoadProfiles": "ပရိုဖိုင်များကို တင်ရန် မအောင်မြင်ပါ။",
       "nameTooLong": "ပရိုဖိုင်အမည်သည် ရှည်လွန်းသည်။",
       "descriptionTooLong": "ဖော်ပြချက်သည် ရှည်လွန်းသည်။",
       "secretsEncrypted": "လျှို့ဝှက်ချက်များကို သိမ်းဆည်းခြင်းမပြုမီ ကုဒ်ဝှက်ထားသည်။",
@@ -2476,20 +2473,6 @@
       "unavailable": "ယခင်မက်ဆေ့ခ်ျများ မရရှိနိုင်ပါ။",
       "tooLarge": "ယခင်မက်ဆေ့ခ်ျများ၏ ဒေတာပမာဏ ကြီးလွန်းသောကြောင့် ရယူ၍မရပါ။"
     },
-    "markdownTable": {
-      "viewTable": "ဇယားကို ကြည့်ပါ",
-      "title": "ဇယား",
-      "close": "ဇယားကို ပိတ်ပါ",
-      "loading": "ဇယားဖွင့်နေသည်",
-      "empty": "ဤဇယားတွင် အတန်းများမရှိပါ။",
-      "columnCount_one": "ကော်လံ",
-      "columnCount": "ကော်လံ",
-      "columnCount_other": "ကော်လံ",
-      "rowCount_one": "အတန်း",
-      "rowCount": "အတန်း",
-      "rowCount_other": "အတန်း",
-      "opensFullScreen": "မျက်နှာပြင်အပြည့် ဖွင့်သည်"
-    },
     "sessionFilter": {
       "title": "စက်ရှင်စစ်ထုတ်ခြင်း",
       "platformCloud": "ကလောက်",
@@ -2583,7 +2566,6 @@
       "linkActions": "လင့်ခ်ဆိုင်ရာ လုပ်ဆောင်ချက်များ",
       "couldNotCopyLink": "လင့်ခ်ကို ကူးယူ၍မရပါ။",
       "couldNotShareLink": "လင့်ခ်ကို မျှဝေ၍မရပါ။",
-      "opensInBrowser": "ဘရောက်ဆာတွင် ဖွင့်သည်",
       "showLinkActions": "လင့်ခ်ဆိုင်ရာ လုပ်ဆောင်ချက်များကို ပြပါ"
     },
     "compaction": {

@@ -967,7 +967,6 @@
       "cantUpload": "Šio failo įkelti negalima.",
       "networkError": "Įvyko tinklo klaida.",
       "uploadFailed": "Nepavyko įkelti.",
-      "failedToUploadFile": "Nepavyko įkelti failo: {{reason}}.",
       "nothingToPaste": "Nėra ko įklijuoti.",
       "metadataStripFailed": "Nepavyko pašalinti nuotraukos metaduomenų.",
       "limit_one": "Gali pridėti iki {{displayCount}} failas.",
@@ -2153,7 +2152,6 @@
       "readOnly": "Šią sesiją galima tik skaityti.",
       "continueInNewSession": "Tęsti naujoje sesijoje",
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
-      "emptyTranscriptDescription": "Šioje sesijoje dar nėra žinučių.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
@@ -2275,7 +2273,6 @@
       "organizationProfiles": "Organizacijos profiliai",
       "personalProfiles": "Asmeniniai profiliai",
       "yourProfiles": "Jūsų profiliai",
-      "failedToLoadProfiles": "Nepavyko įkelti profilių",
       "nameTooLong": "Profilio pavadinimas per ilgas",
       "descriptionTooLong": "Aprašymas per ilgas",
       "secretsEncrypted": "Paslaptys užšifruojamos prieš išsaugant.",
@@ -2542,24 +2539,6 @@
       "omitted_few": "Nepavyko parodyti {{displayCount}} ankstesnių šios sesijos elementų.",
       "omitted_many": "Nepavyko parodyti {{displayCount}} ankstesnio šios sesijos elemento."
     },
-    "markdownTable": {
-      "viewTable": "Peržiūrėti lentelę",
-      "title": "Lentelė",
-      "close": "Uždaryti lentelę",
-      "loading": "Įkeliama lentelė",
-      "empty": "Šioje lentelėje nėra eilučių.",
-      "columnCount_one": "stulpelis",
-      "columnCount": "stulpelių",
-      "columnCount_other": "stulpelių",
-      "rowCount_one": "eilutė",
-      "rowCount": "eilučių",
-      "rowCount_other": "eilučių",
-      "opensFullScreen": "atveriama per visą ekraną",
-      "columnCount_few": "stulpeliai",
-      "columnCount_many": "stulpelio",
-      "rowCount_few": "eilutės",
-      "rowCount_many": "eilutės"
-    },
     "sessionFilter": {
       "title": "Sesijų filtras",
       "platformCloud": "Debesija",
@@ -2659,7 +2638,6 @@
       "linkActions": "Nuorodos veiksmai",
       "couldNotCopyLink": "Nepavyko nukopijuoti nuorodos.",
       "couldNotShareLink": "Nepavyko bendrinti nuorodos.",
-      "opensInBrowser": "Atidaroma naršyklėje",
       "showLinkActions": "Rodyti nuorodos veiksmus"
     },
     "compaction": {

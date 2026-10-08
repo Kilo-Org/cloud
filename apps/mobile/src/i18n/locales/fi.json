@@ -935,7 +935,6 @@
       "cantUpload": "Tätä tiedostoa ei voi lähettää.",
       "networkError": "Verkkoyhteydessä tapahtui virhe.",
       "uploadFailed": "Lähetys epäonnistui.",
-      "failedToUploadFile": "Tiedoston lähetys epäonnistui: {{reason}}.",
       "nothingToPaste": "Leikepöydällä ei ole mitään liitettävää.",
       "metadataStripFailed": "Valokuvan metatietoja ei voitu poistaa.",
       "limit_one": "Voit liittää enintään {{displayCount}} tiedosto.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Tätä istuntoa voi vain lukea.",
       "continueInNewSession": "Jatka uudessa istunnossa",
       "emptyDescription": "Aloita lähettämällä viesti alla olevasta kentästä.",
-      "emptyTranscriptDescription": "Tässä istunnossa ei ole vielä viestejä.",
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
       "renameAccessibility": "Nimeä istunto uudelleen: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Organisaatioprofiilit",
       "personalProfiles": "Henkilökohtaiset profiilit",
       "yourProfiles": "Omat profiilisi",
-      "failedToLoadProfiles": "Profiilien lataaminen epäonnistui",
       "nameTooLong": "Profiilin nimi on liian pitkä",
       "descriptionTooLong": "Kuvaus on liian pitkä",
       "secretsEncrypted": "Salaisuudet salataan ennen tallennusta.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Aiemmat viestit eivät ole saatavilla.",
       "tooLarge": "Aiemmat viestit ovat liian suuria ladattaviksi."
     },
-    "markdownTable": {
-      "viewTable": "Näytä taulukko",
-      "title": "Taulukko",
-      "close": "Sulje taulukko",
-      "loading": "Ladataan taulukkoa",
-      "empty": "Tässä taulukossa ei ole rivejä.",
-      "columnCount_one": "sarake",
-      "columnCount": "saraketta",
-      "columnCount_other": "saraketta",
-      "rowCount_one": "rivi",
-      "rowCount": "riviä",
-      "rowCount_other": "riviä",
-      "opensFullScreen": "avautuu koko näytössä"
-    },
     "sessionFilter": {
       "title": "Suodata istuntoja",
       "platformCloud": "Pilvi",
@@ -2583,7 +2566,6 @@
       "linkActions": "Linkin toiminnot",
       "couldNotCopyLink": "Linkkiä ei voitu kopioida.",
       "couldNotShareLink": "Linkkiä ei voitu jakaa.",
-      "opensInBrowser": "Avautuu selaimessa",
       "showLinkActions": "Näytä linkin toiminnot"
     },
     "compaction": {

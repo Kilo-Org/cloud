@@ -24,7 +24,7 @@ vi.mock('expo-secure-store', () => secureStoreMock);
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Download: 'Download' }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -38,7 +38,7 @@ beforeEach(() => {
 
 function viewerCount(root: TestRenderer.ReactTestInstance): number {
   return root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'ImageViewerModal'
+    node => typeof node.type === 'string' && (node.type as string) === 'ImageViewer'
   ).length;
 }
 
@@ -48,7 +48,7 @@ function imageCount(root: TestRenderer.ReactTestInstance): number {
 }
 
 describe('MarkdownImage viewer mounting', () => {
-  it('mounts ImageViewerModal only after the image is confirmed and pressed', async () => {
+  it('mounts ImageViewer only after the image is confirmed and pressed', async () => {
     const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };

@@ -983,7 +983,6 @@
       "cantUpload": "Dan il-fajl ma jistax jittella'.",
       "networkError": "Seħħ żball fin-netwerk.",
       "uploadFailed": "It-tlugħ falla.",
-      "failedToUploadFile": "Ma setax jittella' l-fajl: {{reason}}",
       "nothingToPaste": "M'hemm xejn x'twaħħal.",
       "metadataStripFailed": "Il-metadata tar-ritratt ma setgħetx titneħħa.",
       "limit_one": "Tista' tehmeż sa {{displayCount}} fajl.",
@@ -2181,7 +2180,6 @@
       "readOnly": "Din is-sessjoni hija għall-qari biss.",
       "continueInNewSession": "Kompli f'sessjoni ġdida",
       "emptyDescription": "Ibgħat messaġġ hawn taħt biex tibda.",
-      "emptyTranscriptDescription": "Din is-sessjoni għadha m'għandha l-ebda messaġġ.",
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
       "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
@@ -2303,7 +2301,6 @@
       "organizationProfiles": "Profili tal-Organizzazzjoni",
       "personalProfiles": "Profili Personali",
       "yourProfiles": "Il-Profili Tiegħek",
-      "failedToLoadProfiles": "Naqas milli jgħabbi l-profili",
       "nameTooLong": "L-isem tal-profil huwa twil wisq",
       "descriptionTooLong": "Id-deskrizzjoni hija twila wisq",
       "secretsEncrypted": "Is-sigrieti huma encrypted qabel il-ħażna.",
@@ -2575,26 +2572,6 @@
       "omitted_few": "Ma setgħux jintwerew {{displayCount}} elementi ta' qabel f'din is-sessjoni.",
       "omitted_many": "Ma setax jintwera {{displayCount}}-il element ta' qabel f'din is-sessjoni."
     },
-    "markdownTable": {
-      "viewTable": "Ara t-tabella",
-      "title": "Tabella",
-      "close": "Agħlaq it-tabella",
-      "loading": "Qed titgħabba t-tabella",
-      "empty": "Din it-tabella m'għandhiex ringieli.",
-      "columnCount_one": "kolonna",
-      "columnCount": "kolonni",
-      "columnCount_other": "kolonni",
-      "rowCount_one": "ringiela",
-      "rowCount": "ringieli",
-      "rowCount_other": "ringieli",
-      "opensFullScreen": "jiftaħ fuq l-iskrin kollu",
-      "columnCount_two": "kolonni",
-      "columnCount_few": "kolonni",
-      "columnCount_many": "kolonna",
-      "rowCount_two": "ringieli",
-      "rowCount_few": "ringieli",
-      "rowCount_many": "ringiela"
-    },
     "sessionFilter": {
       "title": "Iffiltra s-sessjonijiet",
       "platformCloud": "Sħaba",
@@ -2697,7 +2674,6 @@
       "linkActions": "Azzjonijiet tar-rabta",
       "couldNotCopyLink": "Ma setgħetx tiġi kkupjata r-rabta.",
       "couldNotShareLink": "Ma setgħetx tinqasam ir-rabta.",
-      "opensInBrowser": "Jiftaħ fil-brawżer",
       "showLinkActions": "Uri l-azzjonijiet tar-rabta"
     },
     "compaction": {

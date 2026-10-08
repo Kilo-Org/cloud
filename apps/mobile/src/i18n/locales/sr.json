@@ -951,7 +951,6 @@
       "cantUpload": "Ova datoteka se ne može otpremiti.",
       "networkError": "Došlo je do greške u mreži.",
       "uploadFailed": "Otpremanje nije uspelo.",
-      "failedToUploadFile": "Otpremanje datoteke nije uspelo: {{reason}}",
       "nothingToPaste": "Nema sadržaja za lepljenje.",
       "metadataStripFailed": "Nije moguće ukloniti metapodatke fotografije.",
       "limit_one": "Možeš da priložiš do {{displayCount}} datoteke.",
@@ -2125,7 +2124,6 @@
       "readOnly": "Ovu sesiju možeš samo da čitaš.",
       "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Pošalji poruku u polju ispod da započneš razgovor.",
-      "emptyTranscriptDescription": "Ova sesija još nema poruka.",
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
@@ -2247,7 +2245,6 @@
       "organizationProfiles": "Profili organizacije",
       "personalProfiles": "Lični profili",
       "yourProfiles": "Vaši profili",
-      "failedToLoadProfiles": "Učitavanje profila nije uspelo",
       "nameTooLong": "Ime profila je predugačko",
       "descriptionTooLong": "Opis je predugačak",
       "secretsEncrypted": "Tajne su šifrovane pre skladištenja.",
@@ -2509,22 +2506,6 @@
       "tooLarge": "Ranije poruke su prevelike za učitavanje.",
       "omitted_few": "Nije bilo moguće prikazati {{displayCount}} ranije stavke iz ove sesije."
     },
-    "markdownTable": {
-      "viewTable": "Prikaži tabelu",
-      "title": "Tabela",
-      "close": "Zatvori tabelu",
-      "loading": "Učitavanje tabele",
-      "empty": "Ova tabela nema redova.",
-      "columnCount_one": "kolona",
-      "columnCount": "kolona",
-      "columnCount_other": "kolona",
-      "rowCount_one": "red",
-      "rowCount": "redova",
-      "rowCount_other": "redova",
-      "opensFullScreen": "otvara se preko celog ekrana",
-      "columnCount_few": "kolone",
-      "rowCount_few": "reda"
-    },
     "sessionFilter": {
       "title": "Filteri sesija",
       "platformCloud": "Oblak",
@@ -2621,7 +2602,6 @@
       "linkActions": "Radnje za link",
       "couldNotCopyLink": "Kopiranje linka nije uspelo.",
       "couldNotShareLink": "Deljenje linka nije uspelo.",
-      "opensInBrowser": "Otvara se u pregledaču",
       "showLinkActions": "Prikaži radnje za link"
     },
     "compaction": {

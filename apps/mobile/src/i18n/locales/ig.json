@@ -935,7 +935,6 @@
       "cantUpload": "Enweghị ike ibugo faịlụ a.",
       "networkError": "Enwere njehie netwọk.",
       "uploadFailed": "Enweghị ike ibugo faịlụ.",
-      "failedToUploadFile": "Enweghị ike ibugo faịlụ: {{reason}}.",
       "nothingToPaste": "Enweghị ihe a ga-amado.",
       "metadataStripFailed": "Enweghị ike iwepụ ozi gbasara foto ahụ.",
       "limit_one": "Ị nwere ike itinye mgbakwunye faịlụ ruru {{displayCount}}.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Ị nwere ike ịgụ naanị ihe dị na nnọkọ a.",
       "continueInNewSession": "Gaa n'ihu na nnọkọ ọhụrụ",
       "emptyDescription": "Ziga ozi n'okpuru iji bido.",
-      "emptyTranscriptDescription": "Nnọkọ a enwebeghị ozi ọ bụla.",
       "scrollToBottom": "Pịgharịa ruo n'ala",
       "emptyTitle": "Ozi adịbeghị",
       "renameAccessibility": "Gbanwee aha nnọkọ: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Profaịlụ nhazi",
       "personalProfiles": "Profaịlụ nkeonwe",
       "yourProfiles": "Profaịlụ gị",
-      "failedToLoadProfiles": "Ịbunye profaịlụ agaghị eme",
       "nameTooLong": "Aha profaịlụ dị ogologo",
       "descriptionTooLong": "Nkọwa dị ogologo",
       "secretsEncrypted": "A na-ezobe ihe nzuzo tupu nchekwa.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Ozi gara aga adịghị.",
       "tooLarge": "Ozi gara aga buru ibu nke ukwuu nke na a pụghị ibudata ha."
     },
-    "markdownTable": {
-      "viewTable": "Lelee tebụl",
-      "title": "Tebụl",
-      "close": "Mechie tebụl",
-      "loading": "Na-ebudata tebụl",
-      "empty": "Tebụl a enweghị ahịrị.",
-      "columnCount_one": "ogidi",
-      "columnCount": "ogidi",
-      "columnCount_other": "ogidi",
-      "rowCount_one": "ahịrị",
-      "rowCount": "ahịrị",
-      "rowCount_other": "ahịrị",
-      "opensFullScreen": "na-emeghe n'ihuenyo zuru ezu"
-    },
     "sessionFilter": {
       "title": "Yọchaa nnọkọ",
       "platformCloud": "Igwe ojii",
@@ -2583,7 +2566,6 @@
       "linkActions": "Ihe a ga-eme na njikọ",
       "couldNotCopyLink": "Enweghị ike ịdetuo njikọ.",
       "couldNotShareLink": "Enweghị ike ịkekọrịta njikọ.",
-      "opensInBrowser": "Na-emeghe na ihe nchọgharị",
       "showLinkActions": "Gosi ihe a ga-eme na njikọ"
     },
     "compaction": {

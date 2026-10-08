@@ -935,7 +935,6 @@
       "cantUpload": "Faili hii haiwezi kupakiwa.",
       "networkError": "Hitilafu ya mtandao imetokea.",
       "uploadFailed": "Upakiaji umeshindikana.",
-      "failedToUploadFile": "Imeshindikana kupakia faili: {{reason}}",
       "nothingToPaste": "Hakuna cha kubandika.",
       "metadataStripFailed": "Imeshindikana kuondoa taarifa za ziada za picha.",
       "limit_one": "Unaweza kuambatisha hadi faili {{displayCount}}.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Kikao hiki ni cha kusoma tu.",
       "continueInNewSession": "Endelea katika kikao kipya",
       "emptyDescription": "Tuma ujumbe hapa chini ili uanze.",
-      "emptyTranscriptDescription": "Kikao hiki hakina ujumbe bado.",
       "scrollToBottom": "Tembeza hadi chini",
       "emptyTitle": "Bado hakuna ujumbe",
       "renameAccessibility": "Badilisha jina la kikao: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Wasifu wa Shirika",
       "personalProfiles": "Wasifu wa Kibinafsi",
       "yourProfiles": "Wasifu Wako",
-      "failedToLoadProfiles": "Imeshindwa kupakia wasifu",
       "nameTooLong": "Jina la wasifu ni refu sana",
       "descriptionTooLong": "Maelezo ni marefu sana",
       "secretsEncrypted": "Siri husimbwa kwa njia fiche kabla ya kuhifadhi.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Ujumbe wa awali haupatikani.",
       "tooLarge": "Ujumbe wa awali una ukubwa unaozidi kiwango kinachoweza kupakiwa."
     },
-    "markdownTable": {
-      "viewTable": "Tazama jedwali",
-      "title": "Jedwali",
-      "close": "Funga jedwali",
-      "loading": "Inapakia jedwali",
-      "empty": "Jedwali hili halina safu mlalo.",
-      "columnCount_one": "safu wima",
-      "columnCount": "safu wima",
-      "columnCount_other": "safu wima",
-      "rowCount_one": "safu mlalo",
-      "rowCount": "safu mlalo",
-      "rowCount_other": "safu mlalo",
-      "opensFullScreen": "hufunguka kwenye skrini nzima"
-    },
     "sessionFilter": {
       "title": "Chuja vikao",
       "platformCloud": "Wingu",
@@ -2583,7 +2566,6 @@
       "linkActions": "Vitendo vya kiungo",
       "couldNotCopyLink": "Imeshindikana kunakili kiungo.",
       "couldNotShareLink": "Imeshindikana kushiriki kiungo.",
-      "opensInBrowser": "Hufunguka kwenye kivinjari",
       "showLinkActions": "Onyesha vitendo vya kiungo"
     },
     "compaction": {

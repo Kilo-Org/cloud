@@ -935,7 +935,6 @@
       "cantUpload": "Nou pa kapab voye fichye sa a.",
       "networkError": "Gen yon erè nan rezo a.",
       "uploadFailed": "Nou pa t ka voye fichye a.",
-      "failedToUploadFile": "Nou pa t ka voye fichye a: {{reason}}",
       "nothingToPaste": "Pa gen anyen pou kole.",
       "metadataStripFailed": "Nou pa t ka retire metadone foto a.",
       "limit_one": "Ou ka atache jiska {{displayCount}} fichye.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Ou ka li sesyon sa a sèlman.",
       "continueInNewSession": "Kontinye nan yon nouvo sesyon",
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
-      "emptyTranscriptDescription": "Sesyon sa a pa gen okenn mesaj ankò.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
       "renameAccessibility": "Chanje non sesyon an: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Pwofil òganizasyon",
       "personalProfiles": "Pwofil pèsonèl",
       "yourProfiles": "Des ou",
-      "failedToLoadProfiles": "Echwe pou chaje pwofil yo",
       "nameTooLong": "Non pwofil la twò long",
       "descriptionTooLong": "Deskripsyon twò long",
       "secretsEncrypted": "Sekrè yo chiffres anvan depo.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Mesaj anvan yo pa disponib.",
       "tooLarge": "Mesaj anvan yo twò gwo pou chaje."
     },
-    "markdownTable": {
-      "viewTable": "Gade tablo a",
-      "title": "Tablo",
-      "close": "Fèmen tablo a",
-      "loading": "Ap chaje tablo a",
-      "empty": "Tablo sa a pa gen okenn ranje.",
-      "columnCount_one": "kolòn",
-      "columnCount": "kolòn",
-      "columnCount_other": "kolòn",
-      "rowCount_one": "ranje",
-      "rowCount": "ranje",
-      "rowCount_other": "ranje",
-      "opensFullScreen": "louvri an plen ekran"
-    },
     "sessionFilter": {
       "title": "Filtre sesyon yo",
       "platformCloud": "Sèvè adistans",
@@ -2583,7 +2566,6 @@
       "linkActions": "Aksyon pou lyen an",
       "couldNotCopyLink": "Nou pa t ka kopye lyen an.",
       "couldNotShareLink": "Nou pa t ka pataje lyen an.",
-      "opensInBrowser": "Louvri nan navigatè a",
       "showLinkActions": "Montre aksyon pou lyen an"
     },
     "compaction": {

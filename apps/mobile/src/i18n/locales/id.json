@@ -424,7 +424,6 @@
       "cantUpload": "Berkas ini tidak dapat diunggah.",
       "networkError": "Terjadi kesalahan jaringan.",
       "uploadFailed": "Gagal mengunggah.",
-      "failedToUploadFile": "Gagal mengunggah berkas: {{reason}}.",
       "nothingToPaste": "Tidak ada yang dapat ditempelkan.",
       "metadataStripFailed": "Metadata foto tidak dapat dihapus.",
       "limit_one": "Kamu dapat melampirkan hingga {{displayCount}} berkas.",
@@ -1586,7 +1585,6 @@
       "readOnly": "Sesi ini hanya dapat dibaca.",
       "continueInNewSession": "Lanjutkan di sesi baru",
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
-      "emptyTranscriptDescription": "Sesi ini belum memiliki pesan.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
       "renameAccessibility": "Ganti nama sesi: {{title}}",
@@ -1708,7 +1706,6 @@
       "organizationProfiles": "Profil Organisasi",
       "personalProfiles": "Profil Pribadi",
       "yourProfiles": "Profil Anda",
-      "failedToLoadProfiles": "Gagal memuat profil",
       "nameTooLong": "Nama profil terlalu panjang",
       "descriptionTooLong": "Deskripsi terlalu panjang",
       "secretsEncrypted": "Rahasia dienkripsi sebelum disimpan.",
@@ -1965,20 +1962,6 @@
       "unavailable": "Pesan sebelumnya tidak tersedia.",
       "tooLarge": "Pesan sebelumnya terlalu besar untuk dimuat."
     },
-    "markdownTable": {
-      "viewTable": "Lihat tabel",
-      "title": "Tabel",
-      "close": "Tutup tabel",
-      "loading": "Memuat tabel",
-      "empty": "Tabel ini tidak memiliki baris.",
-      "columnCount_one": "kolom",
-      "columnCount": "kolom",
-      "columnCount_other": "kolom",
-      "rowCount_one": "baris",
-      "rowCount": "baris",
-      "rowCount_other": "baris",
-      "opensFullScreen": "terbuka dalam layar penuh"
-    },
     "sessionFilter": {
       "title": "Saring sesi",
       "platformCloud": "Komputasi awan",
@@ -2072,7 +2055,6 @@
       "linkActions": "Tindakan untuk tautan",
       "couldNotCopyLink": "Tidak dapat menyalin tautan.",
       "couldNotShareLink": "Tidak dapat membagikan tautan.",
-      "opensInBrowser": "Terbuka di peramban",
       "showLinkActions": "Tampilkan tindakan untuk tautan"
     },
     "compaction": {

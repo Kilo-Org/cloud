@@ -935,7 +935,6 @@
       "cantUpload": "Ekki er hægt að hlaða þessari skrá upp.",
       "networkError": "Villa kom upp í nettengingu.",
       "uploadFailed": "Upphleðsla mistókst.",
-      "failedToUploadFile": "Ekki tókst að hlaða upp skrá: {{reason}}.",
       "nothingToPaste": "Ekkert er til að líma.",
       "metadataStripFailed": "Ekki tókst að fjarlægja lýsigögn myndar.",
       "limit_one": "Þú getur hengt allt að {{displayCount}} skrá við.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Þessi lota er skrifvarin.",
       "continueInNewSession": "Halda áfram í nýrri lotu",
       "emptyDescription": "Sendu skilaboð hér að neðan til að byrja.",
-      "emptyTranscriptDescription": "Þessi lota hefur engin skilaboð ennþá.",
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
       "renameAccessibility": "Endurnefna lotu: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Stofnunarsnið",
       "personalProfiles": "Persónuleg snið",
       "yourProfiles": "Prófílarnir þínir",
-      "failedToLoadProfiles": "Mistókst að hlaða sniðum",
       "nameTooLong": "Nafn prófílsins er of langt",
       "descriptionTooLong": "Lýsing er of löng",
       "secretsEncrypted": "Leyndarmál eru dulkóðuð fyrir geymslu.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Eldri skilaboð eru ekki tiltæk.",
       "tooLarge": "Eldri skilaboðin eru of stór til að hægt sé að hlaða þeim."
     },
-    "markdownTable": {
-      "viewTable": "Skoða töflu",
-      "title": "Tafla",
-      "close": "Loka töflu",
-      "loading": "Hleður töflunni",
-      "empty": "Engar línur eru í þessari töflu.",
-      "columnCount_one": "dálkur",
-      "columnCount": "dálkar",
-      "columnCount_other": "dálkar",
-      "rowCount_one": "lína",
-      "rowCount": "línur",
-      "rowCount_other": "línur",
-      "opensFullScreen": "opnast á öllum skjánum"
-    },
     "sessionFilter": {
       "title": "Sía lotur",
       "platformCloud": "Ský",
@@ -2583,7 +2566,6 @@
       "linkActions": "Aðgerðir fyrir tengil",
       "couldNotCopyLink": "Ekki tókst að afrita tengilinn.",
       "couldNotShareLink": "Ekki tókst að deila tenglinum.",
-      "opensInBrowser": "Opnast í vafra",
       "showLinkActions": "Sýna aðgerðir fyrir tengil"
     },
     "compaction": {

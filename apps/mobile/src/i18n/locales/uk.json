@@ -424,7 +424,6 @@
       "cantUpload": "Цей файл неможливо завантажити.",
       "networkError": "Сталася помилка мережі.",
       "uploadFailed": "Не вдалося надіслати вкладення.",
-      "failedToUploadFile": "Не вдалося надіслати файл: {{reason}}.",
       "nothingToPaste": "Буфер обміну порожній.",
       "metadataStripFailed": "Не вдалося видалити метадані фото.",
       "limit_one": "Можна прикріпити до {{displayCount}} файл.",
@@ -1610,7 +1609,6 @@
       "readOnly": "Цей сеанс доступний лише для читання.",
       "continueInNewSession": "Продовжити в новому сеансі",
       "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
-      "emptyTranscriptDescription": "У цьому сеансі ще немає повідомлень.",
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
       "renameAccessibility": "Перейменувати сеанс: {{title}}",
@@ -1732,7 +1730,6 @@
       "organizationProfiles": "Профілі організації",
       "personalProfiles": "Персональні профілі",
       "yourProfiles": "Ваші профілі",
-      "failedToLoadProfiles": "Не вдалося завантажити профілі",
       "nameTooLong": "Назва профілю задовга",
       "descriptionTooLong": "Опис задовгий",
       "secretsEncrypted": "Секрети шифруються перед зберіганням.",
@@ -1999,24 +1996,6 @@
       "omitted_few": "Не вдалося відобразити {{displayCount}} попередні елементи цього сеансу.",
       "omitted_many": "Не вдалося відобразити {{displayCount}} попередніх елементів цього сеансу."
     },
-    "markdownTable": {
-      "viewTable": "Переглянути таблицю",
-      "title": "Таблиця",
-      "close": "Закрити таблицю",
-      "loading": "Завантаження таблиці",
-      "empty": "У цій таблиці немає рядків.",
-      "columnCount_one": "стовпець",
-      "columnCount": "стовпця",
-      "columnCount_other": "стовпця",
-      "rowCount_one": "рядок",
-      "rowCount": "рядка",
-      "rowCount_other": "рядка",
-      "opensFullScreen": "відкривається на весь екран",
-      "columnCount_few": "стовпці",
-      "columnCount_many": "стовпців",
-      "rowCount_few": "рядки",
-      "rowCount_many": "рядків"
-    },
     "sessionFilter": {
       "title": "Фільтри сеансів",
       "platformCloud": "Хмара",
@@ -2116,7 +2095,6 @@
       "linkActions": "Дії з посиланням",
       "couldNotCopyLink": "Не вдалося скопіювати посилання.",
       "couldNotShareLink": "Не вдалося поділитися посиланням.",
-      "opensInBrowser": "Відкривається у браузері",
       "showLinkActions": "Показати дії з посиланням"
     },
     "compaction": {

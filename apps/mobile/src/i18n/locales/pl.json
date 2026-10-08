@@ -424,7 +424,6 @@
       "cantUpload": "Tego pliku nie można przesłać.",
       "networkError": "Wystąpił błąd sieci.",
       "uploadFailed": "Przesyłanie nie powiodło się.",
-      "failedToUploadFile": "Nie udało się przesłać pliku: {{reason}}.",
       "nothingToPaste": "Nie ma nic do wklejenia.",
       "metadataStripFailed": "Nie udało się usunąć metadanych zdjęcia.",
       "limit_one": "Maksymalna liczba załącznik: {{displayCount}}.",
@@ -1610,7 +1609,6 @@
       "readOnly": "Ta sesja jest dostępna tylko do odczytu.",
       "continueInNewSession": "Kontynuuj w nowej sesji",
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
-      "emptyTranscriptDescription": "Ta sesja nie ma jeszcze żadnych wiadomości.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
@@ -1732,7 +1730,6 @@
       "organizationProfiles": "Profile organizacji",
       "personalProfiles": "Profile osobiste",
       "yourProfiles": "Twoje profile",
-      "failedToLoadProfiles": "Nie udało się załadować profili",
       "nameTooLong": "Nazwa profilu jest za długa",
       "descriptionTooLong": "Opis jest za długi",
       "secretsEncrypted": "Sekrety są szyfrowane przed przechowywaniem.",
@@ -1999,24 +1996,6 @@
       "omitted_few": "Nie udało się wyświetlić {{displayCount}} wcześniejszych elementów tej sesji.",
       "omitted_many": "Nie udało się wyświetlić {{displayCount}} wcześniejszych elementów tej sesji."
     },
-    "markdownTable": {
-      "viewTable": "Wyświetl tabelę",
-      "title": "Tabela",
-      "close": "Zamknij tabelę",
-      "loading": "Wczytywanie tabeli",
-      "empty": "Ta tabela nie ma wierszy.",
-      "columnCount_one": "kolumna",
-      "columnCount": "kolumny",
-      "columnCount_other": "kolumny",
-      "rowCount_one": "wiersz",
-      "rowCount": "wiersza",
-      "rowCount_other": "wiersza",
-      "opensFullScreen": "otwiera na pełnym ekranie",
-      "columnCount_few": "kolumny",
-      "columnCount_many": "kolumn",
-      "rowCount_few": "wiersze",
-      "rowCount_many": "wierszy"
-    },
     "sessionFilter": {
       "title": "Filtrowanie sesji",
       "platformCloud": "Chmura",
@@ -2116,7 +2095,6 @@
       "linkActions": "Opcje linku",
       "couldNotCopyLink": "Nie udało się skopiować linku.",
       "couldNotShareLink": "Nie udało się udostępnić linku.",
-      "opensInBrowser": "Otwiera w przeglądarce",
       "showLinkActions": "Pokaż opcje linku"
     },
     "compaction": {

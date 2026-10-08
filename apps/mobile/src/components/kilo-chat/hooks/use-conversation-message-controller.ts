@@ -194,6 +194,7 @@ export function useConversationMessageController({
   }, []);
 
   return {
+    deleteDialog: messageActions.deleteDialog,
     editingMessage,
     editingText: editingTextValue,
     handleExecuteAction: messageActions.handleExecuteAction,

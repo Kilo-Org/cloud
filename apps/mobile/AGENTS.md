@@ -28,6 +28,11 @@ git diff --check
 - Fix lint rules in spirit: autofix first, then extract code. Never compress code to dodge line limits.
 - Do not commit plans, specs, or other non-code Markdown files.
 - The repository dev runner owns Metro. Never run `pnpm start`.
+- Use `agent-device` (Callstack) to drive and inspect the app on a simulator, emulator, or device. Run `agent-device help workflow` first.
+  - Open the app with `agent-device open <app-id>`. Read the screen with `agent-device snapshot -i`, then act on its `@eN` refs with `press` and `fill`.
+  - Use `agent-device logs`, `network`, `perf`, `react-devtools`, and `trace` for app logs, HTTP traffic, frames and memory, render profiles, and traces.
+  - Use `agent-device metro` to reload the app. Do not start Metro yourself.
+  - Bind one session to one device with `--session <name>`. A session that is bound to another device rejects the command.
 
 ## Dependencies
 
@@ -42,6 +47,79 @@ git diff --check
 
   Then restart Metro and force-quit the app.
 
+## Library First
+
+Before you build a UI element, find the library that already does it.
+
+1. Check the element map below. If the concern has an entry, use that element.
+2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `57.x`: universal
+   `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
+   `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
+3. Check the Expo SDK 57 docs for the concern.
+4. Check npm for a maintained package. A release in the last six months is the bar.
+
+A hand-built element is correct only when steps 1–4 fail. Record the decision in the PR body: the library
+and version you chose, or which candidates you rejected and why. "It was easier to write it" is not a
+reason.
+
+## Unified Elements
+
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
+
+| Concern | Element | Use instead of |
+|---|---|---|
+| Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
+| Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
+| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
+| Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
+| System confirm, non-destructive | `Alert.alert` | — |
+| Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
+| Video | `expo-video` | `react-native-video`, `expo-av` |
+| Blur | `expo-blur` | `expo-glass-effect`, `@callstack/liquid-glass` (no Liquid Glass) |
+| Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
+| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Icons | `@/components/ui/icons` | `lucide-react-native` |
+| Markdown | `MarkdownText` from `@/components/agents/markdown-text`, rendered by `react-native-enriched-markdown` | `react-native-marked`, `react-native-markdown-display` |
+| HTML in markdown | `MarkdownText`: `markdown-html-convert` turns HTML markdown can express into markdown; the rest renders through `MarkdownHtml` (`@native-html/render`) | `react-native-render-html` |
+| Diagram | ` ```mermaid ` fences → `MarkdownMermaid` (`react-native-webview`) | — |
+
+No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`
+outside `@/components/ui/sheet` and `@/components/ui/dialog`. A sheet or a confirm must be able to stack
+above another native sheet, and a dialog rendered through `@rn-primitives/portal` lives in the app's React
+tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a portal card. A `DialogCard`
+is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
+needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
+
+Markdown images reach `react-native-enriched-markdown` only from HTTPS hosts the reader trusted or confirmed;
+`markdown-image-gate` rewrites every other image into a "Load" link before the native view can fetch it.
+`ImageViewer` measures its viewport and gives the zoom child concrete dimensions.
+Do not use percentage dimensions inside `ResumableZoom`'s unconstrained child container.
+Use explicit pixel sizes for minimum touch targets; native rem is 14 points.
+Use `TabScreenScrollView` for scrolling screens under the absolute tab bar.
+Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone does not create a viewport.
+Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
+
+Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
+`KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,
+conversation, manual-review and PR-discussion surfaces; `useKeyboardState` is the app's one keyboard-height read.
+The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
+A surface whose content
+pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
+(`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard.
+
+Nothing else may read the keyboard: no surface adds a listener beside the provider.
+
+Android searchable `formSheet` routes use only the existing safe-area-capped full detent.
+Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
+iOS keeps native detent expansion when the search field gains focus.
+
+Scope each PR form header with a native safe-area provider outside the scroll view.
+Apply its top inset with `SafeAreaView`, not the app root inset.
+Direct full-screen entry clears the status bar; presented sheets do not add a second inset.
+
 ## Implementation Rules
 
 - Write the smallest boring implementation. Reuse existing helpers, components, and contracts.
@@ -50,6 +128,7 @@ git diff --check
 - Parse backend dates with `parseTimestamp()` from `@/lib/utils`; `new Date()` breaks on PostgreSQL timestamps in Hermes.
 - Every mutation hook shows `toast.error(error.message)` in `onError`. Put shared error handling in the hook, not in each component.
 - Use optimistic updates for obvious reversible mutations: snapshot in `onMutate`, roll back in `onError`, reconcile in `onSettled`.
+- After a session mutation, refresh stored search queries as well as the list through `invalidateAgentSessionQueries`.
 - Keep route files thin. Put screen logic in components or hooks.
 
 ## React Native Rules
@@ -69,12 +148,17 @@ git diff --check
 - Use `defaultValue` only for initial content.
 - Single-line inputs: use `leading-[normal]`. A `lineHeight` above the font's natural one (which `text-sm`/`text-base` set on their own) makes iOS draw the placeholder lower than the typed text and clip it. Multi-line inputs keep an explicit `leading-*`.
 - Single-line inputs: set the height with `min-h-*`, not `py-*`. iOS insets the already-centered text rect by the padding, so vertical padding draws the text and the placeholder low.
+- Use the shared `Input` for every single-line field.
+- `Input` removes vertical padding, centers Android text, and defaults iOS line breaks to `clip`.
+- A single-line caller can change horizontal padding, text size, and minimum height.
+- All inputs use physical `pl-*`/`pr-*` for horizontal padding, including caller overrides and zero-inset search fields; Android `TextInput` does not apply logical `paddingInline` from `px-*`.
+- A multiline caller keeps its alignment and line breaks; its physical padding classes override the shared `pl-3 pr-3 pt-2.5 pb-2.5` inset.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules
 
 - `ScreenHeader` is the first child of the screen root; set stack `headerShown: false`.
-- Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Confirm destructive actions with `Alert.alert()`.
+- Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Confirm a non-destructive action with `Alert.alert()`. Confirm a destructive action with `@/components/ui/dialog`, because Android's native `AlertDialog` drops the `style: 'destructive'` affordance.
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
@@ -113,3 +197,14 @@ The app follows https://github.com/Kilo-Org/kilo-design/ in general, except wher
 - Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
 
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
+
+## Fixtures for End-to-End Testing
+
+Make a fixture when you test your work end to end (E2E) and the state you need is hard to reach by hand.
+
+- Fixtures must be reachable only in development builds. Gate an in-app fixture behind `__DEV__`, and enter it only through `src/app/+native-intent.tsx`, as `src/lib/home-fixture.ts` does.
+- A fixture must be faithful to actual usage. Produce the same data shapes, the same code paths, and the same timing that real use produces. Do not add a code path that only the fixture takes.
+- If a fixture cannot mimic actual usage correctly, use actual backend state. Seed the local backend with a `pnpm dev:seed` topic, or create the state through the real API.
+- Put backend fixtures in `dev/seed/<scope>/<topic>.ts`, and follow the contract in `dev/seed/AGENTS.md`.
+- Commit every fixture you make, so that the next agent can use it again. Do not keep a fixture only in a scratch directory.
+- Write in the fixture what it represents and how to open it, for example the deep link that the seed topic returns.

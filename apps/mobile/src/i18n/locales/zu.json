@@ -935,7 +935,6 @@
       "cantUpload": "Leli fayela alikwazi ukulayishwa.",
       "networkError": "Kwenzeke iphutha lenethiwekhi.",
       "uploadFailed": "Ukulayisha kwehlulekile.",
-      "failedToUploadFile": "Asikwazanga ukulayisha ifayela: {{reason}}.",
       "nothingToPaste": "Akukho ongakunamathisela.",
       "metadataStripFailed": "Asikwazanga ukususa imininingwane efihliwe yesithombe.",
       "limit_one": "Unganamathisela ifayela afinyelela ku-{{displayCount}}.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Le seshini ingafundwa kuphela.",
       "continueInNewSession": "Qhubeka kuseshini entsha",
       "emptyDescription": "Thumela umlayezo ngezansi ukuze uqale.",
-      "emptyTranscriptDescription": "Le seshini ayinawo umilayezo okwamanje.",
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
       "renameAccessibility": "Qamba kabusha iseshini: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Amaphrofayili enhlangano",
       "personalProfiles": "Amaphrofayili Omuntu Siqu",
       "yourProfiles": "Amaphrofayili akho",
-      "failedToLoadProfiles": "Yehlulekile ukulayisha amaphrofayili",
       "nameTooLong": "Igama lephrofayela lide kakhulu",
       "descriptionTooLong": "Incazelo yinde kakhulu",
       "secretsEncrypted": "Izimfihlo zibethelwa ngaphambi kokugcinwa.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Imilayezo yangaphambili ayitholakali.",
       "tooLarge": "Imilayezo yangaphambili mikhulu kakhulu ukuba ilayishwe."
     },
-    "markdownTable": {
-      "viewTable": "Buka ithebula",
-      "title": "Ithebula",
-      "close": "Vala ithebula",
-      "loading": "Ithebula liyalayishwa",
-      "empty": "Leli thebula alinayo imigqa.",
-      "columnCount_one": "ikholomu",
-      "columnCount": "amakholomu",
-      "columnCount_other": "amakholomu",
-      "rowCount_one": "umugqa",
-      "rowCount": "imigqa",
-      "rowCount_other": "imigqa",
-      "opensFullScreen": "kuvuleka esikrinini esigcwele"
-    },
     "sessionFilter": {
       "title": "Hlunga iziseshini",
       "platformCloud": "Ifu",
@@ -2583,7 +2566,6 @@
       "linkActions": "Izenzo zesixhumanisi",
       "couldNotCopyLink": "Asikwazanga ukukopisha isixhumanisi.",
       "couldNotShareLink": "Asikwazanga ukwabelana ngesixhumanisi.",
-      "opensInBrowser": "Kuvuleka esipheqululini",
       "showLinkActions": "Bonisa izenzo zesixhumanisi"
     },
     "compaction": {

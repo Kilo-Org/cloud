@@ -935,7 +935,6 @@
       "cantUpload": "Faayilii kana ol fe'uun hin danda'amu.",
       "networkError": "Dogoggorri neetworkii uumameera.",
       "uploadFailed": "Ol fe'uun hin milkoofne.",
-      "failedToUploadFile": "Faayila ol fe'uun hin danda'amne: {{reason}}.",
       "nothingToPaste": "Wanti maxxanfamu hin jiru.",
       "metadataStripFailed": "Odeeffannoo dabalataa suuraa haquun hin danda'amne.",
       "limit_one": "Faayiloota hanga {{displayCount}}tti qabsiisuu dandeessa.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Turtii kana dubbisuu qofa dandeessa.",
       "continueInNewSession": "Turtii haaraa keessatti itti fufi",
       "emptyDescription": "Jalqabuuf gadiitti ergaa ergi.",
-      "emptyTranscriptDescription": "Turtii kana keessatti hanga ammaatti ergaan hin jiru.",
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
       "renameAccessibility": "Maqaa turtii jijjiiri: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Profaayilii Jaarmiyaa",
       "personalProfiles": "Profaayilii Dhuunfaa",
       "yourProfiles": "Profaayilii Keessan",
-      "failedToLoadProfiles": "Profaayilii fe'uu hin dandeenye",
       "nameTooLong": "Maqaan piroofaayilii baayyee dheeraa dha",
       "descriptionTooLong": "Ibsi baay'ee dheeraa dha",
       "secretsEncrypted": "Iccitiin osoo hin kuufamin dura icciitii ta'a.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Ergaawwan duraanii hin argaman.",
       "tooLarge": "Ergaawwan duraanii fe'uuf baay'ee gurguddoo dha."
     },
-    "markdownTable": {
-      "viewTable": "Gabatee ilaali",
-      "title": "Gabatee",
-      "close": "Gabatee cufi",
-      "loading": "Gabatee fe'aa jira",
-      "empty": "Gabateen kun tarree hin qabu.",
-      "columnCount_one": "tarjaa",
-      "columnCount": "tarjaawwan",
-      "columnCount_other": "tarjaawwan",
-      "rowCount_one": "tarree",
-      "rowCount": "tarreewwan",
-      "rowCount_other": "tarreewwan",
-      "opensFullScreen": "iskiriinii guutuudhaan bana"
-    },
     "sessionFilter": {
       "title": "Turtiiwwan calali",
       "platformCloud": "Duumessa",
@@ -2583,7 +2566,6 @@
       "linkActions": "Gochaalee geessituu",
       "couldNotCopyLink": "Geessituu kopii gochuu hin danda'amne.",
       "couldNotShareLink": "Geessituu qooduu hin danda'amne.",
-      "opensInBrowser": "Biraawzarii keessatti bana",
       "showLinkActions": "Gochaalee geessituu agarsiisi"
     },
     "compaction": {

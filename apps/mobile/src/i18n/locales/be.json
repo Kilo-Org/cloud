@@ -967,7 +967,6 @@
       "cantUpload": "Гэты файл нельга загрузіць.",
       "networkError": "Узнікла памылка сеткі.",
       "uploadFailed": "Не атрымалася загрузіць далучэнне.",
-      "failedToUploadFile": "Не атрымалася загрузіць файл: {{reason}}.",
       "nothingToPaste": "Няма чаго ўставіць.",
       "metadataStripFailed": "Не атрымалася выдаліць метаданыя фота.",
       "limit_one": "Вы можаце далучыць да {{displayCount}} файл.",
@@ -2153,7 +2152,6 @@
       "readOnly": "Гэты сеанс даступны толькі для чытання.",
       "continueInNewSession": "Працягнуць у новым сеансе",
       "emptyDescription": "Адпраўце паведамленне ніжэй, каб пачаць.",
-      "emptyTranscriptDescription": "У гэтым сеансе яшчэ няма паведамленняў.",
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
       "renameAccessibility": "Перайменаваць сеанс: {{title}}",
@@ -2275,7 +2273,6 @@
       "organizationProfiles": "Профілі арганізацыі",
       "personalProfiles": "Асабістыя профілі",
       "yourProfiles": "Вашы профілі",
-      "failedToLoadProfiles": "Не ўдалося загрузіць профілі",
       "nameTooLong": "Імя профілю занадта доўгае",
       "descriptionTooLong": "Апісанне занадта доўгае",
       "secretsEncrypted": "Сакрэты шыфруюцца перад захаваннем.",
@@ -2542,24 +2539,6 @@
       "omitted_few": "Не ўдалося паказаць {{displayCount}} ранейшыя элементы гэтага сеанса.",
       "omitted_many": "Не ўдалося паказаць {{displayCount}} ранейшых элементаў гэтага сеанса."
     },
-    "markdownTable": {
-      "viewTable": "Праглядзець табліцу",
-      "title": "Табліца",
-      "close": "Закрыць табліцу",
-      "loading": "Загрузка табліцы",
-      "empty": "У гэтай табліцы няма радкоў.",
-      "columnCount_one": "слупок",
-      "columnCount": "слупка",
-      "columnCount_other": "слупка",
-      "rowCount_one": "радок",
-      "rowCount": "радка",
-      "rowCount_other": "радка",
-      "opensFullScreen": "адкрываецца на ўвесь экран",
-      "columnCount_few": "слупкі",
-      "columnCount_many": "слупкоў",
-      "rowCount_few": "радкі",
-      "rowCount_many": "радкоў"
-    },
     "sessionFilter": {
       "title": "Фільтр сеансаў",
       "platformCloud": "Воблака",
@@ -2659,7 +2638,6 @@
       "linkActions": "Дзеянні са спасылкай",
       "couldNotCopyLink": "Не ўдалося скапіяваць спасылку.",
       "couldNotShareLink": "Не ўдалося падзяліцца спасылкай.",
-      "opensInBrowser": "Адкрываецца ў браўзеры",
       "showLinkActions": "Паказаць дзеянні са спасылкай"
     },
     "compaction": {

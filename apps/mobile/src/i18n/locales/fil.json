@@ -935,7 +935,6 @@
       "cantUpload": "Hindi ma-upload ang payl na ito.",
       "networkError": "Nagkaproblema sa network.",
       "uploadFailed": "Nabigo ang pag-upload.",
-      "failedToUploadFile": "Hindi ma-upload ang file: {{reason}}.",
       "nothingToPaste": "Walang maipa-paste.",
       "metadataStripFailed": "Hindi maalis ang metadata ng larawan.",
       "limit_one": "Maaari kang maglakip ng hanggang {{displayCount}} file.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Mababasa lang ang sesyong ito.",
       "continueInNewSession": "Magpatuloy sa bagong sesyon",
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
-      "emptyTranscriptDescription": "Wala pang mensahe ang sesyong ito.",
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
       "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Mga Profile ng Organisasyon",
       "personalProfiles": "Mga Personal na Profile",
       "yourProfiles": "Iyong mga Profile",
-      "failedToLoadProfiles": "Nabigong i-load ang mga profile",
       "nameTooLong": "Masyadong mahaba ang pangalan ng profile",
       "descriptionTooLong": "Masyadong mahaba ang paglalarawan",
       "secretsEncrypted": "Ang mga lihim ay naka-encrypt bago imbakan.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Hindi makuha ang mga naunang mensahe.",
       "tooLarge": "Masyadong malaki para i-load ang mga naunang mensahe."
     },
-    "markdownTable": {
-      "viewTable": "Tingnan ang talahanayan",
-      "title": "Talahanayan",
-      "close": "Isara ang talahanayan",
-      "loading": "Nilo-load ang talahanayan",
-      "empty": "Walang hanay ang talahanayang ito.",
-      "columnCount_one": "kolum",
-      "columnCount": "na kolum",
-      "columnCount_other": "na kolum",
-      "rowCount_one": "hanay",
-      "rowCount": "na hanay",
-      "rowCount_other": "na hanay",
-      "opensFullScreen": "bubukas sa buong screen"
-    },
     "sessionFilter": {
       "title": "Salain ang mga sesyon",
       "platformCloud": "Serbisyo sa cloud",
@@ -2583,7 +2566,6 @@
       "linkActions": "Mga aksyon sa link",
       "couldNotCopyLink": "Hindi makopya ang link.",
       "couldNotShareLink": "Hindi maibahagi ang link.",
-      "opensInBrowser": "Bubuksan sa browser",
       "showLinkActions": "Ipakita ang mga aksyon sa link"
     },
     "compaction": {

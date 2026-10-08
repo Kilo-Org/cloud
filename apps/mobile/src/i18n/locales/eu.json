@@ -935,7 +935,6 @@
       "cantUpload": "Fitxategi hau ezin da igo.",
       "networkError": "Errore bat gertatu da sarean.",
       "uploadFailed": "Igoerak huts egin du.",
-      "failedToUploadFile": "Ezin izan da fitxategia igo: {{reason}}.",
       "nothingToPaste": "Ez dago ezer itsasteko.",
       "metadataStripFailed": "Ezin izan dira argazkiaren metadatuak kendu.",
       "limit_one": "Gehienez {{displayCount}} fitxategi erants ditzakezu.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Saio hau irakurtzeko soilik da.",
       "continueInNewSession": "Jarraitu saio berri batean",
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
-      "emptyTranscriptDescription": "Saio honek oraindik ez du mezurik.",
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Erakundeen profilak",
       "personalProfiles": "Profil pertsonalak",
       "yourProfiles": "Zure profilak",
-      "failedToLoadProfiles": "Ezin izan dira kargatu profilak",
       "nameTooLong": "Profilaren izena luzeegia da",
       "descriptionTooLong": "Deskribapena luzeegia da",
       "secretsEncrypted": "Sekretuak biltegiratu aurretik zifratzen dira.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Aurreko mezuak ez daude erabilgarri.",
       "tooLarge": "Aurreko mezuak handiegiak dira kargatzeko."
     },
-    "markdownTable": {
-      "viewTable": "Ikusi taula",
-      "title": "Taula",
-      "close": "Itxi taula",
-      "loading": "Taula kargatzen",
-      "empty": "Taula honek ez du errenkadarik.",
-      "columnCount_one": "zutabe",
-      "columnCount": "zutabe",
-      "columnCount_other": "zutabe",
-      "rowCount_one": "errenkada",
-      "rowCount": "errenkada",
-      "rowCount_other": "errenkada",
-      "opensFullScreen": "pantaila osoan irekitzen da"
-    },
     "sessionFilter": {
       "title": "Iragazi saioak",
       "platformCloud": "Hodeia",
@@ -2583,7 +2566,6 @@
       "linkActions": "Estekaren ekintzak",
       "couldNotCopyLink": "Ezin izan da esteka kopiatu.",
       "couldNotShareLink": "Ezin izan da esteka partekatu.",
-      "opensInBrowser": "Nabigatzailean irekitzen da",
       "showLinkActions": "Erakutsi estekaren ekintzak"
     },
     "compaction": {

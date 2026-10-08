@@ -327,6 +327,8 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    // Inline video file parts in the session transcript (file-part-renderer).
+    'expo-video',
     [
       'expo-image-picker',
       {
@@ -364,6 +366,10 @@ const config: ExpoConfig = {
         enableBackgroundRemoteNotifications: true,
       },
     ],
+    // Registers the BGTaskScheduler identifier and the `processing` background
+    // mode for the periodic glanceable refresh, the fallback for a dropped push
+    // (src/lib/glanceable-refresh-task.ts).
+    'expo-background-task',
     'expo-web-browser',
     // Must stay before '@sentry/react-native/expo': it edits the RNSentrySDK.start() line that plugin writes.
     './plugins/withReactMountLogBreadcrumbs',

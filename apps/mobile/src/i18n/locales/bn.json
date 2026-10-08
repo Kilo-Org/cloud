@@ -935,7 +935,6 @@
       "cantUpload": "এই ফাইলটি আপলোড করা যাবে না।",
       "networkError": "নেটওয়ার্কে ত্রুটি হয়েছে।",
       "uploadFailed": "আপলোড ব্যর্থ হয়েছে।",
-      "failedToUploadFile": "ফাইল আপলোড করা যায়নি: {{reason}}।",
       "nothingToPaste": "পেস্ট করার মতো কিছু নেই।",
       "metadataStripFailed": "ছবির মেটাডেটা সরানো যায়নি।",
       "limit_one": "আপনি সর্বোচ্চ {{displayCount}}টি ফাইল সংযুক্ত করতে পারেন।",
@@ -2097,7 +2096,6 @@
       "readOnly": "এই সেশনের বার্তাগুলো শুধু পড়া যায়।",
       "continueInNewSession": "নতুন সেশনে চালিয়ে যান",
       "emptyDescription": "শুরু করতে নিচে একটি বার্তা পাঠান।",
-      "emptyTranscriptDescription": "এই সেশনে এখনো কোনো বার্তা নেই।",
       "scrollToBottom": "একেবারে নিচে স্ক্রল করুন",
       "emptyTitle": "এখনো কোনো বার্তা নেই",
       "renameAccessibility": "সেশনের নাম পরিবর্তন করুন: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "প্রতিষ্ঠানের প্রোফাইল",
       "personalProfiles": "ব্যক্তিগত প্রোফাইল",
       "yourProfiles": "আপনার প্রোফাইল",
-      "failedToLoadProfiles": "প্রোফাইল লোড করতে ব্যর্থ হয়েছে",
       "nameTooLong": "প্রোফাইল নামটি অনেক বড়৷",
       "descriptionTooLong": "বর্ণনা খুব দীর্ঘ",
       "secretsEncrypted": "গোপনীয়তা স্টোরেজ আগে এনক্রিপ্ট করা হয়.",
@@ -2476,20 +2473,6 @@
       "unavailable": "আগের বার্তাগুলো পাওয়া যাচ্ছে না।",
       "tooLarge": "আগের বার্তাগুলো এত বড় যে লোড করা যাচ্ছে না।"
     },
-    "markdownTable": {
-      "viewTable": "টেবিল দেখুন",
-      "title": "টেবিল",
-      "close": "টেবিল বন্ধ করুন",
-      "loading": "টেবিল লোড হচ্ছে",
-      "empty": "এই টেবিলে কোনো সারি নেই।",
-      "columnCount_one": "কলাম",
-      "columnCount": "কলাম",
-      "columnCount_other": "কলাম",
-      "rowCount_one": "সারি",
-      "rowCount": "সারি",
-      "rowCount_other": "সারি",
-      "opensFullScreen": "পুরো স্ক্রিনে খোলে"
-    },
     "sessionFilter": {
       "title": "সেশন ফিল্টার",
       "platformCloud": "ক্লাউড",
@@ -2583,7 +2566,6 @@
       "linkActions": "লিঙ্কের বিকল্প",
       "couldNotCopyLink": "লিঙ্ক কপি করা যায়নি।",
       "couldNotShareLink": "লিঙ্ক শেয়ার করা যায়নি।",
-      "opensInBrowser": "ব্রাউজারে খোলে",
       "showLinkActions": "লিঙ্কের বিকল্প দেখান"
     },
     "compaction": {

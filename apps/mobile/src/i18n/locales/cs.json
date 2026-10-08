@@ -967,7 +967,6 @@
       "cantUpload": "Tento soubor nelze nahrát.",
       "networkError": "Došlo k chybě sítě.",
       "uploadFailed": "Nahrání se nezdařilo.",
-      "failedToUploadFile": "Soubor se nepodařilo nahrát: {{reason}}.",
       "nothingToPaste": "Není co vložit.",
       "metadataStripFailed": "Metadata fotografie se nepodařilo odstranit.",
       "limit_one": "Maximální počet příloha je {{displayCount}}.",
@@ -2153,7 +2152,6 @@
       "readOnly": "Tato relace je pouze pro čtení.",
       "continueInNewSession": "Pokračovat v nové relaci",
       "emptyDescription": "Začněte odesláním zprávy v poli níže.",
-      "emptyTranscriptDescription": "Tato relace zatím neobsahuje žádné zprávy.",
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
       "renameAccessibility": "Přejmenovat relaci: {{title}}",
@@ -2275,7 +2273,6 @@
       "organizationProfiles": "Profily organizací",
       "personalProfiles": "Osobní profily",
       "yourProfiles": "Vaše profily",
-      "failedToLoadProfiles": "Načtení profilů se nezdařilo",
       "nameTooLong": "Název profilu je příliš dlouhý",
       "descriptionTooLong": "Popis je příliš dlouhý",
       "secretsEncrypted": "Tajemství jsou před uložením zašifrována.",
@@ -2542,24 +2539,6 @@
       "omitted_few": "{{displayCount}} starší položky z této relace se nepodařilo zobrazit.",
       "omitted_many": "{{displayCount}} starší položky z této relace se nepodařilo zobrazit."
     },
-    "markdownTable": {
-      "viewTable": "Zobrazit tabulku",
-      "title": "Tabulka",
-      "close": "Zavřít tabulku",
-      "loading": "Načítání tabulky",
-      "empty": "Tato tabulka nemá žádné řádky.",
-      "columnCount_one": "sloupec",
-      "columnCount": "sloupců",
-      "columnCount_other": "sloupců",
-      "rowCount_one": "řádek",
-      "rowCount": "řádků",
-      "rowCount_other": "řádků",
-      "opensFullScreen": "otevře se na celou obrazovku",
-      "columnCount_few": "sloupce",
-      "columnCount_many": "sloupce",
-      "rowCount_few": "řádky",
-      "rowCount_many": "řádku"
-    },
     "sessionFilter": {
       "title": "Filtr relací",
       "platformCloud": "V cloudu",
@@ -2659,7 +2638,6 @@
       "linkActions": "Akce pro odkaz",
       "couldNotCopyLink": "Odkaz se nepodařilo zkopírovat.",
       "couldNotShareLink": "Odkaz se nepodařilo sdílet.",
-      "opensInBrowser": "Otevře se v prohlížeči",
       "showLinkActions": "Zobrazit akce pro odkaz"
     },
     "compaction": {

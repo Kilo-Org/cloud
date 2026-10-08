@@ -7,7 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { Modal, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -159,7 +159,6 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
-  Modal: 'Modal',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -384,9 +383,6 @@ vi.mock('@/components/agents/mode-normalize', () => ({
 vi.mock('@/components/agents/queued-badge-hold', () => ({
   nextHeldQueuedIds: (held: unknown) => held,
 }));
-vi.mock('@/components/agents/session-keyboard-container-state', () => ({
-  getSessionKeyboardContainerKind: () => 'app-aware-padding',
-}));
 vi.mock('@/components/agents/context-usage-display', () => ({
   getContextSheetMountState: () => ({ mounted: false, visible: false }),
 }));
@@ -528,9 +524,6 @@ vi.mock('@/components/agents/part-renderer', () => ({
 }));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
-}));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
@@ -743,9 +736,20 @@ function openDetails(renderer: TestRenderer.ReactTestRenderer, message: StoredMe
 }
 
 function closeDetails(renderer: TestRenderer.ReactTestRenderer): void {
-  const close = findByType(renderer, Modal)[0]?.props.onRequestClose as () => void;
+  const detailSheet = renderer.root.findAll(node => (node.type as string) === 'BottomSheet')[0];
+  if (!detailSheet) {
+    // Already dismissed: the pair below unmounts the sheet, so a second close
+    // has nothing left to dismiss.
+    return;
+  }
+  // The native sheet reports a dismissal as one event pair: `onClose` then
+  // `onDismiss` (see the library's `fireCloseCallbacks`). Firing only the first
+  // left the wrapper waiting for a report that never came.
+  const close = detailSheet.props.onClose as () => void;
+  const dismiss = detailSheet.props.onDismiss as () => void;
   act(() => {
     close();
+    dismiss();
   });
 }
 

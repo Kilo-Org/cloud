@@ -4,7 +4,7 @@ import { Clipboard as ClipboardIcon, SearchX, X } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, type TextInput, View } from 'react-native';
+import { Pressable, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,6 +13,7 @@ import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
 import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
@@ -38,6 +39,7 @@ export function PrReviewEntryScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   // Uncontrolled iOS input — keep the raw text in a ref so the submit
   // handler reads the latest value without re-rendering on every
   // keystroke. State is only for derived UI (whether there's any text).
@@ -117,24 +119,18 @@ export function PrReviewEntryScreen() {
   };
 
   const handleRemoveRecent = (entry: RecentPr) => {
-    Alert.alert(
-      t('prReview.entry.removeFromRecentsTitle'),
-      t('prReview.entry.removeFromRecentsMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.remove'),
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              await removeRecentPr(entry);
-              const list = await getRecentPrs();
-              setRecent(list);
-            })();
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('prReview.entry.removeFromRecentsTitle'),
+      message: t('prReview.entry.removeFromRecentsMessage'),
+      confirmLabel: t('common.remove'),
+      onConfirm: () => {
+        void (async () => {
+          await removeRecentPr(entry);
+          const list = await getRecentPrs();
+          setRecent(list);
+        })();
+      },
+    });
   };
 
   const showClearButton = selectPrLinkClearButtonVisible({ hasInput });
@@ -328,6 +324,7 @@ export function PrReviewEntryScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.prReview')} />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
+      {dialog}
     </View>
   );
 }

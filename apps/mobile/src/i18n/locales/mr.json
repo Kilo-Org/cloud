@@ -935,7 +935,6 @@
       "cantUpload": "ही फाइल अपलोड करता येत नाही.",
       "networkError": "नेटवर्कमध्ये त्रुटी आली.",
       "uploadFailed": "अपलोड करता आले नाही.",
-      "failedToUploadFile": "फाइल अपलोड करता आली नाही: {{reason}}.",
       "nothingToPaste": "पेस्ट करण्यासाठी काहीही नाही.",
       "metadataStripFailed": "फोटोतील मेटाडेटा काढता आला नाही.",
       "limit_one": "तुम्ही जास्तीत जास्त {{displayCount}} फाइल जोडू शकता.",
@@ -2097,7 +2096,6 @@
       "readOnly": "हे सत्र फक्त वाचता येते.",
       "continueInNewSession": "नवीन सत्रात सुरू ठेवा",
       "emptyDescription": "सुरुवात करण्यासाठी खाली संदेश पाठवा.",
-      "emptyTranscriptDescription": "या सत्रात अजून संदेश नाहीत.",
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
       "renameAccessibility": "{{title}} या सत्राचे नाव बदला",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "संस्था प्रोफाइल",
       "personalProfiles": "वैयक्तिक प्रोफाइल",
       "yourProfiles": "तुमचे प्रोफाइल",
-      "failedToLoadProfiles": "प्रोफाइल लोड करण्यात अयशस्वी",
       "nameTooLong": "प्रोफाइल नाव खूप मोठे आहे",
       "descriptionTooLong": "वर्णन खूप मोठे आहे",
       "secretsEncrypted": "स्टोरेज करण्यापूर्वी रहस्ये कूटबद्ध केली जातात.",
@@ -2476,20 +2473,6 @@
       "unavailable": "आधीचे संदेश उपलब्ध नाहीत.",
       "tooLarge": "आधीचे संदेश लोड करण्यासाठी खूप मोठे आहेत."
     },
-    "markdownTable": {
-      "viewTable": "तक्ता पहा",
-      "title": "तक्ता",
-      "close": "तक्ता बंद करा",
-      "loading": "तक्ता लोड होत आहे",
-      "empty": "या तक्त्यात कोणत्याही ओळी नाहीत.",
-      "columnCount_one": "स्तंभ",
-      "columnCount": "स्तंभ",
-      "columnCount_other": "स्तंभ",
-      "rowCount_one": "ओळ",
-      "rowCount": "ओळी",
-      "rowCount_other": "ओळी",
-      "opensFullScreen": "पूर्ण स्क्रीनवर उघडते"
-    },
     "sessionFilter": {
       "title": "सत्रे फिल्टर करा",
       "platformCloud": "क्लाउड",
@@ -2583,7 +2566,6 @@
       "linkActions": "लिंकसाठी पर्याय",
       "couldNotCopyLink": "लिंक कॉपी करता आली नाही.",
       "couldNotShareLink": "लिंक शेअर करता आली नाही.",
-      "opensInBrowser": "ब्राउझरमध्ये उघडते",
       "showLinkActions": "लिंकसाठी पर्याय दाखवा"
     },
     "compaction": {

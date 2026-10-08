@@ -935,7 +935,6 @@
       "cantUpload": "Энэ файлыг байршуулах боломжгүй.",
       "networkError": "Сүлжээний алдаа",
       "uploadFailed": "Байршуулж чадсангүй.",
-      "failedToUploadFile": "Файлыг байршуулж чадсангүй. Шалтгаан: {{reason}}",
       "nothingToPaste": "Буулгах зүйл алга",
       "metadataStripFailed": "Зургийн мета өгөгдлийг устгаж чадсангүй.",
       "limit_one": "Та {{displayCount}} хүртэл файл хавсаргах боломжтой.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Энэ сессийг зөвхөн унших боломжтой.",
       "continueInNewSession": "Шинэ сессэд үргэлжлүүлэх",
       "emptyDescription": "Эхлэхийн тулд доор мессеж илгээнэ үү.",
-      "emptyTranscriptDescription": "Энэ сессэд хараахан мессеж байхгүй.",
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
       "renameAccessibility": "Сессийн нэрийг өөрчлөх: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Байгууллагын профайл",
       "personalProfiles": "Хувийн профайл",
       "yourProfiles": "Таны профайлууд",
-      "failedToLoadProfiles": "Профайлыг ачаалж чадсангүй",
       "nameTooLong": "Профайлын нэр хэт урт байна",
       "descriptionTooLong": "Тайлбар хэтэрхий урт байна",
       "secretsEncrypted": "Хадгалахаасаа өмнө нууцыг шифрлэдэг.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Өмнөх мессежүүдийг харах боломжгүй.",
       "tooLarge": "Өмнөх мессежүүдийн хэмжээ хэт том тул ачаалах боломжгүй."
     },
-    "markdownTable": {
-      "viewTable": "Хүснэгт үзэх",
-      "title": "Хүснэгт",
-      "close": "Хүснэгтийг хаах",
-      "loading": "Хүснэгт ачаалж байна",
-      "empty": "Энэ хүснэгтэд мөр байхгүй байна.",
-      "columnCount_one": "багана",
-      "columnCount": "багана",
-      "columnCount_other": "багана",
-      "rowCount_one": "мөр",
-      "rowCount": "мөр",
-      "rowCount_other": "мөр",
-      "opensFullScreen": "бүтэн дэлгэцээр нээгдэнэ"
-    },
     "sessionFilter": {
       "title": "Сессийг шүүх",
       "platformCloud": "Үүлэн орчин",
@@ -2583,7 +2566,6 @@
       "linkActions": "Холбоосын үйлдлүүд",
       "couldNotCopyLink": "Холбоосыг хуулж чадсангүй.",
       "couldNotShareLink": "Холбоосыг хуваалцаж чадсангүй.",
-      "opensInBrowser": "Хөтөч дээр нээгдэнэ",
       "showLinkActions": "Холбоосын үйлдлүүдийг харуулах"
     },
     "compaction": {

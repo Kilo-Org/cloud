@@ -935,7 +935,6 @@
       "cantUpload": "ไม่สามารถอัปโหลดไฟล์นี้ได้",
       "networkError": "ข้อผิดพลาดของเครือข่าย",
       "uploadFailed": "อัปโหลดล้มเหลว",
-      "failedToUploadFile": "อัปโหลดไฟล์ไม่สำเร็จ: {{reason}}",
       "nothingToPaste": "ไม่มีอะไรให้วาง",
       "metadataStripFailed": "ไม่สามารถลบข้อมูลเมตาของรูปภาพได้",
       "limit_one": "คุณสามารถแนบได้สูงสุด {{displayCount}} ไฟล์",
@@ -2097,7 +2096,6 @@
       "readOnly": "เซสชันนี้เปิดให้อ่านได้อย่างเดียว",
       "continueInNewSession": "ดำเนินการต่อในเซสชันใหม่",
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
-      "emptyTranscriptDescription": "เซสชันนี้ยังไม่มีข้อความ",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
       "renameAccessibility": "เปลี่ยนชื่อเซสชัน: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "โปรไฟล์องค์กร",
       "personalProfiles": "โปรไฟล์ส่วนบุคคล",
       "yourProfiles": "โปรไฟล์ของคุณ",
-      "failedToLoadProfiles": "โหลดโปรไฟล์ไม่สำเร็จ",
       "nameTooLong": "ชื่อโปรไฟล์ยาวเกินไป",
       "descriptionTooLong": "คำอธิบายยาวเกินไป",
       "secretsEncrypted": "ข้อมูลลับจะถูกเข้ารหัสก่อนจัดเก็บข้อมูล",
@@ -2476,20 +2473,6 @@
       "unavailable": "ข้อความก่อนหน้าไม่พร้อมใช้งาน",
       "tooLarge": "ข้อความก่อนหน้ามีขนาดใหญ่เกินไปที่จะโหลด"
     },
-    "markdownTable": {
-      "viewTable": "ดูตาราง",
-      "title": "ตาราง",
-      "close": "ปิดตาราง",
-      "loading": "กำลังโหลดตาราง",
-      "empty": "ตารางนี้ไม่มีแถว",
-      "columnCount_one": "คอลัมน์",
-      "columnCount": "คอลัมน์",
-      "columnCount_other": "คอลัมน์",
-      "rowCount_one": "แถว",
-      "rowCount": "แถว",
-      "rowCount_other": "แถว",
-      "opensFullScreen": "เปิดแบบเต็มหน้าจอ"
-    },
     "sessionFilter": {
       "title": "กรองเซสชัน",
       "platformCloud": "คลาวด์",
@@ -2583,7 +2566,6 @@
       "linkActions": "ตัวเลือกสำหรับลิงก์",
       "couldNotCopyLink": "คัดลอกลิงก์ไม่สำเร็จ",
       "couldNotShareLink": "แชร์ลิงก์ไม่สำเร็จ",
-      "opensInBrowser": "เปิดในเบราว์เซอร์",
       "showLinkActions": "แสดงตัวเลือกสำหรับลิงก์"
     },
     "compaction": {

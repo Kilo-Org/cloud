@@ -47,14 +47,17 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',
-  FlatList: 'FlatList',
   TextInput: 'TextInput',
+  // The shared single-line Input (now under ModelListScreen's search field)
+  // reads I18nManager.isRTL through withRtlInputAlignment.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   Platform: { OS: 'android' },
   Linking: { openURL: mocks.openURL },
 }));
+vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
   FadeIn: { duration: vi.fn() },
@@ -251,7 +254,7 @@ describe('KiloClaw full-body states', () => {
     async Screen => {
       const root = await mount(createElement(Screen));
       expect(root.findAllByType(CenteredState)).toHaveLength(1);
-      expect(root.findAllByType('FlatList' as ElementType)).toHaveLength(0);
+      expect(root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
       expect(root.findAllByType(ScrollView)).toHaveLength(1);
     }
   );
@@ -265,14 +268,14 @@ describe('KiloClaw full-body states', () => {
     act(() => {
       search.onChangeText('missing');
     });
-    expect(root.findAllByType('FlatList' as ElementType)).toHaveLength(0);
+    expect(root.findAllByType('FlashList' as ElementType)).toHaveLength(0);
     expect(root.findAllByType(CenteredState)).toHaveLength(1);
     expect(root.findByType(EmptyState).props.title).toBe('kiloclaw.modelList.noMatches');
     act(() => {
       press(root.findByType('Button' as ElementType));
     });
     expect(root.findAllByType(CenteredState)).toHaveLength(0);
-    expect(root.findAllByType('FlatList' as ElementType)).toHaveLength(1);
+    expect(root.findAllByType('FlashList' as ElementType)).toHaveLength(1);
   });
 
   it('keeps one picker scroller and preserves setup and retry actions', async () => {

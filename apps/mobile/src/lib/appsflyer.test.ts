@@ -1,46 +1,50 @@
 // oxlint-disable max-lines — one coherent lifecycle/integration suite; splitting
 // would duplicate the shared mock scaffold and weaken the causal ordering tests.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
 
 const mockedAppsFlyer = vi.hoisted(() => ({
-  initSdk: vi.fn(),
-  logEvent: vi.fn(),
-  stop: vi.fn(),
-  setConsentData: vi.fn(),
-  create: vi.fn(),
+  init: vi.fn<() => Promise<void>>(),
+  registerSessionReadyListener: vi.fn<(onReady: () => void) => Promise<void>>(),
+  isSessionReady: vi.fn<() => Promise<boolean>>(),
+  start: vi.fn<() => Promise<void>>(),
+  stop: vi.fn<(params: { shouldStop: boolean }) => Promise<void>>(),
+  setConsentData: vi.fn<(params: Record<string, unknown>) => Promise<void>>(),
+  logEvent: vi.fn<(params: Record<string, unknown>) => Promise<void>>(),
+  create: vi.fn<() => Promise<void>>(),
   startObservingTransactions: vi.fn(),
   stopObservingTransactions: vi.fn(),
 }));
+
+const mockedTracking = vi.hoisted(() => ({
+  getTrackingPermissionsAsync: vi.fn<() => Promise<{ status: string }>>(),
+}));
+
+const mockedSentry = vi.hoisted(() => ({ captureException: vi.fn() }));
 
 const mockedController = vi.hoisted(() => ({
   allowsOptional: vi.fn().mockReturnValue(true),
   currentGeneration: vi.fn().mockReturnValue(0),
 }));
 
+/** Session-ready callbacks the module registered, oldest first. */
+const sessionReadyListeners = vi.hoisted((): (() => void)[] => []);
+
 vi.mock('react-native', () => ({
   Platform: mockedPlatform,
 }));
 
-// Named constructor mock satisfies func-names and keeps the parameter
-// list under max-params via rest args while matching the real
-// AppsFlyerConsent constructor shape.
-function AppsFlyerConsentCtor(this: Record<string, unknown>, ...args: (boolean | undefined)[]) {
-  this.isUserSubjectToGDPR = args[0];
-  this.hasConsentForDataUsage = args[1];
-  this.hasConsentForAdsPersonalization = args[2];
-  this.hasConsentForAdStorage = args[3];
-}
-
 vi.mock('react-native-appsflyer', () => ({
   default: {
-    initSdk: mockedAppsFlyer.initSdk,
-    logEvent: mockedAppsFlyer.logEvent,
+    init: mockedAppsFlyer.init,
+    registerSessionReadyListener: mockedAppsFlyer.registerSessionReadyListener,
+    isSessionReady: mockedAppsFlyer.isSessionReady,
+    start: mockedAppsFlyer.start,
     stop: mockedAppsFlyer.stop,
     setConsentData: mockedAppsFlyer.setConsentData,
+    logEvent: mockedAppsFlyer.logEvent,
   },
-  AppsFlyerConsent: vi.fn(AppsFlyerConsentCtor),
   AppsFlyerPurchaseConnector: {
     create: mockedAppsFlyer.create,
     startObservingTransactions: mockedAppsFlyer.startObservingTransactions,
@@ -49,7 +53,12 @@ vi.mock('react-native-appsflyer', () => ({
   StoreKitVersion: { SK1: 'SK1', SK2: 'SK2' },
 }));
 
-vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
+vi.mock('expo-tracking-transparency', () => ({
+  getTrackingPermissionsAsync: mockedTracking.getTrackingPermissionsAsync,
+  PermissionStatus: { UNDETERMINED: 'undetermined', GRANTED: 'granted', DENIED: 'denied' },
+}));
+
+vi.mock('@sentry/react-native', () => ({ captureException: mockedSentry.captureException }));
 vi.mock('@/lib/analytics/posthog', () => ({ captureEvent: vi.fn() }));
 vi.mock('@/lib/config', () => ({
   APPSFLYER_DEV_KEY: 'dev-key',
@@ -62,43 +71,138 @@ vi.mock('@/lib/telemetry/controller', () => ({
 
 vi.stubGlobal('__DEV__', false);
 
-async function loadInit() {
-  vi.resetModules();
-  const module = await import('./appsflyer');
-  return module.initAppsFlyer;
-}
-
+// A fresh module per test: the SDK state under test is module-level.
 async function loadModule() {
   vi.resetModules();
   const module = await import('./appsflyer');
   return module;
 }
 
-/** Drains the microtasks that gate connector calls on the create() promise. */
-async function flushConnector() {
-  await Promise.resolve();
-  await Promise.resolve();
-  await Promise.resolve();
+/** Lets every queued promise continuation run, without advancing the clock. */
+async function settle() {
+  await vi.advanceTimersByTimeAsync(0);
 }
 
-describe('initAppsFlyer purchase connector', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
-    // Patched create returns a promise; default to resolved.
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
-    // initSdk fires its success callback so startObservingTransactions runs.
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
+/** Native reports the session ready as soon as the listener registers. */
+function readyOnRegister() {
+  // oxlint-disable-next-line require-await -- async required by promise-function-async
+  mockedAppsFlyer.registerSessionReadyListener.mockImplementation(async onReady => {
+    sessionReadyListeners.push(onReady);
+    onReady();
+  });
+}
+
+/** Native holds session-ready until the test fires it. */
+function holdSessionReady() {
+  // oxlint-disable-next-line require-await -- async required by promise-function-async
+  mockedAppsFlyer.registerSessionReadyListener.mockImplementation(async onReady => {
+    sessionReadyListeners.push(onReady);
+  });
+}
+
+function fireSessionReady(index = sessionReadyListeners.length - 1) {
+  sessionReadyListeners[index]?.();
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.clearAllMocks();
+  sessionReadyListeners.length = 0;
+  mockedPlatform.OS = 'ios';
+  mockedController.allowsOptional.mockReturnValue(true);
+  mockedController.currentGeneration.mockReturnValue(0);
+  mockedAppsFlyer.init.mockResolvedValue(undefined);
+  mockedAppsFlyer.isSessionReady.mockResolvedValue(false);
+  mockedAppsFlyer.start.mockResolvedValue(undefined);
+  mockedAppsFlyer.stop.mockResolvedValue(undefined);
+  mockedAppsFlyer.setConsentData.mockResolvedValue(undefined);
+  mockedAppsFlyer.logEvent.mockResolvedValue(undefined);
+  mockedAppsFlyer.create.mockResolvedValue(undefined);
+  mockedTracking.getTrackingPermissionsAsync.mockResolvedValue({ status: 'granted' });
+  readyOnRegister();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('initAppsFlyer startup', () => {
+  it('starts the SDK once the session is ready and delivers events afterwards', async () => {
+    holdSessionReady();
+    const { initAppsFlyer, trackEvent } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+    expect(mockedAppsFlyer.init).toHaveBeenCalledWith({ devKey: 'dev-key', appId: 'app-id' });
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
+
+    fireSessionReady();
+    await settle();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
+
+    trackEvent('access-required-shown', { step: 'one' });
+    await settle();
+    expect(mockedAppsFlyer.logEvent).toHaveBeenCalledWith({
+      eventName: 'access-required-shown',
+      eventValues: { step: 'one' },
+    });
   });
 
+  it('starts once when the session is already ready and the event also fires', async () => {
+    mockedAppsFlyer.isSessionReady.mockResolvedValue(true);
+    holdSessionReady();
+    const { initAppsFlyer } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
+
+    fireSessionReady();
+    await settle();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds start while the iOS tracking prompt is unanswered', async () => {
+    mockedTracking.getTrackingPermissionsAsync
+      .mockResolvedValueOnce({ status: 'undetermined' })
+      .mockResolvedValue({ status: 'granted' });
+    const { initAppsFlyer } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts after 10 s when the tracking prompt stays unanswered', async () => {
+    mockedTracking.getTrackingPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+    const { initAppsFlyer } = await loadModule();
+
+    initAppsFlyer();
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not wait for the tracking prompt on Android', async () => {
+    mockedPlatform.OS = 'android';
+    const { initAppsFlyer } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+
+    expect(mockedTracking.getTrackingPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('initAppsFlyer purchase connector', () => {
   it('creates the connector and observes transactions on iOS', async () => {
-    mockedPlatform.OS = 'ios';
-    const initAppsFlyer = await loadInit();
+    const { initAppsFlyer } = await loadModule();
 
     initAppsFlyer();
 
@@ -108,95 +212,86 @@ describe('initAppsFlyer purchase connector', () => {
       sandbox: false,
       storeKitVersion: 'SK2',
     });
-    await flushConnector();
+    await settle();
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
 
-  it('does not observe transactions when create fails', async () => {
-    mockedPlatform.OS = 'ios';
-    mockedAppsFlyer.create.mockRejectedValue(new Error('native bridge down'));
+  it('does not observe transactions before the SDK has started', async () => {
+    holdSessionReady();
+    const { initAppsFlyer } = await loadModule();
 
-    const initAppsFlyer = await loadInit();
     initAppsFlyer();
+    await settle();
 
-    await flushConnector();
+    expect(mockedAppsFlyer.create).toHaveBeenCalledTimes(1);
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
+  });
+
+  it('does not observe transactions when create fails', async () => {
+    mockedAppsFlyer.create.mockRejectedValue(new Error('native bridge down'));
+    const { initAppsFlyer } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
   });
 
   it('does not touch the purchase connector on Android', async () => {
     mockedPlatform.OS = 'android';
-    const initAppsFlyer = await loadInit();
+    const { initAppsFlyer } = await loadModule();
 
     initAppsFlyer();
+    await settle();
 
-    expect(mockedAppsFlyer.initSdk).toHaveBeenCalledTimes(1);
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.create).not.toHaveBeenCalled();
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
   });
 
-  it('creates the connector only once when init is re-entered before success', async () => {
-    mockedPlatform.OS = 'ios';
-    const successHolder: { current: ((result: string) => void) | undefined } = {
-      current: undefined,
-    };
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, success: (result: string) => void) => {
-        successHolder.current = success;
-      }
-    );
-
-    const initAppsFlyer = await loadInit();
+  it('creates the connector only once when init is re-entered before start', async () => {
+    holdSessionReady();
+    const { initAppsFlyer } = await loadModule();
 
     initAppsFlyer();
     initAppsFlyer();
-
-    await flushConnector();
+    await settle();
     expect(mockedAppsFlyer.create).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
 
-    successHolder.current?.('ok');
-
+    fireSessionReady();
+    await settle();
     initAppsFlyer();
+    await settle();
 
-    await flushConnector();
     expect(mockedAppsFlyer.create).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
 
   it('swallows the benign connector-already-configured rejection', async () => {
-    mockedPlatform.OS = 'ios';
-    const Sentry = await import('@sentry/react-native');
     mockedAppsFlyer.create.mockRejectedValue({
       code: 'Connector already configured',
       message: 'Connector already configured',
     });
+    const { initAppsFlyer } = await loadModule();
 
-    const initAppsFlyer = await loadInit();
     initAppsFlyer();
+    await settle();
 
-    await vi.waitFor(() => {
-      expect(mockedAppsFlyer.create).toHaveBeenCalledTimes(1);
-    });
-    // Flush the handled rejection microtask.
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockedSentry.captureException).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
 
   it('reports non-benign purchase connector failures to Sentry', async () => {
-    mockedPlatform.OS = 'ios';
-    const Sentry = await import('@sentry/react-native');
     mockedAppsFlyer.create.mockRejectedValue(new Error('native bridge down'));
+    const { initAppsFlyer } = await loadModule();
 
-    const initAppsFlyer = await loadInit();
     initAppsFlyer();
+    await settle();
 
-    await vi.waitFor(() => {
-      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    });
-
-    expect(Sentry.captureException).toHaveBeenCalledWith(
+    expect(mockedSentry.captureException).toHaveBeenCalledTimes(1);
+    expect(mockedSentry.captureException).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'AppsFlyer create-purchase-connector failed' }),
       {
         tags: {
@@ -210,103 +305,91 @@ describe('initAppsFlyer purchase connector', () => {
   });
 });
 
-// AppsFlyer's logEvent takes (name, values, onSuccess, onError); the error
-// callback is the fourth argument, read positionally to stay under max-params.
-function failLogEventTransport() {
-  mockedAppsFlyer.logEvent.mockImplementation((...args: unknown[]) => {
-    const onError = args[3] as (details: unknown) => void;
-    onError('Failed to connect to fxvuzl.inapps.appsflyersdk.com/[::]:443');
-  });
-}
+const INIT_SDK_FAILURE = {
+  tags: { 'error.subsystem': 'appsflyer', 'error.operation': 'init-sdk' },
+  extra: { platform: 'ios' },
+  fingerprint: ['appsflyer', 'init-sdk'],
+};
 
-describe('AppsFlyer event reporting', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedPlatform.OS = 'ios';
-    mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
-  });
-
-  it('does not report a logEvent transport failure to Sentry', async () => {
-    const Sentry = await import('@sentry/react-native');
-    failLogEventTransport();
-
+describe('AppsFlyer error reporting', () => {
+  it('does not report a logEvent failure to Sentry', async () => {
+    mockedAppsFlyer.logEvent.mockRejectedValue(new Error('Failed to connect'));
     const { initAppsFlyer, trackEvent } = await loadModule();
+
     initAppsFlyer();
+    await settle();
     trackEvent('access-required-shown');
+    await settle();
 
     expect(mockedAppsFlyer.logEvent).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockedSentry.captureException).not.toHaveBeenCalled();
   });
 
-  it('does not report a queued-event delivery failure when the queue drains', async () => {
-    const Sentry = await import('@sentry/react-native');
-    failLogEventTransport();
-
+  it('does not report a queued-event failure when the queue drains', async () => {
+    mockedAppsFlyer.logEvent.mockRejectedValue(new Error('Failed to connect'));
     const { initAppsFlyer, trackEvent } = await loadModule();
+
     trackEvent('access-required-shown');
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
 
     initAppsFlyer();
+    await settle();
 
     expect(mockedAppsFlyer.logEvent).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockedSentry.captureException).not.toHaveBeenCalled();
   });
 
-  it('still reports an SDK init failure to Sentry', async () => {
-    const Sentry = await import('@sentry/react-native');
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, _onSuccess: (result: string) => void, onError: (d: unknown) => void) => {
-        onError('Invalid dev key');
-      }
-    );
-
+  it('reports an SDK init failure to Sentry', async () => {
+    mockedAppsFlyer.init.mockRejectedValue({ code: 400, message: 'Invalid dev key' });
+    holdSessionReady();
     const { initAppsFlyer } = await loadModule();
-    initAppsFlyer();
 
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
+    initAppsFlyer();
+    await settle();
+
+    expect(mockedSentry.captureException).toHaveBeenCalledTimes(1);
+    expect(mockedSentry.captureException).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'AppsFlyer init-sdk failed' }),
-      {
-        tags: { 'error.subsystem': 'appsflyer', 'error.operation': 'init-sdk' },
-        extra: { platform: 'ios' },
-        fingerprint: ['appsflyer', 'init-sdk'],
-      }
+      INIT_SDK_FAILURE
     );
+  });
+
+  it('reports a start failure to Sentry and keeps events queued', async () => {
+    mockedAppsFlyer.start.mockRejectedValue({ code: 500, message: 'not initialized' });
+    const { initAppsFlyer, trackEvent } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+    trackEvent('post-failure-event');
+    await settle();
+
+    expect(mockedSentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'AppsFlyer init-sdk failed' }),
+      INIT_SDK_FAILURE
+    );
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
   });
 });
 
 describe('AppsFlyer gate', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedPlatform.OS = 'ios';
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
-    mockedController.currentGeneration.mockReturnValue(0);
-  });
-
-  it('initAppsFlyer returns early when optional consent is not given', async () => {
+  it('does not call the SDK when optional consent is not given', async () => {
     mockedController.allowsOptional.mockReturnValue(false);
-    const initAppsFlyer = await loadInit();
-    initAppsFlyer();
+    const { initAppsFlyer } = await loadModule();
 
-    expect(mockedAppsFlyer.initSdk).not.toHaveBeenCalled();
+    initAppsFlyer();
+    await settle();
+
+    expect(mockedAppsFlyer.setConsentData).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.init).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
   });
 
   it('trackEvent returns early when optional consent is not given', async () => {
     mockedController.allowsOptional.mockReturnValue(false);
     const { trackEvent } = await loadModule();
     trackEvent('test-event');
+    await settle();
 
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
   });
@@ -316,142 +399,130 @@ describe('AppsFlyer gate', () => {
     const { trackEvent, initAppsFlyer } = await loadModule();
     trackEvent('test-event');
 
-    // Turn on consent and init — the event must not drain because nothing was queued.
+    // Turn on consent and init — nothing drains because nothing was queued.
     mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
     initAppsFlyer();
+    await settle();
 
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
   });
 });
 
 describe('AppsFlyer consent', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedPlatform.OS = 'ios';
-    mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
-  });
+  it('sets consent and resumes the SDK before init', async () => {
+    const consent = Promise.withResolvers<undefined>();
+    mockedAppsFlyer.setConsentData.mockReturnValue(consent.promise);
+    const { initAppsFlyer } = await loadModule();
 
-  it('calls setConsentData before initSdk', async () => {
-    const initAppsFlyer = await loadInit();
     initAppsFlyer();
-
-    const setConsentCallOrder = mockedAppsFlyer.setConsentData.mock.invocationCallOrder[0];
-    const initSdkCallOrder = mockedAppsFlyer.initSdk.mock.invocationCallOrder[0];
-    expect(setConsentCallOrder).toBeDefined();
-    expect(initSdkCallOrder).toBeDefined();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
-    expect(setConsentCallOrder!).toBeLessThan(initSdkCallOrder!);
-  });
-
-  it('sends consent values from allowsOptional', async () => {
-    mockedController.allowsOptional.mockReturnValue(true);
-    const initAppsFlyer = await loadInit();
-    initAppsFlyer();
-
+    await settle();
     expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
-    const consentArg = mockedAppsFlyer.setConsentData.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(consentArg.isUserSubjectToGDPR).toBeUndefined();
-    expect(consentArg.hasConsentForDataUsage).toBe(true);
-    expect(consentArg.hasConsentForAdsPersonalization).toBe(true);
-    expect(consentArg.hasConsentForAdStorage).toBe(true);
+    expect(mockedAppsFlyer.init).not.toHaveBeenCalled();
+
+    consent.resolve(undefined);
+    await settle();
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith({ shouldStop: false });
+    expect(mockedAppsFlyer.init).toHaveBeenCalledTimes(1);
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call the SDK when optional consent is not given', async () => {
-    mockedController.allowsOptional.mockReturnValue(false);
-    const initAppsFlyer = await loadInit();
+  it('still starts when setting consent fails', async () => {
+    mockedAppsFlyer.setConsentData.mockRejectedValue(new Error('bridge down'));
+    const { initAppsFlyer } = await loadModule();
+
     initAppsFlyer();
+    await settle();
 
-    // initAppsFlyer returns early when allowsOptional is false — the SDK is
-    // never called, including setConsentData and initSdk.
-    expect(mockedAppsFlyer.setConsentData).not.toHaveBeenCalled();
-    expect(mockedAppsFlyer.initSdk).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
   });
 
-  it('re-sends consent after reset when re-initing', async () => {
+  it('sends the given consent and does not claim GDPR is out of scope', async () => {
+    const { initAppsFlyer } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+
+    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledWith({
+      isUserSubjectToGDPR: true,
+      hasConsentForDataUsage: true,
+      hasConsentForAdsPersonalization: true,
+      hasConsentForAdStorage: true,
+    });
+  });
+
+  it('re-sends consent and resumes after a reset when re-initing', async () => {
     const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
     initAppsFlyer();
-    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
+    await settle();
 
     resetAppsFlyerState();
+    await settle();
     mockedAppsFlyer.setConsentData.mockClear();
     mockedAppsFlyer.stop.mockClear();
-    mockedAppsFlyer.initSdk.mockClear();
+    mockedAppsFlyer.start.mockClear();
 
     initAppsFlyer();
+    await settle();
+
     expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
-    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(false);
-    expect(mockedAppsFlyer.initSdk).toHaveBeenCalledTimes(1);
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith({ shouldStop: false });
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('AppsFlyer generation scoping', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedPlatform.OS = 'ios';
-    mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
-  });
-
   it('drops queued events from a stale generation', async () => {
-    mockedController.currentGeneration.mockReturnValue(0);
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
-
     const module = await loadModule();
-    // Queue an event at generation 0.
     module.trackEvent('gen0-event');
 
     // Bump generation before init drains the queue.
     mockedController.currentGeneration.mockReturnValue(1);
     module.initAppsFlyer();
+    await settle();
 
-    // The queued gen0-event must be dropped; no logEvent call.
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
   });
 });
 
 describe('resetAppsFlyerState', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedPlatform.OS = 'ios';
-    mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
-  });
-
-  it('calls stop(true) to stop native transmission', async () => {
+  it('stops native transmission', async () => {
     const { resetAppsFlyerState } = await loadModule();
     resetAppsFlyerState();
+    await settle();
 
-    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(true);
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith({ shouldStop: true });
+  });
+
+  it('stops only after an in-flight resume, so the revoke wins', async () => {
+    const resume = Promise.withResolvers<undefined>();
+    mockedAppsFlyer.stop.mockReturnValueOnce(resume.promise);
+    holdSessionReady();
+    const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
+
+    initAppsFlyer();
+    await settle();
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith({ shouldStop: false });
+
+    resetAppsFlyerState();
+    await settle();
+    expect(mockedAppsFlyer.stop).toHaveBeenCalledTimes(1);
+
+    resume.resolve(undefined);
+    await settle();
+    expect(mockedAppsFlyer.stop).toHaveBeenLastCalledWith({ shouldStop: true });
+    expect(mockedAppsFlyer.init).not.toHaveBeenCalled();
   });
 
   it('calls stopObservingTransactions on iOS after the connector was created', async () => {
-    mockedPlatform.OS = 'ios';
     const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
     initAppsFlyer();
-    await flushConnector();
+    await settle();
 
     resetAppsFlyerState();
+    await settle();
 
-    await flushConnector();
     expect(mockedAppsFlyer.stopObservingTransactions).toHaveBeenCalledTimes(1);
   });
 
@@ -460,11 +531,10 @@ describe('resetAppsFlyerState', () => {
   // first?" and the library drops that promise, so it reached Sentry as an
   // unhandled rejection.
   it('does not call stopObservingTransactions when the connector was never created', async () => {
-    mockedPlatform.OS = 'ios';
     const { resetAppsFlyerState } = await loadModule();
     resetAppsFlyerState();
+    await settle();
 
-    await flushConnector();
     expect(mockedAppsFlyer.stopObservingTransactions).not.toHaveBeenCalled();
   });
 
@@ -472,321 +542,165 @@ describe('resetAppsFlyerState', () => {
     mockedPlatform.OS = 'android';
     const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
     initAppsFlyer();
+    await settle();
     resetAppsFlyerState();
+    await settle();
 
-    await flushConnector();
     expect(mockedAppsFlyer.stopObservingTransactions).not.toHaveBeenCalled();
   });
 
-  it('handles a bare mock without stop gracefully', async () => {
-    const origStop = mockedAppsFlyer.stop;
-    (mockedAppsFlyer as Record<string, unknown>).stop = undefined;
-
-    const { resetAppsFlyerState } = await loadModule();
-    expect(() => {
-      resetAppsFlyerState();
-    }).not.toThrow();
-
-    (mockedAppsFlyer as Record<string, unknown>).stop = origStop;
-  });
-
-  it('re-init after reset calls setConsentData, then stop(false), then initSdk', async () => {
-    const { initAppsFlyer, resetAppsFlyerState } = await loadModule();
-    // Initial init.
-    initAppsFlyer();
-
-    resetAppsFlyerState();
-    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(true);
-
-    mockedAppsFlyer.setConsentData.mockClear();
-    mockedAppsFlyer.stop.mockClear();
-    mockedAppsFlyer.initSdk.mockClear();
-
-    // Re-init after reset.
-    initAppsFlyer();
-
-    const setConsentOrder = mockedAppsFlyer.setConsentData.mock.invocationCallOrder[0];
-    const stopOrder = mockedAppsFlyer.stop.mock.invocationCallOrder[0];
-    const initSdkOrder = mockedAppsFlyer.initSdk.mock.invocationCallOrder[0];
-    expect(setConsentOrder).toBeDefined();
-    expect(stopOrder).toBeDefined();
-    expect(initSdkOrder).toBeDefined();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
-    expect(setConsentOrder!).toBeLessThan(stopOrder!);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded above
-    expect(stopOrder!).toBeLessThan(initSdkOrder!);
-  });
-
-  it('invalidates JS state even when stop throws, blocking stale callback', async () => {
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
+  it('invalidates JS state even when stop fails, blocking a stale session-ready', async () => {
+    holdSessionReady();
     const module = await loadModule();
     module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
+    await settle();
+    expect(sessionReadyListeners).toHaveLength(1);
 
-    // Make stop throw AFTER initAppsFlyer so the initial stop(false) in
-    // initAppsFlyer succeeds. Only the stop(true) inside reset must throw.
-    mockedAppsFlyer.stop.mockImplementation(() => {
-      throw new Error('native bridge down');
-    });
-
-    // reset must not throw despite the native exception.
+    mockedAppsFlyer.stop.mockRejectedValue(new Error('native bridge down'));
     expect(() => {
       module.resetAppsFlyerState();
     }).not.toThrow();
+    await settle();
 
-    // Fire the stale callback — must not re-arm the SDK.
-    successHolders[0]?.('ok');
-    await flushConnector();
+    fireSessionReady(0);
+    await settle();
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
 
-    // Track an event — must buffer, not log, because initialized was cleared.
+    // initialized stayed false, so the event buffers instead of sending.
     module.trackEvent('post-reset-event');
+    await settle();
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
-
-    // Clean up: reset the throwing mock so other tests are not affected.
-    mockedAppsFlyer.stop.mockReset();
   });
 
   it('clears pending events so pre-reset events cannot drain on re-init', async () => {
-    mockedController.currentGeneration.mockReturnValue(0);
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
+    holdSessionReady();
     const module = await loadModule();
-    // Start init but hold the success callback — the SDK is not yet initialized.
     module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
+    await settle();
 
-    // Queue an event while init is pending — goes to pendingEvents, not sent.
     module.trackEvent('pre-reset-event');
-    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
-
-    // Reset clears initialized, pendingEvents, and increments callbackToken.
     module.resetAppsFlyerState();
+    await settle();
 
-    // Fire the stale callback — token mismatch blocks drainPendingEvents.
-    successHolders[0]?.('ok');
+    fireSessionReady(0);
+    await settle();
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
 
-    // Re-init with a fresh callback that fires synchronously.
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        onSuccess('ok');
-      }
-    );
-    mockedAppsFlyer.logEvent.mockClear();
+    readyOnRegister();
     module.initAppsFlyer();
+    await settle();
 
-    // The pre-reset event must not drain because pendingEvents was cleared.
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+  });
+
+  it('does not arm the SDK when start resolves after a reset', async () => {
+    const start = Promise.withResolvers<undefined>();
+    mockedAppsFlyer.start.mockReturnValue(start.promise);
+    const module = await loadModule();
+    module.initAppsFlyer();
+    await settle();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
+
+    module.resetAppsFlyerState();
+    start.resolve(undefined);
+    await settle();
+
+    module.trackEvent('post-reset-event');
+    await settle();
+    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
+    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
   });
 });
 
-describe('stale initSdk callback', () => {
+describe('stale session-ready', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockedPlatform.OS = 'ios';
-    mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
+    holdSessionReady();
   });
 
-  it('does not set initialized when the callback fires after reset', async () => {
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
+  it('does not start or arm the SDK after a generation change', async () => {
     const module = await loadModule();
     module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
+    await settle();
 
-    // Bump generation to simulate controller clear (signOut or reset).
     mockedController.currentGeneration.mockReturnValue(1);
+    fireSessionReady();
+    await settle();
 
-    // Fire the stale callback — must be a no-op.
-    successHolders[0]?.('ok');
-
-    // initialized must still be false, so trackEvent queues instead of logging.
     module.trackEvent('post-stale-event');
-    await flushConnector();
+    await settle();
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
     expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
   });
 
-  it('does not drain buffered events when the callback fires after reset', async () => {
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
+  it('does not drain buffered events after a generation change', async () => {
     const module = await loadModule();
-
-    // Buffer an event while init is stalled.
     module.trackEvent('buffered-event');
-    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
-
-    // Start the stalled init.
     module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
+    await settle();
 
-    // Bump generation before the callback fires.
     mockedController.currentGeneration.mockReturnValue(1);
-
-    // Fire the stale callback — must not drain the buffered event.
-    successHolders[0]?.('ok');
+    fireSessionReady();
+    await settle();
 
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
   });
 
-  it('re-inits fully after a stale callback is ignored', async () => {
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
+  it('re-inits fully after a stale session-ready is ignored', async () => {
     const module = await loadModule();
     module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
+    await settle();
 
-    // Bump generation to invalidate the pending callback.
     mockedController.currentGeneration.mockReturnValue(1);
-
-    // Fire the stale callback.
-    successHolders[0]?.('ok');
-    await flushConnector();
-    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
-
-    // Re-init — generation now matches the controller.
-    mockedAppsFlyer.setConsentData.mockClear();
-    mockedAppsFlyer.stop.mockClear();
-    mockedAppsFlyer.startObservingTransactions.mockClear();
+    fireSessionReady(0);
+    await settle();
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
 
     module.initAppsFlyer();
-    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
-    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(false);
-    expect(mockedAppsFlyer.initSdk).toHaveBeenCalledTimes(2);
+    await settle();
+    expect(mockedAppsFlyer.init).toHaveBeenCalledTimes(2);
 
-    // Fire the new callback.
-    expect(successHolders).toHaveLength(2);
-    successHolders[1]?.('ok');
-    await flushConnector();
+    fireSessionReady(1);
+    await settle();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
-});
 
-describe('callback token revoke invalidation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockedPlatform.OS = 'ios';
-    mockedController.allowsOptional.mockReturnValue(true);
-    mockedController.currentGeneration.mockReturnValue(0);
-    mockedAppsFlyer.create.mockResolvedValue(undefined);
-  });
-
-  it('does not set initialized when callback fires after same-account reset', async () => {
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
+  it('ignores a session-ready that fires after a same-account reset', async () => {
     const module = await loadModule();
-    module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
-
-    // Same-account optional revoke — generation unchanged.
-    mockedController.currentGeneration.mockReturnValue(0);
-    module.resetAppsFlyerState();
-
-    // Fire the stale callback — token mismatch must block it.
-    successHolders[0]?.('ok');
-
-    // Track an event — must buffer because initialized was not set.
-    module.trackEvent('post-reset-event');
-    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
-  });
-
-  it('does not drain queued events when callback fires after same-account reset', async () => {
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
-    const module = await loadModule();
-
-    // Buffer an event while init is stalled.
     module.trackEvent('buffered-event');
-    expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
-
     module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
+    await settle();
 
     // Same-account optional revoke — generation unchanged.
-    mockedController.currentGeneration.mockReturnValue(0);
     module.resetAppsFlyerState();
+    fireSessionReady(0);
+    await settle();
 
-    // Fire the stale callback.
-    successHolders[0]?.('ok');
-
-    // The buffered event must not drain — token mismatch blocked drainPendingEvents.
+    module.trackEvent('post-reset-event');
+    await settle();
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
     expect(mockedAppsFlyer.logEvent).not.toHaveBeenCalled();
   });
 
-  it('re-inits fully after same-account reset invalidation', async () => {
-    const successHolders: ((result: string) => void)[] = [];
-    mockedAppsFlyer.initSdk.mockImplementation(
-      (_options: unknown, onSuccess: (result: string) => void) => {
-        successHolders.push(onSuccess);
-      }
-    );
-
+  it('re-inits fully after a same-account reset', async () => {
     const module = await loadModule();
     module.initAppsFlyer();
-    expect(successHolders).toHaveLength(1);
+    await settle();
 
-    // Same-account optional revoke — generation unchanged.
-    mockedController.currentGeneration.mockReturnValue(0);
     module.resetAppsFlyerState();
-
-    // Fire the stale callback.
-    successHolders[0]?.('ok');
-    await flushConnector();
-    expect(mockedAppsFlyer.startObservingTransactions).not.toHaveBeenCalled();
-
-    // Re-init — token now matches because resetAppsFlyerState was already called.
-    mockedAppsFlyer.setConsentData.mockClear();
-    mockedAppsFlyer.stop.mockClear();
-    mockedAppsFlyer.startObservingTransactions.mockClear();
+    fireSessionReady(0);
+    await settle();
+    expect(mockedAppsFlyer.start).not.toHaveBeenCalled();
 
     module.initAppsFlyer();
-    expect(mockedAppsFlyer.setConsentData).toHaveBeenCalledTimes(1);
-    expect(mockedAppsFlyer.stop).toHaveBeenCalledWith(false);
-    expect(mockedAppsFlyer.initSdk).toHaveBeenCalledTimes(2);
+    await settle();
+    fireSessionReady(1);
+    await settle();
 
-    // Fire the new callback — token matches, must succeed.
-    expect(successHolders).toHaveLength(2);
-    successHolders[1]?.('ok');
-    await flushConnector();
+    expect(mockedAppsFlyer.start).toHaveBeenCalledTimes(1);
     expect(mockedAppsFlyer.startObservingTransactions).toHaveBeenCalledTimes(1);
   });
 });

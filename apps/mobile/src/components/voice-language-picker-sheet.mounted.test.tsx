@@ -13,13 +13,13 @@ import {
 } from '@/components/voice-language-picker-sheet.test-helpers';
 import { VoiceLanguagePickerSheet } from '@/components/voice-language-picker-sheet';
 
-// The mocked FlatList renders through its render props and does not forward
+// The mocked FlashList renders through its render props and does not forward
 // `data` to the host node, so the element carrying the render props is the one
 // whose `data` identity the list was handed.
 function listData(renderer: TestRenderer.ReactTestRenderer): unknown {
   const list = renderer.root.findAll(node => typeof node.props.renderItem === 'function')[0];
   if (!list) {
-    throw new Error('FlatList not found');
+    throw new Error('FlashList not found');
   }
   return list.props.data;
 }
@@ -205,7 +205,7 @@ describe('VoiceLanguagePickerSheet', () => {
       description: "This device's speech recognition reports no supported languages.",
     });
     expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
 
     renderer.unmount();
   });

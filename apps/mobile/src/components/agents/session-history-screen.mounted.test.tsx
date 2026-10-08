@@ -297,30 +297,6 @@ async function renderScreen(
   return renderer;
 }
 
-function hasType(node: TestRenderer.ReactTestInstance, type: string): boolean {
-  return typeof node.type === 'string' && node.type === type;
-}
-
-/** The single screen-level body container wrapping the list content. */
-function isHistoryBodyContainer(node: TestRenderer.ReactTestInstance): boolean {
-  return (
-    hasType(node, 'View') &&
-    node.props.className === 'flex-1' &&
-    node.findAllByType('AgentSessionListContent').length === 1
-  );
-}
-
-function findHistoryBodyContainer(
-  renderer: TestRenderer.ReactTestRenderer
-): TestRenderer.ReactTestInstance {
-  return renderer.root.find(isHistoryBodyContainer);
-}
-
-function bodyPaddingBottom(node: TestRenderer.ReactTestInstance): number {
-  const style = node.props.style as [unknown, { paddingBottom: number }];
-  return style[1].paddingBottom;
-}
-
 describe('SessionHistoryScreen', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -794,17 +770,24 @@ describe('SessionHistoryScreen', () => {
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 
-  it('pads the history body above the Android keyboard without remounting it', async () => {
+  it('keeps the history body in one permanently mounted keyboard container on Android', async () => {
     platformState.OS = 'android';
     const renderer = await renderScreen();
-    expect(bodyPaddingBottom(findHistoryBodyContainer(renderer))).toBe(0);
 
+    // The body lives in the single native container on this platform too: the
+    // provider measures the IME and lifts that host, so the tree carries no JS
+    // padding node and the container is the lift's sole owner.
+    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
+    expect(container.props.behavior).toBe('padding');
+    expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
+
+    // The container is permanent, not swapped per render: a state change (here
+    // opening the filter modal) reuses the same container and body instances.
     act(() => {
-      keyboardState.emit('keyboardDidShow', { endCoordinates: { height: 320 } });
+      historyHeaderActions(renderer).onOpenFilters();
     });
 
-    const container = findHistoryBodyContainer(renderer);
-    expect(bodyPaddingBottom(container)).toBe(320);
+    expect(findNodeByType(renderer, 'KeyboardAvoidingView')).toBe(container);
     expect(container.findAllByType('AgentSessionListContent')).toHaveLength(1);
   });
 });

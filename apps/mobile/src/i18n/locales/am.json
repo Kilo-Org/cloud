@@ -935,7 +935,6 @@
       "cantUpload": "ይህን ፋይል መስቀል አይቻልም።",
       "networkError": "የአውታረ መረብ ስህተት ተከስቷል።",
       "uploadFailed": "ፋይሉን መስቀል አልተሳካም።",
-      "failedToUploadFile": "ፋይሉን መስቀል አልተሳካም፦ {{reason}}።",
       "nothingToPaste": "የሚለጠፍ ነገር የለም።",
       "metadataStripFailed": "የፎቶውን ተጨማሪ መረጃ ማስወገድ አልተቻለም።",
       "limit_one": "እስከ {{displayCount}} ፋይል ማያያዝ ይችላሉ።",
@@ -2097,7 +2096,6 @@
       "readOnly": "ይህን ክፍለ ጊዜ ማንበብ ብቻ ይቻላል።",
       "continueInNewSession": "በአዲስ ክፍለ ጊዜ ይቀጥሉ",
       "emptyDescription": "ለመጀመር ከታች መልእክት ይላኩ።",
-      "emptyTranscriptDescription": "ይህ ክፍለ ጊዜ እስካሁን ምንም መልእክቶች የሉትም።",
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
       "renameAccessibility": "የክፍለ ጊዜውን ስም ይቀይሩ፦ {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "የድርጅት መገለጫዎች",
       "personalProfiles": "የግል መገለጫዎች",
       "yourProfiles": "የእርስዎ መገለጫዎች",
-      "failedToLoadProfiles": "መገለጫዎችን መጫን አልተሳካም።",
       "nameTooLong": "የመገለጫ ስም በጣም ረጅም ነው።",
       "descriptionTooLong": "መግለጫው በጣም ረጅም ነው።",
       "secretsEncrypted": "ሚስጥሮች ከመከማቸታቸው በፊት የተመሰጠሩ ናቸው።",
@@ -2476,20 +2473,6 @@
       "unavailable": "የቀደሙ መልእክቶች አይገኙም።",
       "tooLarge": "የቀደሙ መልእክቶች ለመጫን በጣም ትልቅ ናቸው።"
     },
-    "markdownTable": {
-      "viewTable": "ሰንጠረዡን ይመልከቱ",
-      "title": "ሰንጠረዥ",
-      "close": "ሰንጠረዡን ይዝጉ",
-      "loading": "ሰንጠረዡን በመጫን ላይ",
-      "empty": "ይህ ሰንጠረዥ ምንም ረድፍ የለውም።",
-      "columnCount_one": "ዓምድ",
-      "columnCount": "ዓምዶች",
-      "columnCount_other": "ዓምዶች",
-      "rowCount_one": "ረድፍ",
-      "rowCount": "ረድፎች",
-      "rowCount_other": "ረድፎች",
-      "opensFullScreen": "በሙሉ ማያ ገጽ ይከፈታል"
-    },
     "sessionFilter": {
       "title": "የክፍለ ጊዜ ማጣሪያ",
       "platformCloud": "ክላውድ",
@@ -2583,7 +2566,6 @@
       "linkActions": "የአገናኝ ተግባራት",
       "couldNotCopyLink": "አገናኙን መቅዳት አልተቻለም።",
       "couldNotShareLink": "አገናኙን ማጋራት አልተቻለም።",
-      "opensInBrowser": "በአሳሽ ውስጥ ይከፈታል",
       "showLinkActions": "የአገናኝ ተግባራትን ያሳዩ"
     },
     "compaction": {

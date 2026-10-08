@@ -951,7 +951,6 @@
       "cantUpload": "Šo failu nevar augšupielādēt.",
       "networkError": "Radās tīkla kļūda.",
       "uploadFailed": "Augšupielāde neizdevās.",
-      "failedToUploadFile": "Neizdevās augšupielādēt failu: {{reason}}.",
       "nothingToPaste": "Nav ko ielīmēt.",
       "metadataStripFailed": "Neizdevās noņemt fotoattēla metadatus.",
       "limit_one": "Vari pievienot līdz {{displayCount}} failam.",
@@ -2125,7 +2124,6 @@
       "readOnly": "Šī sesija ir pieejama tikai lasīšanai.",
       "continueInNewSession": "Turpināt jaunā sesijā",
       "emptyDescription": "Lai sāktu, nosūti ziņojumu zemāk esošajā laukā.",
-      "emptyTranscriptDescription": "Šajā sesijā vēl nav ziņojumu.",
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
       "renameAccessibility": "Pārdēvēt sesiju: {{title}}",
@@ -2247,7 +2245,6 @@
       "organizationProfiles": "Organizācijas profili",
       "personalProfiles": "Personiskie profili",
       "yourProfiles": "Jūsu profili",
-      "failedToLoadProfiles": "Neizdevās ielādēt profilus",
       "nameTooLong": "Profila nosaukums ir pārāk garš",
       "descriptionTooLong": "Apraksts ir pārāk garš",
       "secretsEncrypted": "Pirms uzglabāšanas noslēpumi tiek šifrēti.",
@@ -2509,22 +2506,6 @@
       "tooLarge": "Iepriekšējo ziņojumu apjoms ir pārāk liels, lai tos ielādētu.",
       "omitted_zero": "Neizdevās parādīt {{displayCount}} šīs sesijas iepriekšējo vienumu."
     },
-    "markdownTable": {
-      "viewTable": "Skatīt tabulu",
-      "title": "Tabula",
-      "close": "Aizvērt tabulu",
-      "loading": "Ielādē tabulu",
-      "empty": "Šajā tabulā nav rindu.",
-      "columnCount_one": "kolonna",
-      "columnCount": "kolonnas",
-      "columnCount_other": "kolonnas",
-      "rowCount_one": "rinda",
-      "rowCount": "rindas",
-      "rowCount_other": "rindas",
-      "opensFullScreen": "atver pilnekrāna režīmā",
-      "columnCount_zero": "kolonnu",
-      "rowCount_zero": "rindu"
-    },
     "sessionFilter": {
       "title": "Sesiju filtrs",
       "platformCloud": "Mākonis",
@@ -2621,7 +2602,6 @@
       "linkActions": "Saites darbības",
       "couldNotCopyLink": "Neizdevās kopēt saiti.",
       "couldNotShareLink": "Neizdevās kopīgot saiti.",
-      "opensInBrowser": "Atveras pārlūkā",
       "showLinkActions": "Rādīt saites darbības"
     },
     "compaction": {

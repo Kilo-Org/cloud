@@ -111,13 +111,13 @@ export default function RepoPickerScreen() {
           {/* The placeholder is a single-line Text overlay, not the input's own
               placeholder: Android lays the native hint out at the field's width
               with no line cap, so copy wider than a narrow field wraps onto a
-              second line that the field's fixed height clips against its
-              border. A tail-ellipsized Text truncates the copy at any width
-              instead. Both texts share leading-[normal] and a centred text rect
-              so the overlay sits exactly where the typed text will. The
-              overlay box is a row, so the copy starts at the field's start
-              edge — the physical right in RTL — and the hugging Text cannot
-              drift to the other side of the field. */}
+              second line inside the one-line field. A tail-ellipsized Text
+              truncates the copy at any width instead. Both texts share
+              leading-[normal] and a centred text rect so the overlay sits
+              exactly where the typed text will. The overlay box is a row, so
+              the copy starts at the field's start edge — the physical right in
+              RTL — and the hugging Text cannot drift to the other side of the
+              field. */}
           <View className="relative flex-1">
             <Input
               accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
@@ -126,7 +126,7 @@ export default function RepoPickerScreen() {
               clearButtonMode="while-editing"
               returnKeyType="search"
               textAlignVertical="center"
-              className="h-8 p-0 text-base leading-[normal] text-foreground"
+              className="p-0 text-base leading-[normal] text-foreground"
               style={{ color: colors.foreground }}
               onChangeText={setSearch}
             />

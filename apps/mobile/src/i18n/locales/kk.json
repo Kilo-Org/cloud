@@ -935,7 +935,6 @@
       "cantUpload": "Бұл файлды жүктеп салу мүмкін емес.",
       "networkError": "Желі қатесі орын алды.",
       "uploadFailed": "Жүктеп салу мүмкін болмады.",
-      "failedToUploadFile": "Файлды жүктеп салу мүмкін болмады: {{reason}}.",
       "nothingToPaste": "Қоятын ештеңе жоқ.",
       "metadataStripFailed": "Фотосуреттің метадеректерін жою мүмкін болмады.",
       "limit_one": "{{displayCount}} файлға дейін тіркеуге болады.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Бұл сессия тек оқуға арналған.",
       "continueInNewSession": "Жаңа сессияда жалғастыру",
       "emptyDescription": "Бастау үшін төмендегі өрістен хабарлама жіберіңіз.",
-      "emptyTranscriptDescription": "Бұл сессияда әзірге хабарламалар жоқ.",
       "scrollToBottom": "Ең төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
       "renameAccessibility": "Сессия атауын өзгерту: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Ұйым профильдері",
       "personalProfiles": "Жеке профильдер",
       "yourProfiles": "Сіздің профильдеріңіз",
-      "failedToLoadProfiles": "Профильдер жүктелмеді",
       "nameTooLong": "Профиль атауы тым ұзын",
       "descriptionTooLong": "Сипаттама тым ұзақ",
       "secretsEncrypted": "Құпиялар сақтау алдында шифрланады.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Алдыңғы хабарламалар қолжетімсіз.",
       "tooLarge": "Алдыңғы хабарламалардың көлемі тым үлкен болғандықтан, оларды жүктеу мүмкін емес."
     },
-    "markdownTable": {
-      "viewTable": "Кестені қарау",
-      "title": "Кесте",
-      "close": "Кестені жабу",
-      "loading": "Кесте жүктелуде",
-      "empty": "Бұл кестеде жолдар жоқ.",
-      "columnCount_one": "баған",
-      "columnCount": "баған",
-      "columnCount_other": "баған",
-      "rowCount_one": "жол",
-      "rowCount": "жол",
-      "rowCount_other": "жол",
-      "opensFullScreen": "толық экранда ашылады"
-    },
     "sessionFilter": {
       "title": "Сессияларды сүзу",
       "platformCloud": "Бұлт",
@@ -2583,7 +2566,6 @@
       "linkActions": "Сілтемемен орындалатын әрекеттер",
       "couldNotCopyLink": "Сілтемені көшіру мүмкін болмады.",
       "couldNotShareLink": "Сілтемемен бөлісу мүмкін болмады.",
-      "opensInBrowser": "Браузерде ашылады",
       "showLinkActions": "Сілтемемен орындалатын әрекеттерді көрсету"
     },
     "compaction": {

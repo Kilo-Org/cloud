@@ -983,7 +983,6 @@
       "cantUpload": "Ní féidir an comhad seo a uaslódáil.",
       "networkError": "Tharla earráid líonra.",
       "uploadFailed": "Theip ar an uaslódáil.",
-      "failedToUploadFile": "Níorbh fhéidir an comhad a uaslódáil: {{reason}}.",
       "nothingToPaste": "Níl aon rud le greamú.",
       "metadataStripFailed": "Níorbh fhéidir meiteashonraí an ghrianghraif a bhaint.",
       "limit_one": "Is féidir leat suas le {{displayCount}} comhad a cheangal.",
@@ -2181,7 +2180,6 @@
       "readOnly": "Is seisiún inléite amháin é seo.",
       "continueInNewSession": "Lean ar aghaidh i seisiún nua",
       "emptyDescription": "Seol teachtaireacht thíos chun tosú.",
-      "emptyTranscriptDescription": "Níl aon teachtaireacht sa seisiún seo fós.",
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",
       "renameAccessibility": "Athainmnigh seisiún: {{title}}",
@@ -2303,7 +2301,6 @@
       "organizationProfiles": "Próifílí Eagraíochta",
       "personalProfiles": "Próifílí Pearsanta",
       "yourProfiles": "Do Phróifílí",
-      "failedToLoadProfiles": "Theip ar lódáil próifílí",
       "nameTooLong": "Tá an t-ainm próifíl ró-fhada",
       "descriptionTooLong": "Tá an cur síos ró-fhada",
       "secretsEncrypted": "Déantar rúin a chriptiú roimh stóráil.",
@@ -2575,26 +2572,6 @@
       "omitted_few": "Níorbh fhéidir {{displayCount}} mhír níos luaithe ón seisiún seo a thaispeáint.",
       "omitted_many": "Níorbh fhéidir {{displayCount}} mír níos luaithe ón seisiún seo a thaispeáint."
     },
-    "markdownTable": {
-      "viewTable": "Féach ar an tábla",
-      "title": "Tábla",
-      "close": "Dún an tábla",
-      "loading": "Ag lódáil an tábla",
-      "empty": "Níl aon ró sa tábla seo.",
-      "columnCount_one": "cholún",
-      "columnCount": "colún",
-      "columnCount_other": "colún",
-      "rowCount_one": "ró",
-      "rowCount": "ró",
-      "rowCount_other": "ró",
-      "opensFullScreen": "osclaítear ar lánscáileán",
-      "columnCount_two": "cholún",
-      "columnCount_few": "cholún",
-      "columnCount_many": "gcolún",
-      "rowCount_two": "ró",
-      "rowCount_few": "ró",
-      "rowCount_many": "ró"
-    },
     "sessionFilter": {
       "title": "Scag seisiúin",
       "platformCloud": "Scamall",
@@ -2697,7 +2674,6 @@
       "linkActions": "Gníomhartha don nasc",
       "couldNotCopyLink": "Níorbh fhéidir an nasc a chóipeáil.",
       "couldNotShareLink": "Níorbh fhéidir an nasc a roinnt.",
-      "opensInBrowser": "Osclaítear sa bhrabhsálaí",
       "showLinkActions": "Taispeáin gníomhartha don nasc"
     },
     "compaction": {

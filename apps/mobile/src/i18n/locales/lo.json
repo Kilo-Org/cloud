@@ -935,7 +935,6 @@
       "cantUpload": "ບໍ່ສາມາດອັບໂຫຼດໄຟລ໌ນີ້ໄດ້.",
       "networkError": "ເກີດຂໍ້ຜິດພາດດ້ານເຄືອຂ່າຍ.",
       "uploadFailed": "ອັບໂຫຼດບໍ່ສຳເລັດ.",
-      "failedToUploadFile": "ບໍ່ສາມາດອັບໂຫຼດໄຟລ໌ໄດ້: {{reason}}",
       "nothingToPaste": "ບໍ່ມີຂໍ້ມູນໃຫ້ວາງ.",
       "metadataStripFailed": "ບໍ່ສາມາດລຶບຂໍ້ມູນກຳກັບຮູບຖ່າຍໄດ້.",
       "limit_one": "ທ່ານສາມາດແນບໄດ້ສູງສຸດ {{displayCount}} ໄຟລ໌.",
@@ -2097,7 +2096,6 @@
       "readOnly": "ເຊດຊັນນີ້ອ່ານໄດ້ຢ່າງດຽວ.",
       "continueInNewSession": "ສືບຕໍ່ໃນເຊດຊັນໃໝ່",
       "emptyDescription": "ສົ່ງຂໍ້ຄວາມຂ້າງລຸ່ມເພື່ອເລີ່ມຕົ້ນ.",
-      "emptyTranscriptDescription": "ເຊດຊັນນີ້ຍັງບໍ່ມີຂໍ້ຄວາມ.",
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
       "renameAccessibility": "ປ່ຽນຊື່ເຊດຊັນ: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "ໂປຣໄຟລ໌ອົງການຈັດຕັ້ງ",
       "personalProfiles": "ໂປຣໄຟລ໌ສ່ວນຕົວ",
       "yourProfiles": "ໂປຣໄຟລ໌ຂອງເຈົ້າ",
-      "failedToLoadProfiles": "ໂຫຼດໂປຣໄຟລ໌ບໍ່ສຳເລັດ",
       "nameTooLong": "ຊື່ໂປຣໄຟລ໌ຍາວເກີນໄປ",
       "descriptionTooLong": "ຄຳອະທິບາຍຍາວເກີນໄປ",
       "secretsEncrypted": "ຄວາມລັບຖືກເຂົ້າລະຫັດກ່ອນທີ່ຈະເກັບຮັກສາ.",
@@ -2476,20 +2473,6 @@
       "unavailable": "ຂໍ້ຄວາມກ່ອນໜ້າບໍ່ມີໃຫ້ເບິ່ງແລ້ວ.",
       "tooLarge": "ຂໍ້ຄວາມກ່ອນໜ້າມີຂະໜາດໃຫຍ່ເກີນກວ່າຈະໂຫຼດໄດ້."
     },
-    "markdownTable": {
-      "viewTable": "ເບິ່ງຕາຕະລາງ",
-      "title": "ຕາຕະລາງ",
-      "close": "ປິດຕາຕະລາງ",
-      "loading": "ກຳລັງໂຫຼດຕາຕະລາງ",
-      "empty": "ຕາຕະລາງນີ້ບໍ່ມີແຖວ.",
-      "columnCount_one": "ຖັນ",
-      "columnCount": "ຖັນ",
-      "columnCount_other": "ຖັນ",
-      "rowCount_one": "ແຖວ",
-      "rowCount": "ແຖວ",
-      "rowCount_other": "ແຖວ",
-      "opensFullScreen": "ເປີດແບບເຕັມຈໍ"
-    },
     "sessionFilter": {
       "title": "ກັ່ນຕອງເຊດຊັນ",
       "platformCloud": "ຄລາວ",
@@ -2583,7 +2566,6 @@
       "linkActions": "ການຈັດການລິ້ງ",
       "couldNotCopyLink": "ບໍ່ສາມາດຄັດລອກລິ້ງໄດ້.",
       "couldNotShareLink": "ບໍ່ສາມາດແບ່ງປັນລິ້ງໄດ້.",
-      "opensInBrowser": "ເປີດໃນບຣາວເຊີ",
       "showLinkActions": "ສະແດງຕົວເລືອກສຳລັບລິ້ງ"
     },
     "compaction": {

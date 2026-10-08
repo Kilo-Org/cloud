@@ -967,7 +967,6 @@
       "cantUpload": "Te datoteke ni mogoče naložiti.",
       "networkError": "Prišlo je do napake v omrežju.",
       "uploadFailed": "Nalaganje ni uspelo.",
-      "failedToUploadFile": "Datoteke ni bilo mogoče naložiti: {{reason}}.",
       "nothingToPaste": "Ničesar ni mogoče prilepiti.",
       "metadataStripFailed": "Metapodatkov fotografije ni bilo mogoče odstraniti.",
       "limit_one": "Pripneš lahko do {{displayCount}} datoteka.",
@@ -2153,7 +2152,6 @@
       "readOnly": "Ta seja je samo za branje.",
       "continueInNewSession": "Nadaljuj v novi seji",
       "emptyDescription": "Za začetek pošlji sporočilo v spodnjem polju.",
-      "emptyTranscriptDescription": "Ta seja še nima sporočil.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
       "renameAccessibility": "Preimenuj sejo: {{title}}",
@@ -2275,7 +2273,6 @@
       "organizationProfiles": "Profili organizacije",
       "personalProfiles": "Osebni profili",
       "yourProfiles": "Vaši profili",
-      "failedToLoadProfiles": "Nalaganje profilov ni uspelo",
       "nameTooLong": "Ime profila je predolgo",
       "descriptionTooLong": "Opis je predolg",
       "secretsEncrypted": "Skrivnosti so pred shranjevanjem šifrirane.",
@@ -2542,24 +2539,6 @@
       "omitted_two": "{{displayCount}} prejšnjih elementov te seje ni bilo mogoče prikazati.",
       "omitted_few": "{{displayCount}} prejšnjih elementov te seje ni bilo mogoče prikazati."
     },
-    "markdownTable": {
-      "viewTable": "Prikaži tabelo",
-      "title": "Tabela",
-      "close": "Zapri tabelo",
-      "loading": "Nalaganje tabele",
-      "empty": "Ta tabela nima vrstic.",
-      "columnCount_one": "stolpec",
-      "columnCount": "stolpcev",
-      "columnCount_other": "stolpcev",
-      "rowCount_one": "vrstica",
-      "rowCount": "vrstic",
-      "rowCount_other": "vrstic",
-      "opensFullScreen": "odpre celozaslonski prikaz",
-      "columnCount_two": "stolpca",
-      "columnCount_few": "stolpci",
-      "rowCount_two": "vrstici",
-      "rowCount_few": "vrstice"
-    },
     "sessionFilter": {
       "title": "Filtriranje sej",
       "platformCloud": "Oblak",
@@ -2659,7 +2638,6 @@
       "linkActions": "Dejanja za povezavo",
       "couldNotCopyLink": "Povezave ni bilo mogoče kopirati.",
       "couldNotShareLink": "Povezave ni bilo mogoče deliti.",
-      "opensInBrowser": "Odpre se v brskalniku",
       "showLinkActions": "Prikaži dejanja za povezavo"
     },
     "compaction": {

@@ -480,6 +480,9 @@ export function NewSessionPrompt({
           // A shared payload prefills this input, so raising the keyboard on
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
+          // Android's IME swaps the app for its full-screen extract editor in a
+          // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
+          disableFullscreenUI
         />
         {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">

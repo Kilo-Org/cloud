@@ -951,7 +951,6 @@
       "cantUpload": "Aquest fitxer no es pot penjar.",
       "networkError": "S'ha produït un error de xarxa.",
       "uploadFailed": "No s'ha pogut penjar l'adjunt.",
-      "failedToUploadFile": "No s'ha pogut penjar el fitxer: {{reason}}.",
       "nothingToPaste": "No hi ha res per enganxar.",
       "metadataStripFailed": "No s'han pogut eliminar les metadades de la foto.",
       "limit_one": "Pots adjuntar fins a {{displayCount}} fitxer.",
@@ -2125,7 +2124,6 @@
       "readOnly": "Aquesta sessió és només de lectura.",
       "continueInNewSession": "Continua en una sessió nova",
       "emptyDescription": "Envia un missatge a continuació per començar.",
-      "emptyTranscriptDescription": "Aquesta sessió encara no té missatges.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
@@ -2247,7 +2245,6 @@
       "organizationProfiles": "Perfils de l'organització",
       "personalProfiles": "Perfils personals",
       "yourProfiles": "Els teus perfils",
-      "failedToLoadProfiles": "No s'han pogut carregar els perfils",
       "nameTooLong": "El nom del perfil és massa llarg",
       "descriptionTooLong": "La descripció és massa llarga",
       "secretsEncrypted": "Els secrets es xifren abans de l'emmagatzematge.",
@@ -2509,22 +2506,6 @@
       "tooLarge": "Els missatges anteriors són massa grans per carregar-los.",
       "omitted_many": "{{displayCount}} elements anteriors d'aquesta sessió no s'han pogut mostrar."
     },
-    "markdownTable": {
-      "viewTable": "Mostra la taula",
-      "title": "Taula",
-      "close": "Tanca la taula",
-      "loading": "Carregant la taula",
-      "empty": "Aquesta taula no té cap fila.",
-      "columnCount_one": "columna",
-      "columnCount": "columnes",
-      "columnCount_other": "columnes",
-      "rowCount_one": "fila",
-      "rowCount": "files",
-      "rowCount_other": "files",
-      "opensFullScreen": "s'obre a pantalla completa",
-      "columnCount_many": "columnes",
-      "rowCount_many": "files"
-    },
     "sessionFilter": {
       "title": "Filtre de sessions",
       "platformCloud": "Núvol",
@@ -2621,7 +2602,6 @@
       "linkActions": "Accions de l'enllaç",
       "couldNotCopyLink": "No s'ha pogut copiar l'enllaç.",
       "couldNotShareLink": "No s'ha pogut compartir l'enllaç.",
-      "opensInBrowser": "S'obre al navegador",
       "showLinkActions": "Mostra les accions de l'enllaç"
     },
     "compaction": {

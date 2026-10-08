@@ -1,7 +1,7 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CreditCard, Newspaper, Pencil } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, View } from 'react-native';
+import { Linking, Platform, Pressable, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -23,6 +23,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { captureEvent, INSTANCE_ACTION_EVENT } from '@/lib/analytics/posthog';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
 import {
@@ -41,6 +42,7 @@ export default function DashboardScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
   const instanceContext = useInstanceContext(instanceId);
   const organizationId = instanceOrgId(instanceContext);
@@ -100,7 +102,10 @@ export default function DashboardScreen() {
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
     return (
-      <InstanceContextBoundary title={t('kiloclaw.dashboard.title')} context={instanceContext} />
+      <>
+        <InstanceContextBoundary title={t('kiloclaw.dashboard.title')} context={instanceContext} />
+        {dialog}
+      </>
     );
   }
 
@@ -125,6 +130,7 @@ export default function DashboardScreen() {
             </View>
           </Animated.View>
         </Animated.View>
+        {dialog}
       </View>
     );
   }
@@ -140,6 +146,7 @@ export default function DashboardScreen() {
             void billingQuery.refetch();
           }}
         />
+        {dialog}
       </View>
     );
   }
@@ -153,26 +160,24 @@ export default function DashboardScreen() {
     contextName ?? status?.name ?? status?.sandboxId ?? t('kiloclaw.dashboard.instance');
 
   const handleDestroy = () => {
-    Alert.alert(t('kiloclaw.dashboard.destroyTitle'), t('kiloclaw.dashboard.destroyMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('kiloclaw.dashboard.destroy'),
-        style: 'destructive',
-        onPress: () => {
-          captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'destroy' });
-          // Stay on screen while the mutation is pending — DangerZone shows
-          // its own pending UI — and only navigate away once destruction
-          // actually succeeds. On error the centralized mutation hook
-          // toasts the failure and we stay put with context intact.
-          mutations.destroy.mutate(undefined, {
-            onSuccess: () => {
-              router.dismissAll();
-              router.replace('/(app)/(tabs)/(0_home)' as Href);
-            },
-          });
-        },
+    confirm({
+      title: t('kiloclaw.dashboard.destroyTitle'),
+      message: t('kiloclaw.dashboard.destroyMessage'),
+      confirmLabel: t('kiloclaw.dashboard.destroy'),
+      onConfirm: () => {
+        captureEvent(INSTANCE_ACTION_EVENT, { surface: 'claw', action: 'destroy' });
+        // Stay on screen while the mutation is pending — DangerZone shows
+        // its own pending UI — and only navigate away once destruction
+        // actually succeeds. On error the centralized mutation hook
+        // toasts the failure and we stay put with context intact.
+        mutations.destroy.mutate(undefined, {
+          onSuccess: () => {
+            router.dismissAll();
+            router.replace('/(app)/(tabs)/(0_home)' as Href);
+          },
+        });
       },
-    ]);
+    });
   };
 
   return (
@@ -304,6 +309,8 @@ export default function DashboardScreen() {
           }}
         />
       )}
+
+      {dialog}
     </Animated.View>
   );
 }

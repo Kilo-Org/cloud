@@ -935,7 +935,6 @@
       "cantUpload": "ناتوانرێت ئەم پەڕگەیە بار بکرێت.",
       "networkError": "لە تۆڕەکەدا هەڵە ڕوویدا.",
       "uploadFailed": "بارکردن سەرکەوتوو نەبوو.",
-      "failedToUploadFile": "نەتوانرا پەڕگەکە بار بکرێت: {{reason}}.",
       "nothingToPaste": "هیچ شتێک بۆ لکاندن نییە.",
       "metadataStripFailed": "نەتوانرا مێتاداتای وێنەکە لاببرێت.",
       "limit_one": "دەتوانیت تا {{displayCount}} پەڕگە هاوپێچ بکەیت.",
@@ -2097,7 +2096,6 @@
       "readOnly": "ئەم سێشنە تەنها بۆ خوێندنەوەیە.",
       "continueInNewSession": "بەردەوامبوون لە سێشنێکی نوێدا",
       "emptyDescription": "بۆ دەستپێکردن، لە خوارەوە پەیامێک بنێرە.",
-      "emptyTranscriptDescription": "ئەم سێشنە هێشتا هیچ پەیامێک نییە.",
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
       "renameAccessibility": "گۆڕینی ناوی سێشن: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "پڕۆفایلی ڕێکخراوەکان",
       "personalProfiles": "پڕۆفایلی کەسی",
       "yourProfiles": "پڕۆفایلی ئێوە",
-      "failedToLoadProfiles": "شکستی هێنا لە بارکردنی پرۆفایلی",
       "nameTooLong": "ناوی پڕۆفایلی زۆر درێژە",
       "descriptionTooLong": "وەسفکردن زۆر درێژە",
       "secretsEncrypted": "نهێنییەکان پێش هەڵگرتن کۆد دەکرێن.",
@@ -2476,20 +2473,6 @@
       "unavailable": "پەیامە پێشووەکان بەردەست نین.",
       "tooLarge": "قەبارەی پەیامە پێشووەکان زۆر گەورەیە و ناتوانرێت بار بکرێن."
     },
-    "markdownTable": {
-      "viewTable": "بینینی خشتەکە",
-      "title": "خشتە",
-      "close": "داخستنی خشتەکە",
-      "loading": "بارکردنی خشتەکە",
-      "empty": "ئەم خشتەیە هیچ ڕیزێکی نییە.",
-      "columnCount_one": "ئەستوون",
-      "columnCount": "ستوون",
-      "columnCount_other": "ستوون",
-      "rowCount_one": "ڕیز",
-      "rowCount": "ڕیز",
-      "rowCount_other": "ڕیز",
-      "opensFullScreen": "بە شاشەی تەواو دەکرێتەوە"
-    },
     "sessionFilter": {
       "title": "پاڵاوتنی سێشنەکان",
       "platformCloud": "هەور",
@@ -2583,7 +2566,6 @@
       "linkActions": "کردارەکانی بەستەر",
       "couldNotCopyLink": "نەتوانرا بەستەرەکە کۆپی بکرێت.",
       "couldNotShareLink": "نەتوانرا بەستەرەکە هاوبەش بکرێت.",
-      "opensInBrowser": "لە وێبگەڕدا دەکرێتەوە",
       "showLinkActions": "نیشاندانی کردارەکانی بەستەر"
     },
     "compaction": {

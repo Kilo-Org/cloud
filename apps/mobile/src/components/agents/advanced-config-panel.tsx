@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
-import { type Href, useRouter } from 'expo-router';
 import { toast } from 'sonner-native';
 
 import {
@@ -13,7 +12,6 @@ import {
   type ProfileSelectorOwnerType,
   type ProfileSelectorProfile,
 } from '@/components/agents/profile-selector-model';
-import { ProfileSelectorRow } from '@/components/agents/profile-selector-row';
 import {
   SaveProfileSheet,
   type SaveProfileSubmission,
@@ -24,8 +22,6 @@ import { ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-const PROFILES_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 /** Structural view of a list row, so both the personal and combined shapes fit. */
 type ProfileListRow = Readonly<{
@@ -55,14 +51,11 @@ type AdvancedConfigPanelProps = Readonly<{
   /** The route's organization scope; `undefined` is a personal session. */
   organizationId?: string;
   /**
-   * The profile the session holds as an override, or null when none is picked
-   * (the selector row then names the effective default, or `No profile` when
-   * the context has none). Owned by the session body so the Environment row
-   * and this selector are one control driving the submitted `profileId`.
-   * Required: a caller cannot render an inert selector.
+   * The session's profile override, or null to use the effective default.
+   * Used for the resource summary; the Environment row owns profile selection.
    */
   selectedProfileId: string | null;
-  /** Reports a pick, or clearing it, to the session that owns the override. */
+  /** Selects the profile created by saving the manual configuration. */
   onSelectProfile: (id: string | null) => void;
   /**
    * The session's manual environment variables and setup commands, owned by the
@@ -76,18 +69,14 @@ type AdvancedConfigPanelProps = Readonly<{
   onManualVarsChange: (next: VariableEdit[]) => void;
   onManualCommandsChange: (next: string[]) => void;
   disabled?: boolean;
-  /**
-   * Opens the repo default-profile bindings. Omitted until that surface
-   * exists, so the selector shows no dead `Default profiles for repos...`
-   * entry.
-   */
+  /** Opens the repo default-profile bindings when that surface is available. */
   onRepoDefaults?: () => void;
 }>;
 
 /**
  * The Advanced Configuration panel: a collapsed disclosure that expands to the
- * profile selector, the effective var/command summary, a manual environment
- * variables editor, a manual setup commands editor, and `Save as Profile` when
+ * effective var/command summary, a manual environment variables editor,
+ * a manual setup commands editor, and `Save as Profile` when
  * manual configuration exists. Mobile-first — plain tap rows and native
  * sheets, no JSON blob and no drag anywhere.
  */
@@ -104,7 +93,6 @@ export function AdvancedConfigPanel({
 }: Readonly<AdvancedConfigPanelProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const router = useRouter();
   const list = useAgentProfileList(organizationId);
   const {
     create,
@@ -151,16 +139,8 @@ export function AdvancedConfigPanel({
         personalProfiles,
         effectiveDefaultId: list.effectiveDefaultId,
         selectedProfileId,
-        includeRepoDefaults: onRepoDefaults !== undefined,
       }),
-    [
-      organizationId,
-      orgProfiles,
-      personalProfiles,
-      list.effectiveDefaultId,
-      selectedProfileId,
-      onRepoDefaults,
-    ]
+    [organizationId, orgProfiles, personalProfiles, list.effectiveDefaultId, selectedProfileId]
   );
 
   const selectedProfile = selectorState.selectedProfile;
@@ -193,8 +173,7 @@ export function AdvancedConfigPanel({
       if (submission.setAsDefault) {
         await setAsDefault.mutateAsync({ profileId });
       }
-      // Show the new profile immediately, before the invalidated list refetch
-      // lands, so the selector never falls back to its no-override label.
+      // Keep resource counts current before the invalidated list refetch lands.
       setCreatedProfile({
         id: profileId,
         name: submission.name,
@@ -249,21 +228,6 @@ export function AdvancedConfigPanel({
             {t('agentChat.newSession.advancedConfigDescription')}
           </Text>
 
-          <ProfileSelectorRow
-            state={selectorState}
-            isLoading={list.isLoading}
-            isError={list.isError}
-            disabled={disabled}
-            onRetry={() => {
-              void list.refetch();
-            }}
-            onSelect={onSelectProfile}
-            onManageProfiles={() => {
-              router.push(PROFILES_HREF);
-            }}
-            onRepoDefaults={onRepoDefaults}
-          />
-
           {effectiveVars > 0 || effectiveCommands > 0 ? (
             <Text className="text-xs text-muted-foreground">
               {t('agentChat.newSession.profileSummary', {
@@ -293,6 +257,16 @@ export function AdvancedConfigPanel({
               accessibilityLabel={t('agentChat.newSession.saveAsProfile')}
             >
               <Text>{t('agentChat.newSession.saveAsProfile')}</Text>
+            </Button>
+          ) : null}
+          {onRepoDefaults ? (
+            <Button
+              variant="outline"
+              onPress={onRepoDefaults}
+              disabled={disabled}
+              accessibilityLabel={t('profiles.repoBindings.title')}
+            >
+              <Text>{t('profiles.repoBindings.title')}</Text>
             </Button>
           ) : null}
         </View>

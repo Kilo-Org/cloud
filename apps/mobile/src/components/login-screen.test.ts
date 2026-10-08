@@ -2,7 +2,6 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { type AppStateStatus } from 'react-native';
 
 // login-screen.test.ts — narrow contract tests plus mounted globe tests.
 // The refresh boundary contract is verified through the useDeviceAuth hook's
@@ -34,9 +33,6 @@ const deviceAuth = vi.hoisted(() => ({
 const push = vi.hoisted(() => vi.fn());
 const clearDeviceError = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
-const addAppStateListener = vi.hoisted(() =>
-  vi.fn((_event: 'change', _listener: (state: AppStateStatus) => void) => ({ remove: vi.fn() }))
-);
 // The session-ended announcement is asserted through this spy, so it must
 // outlive a single render: the mock factory below runs per import, the spy is
 // cleared per test.
@@ -52,9 +48,7 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  AppState: { addEventListener: addAppStateListener },
   I18nManager: { isRTL: false },
-  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -253,48 +247,31 @@ describe('login-screen error mapping', () => {
 });
 
 describe('login-screen keyboard bottom padding', () => {
-  it.each(['android', 'ios'] as const)(
-    'floors the %s keyboard-down inset at the platform bottom chrome',
-    platform => {
-      // The reported inset is not a reliable floor for the chrome the platform
-      // draws over the app: Android reports navigationBars() only and reports 0
-      // when the window does not inset for the bar, so a bare inset let the
-      // form's last control sit under the home indicator (landscape gesture
-      // bar). 48 is the tallest bottom chrome either platform draws.
-      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28, platform })).toBe(
-        48
-      );
-      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 0, platform })).toBe(
-        48
-      );
-    }
-  );
-
-  it.each(['android', 'ios'] as const)(
-    'keeps a %s reported inset larger than the floor',
-    platform => {
-      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 63, platform })).toBe(
-        63
-      );
-    }
-  );
-
-  it('adds the bottom inset to Android, whose keyboard metric stops at the navigation bar', () => {
-    expect(
-      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'android' })
-    ).toBe(328);
+  it('floors the keyboard-down inset at the platform bottom chrome', () => {
+    // The reported inset is not a reliable floor for the chrome the platform
+    // draws over the app: Android reports navigationBars() only and reports 0
+    // when the window does not inset for the bar, so a bare inset let the
+    // form's last control sit under the home indicator (landscape gesture bar).
+    // 48 is the tallest bottom chrome either platform draws.
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28 })).toBe(48);
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 0 })).toBe(48);
   });
 
-  it('keeps the iOS keyboard frame height, which already includes the home indicator', () => {
-    expect(
-      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'ios' })
-    ).toBe(300);
+  it('keeps a reported inset larger than the floor', () => {
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 63 })).toBe(63);
+  });
+
+  it('reserves exactly the reported height, which already reaches the screen bottom', () => {
+    // The height comes from `react-native-keyboard-controller`, whose metric
+    // spans the whole strip the IME hides on both platforms: Android edge-to-edge
+    // keeps the navigation bar translucent, so nothing is subtracted, and iOS
+    // reports the keyboard frame, which includes the home indicator. Adding the
+    // bottom inset as well would float the form above the keyboard.
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28 })).toBe(300);
   });
 
   it('ignores a negative reported height', () => {
-    expect(
-      resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28, platform: 'android' })
-    ).toBe(48);
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28 })).toBe(48);
   });
 });
 

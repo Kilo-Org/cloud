@@ -935,7 +935,6 @@
       "cantUpload": "Den här filen kan inte laddas upp.",
       "networkError": "Ett nätverksfel uppstod.",
       "uploadFailed": "Uppladdningen misslyckades.",
-      "failedToUploadFile": "Kunde inte ladda upp filen: {{reason}}",
       "nothingToPaste": "Det finns inget att klistra in.",
       "metadataStripFailed": "Fotots metadata kunde inte tas bort.",
       "limit_one": "Du kan bifoga upp till {{displayCount}} fil.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Den här sessionen är skrivskyddad.",
       "continueInNewSession": "Fortsätt i en ny session",
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
-      "emptyTranscriptDescription": "Den här sessionen har inga meddelanden ännu.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
       "renameAccessibility": "Byt namn på sessionen: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Organisationsprofiler",
       "personalProfiles": "Personliga profiler",
       "yourProfiles": "Dina profiler",
-      "failedToLoadProfiles": "Det gick inte att läsa in profiler",
       "nameTooLong": "Profilnamnet är för långt",
       "descriptionTooLong": "Beskrivningen är för lång",
       "secretsEncrypted": "Hemligheter krypteras innan lagring.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Tidigare meddelanden är inte tillgängliga.",
       "tooLarge": "Tidigare meddelanden är för stora för att läsas in."
     },
-    "markdownTable": {
-      "viewTable": "Visa tabell",
-      "title": "Tabell",
-      "close": "Stäng tabell",
-      "loading": "Läser in tabell",
-      "empty": "Den här tabellen har inga rader.",
-      "columnCount_one": "kolumn",
-      "columnCount": "kolumner",
-      "columnCount_other": "kolumner",
-      "rowCount_one": "rad",
-      "rowCount": "rader",
-      "rowCount_other": "rader",
-      "opensFullScreen": "öppnas i helskärm"
-    },
     "sessionFilter": {
       "title": "Filtrera sessioner",
       "platformCloud": "Molnet",
@@ -2583,7 +2566,6 @@
       "linkActions": "Länkåtgärder",
       "couldNotCopyLink": "Det gick inte att kopiera länken.",
       "couldNotShareLink": "Det gick inte att dela länken.",
-      "opensInBrowser": "Öppnas i webbläsaren",
       "showLinkActions": "Visa länkåtgärder"
     },
     "compaction": {

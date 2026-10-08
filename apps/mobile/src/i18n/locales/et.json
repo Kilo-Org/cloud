@@ -935,7 +935,6 @@
       "cantUpload": "Seda faili ei saa üles laadida.",
       "networkError": "Tekkis võrguviga.",
       "uploadFailed": "Üleslaadimine ebaõnnestus.",
-      "failedToUploadFile": "Faili üleslaadimine ebaõnnestus: {{reason}}.",
       "nothingToPaste": "Lõikelaual pole midagi kleepimiseks.",
       "metadataStripFailed": "Foto metaandmete eemaldamine ebaõnnestus.",
       "limit_one": "Võid lisada kuni {{displayCount}} faili.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Seda seanssi saab ainult lugeda.",
       "continueInNewSession": "Jätka uues seansis",
       "emptyDescription": "Alustamiseks kirjuta allolevale väljale sõnum ja saada see.",
-      "emptyTranscriptDescription": "Selles seansis pole veel sõnumeid.",
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
       "renameAccessibility": "Nimeta seanss ümber: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Organisatsiooni profiilid",
       "personalProfiles": "Isiklikud profiilid",
       "yourProfiles": "Teie profiilid",
-      "failedToLoadProfiles": "Profiilide laadimine ebaõnnestus",
       "nameTooLong": "Profiili nimi on liiga pikk",
       "descriptionTooLong": "Kirjeldus on liiga pikk",
       "secretsEncrypted": "Saladused krüpteeritakse enne salvestamist.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Varasemad sõnumid pole saadaval.",
       "tooLarge": "Varasemad sõnumid on liiga suured, et neid laadida."
     },
-    "markdownTable": {
-      "viewTable": "Vaata tabelit",
-      "title": "Tabel",
-      "close": "Sulge tabel",
-      "loading": "Tabeli laadimine",
-      "empty": "Selles tabelis ei ole ridu.",
-      "columnCount_one": "veerg",
-      "columnCount": "veergu",
-      "columnCount_other": "veergu",
-      "rowCount_one": "rida",
-      "rowCount": "rida",
-      "rowCount_other": "rida",
-      "opensFullScreen": "avatakse täisekraanil"
-    },
     "sessionFilter": {
       "title": "Filtreeri seansse",
       "platformCloud": "Pilv",
@@ -2583,7 +2566,6 @@
       "linkActions": "Lingi toimingud",
       "couldNotCopyLink": "Linki ei õnnestunud kopeerida.",
       "couldNotShareLink": "Linki ei õnnestunud jagada.",
-      "opensInBrowser": "Avaneb brauseris",
       "showLinkActions": "Näita lingi toiminguid"
     },
     "compaction": {

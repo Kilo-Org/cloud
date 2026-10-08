@@ -935,7 +935,6 @@
       "cantUpload": "Този файл не може да се качи.",
       "networkError": "Възникна мрежова грешка.",
       "uploadFailed": "Качването завърши неуспешно.",
-      "failedToUploadFile": "Не успяхме да качим файла: {{reason}}.",
       "nothingToPaste": "Няма какво да поставиш.",
       "metadataStripFailed": "Метаданните на снимката не можаха да бъдат премахнати.",
       "limit_one": "Можеш да прикачиш до {{displayCount}} файл.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Тази сесия е само за четене.",
       "continueInNewSession": "Продължи в нова сесия",
       "emptyDescription": "Изпрати съобщение по-долу, за да започнеш.",
-      "emptyTranscriptDescription": "Тази сесия все още няма съобщения.",
       "scrollToBottom": "Превърти до края",
       "emptyTitle": "Все още няма съобщения",
       "renameAccessibility": "Преименувай сесията: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Профили на организацията",
       "personalProfiles": "Лични профили",
       "yourProfiles": "Вашите профили",
-      "failedToLoadProfiles": "Неуспешно зареждане на профили",
       "nameTooLong": "Името на профила е твърде дълго",
       "descriptionTooLong": "Описанието е твърде дълго",
       "secretsEncrypted": "Тайните се криптират преди съхранение.",
@@ -2476,20 +2473,6 @@
       "unavailable": "По-ранните съобщения не са налични.",
       "tooLarge": "По-ранните съобщения са твърде големи, за да се заредят."
     },
-    "markdownTable": {
-      "viewTable": "Прегледай таблицата",
-      "title": "Таблица",
-      "close": "Затвори таблицата",
-      "loading": "Зареждане на таблицата",
-      "empty": "Тази таблица няма редове.",
-      "columnCount_one": "колона",
-      "columnCount": "колони",
-      "columnCount_other": "колони",
-      "rowCount_one": "ред",
-      "rowCount": "реда",
-      "rowCount_other": "реда",
-      "opensFullScreen": "отваря се на цял екран"
-    },
     "sessionFilter": {
       "title": "Филтриране на сесии",
       "platformCloud": "Облак",
@@ -2583,7 +2566,6 @@
       "linkActions": "Действия с връзката",
       "couldNotCopyLink": "Не успяхме да копираме връзката.",
       "couldNotShareLink": "Не успяхме да споделим връзката.",
-      "opensInBrowser": "Отваря се в браузъра",
       "showLinkActions": "Покажи действията с връзката"
     },
     "compaction": {

@@ -935,7 +935,6 @@
       "cantUpload": "امکان بارگذاری این فایل وجود ندارد.",
       "networkError": "خطایی در شبکه رخ داد.",
       "uploadFailed": "بارگذاری ناموفق بود.",
-      "failedToUploadFile": "بارگذاری فایل ناموفق بود: {{reason}}.",
       "nothingToPaste": "چیزی برای جای‌گذاری وجود ندارد.",
       "metadataStripFailed": "حذف فراداده عکس ممکن نشد.",
       "limit_one": "می‌توانید حداکثر {{displayCount}} فایل پیوست کنید.",
@@ -2097,7 +2096,6 @@
       "readOnly": "این نشست فقط خواندنی است.",
       "continueInNewSession": "ادامه در یک نشست جدید",
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
-      "emptyTranscriptDescription": "این نشست هنوز پیامی ندارد.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "نمایه های سازمان",
       "personalProfiles": "پروفایل های شخصی",
       "yourProfiles": "پروفایل های شما",
-      "failedToLoadProfiles": "نمایه ها بارگیری نشد",
       "nameTooLong": "نام نمایه خیلی طولانی است",
       "descriptionTooLong": "توضیحات خیلی طولانی است",
       "secretsEncrypted": "اسرار قبل از ذخیره سازی رمزگذاری می شوند.",
@@ -2476,20 +2473,6 @@
       "unavailable": "پیام‌های قبلی در دسترس نیستند.",
       "tooLarge": "حجم پیام‌های قبلی بیش از حد مجاز برای بارگذاری است."
     },
-    "markdownTable": {
-      "viewTable": "مشاهده جدول",
-      "title": "جدول",
-      "close": "بستن جدول",
-      "loading": "در حال بارگذاری جدول",
-      "empty": "این جدول هیچ ردیفی ندارد.",
-      "columnCount_one": "ستون",
-      "columnCount": "ستون",
-      "columnCount_other": "ستون",
-      "rowCount_one": "ردیف",
-      "rowCount": "ردیف",
-      "rowCount_other": "ردیف",
-      "opensFullScreen": "تمام‌صفحه باز می‌شود"
-    },
     "sessionFilter": {
       "title": "فیلتر نشست‌ها",
       "platformCloud": "ابری",
@@ -2583,7 +2566,6 @@
       "linkActions": "عملیات پیوند",
       "couldNotCopyLink": "کپی پیوند ممکن نشد.",
       "couldNotShareLink": "اشتراک‌گذاری پیوند ممکن نشد.",
-      "opensInBrowser": "در مرورگر باز می‌شود",
       "showLinkActions": "نمایش عملیات پیوند"
     },
     "compaction": {

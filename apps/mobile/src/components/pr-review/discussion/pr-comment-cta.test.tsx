@@ -24,28 +24,10 @@ vi.mock('react-i18next', async importOriginal => {
 
 const insetsState = vi.hoisted(() => ({ bottom: 0 }));
 const platformState = vi.hoisted(() => ({ OS: 'ios' }));
-const keyboardSubscribers = vi.hoisted(() => ({
-  show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
-  hide: null as (() => void) | null,
-}));
 
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: platformState,
-  Keyboard: {
-    addListener: vi.fn((event: string, listener: (event?: unknown) => void) => {
-      if (event === 'keyboardWillShow' || event === 'keyboardDidShow') {
-        keyboardSubscribers.show = listener as (event: {
-          endCoordinates: { height: number };
-        }) => void;
-      }
-      if (event === 'keyboardWillHide' || event === 'keyboardDidHide') {
-        keyboardSubscribers.hide = listener as () => void;
-      }
-      return { remove: vi.fn() };
-    }),
-  },
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -109,12 +91,15 @@ function paddingValues(renderer: TestRenderer.ReactTestRenderer): number[] {
   });
 }
 
+/** The keyboard-lift wrapper the bar rides while the Discussion tab is focused. */
+function liftView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  return renderer.root.find(node => String(node.type) === 'KeyboardAvoidingView');
+}
+
 describe('PrCommentCta', () => {
   beforeEach(() => {
     platformState.OS = 'ios';
     insetsState.bottom = 0;
-    keyboardSubscribers.show = null;
-    keyboardSubscribers.hide = null;
     BASE_PROPS.onPress.mockClear();
   });
 
@@ -140,53 +125,45 @@ describe('PrCommentCta', () => {
   it('pads above the device safe area while the keyboard is closed', () => {
     insetsState.bottom = 34;
     const renderer = mountCta();
-    const paddings = paddingValues(renderer);
-    // Keyboard-padding view reports 0 while closed; the inner view applies
-    // useDetailScreenBottomPadding (max(bottom, 16) + 16).
-    expect(paddings).toContain(0);
-    expect(paddings).toContain(50);
+    // The lift view adds nothing while the keyboard is closed; the bar's own
+    // `useDetailScreenBottomPadding` (max(bottom, 16) + 16) clears the safe area.
+    expect(paddingValues(renderer)).toEqual([50]);
   });
 
   it('lifts above the keyboard while it is open', () => {
     const renderer = mountCta();
-    if (!keyboardSubscribers.show) {
-      throw new Error('keyboard show listener was not registered');
-    }
-    act(() => {
-      keyboardSubscribers.show?.({ endCoordinates: { height: 336 } });
-    });
-    expect(paddingValues(renderer)).toContain(336);
+    // The bar rides a padding-behavior keyboard lift. On iOS the reported frame
+    // already reaches the screen bottom, so the lift takes no inset correction.
+    const lift = liftView(renderer);
+    expect(lift.props.behavior).toBe('padding');
+    expect(lift.props.keyboardVerticalOffset).toBe(0);
   });
 
   it("lifts by the raw Android metric, which the bar's own inset padding completes", () => {
     // The bar's inner padding already includes the platform's bottom inset
-    // (`useDetailScreenBottomPadding`), so the lift must not add it a second
-    // time and float the button a navigation-bar height above the keyboard
-    // (2026-09-21 review finding).
+    // (`useDetailScreenBottomPadding`), so the Android lift is reduced by that
+    // inset (a negative `keyboardVerticalOffset`) and the button never floats a
+    // navigation-bar height above the keyboard (2026-09-21 review finding).
     platformState.OS = 'android';
     insetsState.bottom = 63;
     const renderer = mountCta();
-    if (!keyboardSubscribers.show) {
-      throw new Error('keyboard show listener was not registered');
-    }
-    act(() => {
-      keyboardSubscribers.show?.({ endCoordinates: { height: 704 } });
-    });
-    expect(paddingValues(renderer)).toContain(704);
-    expect(paddingValues(renderer)).not.toContain(767);
+    expect(liftView(renderer).props.keyboardVerticalOffset).toBe(-63);
+    expect(paddingValues(renderer)).toEqual([79]);
   });
 
-  it('does not react to keyboard events at all while the lift is gated off', () => {
+  it('does not mount the lift while it is gated off', () => {
     // The host passes keyboardLift=false when another surface owns the
     // keyboard (the conversation-comment formSheet): the bar must not even
-    // arm the padding view's listener, or a foreign keyboard shrinks the
-    // list viewport behind the sheet and parks the last thread's reply field
-    // under the bar (uxs3 spot check, e4-confirm-discard).
+    // mount the lift view, or a foreign keyboard shrinks the list viewport
+    // behind the sheet and parks the last thread's reply field under the bar
+    // (uxs3 spot check, e4-confirm-discard).
     const renderer = mountCta({ keyboardLift: false });
-    expect(keyboardSubscribers.show).toBeNull();
-    expect(keyboardSubscribers.hide).toBeNull();
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'KeyboardAvoidingView')
+    ).toHaveLength(0);
     // The bar itself still renders; only the lift wrapper is gone.
     expect(renderer.root.find(node => String(node.type) === 'Button')).toBeDefined();
-    expect(paddingValues(renderer)).not.toContain(0);
+    // useDetailScreenBottomPadding floors the reported inset: max(0, 16) + 16.
+    expect(paddingValues(renderer)).toEqual([32]);
   });
 });

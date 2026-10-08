@@ -935,7 +935,6 @@
       "cantUpload": "Fail ini tidak boleh dimuat naik.",
       "networkError": "Ralat rangkaian berlaku.",
       "uploadFailed": "Muat naik gagal.",
-      "failedToUploadFile": "Gagal memuat naik fail: {{reason}}.",
       "nothingToPaste": "Tiada apa-apa untuk ditampal.",
       "metadataStripFailed": "Metadata foto tidak dapat dibuang.",
       "limit_one": "Anda boleh melampirkan sehingga {{displayCount}} fail.",
@@ -2097,7 +2096,6 @@
       "readOnly": "Sesi ini untuk bacaan sahaja.",
       "continueInNewSession": "Teruskan dalam sesi baharu",
       "emptyDescription": "Hantar mesej di bawah untuk bermula.",
-      "emptyTranscriptDescription": "Sesi ini belum mempunyai mesej.",
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
       "renameAccessibility": "Namakan semula sesi: {{title}}",
@@ -2219,7 +2217,6 @@
       "organizationProfiles": "Profil Organisasi",
       "personalProfiles": "Profil Peribadi",
       "yourProfiles": "Profil Anda",
-      "failedToLoadProfiles": "Gagal memuatkan profil",
       "nameTooLong": "Nama profil terlalu panjang",
       "descriptionTooLong": "Penerangan terlalu panjang",
       "secretsEncrypted": "Rahsia disulitkan sebelum penyimpanan.",
@@ -2476,20 +2473,6 @@
       "unavailable": "Mesej terdahulu tidak tersedia.",
       "tooLarge": "Mesej terdahulu terlalu besar untuk dimuatkan."
     },
-    "markdownTable": {
-      "viewTable": "Lihat jadual",
-      "title": "Jadual",
-      "close": "Tutup jadual",
-      "loading": "Memuatkan jadual",
-      "empty": "Jadual ini tiada baris.",
-      "columnCount_one": "lajur",
-      "columnCount": "lajur",
-      "columnCount_other": "lajur",
-      "rowCount_one": "baris",
-      "rowCount": "baris",
-      "rowCount_other": "baris",
-      "opensFullScreen": "dibuka dalam skrin penuh"
-    },
     "sessionFilter": {
       "title": "Tapis sesi",
       "platformCloud": "Awan",
@@ -2583,7 +2566,6 @@
       "linkActions": "Tindakan pautan",
       "couldNotCopyLink": "Tidak dapat menyalin pautan.",
       "couldNotShareLink": "Tidak dapat berkongsi pautan.",
-      "opensInBrowser": "Dibuka dalam pelayar",
       "showLinkActions": "Paparkan tindakan pautan"
     },
     "compaction": {

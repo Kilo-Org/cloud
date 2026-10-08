@@ -1,8 +1,9 @@
+import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Check } from '@/components/ui/icons';
 import { useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -23,6 +24,12 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
+
+// FlashList takes `style`/`contentContainerStyle` (never `className`), so the
+// list's `flex-1 bg-background` classes become the list style plus the themed
+// background. The picker sheet renders its own scroll container
+// (`scrollable={false}`), so the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export default function ModePickerScreen() {
   const router = useRouter();
@@ -104,8 +111,8 @@ export default function ModePickerScreen() {
       scrollable={false}
     >
       {custom.length === 0 ? (
-        <FlatList
-          className="flex-1 bg-background"
+        <FlashList
+          style={[listStyle, { backgroundColor: colors.background }]}
           data={MODE_OPTIONS}
           keyExtractor={item => item.value}
           renderItem={renderItem}

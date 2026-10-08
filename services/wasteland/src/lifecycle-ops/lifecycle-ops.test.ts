@@ -18,8 +18,6 @@
 import { describe, expect, it } from 'vitest';
 import { joinViaSdk, type LifecycleOpsInnerContext } from './lifecycle-ops-inner';
 
-// ── Test-only fetch helpers ─────────────────────────────────────────────
-
 type MockResponse = { status: number; body?: unknown; text?: string };
 type FetchCall = { url: string; method: string; body: string | null };
 
@@ -46,8 +44,6 @@ const baseCtx: LifecycleOpsInnerContext = {
   ownerEmail: 'alice@example.com',
   token: 'tok',
 };
-
-// ── Tests ────────────────────────────────────────────────────────────────
 
 describe('joinViaSdk', () => {
   it('forks, writes registration, opens PR — returns PR URL and alreadyJoined=false', async () => {
@@ -78,7 +74,6 @@ describe('joinViaSdk', () => {
     expect(result.alreadyJoined).toBe(false);
     expect(result.forkUrl).toContain('/alice/wl');
 
-    // Sanity: the registration write hit the right branch endpoint.
     const writeCall = calls.find(
       c => c.method === 'POST' && c.url.includes('/alice/wl/write/main/wl%2Fregister%2Falice')
     );

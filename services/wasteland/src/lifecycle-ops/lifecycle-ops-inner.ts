@@ -17,8 +17,6 @@
 import { WlClient, WlError, WL_SDK_VERSION, type JoinResult } from '@kilocode/wl-sdk';
 import { WantedBoardOpError } from '../wanted-board/errors';
 
-// ── Types ────────────────────────────────────────────────────────────────
-
 export type LifecycleOpsInnerContext = {
   /** Upstream `owner/db`, e.g. `"hop/wl-commons"`. */
   upstream: string;
@@ -47,8 +45,6 @@ export type JoinOpResult = {
   /** True when the fork already existed (so we just confirmed registration). */
   alreadyJoined: boolean;
 };
-
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 function wrapSdkError(err: unknown, label: string): WantedBoardOpError {
   if (err instanceof WantedBoardOpError) return err;
@@ -80,8 +76,6 @@ function parseUpstream(spec: string): { owner: string; db: string } {
   }
   return { owner: spec.slice(0, slash), db: spec.slice(slash + 1) };
 }
-
-// ── Public ops ───────────────────────────────────────────────────────────
 
 /**
  * Run the full join ceremony against the upstream — fork, write

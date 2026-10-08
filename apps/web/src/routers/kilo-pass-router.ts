@@ -87,10 +87,7 @@ import {
   KILO_PASS_BONUS_LIKE_ITEM_KINDS,
   appendKiloPassAuditLog,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
-import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_TIER_CONFIG,
-} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -278,10 +275,6 @@ const KILO_PASS_PENDING_REFERRAL_REWARD_STATUSES = new Set<string>([
   ImpactReferralRewardStatus.Pending,
   ImpactReferralRewardStatus.Earned,
 ]);
-
-function isTwoMonthPromoOfferActive(): boolean {
-  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
-}
 
 function roundToCents(usd: number): number {
   return Math.round(usd * 100) / 100;
@@ -1359,7 +1352,7 @@ export const kiloPassRouter = createTRPCRouter({
     if (!subscriptionBase) {
       return {
         subscription: null,
-        isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive(),
+        isEligibleForFirstMonthPromo: true,
       };
     }
 

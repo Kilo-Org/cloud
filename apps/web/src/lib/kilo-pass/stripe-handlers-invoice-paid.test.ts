@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
+  impact_referral_conversions,
+  impact_referral_reward_decisions,
+  impact_referral_rewards,
   kilocode_users,
   kilo_pass_audit_log,
   kilo_pass_issuance_items,
@@ -14,6 +17,16 @@ import {
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
+import {
+  ImpactReferralBeneficiaryRole,
+  ImpactReferralDecisionOutcome,
+  ImpactReferralPaymentProvider,
+  ImpactReferralProduct,
+  ImpactReferralRewardKind,
+  ImpactReferralRewardStatus,
+  ImpactReferralWinningTouchType,
+} from '@kilocode/db/schema-types';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { KiloPassAuditLogAction } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KiloPassAuditLogResult } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
@@ -27,7 +40,7 @@ import {
   KiloPassWelcomePromoPaymentFingerprintType,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';
 import { randomUUID } from 'node:crypto';
@@ -333,6 +346,60 @@ async function seedBaseIssuance(params: {
     amount_usd: params.amountUsd,
     bonus_percent_applied: null,
   });
+}
+
+async function seedPendingKiloPassReferralReward(params: {
+  beneficiaryUserId: string;
+  role: ImpactReferralBeneficiaryRole;
+  sourcePaymentId: string;
+}): Promise<{ rewardId: string }> {
+  const otherUser = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+  const isReferee = params.role === ImpactReferralBeneficiaryRole.Referee;
+  const earnedAt = new Date(Date.now() - 86_400_000).toISOString();
+  const [conversion] = await db
+    .insert(impact_referral_conversions)
+    .values({
+      product: ImpactReferralProduct.KiloPass,
+      referee_user_id: isReferee ? params.beneficiaryUserId : otherUser.id,
+      referrer_user_id: isReferee ? otherUser.id : params.beneficiaryUserId,
+      winning_touch_type: ImpactReferralWinningTouchType.Referral,
+      payment_provider: ImpactReferralPaymentProvider.Stripe,
+      source_payment_id: params.sourcePaymentId,
+      qualified: true,
+      converted_at: earnedAt,
+    })
+    .returning({ id: impact_referral_conversions.id });
+  if (!conversion) throw new Error('Failed to create impact_referral_conversion');
+
+  const rewardFields = {
+    product: ImpactReferralProduct.KiloPass,
+    conversion_id: conversion.id,
+    beneficiary_user_id: params.beneficiaryUserId,
+    beneficiary_role: params.role,
+    reward_kind: ImpactReferralRewardKind.KiloPassBonus,
+    reward_percent: 0.5,
+    source_tier: KiloPassTier.Tier19,
+    reward_amount_usd: 9.5,
+  };
+  const [decision] = await db
+    .insert(impact_referral_reward_decisions)
+    .values({ ...rewardFields, outcome: ImpactReferralDecisionOutcome.Granted })
+    .returning({ id: impact_referral_reward_decisions.id });
+  if (!decision) throw new Error('Failed to create impact_referral_reward_decision');
+
+  const [reward] = await db
+    .insert(impact_referral_rewards)
+    .values({
+      ...rewardFields,
+      decision_id: decision.id,
+      months_granted: 0,
+      status: ImpactReferralRewardStatus.Pending,
+      earned_at: earnedAt,
+      expires_at: new Date(Date.now() + 365 * 86_400_000).toISOString(),
+    })
+    .returning({ id: impact_referral_rewards.id });
+  if (!reward) throw new Error('Failed to create impact_referral_reward');
+  return { rewardId: reward.id };
 }
 
 async function persistPersonalKiloPassAssessment(params: {
@@ -2694,6 +2761,15 @@ describe('handleKiloPassInvoicePaid', () => {
     });
     expect(issuance).toBeTruthy();
 
+    const replayedSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+    });
+    expect(
+      replayedSubscription?.started_at
+        ? new Date(replayedSubscription.started_at).toISOString()
+        : null
+    ).toBe(new Date(subscription.start_date * 1000).toISOString());
+
     const kinds = await db
       .select({ kind: kilo_pass_issuance_items.kind })
       .from(kilo_pass_issuance_items)
@@ -2701,95 +2777,284 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(kinds.map(k => k.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
   });
 
-  test('monthly: streak counts consecutive months (no bonus is issued on invoice.paid)', async () => {
-    const { handleKiloPassInvoicePaid } =
-      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+  test.each(['2026-10-08T23:59:59.999Z', '2026-10-09T00:00:00.000Z'])(
+    'monthly: renewal and replay preserve subscription start %s and count consecutive months',
+    async startedAt => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
-    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
-    const stripeSubId = `sub_${Math.random()}`;
-    const meta = kiloPassMetadata({
-      kiloUserId: user.id,
-      tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Monthly,
-    });
-    const subscription = makeStripeSubscription({
-      id: stripeSubId,
-      start_date_seconds: 1_735_689_600,
-      metadata: meta,
-    });
-
-    const retrieve = jest.fn(async () => subscription);
-    const stripe = {
-      subscriptions: {
-        retrieve,
-      },
-    };
-
-    // Seed an earlier month issuance for this subscription so the handler computes a 2-month streak.
-    // We can't insert issuances before the subscription exists, so insert a minimal subscription row first.
-    const inserted = await db
-      .insert(kilo_pass_subscriptions)
-      .values({
-        kilo_user_id: user.id,
-        provider_subscription_id: stripeSubId,
-        stripe_subscription_id: stripeSubId,
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
-        status: 'active',
-        started_at: new Date(subscription.start_date * 1000).toISOString(),
-        ended_at: null,
-        current_streak_months: 1,
-      })
-      .returning({ subscriptionId: kilo_pass_subscriptions.id });
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: Math.floor(new Date(startedAt).valueOf() / 1000),
+        metadata: meta,
+      });
 
-    const subscriptionId = inserted[0]?.subscriptionId;
-    expect(subscriptionId).toBeTruthy();
-    if (!subscriptionId) throw new Error('Failed to insert kilo_pass_subscriptions row');
+      const retrieve = jest.fn(async () => subscription);
+      const stripe = {
+        subscriptions: {
+          retrieve,
+        },
+      };
 
-    await db.insert(kilo_pass_issuances).values({
-      kilo_pass_subscription_id: subscriptionId,
-      issue_month: '2025-12-01',
-      source: KiloPassIssuanceSource.Cron,
-      stripe_invoice_id: null,
-    });
+      // Seed an earlier month issuance for this subscription so the handler computes a 2-month streak.
+      // We can't insert issuances before the subscription exists, so insert a minimal subscription row first.
+      const inserted = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          provider_subscription_id: stripeSubId,
+          stripe_subscription_id: stripeSubId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          started_at: startedAt,
+          ended_at: null,
+          current_streak_months: 1,
+        })
+        .returning({ subscriptionId: kilo_pass_subscriptions.id });
 
-    const priceId = await getKiloPassPriceId({
-      tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Monthly,
-    });
-    const invoiceId = `inv_streak_${Math.random()}`;
-    const invoice = makeStripeInvoice({
-      id: invoiceId,
-      amount_paid_cents: 1900,
-      period_start_seconds: 1_767_225_600, // 2026-01-01T00:00:00Z
-      created_seconds: 1_767_225_600,
-      priceId,
-      subscriptionIdOrExpanded: stripeSubId,
-      metadata: meta,
-    });
+      const subscriptionId = inserted[0]?.subscriptionId;
+      expect(subscriptionId).toBeTruthy();
+      if (!subscriptionId) throw new Error('Failed to insert kilo_pass_subscriptions row');
 
-    await handleKiloPassInvoicePaid({
-      eventId: 'evt_test_5',
-      invoice,
-      stripe: stripe as unknown as Stripe,
-    });
+      await db.insert(kilo_pass_issuances).values({
+        kilo_pass_subscription_id: subscriptionId,
+        issue_month: '2026-10-01',
+        source: KiloPassIssuanceSource.Cron,
+        stripe_invoice_id: null,
+      });
 
-    const updatedSub = await db.query.kilo_pass_subscriptions.findFirst({
-      where: eq(kilo_pass_subscriptions.id, subscriptionId),
-    });
-    expect(updatedSub?.current_streak_months).toBe(2);
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const invoiceId = `inv_streak_${Math.random()}`;
+      const invoice = makeStripeInvoice({
+        id: invoiceId,
+        amount_paid_cents: 1900,
+        period_start_seconds: Date.parse('2026-11-01T00:00:00Z') / 1000,
+        created_seconds: Date.parse('2026-11-01T00:00:00Z') / 1000,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      });
 
-    const issuance = await db.query.kilo_pass_issuances.findFirst({
-      where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
-    });
-    expect(issuance).toBeTruthy();
+      await handleKiloPassInvoicePaid({
+        eventId: 'evt_test_5',
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      });
+      await handleKiloPassInvoicePaid({
+        eventId: 'evt_test_5_replay',
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      });
 
-    const issuanceItemKinds = await db
-      .select({ kind: kilo_pass_issuance_items.kind })
-      .from(kilo_pass_issuance_items)
-      .where(eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance?.id ?? ''));
-    expect(issuanceItemKinds.map(i => i.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
-  });
+      const updatedSub = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, subscriptionId),
+      });
+      expect(updatedSub?.current_streak_months).toBe(2);
+      expect(updatedSub?.started_at ? new Date(updatedSub.started_at).toISOString() : null).toBe(
+        new Date(startedAt).toISOString()
+      );
+
+      const issuance = await db.query.kilo_pass_issuances.findFirst({
+        where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
+      });
+      expect(issuance).toBeTruthy();
+
+      const issuanceItemKinds = await db
+        .select({ kind: kilo_pass_issuance_items.kind })
+        .from(kilo_pass_issuance_items)
+        .where(eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance?.id ?? ''));
+      expect(issuanceItemKinds.map(i => i.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
+    }
+  );
+
+  test.each([
+    {
+      label: 'referee starting at the cutoff',
+      startedAt: '2026-10-09T00:00:00.000Z',
+      role: ImpactReferralBeneficiaryRole.Referee,
+      returning: false,
+      monthTwoGetsReferral: false,
+    },
+    {
+      label: 'referrer starting at the cutoff',
+      startedAt: '2026-10-09T00:00:00.000Z',
+      role: ImpactReferralBeneficiaryRole.Referrer,
+      returning: false,
+      monthTwoGetsReferral: false,
+    },
+    {
+      label: 'referee starting before the cutoff',
+      startedAt: '2026-10-08T23:59:59.000Z',
+      role: ImpactReferralBeneficiaryRole.Referee,
+      returning: false,
+      monthTwoGetsReferral: true,
+    },
+    {
+      label: 'returning referrer starting at the cutoff',
+      startedAt: '2026-10-09T00:00:00.000Z',
+      role: ImpactReferralBeneficiaryRole.Referrer,
+      returning: true,
+      monthTwoGetsReferral: true,
+    },
+  ])(
+    'monthly: $label applies a pending referral reward in month two=$monthTwoGetsReferral',
+    async ({ startedAt, role, returning, monthTwoGetsReferral }) => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      if (returning) {
+        const priorSubscriptionId = `sub_prior_${Math.random()}`;
+        await db.insert(kilo_pass_subscriptions).values({
+          kilo_user_id: user.id,
+          provider_subscription_id: priorSubscriptionId,
+          stripe_subscription_id: priorSubscriptionId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'canceled',
+          started_at: '2025-01-01T00:00:00.000Z',
+          ended_at: '2025-02-01T00:00:00.000Z',
+        });
+      }
+
+      const stripeSubId = `sub_referral_welcome_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: Math.floor(Date.parse(startedAt) / 1000),
+        metadata: meta,
+      });
+      const stripe = {
+        subscriptions: { retrieve: jest.fn(async () => subscription) },
+      } as unknown as Stripe;
+
+      const [subscriptionRow] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          provider_subscription_id: stripeSubId,
+          stripe_subscription_id: stripeSubId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          started_at: startedAt,
+          current_streak_months: 1,
+        })
+        .returning({ id: kilo_pass_subscriptions.id });
+      if (!subscriptionRow) throw new Error('Failed to insert kilo_pass_subscriptions row');
+
+      const monthOneInvoiceId = `inv_referral_welcome_m1_${Math.random()}`;
+      await db.insert(kilo_pass_issuances).values({
+        kilo_pass_subscription_id: subscriptionRow.id,
+        issue_month: '2026-10-01',
+        source: KiloPassIssuanceSource.StripeInvoice,
+        stripe_invoice_id: monthOneInvoiceId,
+        initial_welcome_promo_eligibility_reason:
+          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+      });
+      const reward = await seedPendingKiloPassReferralReward({
+        beneficiaryUserId: user.id,
+        role,
+        sourcePaymentId:
+          role === ImpactReferralBeneficiaryRole.Referee
+            ? monthOneInvoiceId
+            : `inv_referee_${Math.random()}`,
+      });
+
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const payMonth = async (periodStartIso: string): Promise<string> => {
+        const invoiceId = `inv_referral_welcome_${Math.random()}`;
+        await handleKiloPassInvoicePaid({
+          eventId: `evt_${invoiceId}`,
+          invoice: makeStripeInvoice({
+            id: invoiceId,
+            amount_paid_cents: 1900,
+            period_start_seconds: Date.parse(periodStartIso) / 1000,
+            created_seconds: Date.parse(periodStartIso) / 1000,
+            priceId,
+            subscriptionIdOrExpanded: stripeSubId,
+            metadata: meta,
+          }),
+          stripe,
+        });
+        return invoiceId;
+      };
+      const getBonusLikeItems = async (invoiceId: string) =>
+        await db
+          .select({
+            kind: kilo_pass_issuance_items.kind,
+            bonusPercentApplied: kilo_pass_issuance_items.bonus_percent_applied,
+          })
+          .from(kilo_pass_issuance_items)
+          .innerJoin(
+            kilo_pass_issuances,
+            eq(kilo_pass_issuances.id, kilo_pass_issuance_items.kilo_pass_issuance_id)
+          )
+          .where(
+            and(
+              eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
+              inArray(kilo_pass_issuance_items.kind, [
+                KiloPassIssuanceItemKind.Bonus,
+                KiloPassIssuanceItemKind.ReferralBonus,
+              ])
+            )
+          );
+      const getRewardStatus = async () =>
+        (
+          await db.query.impact_referral_rewards.findFirst({
+            where: eq(impact_referral_rewards.id, reward.rewardId),
+          })
+        )?.status;
+
+      const monthTwoInvoiceId = await payMonth('2026-11-09T00:00:00.000Z');
+      if (monthTwoGetsReferral) {
+        expect(await getBonusLikeItems(monthTwoInvoiceId)).toEqual([
+          { kind: KiloPassIssuanceItemKind.ReferralBonus, bonusPercentApplied: 0.5 },
+        ]);
+        expect(await getRewardStatus()).toBe(ImpactReferralRewardStatus.Applied);
+        return;
+      }
+
+      expect(await getBonusLikeItems(monthTwoInvoiceId)).toEqual([]);
+      expect(await getRewardStatus()).toBe(ImpactReferralRewardStatus.Pending);
+
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: 1_000_000_000 })
+        .where(eq(kilocode_users.id, user.id));
+      await maybeIssueKiloPassBonusFromUsageThreshold({
+        kiloUserId: user.id,
+        nowIso: '2026-11-10T00:00:00.000Z',
+      });
+      expect(await getBonusLikeItems(monthTwoInvoiceId)).toEqual([
+        { kind: KiloPassIssuanceItemKind.Bonus, bonusPercentApplied: 0.5 },
+      ]);
+
+      const monthThreeInvoiceId = await payMonth('2026-12-09T00:00:00.000Z');
+      expect(await getBonusLikeItems(monthThreeInvoiceId)).toEqual([
+        { kind: KiloPassIssuanceItemKind.ReferralBonus, bonusPercentApplied: 0.5 },
+      ]);
+      expect(await getRewardStatus()).toBe(ImpactReferralRewardStatus.Applied);
+    }
+  );
 
   test('yearly: first invoice issues base credits (bonus is issued later on usage); retry is idempotent', async () => {
     const { handleKiloPassInvoicePaid } =

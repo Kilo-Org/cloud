@@ -27,8 +27,6 @@ import {
 
 export type { JoinOpResult, LifecycleOpsInnerContext } from './lifecycle-ops-inner';
 
-// ── Context resolution ───────────────────────────────────────────────────
-
 type LifecycleContext = LifecycleOpsInnerContext & {
   doStub: ReturnType<typeof getWastelandDOStub>;
   /** Whether the auth token came from a fresh OAuth refresh — informs
@@ -137,8 +135,6 @@ async function loadContext(
     tokenSource: 'stored',
   };
 }
-
-// ── Worker-bound public ops ─────────────────────────────────────────────
 
 /**
  * Run the wasteland join ceremony on behalf of the user.

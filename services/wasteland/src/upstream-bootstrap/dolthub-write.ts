@@ -16,8 +16,6 @@
 import { z } from 'zod';
 import { DOLTHUB_API_BASE, DoltHubApiError } from '../util/dolthub-api.util';
 
-// ── Database creation ─────────────────────────────────────────────────
-
 // DoltHub's create-database response. The 200 envelope exposes
 // `status: 'Success'` plus echoed metadata; the 400 envelope exposes
 // `status: 'Error'` and a human-readable `message` (e.g.
@@ -98,8 +96,6 @@ export async function createDatabase(
     res.status
   );
 }
-
-// ── Branch management ─────────────────────────────────────────────────
 
 const ListBranchesResponse = z
   .object({
@@ -190,8 +186,6 @@ export async function createBranch(
     res.status
   );
 }
-
-// ── Write API with polling ────────────────────────────────────────────
 
 const WriteResponse = z
   .object({
@@ -480,8 +474,6 @@ async function pollWriteOperation(
   );
 }
 
-// ── Branch merge ──────────────────────────────────────────────────────
-
 /**
  * Merge `fromBranch` into `toBranch` via the SQL write API's empty-query
  * mode. Per DoltHub's docs:
@@ -556,8 +548,6 @@ export async function mergeBranchIntoMain(
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-// ── SQL escaping ──────────────────────────────────────────────────────
 
 /**
  * Escape a string for use inside a single-quoted SQL literal. Mirrors

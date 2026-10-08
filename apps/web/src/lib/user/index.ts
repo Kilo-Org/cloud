@@ -608,7 +608,7 @@ export async function createOrUpdateUser(
       console.info('[auth] Signup creation outcome', {
         operationId,
         outcome: 'rejected',
-        reason: 'bouncer_unavailable',
+        reason: bouncerIp ? 'bouncer_unavailable' : 'signup_ip_unavailable',
       });
       return failureResult('SIGNUP-UNAVAILABLE');
     }

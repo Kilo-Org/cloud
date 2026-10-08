@@ -92,6 +92,26 @@ minimumReleaseAgeExclude:
   - '@kilocode/sdk'
   # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
   - openclaw
+  # FlashList 2.3.3 fixes the scroll window in EngagedIndicesTracker: the window
+  # was computed from the projected offset alone, so when the trailing buffer was
+  # smaller than the projection delta, rows actually on screen were excluded. The
+  # agent transcript list is exactly that shape. Patch release; exempted so the
+  # contract test's pin can move off 2.3.2 without waiting out minimumReleaseAge.
+  - '@shopify/flash-list@2.3.3'
+  # react-native-keyboard-controller's 1.22.3 release notes carry the
+  # KeyboardChatScrollView fixes this phase depends on (crash on unmount,
+  # overscroll during interactive dismissal on iOS, propagation view surfaceId
+  # for focused input events inside a Modal). 1.22.6 is the latest patch. Expo
+  # SDK 57 pins 1.21.9, which predates all three, so the pin is overridden with
+  # the same mechanism flash-list uses.
+  - react-native-keyboard-controller@1.22.6
+  # react-native-enriched-markdown 1.1.0 adds onImagePress/onCodeBlockPress, which the transcript markdown cutover wires.
+  - react-native-enriched-markdown@1.1.0
+  # react-native-reanimated 4.7.1 carries the stability fixes the app needs
+  # (synchronously updated props reset, Android crashes, layout animations).
+  # Approved early exception; worklets 0.13.0 is its required pair and is old
+  # enough on its own.
+  - react-native-reanimated@4.7.1
 overrides:
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)
@@ -148,7 +168,8 @@ overrides:
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
   hono: 4.13.5
-  '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
+  '@modelcontextprotocol/sdk@1.29.0': 1.31.0
+  '@modelcontextprotocol/sdk@1.31.0>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
   # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
@@ -174,9 +195,10 @@ overrides:
   js-yaml: 4.3.2
   linkify-it: 5.0.2
   protobufjs: 7.6.5
-  sharp: 0.35.4
+  sharp: 0.35.5
   tar: 7.5.21
-  shell-quote: 1.10.0
+  pbkdf2: 3.1.7
+  shell-quote: 1.11.0
   # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while
   # @slack/oauth and @slack/socket-mode still ask for ^7.15.0, so without this we
   # end up with two copies of the WebClient. apps/web also depends on it directly
@@ -231,7 +253,12 @@ patchedDependencies:
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).
   expo-task-manager@57.0.21: patches/expo-task-manager@57.0.21.patch
   expo-widgets@57.0.22: patches/expo-widgets@57.0.22.patch
-  react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
+  # PurchaseConnector.create returns the native promise, so a create failure
+  # is observable. Android: compile against the project's Kotlin stdlib, not
+  # the 2.4.10 default that RN 0.86's Kotlin 2.1 compiler cannot read. The
+  # package ships TypeScript source, so its `typeof jest` guard (TS2708 here)
+  # gets a ts-ignore.
+  react-native-appsflyer@7.0.2-v2: patches/react-native-appsflyer@7.0.2-v2.patch
   # Fabric mounting race: RCTComponentViewFactory registers component views from
   # the JS thread without the class-map mutex, so a mounting transaction can
   # dereference an unregistered handle and crash (EXC_BAD_ACCESS 0x18,
@@ -243,6 +270,10 @@ patchedDependencies:
   # formatted, which SIGABRTs release builds that link the assert-enabled
   # prebuilt React core (Kilo-Org/kilocode#14065; react/react-native#57865).
   react-native@0.86.3: patches/react-native@0.86.3.patch
+  # Android: read the live entry of the unique work chain, not the first one.
+  # A finished first entry made a cold start re-enqueue with REPLACE, which
+  # cancelled the glanceable refresh run in progress.
+  expo-background-task@57.0.21: patches/expo-background-task@57.0.21.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'
@@ -255,6 +286,7 @@ allowBuilds:
   esbuild: true
   libpq: true
   workerd: true
+  react-native-enriched-markdown: true
   '@sentry/cli': false
   bufferutil: false
   core-js: false

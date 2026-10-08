@@ -289,6 +289,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         billingCycle: input.billingCycle,
         attempt: {
           accountCreatedAt: org.created_at,
+          accountUsedMicrodollars: org.microdollars_used,
           ip: ctx.ip,
           ipCountry: ipCountryFromHeaders(ctx.headersList),
           ja4: ja4FromHeaders(ctx.headersList),

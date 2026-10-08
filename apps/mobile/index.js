@@ -69,3 +69,12 @@ require('./src/lib/notification-background-task')
   .catch(() => {
     // Registration already reports its own failure; the entry must never crash.
   });
+
+// The periodic glanceable refresh is the fallback for a data-only push the OS
+// dropped. WorkManager (Android) and BGTaskScheduler (iOS) start it without the
+// root layout, so it is registered here too (glanceable-refresh-task.ts).
+require('./src/lib/glanceable-refresh-task')
+  .registerGlanceableRefreshTask()
+  .catch(() => {
+    // Registration already reports its own failure; the entry must never crash.
+  });

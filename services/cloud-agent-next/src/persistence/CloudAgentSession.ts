@@ -24,6 +24,8 @@ import {
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
+  hasRetiredDevcontainerRuntime,
+  DEVCONTAINER_RETIRED_MESSAGE,
   type SessionMetadata,
 } from './session-metadata.js';
 import {
@@ -675,7 +677,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                   this.getAgentSandboxRuntimeContext()
                 ).discoverSessionWrappers(),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
-        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
+        checkBillingAdmission: () => this.runtimeAdmissionFailure(),
       });
     }
 
@@ -693,9 +695,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return !(await this.hasDeletionIntent());
   }
 
-  private async containerBillingAdmissionFailure(): Promise<AdmissionFailure | null> {
+  private async runtimeAdmissionFailure(): Promise<AdmissionFailure | null> {
     const metadata = await this.getMetadata();
     if (!metadata) return null;
+    if (hasRetiredDevcontainerRuntime(metadata)) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: DEVCONTAINER_RETIRED_MESSAGE,
+        failureBoundary: 'admission',
+      };
+    }
     if (!isCloudAgentContainerBillingEnabled(this.env, metadata.identity)) return null;
     const admission = await createAgentSandbox(this.env, metadata).ensureBillingAdmission();
     if (admission.success) return null;
@@ -1029,6 +1039,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         metadata.identity.botId,
         {
           createdOnPlatform: metadata.identity.createdOnPlatform,
+          legacyFallback: true,
         }
       ));
 
@@ -1065,7 +1076,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         deliver: plan => this.executeDirectly(plan),
         isDeliveryHeld: async () =>
           isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
-        checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
+        checkBillingAdmission: () => this.runtimeAdmissionFailure(),
         ensureQueuedMessageEvent: event => {
           this.ensureUniqueMessageEvent({
             executionId: '' as EventSourceId,
@@ -2901,7 +2912,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     gitToken?: string;
     gitlabTokenManaged?: boolean;
     bitbucketTokenManaged?: boolean;
-    devcontainer?: SessionMetadata['devcontainer'];
   }): Promise<OperationResult<SessionMetadata>> {
     const metadata = await this.getMetadata();
 
@@ -2956,9 +2966,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         sessionHome: input.sessionHome,
         branchName: input.branchName,
       },
-      ...((input.devcontainer ?? metadata.devcontainer)
-        ? { devcontainer: input.devcontainer ?? metadata.devcontainer }
-        : {}),
       lifecycle: {
         ...metadata.lifecycle,
         preparedAt: metadata.lifecycle.preparedAt ?? now,

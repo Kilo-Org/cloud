@@ -4,12 +4,13 @@ import { LineChart, MessageSquare, Shield, Smartphone, User } from '@/components
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRow } from '@/components/consent/consent-row';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -18,6 +19,7 @@ import { PRIVACY_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 type ConsentCardProps = {
   readonly mode?: ConsentMode;
@@ -43,11 +45,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, top } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const { signOut, token } = useAuth();
   const { userId } = useCurrentUserId({ enabled: token != null });
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const actions = getConsentActions(mode);
-  const rootStyle = { paddingTop: top };
+  const rootStyle = { paddingTop: top, ...sideInsetStyle };
   const contentContainerStyle = {
     paddingTop: 24,
     paddingBottom: 24,
@@ -168,16 +172,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     const message =
       mode === 'review' ? t('consent.revokeSignOutMessage') : t('consent.declineSignOutMessage');
 
-    Alert.alert(actions.destructiveTitle, message, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: actions.destructiveLabel,
-        style: 'destructive',
-        onPress: () => {
-          void runSecondaryAction();
-        },
+    confirm({
+      title: actions.destructiveTitle,
+      message,
+      confirmLabel: actions.destructiveLabel,
+      onConfirm: () => {
+        void runSecondaryAction();
       },
-    ]);
+    });
   };
 
   const handleOpenPrivacy = () => {
@@ -355,6 +357,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           <Text>{actions.secondaryLabel}</Text>
         </Button>
       </View>
+      {dialog}
     </View>
   );
 }

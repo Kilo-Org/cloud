@@ -55,10 +55,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Builds a redactor that remembers the values of every environment whose name
+ * matches `SECRET_NAME`, plus the values of `secretEnvKeys` regardless of name.
+ * Later environments override earlier ones for a named key, mirroring how the
+ * caller layers them.
+ */
 export function createSecretRedactor(
   environment: Record<string, string | undefined>,
-  ...additionalEnvironments: Record<string, string | undefined>[]
+  additionalEnvironments: readonly Record<string, string | undefined>[] = [],
+  secretEnvKeys: readonly string[] = []
 ): (text: string) => string {
+  const sources = [environment, ...additionalEnvironments];
   const secrets = new Set<string>();
   const remember = (value: string): void => {
     if (!value) return;
@@ -87,7 +95,7 @@ export function createSecretRedactor(
       }
     }
   };
-  for (const source of [environment, ...additionalEnvironments]) {
+  for (const source of sources) {
     for (const [name, value] of Object.entries(source)) {
       if (!value) continue;
       if (CONFIG_ENV_NAME.test(name)) {
@@ -101,6 +109,15 @@ export function createSecretRedactor(
         }
       } else if (SECRET_NAME.test(name)) {
         remember(value);
+      }
+    }
+  }
+  for (const key of secretEnvKeys) {
+    for (let index = sources.length - 1; index >= 0; index -= 1) {
+      const value = sources[index][key];
+      if (typeof value === 'string' && value) {
+        remember(value);
+        break;
       }
     }
   }

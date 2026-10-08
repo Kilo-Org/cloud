@@ -44,6 +44,10 @@ export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 export const perRecipientResultSchema = z.object({
   userId: z.string(),
   outcome: perRecipientOutcomeSchema,
+  // Stable, content-free failure classification (e.g. 'expo_ticket_rejected'),
+  // populated by the internal dispatch path for `failed` outcomes. Optional:
+  // older workers and the conversation push path omit it.
+  reason: z.string().optional(),
 });
 export type PerRecipientResult = z.infer<typeof perRecipientResultSchema>;
 

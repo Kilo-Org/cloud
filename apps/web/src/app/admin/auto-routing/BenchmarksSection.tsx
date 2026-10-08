@@ -10,15 +10,17 @@ import {
   BenchmarkRunsResponseSchema,
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
+  getReasoningVariantKeys,
   RequeueBenchmarkRegistryResponseSchema,
   StartBenchmarkRunResponseSchema,
   type AutoBenchmarkDeciderModel,
   type BenchmarkConfig,
-  type BenchmarkDeciderModel,
+  type BenchmarkPlatformModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
   type BenchmarkQueueSelector,
   type BenchmarkRegistryQueue,
+  type BenchmarkRegistryResponse,
   type BenchmarkRoutingTableResponse,
   type BenchmarkRun,
   type RankedCandidate,
@@ -30,11 +32,11 @@ import { ChevronDown, ChevronRight, Play, Plus, RotateCcw, Save, Trash2 } from '
 import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import { toEligibleModelOptions } from '@/components/auto-routing/AutoRoutingModeCard';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -54,6 +56,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseAdminResponse } from './admin-fetch';
+import { useSystemOneModelOptions } from './system-one-models';
 
 // ---------------------------------------------------------------------------
 // Pure helpers (exported for unit tests)
@@ -92,20 +95,27 @@ export function pinnedModelFor(id: string): ModelOption {
   return { id, name: id };
 }
 
-/**
- * Variant keys offered for a decider row: the selected model's catalog keys,
- * plus a saved key the catalog no longer lists (kept so an existing row stays
- * editable and round-trips). Hides only when no key exists.
- */
-export function variantOptionsForModel(
-  modelOption: ModelOption | undefined,
-  savedVariant: string | null
-): string[] {
-  const catalogKeys = modelOption?.variants ?? [];
-  if (savedVariant && !catalogKeys.includes(savedVariant)) {
-    return [...catalogKeys, savedVariant];
-  }
-  return catalogKeys;
+export function effortCoverageForModel(
+  model: ModelOption | undefined,
+  entries?: BenchmarkRegistryResponse['platformEntries']
+): string {
+  if (model?.reasoningVariants === undefined) return 'Effort coverage unavailable';
+  const efforts: (string | null)[] =
+    model.reasoningVariants.length > 0 ? model.reasoningVariants : [null];
+  const supported =
+    model.reasoningVariants.length > 0
+      ? `All ${efforts.length} efforts: ${model.reasoningVariants.join(', ')}`
+      : 'Default (no configurable effort)';
+  if (entries === undefined) return `${supported} · Measurement status unavailable`;
+  const statuses = efforts.map(variant => ({
+    variant,
+    status: entries.find(entry => entry.model === model.id && entry.variant === variant)?.status,
+  }));
+  const measured = statuses.filter(entry => entry.status === 'ready').length;
+  const outstanding = statuses
+    .filter(entry => entry.status !== 'ready')
+    .map(entry => `${entry.variant ?? 'default'}: ${entry.status ?? 'not measured'}`);
+  return `${supported} · ${measured} of ${efforts.length} measured${outstanding.length > 0 ? ` · ${outstanding.join(', ')}` : ''}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,10 +207,7 @@ async function fetchBenchmarkRoutingTable() {
 // Local form state type for decider model rows
 // ---------------------------------------------------------------------------
 
-type DeciderModelRow = {
-  id: string;
-  variant: string | null;
-};
+type DeciderModelRow = BenchmarkPlatformModel;
 
 type AutoDeciderModelRow = AutoBenchmarkDeciderModel;
 
@@ -246,12 +253,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
   }
   return {
     classifierModels: config.classifierModels,
-    deciderModels: (config.manualDeciderModels ?? config.deciderModels).map(m => ({
-      id: m.id,
-      // Legacy reasoningEffort-only rows load as the canonical form variant so
-      // a save emits variant-only manual rows.
-      variant: m.variant ?? m.reasoningEffort ?? null,
-    })),
+    deciderModels: (config.manualDeciderModels ?? config.deciderModels).map(({ id }) => ({ id })),
     autoDeciderModels: config.autoDeciderModels ?? [],
     excludedAutoDeciderModels: (config.excludedAutoDeciderModels ?? []).join('\n'),
     minAccuracy: config.minAccuracy,
@@ -285,16 +287,10 @@ export function effectiveDeciderModels({
   manualDeciderModels: DeciderModelRow[];
   autoDeciderModels: AutoDeciderModelRow[];
   excludedAutoDeciderModels: string[];
-}): BenchmarkDeciderModel[] {
+}): BenchmarkPlatformModel[] {
   const manual = manualDeciderModels
     .filter(row => row.id.trim().length > 0)
-    .map(row => ({
-      id: row.id.trim(),
-      variant: row.variant ?? null,
-      // The contract type requires the legacy field; it stays null on
-      // variant-only rows (both non-null is malformed).
-      reasoningEffort: null,
-    }));
+    .map(row => ({ id: row.id.trim() }));
   const manualIds = new Set(manual.map(model => model.id));
   const excludedAuto = new Set(excludedAutoDeciderModels);
   return [
@@ -302,13 +298,7 @@ export function effectiveDeciderModels({
     ...autoDeciderModels
       .filter(model => !excludedAuto.has(model.id))
       .filter(model => !manualIds.has(model.id))
-      .map(model => ({
-        id: model.id,
-        // Auto rows stay effort-only: the benchmark worker writes and reads the
-        // legacy reasoningEffort for synced rows, so never emit the canonical
-        // variant key here.
-        reasoningEffort: model.reasoningEffort ?? null,
-      })),
+      .map(({ id }) => ({ id })),
   ];
 }
 
@@ -320,13 +310,7 @@ export function formStateToConfig(
   const excludedAutoDeciderModels = parseModelLines(state.excludedAutoDeciderModels);
   const manualDeciderModels = state.deciderModels
     .filter(row => row.id.trim().length > 0)
-    .map(row => ({
-      id: row.id.trim(),
-      variant: row.variant ?? null,
-      // Variant-only rows: the legacy effort field is always null so the two
-      // never collide (both non-null is malformed per the contract).
-      reasoningEffort: null,
-    }));
+    .map(row => ({ id: row.id.trim() }));
   const deciderModels = effectiveDeciderModels({
     manualDeciderModels,
     autoDeciderModels: state.autoDeciderModels,
@@ -369,12 +353,20 @@ function BenchmarkConfigEditor({
   modelOptions,
   modelsLoading,
   modelsError,
+  classifierModelOptions,
+  classifierModelsLoading,
+  classifierModelsError,
+  registryEntries,
 }: {
   config: BenchmarkConfig | null;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
   modelOptions: ModelOption[];
   modelsLoading: boolean;
   modelsError?: string;
+  classifierModelOptions: ModelOption[];
+  classifierModelsLoading: boolean;
+  classifierModelsError?: string;
+  registryEntries?: BenchmarkRegistryResponse['platformEntries'];
 }) {
   const [form, setForm] = useState(() => configToFormState(config));
   // Tracks unsaved local edits. A background config refetch (the runs list
@@ -451,7 +443,7 @@ function BenchmarkConfigEditor({
   const handleAddDeciderRow = useCallback(() => {
     updateForm(prev => ({
       ...prev,
-      deciderModels: [...prev.deciderModels, { id: '', variant: null }],
+      deciderModels: [...prev.deciderModels, { id: '' }],
     }));
   }, [updateForm]);
 
@@ -522,16 +514,16 @@ function BenchmarkConfigEditor({
                     <TableCell className="py-2">
                       <ModelCombobox
                         variant="compact"
-                        models={modelOptions}
+                        models={classifierModelOptions}
                         value={modelId}
                         onValueChange={value => handleClassifierModelChange(index, value)}
                         pinnedModel={
-                          modelId && !modelOptions.some(option => option.id === modelId)
+                          modelId && !classifierModelOptions.some(option => option.id === modelId)
                             ? pinnedModelFor(modelId)
                             : undefined
                         }
-                        isLoading={modelsLoading}
-                        error={modelsError}
+                        isLoading={classifierModelsLoading}
+                        error={classifierModelsError}
                         className="w-full"
                         triggerAriaLabel={`Classifier model ${index + 1}`}
                       />
@@ -568,19 +560,21 @@ function BenchmarkConfigEditor({
         {/* Manual decider models table */}
         <div className="flex flex-col gap-1.5">
           <Label className="text-sm font-medium">Manual decider models</Label>
+          <p className="text-muted-foreground text-xs">
+            Each selected model benchmarks every supported reasoning effort. Queue status is shown
+            in the registry below.
+          </p>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Model</TableHead>
-                  <TableHead className="w-36">Variant</TableHead>
+                  <TableHead>Effort coverage</TableHead>
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {form.deciderModels.map((row, index) => {
-                  const rowModel = modelOptions.find(option => option.id === row.id);
-                  const variantOptions = variantOptionsForModel(rowModel, row.variant);
                   return (
                     <TableRow key={index}>
                       <TableCell className="py-2">
@@ -588,9 +582,7 @@ function BenchmarkConfigEditor({
                           variant="compact"
                           models={modelOptions}
                           value={row.id}
-                          onValueChange={value =>
-                            handleDeciderRowChange(index, { id: value, variant: null })
-                          }
+                          onValueChange={value => handleDeciderRowChange(index, { id: value })}
                           pinnedModel={
                             row.id && !modelOptions.some(option => option.id === row.id)
                               ? pinnedModelFor(row.id)
@@ -603,19 +595,12 @@ function BenchmarkConfigEditor({
                         />
                       </TableCell>
                       <TableCell className="py-2">
-                        {variantOptions.length > 0 ? (
-                          <VariantCombobox
-                            variants={variantOptions}
-                            value={row.variant ?? undefined}
-                            onValueChange={value =>
-                              handleDeciderRowChange(index, { variant: value })
-                            }
-                            className="w-full"
-                            triggerAriaLabel={`Decider model ${index + 1} variant`}
-                          />
-                        ) : row.id ? (
-                          <span className="text-muted-foreground text-xs">default</span>
-                        ) : null}
+                        {row.id
+                          ? effortCoverageForModel(
+                              modelOptions.find(model => model.id === row.id),
+                              registryEntries
+                            )
+                          : null}
                       </TableCell>
                       <TableCell className="py-2">
                         <Button
@@ -660,7 +645,7 @@ function BenchmarkConfigEditor({
                   <TableRow>
                     <TableHead>Model ID</TableHead>
                     <TableHead className="w-32">Avg run</TableHead>
-                    <TableHead className="w-36">Reasoning effort</TableHead>
+                    <TableHead>Effort coverage</TableHead>
                     <TableHead className="w-24">Included</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -676,7 +661,10 @@ function BenchmarkConfigEditor({
                           {formatUsd(model.avgAttemptCostUsd)}
                         </TableCell>
                         <TableCell className="text-muted-foreground text-xs">
-                          {model.variant ?? model.reasoningEffort ?? 'default'}
+                          {effortCoverageForModel(
+                            modelOptions.find(option => option.id === model.id),
+                            registryEntries
+                          )}
                         </TableCell>
                         <TableCell>
                           <Checkbox
@@ -1013,6 +1001,9 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
                   <TableHead className="text-xs">Model</TableHead>
                   {isDecider ? <TableHead className="text-xs">Route</TableHead> : null}
                   <TableHead className="text-right text-xs">Accuracy</TableHead>
+                  {isDecider ? null : (
+                    <TableHead className="text-right text-xs">Route accuracy</TableHead>
+                  )}
                   <TableHead className="text-right text-xs">Avg cost</TableHead>
                   <TableHead className="text-right text-xs">Avg latency</TableHead>
                   <TableHead className="text-right text-xs">p50 latency</TableHead>
@@ -1032,6 +1023,11 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
                     <TableCell className="text-right tabular-nums text-xs">
                       {formatAccuracy(s.accuracy)}
                     </TableCell>
+                    {isDecider ? null : (
+                      <TableCell className="text-right tabular-nums text-xs">
+                        {s.routeAccuracy !== null ? formatAccuracy(s.routeAccuracy) : '—'}
+                      </TableCell>
+                    )}
                     <TableCell className="text-right tabular-nums text-xs">
                       {formatUsd(s.avgCostUsd)}
                     </TableCell>
@@ -1177,50 +1173,81 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
       </div>
 
       {routeEntries.map(([routeKey, candidates]) => {
+        const first = candidates[0];
         return (
-          <div key={routeKey}>
-            <p className="mb-1.5 font-mono text-sm font-medium">{routeKey}</p>
-            <div className="overflow-x-auto rounded-md border">
-              <Table className="min-w-max">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Model</TableHead>
-                    <TableHead className="w-36">Variant</TableHead>
-                    <TableHead className="text-right">Accuracy</TableHead>
-                    <TableHead className="text-right">Avg cost</TableHead>
-                    <TableHead className="text-right">Cost / accuracy</TableHead>
-                    <TableHead>Threshold</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {candidates.map((c, i) => (
-                    <TableRow key={`${routeKey}-${c.model}-${i}`}>
-                      <TableCell className="max-w-56 truncate font-mono text-xs">
-                        {c.model}
-                      </TableCell>
-                      <TableCell className="capitalize text-xs">
-                        {c.variant ?? c.reasoningEffort ?? 'default'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {formatAccuracy(c.accuracy)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {formatUsd(c.avgCostUsd)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-xs">
-                        {formatCostPerAccuracy(c)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
-                          {c.meetsThreshold ? 'meets' : 'below'}
-                        </Badge>
-                      </TableCell>
+          <Collapsible key={routeKey} className="rounded-md border">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size={null}
+                className="min-h-11 w-full justify-start gap-3 whitespace-normal px-3 py-2 text-left [&[data-state=open]>svg]:rotate-90"
+              >
+                <ChevronRight className="size-4 shrink-0" />
+                <span className="grid flex-1 gap-x-4 gap-y-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto]">
+                  <span className="break-all font-mono text-xs">{routeKey}</span>
+                  <span className="break-all text-xs">
+                    <span className="text-muted-foreground">First-ranked: </span>
+                    {first
+                      ? `${first.model} · ${first.variant ?? first.reasoningEffort ?? 'default'}`
+                      : 'No ranked pairs'}
+                  </span>
+                  <span className="text-xs tabular-nums">
+                    {first ? `Accuracy ${formatAccuracy(first.accuracy)}` : '—'}
+                  </span>
+                  <span className="text-xs tabular-nums">
+                    {first ? `Avg cost ${formatUsd(first.avgCostUsd)}` : '—'}
+                  </span>
+                  <span className="text-xs">
+                    {first ? (first.meetsThreshold ? 'Meets threshold' : 'Below threshold') : '—'}
+                  </span>
+                </span>
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="overflow-x-auto border-t">
+                <Table className="min-w-max">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Rank</TableHead>
+                      <TableHead>Model</TableHead>
+                      <TableHead className="w-36">Effort</TableHead>
+                      <TableHead className="text-right">Accuracy</TableHead>
+                      <TableHead className="text-right">Avg cost</TableHead>
+                      <TableHead className="text-right">Cost / accuracy</TableHead>
+                      <TableHead>Threshold</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {candidates.map((c, i) => (
+                      <TableRow key={`${routeKey}-${c.model}-${i}`}>
+                        <TableCell className="text-xs tabular-nums">{i + 1}</TableCell>
+                        <TableCell className="max-w-56 break-all font-mono text-xs">
+                          {c.model}
+                        </TableCell>
+                        <TableCell className="capitalize text-xs">
+                          {c.variant ?? c.reasoningEffort ?? 'default'}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {formatAccuracy(c.accuracy)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {formatUsd(c.avgCostUsd)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums text-xs">
+                          {formatCostPerAccuracy(c)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={c.meetsThreshold ? 'default' : 'secondary'}>
+                            {c.meetsThreshold ? 'meets' : 'below'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         );
       })}
     </div>
@@ -1295,11 +1322,20 @@ export function BenchmarksSection() {
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
 
   const modelsQuery = useModelSelectorList(undefined);
-  const modelOptions = useMemo(
-    () => toEligibleModelOptions(modelsQuery.data?.data ?? [], []),
-    [modelsQuery.data?.data]
-  );
+  const modelOptions = useMemo(() => {
+    const models = modelsQuery.data?.data ?? [];
+    const coverage = new Map(
+      models.map(model => [model.id, getReasoningVariantKeys(model.opencode?.variants)])
+    );
+    return toEligibleModelOptions(models, []).map(model => ({
+      ...model,
+      reasoningVariants: coverage.get(model.id),
+    }));
+  }, [modelsQuery.data?.data]);
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
+  const systemOneModelsQuery = useSystemOneModelOptions();
+  const systemOneModelsError =
+    systemOneModelsQuery.error instanceof Error ? systemOneModelsQuery.error.message : undefined;
 
   const configQuery = useQuery({
     queryKey: ['auto-routing', 'benchmark-config'],
@@ -1441,6 +1477,10 @@ export function BenchmarksSection() {
           modelOptions={modelOptions}
           modelsLoading={modelsQuery.isLoading}
           modelsError={modelsError}
+          registryEntries={registryQuery.data?.platformEntries}
+          classifierModelOptions={systemOneModelsQuery.data ?? []}
+          classifierModelsLoading={systemOneModelsQuery.isLoading}
+          classifierModelsError={systemOneModelsError}
         />
       ) : null}
 

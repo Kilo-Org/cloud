@@ -153,7 +153,6 @@ import type {
   AuditLogAction,
   EncryptedData,
   AuthProviderId,
-  AbuseClassification,
   PlatformRepository,
   IntegrationPermissions,
   BuildStatus,
@@ -175,9 +174,9 @@ import type {
   OpenRouterModel,
   StripeSubscriptionStatus,
   StoredModel,
-  GatewayApiKind,
   ContributorChampionTier,
 } from './schema-types';
+import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 
@@ -2807,6 +2806,7 @@ export const microdollar_usage_metadata = pgTable(
     session_id: text(),
     mode_id: integer(),
     auto_model_id: integer(),
+    reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),
@@ -2963,6 +2963,15 @@ export const auto_model = pgTable(
   table => [uniqueIndex('UQ_auto_model').on(table.auto_model)]
 );
 
+export const reasoning_setting = pgTable(
+  'reasoning_setting',
+  {
+    reasoning_setting_id: serial().notNull().primaryKey(),
+    reasoning_setting: text().notNull(),
+  },
+  table => [uniqueIndex('UQ_reasoning_setting').on(table.reasoning_setting)]
+);
+
 export const microdollar_usage_view = pgView('microdollar_usage_view', {
   id: uuid().notNull(),
   kilo_user_id: text().notNull(),
@@ -3012,6 +3021,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   session_id: text(),
   mode: text(),
   auto_model: text(),
+  reasoning_setting: text(),
   market_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
   abuse_delay: integer(),
@@ -3066,6 +3076,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     meta.session_id,
     md.mode,
     am.auto_model,
+    rs.reasoning_setting,
     meta.market_cost,
     meta.is_free,
     meta.abuse_delay,
@@ -3084,6 +3095,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   LEFT JOIN ${feature} feat ON meta.feature_id = feat.feature_id
   LEFT JOIN ${mode} md ON meta.mode_id = md.mode_id
   LEFT JOIN ${auto_model} am ON meta.auto_model_id = am.auto_model_id
+  LEFT JOIN ${reasoning_setting} rs ON meta.reasoning_setting_id = rs.reasoning_setting_id
 `);
 
 export type MicrodollarUsageView = typeof microdollar_usage_view.$inferSelect;
@@ -3301,57 +3313,6 @@ export const organizations = pgTable(
 );
 
 export type Organization = typeof organizations.$inferSelect;
-
-export type OrganizationDomainClaimStatus = 'pending' | 'verified';
-
-export const organization_domain_claims = pgTable(
-  'organization_domain_claims',
-  {
-    id: idPrimaryKeyColumn,
-    organization_id: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-    domain: text().notNull(),
-    status: text().$type<OrganizationDomainClaimStatus>().notNull().default('pending'),
-    workos_organization_id: text(),
-    workos_domain_id: text(),
-    verified_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    unique('UQ_organization_domain_claims_organization_domain').on(
-      table.organization_id,
-      table.domain
-    ),
-    uniqueIndex('UQ_organization_domain_claims_verified_domain')
-      .on(table.domain)
-      .where(sql`${table.status} = 'verified'`),
-    uniqueIndex('UQ_organization_domain_claims_workos_domain_id')
-      .on(table.workos_domain_id)
-      .where(sql`${table.workos_domain_id} IS NOT NULL`),
-    index('IDX_organization_domain_claims_organization_id').on(table.organization_id),
-    check(
-      'organization_domain_claims_canonical_domain_check',
-      sql`length(${table.domain}) BETWEEN 1 AND 253 AND ${table.domain} = lower(btrim(${table.domain}))`
-    ),
-    check(
-      'organization_domain_claims_status_check',
-      sql`${table.status} IN ('pending', 'verified')`
-    ),
-    check(
-      'organization_domain_claims_verification_shape_check',
-      sql`(${table.status} = 'pending' AND ${table.verified_at} IS NULL)
-        OR (${table.status} = 'verified' AND ${table.verified_at} IS NOT NULL AND ${table.workos_organization_id} IS NOT NULL AND ${table.workos_domain_id} IS NOT NULL)`
-    ),
-  ]
-);
-
-export type OrganizationDomainClaim = typeof organization_domain_claims.$inferSelect;
-export type NewOrganizationDomainClaim = typeof organization_domain_claims.$inferInsert;
 
 export const kilo_pass_org_term_versions = pgTable(
   'kilo_pass_org_term_versions',
@@ -6574,6 +6535,7 @@ export type CloudAgentFailureReason =
   | 'session_import_timeout'
   | 'session_import_failed'
   | 'setup_command_timeout'
+  | 'container_limit_reached'
   | 'admission_capacity'
   | 'admission_not_found'
   | 'admission_internal'
@@ -6707,6 +6669,7 @@ export type CloudAgentSessionRunFailureStage =
   | 'unknown';
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
+  | 'container_limit_reached'
   | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'
@@ -11336,6 +11299,10 @@ export const container_usage_interval = pgTable(
       table.subject_id,
       table.started_at
     ),
+    index('IDX_container_usage_interval_open_subject')
+      .on(table.subject_type, table.subject_id)
+      .concurrently()
+      .where(sql`${table.status} = 'open'`),
     uniqueIndex('UQ_container_usage_interval_single_open')
       .on(table.service, table.instance_id)
       .where(sql`${table.status} = 'open'`),
@@ -11682,6 +11649,54 @@ export const bouncer_credit_event_outbox = pgTable(
 
 export type BouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferSelect;
 export type NewBouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferInsert;
+
+/**
+ * Durable outbox for Bouncer usage events of requests whose decide verdict said `spendWatch`.
+ * Bouncer debits a watched account's spend bucket from these events, so they must not be lost to a
+ * Bouncer or network outage. The usage write enqueues the row in the same transaction as the
+ * `microdollar_usage` insert, the gateway then tries one immediate delivery, and the cron drainer
+ * retries failures with the same state machine as `bouncer_credit_event_outbox`. `request_id` is
+ * the bouncer request id shared by decide and the usage event; Bouncer dedupes on it, so a
+ * redelivery counts once. `payload` is the shaped usage-event wire body and carries account PII
+ * (account id, client ip, JA4 client-fingerprint digest); `user_id` is denormalized onto the row
+ * so user soft deletion can delete it.
+ */
+export type BouncerUsageEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_usage_event_outbox = pgTable(
+  'bouncer_usage_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The bouncer request id; the dedupe key that makes enqueue idempotent. */
+    request_id: text().notNull(),
+    /** The Kilo user who made the request; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerUsageEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_usage_event_outbox_request_id').on(table.request_id),
+    index('IDX_bouncer_usage_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_usage_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerUsageEventOutboxRow = typeof bouncer_usage_event_outbox.$inferSelect;
 
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 

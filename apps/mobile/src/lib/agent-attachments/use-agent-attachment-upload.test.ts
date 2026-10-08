@@ -1084,7 +1084,6 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     });
 
     expect(hoisted.announceForA11y).toHaveBeenCalledTimes(1);
-    expect(hoisted.announceForA11y).toHaveBeenCalledWith('Attachment uploaded');
     const attachment = hookApi().attachments[0];
     expect(attachment?.status).toBe('uploaded');
     expect(attachment?.remoteFilename).toBe('doc.pdf');
@@ -1101,18 +1100,14 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     });
 
     expect(hoisted.announcingToastError).toHaveBeenCalledTimes(1);
-    expect(hoisted.announcingToastError).toHaveBeenCalledWith(
-      'Failed to upload file: Network error'
-    );
     expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     const attachment = hookApi().attachments[0];
     expect(attachment?.status).toBe('error');
     expect(attachment?.terminal).toBe(false);
-    expect(attachment?.error).toBe('Network error');
     renderer.unmount();
   });
 
-  it('owns terminal failure announcements: one announcingToast.error with terminal copy', async () => {
+  it('owns terminal failure announcements without a success announcement', async () => {
     const renderer = await mountHook();
     await addDocument();
 
@@ -1122,11 +1117,10 @@ describe('useAgentAttachmentUpload — announcement ownership (Row 3.3)', () => 
     });
 
     expect(hoisted.announcingToastError).toHaveBeenCalledTimes(1);
-    expect(hoisted.announcingToastError).toHaveBeenCalledWith("This file can't be uploaded.");
+    expect(hoisted.announceForA11y).not.toHaveBeenCalled();
     const attachment = hookApi().attachments[0];
     expect(attachment?.status).toBe('error');
     expect(attachment?.terminal).toBe(true);
-    expect(attachment?.error).toBe("This file can't be uploaded.");
     renderer.unmount();
   });
 

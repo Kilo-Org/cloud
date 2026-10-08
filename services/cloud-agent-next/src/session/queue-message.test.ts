@@ -21,7 +21,10 @@ import type {
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
 
-vi.mock('./model-preflight.js', () => ({ preflightExistingPromptModel: vi.fn() }));
+vi.mock('./model-preflight.js', () => ({
+  preflightExistingPromptModel: vi.fn(),
+  preflightSessionRuntime: vi.fn().mockResolvedValue(undefined),
+}));
 
 type QueueMessageEnv = Pick<Env, 'CLOUD_AGENT_SESSION' | 'SANDBOX_SESSION'>;
 

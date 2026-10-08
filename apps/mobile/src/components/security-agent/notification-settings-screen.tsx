@@ -104,8 +104,6 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     setSlaNotificationWarningDays(config.data.slaNotificationWarningDays);
   }, [config.data]);
 
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
-
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
   // mirroring finding-detail-screen.tsx's tracked-once pattern.
@@ -138,13 +136,18 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const dirty =
     hydratedRef.current &&
     getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
     initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    onSave: handleSave,
+  });
 
   const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({
     value: option.value,
@@ -164,8 +167,9 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   if (config.isLoading || !config.data) {
     return <NotificationSettingsSkeleton />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
   }
 
   return (
@@ -258,7 +262,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                       : t('securityAgent.sla.enterWholeNumber')
                   }
                   className={cn(
-                    'rounded-lg bg-secondary px-3 text-sm text-foreground',
+                    'rounded-lg bg-secondary pl-3 pr-3 text-sm text-foreground',
                     !canManage && 'opacity-50'
                   )}
                   editable={canManage}
@@ -283,6 +287,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           )}
         </View>
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

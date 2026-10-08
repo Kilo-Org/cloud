@@ -3,6 +3,7 @@ import type { WrapperKiloClient } from './kilo-api.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
+import { createMessageId } from '../../src/shared/message-id.js';
 import { decidePublicationRecovery, PUBLICATION_RECOVERY_PROMPT } from './publication-recovery.js';
 
 const DRAIN_DELAY_MS = 250;
@@ -130,6 +131,7 @@ export function createLifecycleManager(
           userMessageId: state.pendingMessageIds.at(-1),
           upstreamBranch: msgConfig.upstreamBranch,
           ...(msgConfig.commitCoAuthor ? { commitCoAuthor: msgConfig.commitCoAuthor } : {}),
+          secretEnvKeys: state.secretEnvKeys,
           signal: autoCommitController.signal,
         }).finally(() => clearTimeout(timeout));
         if (autoCommitTimedOut && !result.success) {
@@ -314,9 +316,10 @@ export function createLifecycleManager(
     try {
       await deps.kiloClient.sendPromptAsync({
         sessionId: session.kiloSessionId,
-        // Kilo rejects a message id without its `msg` prefix (400), so the
-        // synthetic recovery turn must use the same convention as admissions.
-        messageId: `msg_recovery_${crypto.randomUUID()}`,
+        // The synthetic recovery turn is a real Kilo message: mint the same
+        // time-sortable id admissions use so it lands in chronological order
+        // instead of sorting after every `msg_<hex>...` id.
+        messageId: createMessageId(),
         prompt: PUBLICATION_RECOVERY_PROMPT,
         directory: config.workspacePath,
         signal: controller.signal,
@@ -349,7 +352,7 @@ export function createLifecycleManager(
     if (publicationRecoveryInFlight) return;
     const decision = decidePublicationRecovery({
       configured: deps.isGitHubReviewPublicationInstalled(),
-      outputLimit: state.consumeAssistantOutputLimit(),
+      turnFailed: state.consumeAssistantTurnFailure(),
       signal: state.consumePublicationSignal(),
       budgetUsed: publicationRecoveryBudgetUsed,
     });
@@ -445,13 +448,13 @@ export function createLifecycleManager(
       supersedePublicationRecovery();
       publicationRecoveryBudgetUsed = false;
       publicationRecoveryInFlight = false;
-      state.clearAssistantOutputLimit();
+      state.clearAssistantTurnFailure();
       drainPromise = null;
     },
     resetPublicationRecoveryBudget: () => {
       supersedePublicationRecovery();
       publicationRecoveryBudgetUsed = false;
-      state.clearAssistantOutputLimit();
+      state.clearAssistantTurnFailure();
     },
     onSseEvent: resetSseTransportTimer,
   };

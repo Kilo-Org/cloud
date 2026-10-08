@@ -50,6 +50,19 @@ const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
   '@cloudflare/workerd-windows-64@1.20260918.1',
 ] as const;
 
+// Four mobile pins must move without waiting out the gate: FlashList 2.3.3
+// carries the EngagedIndicesTracker scroll-window fix the agent transcript list
+// depends on, react-native-keyboard-controller 1.22.6 carries the
+// KeyboardChatScrollView fixes the keyboard phase depends on (SDK 57 pins
+// 1.21.9), react-native-enriched-markdown 1.1.0 adds the image and code block
+// press events the transcript markdown wires, and react-native-reanimated 4.7.1
+// carries the stability fixes the app needs. One exact package@version each.
+const MOBILE_EXACT_EXCLUDE_ENTRIES = [
+  '@shopify/flash-list@2.3.3',
+  'react-native-keyboard-controller@1.22.6',
+  'react-native-enriched-markdown@1.1.0',
+  'react-native-reanimated@4.7.1',
+] as const;
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
 // @ and a version starting with a digit. Rejects name-only entries, ranges,
 // wildcards, and future-version placeholders alike.
@@ -93,19 +106,24 @@ describe('minimum release age policy contract', () => {
     expect(Number(match?.[1])).toBe(EXPECTED_MINIMUM_RELEASE_AGE_MINUTES);
   });
 
-  it('excludes exactly the base list plus the container-runtime exact versions', () => {
+  it('excludes exactly the base list plus the container-runtime and mobile exact versions', () => {
     // Order as written: tsx, the container-runtime exemptions, then the
-    // remaining base entries — the base list with nothing dropped or changed.
+    // remaining base entries, then the mobile exemptions — the base list with
+    // nothing dropped or changed.
     const expected = [
       BASE_EXCLUDE_ENTRIES[0],
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...BASE_EXCLUDE_ENTRIES.slice(1),
+      ...MOBILE_EXACT_EXCLUDE_ENTRIES,
     ];
     expect(excludeEntries).toEqual(expected);
   });
 
   it('scopes every new exclusion to one exact package@version', () => {
-    expect(newExclusions).toEqual([...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES]);
+    expect(newExclusions).toEqual([
+      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
+      ...MOBILE_EXACT_EXCLUDE_ENTRIES,
+    ]);
     for (const entry of newExclusions) {
       expect(entry).toMatch(EXACT_VERSION_PATTERN);
     }

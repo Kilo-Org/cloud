@@ -25,7 +25,7 @@ export function parseCloudAgentAttachmentUrl(url: string): CloudAgentAttachmentR
   return { messageUuid, filename };
 }
 
-export type FilePartKind = 'image' | 'markdown' | 'other';
+export type FilePartKind = 'image' | 'video' | 'markdown' | 'other';
 
 export function isMarkdownFilePart(filename: string | undefined): boolean {
   return isMarkdownPath(filename ?? '');
@@ -34,6 +34,9 @@ export function isMarkdownFilePart(filename: string | undefined): boolean {
 export function getFilePartKind(input: { mime: string; filename?: string }): FilePartKind {
   if (input.mime.startsWith('image/')) {
     return 'image';
+  }
+  if (input.mime.startsWith('video/')) {
+    return 'video';
   }
   if (isMarkdownFilePart(input.filename)) {
     return 'markdown';
@@ -55,5 +58,7 @@ export function getFilePartAccessibilityLabel(kind: FilePartKind, filename?: str
   if (kind === 'markdown') {
     return i18n.t('agentChat.filePart.preview', { name });
   }
+  // 'video' lands here: the player's own fullscreen control is what "Open"
+  // names, and the app has no video-specific copy to add.
   return i18n.t('common.open', { name });
 }

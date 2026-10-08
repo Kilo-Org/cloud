@@ -511,6 +511,13 @@ function evaluateEntry(platform: string): {
           },
         };
       }
+      case './src/lib/glanceable-refresh-task': {
+        return {
+          registerGlanceableRefreshTask: async (): Promise<void> => {
+            await Promise.resolve();
+          },
+        };
+      }
       default: {
         throw new Error(`The entry required an unexpected module: ${id}`);
       }

@@ -4,19 +4,22 @@ import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
   type LayoutChangeEvent,
+  Platform,
   Pressable,
   Text as RNText,
   useColorScheme,
   View,
 } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
+import { styled } from 'react-native-css';
+import { UITextView } from '@bsky.app/react-native-uitextview';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
-import { renderChunkChildren } from './code-block-chunk-content';
+import { renderChunkChildren, renderSelectableChunkChildren } from './code-block-chunk-content';
 import {
   chunkCodeLines,
   CODE_CHUNK_MOUNT_BATCH,
@@ -86,6 +89,9 @@ const COPY_ACTION_GAP = 8;
  * Mono sizing on every rendered code text: one per chunk of a fence.
  */
 const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
+
+/** `UITextView` with `className` mapped to `style`, like the built-in `Text`. */
+const SelectableCodeText = styled(UITextView, { className: 'style' });
 
 /**
  * Shared highlighted code block for tool detail sheets and markdown fences.
@@ -374,22 +380,41 @@ function CodeBlockImpl({
         accessibilityActions={copyAccessibilityActions}
         onAccessibilityAction={canCopyCode ? handleCopyAccessibilityAction : undefined}
       >
-        {mountedChunks.map((chunk, chunkIndex) => (
-          <RNText
-            // Chunks are positional: the index is their identity.
-            // eslint-disable-next-line react/no-array-index-key -- code chunks are positional, not reorderable
-            key={`chunk-${chunkIndex}`}
-            accessible={false}
-            // Native selection is offered per chunk; the sheet's wrap/scroll
-            // mode and this flag are independent.
-            selectable={effectiveSelectable}
-            className={CODE_LINE_CLASSNAME}
-            // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
-            style={{ color: textBase }}
-          >
-            {renderChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
-          </RNText>
-        ))}
+        {mountedChunks.map((chunk, chunkIndex) =>
+          // iOS `Text selectable` copies the whole Text and shows an empty
+          // first menu (see `selectable-text.tsx`); a `UITextView` chunk gives
+          // the platform's own range selection and callout. Android keeps
+          // `RNText`, whose native selection already works per chunk.
+          Platform.OS === 'ios' && effectiveSelectable ? (
+            <SelectableCodeText
+              // eslint-disable-next-line react/no-array-index-key -- code chunks are positional, not reorderable
+              key={`chunk-${chunkIndex}`}
+              accessible={false}
+              selectable
+              uiTextView
+              className={CODE_LINE_CLASSNAME}
+              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
+              style={{ color: textBase }}
+            >
+              {renderSelectableChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
+            </SelectableCodeText>
+          ) : (
+            <RNText
+              // Chunks are positional: the index is their identity.
+              // eslint-disable-next-line react/no-array-index-key -- code chunks are positional, not reorderable
+              key={`chunk-${chunkIndex}`}
+              accessible={false}
+              // Native selection is offered per chunk; the sheet's wrap/scroll
+              // mode and this flag are independent.
+              selectable={effectiveSelectable}
+              className={CODE_LINE_CLASSNAME}
+              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
+              style={{ color: textBase }}
+            >
+              {renderChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
+            </RNText>
+          )
+        )}
       </View>
     ),
     [

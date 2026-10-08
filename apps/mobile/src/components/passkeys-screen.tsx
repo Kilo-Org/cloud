@@ -1,7 +1,7 @@
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -15,6 +15,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -88,6 +89,7 @@ function InlineFailure({
  */
 export function PasskeysScreen() {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
@@ -182,20 +184,18 @@ export function PasskeysScreen() {
   );
 
   const confirmRemove = (passkey: PasskeyRow) => {
-    Alert.alert(t('profile.removePasskeyTitle'), t('profile.removePasskeyMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        // The destructive action names itself, the same pair every other
-        // confirmation in the app uses (`profile.deleteAccountTitle` /
-        // `profile.deleteAccountConfirm`): a bare "Remove" would not say what
-        // the row is about to lose.
-        text: t('profile.removePasskey'),
-        style: 'destructive',
-        onPress: () => {
-          remove.mutate({ id: passkey.id });
-        },
+    confirm({
+      title: t('profile.removePasskeyTitle'),
+      message: t('profile.removePasskeyMessage'),
+      // The destructive action names itself, the same pair every other
+      // confirmation in the app uses (`profile.deleteAccountTitle` /
+      // `profile.deleteAccountConfirm`): a bare "Remove" would not say what
+      // the row is about to lose.
+      confirmLabel: t('profile.removePasskey'),
+      onConfirm: () => {
+        remove.mutate({ id: passkey.id });
       },
-    ]);
+    });
   };
 
   const handleAdd = async () => {
@@ -413,6 +413,8 @@ export function PasskeysScreen() {
           }}
         />
       )}
+
+      {dialog}
     </View>
   );
 }

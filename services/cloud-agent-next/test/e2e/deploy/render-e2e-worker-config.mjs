@@ -31,7 +31,7 @@ const CALLBACK_QUEUE_E2E = 'cloud-agent-next-callback-queue-e2e-test';
 const REPORT_QUEUE = 'cloud-agent-next-report-queue';
 const SHARED_SANDBOX_OVERRIDES_KV_ID_E2E = '4d5f651fb14b4de682204eaa9fa60a7d';
 
-const E2E_CONTAINER_CLASSES = new Set(['SandboxSmall']);
+const E2E_CONTAINER_CLASSES = new Set(['Sandbox']);
 const E2E_MAX_INSTANCES = 20;
 
 const E2E_CALLBACK_CLASS = 'E2eCallbackSink';
@@ -181,11 +181,15 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     });
   }
 
-  config.kv_namespaces = (config.kv_namespaces ?? []).map(kvNamespace =>
-    kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
-      ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
-      : kvNamespace
-  );
+  // The e2e Worker keeps no `SandboxContainers` class, so it has no repository
+  // snapshots and must not provision a namespace for them.
+  config.kv_namespaces = (config.kv_namespaces ?? [])
+    .filter(kvNamespace => kvNamespace.binding !== 'REPO_SNAPSHOTS')
+    .map(kvNamespace =>
+      kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
+        ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
+        : kvNamespace
+    );
 
   config.queues = {
     ...config.queues,

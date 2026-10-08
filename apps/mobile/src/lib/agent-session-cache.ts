@@ -15,6 +15,7 @@ type ListQueryPathFilter = {
 type AgentSessionTrpcQueries = {
   cliSessionsV2: {
     list: ListQueryPathFilter;
+    search: QueryPathFilter;
     recentRepositories: QueryPathFilter;
   };
   activeSessions: {
@@ -31,6 +32,7 @@ export async function invalidateAgentSessionQueries(
   // that changed.
   reconcileFirstPage(queryClient as QueryClient, trpc.cliSessionsV2.list.pathFilter().queryKey);
   await Promise.all([
+    queryClient.invalidateQueries(trpc.cliSessionsV2.search.pathFilter()),
     queryClient.invalidateQueries(trpc.cliSessionsV2.recentRepositories.pathFilter()),
     queryClient.invalidateQueries(trpc.activeSessions.list.pathFilter()),
   ]);

@@ -1,4 +1,8 @@
-import { formatShortModelName, formatShortModelDisplayName } from './format-model-name';
+import {
+  formatShortModelName,
+  formatShortModelDisplayName,
+  formatModelRefName,
+} from './format-model-name';
 
 describe('formatShortModelName', () => {
   it('strips provider prefix', () => {
@@ -19,6 +23,24 @@ describe('formatShortModelName', () => {
 
   it('handles model with multiple path segments after provider', () => {
     expect(formatShortModelName('google/gemini-2.5-pro')).toBe('gemini-2.5-pro');
+  });
+});
+
+describe('formatModelRefName', () => {
+  it('strips the kilo gateway provider and the upstream provider', () => {
+    expect(formatModelRefName({ providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' })).toBe(
+      'claude-opus-4.6'
+    );
+  });
+
+  it('strips a direct provider prefix', () => {
+    expect(formatModelRefName({ providerID: 'anthropic', modelID: 'claude-sonnet-4' })).toBe(
+      'claude-sonnet-4'
+    );
+  });
+
+  it('returns the model id when it has no slash', () => {
+    expect(formatModelRefName({ providerID: 'openai', modelID: 'gpt-5' })).toBe('gpt-5');
   });
 });
 

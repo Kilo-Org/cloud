@@ -18,6 +18,11 @@ export default {
     if (context.request.kind === 'messages') {
       context.extraHeaders['x-api-key'] = context.provider.apiKey;
     }
+    if (context.request.kind === 'chat_completions') {
+      delete context.request.body.prompt_cache_key;
+      delete context.request.body.safety_identifier;
+      delete context.request.body.user;
+    }
   },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'opencode-go',

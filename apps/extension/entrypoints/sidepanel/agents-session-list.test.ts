@@ -9,8 +9,6 @@ import {
   sessionStatusBadge,
 } from './agents-session-list';
 
-// ---- sessionStatusBadge ----
-
 describe('sessionStatusBadge()', () => {
   it('returns null for null status', () => {
     expect(sessionStatusBadge(null)).toBeNull();
@@ -86,8 +84,6 @@ describe('sessionStatusBadge()', () => {
   });
 });
 
-// ---- mapActiveSessionRow ----
-
 describe('mapActiveSessionRow()', () => {
   const baseSession = {
     connectionId: 'cli-owner-1',
@@ -138,8 +134,6 @@ describe('mapActiveSessionRow()', () => {
   });
 });
 
-// ---- mapHistorySessionRow ----
-
 describe('mapHistorySessionRow()', () => {
   const wireRow = {
     session_id: 'ses_history12345678901234567',
@@ -159,8 +153,6 @@ describe('mapHistorySessionRow()', () => {
     expect(row.title).toBeNull();
   });
 });
-
-// ---- Query key functions ----
 
 describe('query key functions', () => {
   describe('activeSessionsQueryKey()', () => {

@@ -549,6 +549,8 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
+  /** Repository snapshot index for control-plane container starts; absent disables snapshots. */
+  REPO_SNAPSHOTS?: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Record-only container lifecycle usage meter. */
@@ -557,8 +559,6 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
-  /** R2 bucket used by Cloudflare Sandbox directory backups */
-  BACKUP_BUCKET?: R2Bucket;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -606,13 +606,15 @@ export type Env = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Comma-separated user or org IDs admitted to the call-home control plane for interactive web creates. `*` includes personal. */
   CONTROL_PLANE_IDS?: string;
+  /** Comma-separated user or org IDs whose Code Reviewer sessions run on the call-home control plane. `*` includes personal. */
+  CODE_REVIEW_CONTROL_PLANE_IDS?: string;
   WORKTREE_CREATION_ENABLED_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
-  /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */
-  REPO_SNAPSHOT_ORG_IDS?: string;
+  /** Comma-separated user or org IDs whose isolated control-plane containers start from repository snapshots, or '*' for all */
+  CONTAINER_REPO_SNAPSHOT_IDS?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See
    * MEMORY_CGROUPS_PLAN.md (W4).
@@ -643,14 +645,6 @@ export type Env = {
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
   /** R2 bucket name for image attachments */
   R2_ATTACHMENTS_BUCKET?: string;
-  /** R2 bucket name used by Cloudflare Sandbox directory backups */
-  BACKUP_BUCKET_NAME?: string;
-  /** Cloudflare account ID used for R2 backup presigning */
-  CLOUDFLARE_R2_ACCOUNT_ID?: string;
-  /** R2 access key ID used for backup uploads */
-  R2_ACCESS_KEY_ID?: string;
-  /** R2 secret access key used for backup uploads */
-  R2_SECRET_ACCESS_KEY?: string;
   /**
    * Hyperdrive binding for reading Postgres (agent environment profiles).
    * The `connectionString` is proxied through Hyperdrive so the worker

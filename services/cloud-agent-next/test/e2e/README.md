@@ -71,15 +71,66 @@ For new legacy sessions (`agent_*`), `CREDENTIAL_CONTAINMENT_ENABLED` controls
 GitHub, GitLab, Bitbucket, and Kilo credential containment together. Containment
 is enabled unless this variable is set to `false`. Local `dev` defaults to
 `false`; set `CREDENTIAL_CONTAINMENT_ENABLED=true` in `.dev.vars` when using
-proxy-compatible upstreams. Legacy devcontainer sessions remain excluded because
-DIND does not support managed SCM containment.
+proxy-compatible upstreams. Devcontainer support is retired; existing sessions
+can be stopped or deleted but cannot start or resume.
 
 Legacy containment flags are persisted at session creation, so changing the
 variable affects new legacy sessions, not existing ones.
 
 ## Running
 
-> **Non-zero port offset:** except for `multichat-real.ts`, the drivers below use
+### Native supervision acceptance fixtures
+
+With the deterministic model selected, send a native `/goal` command whose objective
+is one of the following. Use a fresh alphanumeric/hyphen/underscore tag for every run.
+
+| Objective | Native workload after the initial execution closes |
+|---|---|
+| `__fake__:supervision:<tag>:progress:660` | Runs three 220-second native tools, emits progress between them, then reports the goal complete after 11 minutes. Model requests remain shorter than the gateway's ten-minute limit. |
+| `__fake__:supervision:<tag>:stuck:1800` | Holds the model response without output for up to 30 minutes. The wrapper's production 20-minute no-progress deadline should cancel it first. |
+| `__fake__:supervision:<tag>:silent:300` | Runs a silent five-minute `bash` sleep with a 330-second native timeout, then reports the goal complete. |
+
+The first execution runs one harmless bootstrap command and finishes its assistant
+reply. The fixture begins its workload only after a later native user message appears
+after that reply, so the initial `/goal` instruction cannot substitute for autonomous
+continuation. The fake shares the ordinary Node/Worker implementation; it adds no
+production goal tracking. Stream timers are released on model-request cancellation.
+Silent tools are limited to 540 seconds because Kilo 7.8.1 caps `bash` at ten minutes.
+
+These directives provide workloads, not acceptance verdicts. Capture the first
+Cloud message's terminal outcome before evaluating the autonomous interval. Prove
+the built wrapper hash, allocation/container identity, active heartbeats and lease
+renewal through the interval; after completion or timeout, observe the unchanged
+ten-minute idle policy. For the stalled case, check the retained/displayed
+`no_progress` reason and recovery with a fresh message in the same chat.
+
+Fast native fixture checks use one- to three-second workloads and an explicit abort for the
+stall. They prove the fixture's continuation and cleanup contracts, not production
+timer or sandbox acceptance:
+
+```bash
+cd services/cloud-agent-next/wrapper
+KILO_781_BINARY=/path/to/isolated/kilo-7.8.1 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
+```
+
+The local production-timer driver discovers this worktree's ports, uses the seeded
+GitHub-enabled account, checks Kilo 7.8.1 and the running wrapper hash, and records
+native continuation, unchanged Cloud outcomes, allocation activity and physical
+idle shutdown. It leaves the stopped chat available for browser/recovery checks:
+
+```bash
+E2E_WRAPPER_SHA256=<sha256-of-reviewed-minified-control-plane-bundle> \
+  pnpm exec tsx services/cloud-agent-next/test/e2e/supervision-local.ts \
+  progress dev/logs/supervision-acceptance/progress-unique-run
+```
+
+Use `stuck` or `silent` for the other cases. Provide a new evidence directory for
+each run. Its local creation credential lasts four hours so a later recovery check
+does not inherit the ordinary driver token's one-hour expiry. These checks take
+roughly 21, 30 and 15 minutes respectively and retain
+the production timers. Freeze source until all timing cases finish.
+
+> **Non-zero port offset:** except for `multichat-real.ts` and `supervision-local.ts`, the drivers below use
 > the default ports (`8794`/`8811`), which only match a zero-offset session. For any other
 > session, first read the offset from `pnpm dev:status --json`
 > (`portOffset` field), then prefix every driver invocation with
@@ -649,7 +700,7 @@ Node server (`fake-llm-server.ts`) and the deployed Worker + Durable Object
 | `realistic:<text>` | Role delta, 3 deterministic reasoning deltas, then content deltas with whitespace separators as their own deltas, then stop + [DONE] with usage; text is capped at 4000 characters and 512 pieces to emulate a real provider stream. |
 | `idle` | One empty-delta chunk, then stop + `[DONE]`. |
 | `hang` | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths. |
-| `first-token:<tag>[:<completion>]` | Emits one assistant content chunk (`held-first-token`) then parks the SSE stream open, so a client frozen mid-turn never receives a finish. A later request with the same tag completes normally with `<completion>` (default `done-<tag>`); this is how a wrapper restart-resubmission recovers the turn. Used by `kilo-hang-recovery`. |
+| `first-token:<tag>[:<completion>]` | Emits one assistant content chunk (`held-first-token`) then parks the SSE stream open, so a client frozen mid-turn never receives a finish. A later request with the same tag completes normally with `<completion>` (default `done-<tag>`); the fixture can also exercise a later request with that tag. `kilo-hang-recovery` observes the first native delta, expects `agent_restarted` after the freeze, and recovers with a fresh message. |
 | `error-terminal:<msg>` | HTTP 400 with OpenAI-shaped error body carrying `<msg>`. Exercises nonretryable provider-error propagation through the gateway. |
 | `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. The non-BYOK gateway converts this to retryable HTTP 503. |
 | `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
@@ -737,7 +788,7 @@ reusable catalog of planned and existing scenarios, see
 | `contained-credentials` | New-plane only. See the new-plane table above: clone + model + checkout read under containment, plus a raw-credential negative check. |
 | `kilo-kill-recovery` | New-plane only. See the new-plane table above: `SIGKILL` Kilo after tool progress, require `agent_restarted`, recover in the same container. |
 | `wrapper-kill-recovery` | New-plane only. See the new-plane table above: `SIGKILL` the new-plane wrapper, require `agent_restarted` and the old Kilo pid gone, recover in the same container. |
-| `kilo-hang-recovery` | New-plane only. See the new-plane table above: `SIGSTOP` Kilo while the fake holds the first token, require a new Kilo pid and the user message once, recover on the replayed turn. |
+| `kilo-hang-recovery` | New-plane only. See the new-plane table above: `SIGSTOP` Kilo while the fake holds the first token, require a new Kilo pid, the progressed turn failing `agent_restarted`, the original user message once, and a fresh follow-up completing. |
 
 The three callback scenarios are shared definitions. Their `callbacks` capability
 is provided by the profile: a host HTTP sink under local Docker, and the e2e
@@ -773,7 +824,7 @@ need a separate create path.
 | `contained-credentials` | Requires `credentialContainment`, advertised from the Worker's own `.dev.vars` `CREDENTIAL_CONTAINMENT_ENABLED` (not a second harness flag). Proves the new plane, requires clone + model + a real checkout read to complete, and proves the negative: no raw SCM credential marker in the container environment and no credential in the git remote. The harness cannot observe the credential lookup itself; a failed negative check is the signal that containment did not apply. |
 | `kilo-kill-recovery` | Holds a turn with `write-then-gate` (a real write tool call, so the turn made progress), then `SIGKILL`s the captured `kilo serve` process. Requires the held message to fail with `agent_restarted` (not be resubmitted) and a follow-up to complete in the same container. |
 | `wrapper-kill-recovery` | Same tool-progress hold, then `SIGKILL`s the captured new-plane control wrapper. Requires `agent_restarted`, proves the old Kilo pid is gone, and requires a follow-up to complete in the same container. |
-| `kilo-hang-recovery` | `SIGSTOP`s Kilo while the fake LLM holds the first token (`first-token:<tag>`). Requires the wrapper to restart Kilo with a new pid and the replayed turn to complete, and requires the user message to appear exactly once in Kilo history (text parts == 1), which catches the B8 duplicate-parts behaviour. |
+| `kilo-hang-recovery` | `SIGSTOP`s Kilo while the fake LLM holds the first token (`first-token:<tag>`). Waits for a correlated native assistant delta before freezing. Requires a new Kilo pid, the progressed turn failing `agent_restarted`, and a fresh follow-up completing in the same allocation. The original user message must appear exactly once in Kilo history (text parts == 1). Pre-progress retry remains a separate wrapper regression contract. |
 
 Capabilities: all eight need `controlPlaneV2` + `controlPlaneRuntime`; the three
 process faults add `sandboxFaults`; callback/report adds `callbacks` + `reports`

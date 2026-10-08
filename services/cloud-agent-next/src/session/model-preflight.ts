@@ -5,6 +5,10 @@ import { fetchSessionMetadata } from '../session-service.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { hasModernRuntimeAuthorization } from './runtime-authorization-persistence.js';
+import {
+  DEVCONTAINER_RETIRED_MESSAGE,
+  hasRetiredDevcontainerRuntime,
+} from '../persistence/session-metadata.js';
 
 type StoredSessionPreflightInput = {
   env: PersistenceEnv;
@@ -24,7 +28,14 @@ async function requireSessionMetadata(
   if (!metadata) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
   }
+  if (hasRetiredDevcontainerRuntime(metadata)) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: DEVCONTAINER_RETIRED_MESSAGE });
+  }
   return metadata;
+}
+
+export async function preflightSessionRuntime(input: StoredSessionPreflightInput): Promise<void> {
+  await requireSessionMetadata(input);
 }
 
 async function assertModelFromStoredContext(

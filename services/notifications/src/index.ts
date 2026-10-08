@@ -154,6 +154,16 @@ app.post('/internal/v1/dispatch', async c => {
       ) as unknown as RecipientDOStub,
     readPreferences: async userId => readPreferencesRow(db, userId),
   });
+  const failedRecipients = result.perRecipient.filter(r => r.outcome === 'failed').length;
+  if (failedRecipients > 0) {
+    // Counts and the caller-supplied dispatch id only — never recipient ids.
+    console.warn('Internal dispatch completed with failed recipients', {
+      dispatchId: c.req.header('X-Dispatch-Id') ?? null,
+      kind: parsed.data.kind,
+      failedRecipients,
+      totalRecipients: result.perRecipient.length,
+    });
+  }
   return c.json(result);
 });
 

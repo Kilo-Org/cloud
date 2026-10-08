@@ -1,5 +1,5 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject, SELF } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -14,7 +14,10 @@ import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js'
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackJob } from '../../src/callbacks/types.js';
-import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import {
+  parseSessionMetadata,
+  DEVCONTAINER_RETIRED_MESSAGE,
+} from '../../src/persistence/session-metadata.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
 import { VercelSandboxRestError } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
@@ -30,10 +33,11 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneRouteSpec,
-  ControlPlaneRouteUpdate,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneRouteSpec,
+  type ControlPlaneRouteUpdate,
 } from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import type { MessageResultRPCResponse } from '../../src/session/message-result.js';
@@ -51,6 +55,44 @@ const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
 const SESSION_OWNER_ID = 'user_123';
 const QUEUED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.queuedBackstopMs;
 const ACCEPTED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.acceptedBackstopMs;
+
+describe('retired control-plane runtime recovery', () => {
+  it.each(['unknown', 'ready'] as const)(
+    'fails stored devcontainer work from a %s route before prepare or delivery and keeps Stop accessible',
+    async routeState => {
+      const sessionId = newSessionId();
+      const sandboxId = `istd-${'a'.repeat(48)}`;
+      const stub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+      const peer = new FakeSandboxPeer();
+      await stub.registerSession(registration(sandboxId, sessionId));
+      await installPeer(stub, peer);
+      await runInDurableObject(stub, async (instance, state) => {
+        const metadata = parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { userId: SESSION_OWNER_ID, sessionId },
+          auth: { kilocodeToken: NATIVE_KILO_TOKEN },
+          workspace: { sandboxId, devcontainerRequested: true },
+          lifecycle: { version: 1, timestamp: 1 },
+        });
+        Object.assign(instance, { metadata });
+        await state.storage.put('session_metadata', metadata);
+        if (routeState === 'ready') {
+          Object.assign(instance, { route: peer.view('ready') });
+          await state.storage.put('control_plane_route', peer.view('ready'));
+        }
+      });
+      const messageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+      await expect(stub.send(promptPayload(messageId))).resolves.toEqual({ type: 'ok' });
+      expect(await messageStatus(stub, messageId)).toBe('failed');
+      expect(await readMessageReason(stub, messageId)).toBe(DEVCONTAINER_RETIRED_MESSAGE);
+      expect(peer.prepareCalls).toEqual([]);
+      expect(peer.deliverCalls).toEqual([]);
+      await stub.stop();
+      expect(peer.abortCalls).toEqual([sessionId]);
+      expect((await stub.getMetadata())?.workspace?.devcontainerRequested).toBe(true);
+    }
+  );
+});
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
@@ -313,6 +355,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -1283,9 +1326,12 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
         db.insert(allocationTable).values(allocation).run();
-        db.insert(routesTable)
-          .values({ ...route, grant: JSON.stringify(grant) })
-          .run();
+        // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
+        db.run(
+          sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
+              VALUES (${route.session_id}, ${route.spec}, ${JSON.stringify(grant)}, ${route.credential_source},
+                      ${route.state}, ${route.attempt_id}, ${route.attempt_deadline_at}, ${route.reason}, ${route.updated_at})`
+        );
         const originalPeerFor = instance.sessionPeerFor;
         let reconstructed: SandboxControlV2 | undefined;
         const restore = () => {
@@ -1614,7 +1660,14 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         expect(callbacks.filter(job => job.payload.messageId === 'retry-B')).toHaveLength(1);
         expect(callbacks.find(job => job.payload.messageId === 'retry-B')?.payload).toMatchObject({
           status: 'failed',
-          errorMessage: 'Workspace setup failed',
+          errorMessage: 'Repository authentication failed',
+          failureStage: 'pre_dispatch',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            subtype: 'git_authentication_failed',
+            message: 'Repository authentication failed',
+          },
         });
         await sessionStub.onRoute({ state: 'ready', attemptId: attemptA.attemptId });
         await sessionStub.onRoute({
@@ -1723,6 +1776,12 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           ? 'Sandbox billing requires additional credits'
           : 'Sandbox configuration is invalid or unsupported'
       );
+      // A settlement without facts still carries the structured failure.
+      expect(callbacks[0]?.payload.failureStage).toBe('pre_dispatch');
+      expect(callbacks[0]?.payload.failure).toMatchObject({
+        stage: 'pre_dispatch',
+        code,
+      });
       expect(provider.createCalls).toBe(1);
       await waitFor(async () =>
         expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
@@ -1741,7 +1800,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           wrapperId: 'wr_recovered',
           allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
         })
-      ).toEqual({ type: 'welcome', protocolVersion: 2 });
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
       expect(await wrapper.next()).toMatchObject({ type: 'session.prepare', spec: { sessionId } });
       const recoveredRoute = (await sandboxStub.status({ sessionId })).view;
       if (failedRoute.state !== 'failed' || recoveredRoute.state !== 'preparing')
@@ -1876,7 +1935,10 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
 
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     const helloReply = await wrapper.hello({ wrapperId: 'wr_1', allocationId });
-    expect(helloReply).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(helloReply).toEqual({
+      type: 'welcome',
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+    });
 
     const prepareFrame = await wrapper.next();
     expect(prepareFrame?.type).toBe('session.prepare');

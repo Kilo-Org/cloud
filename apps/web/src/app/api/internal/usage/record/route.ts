@@ -4,10 +4,7 @@ import type { NextRequest } from 'next/server';
 
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { saveUsageRelatedDataLocally } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
-import {
-  UsageRecordRequestSchema,
-  type UsageRecordResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/usage-record-contract';
+import { UsageRecordRequestSchema, type UsageRecordResponse } from '@kilocode/usage-contracts';
 import {
   createPhaseTimer,
   emitUsageRecordTiming,
@@ -78,14 +75,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
 
-  const { core, metadata, prior_microdollar_usage, posthog_distinct_id } = parsed.data;
+  const { core, metadata, prior_microdollar_usage, posthog_distinct_id, bouncer_usage_event } =
+    parsed.data;
 
   // Redelivery is handled inside the write, not by a lookup here.
   const result = await saveUsageRelatedDataLocally(
     core,
     metadata,
     prior_microdollar_usage,
-    posthog_distinct_id
+    posthog_distinct_id,
+    bouncer_usage_event ?? null
   );
   timer.mark('write');
 

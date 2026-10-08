@@ -115,7 +115,7 @@ const keyboard = vi.hoisted(() => {
     },
   };
 });
-export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
+export { announcements, catalogs, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);

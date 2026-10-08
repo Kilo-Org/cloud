@@ -120,6 +120,7 @@ import {
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  bouncer_usage_event_outbox,
   external_side_effect_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -131,19 +132,7 @@ import {
   quick_chat_threads,
   quick_chat_messages,
 } from '@kilocode/db/schema';
-import {
-  eq,
-  and,
-  inArray,
-  isNotNull,
-  isNull,
-  sql,
-  or,
-  gte,
-  count,
-  ne,
-  notExists,
-} from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
@@ -162,6 +151,9 @@ import {
   generateVercelDownstreamSafetyIdentifier,
 } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
+import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
+import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
   deleteAllOwnedByUserIdPages,
@@ -214,62 +206,8 @@ if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
 }
 
-// Per-IP signup rate limit. Two overlapping windows so an IP can absorb a
-// one-off spike (e.g. meetup where 100 people sign up from the same NAT in a
-// single day) while still bounding sustained abuse. Passing requires both:
-//   - <= 100 signups in the last 24h (burst)
-//   - <= 150 signups in the last 30d  (sustained, averages ~5/day)
-// After a full burst day, only ~50 more signups are allowed over the next
-// 29 days, and the burst day must roll out of the 30d window before the IP
-// can spike again.
-const SIGNUP_BURST_MAX = 100;
-const SIGNUP_BURST_WINDOW_MS = 24 * 60 * 60 * 1000;
-const SIGNUP_SUSTAINED_MAX = 150;
-const SIGNUP_SUSTAINED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
 function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
-}
-
-async function countSignupsFromIpSince(
-  signupIp: string,
-  sinceIso: string,
-  tx: DrizzleTransaction
-): Promise<number> {
-  const [result] = await tx
-    .select({ count: count() })
-    .from(kilocode_users)
-    .where(and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, sinceIso)));
-  return result?.count ?? 0;
-}
-
-async function checkSignupIpRateLimit(
-  signupIp: string | null,
-  tx: DrizzleTransaction
-): Promise<Result<null, AuthErrorType>> {
-  if (IS_DEVELOPMENT) return successResult(null);
-  if (!signupIp) return successResult(null);
-
-  const now = Date.now();
-  const burstWindowStart = new Date(now - SIGNUP_BURST_WINDOW_MS).toISOString();
-  const sustainedWindowStart = new Date(now - SIGNUP_SUSTAINED_WINDOW_MS).toISOString();
-
-  const burstCount = await countSignupsFromIpSince(signupIp, burstWindowStart, tx);
-  const sustainedCount = await countSignupsFromIpSince(signupIp, sustainedWindowStart, tx);
-
-  if (burstCount < SIGNUP_BURST_MAX && sustainedCount < SIGNUP_SUSTAINED_MAX) {
-    return successResult(null);
-  }
-
-  console.warn('[auth] Signup rejected due to per-IP rate limit', {
-    ip_address: signupIp,
-    existing_accounts_24h: burstCount,
-    existing_accounts_30d: sustainedCount,
-    max_signups_24h: SIGNUP_BURST_MAX,
-    max_signups_30d: SIGNUP_SUSTAINED_MAX,
-  });
-
-  return failureResult('SIGNUP-RATE-LIMITED');
 }
 
 async function checkNormalizedEmailUnique(
@@ -649,16 +587,57 @@ export async function createOrUpdateUser(
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
   const signupIp = getSignupIp(requestHeaders);
+  const normalizedEmail = normalizeEmail(args.google_user_email);
+  const operationId = signupOperationId(normalizedEmail);
+  const bouncerIp = bareIpLiteral(signupIp ?? undefined);
+  if (!IS_DEVELOPMENT) {
+    const verdict = bouncerIp
+      ? await signupDecide({
+          operationId,
+          ip: bouncerIp,
+          ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
+        })
+      : null;
+    console.info('[auth] Bouncer signup admission', {
+      operationId,
+      enforced: verdict?.enforced ?? false,
+      available: verdict !== null,
+      flags: verdict?.flags ?? [],
+    });
+    if (verdict === null) {
+      console.info('[auth] Signup creation outcome', {
+        operationId,
+        outcome: 'rejected',
+        reason: bouncerIp ? 'bouncer_unavailable' : 'signup_ip_unavailable',
+      });
+      return failureResult('SIGNUP-UNAVAILABLE');
+    }
+    if (verdict.enforced) {
+      console.info('[auth] Signup creation outcome', {
+        operationId,
+        outcome: 'rejected',
+        reason: 'bouncer',
+      });
+      return failureResult('SIGNUP-RATE-LIMITED');
+    }
+  }
   const newUserId = turnstile_guid ?? randomUUID();
 
   // New user creation path — Stripe customer is created before the DB
   // transaction because stripe_customer_id is NOT NULL. If the transaction
-  // fails (rate limit, constraint violation, etc.) we clean up the Stripe
-  // customer to prevent orphans.
+  // fails (uniqueness rejection, constraint violation, etc.) we clean up the
+  // Stripe customer to prevent orphans.
   const stripeCustomer = await createStripeCustomer({
     email: args.google_user_email,
     name: args.google_user_name,
     metadata: { kiloUserId: newUserId },
+  }).catch(error => {
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: 'failed',
+      reason: 'stripe',
+    });
+    throw error;
   });
 
   const newUser = {
@@ -678,7 +657,7 @@ export async function createOrUpdateUser(
     openrouter_downstream_safety_identifier:
       generateOpenRouterDownstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
-    normalized_email: normalizeEmail(args.google_user_email),
+    normalized_email: normalizedEmail,
     email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
@@ -687,9 +666,6 @@ export async function createOrUpdateUser(
   let caughtError: unknown;
   try {
     txResult = await db.transaction(async tx => {
-      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
-      if (!signupRateLimitResult.success) return signupRateLimitResult;
-
       const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
       if (!dedupResult.success) return dedupResult;
 
@@ -723,8 +699,13 @@ export async function createOrUpdateUser(
   }
 
   // Clean up the Stripe customer when signup didn't succeed (thrown error
-  // or returned failure like rate-limit rejection).
+  // or returned failure like a normalized-email uniqueness rejection).
   if (!txResult.success) {
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: caughtError ? 'failed' : 'rejected',
+      reason: txResult.error,
+    });
     deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
       captureException(cleanupErr, {
         tags: { source: 'signup-stripe-cleanup' },
@@ -735,6 +716,11 @@ export async function createOrUpdateUser(
     return txResult;
   }
   const savedUser = txResult.user;
+  console.info('[auth] Signup creation outcome', {
+    operationId,
+    outcome: 'created',
+    userId: savedUser.id,
+  });
 
   await recordSignupImpactTracking({
     user: savedUser,
@@ -998,6 +984,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   writer's email lookup failed, the user id)
  * - bouncer_credit_event_outbox (every row for the user; its payload carries the
  *   user id, client ip, and card fingerprint)
+ * - bouncer_usage_event_outbox (every row for the user; its payload carries the
+ *   account id, client ip, and client-fingerprint digest)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1077,6 +1065,9 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(bouncer_credit_event_outbox)
     .where(eq(bouncer_credit_event_outbox.user_id, userId));
+  // Bouncer usage-event payloads carry the account id, client ip, and JA4
+  // digest. The usage-event drainer also rechecks the owner before sending.
+  await tx.delete(bouncer_usage_event_outbox).where(eq(bouncer_usage_event_outbox.user_id, userId));
 
   // ── 1. Anonymize the user row ────────────────────────────────────────
   await tx

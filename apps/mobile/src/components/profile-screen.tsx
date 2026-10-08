@@ -18,10 +18,10 @@ import {
   Sparkles,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, type LayoutChangeEvent, type ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, type ScrollView, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
-import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -34,7 +34,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
-import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -48,7 +47,6 @@ import {
   getProfilesPath,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
-import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -80,8 +78,6 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
-  const { left, right } = useScreenSideInsets();
-  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
@@ -96,13 +92,10 @@ export function ProfileScreen() {
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // One destructive confirm for both platforms: the in-app dialog carries the
-  // destructive (red) affordance on iOS and Android alike, so the sign-out
-  // path never branches on the platform. The confirmation itself, and its
-  // rationale, live in `useSignOutConfirmation`.
-  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
-    () => void signOut()
-  );
+  // Both destructive confirms on this screen go through the app's dialog: it
+  // carries the destructive (red) affordance on iOS and Android alike, because
+  // Android's native `AlertDialog` paints every button with the theme accent.
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
     isLoading,
@@ -135,6 +128,17 @@ export function ProfileScreen() {
   const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
+
+  const requestSignOut = () => {
+    confirm({
+      title: t('profile.signOutTitle'),
+      message: t('profile.signOutMessage'),
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => {
+        void signOut();
+      },
+    });
+  };
 
   const {
     phase: deletePhase,
@@ -175,15 +179,18 @@ export function ProfileScreen() {
     setDeleteScrollFrameHeight(current => (current === height ? current : height));
   }, []);
 
+  // The confirmation is the app's own dialog, not the native alert: Android's
+  // `AlertDialog` paints every button with the theme accent, so
+  // `style: 'destructive'` never reaches the screen there. The Profile screen
+  // is a tab, so nothing can be presented over it and the portal dialog is
+  // always visible.
   const confirmDeleteAccount = () => {
-    Alert.alert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('profile.deleteAccountConfirm'),
-        style: 'destructive',
-        onPress: beginDelete,
-      },
-    ]);
+    confirm({
+      title: t('profile.deleteAccountTitle'),
+      message: t('profile.deleteAccountMessage'),
+      confirmLabel: t('profile.deleteAccountConfirm'),
+      onConfirm: beginDelete,
+    });
   };
 
   const showPrivacyChoices = () => {
@@ -196,7 +203,6 @@ export function ProfileScreen() {
       <TabScreenScrollView
         ref={deleteScrollRef}
         className="flex-1"
-        style={scrollStyle}
         contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
         onKeyboardOcclusionChange={setDeleteKeyboardOcclusion}
@@ -481,15 +487,7 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {confirmVisible && (
-        <DestructiveConfirmDialog
-          title={t('profile.signOutTitle')}
-          message={t('profile.signOutMessage')}
-          confirmLabel={t('common.signOut')}
-          onCancel={dismissConfirm}
-          onConfirm={confirmSignOut}
-        />
-      )}
+      {confirmDialog}
 
       {feedbackPrompt.promptDialog}
     </View>

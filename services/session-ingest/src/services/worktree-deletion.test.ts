@@ -563,6 +563,90 @@ describe('durable worktree deletion journal', () => {
     expect(f.cleared.has(kiloId(1))).toBe(true);
   });
 
+  it('recovers a snapshot-only orphan when the recorded checkout matches the snapshot', async () => {
+    const f = database();
+    const directory = '/workspace/app';
+    f.members.push({
+      sessionId: kiloId(1),
+      cloudAgentSessionId: null,
+      cloudAgentSessionScopeId: null,
+      organizationId: null,
+      worktreeId: null,
+      userId,
+      parentSessionId: null,
+    });
+    f.snapshots.set(kiloId(1), { id: kiloId(1), parentID: kiloId(0), directory });
+    await beginWorktreeDeletion(env, params);
+    await recordWorktreeCleanup(env, { ...params, directory });
+    await expect(completeWorktreeDeletion(env, params)).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1)],
+    });
+    expect(f.members).toEqual([]);
+    expect(f.cleared.has(kiloId(1))).toBe(true);
+  });
+
+  it('does not recover a snapshot-only orphan when the recorded checkout disagrees with the snapshot', async () => {
+    const f = database();
+    f.members.push({
+      sessionId: kiloId(1),
+      cloudAgentSessionId: null,
+      cloudAgentSessionScopeId: null,
+      organizationId: null,
+      worktreeId: null,
+      userId,
+      parentSessionId: null,
+    });
+    f.snapshots.set(kiloId(1), { id: kiloId(1), parentID: kiloId(0), directory: '/workspace/app' });
+    await beginWorktreeDeletion(env, params);
+    const recorded = await recordWorktreeCleanup(env, {
+      ...params,
+      directory: `/workspace/owner/worktrees/${worktreeId}`,
+    });
+    expect(recorded.manifest.sessions.map(session => session.sessionId)).toEqual([kiloId(0)]);
+    await expect(completeWorktreeDeletion(env, params)).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+    });
+    expect(f.cleared.has(kiloId(1))).toBe(false);
+    expect(f.members.map(row => row.sessionId)).toEqual([kiloId(1)]);
+  });
+
+  it('merges snapshot-only orphans from every recorded directory', async () => {
+    const f = database(2);
+    const oldDirectory = `/workspace/owner/worktrees/${worktreeId}`;
+    const newDirectory = '/workspace/app';
+    for (const [childIndex, parentIndex, directory] of [
+      [2, 0, oldDirectory],
+      [3, 1, newDirectory],
+    ] as const) {
+      f.members.push({
+        sessionId: kiloId(childIndex),
+        cloudAgentSessionId: null,
+        cloudAgentSessionScopeId: null,
+        organizationId: null,
+        worktreeId: null,
+        userId,
+        parentSessionId: null,
+      });
+      f.snapshots.set(kiloId(childIndex), {
+        id: kiloId(childIndex),
+        parentID: kiloId(parentIndex),
+        directory,
+      });
+    }
+    await beginWorktreeDeletion(env, params);
+    await recordWorktreeCleanup(env, { ...params, directory: oldDirectory });
+    await recordWorktreeCleanup(env, { ...params, directory: newDirectory });
+    await expect(completeWorktreeDeletion(env, params)).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0), kiloId(1), kiloId(2), kiloId(3)],
+    });
+    expect(f.members).toEqual([]);
+    expect(f.cleared.has(kiloId(2))).toBe(true);
+    expect(f.cleared.has(kiloId(3))).toBe(true);
+  });
+
   it('excludes pre-worktree history from every recovery pass but includes boundary and late children', async () => {
     const f = database();
     const directory = `/workspace/owner/worktrees/${worktreeId}`;

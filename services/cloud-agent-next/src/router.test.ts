@@ -41,6 +41,7 @@ const { getPgDbMock } = vi.hoisted(() => ({ getPgDbMock: vi.fn() }));
 vi.mock('./db/pg.js', () => ({ getPgDb: getPgDbMock }));
 
 vi.mock('./session/model-preflight.js', () => ({
+  preflightSessionRuntime: vi.fn().mockResolvedValue(undefined),
   preflightExistingPromptModel: preflightExistingPromptModelMock,
   preflightPreparedInitialPromptModel: preflightPreparedInitialPromptModelMock,
 }));
@@ -271,14 +272,14 @@ describe('router sessionId validation', () => {
 
   describe('sandboxId generation with hash format', () => {
     describe('format validation', () => {
-      it('should generate sandboxId with org prefix for organization accounts', async () => {
+      it('defaults organization accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(undefined, 'org-123', 'user-456', 's');
-        expect(sandboxId).toMatch(/^org-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
 
-      it('should generate sandboxId with bot prefix when botId is provided', async () => {
+      it('defaults organization bot accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(
           undefined,
@@ -287,34 +288,45 @@ describe('router sessionId validation', () => {
           's',
           'reviewer'
         );
-        expect(sandboxId).toMatch(/^bot-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
     });
 
     describe('personal accounts', () => {
-      it('should generate sandboxId with usr prefix for personal accounts', async () => {
+      it('defaults personal accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(undefined, undefined, 'abc-123', 's');
-        expect(sandboxId).toMatch(/^usr-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
 
-      it('should generate sandboxId with ubt prefix for personal bot accounts', async () => {
+      it('defaults personal bot accounts to an isolated sandbox without an allowlist', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const sandboxId = await generateSandboxId(undefined, undefined, 'abc-123', 's', 'reviewer');
-        expect(sandboxId).toMatch(/^ubt-[0-9a-f]{48}$/);
+        expect(sandboxId).toMatch(/^ses-[0-9a-f]{48}$/);
         expect(sandboxId.length).toBe(52);
       });
     });
 
     describe('collision prevention', () => {
-      it('should prevent collision between org and personal accounts', async () => {
+      it('prevents collision between explicit shared org and personal accounts', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const userId = 'same-user-id';
 
-        const orgSandboxId = await generateSandboxId(undefined, 'org-123', userId, 's');
-        const personalSandboxId = await generateSandboxId(undefined, undefined, userId, 's');
+        const orgSandboxId = await generateSandboxId(undefined, 'org-123', userId, 's', undefined, {
+          sandboxAllocation: 'cloudflare-shared',
+        });
+        const personalSandboxId = await generateSandboxId(
+          undefined,
+          undefined,
+          userId,
+          's',
+          undefined,
+          {
+            sandboxAllocation: 'cloudflare-shared',
+          }
+        );
 
         expect(orgSandboxId).not.toBe(personalSandboxId);
         expect(orgSandboxId).toMatch(/^org-[0-9a-f]{48}$/);
@@ -776,14 +788,18 @@ describe('router sessionId validation', () => {
         });
       });
 
-      it('should prevent collision between user and bot sessions', async () => {
+      it('prevents collision between explicit shared user and bot sessions', async () => {
         const { generateSandboxId } = await import('./sandbox-id.js');
         const orgId = 'org-123';
         const userId = 'user-456';
         const botId = 'reviewer';
 
-        const userSandboxId = await generateSandboxId(undefined, orgId, userId, 's');
-        const botSandboxId = await generateSandboxId(undefined, orgId, userId, 's', botId);
+        const userSandboxId = await generateSandboxId(undefined, orgId, userId, 's', undefined, {
+          sandboxAllocation: 'cloudflare-shared',
+        });
+        const botSandboxId = await generateSandboxId(undefined, orgId, userId, 's', botId, {
+          sandboxAllocation: 'cloudflare-shared',
+        });
 
         expect(userSandboxId).not.toBe(botSandboxId);
         expect(userSandboxId).toMatch(/^org-[0-9a-f]{48}$/);

@@ -502,9 +502,11 @@ export async function applyPendingKiloPassReferralBonusForIssuance(
     subscriptionId: string;
     kiloUserId: string;
     stripeInvoiceId?: string | null;
+    /** The issuance pays the welcome promo, so pending referral rewards wait for a later issuance. */
+    deferForWelcomePromo?: boolean;
   }
 ): Promise<KiloPassReferralBonusApplicationResult> {
-  const { issuanceId, subscriptionId, kiloUserId, stripeInvoiceId } = params;
+  const { issuanceId, subscriptionId, kiloUserId, stripeInvoiceId, deferForWelcomePromo } = params;
 
   await lockIssuanceRow(tx, issuanceId);
 
@@ -558,6 +560,18 @@ export async function applyPendingKiloPassReferralBonusForIssuance(
       expiredRewardIds: expiredRewards.map(reward => reward.id),
       issuanceItemId: existingBonusLikeItem.issuanceItemId,
       creditTransactionId: existingBonusLikeItem.creditTransactionId,
+      amountUsd: 0,
+      amountMicrodollars: 0,
+    };
+  }
+
+  if (deferForWelcomePromo) {
+    return {
+      wasIssued: false,
+      rewardId: null,
+      expiredRewardIds: expiredRewards.map(reward => reward.id),
+      issuanceItemId: null,
+      creditTransactionId: null,
       amountUsd: 0,
       amountMicrodollars: 0,
     };

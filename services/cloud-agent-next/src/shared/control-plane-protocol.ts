@@ -1,3 +1,8 @@
+import {
+  RuntimeSkillsSchema,
+  RuntimeAgentsSchema,
+  RuntimeKiloCommandsSchema,
+} from './runtime-profile.js';
 import type {
   CloudAgentAssistantFailureReason,
   CloudAgentProviderOwnership,
@@ -13,7 +18,7 @@ import {
 } from './sandbox-control-protocol.js';
 import { sessionGitSummaryPayloadSchema } from './worktree-changes-wire.js';
 
-export const CONTROL_PLANE_PROTOCOL_VERSION = 2;
+export const CONTROL_PLANE_PROTOCOL_VERSION = 3;
 
 /**
  * Launch-environment key that carries the allocation id. The wrapper echoes it
@@ -33,8 +38,10 @@ export const CONTROL_PLANE_PREPARATION_STEPS = [
   'sandbox_create',
   'sandbox_start',
   'clone',
+  'restore',
   'checkout',
   'setup',
+  'snapshot',
   'kilo_runtime',
   'kilo_session',
 ] as const;
@@ -95,6 +102,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
+  'container_limit_reached',
   'invalid_configuration',
   'connection_lost',
   'sandbox_lost',
@@ -219,6 +227,14 @@ export const controlPlaneRouteKiloSchema = z
   })
   .strict();
 
+/**
+ * How `session.prepare` left the workspace: cloned from scratch, already this
+ * allocation's (a sibling session or a wrapper restart), or adopted from a
+ * repository snapshot of another allocation.
+ */
+export const CONTROL_PLANE_WORKSPACE_OUTCOMES = ['cloned', 'same', 'adopted'] as const;
+export type ControlPlaneWorkspaceOutcome = (typeof CONTROL_PLANE_WORKSPACE_OUTCOMES)[number];
+
 export const controlPlaneRouteSpecSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -229,7 +245,7 @@ export const controlPlaneRouteSpecSchema = z
     branchMode: z.literal('working').optional(),
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
-    env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    env: z.record(z.string().max(256), z.string().max(10000)).optional(),
     /**
      * Materialized (plaintext) MCP servers for `KILO_CONFIG_CONTENT.mcp`. Only
      * the Sandbox DO adds this to the `session.prepare` frame; it is never stored
@@ -238,10 +254,55 @@ export const controlPlaneRouteSpecSchema = z
      */
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    runtimeSkills: RuntimeSkillsSchema.optional(),
+    runtimeAgents: RuntimeAgentsSchema.optional(),
+    kiloCommands: RuntimeKiloCommandsSchema.optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
+    /**
+     * Only the Sandbox DO adds this to the `session.prepare` frame, like `mcp`: the
+     * wrapper may save the workspace as a repository snapshot after setup. It is
+     * never stored in a route spec.
+     */
+    capture: z.literal(true).optional(),
+    /**
+     * Only the Sandbox DO adds this to the `session.prepare` frame, like `mcp`:
+     * the names of the profile secrets it decrypted into `env`, so the wrapper's
+     * output redactor remembers their values. Names only; it is never stored in a
+     * route spec, and the values stay in `env`.
+     */
+    secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((spec, context) => {
+    if (
+      (spec.runtimeSkills?.length || spec.runtimeAgents?.length || spec.kiloCommands?.length) &&
+      spec.runtimeIsolation !== 'per-session'
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['runtimeIsolation'],
+        message: 'Runtime profiles require per-session isolation',
+      });
+    }
+  });
+
+/**
+ * Route spec accepted at the registration boundary. `secretEnvKeys` is
+ * frame-only, so a registration that carries it is rejected here rather than
+ * being stored and then failing every later `session.prepare`.
+ */
+export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSchema.superRefine(
+  (spec, context) => {
+    if (spec.secretEnvKeys !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['secretEnvKeys'],
+        message: 'registration spec must not carry secret env key names',
+      });
+    }
+  }
+);
 
 /**
  * DO-only credential source (plan "Clarification (2026-09-27, B3 credentials)").
@@ -308,6 +369,15 @@ export const controlPlaneCredentialSourceSchema = z
      * the wrapper bundle) never imports the worker persistence schema.
      */
     mcpServers: z.record(z.string().min(1).max(100), z.unknown()).optional(),
+    /**
+     * Worker-encrypted `profile.encryptedSecrets` snapshot. Same contract as
+     * `mcpServers`: persisted only inside this DO-private source, re-validated and
+     * decrypted by the Sandbox DO only when building a `session.prepare` frame,
+     * and never serialized into a wrapper frame or a route spec. Opaque here so
+     * the shared schema never imports the worker persistence schema. Secret names
+     * may be up to 128 characters (`EncryptedSecretsSchema`).
+     */
+    encryptedSecrets: z.record(z.string().min(1).max(128), z.unknown()).optional(),
     /** Credential scope (worktree id); defaults to the route's session id. */
     scopeId: z.string().min(1).max(256).optional(),
   })
@@ -345,6 +415,20 @@ export const controlPlanePrepareInputSchema = z
         code: 'custom',
         path: ['spec', 'mcp'],
         message: 'prepare spec must not carry materialized MCP servers',
+      });
+    }
+    if (value.spec.capture !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'capture'],
+        message: 'prepare spec must not carry a snapshot capture request',
+      });
+    }
+    if (value.spec.secretEnvKeys !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'secretEnvKeys'],
+        message: 'prepare spec must not carry secret env key names',
       });
     }
   });
@@ -585,6 +669,12 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    /**
+     * Optional capability: the wrapper redacts a value by each named secret key
+     * from `session.prepare`, not only names matching the `SECRET_NAME` heuristic.
+     * A secret-bearing prepare is not sent to a wrapper that did not advertise it.
+     */
+    redactsNamedSecrets: z.literal(true).optional(),
   })
   .strict();
 
@@ -632,6 +722,28 @@ const controlPlaneSessionReadyFrameSchema = z
   .object({
     type: z.literal('session.ready'),
     sessionId: z.string().min(1),
+    workspace: z.enum(CONTROL_PLANE_WORKSPACE_OUTCOMES).optional().catch(undefined),
+  })
+  .strict();
+
+/**
+ * Wrapper to Sandbox DO: the workspace is prepared and holds no credential, so the
+ * DO may snapshot the container. `commit` is diagnostic only.
+ */
+const controlPlaneWorkspaceCaptureFrameSchema = z
+  .object({
+    type: z.literal('workspace.capture'),
+    sessionId: z.string().min(1),
+    commit: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+/** Sandbox DO to wrapper: the capture finished; `ok` is false when nothing was saved. */
+const controlPlaneWorkspaceCapturedFrameSchema = z
+  .object({
+    type: z.literal('workspace.captured'),
+    sessionId: z.string().min(1),
+    ok: z.boolean(),
   })
   .strict();
 
@@ -918,6 +1030,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionProgressFrameSchema,
   controlPlaneSessionReadyFrameSchema,
+  controlPlaneWorkspaceCaptureFrameSchema,
+  controlPlaneWorkspaceCapturedFrameSchema,
   controlPlaneSessionFailedFrameSchema,
   controlPlaneSessionCredentialsFrameSchema,
   controlPlaneSessionPromptFrameSchema,
@@ -968,6 +1082,12 @@ export type ControlPlaneSessionProgressFrame = z.infer<
   typeof controlPlaneSessionProgressFrameSchema
 >;
 export type ControlPlaneSessionReadyFrame = z.infer<typeof controlPlaneSessionReadyFrameSchema>;
+export type ControlPlaneWorkspaceCaptureFrame = z.infer<
+  typeof controlPlaneWorkspaceCaptureFrameSchema
+>;
+export type ControlPlaneWorkspaceCapturedFrame = z.infer<
+  typeof controlPlaneWorkspaceCapturedFrameSchema
+>;
 export type ControlPlaneSessionFailedFrame = z.infer<typeof controlPlaneSessionFailedFrameSchema>;
 export type ControlPlaneSessionCredentialsFrame = z.infer<
   typeof controlPlaneSessionCredentialsFrameSchema

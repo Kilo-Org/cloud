@@ -7,6 +7,7 @@
 
 import * as z from 'zod';
 import type { AutoFixTicket } from '@kilocode/db/schema';
+import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
 
 // ============================================================================
 // Constants
@@ -34,22 +35,6 @@ export const FixStatusSchema = z.enum(['pending', 'running', 'completed', 'faile
  * Classification types for issues (subset from triage)
  */
 export const FixClassificationTypeSchema = z.enum(['bug', 'feature', 'question', 'unclear']);
-
-/**
- * Owner schema - discriminated union
- */
-export const OwnerSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('org'),
-    id: z.string().uuid(),
-    userId: z.string(),
-  }),
-  z.object({
-    type: z.literal('user'),
-    id: z.string(),
-    userId: z.string(),
-  }),
-]);
 
 // ============================================================================
 // Configuration Schemas
@@ -399,7 +384,7 @@ export const DispatchFixRequestSchema = z.object({
  */
 export type FixStatus = z.infer<typeof FixStatusSchema>;
 export type FixClassificationType = z.infer<typeof FixClassificationTypeSchema>;
-export type Owner = z.infer<typeof OwnerSchema>;
+export { OwnerSchema, type Owner };
 export type AutoFixAgentConfig = z.infer<typeof AutoFixAgentConfigSchema>;
 export type SaveAutoFixConfig = z.infer<typeof SaveAutoFixConfigSchema>;
 export type CreateFixTicketParams = z.infer<typeof CreateFixTicketParamsSchema>;

@@ -99,6 +99,23 @@ describe('createServiceState', () => {
       });
     });
 
+    it.each(['child-1', 'unknown-1'])(
+      'retry on %s preserves root activity and status',
+      sessionId => {
+        const state = createServiceState(makeConfig());
+        state.setActivity({ type: 'busy' });
+        state.setStatus({ type: 'error', message: 'root error' });
+        state.process({
+          type: 'session.status',
+          sessionId,
+          status: { type: 'retry', attempt: 3, message: 'Overloaded', next: 5000 },
+        });
+        state.process({ type: 'session.status', sessionId, status: { type: 'idle' } });
+        expect(state.getActivity()).toEqual({ type: 'busy' });
+        expect(state.getStatus()).toEqual({ type: 'error', message: 'root error' });
+      }
+    );
+
     it('idle status on root transitions busy to idle', () => {
       const state = createServiceState(makeConfig());
       state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });

@@ -186,7 +186,7 @@ export function MessageInputView({
             <TextInput
               ref={inputRef}
               className={cn(
-                'rounded-md border bg-card px-3 text-foreground',
+                'rounded-md border bg-card pl-3 pr-3 text-foreground',
                 overLimit ? 'border-destructive' : 'border-input',
                 inputDisabled && 'opacity-50'
               )}

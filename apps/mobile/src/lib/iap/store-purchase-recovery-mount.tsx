@@ -4,7 +4,6 @@ import {
   finishTransaction as finishStoreTransaction,
   initConnection,
   requestPurchase as requestStorePurchase,
-  restorePurchases as restoreStorePurchases,
 } from 'expo-iap';
 
 import { useAuth } from '@/lib/auth/auth-context';
@@ -14,7 +13,6 @@ import { getCreditStorefront } from '@/lib/credits/storefront';
 import { createStoreCreditPurchaseActions } from '@/lib/credits/use-store-credit-purchase';
 import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
 import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
-import { createAppStoreKiloPassPurchaseActions } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
 
 /**
@@ -35,24 +33,24 @@ async function connectStore(): Promise<void> {
 }
 
 /**
- * Completes store purchases the backend has not granted yet, for both in-app
- * purchase flows, without the user opening a purchase screen.
+ * Completes credit-pack store purchases the backend has not granted yet,
+ * without the user opening the purchase screen.
  *
  * A purchase becomes incomplete when the app dies between the store charging
  * the user and the backend granting the credits: StoreKit keeps the transaction
  * unfinished precisely so a later connection can finish it, and the grant is
  * keyed on the store transaction id, so completing it twice grants once.
  *
- * The purchase screens cannot own this pass. Each of them mounts the app's
- * single `useIAP` call site, so their recovery runs only while that screen is
+ * The purchase screen cannot own this pass. It mounts the app's single
+ * `useIAP` call site, so its recovery runs only while that screen is
  * open: a user who is charged and then relaunches the app reached Profile, saw
  * an unchanged balance, and stayed short one pack until they opened the purchase
  * screen again — measured at 63 minutes on 2026-09-29.
  *
  * This pass therefore does not mount `useIAP`: two `useIAP` mounts double-handle
  * every purchase, so it reads the store's value-returning queries and completes
- * what it finds there. Each flow's own completion path does the grant, and their
- * module-level completion registry makes a purchase that this pass and a
+ * what it finds there. The credit completion path does the grant, and its
+ * module-level completion registry makes a purchase that this pass and the
  * purchase screen deliver at the same moment complete once.
  *
  * Cost: one store lookup when the app starts and one when it returns to the
@@ -75,19 +73,11 @@ export function StorePurchaseRecoveryMount(): null {
     ...trpc.credits.getMobileStoreProducts.queryOptions(),
     enabled: signedIn,
   });
-  const kiloPassCatalog = useQuery({
-    ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
-    enabled: signedIn,
-  });
 
   const completeAppStoreCredit = useMutation(
     trpc.credits.completeAppStorePurchase.mutationOptions()
   );
   const completePlayCredit = useMutation(trpc.credits.completePlayPurchase.mutationOptions());
-  const completeAppStoreKiloPass = useMutation(
-    trpc.kiloPass.completeAppStorePurchase.mutationOptions()
-  );
-  const completePlayKiloPass = useMutation(trpc.kiloPass.completePlayPurchase.mutationOptions());
 
   const creditPackAppleProductIds = useMemo(
     () => creditsCatalog.data?.products.map(product => product.appleProductId) ?? [],
@@ -97,29 +87,11 @@ export function StorePurchaseRecoveryMount(): null {
     () => creditsCatalog.data?.products.map(product => product.googleProductId) ?? [],
     [creditsCatalog.data]
   );
-  const kiloPassAppleProductIds = useMemo(
-    () => kiloPassCatalog.data?.products.map(product => product.appleProductId) ?? [],
-    [kiloPassCatalog.data]
-  );
-  const kiloPassGoogleProductIds = useMemo(
-    () => kiloPassCatalog.data?.products.map(product => product.googleProductId) ?? [],
-    [kiloPassCatalog.data]
-  );
 
   const invalidateAfterCreditCompletion = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
       queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
-    ]);
-  }, [queryClient, trpc]);
-
-  const invalidateAfterKiloPassCompletion = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
-      queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
-      queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
-      queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
-      queryClient.invalidateQueries(trpc.kiloPass.getPurchasePresentation.pathFilter()),
     ]);
   }, [queryClient, trpc]);
 
@@ -149,47 +121,9 @@ export function StorePurchaseRecoveryMount(): null {
     ]
   );
 
-  const kiloPassActions = useMemo(
-    () =>
-      createAppStoreKiloPassPurchaseActions({
-        storefront,
-        appAccountToken: kiloPassCatalog.data?.appAccountToken ?? '',
-        requestPurchase: requestStorePurchase,
-        getAvailablePurchases: async () => {
-          const pendingPurchases = await withStoreDeadline(
-            fetchPendingStorePurchases(storefront),
-            'the pending purchase lookup'
-          );
-          return pendingPurchases;
-        },
-        restorePurchases: restoreStorePurchases,
-        completeAppStorePurchase: completeAppStoreKiloPass.mutateAsync,
-        completePlayPurchase: completePlayKiloPass.mutateAsync,
-        finishTransaction: finishStoreTransaction,
-        enabledAppleProductIds: kiloPassAppleProductIds,
-        enabledGoogleProductIds: kiloPassGoogleProductIds,
-        invalidateAfterCompletion: invalidateAfterKiloPassCompletion,
-        isAccountCurrent: () => isCurrentAuthEpoch(authEpochRef.current),
-        showError: logRecoveryError,
-      }),
-    [
-      completeAppStoreKiloPass.mutateAsync,
-      completePlayKiloPass.mutateAsync,
-      invalidateAfterKiloPassCompletion,
-      kiloPassAppleProductIds,
-      kiloPassCatalog.data?.appAccountToken,
-      kiloPassGoogleProductIds,
-      storefront,
-    ]
-  );
-
   const passInFlightRef = useRef(false);
   const rerunRequestedRef = useRef(false);
-  const knownProductIdCount =
-    creditPackAppleProductIds.length +
-    creditPackGoogleProductIds.length +
-    kiloPassAppleProductIds.length +
-    kiloPassGoogleProductIds.length;
+  const knownProductIdCount = creditPackAppleProductIds.length + creditPackGoogleProductIds.length;
 
   const recoverUnfinishedPurchases = useCallback(async () => {
     // No catalog yet means no product id to match a purchase against, and no
@@ -218,14 +152,10 @@ export function StorePurchaseRecoveryMount(): null {
       if (!isCurrentAuthEpoch(authEpochRef.current)) {
         return;
       }
-      // Each flow completes only the purchases it sells and ignores the rest, so
-      // one list serves both. Neither reports on screen: a recovery that cannot
-      // finish now is retried on the next pass, and the balance the queries
-      // refresh is the signal that it did.
-      await Promise.all([
-        creditActions.recoverPurchases(pendingPurchases, { notifyErrors: false }),
-        kiloPassActions.recoverPurchases(pendingPurchases, { notifyErrors: false }),
-      ]);
+      // Credit actions ignore purchases outside the credit catalog. A recovery
+      // that cannot finish now retries on the next pass, and the refreshed
+      // balance is the signal that it did.
+      await creditActions.recoverPurchases(pendingPurchases, { notifyErrors: false });
     } catch (error) {
       // The store cannot answer, or the app is offline. Both are states the next
       // pass retries; the purchase stays unfinished in the store until then.
@@ -238,7 +168,7 @@ export function StorePurchaseRecoveryMount(): null {
         void recoverRef.current();
       }
     }
-  }, [creditActions, kiloPassActions, knownProductIdCount, signedIn, storefront]);
+  }, [creditActions, knownProductIdCount, signedIn, storefront]);
 
   // Keep the next pass current before passive effects run. A pending store call
   // can settle immediately after a sign-out commit.
@@ -255,15 +185,11 @@ export function StorePurchaseRecoveryMount(): null {
 
   const hasCreditProducts =
     creditPackAppleProductIds.length + creditPackGoogleProductIds.length > 0;
-  const hasKiloPassProducts = kiloPassAppleProductIds.length + kiloPassGoogleProductIds.length > 0;
-
-  // Each catalog arrives independently. If the second arrives during a pass,
-  // the in-flight guard queues a pass with the newly available product IDs.
   useEffect(() => {
-    if (signedIn && (hasCreditProducts || hasKiloPassProducts)) {
+    if (signedIn && hasCreditProducts) {
       void recoverRef.current();
     }
-  }, [hasCreditProducts, hasKiloPassProducts, signedIn]);
+  }, [hasCreditProducts, signedIn]);
 
   // Foreground regain: the background -> active edge only, so an active -> active
   // echo never re-runs the pass. The app keeps one `AppState` listener, in

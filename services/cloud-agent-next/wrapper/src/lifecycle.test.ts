@@ -5,9 +5,10 @@ import {
   assistantReportsNoActionableOutput,
   classifyPublicationToolPart,
   decidePublicationRecovery,
-  messageInfoReportsOutputLimit,
+  messageInfoReportsAssistantError,
 } from './publication-recovery';
 import type { IngestEvent } from '../../src/shared/protocol';
+import { MESSAGE_ID_PATTERN } from '../../src/shared/message-id';
 import type { WrapperKiloClient } from './kilo-api';
 
 const sessionContext = {
@@ -187,11 +188,11 @@ describe('wrapper lifecycle drain races', () => {
 });
 
 describe('decidePublicationRecovery', () => {
-  const base = { configured: true, outputLimit: false, budgetUsed: false };
+  const base = { configured: true, turnFailed: false, budgetUsed: false };
 
-  it('seals when the tool is not configured or the turn hit its output limit', () => {
+  it('seals when the tool is not configured or the turn failed', () => {
     expect(decidePublicationRecovery({ ...base, configured: false, signal: null })).toBe('seal');
-    expect(decidePublicationRecovery({ ...base, outputLimit: true, signal: null })).toBe('seal');
+    expect(decidePublicationRecovery({ ...base, turnFailed: true, signal: null })).toBe('seal');
   });
 
   it('seals on a verified result and on terminal tool errors', () => {
@@ -263,14 +264,21 @@ describe('classifyPublicationToolPart', () => {
   });
 });
 
-describe('output-limit detection', () => {
-  it('detects the structured MessageOutputLengthError on a root message', () => {
-    expect(messageInfoReportsOutputLimit({ error: { name: 'MessageOutputLengthError' } })).toBe(
-      true
-    );
-    expect(messageInfoReportsOutputLimit({ error: { name: 'ProviderAuthError' } })).toBe(false);
-    expect(messageInfoReportsOutputLimit({ error: null })).toBe(false);
-    expect(messageInfoReportsOutputLimit({})).toBe(false);
+describe('turn failure detection', () => {
+  it('treats any assistant error on a root message as a failed turn', () => {
+    for (const error of [
+      { name: 'MessageOutputLengthError' },
+      { name: 'APIError', data: { message: 'Rate limit exceeded', statusCode: 429 } },
+      { name: 'APIError', data: { message: 'Service Unavailable', statusCode: 503 } },
+      { name: 'ProviderAuthError' },
+      { name: 'MessageAbortedError' },
+      'Assistant request failed',
+    ]) {
+      expect(messageInfoReportsAssistantError({ error })).toBe(true);
+    }
+    expect(messageInfoReportsAssistantError({ error: null })).toBe(false);
+    expect(messageInfoReportsAssistantError({})).toBe(false);
+    expect(messageInfoReportsAssistantError(null)).toBe(false);
   });
 
   it('detects the exact two-fragment plaintext notice and ignores a single fragment', () => {
@@ -370,6 +378,20 @@ async function triggerRecovery(harness: ReturnType<typeof createRecoveryHarness>
 }
 
 describe('publication recovery lifecycle', () => {
+  it('seals a failed turn without sending the recovery prompt', async () => {
+    jest.useFakeTimers();
+    try {
+      const harness = createRecoveryHarness();
+      harness.state.observeAssistantTurnFailure();
+      await triggerRecovery(harness);
+
+      expect(harness.sendCalls).toBe(0);
+      expect(harness.events.map(event => event.streamEventType)).toContain('wrapper_finalizing');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('a verified result seals without aborting the session or emitting an error', async () => {
     jest.useFakeTimers();
     try {
@@ -404,15 +426,14 @@ describe('publication recovery lifecycle', () => {
     }
   });
 
-  it('uses a Kilo-valid msg-prefixed id for the recovery prompt', async () => {
+  it('mints a canonical time-sortable id for the recovery prompt', async () => {
     jest.useFakeTimers();
     try {
       const harness = createRecoveryHarness();
       await triggerRecovery(harness);
 
       expect(harness.messageIds).toHaveLength(1);
-      expect(harness.messageIds[0]?.startsWith('msg')).toBe(true);
-      expect(harness.messageIds[0]?.startsWith('msg_recovery_')).toBe(true);
+      expect(harness.messageIds[0]).toMatch(MESSAGE_ID_PATTERN);
     } finally {
       jest.useRealTimers();
     }

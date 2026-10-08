@@ -1511,12 +1511,10 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
     expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])('forwards explicit devcontainer context %s', async devcontainer => {
+  it.each([false, true])('ignores retired devcontainer context %s', async devcontainer => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: devcontainer
-        ? { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' }
-        : getSandboxAllocationRequest('cloudflare-shared'),
+      defaultDestination: getSandboxAllocationRequest('cloudflare-shared'),
       options: [],
     };
     mockGetSandboxSelectionOptions.mockResolvedValueOnce(capabilities);
@@ -1527,7 +1525,6 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
     ).resolves.toEqual(capabilities);
     expect(mockGetSandboxSelectionOptions).toHaveBeenCalledWith({
       kilocodeOrganizationId: ORGANIZATION_ID,
-      devcontainer,
     });
   });
 
@@ -1780,11 +1777,8 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         autoInitiate: true,
         devcontainer: true,
       })
-    ).rejects.toThrow('Dev container sessions are not available');
-    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
-      'cloud-agent-devcontainer',
-      ORGANIZATION_ID
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
@@ -1846,7 +1840,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     );
   });
 
-  it('forwards devcontainer sessions when the feature flag is enabled', async () => {
+  it('rejects retired devcontainer sessions even when the feature flag is enabled', async () => {
     mockIsFeatureFlagEnabledOrDevelopment.mockResolvedValue(true);
     const caller = createCaller({
       user: { id: 'user-2', is_admin: false } as User,
@@ -1862,21 +1856,9 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         autoInitiate: true,
         devcontainer: true,
       })
-    ).resolves.toEqual({
-      cloudAgentSessionId: 'agent_123',
-      kiloSessionId: 'ses_12345678901234567890123456',
-    });
-    expect(mockIsFeatureFlagEnabledOrDevelopment).toHaveBeenCalledWith(
-      'cloud-agent-devcontainer',
-      ORGANIZATION_ID
-    );
-    expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        githubRepo: 'acme/repo',
-        devcontainer: true,
-        kilocodeOrganizationId: ORGANIZATION_ID,
-      })
-    );
+    ).rejects.toThrow('Devcontainer support has been retired');
+    expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('routes free models through the AppBuilder client so the worker skips the balance minimum', async () => {

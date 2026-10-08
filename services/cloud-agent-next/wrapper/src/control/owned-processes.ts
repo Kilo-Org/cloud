@@ -24,6 +24,7 @@ import { Writable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pidStillMatches, readProcessTable } from '../tool-cgroup.js';
 import { nativeControlPlaneLogsEnabled } from '../../../src/shared/control-diagnostics.js';
+import { releaseGate, spawnGated } from './gated-spawn.js';
 
 /**
  * Native stderr is captured as operational logs, so the raw containment error
@@ -42,10 +43,13 @@ import {
   CGROUP_FS_MAGIC,
   classifyWorkloadMembers,
   createWorkloadReporter,
+  KILO_OOM_SCORE_ADJ,
   readWorkloadStats,
+  TOOL_OOM_SCORE_ADJ,
   WORKLOAD_SERVER_NAME,
   WORKLOAD_SWEEP_INTERVAL_MS,
   WORKLOAD_TOOLS_NAME,
+  writeOomScoreAdj,
   type WorkloadPlacement,
   type WorkloadProcessEntry,
 } from './workload-cgroup.js';
@@ -267,11 +271,6 @@ function releaseChildStreams(child: OwnedChild): void {
   }
 }
 
-function releaseGate(gate: Writable): void {
-  gate.on('error', () => undefined);
-  gate.end('start\n');
-}
-
 function isErofs(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'EROFS';
 }
@@ -474,7 +473,7 @@ function createManagedCgroup(placement: WorkloadPlacement): Cgroup | undefined {
       parentReference: reference,
       serverReference,
       toolsReference,
-      aggregateMaxBytes: placement.aggregateMaxBytes,
+      toolsMaxBytes: placement.toolsMaxBytes,
     });
 
     const procs = openSync(
@@ -677,7 +676,8 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         pids: number[],
         members: Set<number>,
         procs: number,
-        reference: string
+        reference: string,
+        oomScoreAdj: string
       ): Promise<number> => {
         let moved = 0;
         for (const pid of pids) {
@@ -697,12 +697,12 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           });
           if (outcome === 'migrated') {
             moved += 1;
-            continue;
+            if (writeOomScoreAdj(pid, oomScoreAdj)) continue;
           }
           workloadReporter?.emit(scopeId, {
             phase: 'failed',
             workloadPhase: 'migration',
-            workloadFailure: outcome,
+            workloadFailure: outcome === 'migrated' ? 'write_failed' : outcome,
           });
         }
         return moved;
@@ -718,9 +718,16 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           serverPids,
           serverMembers,
           managed.serverProcs,
-          managed.serverReference
+          managed.serverReference,
+          KILO_OOM_SCORE_ADJ
         )) +
-        (await migrateInto(toolPids, toolsMembers, managed.toolsProcs, managed.toolsReference));
+        (await migrateInto(
+          toolPids,
+          toolsMembers,
+          managed.toolsProcs,
+          managed.toolsReference,
+          TOOL_OOM_SCORE_ADJ
+        ));
       if (migrated > 0) {
         workloadReporter?.emit(scopeId, {
           phase: 'completed',
@@ -739,6 +746,8 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           workloadPhase: 'oom',
           oomKills: stats.oomKills,
           oomGroupKills: stats.oomGroupKills,
+          toolOomKills: toolStats.oomKills,
+          serverOomKills: serverStats.oomKills,
         });
       }
       workloadReporter?.emit(scopeId, {
@@ -749,6 +758,8 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         migratedCount: migrated,
         oomKills: stats.oomKills,
         oomGroupKills: stats.oomGroupKills,
+        toolOomKills: toolStats.oomKills,
+        serverOomKills: serverStats.oomKills,
         cpuController: managed.cpuController,
         ...(stats.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
         ...(stats.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
@@ -885,17 +896,11 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
 
       const spawnChild = (gatedChild: boolean): OwnedChild => {
         const child = gatedChild
-          ? spawn(
-              '/bin/sh',
-              [
-                '-c',
-                'IFS= read -r start <&3 && [ "$start" = start ] && exec 3<&- && exec "$@"',
-                'kilo-owned',
-                command,
-                ...args,
-              ],
-              { ...options, detached: true, stdio: ['pipe', 'pipe', 'pipe', 'pipe'] }
-            )
+          ? spawnGated(command, args, {
+              ...options,
+              detached: true,
+              stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+            })
           : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
         const record: OwnedChild = { process: child, exited: false };
         children.add(record);
@@ -955,6 +960,9 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         const activated = processIdentity(pid, readFileSync(`/proc/${pid}/stat`, 'utf8'));
         if (activated.identity !== record.identity || activated.parent !== process.pid) {
           throw new Error('Owned child changed');
+        }
+        if (group.managed && !writeOomScoreAdj(pid, KILO_OOM_SCORE_ADJ)) {
+          console.warn('Owned process OOM protection unavailable');
         }
         releaseGate(gate);
       } catch {

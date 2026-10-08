@@ -127,18 +127,6 @@ export function selectThreadAnchorLabel(thread: ReviewThread): string {
 }
 
 /**
- * Returns the same `isResolved` value with the `isOutdated` label
- * surfaced for the badges in the thread header. Purely presentational.
- */
-export function selectThreadBadges(thread: ReviewThread) {
-  return {
-    resolved: thread.isResolved,
-    outdated: thread.isOutdated,
-    fileLevel: thread.subjectType === 'FILE' || thread.line === null,
-  };
-}
-
-/**
  * Display name for a comment author. Returns "deleted user" when the
  * author is null (deleted / banned GitHub accounts surface as
  * `author: null` in the GraphQL DTO).

@@ -59,10 +59,11 @@ export class WrapperState {
   private _publicationSignal: PublicationRecoverySignal | null = null;
   private _publicationSignalGeneration: number | undefined = undefined;
   private _publicationSignalConnectionId: string | undefined = undefined;
-  private _assistantOutputLimit = false;
+  private _assistantTurnFailed = false;
   private _observedGateResult: 'pass' | 'fail' | null = null;
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
   private _logUploader: LogUploader | null = null;
+  private _secretEnvKeys: readonly string[] = [];
 
   get isIdle(): boolean {
     return !this.isActive;
@@ -144,6 +145,14 @@ export class WrapperState {
 
   get logUploader(): LogUploader | null {
     return this._logUploader;
+  }
+
+  get secretEnvKeys(): readonly string[] {
+    return this._secretEnvKeys;
+  }
+
+  setSecretEnvKeys(keys: readonly string[] | undefined): void {
+    this._secretEnvKeys = keys ?? [];
   }
 
   setLogUploader(uploader: LogUploader | null): void {
@@ -240,12 +249,13 @@ export class WrapperState {
     this._logUploader?.stop();
     this._logUploader = null;
     this.session = null;
+    this._secretEnvKeys = [];
     this.clearAllMessages();
     this._lastAssistantMessageId = null;
     this._publicationSignal = null;
     this._publicationSignalGeneration = undefined;
     this._publicationSignalConnectionId = undefined;
-    this._assistantOutputLimit = false;
+    this._assistantTurnFailed = false;
   }
 
   observePublicationSignal(signal: PublicationRecoverySignal): void {
@@ -269,17 +279,17 @@ export class WrapperState {
     return signal;
   }
 
-  observeAssistantOutputLimit(): void {
-    this._assistantOutputLimit = true;
+  observeAssistantTurnFailure(): void {
+    this._assistantTurnFailed = true;
   }
 
-  clearAssistantOutputLimit(): void {
-    this._assistantOutputLimit = false;
+  clearAssistantTurnFailure(): void {
+    this._assistantTurnFailed = false;
   }
 
-  consumeAssistantOutputLimit(): boolean {
-    const observed = this._assistantOutputLimit;
-    this._assistantOutputLimit = false;
+  consumeAssistantTurnFailure(): boolean {
+    const observed = this._assistantTurnFailed;
+    this._assistantTurnFailed = false;
     return observed;
   }
 

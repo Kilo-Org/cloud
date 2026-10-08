@@ -192,6 +192,26 @@ describe('admin.sessionTraces authorization', () => {
     expect(mockFetchSessionSnapshot).toHaveBeenCalledWith(sessionId, owner.id);
   });
 
+  test('a session viewer can resolve a control-plane workspace_ session ID', async () => {
+    const owner = await insertTestUser();
+    const viewer = await insertAdmin({ can_view_sessions: true });
+    const sessionId = `ses_${crypto.randomUUID()}`;
+    const cloudAgentSessionId = `workspace_${crypto.randomUUID()}`;
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: owner.id,
+      cloud_agent_session_id: cloudAgentSessionId,
+      cloud_agent_session_scope_id: cloudAgentSessionId,
+    });
+
+    const caller = await createCallerForUser(viewer.id);
+    await expect(
+      caller.admin.sessionTraces.resolveCloudAgentSession({
+        cloud_agent_session_id: cloudAgentSessionId,
+      })
+    ).resolves.toEqual({ session_id: sessionId });
+  });
+
   test('getMessages sorts v2 messages and parts by time-ordered ID like the cloud-agent-next UI', async () => {
     const owner = await insertTestUser();
     const viewer = await insertAdmin({ can_view_sessions: true });

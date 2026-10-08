@@ -23,7 +23,6 @@ import {
 } from 'react';
 import {
   AccessibilityInfo,
-  Alert,
   AppState,
   type GestureResponderEvent,
   Keyboard,
@@ -47,6 +46,7 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
@@ -71,7 +71,7 @@ import {
   SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
-import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
+import { useRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { SuggestionCard } from '@/components/agents/suggestion-card';
 import {
@@ -87,7 +87,6 @@ import {
 } from '@/components/agents/chat-composer-stop-remount';
 import { ChatComposerInputRow } from '@/components/agents/chat-composer-input-row';
 import { BlurBar } from '@/components/ui/blur-bar';
-import { VoiceInputStatus } from '@/components/voice-input-control';
 import {
   AGENT_ATTACHMENT_MAX_BYTES,
   AGENT_ATTACHMENT_MAX_FILES,
@@ -114,7 +113,6 @@ import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-s
 import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
 import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
-import { cn } from '@/lib/utils';
 import { useSharePrefill } from '@/lib/share-prefill';
 import {
   shouldArmAutoSendOnDelivery,
@@ -391,25 +389,22 @@ export function ChatComposer({
   // /restart, /exit) is already rejected while attachments are present, so no
   // bypass flag is needed; a successful send clears the chips and disarms.
   const navigation = useNavigation();
+  const { confirm, dialog } = useConfirmDialog();
+  const { confirmExit, exitDialog } = useRemoteSessionExitConfirmation();
   const releaseUnclaimedRef = useRef(upload.releaseUnclaimedUploads);
   releaseUnclaimedRef.current = upload.releaseUnclaimedUploads;
   usePreventRemove(upload.hasUnclaimedAttachments, ({ data }) => {
     const action = data.action;
-    Alert.alert(
-      i18n.t('agentChat.composer.discardAttachmentsTitle'),
-      i18n.t('agentChat.composer.discardAttachmentsMessage'),
-      [
-        { text: i18n.t('common.keepEditing'), style: 'cancel' },
-        {
-          text: i18n.t('common.discard'),
-          style: 'destructive',
-          onPress: () => {
-            releaseUnclaimedRef.current();
-            navigation.dispatch(action);
-          },
-        },
-      ]
-    );
+    confirm({
+      title: i18n.t('agentChat.composer.discardAttachmentsTitle'),
+      message: i18n.t('agentChat.composer.discardAttachmentsMessage'),
+      confirmLabel: i18n.t('common.discard'),
+      cancelLabel: i18n.t('common.keepEditing'),
+      onConfirm: () => {
+        releaseUnclaimedRef.current();
+        navigation.dispatch(action);
+      },
+    });
   });
 
   const fontSize = TEXT_INPUT_FONT_SIZE * fontScale;
@@ -759,6 +754,22 @@ export function ChatComposer({
     },
   });
   abortVoiceInputRef.current = voiceInput.abort;
+  // The voice status rides in the input's placeholder slot instead of a caption
+  // row, so starting or stopping speech never changes the composer's height.
+  const voiceTranscribing = voiceInput.status === 'transcribing';
+  let voiceStatusMessage: string | null = null;
+  if (voiceInput.status === 'listening') {
+    voiceStatusMessage = i18n.t('voiceInput.listening');
+  } else if (voiceTranscribing) {
+    voiceStatusMessage = i18n.t('voiceInput.transcribing');
+  }
+  // Entering `listening` is announced by the voice controller; the placeholder
+  // is not a live region, so `transcribing` is announced here.
+  useEffect(() => {
+    if (voiceTranscribing) {
+      AccessibilityInfo.announceForAccessibility(i18n.t('voiceInput.transcribing'));
+    }
+  }, [voiceTranscribing]);
 
   const control = resolveChatComposerControlState({
     attachmentsCount: upload.attachments.length,
@@ -1068,7 +1079,7 @@ export function ChatComposer({
           onExitSession: async onAccepted => {
             await onExitSession(onAccepted, submissionLockRef, voiceInput.settleBeforeSubmit);
           },
-          confirmExitSession: showRemoteSessionExitConfirmation,
+          confirmExitSession: confirmExit,
           onSendPrompt: async prompt => {
             const optimisticChips = upload.attachments;
             try {
@@ -1362,17 +1373,6 @@ export function ChatComposer({
           className="mb-2 px-4 text-xs"
         />
 
-        <View
-          className={cn(
-            'px-3',
-            voiceInput.status === 'listening' || voiceInput.status === 'transcribing'
-              ? 'pb-1'
-              : 'pb-0'
-          )}
-        >
-          <VoiceInputStatus status={voiceInput.status} />
-        </View>
-
         {goalComposeActive ? (
           <AccessibleStatus
             message={i18n.t('agentChat.goal.editPlaceholder')}
@@ -1437,7 +1437,7 @@ export function ChatComposer({
                 void voiceInput.toggle();
               }}
               paperclipDisabled={control.paperclipDisabled}
-              placeholder={placeholder}
+              placeholder={voiceStatusMessage ?? placeholder}
               returnSendsMessage={returnSendsMessage}
               sendDisabledReason={sendDisabledReason}
               textInputStyle={textInputStyle}
@@ -1448,6 +1448,8 @@ export function ChatComposer({
           </View>
         </GestureDetector>
       </View>
+      {dialog}
+      {exitDialog}
     </BlurBar>
   );
 }

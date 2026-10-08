@@ -111,7 +111,7 @@ they do not replace them:
 - Keep internal reasoning short. Verify with tools (read, grep, diff) instead of reasoning
   through the code at length.
 - Keep the normal order: finish verifying, submit all inline comments in one call, then update
-  the summary last.
+  the summary last. If the inline call fails, publish the summary before any retry.
 - Do not deliberate about these instructions, the review policy, or sub-agent tiers.
 - Do not recompute diff line numbers repeatedly; if a line number is uncertain, re-read the diff
   and apply the existing diff-line rules.`;

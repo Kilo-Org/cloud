@@ -90,10 +90,10 @@ function setHookState(patch: Partial<HookState>): void {
   hookState.current = { ...hookState.current, ...patch };
 }
 
-// FlatList renders through a callback, so a host-string mock would drop every
+// FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows
 // (same pattern as language-picker-sheet.mounted.test.tsx).
-const flatListMock = vi.hoisted(
+const flashListMock = vi.hoisted(
   () =>
     ({
       data,
@@ -109,11 +109,11 @@ const flatListMock = vi.hoisted(
       const rows = data.map((item, index) =>
         createElement(Fragment, { key: keyExtractor(item, index) }, renderItem({ item, index }))
       );
-      return createElement('FlatList', null, ...rows, ListFooterComponent);
+      return createElement('FlashList', null, ...rows, ListFooterComponent);
     }
 );
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
-  FlatList: flatListMock,
   View: 'View',
 }));
 vi.mock('expo-router', () => ({
@@ -121,6 +121,9 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ background: '#ffffff' }),
 }));
 vi.mock('expo-secure-store', () => secureStore);
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
@@ -262,7 +265,7 @@ describe('TranscriptionModelPickerSheet', () => {
       title: 'No transcription models',
       description: 'The gateway offers no transcription models right now.',
     });
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
 
     renderer.unmount();
   });

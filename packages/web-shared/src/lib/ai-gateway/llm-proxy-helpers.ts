@@ -699,6 +699,62 @@ export function requestedSamples(body: unknown): number | null {
   return typeof body.n === 'number' ? body.n : null;
 }
 
+function reasoningBudgetBucket(value: unknown): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  if (value <= 1_000) return 'le1k';
+  if (value <= 4_000) return 'le4k';
+  if (value <= 16_000) return 'le16k';
+  if (value <= 64_000) return 'le64k';
+  return 'gt64k';
+}
+
+function isReasoningObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Bounded labels for requested thinking, effort, and reasoning (in that order).
+ * Never persist client-provided strings. When effort aliases coexist, prefer
+ * Anthropic output_config, then Chat Completions, then the reasoning object.
+ */
+export function extractReasoningSetting(body: unknown): string | null {
+  if (!isReasoningObject(body)) return null;
+  const labels: string[] = [];
+  const thinking = isReasoningObject(body.thinking) ? body.thinking : undefined;
+  if (
+    thinking?.type === 'enabled' ||
+    thinking?.type === 'adaptive' ||
+    thinking?.type === 'disabled'
+  ) {
+    const bucket = reasoningBudgetBucket(thinking.budget_tokens);
+    labels.push(`thinking:${thinking.type}${bucket ? `:${bucket}` : ''}`);
+  }
+
+  const outputConfig = isReasoningObject(body.output_config) ? body.output_config : undefined;
+  const reasoning = isReasoningObject(body.reasoning) ? body.reasoning : undefined;
+  const effort = outputConfig?.effort ?? body.reasoning_effort ?? reasoning?.effort;
+  if (typeof effort === 'string') {
+    switch (effort) {
+      case 'none':
+      case 'minimal':
+      case 'low':
+      case 'medium':
+      case 'high':
+      case 'xhigh':
+      case 'max':
+        labels.push(`effort:${effort}`);
+        break;
+      default:
+        labels.push('effort:other');
+    }
+  }
+
+  if (reasoning?.enabled === false) labels.push('reasoning:disabled');
+  const bucket = reasoningBudgetBucket(reasoning?.max_tokens);
+  if (bucket) labels.push(`reasoning:budget:${bucket}`);
+  return labels.length > 0 ? labels.join('+') : null;
+}
+
 // ============================================================================
 // FIM-Specific Code
 // ============================================================================

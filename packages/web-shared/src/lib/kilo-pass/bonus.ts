@@ -1,12 +1,10 @@
 import { KiloPassCadence, type KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF,
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
 } from '@kilocode/web-shared/lib/kilo-pass/constants';
-import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 export const getMonthlyPriceUsd = (tier: KiloPassTier): number => {
   return KILO_PASS_TIER_CONFIG[tier].monthlyPriceUsd;
@@ -24,6 +22,16 @@ export const isKiloPassSelectionEligibleForKiloclawCommitUpsell = (params: {
   return getMonthlyPriceUsd(params.tier) * 1_000_000 >= params.commitCostMicrodollars;
 };
 
+export const getMonthlyWelcomePromoMonth = (
+  subscriptionStartedAtIso: string | null | undefined
+): 1 | 2 => {
+  const startedAtMillis = subscriptionStartedAtIso ? Date.parse(subscriptionStartedAtIso) : NaN;
+  return Number.isFinite(startedAtMillis) &&
+    startedAtMillis >= KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF.valueOf()
+    ? 2
+    : 1;
+};
+
 export const computeMonthlyCadenceBonusPercent = (params: {
   tier: KiloPassTier;
   streakMonths: number;
@@ -36,24 +44,12 @@ export const computeMonthlyCadenceBonusPercent = (params: {
     throw new Error('streakMonths must be >= 1');
   }
 
-  if (streakMonths === 1 && isFirstTimeSubscriberEver) {
+  if (
+    isFirstTimeSubscriberEver &&
+    streakMonths <= 2 &&
+    streakMonths === getMonthlyWelcomePromoMonth(subscriptionStartedAtIso)
+  ) {
     return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
-  }
-
-  // Limited-time grandfathered promo: first-time subscribers who started strictly before the
-  // cutoff keep the 50% bonus for streak month 2.
-  if (streakMonths === 2 && isFirstTimeSubscriberEver) {
-    const startedAt = subscriptionStartedAtIso ?? null;
-    if (startedAt != null) {
-      const startedAtUtc = dayjs(startedAt).utc();
-
-      if (
-        startedAtUtc.isValid() &&
-        startedAtUtc.isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
-      ) {
-        return KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT;
-      }
-    }
   }
 
   const config = KILO_PASS_TIER_CONFIG[tier];

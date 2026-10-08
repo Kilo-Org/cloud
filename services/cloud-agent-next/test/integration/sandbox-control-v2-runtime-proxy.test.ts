@@ -1,4 +1,5 @@
 import { createExecutionContext, env, reset, runInDurableObject } from 'cloudflare:test';
+import { generateKeyPairSync } from 'node:crypto';
 import {
   renewRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -21,11 +22,15 @@ import {
   renewStoredRuntimeAuthorization,
 } from '../../src/session/runtime-authorization-persistence.js';
 import worker from '../../src/server.js';
+import { logger } from '../../src/logger.js';
 import type { AgentSandboxProvider, Env } from '../../src/types.js';
 import type { ProviderAdapter, StopResult } from '../../src/sandbox-control/provider.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import {
   createFakeCredentialBroker,
   fakeOutboundContainerId,
@@ -34,6 +39,10 @@ import {
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
+import { encryptWithPublicKey } from '../../src/utils/encryption.js';
+import { routes as routesTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
@@ -96,6 +105,7 @@ function metadata(input: {
   kiloToken: string;
   provider?: AgentSandboxProvider;
   worktreeId?: string;
+  encryptedSecrets?: Record<string, unknown>;
 }) {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
@@ -107,6 +117,9 @@ function metadata(input: {
     },
     auth: { kiloSessionId: input.kiloSessionIdValue, kilocodeToken: input.kiloToken },
     agent: { mode: 'code', model: 'test/model' },
+    ...(input.encryptedSecrets === undefined
+      ? {}
+      : { profile: { encryptedSecrets: input.encryptedSecrets } }),
     repository: {
       type: 'git',
       url: 'https://github.com/acme/widgets.git',
@@ -178,6 +191,7 @@ function createProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -196,7 +210,8 @@ function createProvider(): FakeProvider {
 async function installSandbox(
   sandboxId: string,
   provider: FakeProvider,
-  broker = createFakeCredentialBroker()
+  broker = createFakeCredentialBroker(),
+  privateKey?: string
 ): Promise<DurableObjectStub<SandboxControlV2>> {
   const sandboxStub = sandboxes.getByName(sandboxId);
   await runInDurableObject(sandboxStub, async instance => {
@@ -208,6 +223,7 @@ async function installSandbox(
       KILOCODE_BACKEND_BASE_URL: WORKER_URL,
       KILO_OPENROUTER_BASE: WORKER_URL,
       KILO_SESSION_INGEST_URL: WORKER_URL,
+      AGENT_ENV_VARS_PRIVATE_KEY: privateKey,
     });
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
@@ -226,6 +242,7 @@ async function createVercelSession(input: {
   provider?: AgentSandboxProvider;
   contained?: boolean;
   worktreeId?: string;
+  encryptedSecrets?: Record<string, unknown>;
 }): Promise<DurableObjectStub<SandboxSessionV2>> {
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, input.sessionId));
   await runInDurableObject(sessionStub, instance => {
@@ -239,6 +256,7 @@ async function createVercelSession(input: {
       kiloToken: input.kiloToken,
       provider: input.provider,
       worktreeId: input.worktreeId,
+      encryptedSecrets: input.encryptedSecrets,
     }),
     message: promptPayload(messageId()),
     sandboxSelection: {
@@ -630,7 +648,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
 
     const frame = await wrapper.next();
@@ -726,7 +744,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       const reconnected = await FakeWrapper.connect({ sandboxId, credential });
       expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
         type: 'welcome',
-        protocolVersion: 2,
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       });
 
       expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
@@ -790,7 +808,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const restarted = await FakeWrapper.connect({ sandboxId, credential });
     expect(await restarted.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     const second = await restarted.next();
     if (second?.type !== 'session.prepare') throw new Error('expected session.prepare');
@@ -832,7 +850,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const restarted = await FakeWrapper.connect({ sandboxId, credential });
     expect(await restarted.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     const second = await restarted.next();
     if (second?.type !== 'session.prepare') throw new Error('expected session.prepare');
@@ -884,7 +902,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const reconnected = await FakeWrapper.connect({ sandboxId, credential });
     expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     const second = await reconnected.next();
     if (second?.type !== 'session.prepare') throw new Error('expected session.prepare');
@@ -940,7 +958,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const restarted = await FakeWrapper.connect({ sandboxId, credential });
     expect(await restarted.hello({ wrapperId: 'wr_2', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
     await waitFor(() => expect(bindCalls).toBe(2));
 
@@ -977,7 +995,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     const wrapper = await FakeWrapper.connect({ sandboxId, credential });
     expect(await wrapper.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
       type: 'welcome',
-      protocolVersion: 2,
+      protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
     });
 
     await waitFor(async () => {
@@ -988,5 +1006,200 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     });
     // No prepare reaches the wrapper: the attempt failed before the frame.
     expect(await wrapper.next(100)).toBeNull();
+  });
+});
+
+describe('SandboxControlV2 runtime proxy prepare frame secrets', () => {
+  const SECRET_VALUE = 'proxy-secret-value';
+
+  function generateSecretsKeyPair() {
+    return generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+  }
+
+  function readRouteRow(sandboxStub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
+    return runInDurableObject(sandboxStub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+      return rows[0] ?? null;
+    });
+  }
+
+  async function captureRouteFailures<T>(
+    action: () => Promise<T>
+  ): Promise<{ result: T; failures: Record<string, unknown>[] }> {
+    const failures: Record<string, unknown>[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'route_failed') failures.push(bounded);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    try {
+      const result = await action();
+      return { result, failures };
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+      warn.mockRestore();
+    }
+  }
+
+  it('decrypts secrets into the proxy prepare frame and never persists plaintext', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createProvider();
+    const sandboxStub = await installSandbox(
+      sandboxId,
+      provider,
+      createFakeCredentialBroker(),
+      privateKey
+    );
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    await createVercelSession({
+      sessionId,
+      kiloId: kiloSessionId(),
+      sandboxId,
+      kiloToken: token,
+      seal,
+      encryptedSecrets: { DATABASE_URL: envelope },
+    });
+
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const identity = launchIdentity(provider);
+    const wrapper = await FakeWrapper.connect({ sandboxId, credential: identity.credential });
+    expect(
+      await wrapper.hello({
+        wrapperId: 'wr_1',
+        allocationId: identity.allocationId,
+        redactsNamedSecrets: true,
+      })
+    ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.env?.DATABASE_URL).toBe(SECRET_VALUE);
+    expect(frame.spec.secretEnvKeys).toEqual(['DATABASE_URL']);
+
+    const row = await readRouteRow(sandboxStub, sessionId);
+    expect(row?.spec ?? '').not.toContain(SECRET_VALUE);
+    expect(row?.spec ?? '').not.toContain('secretEnvKeys');
+    expect(row?.credential_source ?? '').toContain(envelope.encryptedData);
+    expect(row?.credential_source ?? '').not.toContain(SECRET_VALUE);
+  });
+
+  it('fails without sending when the proxy wrapper did not advertise named-secret redaction', async () => {
+    const { publicKey, privateKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createProvider();
+    const sandboxStub = await installSandbox(
+      sandboxId,
+      provider,
+      createFakeCredentialBroker(),
+      privateKey
+    );
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    await createVercelSession({
+      sessionId,
+      kiloId: kiloSessionId(),
+      sandboxId,
+      kiloToken: token,
+      seal,
+      encryptedSecrets: { DATABASE_URL: envelope },
+    });
+
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const identity = launchIdentity(provider);
+    const connected = await FakeWrapper.connect({ sandboxId, credential: identity.credential });
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      expect(
+        await connected.hello({ wrapperId: 'wr_1', allocationId: identity.allocationId })
+      ).toEqual({
+        type: 'welcome',
+        protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+      });
+
+      await waitFor(async () => {
+        expect(await sandboxStub.status({ sessionId })).toEqual({
+          sessionId,
+          view: {
+            state: 'failed',
+            attemptId: expect.any(String),
+            reason: 'workspace_setup_failed',
+          },
+        });
+      });
+      return connected;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'wrapper_redaction_unsupported',
+      })
+    );
+    expect(await wrapper.next(100)).toBeNull();
+    expect(JSON.stringify(await readRouteRow(sandboxStub, sessionId))).not.toContain(SECRET_VALUE);
+  });
+
+  it('fails without sending when proxy secrets cannot be decrypted, leaking no value', async () => {
+    const { publicKey } = generateSecretsKeyPair();
+    const envelope = encryptWithPublicKey(SECRET_VALUE, publicKey);
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const provider = createProvider();
+    // No AGENT_ENV_VARS_PRIVATE_KEY binding: decryption fails at send time.
+    const sandboxStub = await installSandbox(sandboxId, provider);
+    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+    await createVercelSession({
+      sessionId,
+      kiloId: kiloSessionId(),
+      sandboxId,
+      kiloToken: token,
+      seal,
+      encryptedSecrets: { DATABASE_URL: envelope },
+    });
+
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const identity = launchIdentity(provider);
+    const connected = await FakeWrapper.connect({ sandboxId, credential: identity.credential });
+    const { result: wrapper, failures } = await captureRouteFailures(async () => {
+      expect(
+        await connected.hello({
+          wrapperId: 'wr_1',
+          allocationId: identity.allocationId,
+          redactsNamedSecrets: true,
+        })
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+      await waitFor(async () => {
+        expect(await sandboxStub.status({ sessionId })).toEqual({
+          sessionId,
+          view: {
+            state: 'failed',
+            attemptId: expect.any(String),
+            reason: 'workspace_setup_failed',
+          },
+        });
+      });
+      return connected;
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        diagnosticEvent: 'route_failed',
+        reason: 'workspace_setup_failed',
+        stage: 'frame_materialization_failed',
+      })
+    );
+    expect(await wrapper.next(100)).toBeNull();
+    expect(JSON.stringify(await readRouteRow(sandboxStub, sessionId))).not.toContain(SECRET_VALUE);
   });
 });

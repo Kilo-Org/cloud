@@ -1,12 +1,13 @@
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   computeMonthlyCadenceBonusPercent,
+  getMonthlyWelcomePromoMonth,
+  computeYearlyCadenceMonthlyBonusUsd,
   isKiloPassSelectionEligibleForKiloclawCommitUpsell,
 } from './bonus';
 
 import {
-  KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF,
   KILO_PASS_TIER_CONFIG,
 } from './constants';
 
@@ -37,119 +38,75 @@ describe('kilo pass bonus utilities', () => {
     });
   });
 
-  describe('computeMonthlyCadenceBonusPercent', () => {
-    it('keeps the second-month grandfather cutoff at midnight May 7 UTC', () => {
-      expect(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString()).toBe(
-        '2026-05-07T00:00:00.000Z'
-      );
+  describe('monthly welcome promo cutoff', () => {
+    it.each([
+      ['2026-05-01T00:00:00Z', 1],
+      ['2026-10-08T23:59:59.999Z', 1],
+      ['2026-10-09T00:00:00.000Z', 2],
+      ['2026-10-09T00:00:00.001Z', 2],
+      ['2027-01-01T00:00:00Z', 2],
+      ['2026-10-08 23:59:59.999+00', 1],
+      ['2026-10-09 00:00:00+00', 2],
+      ['2026-10-08T20:00:00-04:00', 2],
+      [null, 1],
+      [undefined, 1],
+      ['', 1],
+      ['not-a-timestamp', 1],
+      ['2026-13-01T00:00:00Z', 1],
+      ['2026-10-99T00:00:00Z', 1],
+    ] as const)('selects promo month %s => %s', (startedAtIso, expectedMonth) => {
+      expect(getMonthlyWelcomePromoMonth(startedAtIso)).toBe(expectedMonth);
     });
 
-    it('applies the 50% promo for streak months 1 and 2 when eligible (strictly before cutoff)', () => {
-      expect(
+    it.each([KiloPassTier.Tier19, KiloPassTier.Tier49, KiloPassTier.Tier199])(
+      'uses the start timestamp and normal ramp for %s',
+      tier => {
+        for (const subscriptionStartedAtIso of [
+          '2026-05-01T00:00:00Z',
+          '2026-10-08T23:59:59.999Z',
+          KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF.toISOString(),
+          '2026-10-09T00:00:00.001Z',
+          null,
+          'not-a-timestamp',
+        ]) {
+          for (const isFirstTimeSubscriberEver of [false, true]) {
+            const bonuses = [1, 2, 3].map(streakMonths =>
+              computeMonthlyCadenceBonusPercent({
+                tier,
+                streakMonths,
+                isFirstTimeSubscriberEver,
+                subscriptionStartedAtIso,
+              })
+            );
+            const expected = !isFirstTimeSubscriberEver
+              ? [0.05, 0.1, 0.15]
+              : getMonthlyWelcomePromoMonth(subscriptionStartedAtIso) === 1
+                ? [0.5, 0.1, 0.15]
+                : [0.05, 0.5, 0.15];
+            bonuses.forEach((bonus, index) => expect(bonus).toBeCloseTo(expected[index]));
+          }
+        }
+      }
+    );
+
+    it('rejects streak months below 1', () => {
+      expect(() =>
         computeMonthlyCadenceBonusPercent({
           tier: KiloPassTier.Tier19,
-          streakMonths: 1,
+          streakMonths: 0,
           isFirstTimeSubscriberEver: true,
-          subscriptionStartedAtIso: '2026-01-26T23:59:59.000Z',
         })
-      ).toBeCloseTo(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT);
-
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier19,
-          streakMonths: 2,
-          isFirstTimeSubscriberEver: true,
-          subscriptionStartedAtIso: '2026-01-26T23:59:59.000Z',
-        })
-      ).toBeCloseTo(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT);
-
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier19,
-          streakMonths: 3,
-          isFirstTimeSubscriberEver: true,
-          subscriptionStartedAtIso: '2026-01-26T23:59:59.000Z',
-        })
-      ).toBeCloseTo(
-        KILO_PASS_TIER_CONFIG.tier_19.monthlyBaseBonusPercent +
-          KILO_PASS_TIER_CONFIG.tier_19.monthlyStepBonusPercent * 2
-      );
+      ).toThrow('streakMonths must be >= 1');
     });
 
-    it('applies the first-month promo for first-time subscribers after the grandfather cutoff', () => {
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier19,
-          streakMonths: 1,
-          isFirstTimeSubscriberEver: true,
-          subscriptionStartedAtIso: new Date(
-            KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.valueOf() + 1
-          ).toISOString(),
-        })
-      ).toBeCloseTo(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT);
-    });
-
-    it('does not apply the override when isFirstTimeSubscriberEver is false', () => {
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier49,
-          streakMonths: 1,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(KILO_PASS_TIER_CONFIG.tier_49.monthlyBaseBonusPercent);
-    });
-  });
-
-  describe('computeMonthlyCadenceBonusPercent (promo cutoff behavior)', () => {
-    const tier = KiloPassTier.Tier49;
-
-    const computeFallback = (params: {
-      streakMonths: number;
-      isFirstTimeSubscriberEver: boolean;
-    }): number => {
-      return computeMonthlyCadenceBonusPercent({
-        tier,
-        streakMonths: params.streakMonths,
-        isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
-        subscriptionStartedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
-      });
-    };
-
-    it('applies the first-month promo at the second-month grandfather cutoff', () => {
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier,
-          streakMonths: 1,
-          isFirstTimeSubscriberEver: true,
-          subscriptionStartedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
-        })
-      ).toBe(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT);
-    });
-
-    it('does not apply the second-month promo at the grandfather cutoff', () => {
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier,
-          streakMonths: 2,
-          isFirstTimeSubscriberEver: true,
-          subscriptionStartedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
-        })
-      ).toBeCloseTo(
-        KILO_PASS_TIER_CONFIG.tier_49.monthlyBaseBonusPercent +
-          KILO_PASS_TIER_CONFIG.tier_49.monthlyStepBonusPercent
-      );
-    });
-
-    it('does not apply promo when isFirstTimeSubscriberEver is false', () => {
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier,
-          streakMonths: 1,
-          isFirstTimeSubscriberEver: false,
-          subscriptionStartedAtIso: '2026-01-26T23:59:59.000Z',
-        })
-      ).toBe(computeFallback({ streakMonths: 1, isFirstTimeSubscriberEver: false }));
-    });
+    it.each([KiloPassTier.Tier19, KiloPassTier.Tier49, KiloPassTier.Tier199])(
+      'leaves yearly %s bonuses at 50%',
+      tier => {
+        expect(computeYearlyCadenceMonthlyBonusUsd(tier)).toBe(
+          KILO_PASS_TIER_CONFIG[tier].monthlyPriceUsd * 0.5
+        );
+      }
+    );
   });
 
   describe('isKiloPassSelectionEligibleForKiloclawCommitUpsell', () => {

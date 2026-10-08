@@ -53,8 +53,6 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
-    "BACKUP_BUCKET_NAME": "kilocode-sessions",
-    "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
     "CREDENTIAL_CONTAINMENT_ENABLED": "true",
@@ -164,11 +162,10 @@
       "binding": "R2_BUCKET",
       "bucket_name": "kilocode-sessions",
     },
-    {
-      "binding": "BACKUP_BUCKET",
-      "bucket_name": "kilocode-sessions",
-    },
   ],
+  // SandboxSmall and SandboxCodeReview receive no traffic: every non-contained sandbox runs
+  // in Sandbox. SandboxDIND remains for stop/delete of persisted devcontainer sessions.
+  // Remove retired applications/bindings only after verifying drain and external bindings.
   "containers": [
     {
       "class_name": "Sandbox",
@@ -181,7 +178,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 200,
+      "max_instances": 40,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -195,7 +192,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 150,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -209,7 +206,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 20,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -223,7 +220,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 500,
+      "max_instances": 5,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -237,7 +234,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 750,
+      "max_instances": 300,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -251,7 +248,7 @@
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.8.1",
       },
-      "max_instances": 300,
+      "max_instances": 1500,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -401,6 +398,9 @@
     {
       "binding": "SHARED_SANDBOX_OVERRIDES",
     },
+    {
+      "binding": "REPO_SNAPSHOTS",
+    },
   ],
 
   /**
@@ -453,6 +453,9 @@
         {
           "binding": "SHARED_SANDBOX_OVERRIDES",
         },
+        {
+          "binding": "REPO_SNAPSHOTS",
+        },
       ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
@@ -466,13 +469,10 @@
         "CLI_TIMEOUT_SECONDS": "900",
         "REAPER_INTERVAL_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
-        "BACKUP_BUCKET_NAME": "kilocode-sessions-dev",
-        "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
         "CREDENTIAL_CONTAINMENT_ENABLED": "false",
-        "REPO_SNAPSHOT_ORG_IDS": "",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
         "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
         "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
@@ -522,10 +522,6 @@
       "r2_buckets": [
         {
           "binding": "R2_BUCKET",
-          "bucket_name": "kilocode-sessions-dev",
-        },
-        {
-          "binding": "BACKUP_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
         },
       ],

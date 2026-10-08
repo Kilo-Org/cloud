@@ -70,7 +70,7 @@ export function useDeleteAccount() {
     trpc.user.requestAccountDeletion.mutationOptions({
       onSuccess: () => {
         toast.success(i18n.t('profile.accountDeleted'));
-        void signOut(true);
+        void signOut();
       },
       onError: error => {
         toast.error(error.message);

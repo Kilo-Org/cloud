@@ -4,6 +4,7 @@ import { getSandboxAllocationProvider } from '@kilocode/worker-utils/sandbox-all
 import {
   CurrentSessionMetadataSchema,
   getEffectiveCredentialContainment,
+  hasCredentialContainment,
   getSandboxProvider,
   parseSessionMetadata,
   requiresContainmentSandbox,
@@ -29,6 +30,25 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it.each(['github', 'gitlab', 'bitbucket', 'kilocode'] as const)(
+    'uses the same containment predicate for computed and persisted %s flags',
+    flag => {
+      const disabled = { github: false, gitlab: false, bitbucket: false, kilocode: false };
+      expect(hasCredentialContainment(disabled)).toBe(false);
+      const enabled = { ...disabled, [flag]: true };
+      expect(hasCredentialContainment(enabled)).toBe(true);
+      expect(
+        requiresContainmentSandbox({
+          metadataSchemaVersion: 2,
+          identity: { sessionId: 'agent_containment', userId: 'user_containment' },
+          auth: {},
+          workspace: { credentialContainment: enabled },
+          lifecycle: { version: 1, timestamp: 1 },
+        })
+      ).toBe(true);
+    }
+  );
+
   it('maps legacy managed SCM containment to GitHub and Kilo only', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,

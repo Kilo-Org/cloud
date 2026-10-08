@@ -531,6 +531,12 @@ async function applyStoreUpgradeCreditAdjustments(
   }
 }
 
+/**
+ * The first order of a Play replacement token starts at the switch, seconds from the token's
+ * start time. A later order of the token starts when a paid period ends.
+ */
+const PLAY_REPLACEMENT_FIRST_ORDER_TOLERANCE_MS = 5 * 60 * 1000;
+
 // ----- purchase ledger (P1-A-08d) -------------------------------------------
 
 const PURCHASE_LEDGER_DOMAIN = 'purchase' as const;
@@ -652,11 +658,11 @@ export async function completeStoreKiloPassPurchase(params: {
       if (otherActive && !isStripeSubscriptionEnded(otherActive.status)) {
         throw new Error(ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE);
       }
+      const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
+        where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
+        orderBy: desc(kilo_pass_store_purchases.purchased_at),
+      });
       if (replacement.deferred) {
-        const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
-          where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
-          orderBy: desc(kilo_pass_store_purchases.purchased_at),
-        });
         if (
           !receipt ||
           receipt.kilo_pass_subscription_id !== subscription.id ||
@@ -675,18 +681,42 @@ export async function completeStoreKiloPassPurchase(params: {
         });
         if (refund) throw new Error('Store purchase has been refunded');
       }
+      // Every other replacement mode switches the plan at once, but Play bills the new price at
+      // the old renewal date (WITHOUT_PRORATION) or converts the unused time (WITH_TIME_PRORATION).
+      // The first order of the new token then starts at the switch, inside the paid period, and
+      // pays for no period of the new plan. Keep the paid tier and its credits; the next order of
+      // the token (its renewal) changes the tier. A charged switch (CHARGE_*_PRICE) waits too: a
+      // prorated charge near the period end must not buy a full base of the new tier.
+      const startedAt = purchase.subscriptionStartedAtIso
+        ? dayjs(purchase.subscriptionStartedAtIso).valueOf()
+        : NaN;
+      const periodStart = dayjs(purchase.purchasedAtIso).valueOf();
+      const isMidPeriodReplacement =
+        !replacement.deferred &&
+        receipt?.expires_at != null &&
+        Math.abs(periodStart - startedAt) <= PLAY_REPLACEMENT_FIRST_ORDER_TOLERANCE_MS &&
+        periodStart < dayjs(receipt.expires_at).valueOf();
       await tx
         .update(kilo_pass_subscriptions)
         .set({ provider_subscription_id: purchase.providerSubscriptionId })
         .where(eq(kilo_pass_subscriptions.id, subscription.id));
-      return replacement.deferred
-        ? {
-            subscriptionId: subscription.id,
-            tier: purchase.tier,
-            cadence: purchase.cadence,
-            alreadyProcessed: true,
-          }
-        : null;
+      if (replacement.deferred) {
+        return {
+          subscriptionId: subscription.id,
+          tier: purchase.tier,
+          cadence: purchase.cadence,
+          alreadyProcessed: true,
+        };
+      }
+      if (isMidPeriodReplacement) {
+        return {
+          subscriptionId: subscription.id,
+          tier: subscription.tier,
+          cadence: subscription.cadence,
+          alreadyProcessed: true,
+        };
+      }
+      return null;
     };
     const transferred = params.dbOrTx
       ? await transfer(params.dbOrTx)

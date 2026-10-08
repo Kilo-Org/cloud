@@ -1,4 +1,5 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
+import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
 import {
   containersBillingIdentity,
   parseSandboxBillingInput,
@@ -93,7 +94,8 @@ export function createCloudflareContainersProviderAdapter(deps: {
       let admission: SandboxBillingAdmissionResult;
       try {
         admission = await container.ensureBillingAdmission(input, instance);
-      } catch {
+      } catch (error) {
+        if (isContainerConcurrencyLimitError(error)) throw error;
         admission = {
           success: false,
           code: 'meter_unavailable',
@@ -104,7 +106,11 @@ export function createCloudflareContainersProviderAdapter(deps: {
         throw new ProviderCreationError(admission.code);
       }
     } else {
-      await container.configureBilling(input, instance).catch(() => undefined);
+      await withDORetry(
+        () => deps.getContainer(deps.logicalSandboxId),
+        container => container.configureBilling(input, instance),
+        'configureSandboxContainersBilling'
+      );
     }
   };
 
@@ -118,7 +124,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, env, options) {
       const owned = decodeOwnedProviderRef(ref);
       if (owned === null) {
         throw new ProviderCreationError('invalid_configuration');
@@ -127,10 +133,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const workloadLimitMb =
         env['CONTROL_WORKLOAD_LIMIT_MB'] ??
         String(containersBillingIdentity(instance).capacity.memoryMiB);
-      await container.launchWrapper({
+      const { startSource } = await container.launchWrapper({
         allocationRef: ref,
         instance,
         containment: owned.containment,
+        ...(options?.repoKey === undefined ? {} : { repoKey: options.repoKey }),
+        ...(options?.discardRepository === true ? { discardRepository: true as const } : {}),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
@@ -142,6 +150,17 @@ export function createCloudflareContainersProviderAdapter(deps: {
       // recovery admission gate can delay. Establish the initial lease here so
       // the container is not reaped by its inactivity timeout before then.
       await container.ensureLeaseAtLeast(ref, leaseAtLeastMs());
+      return { startSource };
+    },
+    async captureRepository(ref, repoKey, commit) {
+      if (decodeOwnedProviderRef(ref) === null) return false;
+      try {
+        return await deps
+          .getContainer(deps.logicalSandboxId)
+          .captureRepository(ref, repoKey, commit);
+      } catch {
+        return false;
+      }
     },
     async observe(ref, intent) {
       const providerRef = resolveProviderRef(ref, intent);

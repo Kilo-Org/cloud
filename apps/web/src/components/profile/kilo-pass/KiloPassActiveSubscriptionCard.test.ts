@@ -59,6 +59,46 @@ function buildScheduledChange(
 
 describe('KiloPassActiveSubscriptionCard.logic', () => {
   describe('computeRenewInfoRowModel()', () => {
+    test.each([
+      ['2026-10-08T23:59:59.999Z', true, 0, 9.5],
+      ['2026-10-08T23:59:59.999Z', true, 1, 1.9],
+      ['2026-10-08T23:59:59.999Z', true, 2, 2.85],
+      ['2026-10-09T00:00:00Z', true, 0, 0.95],
+      ['2026-10-09T00:00:00Z', true, 1, 9.5],
+      ['2026-10-09T00:00:00Z', true, 2, 2.85],
+      ['2026-05-06T00:00:00Z', true, 0, 9.5],
+      ['2026-05-06T00:00:00Z', true, 1, 1.9],
+      [null, true, 0, 9.5],
+      [null, true, 1, 1.9],
+      ['invalid', true, 0, 9.5],
+      ['invalid', true, 1, 1.9],
+      ['2026-10-08T23:59:59.999Z', false, 0, 0.95],
+      ['2026-10-08T23:59:59.999Z', false, 1, 1.9],
+      ['2026-10-09T00:00:00Z', false, 0, 0.95],
+      ['2026-10-09T00:00:00Z', false, 1, 1.9],
+      ['2026-10-09T00:00:00Z', false, 2, 2.85],
+    ])(
+      'projects the monthly schedule for start %s, first-time eligibility %s and streak %i',
+      (startedAt, isFirstTimeSubscriberEver, currentStreakMonths, expectedBonusUsd) => {
+        const rows = computeRenewInfoRowModel({
+          subscription: buildSubscription({
+            startedAt,
+            currentStreakMonths,
+            isFirstTimeSubscriberEver,
+            refillAt: '2026-11-08T10:16:13Z',
+          }),
+          isPendingCancellation: false,
+          scheduledChange: null,
+          nowIso: '2026-10-09T00:00:00Z',
+        });
+        const row = rows.find(row => row.kind === 'renews_and_adds_bonus');
+        if (row?.kind !== 'renews_and_adds_bonus') {
+          throw new Error('expected renews_and_adds_bonus');
+        }
+        expect(row.bonusUsd).toBeCloseTo(expectedBonusUsd);
+      }
+    );
+
     test('returns active_until when pending cancellation and refillAt exists', () => {
       const rows = computeRenewInfoRowModel({
         subscription: buildSubscription({

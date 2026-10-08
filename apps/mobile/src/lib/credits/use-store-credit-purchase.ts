@@ -289,7 +289,7 @@ export function isStoreAlreadyOwnedError(error: unknown): boolean {
 /**
  * Maps a store or backend error to the catalog key the screen translates.
  * A store-side `UserCancelled` is not a failure: it maps to `null` (no toast,
- * no copy), mirroring `getKiloPassPurchaseErrorMessage`.
+ * no copy).
  */
 export function getStoreCreditPurchaseErrorMessageKey(
   error: unknown,

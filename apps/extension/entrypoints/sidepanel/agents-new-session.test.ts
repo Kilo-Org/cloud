@@ -25,10 +25,6 @@ vi.mock('#imports', () => ({
   },
 }));
 
-// ---------------------------------------------------------------------------
-// IsModelPreferencesGetResult
-// ---------------------------------------------------------------------------
-
 describe('isModelPreferencesGetResult helper', () => {
   it('returns true for a valid model preferences object with lastSelected', () => {
     const value = { favorites: ['model-a', 'model-b'], lastSelected: { model: 'model-a' } };
@@ -65,10 +61,6 @@ describe('isModelPreferencesGetResult helper', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 describe('constants', () => {
   it('promptMinLength is 3', () => {
     expect(PROMPT_MIN_LENGTH).toBe(3);
@@ -82,10 +74,6 @@ describe('constants', () => {
     expect(MODE).toBe('code');
   });
 });
-
-// ---------------------------------------------------------------------------
-// BuildSubmitInput
-// ---------------------------------------------------------------------------
 
 describe('buildSubmitInput helper', () => {
   const baseParams = {
@@ -134,10 +122,6 @@ describe('buildSubmitInput helper', () => {
     expect(result).not.toHaveProperty('organizationId');
   });
 });
-
-// ---------------------------------------------------------------------------
-// BuildPrepareSessionInput
-// ---------------------------------------------------------------------------
 
 describe('buildPrepareSessionInput helper', () => {
   const baseInput = {

@@ -66,8 +66,8 @@ repository.
    preparation under the triggering message: the current step, and the running
    setup command's output.
 2. Steps the user MUST be able to see when they run: cloning the repository,
-   checking out the branch, restoring a previous workspace, running setup
-   commands.
+   using a prepared repository, checking out the branch, restoring a previous
+   workspace, running setup commands, saving the repository for faster starts.
 3. Preparation that only acquired and booted an environment -- warm reuse, no
    real provisioning -- MUST NOT leave a completed preparation row.
 4. Running and failed preparation MUST always be visible. Failed preparation,
@@ -103,21 +103,31 @@ repository.
    session. The repository MUST remain the one chosen at start.
 8. The user MAY change model and mode for later turns. When a profile or agent
    pins the model, the picker MUST be disabled and MUST say why.
-9. A turn that makes no real agent progress for seven minutes MUST fail, MUST
-   tell the user the turn did not complete, MUST re-enable the composer, and
-   MUST leave the session usable for a later message. Retry and offline status
-   are not real progress. A tool or subagent that is still running within its
-   own timeout MUST hold the inactivity check so the turn is not failed while it
-   runs; the seven-minute check restarts when the tool completes or errors.
-   Tool-part updates remain real progress; silent running time adds no new
-   progress events. A stop during a retry MUST still end the turn immediately
-   (rule 6).
-   For `workspace_*` sessions, the wrapper owns the seven-minute Kilo-progress
-   check and the 120-minute hard execution cap. A tool part that is `running`
-   in the routed root session or a resolved descendant tree (including a
-   subagent `task`) holds the seven-minute check until it ends, and the
-   120-minute cap still fails the turn. If the control plane cannot
-   reach the wrapper, missing updates MUST NOT be treated as Kilo inactivity.
+9. For legacy `agent_*` turns, seven minutes without real progress MUST fail
+   the turn, tell the user it did not complete, re-enable the composer, and
+   leave the chat usable. A tool or subagent within its own timeout holds that
+   legacy inactivity check until it completes or errors.
+   For `workspace_*`, every native Kilo execution MUST be supervised, including
+   work started without an accepted Cloud message or an open browser. Twenty
+   minutes without real assistant text/reasoning or tool output/state progress
+   MUST interrupt the affected session/tree with `no_progress`. Silent running
+   tools MUST receive the same bound. Repeated parts, metadata-only changes,
+   user messages, retry/busy status and heartbeats MUST NOT reset it. Useful
+   descendant progress MUST count for its ancestors, never unrelated roots.
+   Requests waiting on the user MUST pause only the no-progress clock when no
+   independent work is runnable. Resolving one request MUST NOT clear another.
+   The separate 120-minute execution cap MUST include user waits. Native
+   cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
+   use bounded runtime recovery. Accepted Cloud messages MUST settle once;
+   autonomous routed failures MUST remain visible without inventing new message
+   identities or rewriting earlier outcomes.
+   Any working native session or actual wrapper operation MUST keep shared
+   compute alive. Entirely waiting or idle sessions MUST permit the existing
+   10-minute idle stop and same-chat recovery. UI selection MUST have no effect.
+   Reconciliation MUST repair missed events without resetting known clocks;
+   missing or failed observations MUST trigger bounded observation recovery,
+   not a false inactivity result. A stop during retry MUST still end the turn
+   immediately (rule 6).
    The user MUST still be able to Stop or queue another message while the
    wrapper reconnects. If the connection returns, accepted work MUST
    NOT fail because the connection dropped. If no wrapper frame arrives for
@@ -144,6 +154,9 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+3. Open workspace tabs — the workspace terminal and file tabs, their order, and
+   the active tab — MUST survive refresh and navigation between worktrees, and
+   MUST remain scoped to the current user and personal or organization context.
 
 ### Shared Worktrees
 

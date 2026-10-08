@@ -40,9 +40,18 @@ strict, one-directional dependencies:
   blocks on `/decide`, falls back to balanced Qwen, bills the classifier cost, and
   hosts the admin panel (proxied to the benchmark worker with the internal secret).
 
-Shared request-classification code (prompt, parsing, taxonomy, tier derivation,
-routing-table schema) lives in `packages/auto-routing-contracts` so the benchmark
-replays the exact code production runs.
+Shared request-classification code (System One questions and decoding, taxonomy,
+tier derivation, routing-table schema) lives in `packages/auto-routing-contracts`
+so the benchmark replays the exact code production runs. The classifier is a
+System One model (default `typesafe/jev-1.13`) served by OpenRouter `/systemone`;
+it returns typed answers, so there is no output parsing or heuristic fallback.
+A failed classification yields a null decision.
+
+Ordinary requests prepare classifier metadata and cache reads while loading owner settings, model capabilities, and the routing table.
+On a cache miss, inference overlaps those independent reads.
+Active coding plans resolve constrained eligibility before any paid classification.
+The six-question payload, cache identity, analytics, billing, and sticky decisions remain unchanged.
+
 
 ## Invariants (what not to change without revisiting this ADR)
 
@@ -61,15 +70,14 @@ replays the exact code production runs.
    with any empty tier → skipped, previous table stays live. An
    `efficient` request must never degrade *below* balanced.
 4. **Results are reproducible.** Grading is mechanical only (`exact` /
-   `contains_all` / `regex` / `json_equal`), never LLM-judged. Each run snapshots
-   its config (`min_accuracy`, `switch_cost_factor`, `max_concurrency`,
-   `benchmark_user_id`, per-model `reasoning_effort`); all processing and
-   publishing reads the snapshot, not live config.
-5. **Carried results are identity-gated.** A prior model's summaries are reused on
-   a new run only when the engine identity (dataset + grading/CLI version),
-   repetition count, and the model's `reasoning_effort` all match. Any change
-   re-benchmarks the affected model rather than silently mixing incomparable
-   numbers.
+   `contains_all` / `regex` / `json_equal`), never LLM-judged.
+   Each run snapshots its policy, container budget, benchmark identity, and exact `(model, variant)` entries.
+   Measurements use that snapshot.
+   Platform publication selects current catalog pairs from the ready registry.
+5. **Registry reuse requires exact identity.** Reuse requires the same engine identity, repetition count, model, and canonical variant.
+   The engine identity includes the dataset and grading/CLI version.
+   Platform selectors choose models; the catalog supplies all supported reasoning efforts.
+   A new effort gets its own measurement, not another effort's score.
 6. **One active run per kind.** A partial unique index plus a server-side check
    admit at most one `running` classifier and one `running` decider run; a second
    start returns 409, not 500. Stale runs are swept to `failed` on run listing.
@@ -82,7 +90,7 @@ replays the exact code production runs.
 
 ## Billing policy
 
-The classifier LLM runs on Kilo's OpenRouter credential during model resolution,
+The System One classifier runs on Kilo's OpenRouter credential during model resolution,
 so its cost is owed regardless of how the request ends. It is billed as a separate
 microdollar usage row (`requested_model` set to the requested auto ID, model
 `auto-routing/classifier`) to the authenticated requesting user, scheduled as soon
@@ -101,8 +109,7 @@ cheaper by more than the table's `switchCostFactor`. Rationale: a model switch
 discards the provider's prompt cache, and rebuilding it costs full-price input
 tokens (4–10× cache-read rates) on a context that dominates agent-session spend —
 switching only pays off when recurring per-turn savings clearly exceed that
-one-time penalty. Stickiness trusts only real classifier output; heuristic
-fallbacks never re-anchor the session's model.
+one-time penalty. Stickiness trusts only real classifier output.
 
 ## Alternatives considered
 

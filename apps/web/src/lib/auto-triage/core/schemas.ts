@@ -7,6 +7,7 @@
 
 import * as z from 'zod';
 import type { AutoTriageTicket } from '@kilocode/db/schema';
+import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
 import { AUTO_TRIAGE_CONSTANTS } from './constants';
 
 // ============================================================================
@@ -37,22 +38,6 @@ export const ActionTakenSchema = z.enum([
   'comment_posted',
   'closed_duplicate',
   'needs_clarification',
-]);
-
-/**
- * Owner schema - discriminated union
- */
-export const OwnerSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('org'),
-    id: z.string().uuid(),
-    userId: z.string(),
-  }),
-  z.object({
-    type: z.literal('user'),
-    id: z.string(),
-    userId: z.string(),
-  }),
 ]);
 
 // ============================================================================
@@ -425,7 +410,7 @@ export const DispatchTriageRequestSchema = z.object({
 export type TriageStatus = z.infer<typeof TriageStatusSchema>;
 export type ClassificationType = z.infer<typeof ClassificationTypeSchema>;
 export type ActionTaken = z.infer<typeof ActionTakenSchema>;
-export type Owner = z.infer<typeof OwnerSchema>;
+export { OwnerSchema, type Owner };
 export type AutoTriageAgentConfig = z.infer<typeof AutoTriageAgentConfigSchema>;
 export type SaveAutoTriageConfig = z.infer<typeof SaveAutoTriageConfigSchema>;
 export type CreateTicketParams = z.infer<typeof CreateTicketParamsSchema>;

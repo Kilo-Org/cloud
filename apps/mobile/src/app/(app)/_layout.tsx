@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
@@ -104,6 +105,12 @@ function AppWideFreshnessMount() {
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();
+  // Android's half-height search sheets leave their results behind the IME.
+  // Keep searchable sheets at the existing safe-area-capped full detent.
+  const searchSheetOptions =
+    Platform.OS === 'android'
+      ? { ...sheetOptions, sheetAllowedDetents: [sheetOptions.sheetAllowedDetents[1]] }
+      : sheetOptions;
   useSecurityLifecycleInvalidation();
   useGlanceableOrgFence();
 
@@ -140,8 +147,8 @@ export default function AppLayout() {
             />
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
-            <Stack.Screen name="agent-chat/model-picker" options={sheetOptions} />
-            <Stack.Screen name="agent-chat/repo-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/model-picker" options={searchSheetOptions} />
+            <Stack.Screen name="agent-chat/repo-picker" options={searchSheetOptions} />
             <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
             <Stack.Screen
               name="agent-chat/mode-picker"
@@ -151,9 +158,9 @@ export default function AppLayout() {
             <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
             <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
             <Stack.Screen name="share-gate" options={sheetOptions} />
-            <Stack.Screen name="language-picker" options={sheetOptions} />
+            <Stack.Screen name="language-picker" options={searchSheetOptions} />
             <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
-            <Stack.Screen name="voice-language-picker" options={sheetOptions} />
+            <Stack.Screen name="voice-language-picker" options={searchSheetOptions} />
             <Stack.Screen
               name="kilo-pass"
               options={{

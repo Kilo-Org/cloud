@@ -2,6 +2,7 @@ import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { MISTRAL_LARGE_4_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import {
   calculateCost_mUsd,
   type Pricing,
@@ -28,6 +29,21 @@ export const customPricingByModelId: Record<string, CustomPricing> = {
           completion_per_million: 3.75,
           input_cache_read_per_million: 0.075,
           input_cache_write_per_million: 0.0416666666667,
+        },
+      },
+    ],
+  },
+  // OpenRouter lists a 50% discount on Mistral, the only provider for this model.
+  [MISTRAL_LARGE_4_MODEL_ID]: {
+    discountPercentage: 50,
+    pricing: [
+      {
+        start_context_length: 0,
+        pricing: {
+          prompt_per_million: 0.68,
+          completion_per_million: 2.09,
+          input_cache_read_per_million: 0.07,
+          input_cache_write_per_million: null,
         },
       },
     ],

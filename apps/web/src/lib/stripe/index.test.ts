@@ -5257,7 +5257,10 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
       cancelUrl: 'https://app.test/cancel',
       plan: 'teams',
       billingCycle,
-      attempt: { accountCreatedAt: '2026-01-01T00:00:00.000Z' },
+      attempt: {
+        accountCreatedAt: '2026-01-01T00:00:00.000Z',
+        accountUsedMicrodollars: 1_250_000,
+      },
     });
 
     const rows = await db
@@ -5275,6 +5278,7 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
         orgId: 'org-seats',
         amountCents,
         accountCreatedAt: '2026-01-01T00:00:00.000Z',
+        accountUsedMicrodollars: 1_250_000,
       })
     );
     createSpy.mockRestore();

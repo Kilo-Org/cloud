@@ -62,6 +62,37 @@ describe('message input layout', () => {
     ).toBe(8);
   });
 
+  it('releases the iOS home-indicator inset while the keyboard covers it and restores it on close', () => {
+    const restingPadding = resolveMessageInputBottomPadding({
+      platform: 'ios',
+      bottomSafeAreaInset: 0,
+    });
+    const safeArea = 34;
+
+    expect(
+      resolveMessageInputBottomPadding({
+        platform: 'ios',
+        bottomSafeAreaInset: safeArea,
+        keyboardVisible: true,
+      })
+    ).toBe(restingPadding);
+    expect(
+      resolveMessageInputBottomPadding({
+        platform: 'ios',
+        bottomSafeAreaInset: safeArea,
+        keyboardVisible: false,
+      })
+    ).toBe(safeArea);
+  });
+
+  it('keeps Android inset ownership unchanged while the keyboard is visible', () => {
+    const insets = { platform: 'android', bottomSafeAreaInset: 24 };
+
+    expect(resolveMessageInputBottomPadding({ ...insets, keyboardVisible: true })).toBe(
+      resolveMessageInputBottomPadding({ ...insets, keyboardVisible: false })
+    );
+  });
+
   it('caps the visible composer text area at five lines', () => {
     const expectedMaxHeight =
       MESSAGE_INPUT_LINE_HEIGHT * MESSAGE_INPUT_MAX_VISIBLE_LINES + MESSAGE_INPUT_VERTICAL_INSET;

@@ -12,7 +12,7 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, BackHandler, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import { BackHandler, Keyboard, ScrollView, type TextInput, View } from 'react-native';
 import {
   ComposerInlineError,
   type ComposerInlineErrorKind,
@@ -21,6 +21,7 @@ import { PrFormSheetFooter, PrFormSheetHeader } from '@/components/pr-review/pr-
 import { CommentBodyField } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -70,6 +71,7 @@ export function PrConversationCommentComposer({
   onDismiss,
 }: PrConversationCommentComposerProps) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const addComment = useAddPrCommentMutation(prRef);
 
   // Durable comment draft, keyed by account and PR. Nothing is saved or
@@ -260,35 +262,34 @@ export function PrConversationCommentComposer({
       return;
     }
     if (bodyRef.current.trim().length > 0) {
-      Alert.alert(t('prReview.composer.discardTitle'), t('prReview.composer.discardMessage'), [
-        { text: t('common.keepEditing'), style: 'cancel' },
-        {
-          text: t('common.discard'),
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              // The clear must SETTLE before the dismiss: the next open's
-              // draft load races an in-flight removeItem otherwise, and the
-              // discarded text reappears for one open. When the clear FAILS,
-              // stay on the composer with the text intact (the drafts.ts
-              // contract for the returned boolean): dismissing anyway would
-              // resurface the draft on the next open as if the discard never
-              // happened. The Cancel/back gate is the retry CTA, so the
-              // inline error is retryable.
-              if (userId) {
-                const cleared = await clearDraft(userId, commentDraftKey);
-                if (!cleared) {
-                  setInlineError(t('agentChat.newSession.discardFailed'));
-                  setInlineErrorKind('retryable');
-                  setInlineErrorIsLocal(true);
-                  return;
-                }
+      confirm({
+        title: t('prReview.composer.discardTitle'),
+        message: t('prReview.composer.discardMessage'),
+        confirmLabel: t('common.discard'),
+        cancelLabel: t('common.keepEditing'),
+        onConfirm: () => {
+          void (async () => {
+            // The clear must SETTLE before the dismiss: the next open's
+            // draft load races an in-flight removeItem otherwise, and the
+            // discarded text reappears for one open. When the clear FAILS,
+            // stay on the composer with the text intact (the drafts.ts
+            // contract for the returned boolean): dismissing anyway would
+            // resurface the draft on the next open as if the discard never
+            // happened. The Cancel/back gate is the retry CTA, so the
+            // inline error is retryable.
+            if (userId) {
+              const cleared = await clearDraft(userId, commentDraftKey);
+              if (!cleared) {
+                setInlineError(t('agentChat.newSession.discardFailed'));
+                setInlineErrorKind('retryable');
+                setInlineErrorIsLocal(true);
+                return;
               }
-              onDismiss();
-            })();
-          },
+            }
+            onDismiss();
+          })();
         },
-      ]);
+      });
       return;
     }
     onDismiss();
@@ -396,6 +397,7 @@ export function PrConversationCommentComposer({
           </Button>
         </PrFormSheetFooter>
       </ScrollView>
+      {dialog}
     </>
   );
 }

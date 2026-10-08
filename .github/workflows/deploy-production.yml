@@ -112,6 +112,17 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
+  stage-ai-gateway:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: production
+      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
+    secrets:
+      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
+
   promote-app:
     needs: [stage-app, check-production-db-startup, run-migrations]
     uses: ./.github/workflows/promote-vercel-deployment.yml
@@ -130,6 +141,20 @@ jobs:
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
+  promote-ai-gateway:
+    needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
+      # The gateway has no dedicated Axiom dataset. Its logs reach Axiom through
+      # the Axiom Vercel integration's drain, which feeds the shared `vercel`
+      # dataset, so annotate promotes there.
+      axiom_annotation_dataset: vercel
+      axiom_expected_project: kilocode-ai-gateway
+    secrets:
+      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
   deploy-workers:
     needs:
       [
@@ -138,8 +163,10 @@ jobs:
         check-changes,
         stage-app,
         stage-global-app,
+        stage-ai-gateway,
         promote-app,
         promote-global-app,
+        promote-ai-gateway,
       ]
     if: >-
       ${{
@@ -149,8 +176,10 @@ jobs:
         needs.run-migrations.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result)
+        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-ai-gateway.result)
       }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
@@ -244,8 +273,10 @@ jobs:
         detect-gastown-wasteland-changes,
         stage-app,
         stage-global-app,
+        stage-ai-gateway,
         promote-app,
         promote-global-app,
+        promote-ai-gateway,
       ]
     if: >-
       ${{
@@ -256,8 +287,10 @@ jobs:
         needs.detect-gastown-wasteland-changes.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-ai-gateway.result) &&
         (
           needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true' ||
           needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
@@ -306,21 +339,9 @@ jobs:
         continue-on-error: true
         run: pnpm --filter cloudflare-gastown sentry:sourcemaps
 
-  deploy-kiloclaw:
-    needs: [check-changes, check-production-db-startup, run-migrations]
-    if: needs.check-changes.outputs.deploy_kiloclaw == 'true'
-    # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
-    # exceed the caller). The reusable workflow restricts further per job — only
-    # its isolated attest-sbom job actually uses id-token/attestations.
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    uses: ./.github/workflows/deploy-kiloclaw.yml
-    with:
-      source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets: inherit
+  # The KiloClaw image and worker deploy (deploy-kiloclaw.yml) is not part of
+  # the scheduled pipeline. It runs manually via workflow_dispatch from the
+  # Actions tab.
 
   record-deployment:
     needs:
@@ -330,12 +351,13 @@ jobs:
         run-migrations,
         stage-app,
         stage-global-app,
+        stage-ai-gateway,
         promote-app,
         promote-global-app,
+        promote-ai-gateway,
         deploy-workers,
         detect-gastown-wasteland-changes,
         deploy-gastown-wasteland,
-        deploy-kiloclaw,
       ]
     if: >-
       ${{
@@ -345,12 +367,13 @@ jobs:
         needs.run-migrations.result == 'success' &&
         needs.stage-app.result == 'success' &&
         needs.stage-global-app.result == 'success' &&
+        needs.stage-ai-gateway.result == 'success' &&
         needs.promote-app.result == 'success' &&
         needs.promote-global-app.result == 'success' &&
+        needs.promote-ai-gateway.result == 'success' &&
         needs.deploy-workers.result == 'success' &&
         needs.detect-gastown-wasteland-changes.result == 'success' &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-kiloclaw.result)
+        contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result)
       }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

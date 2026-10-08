@@ -12,6 +12,7 @@ import {
 } from '../container-usage-context.js';
 import type { SandboxBillingAdmissionResult } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
+import { withDORetry } from '../utils/do-retry.js';
 
 export type SessionKiloFacadeDecision =
   | { kind: 'proxy-live-wrapper' }
@@ -92,15 +93,15 @@ export async function resolveLiveWrapperTarget(params: {
       metadata.identity.botId,
       {
         createdOnPlatform: metadata.identity.billingOrigin,
+        legacyFallback: true,
       }
     ));
 
-  const sandbox = getSandbox(
-    getSandboxNamespace(env, sandboxId, {
-      managedScmContainment: requiresContainmentSandbox(metadata),
-    }),
-    sandboxId
-  );
+  const namespace = getSandboxNamespace(env, sandboxId, {
+    managedScmContainment: requiresContainmentSandbox(metadata),
+  });
+  const resolveSandbox = () => getSandbox(namespace, sandboxId);
+  let sandbox = resolveSandbox();
   const billingInput = buildSandboxBillingInput(
     metadata,
     sandboxId,
@@ -111,7 +112,14 @@ export async function resolveLiveWrapperTarget(params: {
     const admission = await ensureSandboxBillingAdmissionInput(sandbox, billingInput);
     if (!admission.success) return { kind: 'billing-rejected', admission };
   } else {
-    void configureSandboxBillingInput(sandbox, billingInput);
+    sandbox = await withDORetry(
+      resolveSandbox,
+      async sandbox => {
+        await configureSandboxBillingInput(sandbox, billingInput);
+        return sandbox;
+      },
+      'configureSandboxBilling'
+    );
   }
   const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
   if (!wrapperInfo) {

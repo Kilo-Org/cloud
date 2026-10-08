@@ -229,13 +229,25 @@ export function CloudSidebarLayout({
     });
   }, [platformFilter]);
 
+  const folderWorktreeIds = useMemo(
+    () => workspaceFolders.folders.flatMap(folder => folder.worktreeIds),
+    [workspaceFolders.folders]
+  );
   const { sessions, cachedSessions, worktreeDetails, refetchSessions, renameSessionLocally } =
     useSidebarSessions({
       organizationId: organizationId ?? null,
       searchQuery,
       createdOnPlatform,
       gitUrl: projectFilter.length > 0 ? projectFilter : undefined,
+      folderWorktreeIds,
     });
+  const sidebarWorkspaceFolders = {
+    ...workspaceFolders,
+    refresh: async () => {
+      refetchSessions();
+      await workspaceFolders.refresh();
+    },
+  };
   const foregroundSessionStatus = useMemo(
     () =>
       deriveForegroundSessionStatus({
@@ -719,7 +731,7 @@ export function CloudSidebarLayout({
             </SheetHeader>
             <ChatSidebar
               key={`mobile:${currentUserId}:${organizationId ?? 'personal'}`}
-              workspaceFolders={workspaceFolders}
+              workspaceFolders={sidebarWorkspaceFolders}
               sessions={sidebarSessions}
               currentSessionId={currentSessionId}
               selectedWorktreeId={selectedWorktreeId}
@@ -753,7 +765,7 @@ export function CloudSidebarLayout({
         <div className="hidden w-80 shrink-0 border-r lg:block">
           <ChatSidebar
             key={`desktop:${currentUserId}:${organizationId ?? 'personal'}`}
-            workspaceFolders={workspaceFolders}
+            workspaceFolders={sidebarWorkspaceFolders}
             sessions={sidebarSessions}
             currentSessionId={currentSessionId}
             selectedWorktreeId={selectedWorktreeId}

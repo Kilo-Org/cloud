@@ -6,7 +6,10 @@ import { generateSandboxId } from '../../src/sandbox-id.js';
 import { sessionDoName } from '../../src/session-plane.js';
 import { createMessageId, MESSAGE_ID_PATTERN } from '../../src/session/message-id.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneWrapperFrame } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -99,6 +102,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -185,6 +189,7 @@ function startWrapperPump(wrapper: FakeWrapper, recording: Recording): () => voi
   };
 }
 
+/** Two sessions on one sandbox: only a shared sandbox hosts more than one workspace. */
 async function setupSiblingPair(): Promise<{
   sandboxStub: DurableObjectStub<SandboxControlV2>;
   sessionA: string;
@@ -198,7 +203,9 @@ async function setupSiblingPair(): Promise<{
 }> {
   const sessionA = newSessionId();
   const sessionB = newSessionId();
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionA);
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA, undefined, {
+    sandboxAllocation: 'cloudflare-shared',
+  });
   const provider = createFakeProvider();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter);
 
@@ -236,7 +243,7 @@ async function setupSiblingPair(): Promise<{
     wrapperId: 'wr_sibling',
     allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
   });
-  expect(welcome).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(welcome).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
 
   const recording: Recording = { prepares: [], prompts: [], aborts: [], answers: [] };
   const stopPump = startWrapperPump(wrapper, recording);
@@ -282,6 +289,46 @@ afterEach(async () => {
 });
 
 describe('SandboxSessionV2 Stop, answers and permissions', () => {
+  it('retains an autonomous deadline error for replay without changing an earlier completed message', async () => {
+    const pair = await setupSiblingPair();
+    try {
+      await pair.stubA.onOutcome({
+        sessionId: pair.sessionA,
+        status: 'completed',
+        lastMessageId: pair.messageA,
+      });
+      const before = await pair.stubA.getSession();
+      const error = {
+        type: 'session.error',
+        properties: {
+          sessionID: kiloSessionId(),
+          reason: 'no_progress',
+          error: 'Execution stopped because it made no progress. You can continue in this chat.',
+        },
+      };
+      await pair.stubA.onEvents({ events: [error] });
+      const after = await pair.stubA.getSession();
+      expect(before.type).toBe('found');
+      expect(after.type).toBe('found');
+      if (before.type !== 'found' || after.type !== 'found') throw new Error('Session disappeared');
+      expect(after.messages).toEqual(before.messages);
+      expect(after.latestEventId).toBeGreaterThan(before.latestEventId);
+      const rows = await runInDurableObject(pair.stubA, (_instance, state) =>
+        state.storage.sql
+          .exec<{ payload: string; execution_id: string }>(
+            "SELECT payload, execution_id FROM events WHERE stream_event_type = 'kilocode' AND json_extract(payload, '$.type') = 'session.error'"
+          )
+          .toArray()
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].execution_id).toBe('');
+      expect(JSON.parse(rows[0].payload)).toMatchObject(error);
+      expect(await messageStatus(pair.stubA, pair.messageA)).toBe('completed');
+      expect(await messageStatus(pair.stubB, pair.messageB)).toBe('running');
+    } finally {
+      pair.stopPump();
+    }
+  });
   it('stops one session without affecting a sibling route on the same sandbox', async () => {
     const pair = await setupSiblingPair();
     try {

@@ -16,11 +16,12 @@ import { type MonoScrollTextMode } from './mono-scroll-block-model';
 import { tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
 import '@/i18n';
 
-const { useMonoScrollSheetMock, useColorSchemeMock } = vi.hoisted(() => ({
+const { useMonoScrollSheetMock, useColorSchemeMock, platform } = vi.hoisted(() => ({
   useMonoScrollSheetMock: vi.fn<() => { mode: MonoScrollTextMode; track: () => () => void } | null>(
     () => null
   ),
   useColorSchemeMock: vi.fn<() => 'dark' | 'light'>(() => 'light'),
+  platform: { OS: 'android' as 'android' | 'ios' },
 }));
 
 // RNGH ships Flow source that the node project cannot parse, so the horizontal
@@ -29,6 +30,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
   Text: 'RNText',
+  Platform: platform,
   useColorScheme: useColorSchemeMock,
 }));
 vi.mock('react-native-gesture-handler', () => ({
@@ -323,6 +325,7 @@ function withSheet(
 // colors; the theme suite overrides it per test.
 beforeEach(() => {
   useColorSchemeMock.mockReturnValue('light');
+  platform.OS = 'android';
 });
 
 describe('CodeBlock', () => {
@@ -672,6 +675,35 @@ describe('CodeBlock', () => {
     const parent = codeParent(renderer.root);
     expect(parent).toBeDefined();
     expect(propOf(parent, 'selectable')).toBe(false);
+    await unmount(renderer);
+  });
+
+  it('renders an iOS selectable fence as UITextView chunks with colored token spans', async () => {
+    platform.OS = 'ios';
+    const renderer = await mount(blockElement({ code: 'const x = 1;', language: 'typescript' }));
+    const chunks = renderer.root.findAll(
+      node => isMockedStringElement(node, 'UITextView') && propOf(node, 'uiTextView') === true
+    );
+    expect(chunks).toHaveLength(1);
+    expect(propOf(chunks[0], 'selectable')).toBe(true);
+    expect(codeLines(renderer.root)).toHaveLength(0);
+    const spans = renderer.root.findAll(
+      node => isMockedStringElement(node, 'UITextView') && propOf(node, 'uiTextView') !== true
+    );
+    expect(spans.length).toBeGreaterThan(0);
+    expect(spans.map(span => span.props.children as unknown)).toContain('const');
+    await unmount(renderer);
+  });
+
+  it('keeps an iOS non-selectable fence on plain Text', async () => {
+    platform.OS = 'ios';
+    const renderer = await mount(
+      blockElement({ code: 'const x = 1;', language: 'typescript', selectable: false })
+    );
+    expect(renderer.root.findAll(node => isMockedStringElement(node, 'UITextView'))).toHaveLength(
+      0
+    );
+    expect(codeLines(renderer.root)).toHaveLength(1);
     await unmount(renderer);
   });
 });

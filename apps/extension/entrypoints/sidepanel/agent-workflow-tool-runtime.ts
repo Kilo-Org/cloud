@@ -20,8 +20,6 @@ import { runWorkflow } from '@/src/shared/agent-workflow-runner';
 import type { WorkflowRunResult } from '@/src/shared/agent-workflow-runner';
 import type { ApprovalKind, ApprovalOutcome } from './pending-approval';
 
-// ---------- tool context ----------
-
 type MaybePromise<Value> = Promise<Value> | Value;
 
 export interface WorkflowToolContext {
@@ -44,8 +42,6 @@ export interface WorkflowToolContext {
   readonly navigateTab: (tabId: number, url: string) => Promise<void>;
   readonly getTabUrl: (tabId: number) => Promise<string>;
 }
-
-// ---------- zod schemas ----------
 
 const saveWorkflowArgsSchema = z.object({
   description: z.string().max(300),
@@ -86,8 +82,6 @@ const saveMemoryArgsSchema = z.object({
   text: z.string().max(8000),
 });
 
-// ---------- run guidance ----------
-
 // The runs toggle is a permission the model reads through the save result's nextStep.
 // The setting is read when the save completes, so a change during a pending card is reflected.
 // It is never a runtime refusal. The exact strings are pinned by the runtime tests.
@@ -95,8 +89,6 @@ const NEXT_STEP_RUNS_AUTO_APPROVED =
   'Auto-approve workflow runs is on. Verify with run_workflow dryRun: true when the script clicks or fills, then start the real run yourself with run_workflow.';
 const NEXT_STEP_RUNS_ASK_USER =
   'Verify with run_workflow dryRun: true, then ask the user to start the first real run from Workflows in settings.';
-
-// ---------- helpers ----------
 
 // Zod's generic "Invalid input" gives a model nothing to act on for the one field it most often garbles. Field-specific guidance replaces it.
 const ARGS_FIELD_GUIDANCE = {
@@ -271,8 +263,6 @@ const runResultToToolResult = (
     ok: false,
   };
 };
-
-// ---------- tool implementations ----------
 
 const executeSearchWorkflows = async (
   toolCall: WorkflowToolCallEvent,
@@ -559,8 +549,6 @@ const executeSaveMemory = async (
   const outcome = await ctx.requestApproval('memory', draft);
   return approvalOutcomeToToolResult(outcome, 'memoryId');
 };
-
-// ---------- main executor ----------
 
 export const executeWorkflowToolCall = (
   toolCall: WorkflowToolCallEvent,

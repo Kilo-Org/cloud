@@ -34,6 +34,7 @@ type SendUpstreamAttemptInput = {
   organizationId: string | null;
   sessionId: string | null;
   taskId: string | null;
+  isNonTrialEnterprise: boolean;
   search: string;
   method: string;
   signal?: AbortSignal;
@@ -60,6 +61,7 @@ export async function sendUpstreamAttempt({
   organizationId,
   sessionId,
   taskId,
+  isNonTrialEnterprise,
   search,
   method,
   signal,
@@ -76,7 +78,8 @@ export async function sendUpstreamAttempt({
     userId,
     organizationId,
     sessionId,
-    taskId
+    taskId,
+    isNonTrialEnterprise
   );
 
   if (providerContext.provider.id === 'openrouter') {

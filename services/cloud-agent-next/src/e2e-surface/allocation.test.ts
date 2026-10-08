@@ -16,6 +16,7 @@ describe('projectAllocationInspection', () => {
     expect(projectAllocationInspection(SANDBOX_ID, view({}))).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
+      provider: 'cloudflare',
       physicalState: null,
     });
   });
@@ -26,6 +27,7 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
+      provider: 'cloudflare',
       physicalState: 'stopped',
     });
   });
@@ -39,6 +41,7 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: 'provider-ref-9',
+      provider: 'cloudflare',
       physicalState: 'unknown',
     });
   });
@@ -49,6 +52,7 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: null,
+      provider: 'cloudflare',
       physicalState: 'creating',
     });
   });
@@ -62,6 +66,7 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: 'provider-ref-9',
+      provider: 'cloudflare',
       physicalState: 'running',
     });
   });
@@ -75,7 +80,30 @@ describe('projectAllocationInspection', () => {
     ).toEqual({
       logicalSandboxId: SANDBOX_ID,
       physicalProviderRef: 'provider-ref-9',
+      provider: 'cloudflare',
       physicalState: 'stopping',
     });
   });
+
+  it.each(['vercel', 'cloudflare-containers'] as const)(
+    'reports the persisted %s provider next to the reference',
+    provider => {
+      expect(
+        projectAllocationInspection(
+          SANDBOX_ID,
+          view({
+            kind: 'connected',
+            allocationId: 'alloc-1',
+            providerRef: 'provider-ref-9',
+            provider,
+          })
+        )
+      ).toEqual({
+        logicalSandboxId: SANDBOX_ID,
+        physicalProviderRef: 'provider-ref-9',
+        provider,
+        physicalState: 'running',
+      });
+    }
+  );
 });

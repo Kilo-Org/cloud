@@ -91,6 +91,7 @@ describe('createDeployedScenarioEnvironment', () => {
       Response.json({
         logicalSandboxId: 'usr-123456789abc',
         physicalProviderRef: 'provider-ref-9',
+        provider: 'cloudflare',
         physicalState: 'running',
       })
     );
@@ -123,6 +124,7 @@ describe('createDeployedScenarioEnvironment', () => {
       return Response.json({
         logicalSandboxId: 'usr-123456789abc',
         physicalProviderRef: calls === 1 ? null : 'provider-ref-9',
+        provider: 'cloudflare',
         physicalState: calls === 1 ? 'creating' : 'running',
       });
     });
@@ -132,6 +134,176 @@ describe('createDeployedScenarioEnvironment', () => {
       surfaceUrl: 'https://worker.test/',
       bearerToken: 'token-1',
       internalApiSecret: SECRET,
+    });
+    const pending = env.sessionSandbox!.waitForContainer({
+      cloudAgentSessionId: 'agent_1',
+      kiloSessionId: 'ses_1',
+      timeoutMs: 5_000,
+    });
+    await vi.advanceTimersByTimeAsync(600);
+
+    await expect(pending).resolves.toBe('provider-ref-9');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails the boot wait when the observed provider does not match the requested allocation', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        logicalSandboxId: 'usr-123456789abc',
+        physicalProviderRef: 'provider-ref-9',
+        provider: 'cloudflare',
+        physicalState: 'running',
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test/',
+      bearerToken: 'token-1',
+      internalApiSecret: SECRET,
+      expectedProvider: 'vercel',
+    });
+
+    await expect(
+      env.sessionSandbox!.waitForContainer({
+        cloudAgentSessionId: 'agent_1',
+        kiloSessionId: 'ses_1',
+        timeoutMs: 5_000,
+      })
+    ).rejects.toThrow(/did not match the requested "vercel"/);
+  });
+
+  it('passes the boot wait when the observed provider matches the requested allocation', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        logicalSandboxId: 'usr-123456789abc',
+        physicalProviderRef: 'provider-ref-9',
+        provider: 'vercel',
+        physicalState: 'running',
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test/',
+      bearerToken: 'token-1',
+      internalApiSecret: SECRET,
+      expectedProvider: 'vercel',
+    });
+
+    await expect(
+      env.sessionSandbox!.waitForContainer({
+        cloudAgentSessionId: 'agent_1',
+        kiloSessionId: 'ses_1',
+        timeoutMs: 5_000,
+      })
+    ).resolves.toBe('provider-ref-9');
+  });
+
+  it('rejects an unknown provider in the surface response', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        logicalSandboxId: 'usr-123456789abc',
+        physicalProviderRef: 'provider-ref-9',
+        provider: 'aws-lambda',
+        physicalState: 'running',
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test/',
+      bearerToken: 'token-1',
+      internalApiSecret: SECRET,
+    });
+
+    await expect(
+      env.sessionSandbox!.currentContainer({
+        cloudAgentSessionId: 'agent_1',
+        kiloSessionId: 'ses_1',
+      })
+    ).rejects.toThrow(/unknown provider/);
+  });
+
+  it('accepts an older surface that omits the provider when no allocation was requested', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        logicalSandboxId: 'usr-123456789abc',
+        physicalProviderRef: 'provider-ref-9',
+        physicalState: 'running',
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test/',
+      bearerToken: 'token-1',
+      internalApiSecret: SECRET,
+    });
+
+    await expect(
+      env.sessionSandbox!.currentContainer({
+        cloudAgentSessionId: 'agent_1',
+        kiloSessionId: 'ses_1',
+      })
+    ).resolves.toBe('provider-ref-9');
+  });
+
+  it('fails an explicit allocation against an older surface that omits the provider', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        logicalSandboxId: 'usr-123456789abc',
+        physicalProviderRef: 'provider-ref-9',
+        physicalState: 'running',
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test/',
+      bearerToken: 'token-1',
+      internalApiSecret: SECRET,
+      expectedProvider: 'vercel',
+    });
+
+    await expect(
+      env.sessionSandbox!.waitForContainer({
+        cloudAgentSessionId: 'agent_1',
+        kiloSessionId: 'ses_1',
+        timeoutMs: 5_000,
+      })
+    ).rejects.toThrow(/did not report a provider; redeploy/);
+  });
+
+  it('defers a provider mismatch while the pin is unwritten (physicalState null)', async () => {
+    vi.useFakeTimers();
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls += 1;
+      // Before the first prepare the state has no allocation and reports the
+      // default provider; the wait must keep polling, not fail once.
+      if (calls === 1) {
+        return Response.json({
+          logicalSandboxId: 'usr-123456789abc',
+          physicalProviderRef: null,
+          provider: 'cloudflare',
+          physicalState: null,
+        });
+      }
+      return Response.json({
+        logicalSandboxId: 'usr-123456789abc',
+        physicalProviderRef: 'provider-ref-9',
+        provider: 'vercel',
+        physicalState: 'running',
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test/',
+      bearerToken: 'token-1',
+      internalApiSecret: SECRET,
+      expectedProvider: 'vercel',
     });
     const pending = env.sessionSandbox!.waitForContainer({
       cloudAgentSessionId: 'agent_1',

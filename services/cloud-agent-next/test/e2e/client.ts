@@ -11,6 +11,10 @@
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { z } from 'zod';
+import {
+  getSandboxAllocationRequest,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { mintApiToken, mintStreamTicket } from './auth.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
 import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
@@ -97,6 +101,13 @@ export type DriverConfig = {
    * `/test/release`, `/test/gate-status`, and `/test/requests`.
    */
   fakeLlmUrl: string;
+  /**
+   * Explicit sandbox allocation every session this driver starts must use.
+   * Scenarios call `startSession` with a prompt only, so the driver owns both
+   * the value and the forwarding to the unified `runtime.sandboxAllocation`.
+   * Absent keeps the default allocation path and changes nothing.
+   */
+  sandboxAllocation?: SandboxAllocation;
 };
 
 export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
@@ -220,6 +231,11 @@ export type StartSessionArgs = {
 /**
  * Start a new session using whichever API surface the scenario asked for.
  *
+ * `config.sandboxAllocation` is the single owner of the explicit allocation:
+ * scenarios pass only a prompt, so the unified start reads it from the driver
+ * config. The legacy surface has no supported explicit-allocation contract
+ * here, so it refuses before any request is issued.
+ *
  * Both branches return the same `StartSessionResult` shape so downstream
  * scenario code (event assertions, callback assertions, etc.) doesn't care
  * which surface produced it.
@@ -229,6 +245,12 @@ export async function startSession(
   args: StartSessionArgs,
   api: ApiVersion = 'unified'
 ): Promise<StartSessionResult> {
+  const allocation = config.sandboxAllocation;
+  if (api === 'legacy' && allocation !== undefined) {
+    throw new Error(
+      'explicit sandbox allocation requires the unified API; rerun with --api=unified'
+    );
+  }
   const started = {
     ...args,
     branch: args.branch ?? config.branch,
@@ -236,7 +258,7 @@ export async function startSession(
   const result =
     api === 'legacy'
       ? await startSessionLegacy(config, started)
-      : await startSessionUnified(config, started);
+      : await startSessionUnified(config, started, allocation);
   if (api === 'unified') {
     config.onSessionCreated?.(result.cloudAgentSessionId, result.kiloSessionId);
   }
@@ -250,7 +272,8 @@ export async function startSession(
 
 async function startSessionUnified(
   config: DriverConfig,
-  args: StartSessionArgs
+  args: StartSessionArgs,
+  allocation: SandboxAllocation | undefined
 ): Promise<StartSessionResult> {
   if (args.callbackTarget) {
     throw new Error('callbackTarget is accepted by prepareSession only; rerun with --api=legacy');
@@ -278,6 +301,9 @@ async function startSessionUnified(
             url: config.gitUrl,
             ...(args.branch !== undefined ? { branch: args.branch } : {}),
           },
+      ...(allocation === undefined
+        ? {}
+        : { runtime: { sandboxAllocation: getSandboxAllocationRequest(allocation) } }),
       options: {
         createdOnPlatform: 'cloud-agent-web',
         ...(config.kilocodeOrganizationId
@@ -402,6 +428,12 @@ export async function prepareBrowserSession(
       autoInitiate: true,
       operationKey: input.operationKey ?? randomUUID(),
       autoCommit: input.autoCommit ?? true,
+      // The prepare schema accepts the same structured allocation request as the
+      // unified start; forward the driver selection so the browser helper never
+      // silently drops it.
+      ...(config.sandboxAllocation !== undefined
+        ? { sandboxAllocation: getSandboxAllocationRequest(config.sandboxAllocation) }
+        : {}),
       ...(config.kilocodeOrganizationId
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),
@@ -422,6 +454,10 @@ export async function createWorktreeChat(
   },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
+  // A worktree chat creation does not allocate a new physical sandbox: the
+  // handler derives the child allocation from the source session's persisted
+  // workspace metadata, so `config.sandboxAllocation` is not read here and is
+  // not silently dropped. The source session's own start carried it.
   const created = await trpcCall<WorktreeSessionResult>(
     config,
     'createWorktreeChat',

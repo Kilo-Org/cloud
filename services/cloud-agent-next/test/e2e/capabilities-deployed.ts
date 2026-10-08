@@ -8,6 +8,7 @@
  * that declares them is `unsupported` — never a silent unauthenticated run.
  */
 
+import type { AgentSandboxProvider } from '../../src/types.js';
 import { createHttpCallbacks, createHttpSessionSandbox } from './e2e-surface-client.js';
 import type { ScenarioEnvironment } from './scenario-capabilities.js';
 
@@ -15,6 +16,8 @@ export type DeployedScenarioEnvironmentInput = {
   surfaceUrl?: string;
   bearerToken?: string;
   internalApiSecret?: string;
+  /** Required provider when a run selects an explicit allocation. */
+  expectedProvider?: AgentSandboxProvider;
 };
 
 export function createDeployedScenarioEnvironment(
@@ -33,6 +36,7 @@ export function createDeployedScenarioEnvironment(
       surfaceUrl,
       internalApiSecret,
       ...(input.bearerToken !== undefined ? { bearerToken: input.bearerToken } : {}),
+      ...(input.expectedProvider !== undefined ? { expectedProvider: input.expectedProvider } : {}),
     };
     env.sessionSandbox = createHttpSessionSandbox(surface);
     env.callbacks = createHttpCallbacks(surface);

@@ -1021,6 +1021,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     onRuntimeRestart(info: KiloRestartInfo & { key: string }): void {
       const ownedTurns = new Set(turnsForRuntimeKey(info.key).map(turn => turn.route.sessionId));
       void publishCommandsForRuntimeKey(info.key);
+      const outcomeReason = info.outcomeReason ?? 'agent_restarted';
       for (const turn of turnsForRuntimeKey(info.key)) {
         turn.deferredCompletion = undefined;
         if (turn.phase === 'finalizing') {
@@ -1029,7 +1030,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
             // started; the restart interrupted its Kilo work, so fail it
             // instead of letting it end as no_progress.
             turn.stepAbort?.abort(new Error('agent restarted'));
-            sendOutcome(turn, 'failed', 'agent_restarted');
+            sendOutcome(turn, 'failed', outcomeReason);
           }
           // Otherwise let finalization finish; a later idle triggers it again.
           continue;
@@ -1060,7 +1061,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
           drainInbox(turn);
           continue;
         }
-        sendOutcome(turn, 'failed', 'agent_restarted');
+        sendOutcome(turn, 'failed', outcomeReason);
       }
       const reported = new Set<string>();
       for (const execution of info.interruptedExecutions ?? []) {

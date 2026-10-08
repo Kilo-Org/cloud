@@ -43,6 +43,7 @@ import {
   CGROUP_FS_MAGIC,
   classifyWorkloadMembers,
   createWorkloadReporter,
+  decideWorkloadStatsEmission,
   KILO_OOM_SCORE_ADJ,
   readWorkloadStats,
   TOOL_OOM_SCORE_ADJ,
@@ -52,6 +53,8 @@ import {
   writeOomScoreAdj,
   type WorkloadPlacement,
   type WorkloadProcessEntry,
+  type WorkloadSnapshot,
+  type WorkloadStatsEmissionState,
 } from './workload-cgroup.js';
 
 export type DirectProcessState = 'absent' | 'reused' | 'alive' | 'unknown';
@@ -75,6 +78,7 @@ export type OwnedProcessScope = {
   captureBaseline(allowed: (argv: string[]) => boolean, deadlineAt?: number): Promise<void>;
   verify(baseline?: boolean, deadlineAt?: number): Promise<boolean>;
   stop(deadlineAt: number): Promise<boolean>;
+  latestSnapshot(): WorkloadSnapshot | undefined;
 };
 
 type ProcessIdentity = {
@@ -643,6 +647,11 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
   let sweeping = false;
   let lastOomKills = 0;
   let lastOomGroupKills = 0;
+  let statsEmission: WorkloadStatsEmissionState = {
+    lastEmittedAtMs: 0,
+    highPressure: false,
+  };
+  let workloadSnapshot: WorkloadSnapshot | undefined;
   const children = new Set<OwnedChild>();
   const baseline = new Set<string>();
   const observations = new Set<Deadline>();
@@ -738,6 +747,40 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       const stats = readWorkloadStats(group.reference);
       const toolStats = readWorkloadStats(managed.toolsReference);
       const serverStats = readWorkloadStats(managed.serverReference);
+      if (placement !== undefined) {
+        workloadSnapshot = {
+          scopeId,
+          aggregateMaxBytes: placement.aggregateMaxBytes,
+          toolsMaxBytes: placement.toolsMaxBytes,
+          containerLimitBytes: placement.containerLimitBytes,
+          oomKills: stats.oomKills,
+          oomGroupKills: stats.oomGroupKills,
+          toolOomKills: toolStats.oomKills,
+          serverOomKills: serverStats.oomKills,
+          pressureAvailable: stats.pressureAvailable,
+          ...(stats.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
+          ...(stats.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
+          ...(stats.anonBytes !== undefined ? { anonBytes: stats.anonBytes } : {}),
+          ...(stats.fileBytes !== undefined ? { fileBytes: stats.fileBytes } : {}),
+          ...(stats.shmemBytes !== undefined ? { shmemBytes: stats.shmemBytes } : {}),
+          ...(toolStats.currentBytes !== undefined
+            ? { toolCurrentBytes: toolStats.currentBytes }
+            : {}),
+          ...(toolStats.peakBytes !== undefined ? { toolPeakBytes: toolStats.peakBytes } : {}),
+          ...(serverStats.currentBytes !== undefined
+            ? { serverCurrentBytes: serverStats.currentBytes }
+            : {}),
+          ...(serverStats.peakBytes !== undefined
+            ? { serverPeakBytes: serverStats.peakBytes }
+            : {}),
+          ...(stats.memoryMaxEvents !== undefined
+            ? { memoryMaxEvents: stats.memoryMaxEvents }
+            : {}),
+          ...(stats.memoryOomEvents !== undefined
+            ? { memoryOomEvents: stats.memoryOomEvents }
+            : {}),
+        };
+      }
       if (stats.oomKills > lastOomKills || stats.oomGroupKills > lastOomGroupKills) {
         lastOomKills = Math.max(lastOomKills, stats.oomKills);
         lastOomGroupKills = Math.max(lastOomGroupKills, stats.oomGroupKills);
@@ -750,6 +793,14 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           serverOomKills: serverStats.oomKills,
         });
       }
+      const decision = decideWorkloadStatsEmission({
+        nowMs: Date.now(),
+        stats,
+        limitBytes: activePlacement?.aggregateMaxBytes,
+        state: statsEmission,
+      });
+      statsEmission = decision.state;
+      if (!decision.emit) return;
       workloadReporter?.emit(scopeId, {
         phase: 'completed',
         workloadPhase: 'stats',
@@ -763,6 +814,10 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         cpuController: managed.cpuController,
         ...(stats.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
         ...(stats.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
+        ...(stats.anonBytes !== undefined ? { anonBytes: stats.anonBytes } : {}),
+        ...(stats.fileBytes !== undefined ? { fileBytes: stats.fileBytes } : {}),
+        ...(stats.shmemBytes !== undefined ? { shmemBytes: stats.shmemBytes } : {}),
+        pressureAvailable: stats.pressureAvailable,
         ...(stats.pressureSomeTotal !== undefined
           ? { pressureSomeTotal: stats.pressureSomeTotal }
           : {}),
@@ -790,6 +845,14 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         ...(toolStats.ioWriteBytes !== undefined
           ? { toolIoWriteBytes: toolStats.ioWriteBytes }
           : {}),
+        ...(toolStats.currentBytes !== undefined
+          ? { toolCurrentBytes: toolStats.currentBytes }
+          : {}),
+        ...(toolStats.peakBytes !== undefined ? { toolPeakBytes: toolStats.peakBytes } : {}),
+        ...(serverStats.currentBytes !== undefined
+          ? { serverCurrentBytes: serverStats.currentBytes }
+          : {}),
+        ...(serverStats.peakBytes !== undefined ? { serverPeakBytes: serverStats.peakBytes } : {}),
       });
     } catch {
       workloadReporter?.emit(path.basename(group.directory), {
@@ -1051,6 +1114,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
     },
     run: operation => current.run(scope, operation),
     observesOccupancy: occupancyObservable,
+    latestSnapshot: () => workloadSnapshot,
     seal() {
       sealed = true;
     },

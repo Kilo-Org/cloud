@@ -31,6 +31,26 @@ export const KILO_SERVER_HEADROOM_BYTES = 1536 * 1024 * 1024;
 export const MIN_WORKLOAD_CAP_BYTES = 1024 * 1024 * 1024;
 export const WORKLOAD_CPU_WEIGHT = 50;
 export const WORKLOAD_SWEEP_INTERVAL_MS = 1000;
+/**
+ * Stats are observation only, so they sample far slower than the containment
+ * sweep. The sweep still runs every second to migrate new processes; emitting
+ * its monotonic cpu/io/memory counters at that rate floods the diagnostic stream.
+ */
+export const WORKLOAD_STATS_INTERVAL_MS = 30_000;
+/**
+ * Bounds the immediate triggers (throttle/memory-event increases, first
+ * pressure crossing). Those counters are monotonic and can increase on
+ * consecutive one-second sweeps, so without a cooldown a scope parked at its
+ * limit would emit on almost every sweep.
+ */
+export const WORKLOAD_STATS_EVENT_COOLDOWN_MS = 10_000;
+export const WORKLOAD_MEMORY_PRESSURE_FRACTION = 0.9;
+/**
+ * Pressure latches at `WORKLOAD_MEMORY_PRESSURE_FRACTION` and only releases
+ * below this fraction, so `memory.current` oscillating around the threshold
+ * cannot re-arm the trigger every sweep.
+ */
+export const WORKLOAD_MEMORY_PRESSURE_RELEASE_FRACTION = 0.8;
 export const WORKLOAD_PARENT_NAME = 'kilo-workloads';
 export const WORKLOAD_SERVER_NAME = 'server';
 export const WORKLOAD_TOOLS_NAME = 'tools';
@@ -92,10 +112,15 @@ export type WorkloadProcessEntry = { pid: number; ppid: number; argv: string[] }
 export type WorkloadStats = {
   currentBytes?: number;
   peakBytes?: number;
+  anonBytes?: number;
+  fileBytes?: number;
+  shmemBytes?: number;
   memoryMaxEvents?: number;
   memoryOomEvents?: number;
   oomKills: number;
   oomGroupKills: number;
+  /** Whether the kernel exposes cgroup v2 `memory.pressure` (PSI). */
+  pressureAvailable: boolean;
   pressureSomeTotal?: number;
   pressureFullTotal?: number;
   cpuUsageUsec?: number;
@@ -104,6 +129,135 @@ export type WorkloadStats = {
   ioReadBytes?: number;
   ioWriteBytes?: number;
 };
+
+/**
+ * The last observed workload state for one scope. Unlike an emitted stats
+ * record it is updated on every sweep, so a restart decision made between
+ * samples still sees the current attribution.
+ */
+export type WorkloadSnapshot = {
+  scopeId?: string;
+  aggregateMaxBytes: number;
+  toolsMaxBytes: number;
+  containerLimitBytes: number;
+  currentBytes?: number;
+  peakBytes?: number;
+  anonBytes?: number;
+  fileBytes?: number;
+  shmemBytes?: number;
+  toolCurrentBytes?: number;
+  toolPeakBytes?: number;
+  serverCurrentBytes?: number;
+  serverPeakBytes?: number;
+  pressureAvailable: boolean;
+  memoryMaxEvents?: number;
+  memoryOomEvents?: number;
+  oomKills: number;
+  oomGroupKills: number;
+  toolOomKills: number;
+  serverOomKills: number;
+};
+
+/**
+ * A workload at this share of its cap is treated as memory-exhausted: the group
+ * cannot grow further without reclaim, so a restart at this point is attributed
+ * to the user's workload rather than an unexplained platform fault.
+ */
+export const WORKLOAD_AT_CAP_FRACTION = 0.95;
+
+export function isWorkloadAtCap(snapshot: WorkloadSnapshot): boolean {
+  const current = snapshot.currentBytes;
+  if (current === undefined) return false;
+  return current >= snapshot.aggregateMaxBytes * WORKLOAD_AT_CAP_FRACTION;
+}
+
+export type WorkloadStatsEmissionState = {
+  lastEmittedAtMs: number;
+  lastThrottleCount?: number;
+  lastMemoryMaxEvents?: number;
+  lastMemoryOomEvents?: number;
+  highPressure: boolean;
+};
+
+export type WorkloadStatsEmissionReason =
+  | 'interval'
+  | 'throttle_increase'
+  | 'memory_events'
+  | 'memory_pressure'
+  | 'none';
+
+export type WorkloadStatsEmissionDecision = {
+  emit: boolean;
+  reason: WorkloadStatsEmissionReason;
+  state: WorkloadStatsEmissionState;
+};
+
+/**
+ * Periodic stats are capped to `WORKLOAD_STATS_INTERVAL_MS`, but an actionable
+ * change (a new throttle or memory-event counter, or the first crossing into
+ * high memory pressure) emits sooner so the signal is not delayed to the next
+ * sample. Immediate emissions share `WORKLOAD_STATS_EVENT_COOLDOWN_MS` because
+ * the underlying counters are monotonic and would otherwise fire on every
+ * one-second sweep. Emission baselines advance only when a record is emitted,
+ * so an increase observed between samples still surfaces on the next decision.
+ */
+export function decideWorkloadStatsEmission(input: {
+  nowMs: number;
+  stats: WorkloadStats;
+  limitBytes?: number;
+  state: WorkloadStatsEmissionState;
+}): WorkloadStatsEmissionDecision {
+  const { nowMs, stats, limitBytes, state } = input;
+  const current = stats.currentBytes;
+  const abovePressure =
+    limitBytes !== undefined &&
+    current !== undefined &&
+    current >= limitBytes * WORKLOAD_MEMORY_PRESSURE_FRACTION;
+  const highPressure =
+    abovePressure ||
+    (state.highPressure &&
+      limitBytes !== undefined &&
+      current !== undefined &&
+      current >= limitBytes * WORKLOAD_MEMORY_PRESSURE_RELEASE_FRACTION);
+  const throttleIncreased =
+    stats.cpuThrottleCount !== undefined &&
+    state.lastThrottleCount !== undefined &&
+    stats.cpuThrottleCount > state.lastThrottleCount;
+  const memoryEventsIncreased =
+    (stats.memoryMaxEvents !== undefined &&
+      state.lastMemoryMaxEvents !== undefined &&
+      stats.memoryMaxEvents > state.lastMemoryMaxEvents) ||
+    (stats.memoryOomEvents !== undefined &&
+      state.lastMemoryOomEvents !== undefined &&
+      stats.memoryOomEvents > state.lastMemoryOomEvents);
+  const sinceEmittedMs = nowMs - state.lastEmittedAtMs;
+  const reason: WorkloadStatsEmissionReason =
+    sinceEmittedMs >= WORKLOAD_STATS_INTERVAL_MS
+      ? 'interval'
+      : sinceEmittedMs < WORKLOAD_STATS_EVENT_COOLDOWN_MS
+        ? 'none'
+        : throttleIncreased
+          ? 'throttle_increase'
+          : memoryEventsIncreased
+            ? 'memory_events'
+            : abovePressure && !state.highPressure
+              ? 'memory_pressure'
+              : 'none';
+  if (reason === 'none') {
+    return { emit: false, reason, state: { ...state, highPressure } };
+  }
+  return {
+    emit: true,
+    reason,
+    state: {
+      lastEmittedAtMs: nowMs,
+      lastThrottleCount: stats.cpuThrottleCount,
+      lastMemoryMaxEvents: stats.memoryMaxEvents,
+      lastMemoryOomEvents: stats.memoryOomEvents,
+      highPressure,
+    },
+  };
+}
 
 export class WorkloadUnavailableError extends Error {
   constructor(readonly failure: WorkloadFailure) {
@@ -152,19 +306,27 @@ export function createWorkloadReporter(report?: ControlDiagnosticReporter): Work
         fields.serverOomKills ?? '',
         fields.currentBytes ?? '',
         fields.peakBytes ?? '',
-        fields.pressureSomeTotal ?? '',
-        fields.pressureFullTotal ?? '',
+        fields.anonBytes ?? '',
+        fields.fileBytes ?? '',
+        fields.shmemBytes ?? '',
         fields.memoryMaxEvents ?? '',
         fields.memoryOomEvents ?? '',
+        fields.pressureSomeTotal ?? '',
+        fields.pressureFullTotal ?? '',
         fields.cpuUsageUsec ?? '',
         fields.cpuThrottledUsec ?? '',
         fields.cpuThrottleCount ?? '',
         fields.ioReadBytes ?? '',
         fields.ioWriteBytes ?? '',
+        fields.toolCurrentBytes ?? '',
+        fields.toolPeakBytes ?? '',
+        fields.serverCurrentBytes ?? '',
+        fields.serverPeakBytes ?? '',
         fields.toolCpuUsageUsec ?? '',
         fields.serverCpuUsageUsec ?? '',
         fields.toolIoReadBytes ?? '',
         fields.toolIoWriteBytes ?? '',
+        fields.pressureAvailable ?? '',
         fields.toolCount ?? '',
         fields.serverCount ?? '',
         fields.migratedCount ?? '',
@@ -282,11 +444,12 @@ export function parsePressureTotal(
 }
 
 export function readWorkloadStats(reference: string): WorkloadStats {
-  const stats: WorkloadStats = { oomKills: 0, oomGroupKills: 0 };
+  const stats: WorkloadStats = { oomKills: 0, oomGroupKills: 0, pressureAvailable: false };
   const current = readControl(path.join(reference, 'memory.current'));
   const peak = readControl(path.join(reference, 'memory.peak'));
   const pressure = readControl(path.join(reference, 'memory.pressure'));
   const events = readControl(path.join(reference, 'memory.events'));
+  const memoryStat = readControl(path.join(reference, 'memory.stat'));
   const cpu = readControl(path.join(reference, 'cpu.stat'));
   const io = readControl(path.join(reference, 'io.stat'));
   if (current.ok) {
@@ -297,10 +460,21 @@ export function readWorkloadStats(reference: string): WorkloadStats {
     const parsed = Number.parseInt(peak.text.trim(), 10);
     if (Number.isSafeInteger(parsed) && parsed >= 0) stats.peakBytes = parsed;
   }
+  stats.pressureAvailable = pressure.ok;
   const some = parsePressureTotal(pressure.ok ? pressure.text : undefined, 'some');
   const full = parsePressureTotal(pressure.ok ? pressure.text : undefined, 'full');
   if (some !== undefined) stats.pressureSomeTotal = some;
   if (full !== undefined) stats.pressureFullTotal = full;
+  if (memoryStat.ok) {
+    for (const line of memoryStat.text.split('\n')) {
+      const [key, value] = line.trim().split(/\s+/);
+      const parsed = Number.parseInt(value ?? '', 10);
+      if (!Number.isSafeInteger(parsed) || parsed < 0) continue;
+      if (key === 'anon') stats.anonBytes = parsed;
+      if (key === 'file') stats.fileBytes = parsed;
+      if (key === 'shmem') stats.shmemBytes = parsed;
+    }
+  }
   if (events.ok) {
     for (const line of events.text.split('\n')) {
       const [key, value] = line.trim().split(/\s+/);

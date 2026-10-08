@@ -68,6 +68,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
   agent_restarted: 'The agent restarted',
+  sandbox_out_of_memory: 'The sandbox ran out of memory',
   no_progress: 'The turn made no progress',
   no_outcome: 'The turn did not complete',
   prompt_failed: 'Prompt delivery failed',

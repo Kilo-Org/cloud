@@ -4057,42 +4057,49 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private createProviderAdapter(pin: StoredProviderPin): ProviderAdapter {
     const allocationName = pin.allocationName ?? this.sandboxId;
-    if (pin.provider === 'vercel') {
-      const resources =
-        pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
-      const config = this.vercelConfig(pin.locator, resources);
-      return createVercelProviderAdapter({
-        sandboxName: allocationName,
-        config,
-        billingLifetimeSink: evidence => this.recordVercelBillingLifetime(evidence),
-      });
+    switch (pin.provider) {
+      case 'vercel': {
+        const resources =
+          pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
+        const config = this.vercelConfig(pin.locator, resources);
+        return createVercelProviderAdapter({
+          sandboxName: allocationName,
+          config,
+          billingLifetimeSink: evidence => this.recordVercelBillingLifetime(evidence),
+        });
+      }
+      case 'cloudflare-containers': {
+        const instance =
+          pin.configuration?.provider === 'cloudflare-containers'
+            ? pin.configuration.instance
+            : undefined;
+        return createCloudflareContainersProviderAdapter({
+          logicalSandboxId: this.sandboxId,
+          allocationName,
+          ...(instance === undefined ? {} : { instance }),
+          getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
+        });
+      }
+      case 'cloudflare':
+        return createCloudflareProviderAdapter({
+          sandboxId: allocationName,
+          getSandbox: (id, options) =>
+            getSandbox(
+              getSandboxNamespace(this.env, id, { managedScmContainment: options.containment }),
+              id
+            ),
+          destroy: (id, options) =>
+            forceDestroyControlPlaneSandbox(
+              getSandboxNamespace(this.env, id, {
+                managedScmContainment: options.containment,
+              }).getByName(id)
+            ),
+        });
+      default: {
+        void (pin.provider satisfies never);
+        throw new ProviderCreationError('invalid_configuration');
+      }
     }
-    if (pin.provider === 'cloudflare-containers') {
-      const instance =
-        pin.configuration?.provider === 'cloudflare-containers'
-          ? pin.configuration.instance
-          : undefined;
-      return createCloudflareContainersProviderAdapter({
-        logicalSandboxId: this.sandboxId,
-        allocationName,
-        ...(instance === undefined ? {} : { instance }),
-        getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
-      });
-    }
-    return createCloudflareProviderAdapter({
-      sandboxId: allocationName,
-      getSandbox: (id, options) =>
-        getSandbox(
-          getSandboxNamespace(this.env, id, { managedScmContainment: options.containment }),
-          id
-        ),
-      destroy: (id, options) =>
-        forceDestroyControlPlaneSandbox(
-          getSandboxNamespace(this.env, id, {
-            managedScmContainment: options.containment,
-          }).getByName(id)
-        ),
-    });
   }
 
   private vercelConfig(

@@ -96,9 +96,6 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
     stopGates: [],
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;

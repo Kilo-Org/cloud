@@ -115,9 +115,6 @@ export function createCloudflareContainersProviderAdapter(deps: {
   };
 
   return {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeIntentProviderRef(intent);

@@ -135,9 +135,6 @@ function promptPayload(messageId: string, prompt = 'hello'): ControlPlanePromptP
 function createFakeProvider(): { adapter: ProviderAdapter; createCalls: number } {
   const provider = { adapter: null as unknown as ProviderAdapter, createCalls: 0 };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;

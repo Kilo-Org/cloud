@@ -107,9 +107,6 @@ export function createVercelProviderAdapter(deps: {
       throw new ProviderCreationError('invalid_configuration');
     };
     return {
-      resumable: false,
-      persistentWorkspace: true,
-      destroysOnStop: false,
       ensureBillingAdmission: unavailable,
       create: unavailable,
       launch: unavailable,
@@ -158,9 +155,6 @@ export function createVercelProviderAdapter(deps: {
   };
 
   return {
-    resumable: false,
-    persistentWorkspace: true,
-    destroysOnStop: false,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
       const created = await restClient

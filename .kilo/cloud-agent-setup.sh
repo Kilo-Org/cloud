@@ -129,6 +129,12 @@ else
     global_pnpm=$(command -v pnpm)
   fi
   real_pnpm=$(readlink -f "$global_pnpm")
+  if [[ ! -L $global_pnpm ]]; then
+    # The wrapper replaces this path, so move a standalone pnpm binary out of the way first.
+    "${root[@]}" mkdir -p "$global_state_dir"
+    "${root[@]}" mv "$global_pnpm" "$global_state_dir/pnpm"
+    real_pnpm="$global_state_dir/pnpm"
+  fi
 fi
 if [[ ! -x $real_pnpm ]] || grep -qF "$pnpm_wrapper_marker" "$real_pnpm"; then
   printf 'Could not locate the real pnpm executable (resolved %s).\n' "$real_pnpm" >&2

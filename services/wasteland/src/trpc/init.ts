@@ -18,7 +18,6 @@ const t = initTRPC.context<TRPCContext>().create();
 
 export const router = t.router;
 
-// tRPC procedure paths that correspond to key operations for Sentry breadcrumbs
 const BREADCRUMB_OPERATIONS = new Set([
   'wasteland.createWasteland',
   'wasteland.claimWantedItem',
@@ -41,23 +40,15 @@ function extractWastelandId(rawInput: unknown): string | undefined {
   return parsed.success ? parsed.data.wastelandId : undefined;
 }
 
-/**
- * Analytics + observability middleware — wraps every tRPC procedure to:
- * 1. Emit analytics events with timing data
- * 2. Add Sentry breadcrumbs for key operations
- * 3. Set Sentry tags for error correlation
- */
 const analyticsProcedure = t.procedure.use(async ({ ctx, path, type, getRawInput, next }) => {
   const start = performance.now();
   const rawInput = await getRawInput();
   const wastelandId = extractWastelandId(rawInput);
 
-  // Set Sentry tags for error correlation
   Sentry.setTag('operation', path);
   if (ctx.userId) Sentry.setTag('userId', ctx.userId);
   if (wastelandId) Sentry.setTag('wastelandId', wastelandId);
 
-  // Add Sentry breadcrumb for key operations
   if (BREADCRUMB_OPERATIONS.has(path)) {
     Sentry.addBreadcrumb({
       category: 'trpc',

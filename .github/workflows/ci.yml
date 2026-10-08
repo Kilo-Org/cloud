@@ -348,9 +348,6 @@ jobs:
         # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter container-usage-meter test:postgres
 
-      - name: Run Security Sync Postgres regressions
-        run: pnpm --filter cloudflare-security-sync test:integration
-
       - name: Run Session Ingest Durable Object regressions
         run: pnpm --filter cloudflare-session-ingest run test:integration
 

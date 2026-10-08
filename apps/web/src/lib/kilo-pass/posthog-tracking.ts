@@ -1,9 +1,6 @@
 /**
- * Server-side PostHog tracking for Kilo Pass purchase completion.
- *
- * Future store-purchase completion call sites (e.g. Google Play) must call
- * `trackKiloPassPurchaseCompleted` post-commit — there is no automatic hook
- * inside `completeStoreKiloPassPurchase`.
+ * Server-side PostHog tracking for Stripe Kilo Pass purchase completion.
+ * Call after the purchase transaction commits.
  */
 import 'server-only';
 
@@ -14,61 +11,38 @@ import type { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kil
 
 export type KiloPassPurchaseKind = 'initial' | 'renewal' | 'upgrade' | 'unknown';
 
-type TrackKiloPassPurchaseCompletedBase = {
+export type TrackKiloPassPurchaseCompletedParams = {
   distinctId: string;
   userId: string;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
   purchaseKind: KiloPassPurchaseKind;
+  channel: 'stripe';
+  stripeInvoiceId: string;
+  amountPaidUsd: number;
+  currency: string;
+  livemode: boolean;
 };
-
-export type TrackKiloPassPurchaseCompletedParams =
-  | (TrackKiloPassPurchaseCompletedBase & {
-      channel: 'app_store' | 'google_play';
-      providerTransactionId: string;
-      productId: string;
-      environment: string;
-    })
-  | (TrackKiloPassPurchaseCompletedBase & {
-      channel: 'stripe';
-      stripeInvoiceId: string;
-      amountPaidUsd: number;
-      currency: string;
-      livemode: boolean;
-    });
 
 const posthogClient = PostHogClient();
 
 /**
- * Re-exported so existing store-notification and webhook call sites keep their
- * import path. The implementation lives in `@/lib/after-response`.
+ * Shared post-response scheduling for Stripe webhooks.
  */
 export { runAfterResponse } from '@/lib/after-response';
 
 export function trackKiloPassPurchaseCompleted(params: TrackKiloPassPurchaseCompletedParams): void {
-  const baseProperties = {
+  const properties = {
     channel: params.channel,
     tier: params.tier,
     cadence: params.cadence,
     purchase_kind: params.purchaseKind,
     user_id: params.userId,
+    stripe_invoice_id: params.stripeInvoiceId,
+    amount_paid_usd: params.amountPaidUsd,
+    currency: params.currency,
+    livemode: params.livemode,
   };
-
-  const properties =
-    params.channel === 'stripe'
-      ? {
-          ...baseProperties,
-          stripe_invoice_id: params.stripeInvoiceId,
-          amount_paid_usd: params.amountPaidUsd,
-          currency: params.currency,
-          livemode: params.livemode,
-        }
-      : {
-          ...baseProperties,
-          provider_transaction_id: params.providerTransactionId,
-          product_id: params.productId,
-          environment: params.environment,
-        };
 
   try {
     posthogClient.capture({

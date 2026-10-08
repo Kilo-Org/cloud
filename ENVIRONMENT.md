@@ -188,15 +188,15 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `CHURNKEY_API_SECRET` - Secret for Churnkey (cancellation flows). `[SECRET]`
 - `NEXT_PUBLIC_CHURNKEY_APP_ID` - Public app ID for Churnkey widget. [PUBLIC]
 
-### Apple / In-App Purchases
+### Apple / Google Play Credit-Pack Purchases
 
-- `APPLE_APP_APPLE_ID` - Apple App ID for IAP verification. `[SECRET]`
-- `APPLE_IAP_ENVIRONMENT` - Apple IAP environment (`Sandbox` or `Production`). [SERVER]
-- `APPLE_IAP_KEY_ID` - Apple IAP key identifier. `[SECRET]`
-- `APPLE_IAP_ISSUER_ID` - Apple IAP issuer (team) ID. `[SECRET]`
-- `APPLE_IAP_PRIVATE_KEY` - Apple IAP private key (PEM/ES256) for receipt validation. `[SECRET]`
-- `APPLE_ROOT_CERTIFICATES_PEM` - Apple root CA certs (PEM) for validating IAP receipts. [SERVER]
-- `GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON` - Service account JSON for the Android Publisher API (subscriptions v2 get). `[SECRET]`
+- `APPLE_APP_APPLE_ID` - Apple App ID for credit-pack receipt and server-notification verification. `[SECRET]`
+- `APPLE_IAP_ENVIRONMENT` - Apple credit-pack IAP environment (`Sandbox` or `Production`). [SERVER]
+- `APPLE_IAP_KEY_ID` - Apple server API key identifier, retained for credit-pack consumption requests. `[SECRET]`
+- `APPLE_IAP_ISSUER_ID` - Apple server API issuer (team) ID, retained for credit-pack consumption requests. `[SECRET]`
+- `APPLE_IAP_PRIVATE_KEY` - Apple server API private key (PEM/ES256), retained for credit-pack consumption requests. `[SECRET]`
+- `APPLE_ROOT_CERTIFICATES_PEM` - Apple root CA certs (PEM) for validating credit-pack receipts and server notifications. [SERVER]
+- `GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON` - Android Publisher service account JSON for credit-pack purchase verification, consumption, and refund order lookup. Kilo Pass subscription API access is no longer used. `[SECRET]`
 - `GOOGLE_PLAY_RTDN_PUSH_AUDIENCE` - Expected OIDC audience for Play Real-time Developer Notification Pub/Sub push (the HTTPS URL of POST /api/kilo-pass/play/notifications). `[SERVER]`
 - `GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL` - Expected service-account email for the Play RTDN Pub/Sub push OIDC token; the token `email` claim must match it. [SERVER]
 - `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]

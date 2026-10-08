@@ -96,8 +96,14 @@ Kilo Pass exchanges a recurring payment for monthly base credits and a usage-tri
 and yearly subscriptions. The mobile app does not expose native Kilo Pass purchases, restores, or store management.
 Its Profile card and `/kilo-pass` route render the backend purchase presentation: `unavailable` has no purchase controls,
 while `web_management` exposes Manage, which opens the returned `webUrl`. Native credit-pack purchases are unchanged.
-Backend store verification, purchase completion, provider notifications, and expiry reconciliation remain available
-for existing Kilo Pass store subscriptions independently of the mobile presentation.
+The backend no longer verifies or completes Kilo Pass store purchases, reconciles their expiry, or applies their
+notification lifecycle. Authenticated store notifications are recorded for deduplication and acknowledged without
+subscription mutations, credits, refunds, or provider API calls. The notification endpoints remain for credit-pack
+refunds and restorations; historical store subscriptions and purchase rows remain readable without a data migration.
+
+This cutover MUST merge only after 2026-11-09 and after `app_min_versions` is raised past the mobile release that removed
+Kilo Pass IAP in #7304. Play subscription renewals for blocked accounts may continue until 2028 and MUST be acknowledged
+and ignored.
 
 A successful base-credit grant writes one threshold on the user row. When cumulative user usage reaches the effective
 threshold, bonus logic acts on the selected effective active subscription. Monthly subscriptions use the tenure ramp
@@ -108,12 +114,12 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 | Capability | Stripe | App Store | Google Play |
 |---|---|---|---|
 | Persisted provider representation | Yes | Yes | Yes |
-| Web state reads | Yes | Yes | Existing rows only |
-| Monthly subscription entrypoint | Yes | No native mobile UI | No native mobile UI |
+| Web state reads | Yes | Historical rows only | Historical rows only |
+| Monthly subscription entrypoint | Yes | Removed | Removed |
 | Yearly subscription entrypoint | Yes | Not exposed | Not exposed |
-| Verified purchase completion ingress | Invoice-paid webhook | Signed transaction completion | Not exposed |
-| Provider notification handling | Stripe events | App Store server notifications | Not exposed |
-| Store-expiry reconciliation | N/A | Yes | Existing rows only |
+| Verified purchase completion ingress | Invoice-paid webhook | Removed | Removed |
+| Provider subscription notifications | Stripe events | Acknowledge and ignore | Acknowledge and ignore |
+| Persisted store-expiry reconciliation | N/A | Removed; derive expiry on reads | Removed; derive expiry on reads |
 | Duplicate-card gate | Yes | No | No |
 | Scheduled tier/cadence changes | Yes | No | No |
 
@@ -133,8 +139,8 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
    subscription row.
 5. KiloClaw pending-balance reads MUST apply the same persisted-row ranking and MUST derive an open pause after
    selection. That path does not derive store expiration.
-6. Store purchase completion MUST use its own active-row check: the first user subscription row with a null ended
-   marker. It does not reuse the general effective-subscription selector or apply an explicit ordering.
+6. Store subscription purchase completion MUST NOT be exposed. Historical rows MUST remain readable using the existing
+   effective-subscription selector and expiry derivation.
 7. Persisted subscription rows MUST contain one provider shape at a time: Stripe rows use matching provider and Stripe
    subscription identifiers; store rows use a provider subscription identifier and no Stripe subscription identifier.
 
@@ -143,8 +149,8 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 8. A handled Stripe `invoice.paid` event MUST issue base credits equal to the tier's configured monthly price,
    independent of charged amount, tax, discount, or proration. A handled zero-dollar invoice still qualifies for base
    credits.
-9. An accepted store purchase MUST issue base credits equal to the tier's configured monthly price, except for App Store
-   same-period tier upgrades, which replace the current-period base grant through the upgrade-adjustment path.
+9. Store subscription notifications MUST NOT grant, claw back, or restore Kilo Pass credits. One-off credit-pack
+   purchase, refund, and restoration handling MUST remain unchanged.
 10. Stripe yearly subscriptions MUST receive an initial monthly base grant from invoice handling and later monthly base
     grants from the yearly monthly-base cron. The cron processes Stripe rows only.
 11. Base credits for a subscription and issue month MUST be issued at most once through the normal issuance path.
@@ -275,12 +281,8 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 47. Pause months consume scan budget. Monthly streak MUST NOT be described as an unbounded lifetime tenure count.
 48. Stripe monthly invoice handling MUST reset streak to `1` when previous persisted provider status was ended. Recovery
     from a non-ended transitional status such as `past_due` does not, by itself, reset streak.
-49. Store monthly completion MUST recompute streak from the capped issuance-and-pause scan. It does not separately reset
-    streak because a prior store row was ended. Reactivation under the same provider subscription MAY reconnect
-    historical streak when issue months remain contiguous.
-50. Stripe yearly invoice handling MUST store streak `0` and track the next monthly issue cursor instead. Generic store
-    purchase completion accepts yearly input internally but sets initial streak `1`; exposed store products are monthly
-    only and no store-yearly monthly-base cron exists.
+49. Historical store streak values and issuance rows MUST remain unchanged; store notifications no longer recompute them.
+50. Stripe yearly invoice handling MUST store streak `0` and track the next monthly issue cursor instead.
 
 ### Duplicate-Card Gate
 
@@ -344,8 +346,8 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
     pending cancellation overlap, current renewal-row UI gives active-until display precedence.
 65. On the web read path, a selected store subscription whose latest purchase expired at or before now MUST be returned
     as derived `canceled`, even if provider end notification was not received.
-66. Store-expiry reconciliation MUST scan non-canceled App Store and Google Play rows, skip rows without purchases, and
-    persist `canceled`, clear pending cancellation, and set ended marker when latest purchase expired.
+66. Store-expiry reconciliation MUST NOT run or persist cancellation. Store notifications MUST be acknowledged and
+    ignored, including purchases, renewals, expiry, cancellation, refund, revocation, and refund reversal.
 
 ### Bonus Expiry
 
@@ -364,15 +366,14 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
     attempt a separate failed audit write after rollback and report audit-write failure operationally.
 73. Yearly monthly-base cron MUST append run and subscription audit entries. A per-subscription issuance failure MUST
     append a failed audit entry and rethrow.
-74. Store-expiry reconciliation MUST append success audit after persisted cancellation. App Store expiry notifications
-    also append success audit after persisting ended state.
+74. Ignored store subscription notifications MUST retain store-event deduplication records but MUST NOT append
+    subscription lifecycle audit entries or change historical subscription rows.
 75. Duplicate-card blocking MUST commit before provider enforcement and remain authoritative replay evidence. The block
     audit MUST identify the matched first fingerprint claim and fingerprint digest without recording the raw fingerprint.
     Cancellation and refund outcomes MUST be recorded separately in audit payloads. Cancellation failure MUST throw for
     webhook retry; refund failure MUST remain observable without reversing the block or granting credits.
 76. Repeated base or bonus issuance handled by normal issuance helpers MUST append skipped-idempotent audit entries.
-    Store-transaction replay and usage-triggered prechecks that find an existing bonus-like item return without an
-    equivalent skipped-idempotent audit entry.
+    Usage-triggered prechecks that find an existing bonus-like item return without an equivalent skipped-idempotent audit entry.
 77. Usage-triggered bonus call sites do not share one failure-audit wrapper. Some callers append a failed audit entry,
     while others log or propagate the error only.
 
@@ -406,18 +407,14 @@ The following behavior or stronger guarantees are not implemented by current cod
 
 1. Deterministic identifier tiebreak for equal-recency subscription rows.
 2. Effective-subscription reselection after late-derived pause or store expiration.
-3. Exposed verified Google Play purchase completion and provider notification handling.
-4. Mobile-store yearly products and store-yearly monthly issuance lifecycle.
 5. Dedicated durable workflow state for duplicate-card cancellation or refund partial failures beyond existing audits and
    Stripe idempotency keys.
 6. One canonical projection path that matches issuance eligibility, existing bonus-like item checks, scheduled-change
    target behavior, and stored Stripe promo reason across every consumer.
 7. Unbounded or explicitly durable streak accounting beyond the 36-month scan cap.
-8. Explicit ended-state streak reset for reactivated store subscriptions.
 9. Guaranteed expiry for every granted bonus credit.
 10. Independent durable audit recording for every failed provider or issuance operation.
 11. Retirement of the grandfathered streak-month-2 promo branch after no eligible pre-cutoff subscriptions remain.
-12. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
 13. Atomic prevention of concurrent or repeated active Kilo Pass purchases by the same user. Duplicate-card Rules 51-55
     intentionally exclude same-user purchases.
 
@@ -432,6 +429,13 @@ Passing the cancellation cooldown after 24 hours does not make a previously clai
 promo or Kilo Pass referral conversion.
 
 ## Changelog
+
+### Store subscription backend retirement (merge gated after 2026-11-09)
+
+- Removed App Store and Play Kilo Pass catalogs, verification, completion, and expiry reconciliation.
+- Store subscription notifications are acknowledged and ignored, while credit-pack refund and restoration paths remain.
+- Shared Apple receipt decoding remains in the store SDK for credit-pack verification; subscription-only verifiers are removed.
+- Retained historical store data, expiry-derived reads, provider-management guards, and Stripe Kilo Pass.
 
 ### 2026-06-08 -- Yearly duplicate-card enforcement
 

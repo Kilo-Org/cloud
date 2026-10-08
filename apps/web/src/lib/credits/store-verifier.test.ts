@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
-import type { AppleStoreDecodedTransaction } from '@/lib/kilo-pass/apple-store-verifier';
-import type * as AppleStoreVerifier from '@/lib/kilo-pass/apple-store-verifier';
+import type { AppleStoreDecodedTransaction } from '@/lib/kilo-pass/apple-store-sdk';
+import type * as AppleStoreVerifier from '@/lib/kilo-pass/apple-store-sdk';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   STORE_PURCHASE_PENDING_MESSAGE,
@@ -34,10 +34,8 @@ jest.mock('@/lib/kilo-pass/google-play-sdk', () => ({
     mockConsumeGooglePlayProductPurchase(...args),
 }));
 
-jest.mock('@/lib/kilo-pass/apple-store-verifier', () => {
-  const actual = jest.requireActual<typeof AppleStoreVerifier>(
-    '@/lib/kilo-pass/apple-store-verifier'
-  );
+jest.mock('@/lib/kilo-pass/apple-store-sdk', () => {
+  const actual = jest.requireActual<typeof AppleStoreVerifier>('@/lib/kilo-pass/apple-store-sdk');
   return {
     ...actual,
     decodeAppleStoreTransactionJws: (...args: [string]) =>

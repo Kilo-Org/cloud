@@ -46,64 +46,6 @@ describe('Kilo Pass PostHog tracking', () => {
     mockCaptureException.mockReset();
   });
 
-  it('captures app_store purchase completed with snake_case wire properties', () => {
-    trackKiloPassPurchaseCompleted({
-      channel: 'app_store',
-      distinctId: 'user@example.com',
-      userId: 'user-123',
-      tier: KiloPassTier.Tier49,
-      cadence: KiloPassCadence.Monthly,
-      purchaseKind: 'initial',
-      providerTransactionId: 'tx-abc',
-      productId: 'kilopass.tier49.monthly.v1',
-      environment: 'Sandbox',
-    });
-
-    expect(mockCapture).toHaveBeenCalledWith({
-      distinctId: 'user@example.com',
-      event: 'kilo_pass_purchase_completed',
-      properties: {
-        channel: 'app_store',
-        tier: KiloPassTier.Tier49,
-        cadence: KiloPassCadence.Monthly,
-        purchase_kind: 'initial',
-        user_id: 'user-123',
-        provider_transaction_id: 'tx-abc',
-        product_id: 'kilopass.tier49.monthly.v1',
-        environment: 'Sandbox',
-      },
-    });
-  });
-
-  it('captures google_play purchase completed with snake_case wire properties', () => {
-    trackKiloPassPurchaseCompleted({
-      channel: 'google_play',
-      distinctId: 'user@example.com',
-      userId: 'user-789',
-      tier: KiloPassTier.Tier49,
-      cadence: KiloPassCadence.Monthly,
-      purchaseKind: 'renewal',
-      providerTransactionId: 'GPA.1234',
-      productId: 'kilopass_tier49',
-      environment: 'Sandbox',
-    });
-
-    expect(mockCapture).toHaveBeenCalledWith({
-      distinctId: 'user@example.com',
-      event: 'kilo_pass_purchase_completed',
-      properties: {
-        channel: 'google_play',
-        tier: KiloPassTier.Tier49,
-        cadence: KiloPassCadence.Monthly,
-        purchase_kind: 'renewal',
-        user_id: 'user-789',
-        provider_transaction_id: 'GPA.1234',
-        product_id: 'kilopass_tier49',
-        environment: 'Sandbox',
-      },
-    });
-  });
-
   it('captures stripe purchase completed with snake_case wire properties', () => {
     trackKiloPassPurchaseCompleted({
       channel: 'stripe',
@@ -143,15 +85,16 @@ describe('Kilo Pass PostHog tracking', () => {
 
     expect(() =>
       trackKiloPassPurchaseCompleted({
-        channel: 'app_store',
+        channel: 'stripe',
         distinctId: 'user@example.com',
         userId: 'user-123',
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Monthly,
         purchaseKind: 'upgrade',
-        providerTransactionId: 'tx-abc',
-        productId: 'kilopass.tier49.monthly.v1',
-        environment: 'Production',
+        stripeInvoiceId: 'in_abc',
+        amountPaidUsd: 49,
+        currency: 'usd',
+        livemode: true,
       })
     ).not.toThrow();
 
@@ -159,14 +102,15 @@ describe('Kilo Pass PostHog tracking', () => {
       tags: { source: 'posthog_kilo_pass_purchase_completed' },
       extra: {
         properties: {
-          channel: 'app_store',
+          channel: 'stripe',
           tier: KiloPassTier.Tier49,
           cadence: KiloPassCadence.Monthly,
           purchase_kind: 'upgrade',
           user_id: 'user-123',
-          provider_transaction_id: 'tx-abc',
-          product_id: 'kilopass.tier49.monthly.v1',
-          environment: 'Production',
+          stripe_invoice_id: 'in_abc',
+          amount_paid_usd: 49,
+          currency: 'usd',
+          livemode: true,
         },
       },
     });

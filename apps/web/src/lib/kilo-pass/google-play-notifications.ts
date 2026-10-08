@@ -1,16 +1,6 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
-import { captureException } from '@sentry/nextjs';
+import { and, eq, sql } from 'drizzle-orm';
 
-import {
-  credit_transactions,
-  kilo_pass_issuance_items,
-  kilo_pass_issuances,
-  kilo_pass_store_events,
-  kilo_pass_store_purchases,
-  kilo_pass_subscriptions,
-  kilocode_users,
-  type User,
-} from '@kilocode/db/schema';
+import { credit_transactions, kilo_pass_store_events } from '@kilocode/db/schema';
 import type { BouncerCreditEventOutboxDatabase } from '@kilocode/db/bouncer-credit-event-outbox';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -18,40 +8,22 @@ import {
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
-  decodeGooglePlaySubscriptionPurchase,
-  mapGooglePlayKiloPassPurchase,
-} from './google-play-verifier';
-import {
-  acknowledgeGooglePlaySubscriptionPurchase,
   GOOGLE_PLAY_PACKAGE_NAME,
   getGooglePlayProductPurchase,
-  getGooglePlaySubscriptionPurchase,
-  getGooglePlaySubscriptionOrder,
+  getGooglePlayOrder,
 } from './google-play-sdk';
-import {
-  completeStoreKiloPassPurchase,
-  isActiveKiloPassSubscriptionError,
-  isStorePurchaseMismatchError,
-  type CompleteStoreKiloPassPurchaseResult,
-} from './store-subscription-completion';
-import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-subscription';
-import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import type { StoreCreditEvent, StoreEventKind } from '@kilocode/web-shared/lib/bouncer/client';
 import { enqueueCreditEvent } from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByGoogleProductId } from '@/lib/credits/store-products';
 import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
-import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   lockStoreCreditPurchase,
   reverseStoreCreditPurchase,
   STORE_FULL_MILLIUNITS,
 } from '@/lib/credits/store-refund';
-import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
-import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
 type DbOrTx = DrizzleTransaction | typeof db;
 
@@ -80,25 +52,6 @@ export type GooglePlayKiloPassNotificationProcessingResult =
   | { processed: true }
   | { processed: true; status: 'already_processed' }
   | { processed: false; status: 'in_flight' };
-
-// Google Play Real-time Developer Notification subscription types:
-// https://developer.android.com/google/play/billing/subscriptions#notification-types
-const GOOGLE_PLAY_NOTIFICATION_TYPE = {
-  SUBSCRIPTION_RECOVERED: 1,
-  SUBSCRIPTION_RENEWED: 2,
-  SUBSCRIPTION_CANCELED: 3,
-  SUBSCRIPTION_PURCHASED: 4,
-  SUBSCRIPTION_RESTARTED: 7,
-  SUBSCRIPTION_REVOKED: 12,
-  SUBSCRIPTION_EXPIRED: 13,
-} as const;
-
-const PURCHASE_TYPES = new Set<number>([
-  GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_RECOVERED,
-  GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_RENEWED,
-  GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_PURCHASED,
-  GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_RESTARTED,
-]);
 
 // Google Play VoidedPurchaseNotification.productType and refundType:
 // https://developer.android.com/google/play/billing/rtdn-reference#voided
@@ -235,402 +188,11 @@ async function markGooglePlayStoreEventProcessed(
     );
 }
 
-async function markGooglePlaySubscriptionEnded(
-  dbOrTx: DbOrTx,
-  purchaseToken: string
-): Promise<void> {
-  await dbOrTx
-    .update(kilo_pass_subscriptions)
-    .set({
-      status: 'canceled',
-      cancel_at_period_end: false,
-      ended_at: new Date().toISOString(),
-    })
-    .where(
-      and(
-        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
-        eq(kilo_pass_subscriptions.provider_subscription_id, purchaseToken)
-      )
-    );
-}
-
-async function getUserForGooglePlayRenewal(params: {
-  providerSubscriptionId: string;
-  appAccountToken: string | null;
-}): Promise<User | null> {
-  const row = await db
-    .select({ user: kilocode_users })
-    .from(kilo_pass_subscriptions)
-    .innerJoin(kilocode_users, eq(kilo_pass_subscriptions.kilo_user_id, kilocode_users.id))
-    .where(
-      and(
-        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
-        eq(kilo_pass_subscriptions.provider_subscription_id, params.providerSubscriptionId)
-      )
-    )
-    .limit(1);
-
-  if (row[0]?.user) {
-    if (row[0].user.app_store_account_token !== params.appAccountToken) {
-      throw new Error('Google Play renewal account token does not match subscription owner');
-    }
-    return row[0].user;
-  }
-
-  if (!params.appAccountToken) return null;
-
-  const tokenRows = await db
-    .select()
-    .from(kilocode_users)
-    .where(eq(kilocode_users.app_store_account_token, params.appAccountToken))
-    .limit(1);
-
-  return tokenRows[0] ?? null;
-}
-
-type CreditReversalResult = {
-  storePurchaseFound: boolean;
-  creditTransactionIds: string[];
-  totalReversalMicrodollars: number;
-  reversedItemKinds: KiloPassIssuanceItemKind[];
-};
-
-async function insertCreditReversal(
-  tx: DrizzleTransaction,
-  params: {
-    kiloUserId: string;
-    amountMicrodollars: number;
-    isFree: boolean;
-    description: string;
-    creditCategory: string;
-    originalBaselineMicrodollarsUsed: number;
-  }
-): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
-  const creditTransactionId = crypto.randomUUID();
-  const insertResult = await tx
-    .insert(credit_transactions)
-    .values({
-      id: creditTransactionId,
-      kilo_user_id: params.kiloUserId,
-      amount_microdollars: -params.amountMicrodollars,
-      is_free: params.isFree,
-      description: params.description,
-      credit_category: params.creditCategory,
-      check_category_uniqueness: true,
-      original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
-    })
-    .onConflictDoNothing();
-
-  if ((insertResult.rowCount ?? 0) === 0) {
-    const existingRows = await tx
-      .select({ id: credit_transactions.id })
-      .from(credit_transactions)
-      .where(
-        and(
-          eq(credit_transactions.kilo_user_id, params.kiloUserId),
-          eq(credit_transactions.credit_category, params.creditCategory)
-        )
-      )
-      .limit(1);
-    return { wasInserted: false, creditTransactionId: existingRows[0]?.id ?? null };
-  }
-
-  await tx
-    .update(kilocode_users)
-    .set({
-      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${params.amountMicrodollars}`,
-    })
-    .where(eq(kilocode_users.id, params.kiloUserId));
-
-  return { wasInserted: true, creditTransactionId };
-}
-
-function getGooglePlayRefundReversalDescription(kind: KiloPassIssuanceItemKind): string {
-  if (kind === KiloPassIssuanceItemKind.Base) {
-    return 'Google Play Kilo Pass refund clawback';
-  }
-  if (kind === KiloPassIssuanceItemKind.Bonus) {
-    return 'Google Play Kilo Pass bonus refund clawback';
-  }
-  return 'Google Play Kilo Pass promo refund clawback';
-}
-
-function getGooglePlayProviderPaymentId(providerTransactionId: string): string {
-  return `kilo-pass:${KiloPassPaymentProvider.GooglePlay}:${providerTransactionId}`;
-}
-
-function getGooglePlayUpgradeBaseCreditCategory(providerTransactionId: string): string {
-  return `kilo-pass-upgrade-base:${KiloPassPaymentProvider.GooglePlay}:${providerTransactionId}`;
-}
-
-async function reverseGooglePlayRefundCredits(
-  tx: DrizzleTransaction,
-  purchaseToken: string,
-  latestOrderId: string
-): Promise<CreditReversalResult> {
-  // Refunds target the original receipt token, which survives subscription replacement.
-  const storePurchase = await tx.query.kilo_pass_store_purchases.findFirst({
-    where: and(
-      eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
-      eq(kilo_pass_store_purchases.purchase_token, purchaseToken),
-      eq(kilo_pass_store_purchases.provider_transaction_id, latestOrderId)
-    ),
-  });
-
-  if (!storePurchase) {
-    return {
-      storePurchaseFound: false,
-      creditTransactionIds: [],
-      totalReversalMicrodollars: 0,
-      reversedItemKinds: [],
-    };
-  }
-
-  const providerTransactionId = storePurchase.provider_transaction_id;
-
-  const userRows = await tx
-    .select({ microdollarsUsed: kilocode_users.microdollars_used })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, storePurchase.kilo_user_id))
-    .for('update')
-    .limit(1);
-  const user = userRows[0];
-  if (!user) {
-    throw new Error('Google Play refund cannot find the subscribed user');
-  }
-
-  const ownedBaseCreditRows = await tx
-    .select({
-      creditTransactionId: credit_transactions.id,
-      amountMicrodollars: credit_transactions.amount_microdollars,
-      isFree: credit_transactions.is_free,
-    })
-    .from(credit_transactions)
-    .where(
-      and(
-        eq(credit_transactions.kilo_user_id, storePurchase.kilo_user_id),
-        or(
-          eq(
-            credit_transactions.stripe_payment_id,
-            getGooglePlayProviderPaymentId(providerTransactionId)
-          ),
-          eq(
-            credit_transactions.credit_category,
-            getGooglePlayUpgradeBaseCreditCategory(providerTransactionId)
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  const ownedBaseCredit = ownedBaseCreditRows[0] ?? null;
-
-  const issueMonth = dayjs(storePurchase.purchased_at).utc().format('YYYY-MM-01');
-  const issuance = await tx.query.kilo_pass_issuances.findFirst({
-    where: and(
-      eq(kilo_pass_issuances.kilo_pass_subscription_id, storePurchase.kilo_pass_subscription_id),
-      eq(kilo_pass_issuances.issue_month, issueMonth)
-    ),
-  });
-
-  const issuedItems: {
-    itemId: string;
-    kind: KiloPassIssuanceItemKind;
-    amountMicrodollars: number;
-    isFree: boolean;
-  }[] = [];
-
-  if (ownedBaseCredit) {
-    issuedItems.push({
-      itemId: ownedBaseCredit.creditTransactionId,
-      kind: KiloPassIssuanceItemKind.Base,
-      amountMicrodollars: ownedBaseCredit.amountMicrodollars,
-      isFree: ownedBaseCredit.isFree,
-    });
-  }
-
-  if (issuance) {
-    const currentBaseItemRows = await tx
-      .select({ itemId: kilo_pass_issuance_items.id })
-      .from(kilo_pass_issuance_items)
-      .innerJoin(
-        credit_transactions,
-        eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
-      )
-      .where(
-        and(
-          eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
-          eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base),
-          or(
-            eq(
-              credit_transactions.stripe_payment_id,
-              getGooglePlayProviderPaymentId(providerTransactionId)
-            ),
-            eq(
-              credit_transactions.credit_category,
-              getGooglePlayUpgradeBaseCreditCategory(providerTransactionId)
-            )
-          )
-        )
-      )
-      .limit(1);
-
-    if (currentBaseItemRows[0]) {
-      const bonusItems = await tx
-        .select({
-          itemId: kilo_pass_issuance_items.id,
-          kind: kilo_pass_issuance_items.kind,
-          amountMicrodollars: credit_transactions.amount_microdollars,
-          isFree: credit_transactions.is_free,
-        })
-        .from(kilo_pass_issuance_items)
-        .innerJoin(
-          credit_transactions,
-          eq(kilo_pass_issuance_items.credit_transaction_id, credit_transactions.id)
-        )
-        .where(
-          and(
-            eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.id),
-            inArray(kilo_pass_issuance_items.kind, [
-              KiloPassIssuanceItemKind.Bonus,
-              KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
-            ])
-          )
-        );
-      issuedItems.push(...bonusItems);
-    }
-  }
-
-  const creditTransactionIds: string[] = [];
-  const reversedItemKinds: KiloPassIssuanceItemKind[] = [];
-  let totalReversalMicrodollars = 0;
-  for (const item of issuedItems) {
-    // Reverse what Kilo granted, never the Play store price. Google returns the
-    // full charge to the customer and reverses its own commission, so clawing
-    // back the store price would leave a customer who spent nothing at minus the
-    // store margin.
-    const reversalAmountMicrodollars = item.amountMicrodollars;
-
-    if (reversalAmountMicrodollars <= 0) {
-      continue;
-    }
-
-    const reversal = await insertCreditReversal(tx, {
-      kiloUserId: storePurchase.kilo_user_id,
-      amountMicrodollars: reversalAmountMicrodollars,
-      isFree: item.isFree,
-      description: getGooglePlayRefundReversalDescription(item.kind),
-      creditCategory: `kilo-pass-store-refund:${KiloPassPaymentProvider.GooglePlay}:${providerTransactionId}:${item.kind}:${item.itemId}`,
-      originalBaselineMicrodollarsUsed: user.microdollarsUsed,
-    });
-    if (reversal.creditTransactionId) {
-      creditTransactionIds.push(reversal.creditTransactionId);
-    }
-    if (reversal.wasInserted) {
-      totalReversalMicrodollars += reversalAmountMicrodollars;
-      reversedItemKinds.push(item.kind);
-    }
-  }
-
-  return {
-    storePurchaseFound: true,
-    creditTransactionIds,
-    totalReversalMicrodollars,
-    reversedItemKinds,
-  };
-}
-
-type TerminalStoreEvent = {
-  eventId: string;
-  notificationType: string | null;
-  terminalTimestampMs: number | null;
-};
-
-async function findProcessedTerminalStoreEventForGooglePlayPurchase(params: {
-  purchaseToken: string;
-  providerTransactionId: string;
-  purchasedAtMs: number;
-}): Promise<TerminalStoreEvent | null> {
-  const terminalNotificationTypeFilter = sql`(${kilo_pass_store_events.payload_json}->>'notificationType') = '12'`;
-  const terminalTimestampMs = sql<
-    number | null
-  >`(${kilo_pass_store_events.payload_json}->>'eventTimeMillis')::double precision`;
-
-  const terminalEvents = await db
-    .select({
-      eventId: kilo_pass_store_events.event_id,
-      notificationType: sql<
-        string | null
-      >`${kilo_pass_store_events.payload_json}->>'notificationType'`,
-      terminalTimestampMs,
-    })
-    .from(kilo_pass_store_events)
-    .where(
-      and(
-        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
-        sql`${kilo_pass_store_events.processed_at} IS NOT NULL`,
-        or(
-          and(
-            sql`(${kilo_pass_store_events.payload_json}->>'notificationType') = 'voided_purchase'`,
-            eq(kilo_pass_store_events.provider_transaction_id, params.providerTransactionId)
-          ),
-          and(
-            terminalNotificationTypeFilter,
-            or(
-              eq(kilo_pass_store_events.provider_transaction_id, params.providerTransactionId),
-              and(
-                eq(kilo_pass_store_events.provider_subscription_id, params.purchaseToken),
-                sql`${terminalTimestampMs} >= ${params.purchasedAtMs}`
-              )
-            )
-          )
-        )
-      )
-    )
-    .limit(1);
-
-  return terminalEvents[0] ?? null;
-}
-
 /** Play `eventTimeMillis` is milliseconds since the epoch, as a string or a number. */
 function googlePlayEventTime(eventTimeMillis: string | number | null): Date | undefined {
   if (eventTimeMillis === null) return undefined;
   const millis = Number(eventTimeMillis);
   return Number.isFinite(millis) ? new Date(millis) : undefined;
-}
-
-/**
- * The store money event a Play subscription notification maps to. A voided purchase is a
- * review-level refund the caller reports separately; every other type here reports none.
- */
-function getGooglePlayBouncerReport(
-  notificationType: number,
-  amountCents: number | undefined
-): StoreEventKind | null {
-  switch (notificationType) {
-    case GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_PURCHASED:
-    case GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_RENEWED:
-      return { type: 'store.purchase', amountCents };
-    case GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_REVOKED:
-      return { type: 'store.revoked' };
-    default:
-      return null;
-  }
-}
-
-/**
- * The Kilo account that owns a Play subscription, for a report. A provider/user mismatch fails the
- * purchase path, but it must never fail a report.
- */
-async function resolveGooglePlayKiloPassOwner(params: {
-  providerSubscriptionId: string;
-  appAccountToken: string | null;
-}): Promise<string | null> {
-  try {
-    return (await getUserForGooglePlayRenewal(params))?.id ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -677,82 +239,35 @@ export async function processGooglePlayKiloPassNotification(params: {
   }
 
   const voided = developerNotification.voidedPurchaseNotification;
-  if (voided?.productType === 1 && voided.refundType === 1) {
-    const { purchaseToken, orderId } = voided;
-    if (!purchaseToken || !orderId) throw new Error('Google Play refund missing identifiers');
-    const order = await getGooglePlaySubscriptionOrder(orderId);
-    if (
-      order.orderId !== orderId ||
-      order.purchaseToken !== purchaseToken ||
-      order.state !== 'REFUNDED'
-    ) {
-      throw new Error('Google Play refund does not match a refunded order');
+  const subscription = developerNotification.subscriptionNotification;
+  if (subscription || voided?.productType === GOOGLE_PLAY_VOIDED_PRODUCT_TYPE.SUBSCRIPTION) {
+    // Store subscriptions have been retired. Record delivery deduplication only;
+    // never fetch purchases/orders or change historical subscriptions or credits.
+    const purchaseToken = subscription?.purchaseToken ?? voided?.purchaseToken;
+    const notificationType = subscription?.notificationType ?? 'voided_purchase';
+    if (!purchaseToken || (subscription && subscription.notificationType == null)) {
+      throw new Error('Google Play notification missing subscription identifiers');
     }
-    const snapshot = decodeGooglePlaySubscriptionPurchase(
-      await getGooglePlaySubscriptionPurchase(purchaseToken),
-      purchaseToken
-    );
-    const owner = await getUserForGooglePlayRenewal({
-      providerSubscriptionId: purchaseToken,
-      appAccountToken: snapshot.obfuscatedExternalAccountId ?? null,
-    });
     const eventId = computeGooglePlayEventId({
       messageId,
       purchaseToken,
-      notificationType: 'voided_purchase',
+      notificationType,
       eventTimeMillis: developerNotification.eventTimeMillis ?? null,
     });
     const claim = await claimGooglePlayStoreEventForProcessing({
       eventId,
-      notificationType: 'voided_purchase',
+      notificationType,
       packageName: developerNotification.packageName,
       eventTimeMillis: developerNotification.eventTimeMillis ?? null,
       purchaseToken,
-      latestOrderId: orderId,
-      appAccountToken: snapshot.obfuscatedExternalAccountId ?? null,
-      productId: order.lineItems?.[0]?.productId ?? 'unknown',
-      environment: snapshot.environment,
+      latestOrderId: voided?.orderId ?? '',
+      appAccountToken: null,
+      productId: subscription?.subscriptionId ?? 'unknown',
+      environment: 'unknown',
     });
     if (claim === 'already_processed') return { processed: true, status: 'already_processed' };
     if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
-    let storePurchaseFound = false;
-    await db.transaction(async tx => {
-      // Serialize with purchase completion and usage bonuses before reading the ledger.
-      if (owner)
-        await tx
-          .select({ id: kilocode_users.id })
-          .from(kilocode_users)
-          .where(eq(kilocode_users.id, owner.id))
-          .for('update');
-      const reversal = await reverseGooglePlayRefundCredits(tx, purchaseToken, orderId);
-      storePurchaseFound = reversal.storePurchaseFound;
-      await appendKiloPassAuditLog(tx, {
-        action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
-        result: KiloPassAuditLogResult.Success,
-        payload: { messageId: messageId ?? null, providerTransactionId: orderId, ...reversal },
-      });
-      // A refund can leave the subscription entitled. Lifecycle notifications
-      // reconcile access; this event reverses only the exact refunded order.
-      // An order Kilo never admitted is a duplicate purchase that Kilo refunded
-      // itself (`reverseDuplicateGooglePlaySubscription`), not a customer refund.
-      await enqueueGooglePlayCreditEventToBouncer(tx, {
-        environment: snapshot.environment,
-        eventId,
-        eventTimeMillis: developerNotification.eventTimeMillis ?? null,
-        referenceId: orderId,
-        event: storePurchaseFound ? { type: 'store.refund', reason: 'other' } : null,
-        userId: owner?.id ?? null,
-      });
-      await tx
-        .update(kilo_pass_store_events)
-        .set({ processed_at: new Date().toISOString() })
-        .where(
-          and(
-            eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
-            eq(kilo_pass_store_events.event_id, eventId)
-          )
-        );
-    });
+    await markGooglePlayStoreEventProcessed(eventId);
     return { processed: true };
   }
 
@@ -763,7 +278,7 @@ export async function processGooglePlayKiloPassNotification(params: {
   ) {
     const { purchaseToken, orderId } = voided;
     if (!purchaseToken || !orderId) throw new Error('Google Play refund missing identifiers');
-    const order = await getGooglePlaySubscriptionOrder(orderId);
+    const order = await getGooglePlayOrder(orderId);
     const lineItem = order.lineItems?.[0];
     if (!getStoreCreditProductByGoogleProductId(lineItem?.productId ?? '')) {
       // A voided one-time product Kilo does not sell as a credit pack has
@@ -893,337 +408,6 @@ export async function processGooglePlayKiloPassNotification(params: {
     return { processed: true };
   }
 
-  const subscriptionNotification = developerNotification.subscriptionNotification;
-  if (!subscriptionNotification) {
-    // Other product and test notifications do not affect Kilo Pass.
-    return { processed: true };
-  }
-
-  const notificationType = subscriptionNotification.notificationType;
-  const purchaseToken = subscriptionNotification.purchaseToken;
-
-  if (notificationType == null || purchaseToken == null) {
-    throw new Error('Google Play notification missing subscription identifiers');
-  }
-
-  const eventTimeMillis = developerNotification.eventTimeMillis ?? null;
-  const eventId = computeGooglePlayEventId({
-    messageId,
-    purchaseToken,
-    notificationType,
-    eventTimeMillis,
-  });
-
-  const apiData = await getGooglePlaySubscriptionPurchase(purchaseToken);
-  const decoded = decodeGooglePlaySubscriptionPurchase(apiData, purchaseToken);
-
-  const claim = await claimGooglePlayStoreEventForProcessing({
-    eventId,
-    notificationType,
-    packageName: developerNotification.packageName,
-    eventTimeMillis,
-    purchaseToken,
-    latestOrderId: decoded.latestOrderId,
-    appAccountToken: decoded.obfuscatedExternalAccountId ?? null,
-    productId: decoded.productId || 'unknown',
-    environment: decoded.environment,
-  });
-  if (claim === 'already_processed') {
-    return { processed: true, status: 'already_processed' };
-  }
-  if (claim === 'in_flight') {
-    return { processed: false, status: 'in_flight' };
-  }
-
-  const isPurchaseType = PURCHASE_TYPES.has(notificationType);
-  const isExpired = decoded.expiryTimeMs <= Date.now();
-
-  const entitlement = {
-    providerSubscriptionId: purchaseToken,
-    providerTransactionId: decoded.latestOrderId,
-    expiresAtIso: Number.isFinite(decoded.expiryTimeMs)
-      ? new Date(decoded.expiryTimeMs).toISOString()
-      : null,
-    subscriptionState: decoded.subscriptionState,
-  };
-  if (isPurchaseType) {
-    if (
-      isExpired ||
-      ![
-        'SUBSCRIPTION_STATE_ACTIVE',
-        'SUBSCRIPTION_STATE_CANCELED',
-        'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
-      ].includes(decoded.subscriptionState)
-    ) {
-      await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
-      await markGooglePlayStoreEventProcessed(eventId);
-      return { processed: true };
-    }
-
-    const order = await getGooglePlaySubscriptionOrder(decoded.latestOrderId);
-    if (
-      order.state === 'REFUNDED' &&
-      order.orderId === decoded.latestOrderId &&
-      order.purchaseToken === purchaseToken
-    ) {
-      await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
-      await markGooglePlayStoreEventProcessed(eventId);
-      return { processed: true };
-    }
-    const purchase = mapGooglePlayKiloPassPurchase(decoded, order);
-
-    const terminalEvent = await findProcessedTerminalStoreEventForGooglePlayPurchase({
-      purchaseToken,
-      providerTransactionId: purchase.providerTransactionId,
-      purchasedAtMs: Date.parse(purchase.purchasedAtIso),
-    });
-    if (terminalEvent) {
-      await db.transaction(async tx => {
-        await appendKiloPassAuditLog(tx, {
-          action: KiloPassAuditLogAction.StoreNotificationReceived,
-          result: KiloPassAuditLogResult.Success,
-          payload: {
-            messageId: messageId ?? null,
-            notificationType,
-            providerSubscriptionId: purchaseToken,
-            providerTransactionId: purchase.providerTransactionId,
-            skippedStorePurchaseCompletion: true,
-            terminalEventId: terminalEvent.eventId,
-            terminalNotificationType: terminalEvent.notificationType,
-            terminalTimestampMs: terminalEvent.terminalTimestampMs,
-          },
-        });
-        await tx
-          .update(kilo_pass_store_events)
-          .set({ processed_at: new Date().toISOString() })
-          .where(
-            and(
-              eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
-              eq(kilo_pass_store_events.event_id, eventId)
-            )
-          );
-      });
-      return { processed: true };
-    }
-
-    const user = await getUserForGooglePlayRenewal({
-      providerSubscriptionId: purchase.providerSubscriptionId,
-      appAccountToken: purchase.appAccountToken,
-    });
-    if (!user) {
-      if (notificationType !== GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_PURCHASED) {
-        throw new Error(
-          'Google Play renewal notification cannot create a subscription without a user'
-        );
-      }
-      await markGooglePlayStoreEventProcessed(eventId);
-      return { processed: true };
-    }
-
-    let completionResult: CompleteStoreKiloPassPurchaseResult | null = null;
-    let purchaseMismatch = false;
-    let duplicateSubscription = false;
-    await db.transaction(async tx => {
-      try {
-        completionResult = await completeStoreKiloPassPurchase({ dbOrTx: tx, user, purchase });
-      } catch (error) {
-        // A user holds at most one Kilo Pass, so this paid order is a duplicate
-        // purchase. Reverse it after the transaction closes instead of
-        // acknowledging it here, which would drop the charge.
-        if (isActiveKiloPassSubscriptionError(error)) {
-          duplicateSubscription = true;
-          return;
-        }
-        // A permanent provider/user mismatch settles `failed` inside the
-        // completion, so this event must be marked processed and never retried.
-        if (isStorePurchaseMismatchError(error)) {
-          purchaseMismatch = true;
-          await tx
-            .update(kilo_pass_store_events)
-            .set({ processed_at: new Date().toISOString() })
-            .where(
-              and(
-                eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
-                eq(kilo_pass_store_events.event_id, eventId)
-              )
-            );
-          return;
-        }
-        throw error;
-      }
-      // A restart can reuse a settled order. Reconcile the live Play state
-      // even when the purchase ledger correctly skips credit issuance.
-      await reconcileGooglePlaySubscriptionState(tx, purchase);
-      await appendKiloPassAuditLog(tx, {
-        action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
-        result: KiloPassAuditLogResult.Success,
-        kiloUserId: user.id,
-        payload: {
-          messageId: messageId ?? null,
-          providerSubscriptionId: purchase.providerSubscriptionId,
-        },
-      });
-    });
-    if (purchaseMismatch) {
-      return { processed: true };
-    }
-    if (duplicateSubscription) {
-      await reverseDuplicateGooglePlaySubscription({
-        kiloUserId: user.id,
-        productId: purchase.productId,
-        purchaseToken,
-        providerSubscriptionId: purchase.providerSubscriptionId,
-        providerTransactionId: purchase.providerTransactionId,
-        amountChargedMinorUnits: purchase.amountChargedMinorUnits ?? null,
-        currency: purchase.currency ?? null,
-        taxMinorUnits: purchase.taxMinorUnits ?? null,
-        messageId: messageId ?? null,
-        eventId,
-      });
-      return { processed: true };
-    }
-    if (purchase.rawPayload.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {
-      await acknowledgeGooglePlaySubscriptionPurchase(
-        purchase.productId,
-        purchaseToken,
-        purchase.rawPayload.outOfAppPurchaseContext ? purchase.appAccountToken : undefined
-      );
-    }
-    // Play states the amount in its currency's ISO 4217 minor units, so only USD is US cents.
-    const amountCents =
-      purchase.currency === 'USD' ? (purchase.amountChargedMinorUnits ?? undefined) : undefined;
-    // The report and the processed mark commit together, so a crash cannot mark the event
-    // processed while losing the report.
-    await db.transaction(async tx => {
-      await enqueueGooglePlayCreditEventToBouncer(tx, {
-        environment: purchase.environment,
-        eventId,
-        eventTimeMillis,
-        referenceId: purchase.providerTransactionId,
-        event: getGooglePlayBouncerReport(notificationType, amountCents),
-        userId: user.id,
-      });
-      await markGooglePlayStoreEventProcessed(eventId, tx);
-    });
-    // Post-commit only — never capture inside the transaction.
-    const trackedResult = completionResult as CompleteStoreKiloPassPurchaseResult | null;
-    if (trackedResult && !trackedResult.alreadyProcessed) {
-      await runAfterResponse(async () => {
-        trackKiloPassPurchaseCompleted({
-          channel: 'google_play',
-          distinctId: user.google_user_email,
-          userId: user.id,
-          tier: trackedResult.tier,
-          cadence: trackedResult.cadence,
-          purchaseKind: trackedResult.purchaseKind,
-          providerTransactionId: purchase.providerTransactionId,
-          productId: purchase.productId,
-          environment: purchase.environment,
-        });
-      });
-    }
-    return { processed: true };
-  }
-
-  if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_CANCELED) {
-    await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
-    await appendKiloPassAuditLog(db, {
-      action: KiloPassAuditLogAction.StoreSubscriptionCanceled,
-      result: KiloPassAuditLogResult.Success,
-      payload: {
-        messageId: messageId ?? null,
-        providerSubscriptionId: purchaseToken,
-      },
-    });
-    await markGooglePlayStoreEventProcessed(eventId);
-    return { processed: true };
-  }
-
-  if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_EXPIRED) {
-    // A delayed expiry can arrive after the subscription renewed or recovered.
-    // Play still reports a future expiry in that case, so this event is stale.
-    if (!isExpired) {
-      await markGooglePlayStoreEventProcessed(eventId);
-      return { processed: true };
-    }
-    await markGooglePlaySubscriptionEnded(db, purchaseToken);
-    await appendKiloPassAuditLog(db, {
-      action: KiloPassAuditLogAction.StoreSubscriptionExpired,
-      result: KiloPassAuditLogResult.Success,
-      payload: {
-        messageId: messageId ?? null,
-        providerSubscriptionId: purchaseToken,
-      },
-    });
-    await markGooglePlayStoreEventProcessed(eventId);
-    return { processed: true };
-  }
-
-  if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_REVOKED) {
-    const revokedUserId = await resolveGooglePlayKiloPassOwner({
-      providerSubscriptionId: purchaseToken,
-      appAccountToken: decoded.obfuscatedExternalAccountId ?? null,
-    });
-    let storePurchaseFound = false;
-    await db.transaction(async tx => {
-      let reversal: CreditReversalResult;
-      try {
-        reversal = await reverseGooglePlayRefundCredits(tx, purchaseToken, decoded.latestOrderId);
-      } catch (error) {
-        // The purchase token is a bearer credential and a failed query quotes
-        // its own parameters, so the report carries a sanitized copy.
-        captureException(sanitizeErrorForTelemetry(error, [purchaseToken]), {
-          tags: { area: 'kilo-pass', operation: 'reverse-google-play-refund-credits' },
-          extra: {
-            latestOrderId: decoded.latestOrderId,
-          },
-        });
-        // A failed clawback must not be recorded as a successful revocation. The
-        // throw rolls this transaction back so Pub/Sub redelivers and retries.
-        throw error;
-      }
-      storePurchaseFound = reversal.storePurchaseFound;
-      await markGooglePlaySubscriptionEnded(tx, purchaseToken);
-      await appendKiloPassAuditLog(tx, {
-        action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
-        result: KiloPassAuditLogResult.Success,
-        payload: {
-          messageId: messageId ?? null,
-          providerSubscriptionId: purchaseToken,
-          providerTransactionId: decoded.latestOrderId,
-          storePurchaseFound: reversal.storePurchaseFound,
-          creditTransactionIds: reversal.creditTransactionIds,
-          totalReversalMicrodollars: reversal.totalReversalMicrodollars,
-          reversedItemKinds: reversal.reversedItemKinds,
-        },
-      });
-      // `store.revoked` opens a bouncer fraud flag. Kilo's own duplicate-purchase
-      // reversal revokes an order it never admitted, so only an admitted order reports.
-      await enqueueGooglePlayCreditEventToBouncer(tx, {
-        environment: decoded.environment,
-        eventId,
-        eventTimeMillis,
-        referenceId: decoded.latestOrderId,
-        event: storePurchaseFound ? getGooglePlayBouncerReport(notificationType, undefined) : null,
-        userId: revokedUserId,
-      });
-      await tx
-        .update(kilo_pass_store_events)
-        .set({ processed_at: new Date().toISOString() })
-        .where(
-          and(
-            eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
-            eq(kilo_pass_store_events.event_id, eventId)
-          )
-        );
-    });
-    return { processed: true };
-  }
-
-  // Reconcile entitlement-only changes without granting a paid month again.
-  if ([5, 6, 9, 10, 11].includes(notificationType)) {
-    await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
-  }
-  await markGooglePlayStoreEventProcessed(eventId);
+  // Other product and test notifications retain their existing ACK-only behavior.
   return { processed: true };
 }

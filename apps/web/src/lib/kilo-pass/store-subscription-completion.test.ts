@@ -137,6 +137,50 @@ describe('completeStoreKiloPassPurchase', () => {
     );
   });
 
+  it.each([KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay] as const)(
+    '%s legacy schedule survives tier/cadence changes and purchase replay',
+    async paymentProvider => {
+      const user = await insertTestUser();
+      const providerSubscriptionId = crypto.randomUUID();
+      const [legacy] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          payment_provider: paymentProvider,
+          provider_subscription_id: providerSubscriptionId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          started_at: '2026-01-01T00:00:00.000Z',
+        })
+        .returning();
+      expect(legacy?.welcome_promo_in_second_month).toBe(false);
+      const purchase = applePurchase({
+        paymentProvider,
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        productId: 'kilopass.tier49.yearly.v1',
+        purchasedAtIso: '2026-06-01T00:00:00.000Z',
+        expiresAtIso: '2027-06-01T00:00:00.000Z',
+      });
+
+      const changed = await completeStoreKiloPassPurchase({ user, purchase });
+      const replayed = await completeStoreKiloPassPurchase({ user, purchase });
+      expect(replayed).toMatchObject({ subscriptionId: legacy?.id, alreadyProcessed: true });
+      expect(changed.subscriptionId).toBe(legacy?.id);
+      const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, changed.subscriptionId),
+      });
+      expect(subscription).toMatchObject({
+        welcome_promo_in_second_month: false,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+      });
+    }
+  );
+
   it('persists nulls when a Google Play order carries no money', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const order = googlePlayOrder();
@@ -261,6 +305,7 @@ describe('completeStoreKiloPassPurchase', () => {
       tier: to,
       current_streak_months: 2,
       provider_subscription_id: newToken,
+      welcome_promo_in_second_month: true,
     });
   });
 
@@ -493,6 +538,7 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0]).toMatchObject({
       payment_provider: KiloPassPaymentProvider.AppStore,
+      welcome_promo_in_second_month: true,
       provider_subscription_id: purchase.providerSubscriptionId,
       stripe_subscription_id: null,
       status: 'active',
@@ -563,6 +609,11 @@ describe('completeStoreKiloPassPurchase', () => {
       cadence: first.cadence,
       alreadyProcessed: true,
     });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
+    });
+    expect(subscription?.welcome_promo_in_second_month).toBe(true);
 
     const storePurchases = await db
       .select()
@@ -781,6 +832,7 @@ describe('completeStoreKiloPassPurchase', () => {
       '2026-05-01T00:00:00.000Z'
     );
     expect(subscription?.current_streak_months).toBe(2);
+    expect(subscription?.welcome_promo_in_second_month).toBe(true);
 
     const renewalPurchase = await db.query.kilo_pass_store_purchases.findFirst({
       where: eq(kilo_pass_store_purchases.provider_transaction_id, renewalTransactionId),

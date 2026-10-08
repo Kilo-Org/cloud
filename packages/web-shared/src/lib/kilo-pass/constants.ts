@@ -19,6 +19,3 @@ export const KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT = dayjs(
 export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF = dayjs('2026-05-07T00:00:00Z').utc();
 
 export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT = 0.5;
-
-// Keep this boundary fixed so existing subscriptions retain their welcome-bonus schedule.
-export const KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT = dayjs('2026-10-08T10:16:13Z').utc();

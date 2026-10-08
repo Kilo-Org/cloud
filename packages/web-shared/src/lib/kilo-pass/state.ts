@@ -30,6 +30,7 @@ export type KiloPassSubscriptionState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  welcomePromoInSecondMonth: boolean;
   resumesAt: string | null;
 };
 
@@ -45,6 +46,7 @@ type KiloPassSubscriptionRowForState = {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAt: string | null;
+  welcomePromoInSecondMonth: boolean;
   createdAt: string;
 };
 
@@ -138,6 +140,7 @@ export async function getKiloPassStateForUser(
       currentStreakMonths: kilo_pass_subscriptions.current_streak_months,
       nextYearlyIssueAt: kilo_pass_subscriptions.next_yearly_issue_at,
       startedAt: kilo_pass_subscriptions.started_at,
+      welcomePromoInSecondMonth: kilo_pass_subscriptions.welcome_promo_in_second_month,
       createdAt: kilo_pass_subscriptions.created_at,
     })
     .from(kilo_pass_subscriptions)
@@ -176,6 +179,7 @@ export async function getKiloPassStateForUser(
         currentStreakMonths: selected.currentStreakMonths,
         nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
         startedAt: normalizeTimestampToIso(selected.startedAt),
+        welcomePromoInSecondMonth: selected.welcomePromoInSecondMonth,
         resumesAt: null,
       };
     }
@@ -203,6 +207,7 @@ export async function getKiloPassStateForUser(
     currentStreakMonths: selected.currentStreakMonths,
     nextYearlyIssueAt: normalizeTimestampToIso(selected.nextYearlyIssueAt),
     startedAt: normalizeTimestampToIso(selected.startedAt),
+    welcomePromoInSecondMonth: selected.welcomePromoInSecondMonth,
     resumesAt,
   };
 }

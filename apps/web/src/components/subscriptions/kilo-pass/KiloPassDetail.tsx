@@ -240,6 +240,7 @@ export function KiloPassDetail() {
                   }
                   streakMonths={subscription.currentStreakMonths}
                   subscriptionStartedAtIso={subscription.startedAt}
+                  welcomePromoInSecondMonth={subscription.welcomePromoInSecondMonth}
                 />
               </CardTitle>
             </CardHeader>

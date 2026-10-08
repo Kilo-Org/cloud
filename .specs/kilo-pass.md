@@ -157,9 +157,13 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     Bonus-decision paths MUST clamp streak to at least `1` before applying the ramp.
 14. Yearly cadence MUST use a flat monthly bonus of 50% of the monthly price and MUST NOT use the monthly ramp or
     welcome-promo branch.
-15. An eligible first-time monthly subscriber starting at or after `2026-10-08T10:16:13Z` MUST receive the regular 5%
-    bonus in streak month 1 and the 50% welcome bonus in streak month 2.
-16. Subscriptions starting before that rollout MUST retain their previous welcome schedule: 50% in streak month 1.
+15. For eligible first-time monthly subscribers with `welcome_promo_in_second_month = true`, streak month 1 MUST use 5%.
+    Streak month 2 MUST use the 50% welcome bonus.
+    New subscription writers MUST set this flag to `true`.
+16. Existing subscriptions MUST retain `welcome_promo_in_second_month = false`.
+    The database MUST default this flag to `false`, including inserts from application versions without this field.
+    Renewals, webhook replays, and tier or cadence changes MUST preserve the stored flag.
+    Eligible subscribers with this flag set to `false` MUST retain 50% in streak month 1.
     Those starting strictly before `2026-05-07T00:00:00Z` MUST also retain 50% in streak month 2.
     Missing or invalid subscription starts MUST retain the legacy month-1 schedule.
 17. From streak month 3 onward, and in any month where the welcome promo does not apply, monthly cadence MUST use the
@@ -435,7 +439,9 @@ promo or Kilo Pass referral conversion.
 ### 2026-10-08 -- New monthly welcome bonus moves to month 2
 
 - Moved the eligible new monthly subscriber's 50% welcome bonus from streak month 1 to streak month 2.
-- Preserved existing subscriptions with a fixed start boundary of `2026-10-08T10:16:13Z`.
+- Preserved existing subscriptions with a stored schedule flag that defaults to `false`.
+- Set the flag to `true` only when the new application creates a subscription.
+- Preserved the flag on renewals, replays, and tier or cadence changes.
 - Kept the regular monthly ramp, yearly bonuses, payment eligibility, and usage unlock unchanged.
 - Updated subscription offers, ramp previews, and KiloClaw upsells to show the new schedule.
 

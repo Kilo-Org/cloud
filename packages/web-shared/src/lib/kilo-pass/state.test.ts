@@ -83,6 +83,7 @@ describe('getKiloPassStateForUser', () => {
         cancel_at_period_end: false,
         started_at: '2025-05-01T00:00:00.000Z',
         ended_at: null,
+        welcome_promo_in_second_month: true,
         current_streak_months: 6,
         next_yearly_issue_at: null,
       },
@@ -98,6 +99,7 @@ describe('getKiloPassStateForUser', () => {
         cancelAtPeriodEnd: false,
         currentStreakMonths: 6,
         nextYearlyIssueAt: null,
+        welcomePromoInSecondMonth: true,
         stripeSubscriptionId: expect.stringMatching(/^test-stripe-sub-active-new-/),
       })
     );
@@ -192,6 +194,7 @@ describe('getKiloPassStateForUser', () => {
         paymentProvider: KiloPassPaymentProvider.AppStore,
         providerSubscriptionId,
         stripeSubscriptionId: null,
+        welcomePromoInSecondMonth: false,
       })
     );
   });

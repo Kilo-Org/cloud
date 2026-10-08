@@ -158,6 +158,7 @@ describe('kilo pass bonus utilities', () => {
             streakMonths,
             isFirstTimeSubscriberEver: true,
             subscriptionStartedAtIso: startedAtIso,
+            welcomePromoInSecondMonth: true,
           })
         );
 
@@ -168,24 +169,30 @@ describe('kilo pass bonus utilities', () => {
     );
 
     it.each([
-      ['2026-10-08T10:16:12.999Z', [0.5, 0.1]],
-      ['2026-10-08T10:16:13.001Z', [0.05, 0.5]],
-      ['2026-10-08 10:16:13+00', [0.05, 0.5]],
-      ['2026-10-08T12:16:13+02:00', [0.05, 0.5]],
-      [null, [0.5, 0.1]],
-      ['not-a-timestamp', [0.5, 0.1]],
-    ])('preserves the schedule boundary for start %s', (subscriptionStartedAtIso, expected) => {
-      const bonuses = [1, 2].map(streakMonths =>
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier19,
-          streakMonths,
-          isFirstTimeSubscriberEver: true,
-          subscriptionStartedAtIso,
-        })
-      );
+      ['2026-05-06T23:59:59.999Z', false, [0.5, 0.5]],
+      ['2026-05-07T00:00:00.000Z', false, [0.5, 0.1]],
+      ['2027-01-01T00:00:00.000Z', false, [0.5, 0.1]],
+      ['2026-05-06T23:59:59.999Z', true, [0.05, 0.5]],
+      ['2026-10-08 10:16:13+00', true, [0.05, 0.5]],
+      [null, false, [0.5, 0.1]],
+      [null, true, [0.05, 0.5]],
+      ['not-a-timestamp', false, [0.5, 0.1]],
+    ] as const)(
+      'uses the persisted schedule for start %s and second-month flag %s',
+      (subscriptionStartedAtIso, welcomePromoInSecondMonth, expected) => {
+        const bonuses = [1, 2].map(streakMonths =>
+          computeMonthlyCadenceBonusPercent({
+            tier: KiloPassTier.Tier19,
+            streakMonths,
+            isFirstTimeSubscriberEver: true,
+            subscriptionStartedAtIso,
+            welcomePromoInSecondMonth,
+          })
+        );
 
-      expect(bonuses).toEqual(expected);
-    });
+        expect(bonuses).toEqual(expected);
+      }
+    );
 
     it('does not give returning subscribers the second-month welcome bonus', () => {
       expect(
@@ -194,6 +201,7 @@ describe('kilo pass bonus utilities', () => {
           streakMonths: 2,
           isFirstTimeSubscriberEver: false,
           subscriptionStartedAtIso: startedAtIso,
+          welcomePromoInSecondMonth: true,
         })
       ).toBeCloseTo(0.1);
     });

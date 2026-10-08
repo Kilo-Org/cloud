@@ -26,6 +26,7 @@ function buildSubscription(
     tier: KiloPassTier.Tier19,
     currentStreakMonths: 0,
     isFirstTimeSubscriberEver: false,
+    welcomePromoInSecondMonth: false,
     startedAt: null,
     refillAt: null,
     nextBillingAt: null,
@@ -60,18 +61,23 @@ function buildScheduledChange(
 describe('KiloPassActiveSubscriptionCard.logic', () => {
   describe('computeRenewInfoRowModel()', () => {
     test.each([
-      ['2026-10-08T10:16:13Z', 0, 0.95],
-      ['2026-10-08T10:16:13Z', 1, 9.5],
-      ['2026-10-08T10:16:13Z', 2, 2.85],
-      ['2026-10-08T10:16:12Z', 0, 9.5],
-      ['2026-10-08T10:16:12Z', 1, 1.9],
-      ['2026-05-06T00:00:00Z', 1, 9.5],
+      ['2026-10-08T10:16:13Z', true, 0, 0.95],
+      ['2026-10-08T10:16:13Z', true, 1, 9.5],
+      ['2026-10-08T10:16:13Z', true, 2, 2.85],
+      ['2026-10-08T10:16:13Z', false, 0, 9.5],
+      ['2026-10-08T10:16:13Z', false, 1, 1.9],
+      ['2026-10-08T10:16:12Z', false, 0, 9.5],
+      ['2026-10-08T10:16:12Z', false, 1, 1.9],
+      ['2026-05-06T00:00:00Z', false, 1, 9.5],
+      ['2026-05-06T00:00:00Z', true, 0, 0.95],
+      ['2026-05-06T00:00:00Z', true, 1, 9.5],
     ])(
-      'projects the preserved monthly schedule for start %s and streak %i',
-      (startedAt, currentStreakMonths, expectedBonusUsd) => {
+      'projects the monthly schedule for start %s, second-month promo %s and streak %i',
+      (startedAt, welcomePromoInSecondMonth, currentStreakMonths, expectedBonusUsd) => {
         const rows = computeRenewInfoRowModel({
           subscription: buildSubscription({
             startedAt,
+            welcomePromoInSecondMonth,
             currentStreakMonths,
             isFirstTimeSubscriberEver: true,
             refillAt: '2026-11-08T10:16:13Z',

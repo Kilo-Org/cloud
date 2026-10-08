@@ -40,6 +40,7 @@ async function seedBaseIssuance(params: {
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
   startedAtIso?: string | null;
+  welcomePromoInSecondMonth?: boolean;
   paymentProvider?: KiloPassPaymentProvider;
   welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
   initialWelcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason;
@@ -55,6 +56,7 @@ async function seedBaseIssuance(params: {
     currentStreakMonths,
     nextYearlyIssueAt,
     startedAtIso,
+    welcomePromoInSecondMonth = false,
     paymentProvider = KiloPassPaymentProvider.Stripe,
     welcomePromoEligibilityReason,
     initialWelcomePromoEligibilityReason,
@@ -76,6 +78,7 @@ async function seedBaseIssuance(params: {
       status: 'active',
       cancel_at_period_end: false,
       started_at: startedAtIso ?? new Date('2026-01-01T00:00:00.000Z').toISOString(),
+      welcome_promo_in_second_month: welcomePromoInSecondMonth,
       ended_at: null,
       current_streak_months: currentStreakMonths,
       next_yearly_issue_at: nextYearlyIssueAt,
@@ -206,7 +209,8 @@ describe('maybeIssueKiloPassBonusFromUsageThreshold', () => {
         stripeInvoiceId: `inv_new_monthly_${currentStreakMonths}`,
         currentStreakMonths,
         nextYearlyIssueAt: null,
-        startedAtIso: '2026-10-08T10:16:13.000Z',
+        startedAtIso: '2026-01-01T00:00:00.000Z',
+        welcomePromoInSecondMonth: true,
         initialWelcomePromoEligibilityReason:
           KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
       });

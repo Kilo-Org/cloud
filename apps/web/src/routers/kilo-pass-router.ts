@@ -87,11 +87,7 @@ import {
   KILO_PASS_BONUS_LIKE_ITEM_KINDS,
   appendKiloPassAuditLog,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
-import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT,
-  KILO_PASS_TIER_CONFIG,
-} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -205,6 +201,7 @@ const KiloPassSubscriptionStateBaseSchema = z.object({
   currentStreakMonths: z.number(),
   nextYearlyIssueAt: z.string().nullable(),
   startedAt: z.string().nullable(),
+  welcomePromoInSecondMonth: z.boolean(),
   resumesAt: z.string().nullable(),
 });
 
@@ -442,6 +439,7 @@ function getNextKiloPassBonusCreditsUsd(params: {
     tier: params.subscription.tier,
     cadence: params.subscription.cadence,
     startedAtIso: params.subscription.startedAt,
+    welcomePromoInSecondMonth: params.subscription.welcomePromoInSecondMonth,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
     welcomePromoPolicy: params.welcomePromoPolicy,
@@ -459,6 +457,7 @@ function getCurrentKiloPassBonusCreditsUsd(params: {
     tier: params.subscription.tier,
     cadence: params.subscription.cadence,
     startedAtIso: params.subscription.startedAt,
+    welcomePromoInSecondMonth: params.subscription.welcomePromoInSecondMonth,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
     welcomePromoPolicy: params.welcomePromoPolicy,
@@ -1734,9 +1733,7 @@ export const kiloPassRouter = createTRPCRouter({
     if (!subscriptionBase) {
       return {
         subscription: null,
-        isEligibleForFirstMonthPromo:
-          dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF) ||
-          !dayjs().utc().isBefore(KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT),
+        isEligibleForFirstMonthPromo: true,
       };
     }
 

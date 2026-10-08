@@ -2052,6 +2052,8 @@ export const kilo_pass_subscriptions = pgTable(
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     ended_at: timestamp({ withTimezone: true, mode: 'string' }),
     current_streak_months: integer().notNull().default(0),
+    // Existing rows and older writers retain the legacy welcome schedule.
+    welcome_promo_in_second_month: boolean().notNull().default(false),
     /**
      * Used to track the next eligible monthly bonus period for yearly Kilo Pass subscriptions.
      *

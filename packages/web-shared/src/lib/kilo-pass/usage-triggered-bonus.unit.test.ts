@@ -168,7 +168,8 @@ describe('usage-triggered-bonus (unit)', () => {
       (currentStreakMonths, welcomePromoEligibilityReason, isFirstTimeSubscriberEver, expected) => {
         const decision = computeUsageTriggeredMonthlyBonusDecision({
           tier: KiloPassTier.Tier19,
-          startedAtIso: '2026-10-08T10:16:13.000Z',
+          startedAtIso: '2026-01-01T00:00:00.000Z',
+          welcomePromoInSecondMonth: true,
           currentStreakMonths,
           isFirstTimeSubscriberEver,
           welcomePromoPolicy: 'settled-payment-required',

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT,
   KILO_PASS_TIER_CONFIG,
 } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { cn } from '@/lib/utils';
@@ -95,7 +94,7 @@ export function KiloPassTierCard(props: {
               <KiloPassBonusRampDialog
                 tier={tier}
                 showFirstMonthPromo={showFirstMonthPromo}
-                subscriptionStartedAtIso={KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT.toISOString()}
+                welcomePromoInSecondMonth={true}
               />
             </div>
 

@@ -87,9 +87,6 @@ jest.mock('@/lib/kilo-pass/google-play-sdk', () => ({
   acknowledgeGooglePlaySubscriptionPurchase: mockAcknowledgePlay,
 }));
 
-const PROMO_OFFER_ACTIVE_TEST_TIME = '2026-05-06T12:00:00.000Z';
-const PROMO_OFFER_EXPIRED_TEST_TIME = '2026-05-07T00:00:00.000Z';
-
 let mockKiloPassNowIso: string | null = null;
 
 type StripeMock = {
@@ -259,6 +256,7 @@ type KiloPassCaller = {
       cancelAtPeriodEnd: boolean;
       currentStreakMonths: number;
       nextYearlyIssueAt: string | null;
+      welcomePromoInSecondMonth: boolean;
       nextBonusCreditsUsd: number | null;
       nextBillingAt: string | null;
 
@@ -558,6 +556,7 @@ async function insertSubscription(params: {
   currentStreakMonths?: number;
   nextYearlyIssueAt?: string | null;
   startedAt?: string | null;
+  welcomePromoInSecondMonth?: boolean;
 }) {
   const now = new Date().toISOString();
   const isEnded =
@@ -586,6 +585,7 @@ async function insertSubscription(params: {
       current_streak_months: params.currentStreakMonths ?? 0,
       next_yearly_issue_at: params.nextYearlyIssueAt ?? null,
       started_at: startedAt,
+      welcome_promo_in_second_month: params.welcomePromoInSecondMonth ?? false,
       ended_at: isEnded ? now : null,
     })
     .returning({ id: kilo_pass_subscriptions.id });
@@ -1886,8 +1886,6 @@ describe('kiloPassRouter', () => {
 
   describe('getState', () => {
     it('returns null subscription when user has no Kilo Pass subscription', async () => {
-      freezeKiloPassClock(PROMO_OFFER_ACTIVE_TEST_TIME);
-
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-get-state-empty@example.com',
       });
@@ -2229,52 +2227,62 @@ describe('kiloPassRouter', () => {
       }
     );
 
-    it('keeps first-month current bonus visible for first-time subscribers with a new card', async () => {
-      const stripeMock = getStripeMock();
-      const currentPeriodEndSeconds = 1_700_123_456;
-      const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
-      stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_test_monthly_new_card_current_bonus',
-        status: 'active',
-        items: {
-          data: [
-            {
-              current_period_end: currentPeriodEndSeconds,
-              current_period_start: currentPeriodStartSeconds,
-            },
-          ],
-        },
-      });
+    it.each([
+      { welcomePromoInSecondMonth: false, currentPercent: 0.5, nextPercent: 0.1 },
+      { welcomePromoInSecondMonth: true, currentPercent: 0.05, nextPercent: 0.5 },
+    ])(
+      'projects monthly bonuses using stored welcome schedule $welcomePromoInSecondMonth',
+      async ({ welcomePromoInSecondMonth, currentPercent, nextPercent }) => {
+        const stripeMock = getStripeMock();
+        const stripeSubscriptionId = `sub_test_monthly_new_card_${welcomePromoInSecondMonth}`;
+        const currentPeriodEndSeconds = 1_700_123_456;
+        const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
+        stripeMock.subscriptions.retrieve.mockResolvedValue({
+          id: stripeSubscriptionId,
+          status: 'active',
+          items: {
+            data: [
+              {
+                current_period_end: currentPeriodEndSeconds,
+                current_period_start: currentPeriodStartSeconds,
+              },
+            ],
+          },
+        });
 
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-get-state-new-card-current-bonus@example.com',
-      });
-      const { id: subscriptionId } = await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_test_monthly_new_card_current_bonus',
-        tier: KiloPassTier.Tier199,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-        currentStreakMonths: 1,
-        startedAt: '2026-06-01T00:00:00.000Z',
-      });
-      await insertBaseCreditsIssuance({
-        subscriptionId,
-        kiloUserId: user.id,
-        welcomePromoEligibilityReason:
-          KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
-      });
+        const user = await insertTestUser({
+          google_user_email: `kilo-pass-stored-schedule-${welcomePromoInSecondMonth}@example.com`,
+        });
+        const { id: subscriptionId } = await insertSubscription({
+          kiloUserId: user.id,
+          stripeSubscriptionId,
+          tier: KiloPassTier.Tier199,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          currentStreakMonths: 1,
+          startedAt: '2026-06-01T00:00:00.000Z',
+          welcomePromoInSecondMonth,
+        });
+        await insertBaseCreditsIssuance({
+          subscriptionId,
+          kiloUserId: user.id,
+          welcomePromoEligibilityReason:
+            KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim,
+        });
 
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getState();
+        const caller = await createCallerForUser(user.id);
+        const result = await caller.kiloPass.getState();
 
-      const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
-      const expectedCurrentBonusUsd =
-        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) /
-        100;
-
-      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
-    });
+        const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
+        expect(result.subscription?.welcomePromoInSecondMonth).toBe(welcomePromoInSecondMonth);
+        expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(
+          Math.round(baseAmountUsd * currentPercent * 100) / 100
+        );
+        expect(result.subscription?.nextBonusCreditsUsd).toBe(
+          Math.round(baseAmountUsd * nextPercent * 100) / 100
+        );
+      }
+    );
 
     it('uses ramp current bonus instead of grandfathered month-2 promo for reused cards', async () => {
       const stripeMock = getStripeMock();
@@ -3276,53 +3284,10 @@ describe('kiloPassRouter', () => {
 
   describe('isEligibleForFirstMonthPromo in getState', () => {
     it('returns isEligibleForFirstMonthPromo=true when user has no subscriptions', async () => {
-      freezeKiloPassClock(PROMO_OFFER_ACTIVE_TEST_TIME);
-
       const user = await insertTestUser({
         google_user_email: 'kilo-pass-promo-eligible-no-sub@example.com',
       });
 
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getState();
-
-      expect(result.isEligibleForFirstMonthPromo).toBe(true);
-      expect(result.subscription).toBeNull();
-    });
-
-    it('returns isEligibleForFirstMonthPromo=false after the promo cutoff', async () => {
-      freezeKiloPassClock(PROMO_OFFER_EXPIRED_TEST_TIME);
-
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-promo-expired-no-sub@example.com',
-      });
-
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getState();
-
-      expect(result.isEligibleForFirstMonthPromo).toBe(false);
-      expect(result.subscription).toBeNull();
-    });
-
-    it('keeps isEligibleForFirstMonthPromo=true for a never-subscribed user', async () => {
-      freezeKiloPassClock(PROMO_OFFER_ACTIVE_TEST_TIME);
-
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-promo-cutoff-still-eligible@example.com',
-      });
-
-      const caller = await createCallerForUser(user.id);
-      const result = await caller.kiloPass.getState();
-
-      expect(result.isEligibleForFirstMonthPromo).toBe(true);
-      expect(result.subscription).toBeNull();
-    });
-
-    it('offers the month-2 welcome bonus to a never-subscribed user after rollout', async () => {
-      freezeKiloPassClock('2026-10-08T10:16:13.000Z');
-
-      const user = await insertTestUser({
-        google_user_email: 'kilo-pass-month-two-welcome@example.com',
-      });
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 

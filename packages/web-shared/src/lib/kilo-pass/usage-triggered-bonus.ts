@@ -52,6 +52,7 @@ export type UsageTriggeredMonthlyBonusDecision = {
 export function computeUsageTriggeredMonthlyBonusDecision(params: {
   tier: KiloPassSubscriptionState['tier'];
   startedAtIso: string | null;
+  welcomePromoInSecondMonth?: boolean;
   currentStreakMonths: number;
   isFirstTimeSubscriberEver: boolean;
   welcomePromoPolicy: KiloPassWelcomePromoPolicy;
@@ -61,6 +62,7 @@ export function computeUsageTriggeredMonthlyBonusDecision(params: {
   return computeMonthlyKiloPassBonusDecision({
     tier: params.tier,
     startedAtIso: params.startedAtIso,
+    welcomePromoInSecondMonth: params.welcomePromoInSecondMonth,
     streakMonths: params.currentStreakMonths,
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
     welcomePromoPolicy: params.welcomePromoPolicy,
@@ -297,6 +299,7 @@ async function maybeIssueBonusFromUsageThreshold(
     const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
       tier: subscription.tier,
       startedAtIso: subscription.startedAt,
+      welcomePromoInSecondMonth: subscription.welcomePromoInSecondMonth,
       currentStreakMonths: subscription.currentStreakMonths,
       isFirstTimeSubscriberEver,
       welcomePromoPolicy,

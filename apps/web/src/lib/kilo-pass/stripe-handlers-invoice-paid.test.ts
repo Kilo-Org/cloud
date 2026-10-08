@@ -2353,6 +2353,7 @@ describe('handleKiloPassInvoicePaid', () => {
     });
     expect(subRow).toBeTruthy();
     expect(subRow?.kilo_user_id).toBe(user.id);
+    expect(subRow?.welcome_promo_in_second_month).toBe(true);
     expect(subRow?.tier).toBe(KiloPassTier.Tier19);
     expect(subRow?.cadence).toBe(KiloPassCadence.Monthly);
     expect(subRow?.status).toBe('active');
@@ -2694,6 +2695,11 @@ describe('handleKiloPassInvoicePaid', () => {
     });
     expect(issuance).toBeTruthy();
 
+    const replayedSubscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
+    });
+    expect(replayedSubscription?.welcome_promo_in_second_month).toBe(true);
+
     const kinds = await db
       .select({ kind: kilo_pass_issuance_items.kind })
       .from(kilo_pass_issuance_items)
@@ -2701,95 +2707,105 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(kinds.map(k => k.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
   });
 
-  test('monthly: streak counts consecutive months (no bonus is issued on invoice.paid)', async () => {
-    const { handleKiloPassInvoicePaid } =
-      await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
+  test.each([false, true])(
+    'monthly: renewal and replay preserve welcome schedule %s and count consecutive months',
+    async welcomePromoInSecondMonth => {
+      const { handleKiloPassInvoicePaid } =
+        await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
-    const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
-    const stripeSubId = `sub_${Math.random()}`;
-    const meta = kiloPassMetadata({
-      kiloUserId: user.id,
-      tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Monthly,
-    });
-    const subscription = makeStripeSubscription({
-      id: stripeSubId,
-      start_date_seconds: 1_735_689_600,
-      metadata: meta,
-    });
-
-    const retrieve = jest.fn(async () => subscription);
-    const stripe = {
-      subscriptions: {
-        retrieve,
-      },
-    };
-
-    // Seed an earlier month issuance for this subscription so the handler computes a 2-month streak.
-    // We can't insert issuances before the subscription exists, so insert a minimal subscription row first.
-    const inserted = await db
-      .insert(kilo_pass_subscriptions)
-      .values({
-        kilo_user_id: user.id,
-        provider_subscription_id: stripeSubId,
-        stripe_subscription_id: stripeSubId,
+      const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
+      const stripeSubId = `sub_${Math.random()}`;
+      const meta = kiloPassMetadata({
+        kiloUserId: user.id,
         tier: KiloPassTier.Tier19,
         cadence: KiloPassCadence.Monthly,
-        status: 'active',
-        started_at: new Date(subscription.start_date * 1000).toISOString(),
-        ended_at: null,
-        current_streak_months: 1,
-      })
-      .returning({ subscriptionId: kilo_pass_subscriptions.id });
+      });
+      const subscription = makeStripeSubscription({
+        id: stripeSubId,
+        start_date_seconds: 1_735_689_600,
+        metadata: meta,
+      });
 
-    const subscriptionId = inserted[0]?.subscriptionId;
-    expect(subscriptionId).toBeTruthy();
-    if (!subscriptionId) throw new Error('Failed to insert kilo_pass_subscriptions row');
+      const retrieve = jest.fn(async () => subscription);
+      const stripe = {
+        subscriptions: {
+          retrieve,
+        },
+      };
 
-    await db.insert(kilo_pass_issuances).values({
-      kilo_pass_subscription_id: subscriptionId,
-      issue_month: '2025-12-01',
-      source: KiloPassIssuanceSource.Cron,
-      stripe_invoice_id: null,
-    });
+      // Seed an earlier month issuance for this subscription so the handler computes a 2-month streak.
+      // We can't insert issuances before the subscription exists, so insert a minimal subscription row first.
+      const inserted = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          welcome_promo_in_second_month: welcomePromoInSecondMonth,
+          provider_subscription_id: stripeSubId,
+          stripe_subscription_id: stripeSubId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          started_at: new Date(subscription.start_date * 1000).toISOString(),
+          ended_at: null,
+          current_streak_months: 1,
+        })
+        .returning({ subscriptionId: kilo_pass_subscriptions.id });
 
-    const priceId = await getKiloPassPriceId({
-      tier: KiloPassTier.Tier19,
-      cadence: KiloPassCadence.Monthly,
-    });
-    const invoiceId = `inv_streak_${Math.random()}`;
-    const invoice = makeStripeInvoice({
-      id: invoiceId,
-      amount_paid_cents: 1900,
-      period_start_seconds: 1_767_225_600, // 2026-01-01T00:00:00Z
-      created_seconds: 1_767_225_600,
-      priceId,
-      subscriptionIdOrExpanded: stripeSubId,
-      metadata: meta,
-    });
+      const subscriptionId = inserted[0]?.subscriptionId;
+      expect(subscriptionId).toBeTruthy();
+      if (!subscriptionId) throw new Error('Failed to insert kilo_pass_subscriptions row');
 
-    await handleKiloPassInvoicePaid({
-      eventId: 'evt_test_5',
-      invoice,
-      stripe: stripe as unknown as Stripe,
-    });
+      await db.insert(kilo_pass_issuances).values({
+        kilo_pass_subscription_id: subscriptionId,
+        issue_month: '2025-12-01',
+        source: KiloPassIssuanceSource.Cron,
+        stripe_invoice_id: null,
+      });
 
-    const updatedSub = await db.query.kilo_pass_subscriptions.findFirst({
-      where: eq(kilo_pass_subscriptions.id, subscriptionId),
-    });
-    expect(updatedSub?.current_streak_months).toBe(2);
+      const priceId = await getKiloPassPriceId({
+        tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly,
+      });
+      const invoiceId = `inv_streak_${Math.random()}`;
+      const invoice = makeStripeInvoice({
+        id: invoiceId,
+        amount_paid_cents: 1900,
+        period_start_seconds: 1_767_225_600, // 2026-01-01T00:00:00Z
+        created_seconds: 1_767_225_600,
+        priceId,
+        subscriptionIdOrExpanded: stripeSubId,
+        metadata: meta,
+      });
 
-    const issuance = await db.query.kilo_pass_issuances.findFirst({
-      where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
-    });
-    expect(issuance).toBeTruthy();
+      await handleKiloPassInvoicePaid({
+        eventId: 'evt_test_5',
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      });
+      await handleKiloPassInvoicePaid({
+        eventId: 'evt_test_5_replay',
+        invoice,
+        stripe: stripe as unknown as Stripe,
+      });
 
-    const issuanceItemKinds = await db
-      .select({ kind: kilo_pass_issuance_items.kind })
-      .from(kilo_pass_issuance_items)
-      .where(eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance?.id ?? ''));
-    expect(issuanceItemKinds.map(i => i.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
-  });
+      const updatedSub = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, subscriptionId),
+      });
+      expect(updatedSub?.current_streak_months).toBe(2);
+      expect(updatedSub?.welcome_promo_in_second_month).toBe(welcomePromoInSecondMonth);
+
+      const issuance = await db.query.kilo_pass_issuances.findFirst({
+        where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),
+      });
+      expect(issuance).toBeTruthy();
+
+      const issuanceItemKinds = await db
+        .select({ kind: kilo_pass_issuance_items.kind })
+        .from(kilo_pass_issuance_items)
+        .where(eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance?.id ?? ''));
+      expect(issuanceItemKinds.map(i => i.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
+    }
+  );
 
   test('yearly: first invoice issues base credits (bonus is issued later on usage); retry is idempotent', async () => {
     const { handleKiloPassInvoicePaid } =

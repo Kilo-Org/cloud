@@ -8,8 +8,10 @@ import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { STEP_5_PREVIEW_FREE_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import { getMonitoredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 
@@ -76,6 +78,13 @@ describe('OpenRouter Models Config', () => {
     supersededModels.forEach(model => {
       expect(preferredModels).not.toContain(model);
     });
+
+    expect(preferredModels.indexOf(STEP_5_PREVIEW_FREE_MODEL_ID)).toBeGreaterThan(
+      preferredModels.indexOf(KILO_AUTO_EFFICIENT_MODEL.id)
+    );
+    expect(preferredModels.indexOf(STEP_5_PREVIEW_FREE_MODEL_ID)).toBeLessThan(
+      preferredModels.indexOf(KILO_AUTO_FREE_MODEL.id)
+    );
 
     expect(preferredModels.indexOf(DEEPSEEK_V4_1_FLASH_MODEL_ID)).toBeLessThan(
       preferredModels.indexOf(GLM_FLASH_CURRENT_MODEL_ID)

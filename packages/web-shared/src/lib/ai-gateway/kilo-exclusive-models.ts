@@ -10,6 +10,7 @@ import {
   GEMMA_4_26B_A4B_IT_ID,
   GEMMA_4_26B_A4B_IT_FREE_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { STEP_5_PREVIEW_FREE_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import type {
   KiloExclusiveModel,
   Pricing,
@@ -200,7 +201,7 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
 };
 
 export const stepfun_5_preview_free_model: KiloExclusiveModel = {
-  public_id: 'stepfun/step-5-preview-free',
+  public_id: STEP_5_PREVIEW_FREE_MODEL_ID,
   display_name: 'StepFun: Step 5 Preview (free)',
   description:
     "Step 5 Preview is StepFun's flagship model for agentic work, with strong capabilities in software engineering, professional knowledge work, and finance. It natively supports text, image, and video input with a 1M-token context window and up to 64K output tokens. The model supports tool calling, structured outputs, and selectable reasoning levels (low/medium/high) for long-context research, coding, and multi-step workflows.",

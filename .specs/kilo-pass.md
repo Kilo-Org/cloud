@@ -101,9 +101,7 @@ notification lifecycle. Authenticated store notifications are recorded for dedup
 subscription mutations, credits, refunds, or provider API calls. The notification endpoints remain for credit-pack
 refunds and restorations; historical store subscriptions and purchase rows remain readable without a data migration.
 
-This cutover MUST merge only after 2026-11-09 and after `app_min_versions` is raised past the mobile release that removed
-Kilo Pass IAP in #7304. Play subscription renewals for blocked accounts may continue until 2028 and MUST be acknowledged
-and ignored.
+Store subscription notifications, including Play renewals for blocked accounts, MUST be acknowledged and ignored.
 
 A successful base-credit grant writes one threshold on the user row. When cumulative user usage reaches the effective
 threshold, bonus logic acts on the selected effective active subscription. Monthly subscriptions use the tenure ramp
@@ -433,7 +431,7 @@ promo or Kilo Pass referral conversion.
 
 ## Changelog
 
-### Store subscription backend retirement (merge gated after 2026-11-09)
+### 2026-11-09 -- Store subscription backend retirement
 
 - Removed App Store and Play Kilo Pass catalogs, verification, completion, and expiry reconciliation.
 - Store subscription notifications are acknowledged and ignored, while credit-pack refund and restoration paths remain.

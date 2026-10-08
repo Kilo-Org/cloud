@@ -112,6 +112,7 @@ function createHarness(options?: {
   hasObservedWrapperIdle?: boolean;
   metadata?: SessionMetadata;
   assistantMessage?: LatestAssistantMessage;
+  recentAssistantMessages?: LatestAssistantMessage[];
   failTerminalEventOnce?: boolean;
 }) {
   const storage = createMemoryStorage();
@@ -155,6 +156,9 @@ function createHarness(options?: {
         reportedTerminalStates.push(reportState);
       },
       getAssistantMessageForUserMessage: () => options?.assistantMessage ?? null,
+      getRecentAssistantMessagesForUserMessage: () =>
+        options?.recentAssistantMessages ??
+        (options?.assistantMessage ? [options.assistantMessage] : []),
       ensureTerminalMessageEvent: event => {
         if (failTerminalEvent) {
           failTerminalEvent = false;
@@ -174,6 +178,65 @@ function createHarness(options?: {
 }
 
 describe('MessageSettlementOutbox', () => {
+  it.each(['completed', 'failed', 'interrupted'] as const)(
+    'only includes recent activity for completed callbacks: %s',
+    async kind => {
+      const recentAssistantMessages: LatestAssistantMessage[] = [
+        {
+          eventId: 1 as LatestAssistantMessage['eventId'],
+          timestamp: 1,
+          info: { id: 'earlier', role: 'assistant' },
+          parts: [
+            { id: 'narration', messageID: 'earlier', type: 'text', text: 'Investigating' },
+            {
+              id: 'tool',
+              messageID: 'earlier',
+              type: 'tool',
+              tool: 'read',
+              state: { status: 'completed', output: 'private' },
+            },
+          ],
+        },
+        {
+          eventId: 2 as LatestAssistantMessage['eventId'],
+          timestamp: 2,
+          info: { id: 'empty', role: 'assistant' },
+          parts: [],
+        },
+      ];
+      const harness = createHarness({
+        recentAssistantMessages,
+        assistantMessage: recentAssistantMessages[1],
+      });
+      await putSessionMessageState(
+        harness.storage,
+        acceptedMessageState(firstMessageId, { url: 'https://example.com/callback' })
+      );
+      await harness.outbox.terminalizeSessionMessageOnce(
+        firstMessageId,
+        kind === 'completed'
+          ? { kind: 'completed', completionSource: 'assistant_message_event' }
+          : kind === 'failed'
+            ? {
+                kind: 'failed',
+                reason: 'assistant_error',
+                completionSource: 'assistant_message_event',
+              }
+            : { kind: 'interrupted', completionSource: 'assistant_message_event' }
+      );
+      expect(harness.callbackJobs).toHaveLength(1);
+      expect(harness.callbackJobs[0].payload.lastAssistantMessageText || undefined).toBeUndefined();
+      if (kind === 'completed') {
+        expect(JSON.parse(harness.callbackJobs[0].payload.recentActivity ?? 'null')).toEqual({
+          partial: true,
+          messages: [{ text: 'Investigating', tools: [{ name: 'read', status: 'completed' }] }],
+        });
+      } else {
+        expect(harness.callbackJobs[0].payload.recentActivity).toBeUndefined();
+      }
+    }
+  );
+
   it('terminalizes once and emits one terminal lifecycle event', async () => {
     const harness = createHarness();
     await putSessionMessageState(harness.storage, acceptedMessageState(firstMessageId));
@@ -347,6 +410,7 @@ describe('MessageSettlementOutbox', () => {
         throw new Error('report unavailable');
       },
       getAssistantMessageForUserMessage: () => null,
+      getRecentAssistantMessagesForUserMessage: () => [],
       ensureTerminalMessageEvent: () => undefined,
       hasObservedWrapperIdle: async () => true,
       requestAlarmAtOrBefore: async () => undefined,
@@ -895,6 +959,7 @@ describe('MessageSettlementOutbox', () => {
       CALLBACK_QUEUE_MAX_SERIALIZED_BYTES
     );
     expect(harness.callbackJobs[0].payload.lastAssistantMessageText).toBeUndefined();
+    expect(harness.callbackJobs[0].payload.recentActivity).toBeDefined();
     expect(harness.callbackJobs[0].payload.lastAssistantMessageTextTruncation).toEqual({
       originalUtf8ByteLength: new TextEncoder().encode(assistantText.trim()).byteLength,
       retainedUtf8ByteLength: 0,

@@ -84,6 +84,7 @@ type RecordBotRequestCloudAgentSessionResultParams = {
   botRequestId: string;
   cloudAgentSessionId: string;
   finalMessage: string;
+  resultError?: string;
   fetchedAt?: string;
 };
 
@@ -216,7 +217,9 @@ export async function recordBotRequestCloudAgentSessionResultStrict(
     .set({
       final_message: params.finalMessage,
       final_message_fetched_at: params.fetchedAt ?? new Date().toISOString(),
-      final_message_error: null,
+      final_message_error: params.resultError
+        ? truncateFinalMessageError(params.resultError)
+        : null,
     })
     .where(
       and(

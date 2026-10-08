@@ -915,7 +915,8 @@ describe('manual sync lease dispositions', () => {
     ).toBe(true);
     expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
       workerDb,
-      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      new Error('sync failed')
     );
     expect(
       vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
@@ -1217,7 +1218,8 @@ describe('manual dismissal dispatch', () => {
 
     expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith(
       workerDb,
-      'dddddddd-dddd-4ddd-8ddd-dddddddddddd'
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      new Error('Security Agent command running transition rejected')
     );
     expect(
       vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]

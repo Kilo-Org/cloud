@@ -1,6 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
 import {
-  buildUpstreamBody,
   extractTranscriptionPromptInfo,
   TranscriptionRequestSchema,
 } from './transcription-request';
@@ -29,21 +28,6 @@ describe('TranscriptionRequestSchema', () => {
         input_audio: { format: 'wav' },
       })
     ).toThrow();
-  });
-});
-
-describe('buildUpstreamBody', () => {
-  it('passes through standard and provider fields', () => {
-    const body = TranscriptionRequestSchema.parse({
-      model: 'openai/gpt-4o-mini-transcribe',
-      input_audio: { data: 'UklGRiQA', format: 'wav' },
-      language: 'en',
-      provider: { only: ['OpenAI'] },
-      safety_identifier: 'hash-abc',
-      user: 'hash-abc',
-    });
-
-    expect(buildUpstreamBody(body)).toEqual(body);
   });
 });
 

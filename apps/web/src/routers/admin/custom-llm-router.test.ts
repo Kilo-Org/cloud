@@ -466,7 +466,9 @@ describe('adminCustomLlmRouter', () => {
     it.each([
       ['Acme/Model', 'lowercase letters'],
       ['acme/my model', 'lowercase letters'],
-      ['acme/model:free', 'must not contain ":"'],
+      ['acme/model:free', 'must not contain ":" or "~"'],
+      ['~acme/model', 'must not contain ":" or "~"'],
+      ['acme/model~latest', 'must not contain ":" or "~"'],
       ['kilo/model', 'must not start with'],
       ['kilo-auto/model', 'must not start with'],
       ['kilocode/model', 'must not start with'],

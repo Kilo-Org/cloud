@@ -553,7 +553,7 @@ export function CustomLlmsContent() {
                 the outbound request body.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                Public ID may only contain lowercase letters, digits, and <code>. / ~ -</code>. It
+                Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
                 must not start with <code>kilo/</code>, <code>kilo-auto/</code>, or{' '}
                 <code>kilocode/</code>, be an OpenRouter model, or use a direct BYOK provider
                 prefix. It may reuse a Kilo-exclusive model ID, which the custom LLM then replaces.

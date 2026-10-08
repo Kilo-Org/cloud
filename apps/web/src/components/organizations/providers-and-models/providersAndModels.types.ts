@@ -21,23 +21,27 @@ export type ProviderRow = {
   unavailableReason?: string;
 };
 
-export type ProviderOffering = {
+export type OfferingPricing = {
+  promptPrice: string;
+  completionPrice: string;
+  /** List price, set only when Kilo's custom pricing bills less than it. */
+  originalPromptPrice?: string;
+  originalCompletionPrice?: string;
+};
+
+export type ProviderOffering = OfferingPricing & {
   providerSlug: string;
   providerDisplayName: string;
   providerIconUrl: string | null;
   trains: boolean;
   retainsPrompts: boolean;
-  promptPrice: string;
-  completionPrice: string;
 };
 
-export type ProviderModelRow = {
+export type ProviderModelRow = OfferingPricing & {
   modelId: string;
   modelName: string;
   preferredIndex: number | undefined;
   sourceIndex: number;
-  promptPrice: string;
-  completionPrice: string;
   trains: boolean;
   retainsPrompts: boolean;
 };

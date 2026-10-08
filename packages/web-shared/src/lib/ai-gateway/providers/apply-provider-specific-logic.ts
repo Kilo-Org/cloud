@@ -61,7 +61,7 @@ import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
-import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 

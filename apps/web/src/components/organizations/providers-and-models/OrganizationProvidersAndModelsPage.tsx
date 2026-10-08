@@ -7,7 +7,10 @@ import {
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
 import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  getSnapshotModelVariantId,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -35,7 +38,7 @@ import {
   modelRetainsPrompts,
   modelTrains,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
-import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type Props = {
@@ -275,7 +278,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         m => m.endpoint && normalizeModelId(m.slug) === infoModel.modelId
       );
       if (!model || !model.endpoint) continue;
-      const pricing = getModelDisplayPricing(model.endpoint.pricing) ?? model.endpoint.pricing;
 
       offerings.push({
         providerSlug: provider.slug,
@@ -283,8 +285,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
-        promptPrice: pricing.prompt,
-        completionPrice: pricing.completion,
+        ...getOfferingPricing(getSnapshotModelVariantId(model), model.endpoint.pricing),
       });
     }
 
@@ -420,14 +421,12 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       if (!model.endpoint) continue;
       const normalizedModelId = normalizeModelId(model.slug);
       const sourceIndex = rows.length;
-      const pricing = getModelDisplayPricing(model.endpoint.pricing) ?? model.endpoint.pricing;
       rows.push({
         modelId: normalizedModelId,
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        promptPrice: pricing.prompt,
-        completionPrice: pricing.completion,
+        ...getOfferingPricing(getSnapshotModelVariantId(model), model.endpoint.pricing),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });

@@ -59,6 +59,11 @@ export type KiloMemoryHold = {
    * ends any hold, and the caller restarts as before. Callers in the same check get one answer.
    */
   holds(now: number): boolean;
+  /**
+   * The episode's hold expired with the workload still reclaiming at its cap, so a hang restart
+   * now is the sandbox running out of memory. Cleared again by a healthy Kilo or a restart.
+   */
+  expired(): boolean;
   /** Ends a running hold because Kilo was replaced or stopped. */
   release(now: number, outcome: 'restarted' | 'stopped'): void;
 };
@@ -150,6 +155,9 @@ export function createKiloMemoryHold(deps: {
       if (spent || !pressured) return false;
       start(now);
       return true;
+    },
+    expired() {
+      return spent;
     },
     release(now, outcome) {
       end(now, outcome);

@@ -624,9 +624,9 @@ native activity plus the existing Cloud-work and PTY protections.
 - Busy turns on a restarted runtime: a turn with no real progress since it started is submitted
   again, once. Its prompts go back to the front of the inbox in order, with the same `messageID`s
   (Kilo stores messages by ID). No real progress means no tool events, so no tool work repeats. A
-  turn with real progress, or one already submitted again, gets `failed`: `agent_unresponsive`
-  after a hang restart (including one at the end of a memory hold) other than one for exhausted
-  activity capacity, otherwise `agent_restarted`.
+  turn with real progress, or one already submitted again, gets `failed`: `sandbox_out_of_memory`
+  after a hang restart that ends an expired memory hold, `agent_unresponsive` after any other hang
+  restart except one for exhausted activity capacity, otherwise `agent_restarted`.
 - That recovery selection occurs only in the restart-completion turn transition. It invalidates
   the retired submission chain and rebuilds the existing inbox in original message order, without
   waiting for held retired HTTP results. Restart-caused transport rejection is recognized by the
@@ -722,9 +722,9 @@ them through one development-only override.
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
 | Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
-| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to 10 min while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`) |
+| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to 10 min while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo crash | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang, but the reason is `agent_restarted` |
-| Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`) |
+| Dead event stream (Kilo still answers health) | Wrapper, after 6 reconnects in 2 min | Restart Kilo, at most 3 in 10 min | Same as Kilo hang (`agent_unresponsive`, or `sandbox_out_of_memory` when the memory hold expired) |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
 | Kilo final error | Wrapper | None (Kilo already retried) | Accepted fail with Kilo's reason |
 | No real progress for 20 min, including silent tools | Native session supervisor | Bounded tree abort; runtime recovery if unconfirmed | Accepted fail (`no_progress`), or routed error without a current turn |
@@ -811,7 +811,7 @@ failure monitors keep working.
 | `billing_unavailable` (existing Vercel admission failure) | `pre_dispatch` / `admission_billing_unavailable` |
 | `invalid_configuration` (proven provider configuration failure) | `pre_dispatch` / `sandbox_connect_failed` |
 | `agent_unavailable` | queued: `pre_dispatch` / `kilo_server_failed`; accepted: `post_dispatch_no_activity` / `wrapper_disconnected` |
-| `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive` | `post_dispatch_no_activity` / `wrapper_disconnected` |
+| `connection_lost`, `sandbox_lost`, `agent_restarted`, `agent_unresponsive`, `sandbox_out_of_memory` | `post_dispatch_no_activity` / `wrapper_disconnected` |
 | `no_progress`, `no_outcome` | `post_dispatch_no_activity` / `wrapper_no_output` |
 | `prompt_failed` | `post_dispatch_no_activity` / `wrapper_error_before_activity` |
 | `sandbox_stopped` (idle while waiting on the user), `execution_limit` | `interruption` / `system_interrupt` |

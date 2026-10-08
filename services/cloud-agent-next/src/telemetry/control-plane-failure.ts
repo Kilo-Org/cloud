@@ -108,7 +108,7 @@ export function classifyControlPlaneFailure(
       return dispatchState === 'accepted'
         ? POST_DISPATCH_WRAPPER_DISCONNECTED
         : PRE_DISPATCH_KILO_SERVER;
-    // `sandbox_out_of_memory` is a health restart with the workload at its cap:
+    // `sandbox_out_of_memory` is a hang restart after an expired memory hold:
     // still a post-dispatch wrapper-path failure, but with a reason triage can name.
     case 'connection_lost':
     case 'sandbox_lost':

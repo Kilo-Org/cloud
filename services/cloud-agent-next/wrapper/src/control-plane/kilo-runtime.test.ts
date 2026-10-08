@@ -167,7 +167,7 @@ function createRuntime(options: {
   feed: ReturnType<typeof createFeedFactory>;
   probe: ReturnType<typeof createProbe>;
   scheduler: FakeScheduler;
-  restarts?: Array<{ reason: string }>;
+  restarts?: Array<{ reason: string; outcomeReason?: string }>;
   unavailable?: number;
   directory?: string;
   env?: Record<string, string>;
@@ -180,7 +180,7 @@ function createRuntime(options: {
   memoryHolds?: boolean[];
   readSnapshot?: KiloRuntimeOptions['readSnapshot'];
 }) {
-  const restarts: Array<{ reason: string }> = options.restarts ?? [];
+  const restarts: Array<{ reason: string; outcomeReason?: string }> = options.restarts ?? [];
   const restartingAtOnRestart: boolean[] = [];
   const logs: string[] = [];
   const nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }> = [];
@@ -208,7 +208,10 @@ function createRuntime(options: {
     ...(options.sampleMemory ? { sampleMemory: options.sampleMemory } : {}),
     onMemoryHold: info => options.memoryHolds?.push(info.held),
     onRestart: info => {
-      restarts.push({ reason: info.reason });
+      restarts.push({
+        reason: info.reason,
+        ...(info.outcomeReason === undefined ? {} : { outcomeReason: info.outcomeReason }),
+      });
       restartingAtOnRestart.push(runtimeRef.current?.isRestarting() ?? true);
       options.onRestart?.(info);
     },
@@ -1471,7 +1474,7 @@ describe('Kilo hang restart under memory pressure', () => {
     scheduler.fire();
     await waitFor(() => spawner.spawnCount() === 2);
 
-    expect(restarts).toEqual([{ reason: 'hang' }]);
+    expect(restarts).toEqual([{ reason: 'hang', outcomeReason: 'sandbox_out_of_memory' }]);
     expect(memoryHolds).toEqual([true, false]);
     expect(holdPhases(nativeDiagnostics)).toEqual([
       ['kilo_memory_hold_started', undefined],
@@ -1527,7 +1530,7 @@ describe('Kilo hang restart under memory pressure', () => {
 
     await heartbeatAndAdvance(500);
     await waitFor(() => spawner.spawnCount() === 2);
-    expect(restarts).toEqual([{ reason: 'hang' }]);
+    expect(restarts).toEqual([{ reason: 'hang', outcomeReason: 'sandbox_out_of_memory' }]);
     expect(holdPhases(nativeDiagnostics)).toEqual([
       ['kilo_memory_hold_started', undefined],
       ['kilo_memory_hold_ended', 'expired'],

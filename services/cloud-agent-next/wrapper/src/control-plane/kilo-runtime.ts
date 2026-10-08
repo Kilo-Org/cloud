@@ -15,7 +15,6 @@ import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owne
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
   admitControlWorkload,
-  isWorkloadAtCap,
   type ControlWorkload,
   type WorkloadSnapshot,
 } from '../control/workload-cgroup.js';
@@ -945,6 +944,10 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     if (phase === 'stopped' || phase === 'unavailable') return false;
     if (phase === 'restarting') return false;
     const now = scheduler.now();
+    const outcomeReason =
+      isUnresponsiveRestart({ reason, trigger }) && memoryHold.expired()
+        ? ('sandbox_out_of_memory' as const)
+        : undefined;
     memoryHold.release(now, 'restarted');
     // A deliberate credential refresh is not a fault and does not spend the
     // 3-in-10-minutes crash budget (spec §7 "Kilo supervision").
@@ -966,10 +969,6 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       activity?.executions().filter(execution => execution.activity !== 'stopping') ?? [];
     phase = 'restarting';
     const restartWorkload = trigger === 'health_probe_false' ? latestWorkloadSnapshot() : undefined;
-    const outcomeReason =
-      restartWorkload !== undefined && isWorkloadAtCap(restartWorkload)
-        ? ('sandbox_out_of_memory' as const)
-        : undefined;
     let diagnostic = '';
     if (reason !== 'credentials') {
       const observation = trigger === 'health_probe_false' ? healthObservation : undefined;

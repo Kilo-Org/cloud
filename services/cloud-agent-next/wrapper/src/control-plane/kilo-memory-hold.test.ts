@@ -73,6 +73,7 @@ describe('createKiloMemoryHold', () => {
     expect(memoryHold.holds(16_000)).toBe(true);
     memoryHold.sample(21_000, false);
     expect(memoryHold.holds(21_000)).toBe(false);
+    expect(memoryHold.expired()).toBe(false);
     expect(held).toEqual([true, false]);
     expect(reports.at(-1)).toMatchObject({
       phase: 'kilo_memory_hold_ended',
@@ -98,9 +99,11 @@ describe('createKiloMemoryHold', () => {
     expect(memoryHold.holds(610_000)).toBe(false);
     expect(held).toEqual([true, false]);
     expect(reports.map(fields => fields.memoryHoldOutcome).filter(Boolean)).toEqual(['expired']);
+    expect(memoryHold.expired()).toBe(true);
 
     // A healthy Kilo starts a new episode.
     memoryHold.sample(615_000, true);
+    expect(memoryHold.expired()).toBe(false);
     memoryHold.sample(620_000, false);
     expect(memoryHold.holds(620_000)).toBe(true);
   });
@@ -125,6 +128,7 @@ describe('createKiloMemoryHold', () => {
     memoryHold.sample(0, false);
     expect(memoryHold.holds(1_000)).toBe(false);
     memoryHold.release(2_000, 'restarted');
+    expect(memoryHold.expired()).toBe(false);
     expect(reports).toEqual([]);
     expect(held).toEqual([]);
   });

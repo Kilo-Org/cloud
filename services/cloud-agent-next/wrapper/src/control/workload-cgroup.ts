@@ -162,19 +162,6 @@ export type WorkloadSnapshot = {
   serverOomKills: number;
 };
 
-/**
- * A workload at this share of its cap is treated as memory-exhausted: the group
- * cannot grow further without reclaim, so a restart at this point is attributed
- * to the user's workload rather than an unexplained platform fault.
- */
-export const WORKLOAD_AT_CAP_FRACTION = 0.95;
-
-export function isWorkloadAtCap(snapshot: WorkloadSnapshot): boolean {
-  const current = snapshot.currentBytes;
-  if (current === undefined) return false;
-  return current >= snapshot.aggregateMaxBytes * WORKLOAD_AT_CAP_FRACTION;
-}
-
 export type WorkloadStatsEmissionState = {
   lastEmittedAtMs: number;
   lastThrottleCount?: number;

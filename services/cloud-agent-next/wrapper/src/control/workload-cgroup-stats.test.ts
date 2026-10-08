@@ -5,14 +5,11 @@ import path from 'node:path';
 import {
   createWorkloadReporter,
   decideWorkloadStatsEmission,
-  isWorkloadAtCap,
   readWorkloadStats,
-  WORKLOAD_AT_CAP_FRACTION,
   WORKLOAD_MEMORY_PRESSURE_FRACTION,
   WORKLOAD_MEMORY_PRESSURE_RELEASE_FRACTION,
   WORKLOAD_STATS_EVENT_COOLDOWN_MS,
   WORKLOAD_STATS_INTERVAL_MS,
-  type WorkloadSnapshot,
   type WorkloadStats,
   type WorkloadStatsEmissionState,
 } from './workload-cgroup.js';
@@ -213,46 +210,6 @@ describe('decideWorkloadStatsEmission', () => {
       state: emitted,
     });
     expect(decision).toMatchObject({ emit: false, reason: 'none' });
-  });
-});
-
-describe('isWorkloadAtCap', () => {
-  const gib = 1024 ** 3;
-  const snapshot: WorkloadSnapshot = {
-    aggregateMaxBytes: 11 * gib,
-    toolsMaxBytes: 8 * gib,
-    containerLimitBytes: 12 * gib,
-    currentBytes: 11 * gib,
-    pressureAvailable: false,
-    oomKills: 0,
-    oomGroupKills: 0,
-    toolOomKills: 0,
-    serverOomKills: 0,
-  };
-
-  it('treats the group at its cap as exhausted', () => {
-    expect(isWorkloadAtCap(snapshot)).toBe(true);
-  });
-
-  it('treats the cap threshold as exhausted and steps just below it as not', () => {
-    const max = 1000;
-    const atThreshold: WorkloadSnapshot = {
-      ...snapshot,
-      aggregateMaxBytes: max,
-      currentBytes: Math.ceil(max * WORKLOAD_AT_CAP_FRACTION),
-    };
-    expect(isWorkloadAtCap(atThreshold)).toBe(true);
-    expect(
-      isWorkloadAtCap({
-        ...atThreshold,
-        currentBytes: Math.floor(max * WORKLOAD_AT_CAP_FRACTION) - 1,
-      })
-    ).toBe(false);
-  });
-
-  it('is false below the cap or without a reading', () => {
-    expect(isWorkloadAtCap({ ...snapshot, currentBytes: 5 * gib })).toBe(false);
-    expect(isWorkloadAtCap({ ...snapshot, currentBytes: undefined })).toBe(false);
   });
 });
 

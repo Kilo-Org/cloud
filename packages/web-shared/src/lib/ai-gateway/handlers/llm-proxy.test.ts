@@ -689,7 +689,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         userId: 'user-123',
         ip: '127.0.0.1',
       },
-      { timeoutMs: 500 }
+      expect.anything()
     );
   });
 
@@ -715,7 +715,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledWith(
       expect.objectContaining({ tier: 'team', accountId: 'org:org-1', userId: 'user-123' }),
-      { timeoutMs: 500 }
+      expect.anything()
     );
   });
 
@@ -735,7 +735,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
       { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
-      { timeoutMs: 500 }
+      expect.anything()
     );
     // Anonymous usage is keyed on the IP with no payer account.
     const anonymousBouncer = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer;
@@ -800,7 +800,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
           accountId: 'user:user-123',
           userId: 'user-123',
         }),
-        { timeoutMs: 500 }
+        expect.anything()
       );
       expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();
     }

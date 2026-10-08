@@ -162,6 +162,9 @@ YAML
 cat > .wrangler/kilo-startup/bin/pnpm <<SH
 #!/usr/bin/env bash
 export NODE_OPTIONS=--max-old-space-size=512
+if [[ \$PWD == */apps/web ]]; then
+  export NODE_OPTIONS=--max-old-space-size=1536
+fi
 for arg in "\$@"; do
   if [[ \$arg == *apps/web* ]]; then
     export NODE_OPTIONS=--max-old-space-size=1536

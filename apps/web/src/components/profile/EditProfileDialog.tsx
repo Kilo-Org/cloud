@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+// Default `React` is required by Jest's SWC classic JSX transform; production
+// uses the automatic JSX runtime from tsconfig.
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -124,8 +126,13 @@ export function EditProfileDialog({
                 setLinkedinError(null);
               }}
               aria-invalid={linkedinError !== null}
+              aria-describedby={linkedinError ? 'linkedin-url-error' : undefined}
             />
-            {linkedinError && <p className="text-destructive text-sm">{linkedinError}</p>}
+            {linkedinError && (
+              <p id="linkedin-url-error" role="alert" className="text-destructive text-sm">
+                {linkedinError}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="github-url">GitHub Profile URL</Label>
@@ -147,13 +154,20 @@ export function EditProfileDialog({
                     setGithubError(null);
                   }}
                   aria-invalid={githubError !== null}
+                  aria-describedby={githubError ? 'github-url-error' : undefined}
                 />
-                {githubError && <p className="text-destructive text-sm">{githubError}</p>}
+                {githubError && (
+                  <p id="github-url-error" role="alert" className="text-destructive text-sm">
+                    {githubError}
+                  </p>
+                )}
               </>
             )}
           </div>
           {updateProfileMutation.error && (
-            <p className="text-destructive text-sm">Failed to save profile. Please try again.</p>
+            <p role="alert" className="text-destructive text-sm">
+              Failed to save profile. Please try again.
+            </p>
           )}
         </div>
         <DialogFooter>

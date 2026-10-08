@@ -2150,7 +2150,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       const bonus = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
       });
-      const bonusUsd = tier * (returning ? 0.05 : 0.5);
+      const bonusUsd = tier * 0.05;
       expect(bonus!.total_microdollars_acquired - paid!.total_microdollars_acquired).toBe(
         toMicrodollars(bonusUsd)
       );

@@ -15,6 +15,7 @@
   "env": {
     "staging": {
       "name": "usage-ingest-staging",
+      "workers_dev": true,
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging" },

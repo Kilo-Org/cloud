@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
+import { after } from 'next/server';
+import { USAGE_SHADOW_PUBLISH_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { enqueueUsage } from './usage-publisher';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -101,7 +104,7 @@ import {
 } from '@kilocode/web-shared/lib/bouncer/client';
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
-import type { BouncerUsageEventEnqueue } from '@kilocode/usage-contracts';
+import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
 
 const posthogClient = PostHogClient();
 
@@ -284,6 +287,39 @@ export async function toInsertableDbUsageRecord(
   return { core, metadata };
 }
 
+function scheduleUsageEnqueue(payload: UsageRecordRequest): void {
+  if (!USAGE_SHADOW_PUBLISH_ENABLED) return;
+
+  try {
+    // Each promise gets its own lifetime tracking even after an earlier callback queue drains.
+    // Start enqueueing only after registration succeeds, so missing request scope does no I/O.
+    const start = Promise.withResolvers<void>();
+    after(
+      start.promise.then(async () => {
+        try {
+          const outcome = await enqueueUsage(payload);
+          if (outcome.kind === 'accepted') {
+            console.info('usage enqueue accepted', { usageId: payload.core.id });
+          }
+        } catch {
+          console.warn('usage enqueue unavailable', {
+            usageId: payload.core.id,
+            kind: 'unavailable',
+            reason: 'unexpected_rejection',
+          });
+        }
+      })
+    );
+    start.resolve();
+  } catch {
+    console.warn('usage enqueue unavailable', {
+      usageId: payload.core.id,
+      kind: 'unavailable',
+      reason: 'registration_failed',
+    });
+  }
+}
+
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext,
@@ -292,6 +328,14 @@ export async function logMicrodollarUsage(
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
+
+  scheduleUsageEnqueue({
+    core,
+    metadata,
+    prior_microdollar_usage: usageContext.prior_microdollar_usage,
+    posthog_distinct_id: usageContext.posthog_distinct_id ?? null,
+    bouncer_usage_event: bouncerUsageEvent,
+  });
 
   const inserted = await saveUsageRelatedData(
     core,

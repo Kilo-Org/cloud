@@ -44,10 +44,13 @@ pnpm --filter cloudflare-usage-ingest exec wrangler deploy --env staging
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy
 ```
 
-`workers_dev: false` disables the public Workers subdomain; it does not prevent
-deployment. There are no routes or preview URLs configured. The queue can exist
-without a consumer; publishing requires the dedicated secret above, with no database
-access. See [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
+Staging enables its public `workers.dev` URL. After deployment, append `/usage`
+to the hostname shown for `usage-ingest-staging` and use that as the gateway's
+`USAGE_INGEST_URL`. Requests require the dedicated publisher secret above.
+Production keeps `workers_dev: false`; no custom routes or preview URLs are
+configured. These settings do not prevent deployment. The queue can exist
+without a consumer, and publishing does not require database access. See
+[Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 
 ## Verify locally
 
@@ -71,4 +74,5 @@ service's ignored `.dev.vars`, then run `pnpm --filter cloudflare-usage-ingest d
 The queue is simulated locally; receipt verification needs a temporary local
 consumer. Keep tokens and payloads out of logs. Before a future remote rollout,
 configure a reachable URL and separate dedicated publisher secrets for production
-and staging. Public Workers and preview URLs remain disabled.
+and staging. The staging `workers.dev` URL is enabled on deployment; production
+public URLs and all preview URLs remain disabled.

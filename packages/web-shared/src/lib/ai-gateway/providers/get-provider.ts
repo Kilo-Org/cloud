@@ -56,7 +56,8 @@ export type GetProviderProviderResult = {
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
-  | { kind: 'custom-llm-unavailable' };
+  | { kind: 'custom-llm-unavailable' }
+  | { kind: 'custom-llm-temporarily-unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -105,27 +106,41 @@ async function isEligibleForCustomLlm(
   return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
 }
 
-async function resolveCustomLlmApiKey(
-  customLlm: CustomLlm
-): Promise<{ apiKey: string; apiKeyHeader: 'x-api-key' | null } | null> {
+type CustomLlmApiKeyResult =
+  | { kind: 'resolved'; apiKey: string; apiKeyHeader: 'x-api-key' | null }
+  | { kind: 'invalid-credentials' }
+  | { kind: 'token-exchange-failed' };
+
+function readCustomLlmCredentials(customLlm: CustomLlm) {
   if (!customLlm.encrypted_api_key) return null;
-  const decrypted = decryptApiKey(customLlm.encrypted_api_key, BYOK_ENCRYPTION_KEY);
-  let parsedJson: unknown;
   try {
-    parsedJson = JSON.parse(decrypted);
+    const decrypted = decryptApiKey(customLlm.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+    return CustomLlmCredentialsSchema.safeParse(JSON.parse(decrypted)).data ?? null;
   } catch {
+    // A rotated encryption key, corrupted ciphertext, or malformed JSON.
     return null;
   }
-  const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
-  if (!parsedCredentials.success) return null;
-  const credentials = parsedCredentials.data;
+}
+
+async function resolveCustomLlmApiKey(customLlm: CustomLlm): Promise<CustomLlmApiKeyResult> {
+  const credentials = readCustomLlmCredentials(customLlm);
+  if (!credentials) return { kind: 'invalid-credentials' };
   if (credentials.type === 'api_key' || credentials.type === 'x-api-key') {
     return {
+      kind: 'resolved',
       apiKey: credentials.api_key,
       apiKeyHeader: credentials.type === 'x-api-key' ? 'x-api-key' : null,
     };
   }
-  return { apiKey: await getGoogleServiceAccountAccessToken(credentials), apiKeyHeader: null };
+  try {
+    const apiKey = await getGoogleServiceAccountAccessToken(credentials);
+    return { kind: 'resolved', apiKey, apiKeyHeader: null };
+  } catch (error) {
+    console.error('Custom LLM service account token exchange failed', customLlm.public_id, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { kind: 'token-exchange-failed' };
+  }
 }
 
 /**
@@ -141,9 +156,12 @@ async function resolveCustomLlmProvider(
     return { kind: 'custom-llm-unavailable' };
   }
   const apiKey = await resolveCustomLlmApiKey(customLlm);
-  if (!apiKey) {
+  if (apiKey.kind === 'invalid-credentials') {
     console.error('Custom LLM credentials are missing or invalid', customLlm.public_id);
     return { kind: 'custom-llm-unavailable' };
+  }
+  if (apiKey.kind === 'token-exchange-failed') {
+    return { kind: 'custom-llm-temporarily-unavailable' };
   }
 
   const { definition } = customLlm;

@@ -3,6 +3,7 @@ import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { captureException } from '@sentry/nextjs';
 
 export type CustomLlm = {
   public_id: string;
@@ -47,52 +48,56 @@ const CACHE_TTL_MS = 60_000;
 
 let cache: { byId: ReadonlyMap<string, CustomLlm>; at: number } | null = null;
 let inFlight: Promise<ReadonlyMap<string, CustomLlm>> | null = null;
+/** Bumped on invalidation so a load that started earlier cannot re-cache stale rows. */
+let generation = 0;
 
 async function loadCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
+  const loadGeneration = generation;
   const byId = new Map<string, CustomLlm>();
   for (const customLlm of await fetchCustomLlmsFromDatabase()) {
     byId.set(customLlm.public_id.toLowerCase(), customLlm);
   }
-  cache = { byId, at: Date.now() };
+  if (loadGeneration === generation) {
+    cache = { byId, at: Date.now() };
+  }
   return byId;
 }
 
 /**
  * All valid custom LLMs keyed by lowercased public id. A failed refresh serves
- * the previous value; with nothing cached it throws, because silently treating
- * a custom LLM id as unknown would route it to another upstream.
+ * the previous value. With nothing cached it serves an empty map without
+ * caching it, so a database outage does not fail requests for built-in models;
+ * the next call retries.
  */
 export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
     return cache.byId;
   }
-  inFlight ??= loadCustomLlmsById().finally(() => {
-    inFlight = null;
-  });
+  if (!inFlight) {
+    const load = loadCustomLlmsById().finally(() => {
+      if (inFlight === load) inFlight = null;
+    });
+    inFlight = load;
+  }
   try {
     return await inFlight;
   } catch (error) {
     if (cache) return cache.byId;
-    throw error;
+    console.error('Failed to load custom LLMs; treating every model id as built-in', error);
+    captureException(error, { tags: { source: 'custom_llm_catalog' } });
+    return new Map();
   }
 }
 
 /** Drops this instance's cache so admin edits apply here immediately. */
 export function invalidateCustomLlmCache() {
+  generation++;
   cache = null;
+  inFlight = null;
 }
 
 export async function findCustomLlm(modelId: string): Promise<CustomLlm | null> {
   return (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null;
-}
-
-export async function getPublicCustomLlms(): Promise<
-  Array<CustomLlm & { definition: PublicCustomLlmDefinition }>
-> {
-  return [...(await getCustomLlmsById()).values()].flatMap(customLlm => {
-    const { definition } = customLlm;
-    return isPublicCustomLlm(definition) ? [{ ...customLlm, definition }] : [];
-  });
 }
 
 /**

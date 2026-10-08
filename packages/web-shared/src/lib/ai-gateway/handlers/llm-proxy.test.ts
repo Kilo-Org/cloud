@@ -2161,6 +2161,18 @@ describe('custom LLM requests', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('returns service unavailable when custom LLM credentials cannot be resolved now', async () => {
+    mockedFindCustomLlm.mockResolvedValue(customLlm('acme/public-model', true));
+    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-temporarily-unavailable' });
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/public-model')) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('rejects a public custom LLM when the request excludes its inference providers', async () => {
     mockedFindCustomLlm.mockResolvedValue(customLlm('acme/public-model', true));
 

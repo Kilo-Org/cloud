@@ -1,9 +1,11 @@
-import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/globals';
 import {
   findCustomLlm,
   getPublicCustomLlmInferenceProviders,
+  invalidateCustomLlmCache,
   isFreeModelIncludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { stepfun_37_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   deleteCustomLlmForTest,
@@ -23,6 +25,39 @@ describe('custom LLM catalog', () => {
   afterAll(async () => {
     await deleteCustomLlmForTest('Acme/Public-Model');
     await deleteCustomLlmForTest(freeExclusiveId);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    invalidateCustomLlmCache();
+  });
+
+  test('treats every id as built-in when the first load fails, then retries', async () => {
+    invalidateCustomLlmCache();
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(readDb, 'select').mockImplementationOnce(() => {
+      throw new Error('database unavailable');
+    });
+
+    await expect(findCustomLlm('acme/public-model')).resolves.toBeNull();
+    await expect(findCustomLlm('acme/public-model')).resolves.not.toBeNull();
+  });
+
+  test('does not cache rows from a load that started before an invalidation', async () => {
+    invalidateCustomLlmCache();
+    let releaseStaleLoad: (rows: never[]) => void = () => {};
+    const staleRows = new Promise<never[]>(resolve => {
+      releaseStaleLoad = resolve;
+    });
+    jest.spyOn(readDb, 'select').mockImplementationOnce(() => ({ from: () => staleRows }) as never);
+
+    const staleLookup = findCustomLlm('acme/public-model');
+    invalidateCustomLlmCache();
+    await expect(findCustomLlm('acme/public-model')).resolves.not.toBeNull();
+    releaseStaleLoad([]);
+    await expect(staleLookup).resolves.toBeNull();
+
+    await expect(findCustomLlm('acme/public-model')).resolves.not.toBeNull();
   });
 
   test('finds custom LLMs case-insensitively', async () => {

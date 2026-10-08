@@ -28,6 +28,25 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   checkOpenAiChatGptByok: jest.fn().mockResolvedValue(null),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account', () => ({
+  getGoogleServiceAccountAccessToken: jest.fn().mockRejectedValue(new Error('network error')),
+}));
+
+const serviceAccountKey = encryptApiKey(
+  JSON.stringify({
+    type: 'service_account',
+    project_id: 'project',
+    private_key_id: 'key-id',
+    private_key: 'private-key',
+    client_email: 'service@project.iam.gserviceaccount.com',
+    client_id: 'client-id',
+    auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+    token_uri: 'https://oauth2.googleapis.com/token',
+    auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+    client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/service',
+  }),
+  BYOK_ENCRYPTION_KEY
+);
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const OTHER_ORG_ID = '00000000-0000-4000-8000-000000000002';
@@ -69,6 +88,15 @@ describe('getProvider with custom LLMs', () => {
       encryptedApiKey
     );
     await insertCustomLlmForTest('acme/no-credentials', publicCustomLlmDefinition(['acme']), null);
+    await insertCustomLlmForTest('acme/undecryptable', publicCustomLlmDefinition(['acme']), {
+      ...encryptedApiKey,
+      authTag: Buffer.alloc(16).toString('base64'),
+    });
+    await insertCustomLlmForTest(
+      'acme/service-account',
+      publicCustomLlmDefinition(['acme']),
+      serviceAccountKey
+    );
     await insertCustomLlmForTest(
       shadowedExclusiveId,
       privateCustomLlmDefinition({ organization_ids: [ORG_ID] }),
@@ -81,6 +109,8 @@ describe('getProvider with custom LLMs', () => {
       'acme/public-model',
       'acme/private-model',
       'acme/no-credentials',
+      'acme/undecryptable',
+      'acme/service-account',
       shadowedExclusiveId,
     ]) {
       await deleteCustomLlmForTest(publicId);
@@ -132,6 +162,20 @@ describe('getProvider with custom LLMs', () => {
     const result = await getProvider(providerInput('acme/no-credentials', user, undefined));
 
     expect(result).toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test('fails a custom LLM whose credentials cannot be decrypted instead of throwing', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await getProvider(providerInput('acme/undecryptable', user, undefined));
+
+    expect(result).toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test('reports a failed service account token exchange as temporary', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const result = await getProvider(providerInput('acme/service-account', user, undefined));
+
+    expect(result).toEqual({ kind: 'custom-llm-temporarily-unavailable' });
   });
 
   test('routes ids without a custom LLM to the regular gateway', async () => {

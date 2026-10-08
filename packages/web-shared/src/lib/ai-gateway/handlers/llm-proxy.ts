@@ -803,6 +803,9 @@ export async function handleLlmProxyRequest(
   if (providerResult.kind === 'custom-llm-unavailable') {
     return modelDoesNotExistResponse();
   }
+  if (providerResult.kind === 'custom-llm-temporarily-unavailable') {
+    return temporarilyUnavailableResponse();
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {

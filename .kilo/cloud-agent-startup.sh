@@ -19,7 +19,7 @@ cloud_agents=false
 if [[ "$*" != app ]]; then
   cloud_agents=true
 fi
-export KILO_STARTUP_MEMORY_MB="${KILO_STARTUP_MEMORY_MB:-$([[ $cloud_agents == true ]] && printf 6144 || printf 5120)}"
+export KILO_STARTUP_MEMORY_MB="${KILO_STARTUP_MEMORY_MB:-6144}"
 
 if [[ $(uname -s) != Linux ]] || ! command -v apt-get >/dev/null; then
   printf 'This startup script requires a Debian/Ubuntu Linux sandbox.\n' >&2
@@ -142,7 +142,7 @@ if tmux list-sessions >/dev/null 2>&1; then
 fi
 mkdir -p .wrangler/kilo-startup/bin
 real_docker=${KILO_STARTUP_REAL_DOCKER:-$(command -v docker)}
-real_pnpm=${KILO_STARTUP_REAL_PNPM:-$(command -v pnpm)}
+real_pnpm=$(readlink -f "${KILO_STARTUP_REAL_PNPM:-$(command -v pnpm)}")
 export KILO_STARTUP_REAL_PNPM="$real_pnpm"
 cat > .wrangler/kilo-startup/compose.memory.yml <<YAML
 services:
@@ -164,6 +164,9 @@ services:
 YAML
 cat > .wrangler/kilo-startup/bin/pnpm <<SH
 #!/usr/bin/env bash
+if [[ \$PWD != "$PWD" && \$PWD != "$PWD/"* ]]; then
+  exec "$real_pnpm" "\$@"
+fi
 export NODE_OPTIONS=--max-old-space-size=512
 web=false
 if [[ \$PWD == */apps/web ]]; then
@@ -175,7 +178,7 @@ for arg in "\$@"; do
   fi
 done
 if [[ \$web == true ]]; then
-  export NODE_OPTIONS=--max-old-space-size=2048
+  export NODE_OPTIONS=--max-old-space-size=3072
   if [[ " \$* " == *" run dev "* ]]; then
     set -- "\$@" --webpack
   fi
@@ -191,6 +194,7 @@ fi
 exec /bin/bash "$@"
 SH
 chmod +x .wrangler/kilo-startup/bin/pnpm .wrangler/kilo-startup/bin/kilo-shell
+"${root[@]}" ln -sfn "$PWD/.wrangler/kilo-startup/bin/pnpm" /usr/local/bin/pnpm
 export WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST=1
 export KILO_STARTUP_REAL_DOCKER="$real_docker"
 export KILO_STARTUP_BUILDER="kilo-lowmem-$(basename "$PWD")"
@@ -241,7 +245,7 @@ chmod +x "$WRANGLER_DOCKER_BIN"
 ln -sf "$WRANGLER_DOCKER_BIN" .wrangler/kilo-startup/bin/docker
 export PATH="$PWD/.wrangler/kilo-startup/bin:$PATH"
 export SHELL="$PWD/.wrangler/kilo-startup/bin/kilo-shell"
-"$SHELL" -lc "cd $(printf '%q' "$PWD/apps/web") && pnpm exec node -e 'if (process.env.NODE_OPTIONS !== \"--max-old-space-size=2048\") throw new Error(\"Web heap budget is not applied\")'"
+"$SHELL" -lc "cd $(printf '%q' "$PWD/apps/web") && pnpm exec node -e 'if (process.env.NODE_OPTIONS !== \"--max-old-space-size=3072\") throw new Error(\"Web heap budget is not applied\")'"
 if [[ $cloud_agents == true ]]; then
   cat > .wrangler/kilo-startup/buildkitd.toml <<'TOML'
 [worker.oci]

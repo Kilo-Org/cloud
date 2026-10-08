@@ -54,34 +54,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
-    id: 'mercury-edit-2-extension-july-24',
-    title: 'Free Mercury Edit 2 access extended',
-    message: 'Free access to Mercury Edit 2 has been extended until Friday, July 24 at 12 PM ET.',
-    showIn: ['extension'],
-    expiresAt: '2026-07-24T16:00:00Z',
-  },
-  {
-    id: 'legacy-upgrade-final-week-july-2026',
-    title: 'Final Week: Kilo Code 5.x Support Ends July 31',
-    message:
-      'Kilo Code strongly recommends updating to version 7.x this week. Support for Kilo Code extension version 5.x ends July 31, 2026. After that date, there will be no updates, bug fixes, security patches, compatibility fixes, or marketplace releases. Upgrade now to stay on a supported version.',
-    action: {
-      actionText: 'Upgrade Before July 31',
-      actionURL: 'https://github.com/Kilo-Org/kilocode-legacy#legacy-ide-extensions-end-of-life',
-    },
-    showIn: ['extension'],
-    expiresAt: '2026-08-01T04:00:00Z',
-    showOnlyOnLegacyExtension: true,
-  },
-  {
-    id: 'stealth-opus-discount-may-25',
-    title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
-    message:
-      'A stealth provider is offering Claude Opus 4.7 at 20% off list price, exclusively in Kilo Code.',
-    suggestModelId: 'stealth/claude-opus-4.7',
-    expiresAt: '2026-06-08T08:00:00Z',
-  },
-  {
     id: 'kilo-cli-jan-5',
     title: 'Kilo CLI',
     message: 'Prefer the terminal? Install the Kilo CLI with npm install -g @kilocode/cli',
@@ -100,30 +72,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
       actionURL: 'https://app.kilo.ai/cloud',
     },
     showIn: ['extension', 'cli'],
-  },
-  {
-    id: 'app-builder-promo-mar-6',
-    title: 'Try App Builder',
-    message: "Don't feel like coding? Try App Builder to build with natural language from the web",
-    action: {
-      actionText: 'Try App Builder',
-      actionURL: 'https://app.kilo.ai/app-builder',
-    },
-    showIn: ['extension'],
-    expiresAt: '2026-03-09T08:00:00Z',
-  },
-  {
-    id: 'nvidia-nemotron-3-super-launch-mar-11',
-    title: 'NVIDIA Nemotron 3 Super is live in Kilo!',
-    message:
-      'NVIDIA Nemotron 3 Super is now free to use for a limited time in Kilo — 120B parameter model with 256k context window!',
-    action: {
-      actionText: 'Learn more',
-      actionURL: 'https://blog.kilo.ai/nvidia-nemotron-3-super-launch',
-    },
-    suggestModelId: 'nvidia/nemotron-3-super-120b-a12b:free',
-    showIn: ['extension', 'cli'],
-    expiresAt: '2026-03-25T08:00:00Z',
   },
 ];
 
@@ -155,7 +103,6 @@ export async function generateUserNotifications(
     generateAutoTopUpNotification,
     generateAutoTopUpOrgsNotification,
     generateKiloPassNotification,
-    generateKiloPassPromoMay29Notification,
   ];
 
   const resolvedConditionalNotifications = (
@@ -272,29 +219,6 @@ async function generateTeamsTrialNotification(
         actionURL: 'https://app.kilocode.ai/get-started/teams',
       },
       showIn: ['cli', 'extension'],
-    },
-  ];
-}
-
-async function generateKiloPassPromoMay29Notification(
-  user: User,
-  _ctx: NotificationContext
-): Promise<KiloNotification[]> {
-  if (!(await hasUserEverPaid(user.id))) {
-    return [];
-  }
-
-  return [
-    {
-      id: 'kilo-pass-promo-may-29',
-      title: 'Get more from every dollar with Kilo Pass',
-      message: 'A monthly AI token subscription with up to 50% bonus credits included.',
-      action: {
-        actionText: 'Explore Kilo Pass',
-        actionURL: 'https://kilo.ai/pricing/kilo-pass',
-      },
-      showIn: ['cli', 'extension'],
-      expiresAt: '2026-06-30T08:00:00Z',
     },
   ];
 }

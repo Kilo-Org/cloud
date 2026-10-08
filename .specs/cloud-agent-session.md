@@ -119,7 +119,8 @@ repository.
    A Kilo that stops answering while the sandbox reclaims at its memory cap
    MUST be held instead of restarted, for at most ten minutes; the hold MUST
    pause the no-progress clock and post a non-fatal notice. A turn failed by a
-   hang restart MUST say that Kilo was not responding.
+   hang restart MUST say that Kilo was not responding, unless the restart was
+   for exhausted activity-tracking capacity while Kilo still answered.
    The separate 120-minute execution cap MUST include user waits. Native
    cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
    use bounded runtime recovery. Accepted Cloud messages MUST settle once;

@@ -264,7 +264,6 @@ async function setup() {
       }),
 
       // 14. Buy $10, use $10, get $10 free → original_baseline=10 (spent $10 before free credit)
-      //     The paid $10 is non-expiring, non-free
       makeCredit(USER_BUY_USE_FREE, 10, { isFree: false }),
       makeCredit(USER_BUY_USE_FREE, 10, { originalBaseline: 10 }),
 

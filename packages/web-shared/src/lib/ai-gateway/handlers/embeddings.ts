@@ -331,6 +331,7 @@ export async function handleEmbeddingsRequest(
       ? undefined
       : {
           accountId: bouncerAccountId(user.id, organizationId),
+          userId: user.id,
           tier: bouncerDecideTier(organizationId, accountPlan, accountBalance),
           payer: accountPayer,
         },

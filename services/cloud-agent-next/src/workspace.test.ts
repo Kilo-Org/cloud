@@ -1498,6 +1498,39 @@ describe('workspace path construction', () => {
     ).toBe(getSessionWorkspacePath(ORG_ID, 'user-1', SESSION_ID));
   });
 
+  it.each([
+    ['isolated', true],
+    ['code-review', false],
+    ['shared', false],
+  ] as const)('resolves a placed %s sandbox directory from its kind', (sandboxKind, isolated) => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: `sbx-${'a'.repeat(48)}`,
+        sandboxKind,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(
+      isolated
+        ? ISOLATED_CONTAINER_WORKSPACE_PATH
+        : getSessionWorkspacePath(ORG_ID, 'user-1', SESSION_ID)
+    );
+  });
+
+  it('rejects a placed sandbox key without its kind', () => {
+    expect(() =>
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: `sbx-${'a'.repeat(48)}`,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toThrow('Sandbox key and kind do not match');
+  });
+
   it('uses the isolated container directory over an explicit worktree path', () => {
     const explicit = getWorktreeWorkspacePath(ORG_ID, 'user-1', WORKTREE_ID);
     expect(

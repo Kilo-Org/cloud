@@ -466,6 +466,7 @@ function assertRegisteredMetadata(
     workspace.sandboxAllocation !== source.workspace.sandboxAllocation ||
     workspace.branchName !== sourceWorktreeBranchName(source) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
+    workspace.sandboxKind !== source.workspace.sandboxKind ||
     !metadata.repository ||
     canonicalRepositoryUrl(metadata.repository) !== canonicalRepositoryUrl(source.repository) ||
     (source.repository.type === 'github' &&

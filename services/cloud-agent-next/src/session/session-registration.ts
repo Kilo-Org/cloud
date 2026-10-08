@@ -94,6 +94,11 @@ import {
   selectSandboxProvider,
   type SandboxSelection,
 } from '../sandbox-id.js';
+import {
+  sandboxKindMatchesKey,
+  sandboxKindSchema,
+  type SandboxKind,
+} from '../sandbox-placement.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { sha256Hex } from '../utils/sha256.js';
@@ -189,6 +194,7 @@ export type SessionRegistrationResult = {
   kiloSessionId: string;
   sandboxId: SandboxId;
   sandboxRoute?: SharedSandboxRouteMetadata;
+  sandboxKind?: SandboxKind;
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
@@ -921,6 +927,16 @@ function rebuildRecordedSessionAllocation(
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
   const sandboxRoute = canonical.sandboxRoute;
+  // A legacy prefixed key recorded no kind; a placed key never rebuilds without one.
+  const recordedKind = sandboxKindSchema.optional().safeParse(canonical.sandboxKind);
+  if (
+    !recordedKind.success ||
+    typeof sandboxId !== 'string' ||
+    !sandboxKindMatchesKey(sandboxId, recordedKind.data)
+  ) {
+    throw creationInProgressError();
+  }
+  const sandboxKind = recordedKind.data;
   const requested = isSelectableSandboxAllocation(input.runtime?.sandboxAllocation)
     ? input.runtime?.sandboxAllocation
     : undefined;
@@ -937,7 +953,13 @@ function rebuildRecordedSessionAllocation(
         orgId: input.options?.kilocodeOrganizationId,
       },
       auth: {},
-      workspace: { sandboxId, sandboxProvider, sandboxRoute, sandboxAllocation: recorded.data },
+      workspace: {
+        sandboxId,
+        sandboxProvider,
+        sandboxRoute,
+        sandboxKind,
+        sandboxAllocation: recorded.data,
+      },
       lifecycle: { version: 1, timestamp: Date.now() },
     });
     if (!metadata.success) throw creationInProgressError();
@@ -1007,6 +1029,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
+    ...(sandboxKind ? { sandboxKind } : {}),
     sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
@@ -1100,6 +1123,7 @@ function buildSessionRegistrationCommand(
           }
         : {}),
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
+      ...(allocation.sandboxKind ? { sandboxKind: allocation.sandboxKind } : {}),
       credentialContainment: allocation.credentialContainment,
       ...(input.runtime?.sandboxAllocation
         ? { sandboxAllocation: input.runtime.sandboxAllocation }

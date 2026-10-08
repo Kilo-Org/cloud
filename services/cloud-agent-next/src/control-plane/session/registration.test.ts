@@ -468,6 +468,49 @@ describe('controlPlaneRouteSpecSchema MCP boundaries', () => {
   });
 });
 
+describe('buildControlPlaneSessionRegistration sandbox kind', () => {
+  const placed = metadata({
+    workspace: {
+      sandboxId: `sbx-${'a'.repeat(48)}`,
+      sandboxProvider: 'cloudflare',
+      sandboxKind: 'isolated',
+    },
+  });
+
+  it.each([
+    ['omits the kind', { provider: 'cloudflare' as const }],
+    ['names another kind', { provider: 'cloudflare' as const, sandboxKind: 'shared' as const }],
+  ])('rejects a selection that %s', (_label, sandboxSelection) => {
+    expect(() => buildControlPlaneSessionRegistration(placed, sandboxSelection)).toThrow(
+      'Sandbox selection kind does not match session metadata'
+    );
+  });
+
+  it('rejects billing with a different kind than the pin', () => {
+    expect(() =>
+      buildControlPlaneSessionRegistration(placed, {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+        billing: {
+          sandboxId: `sbx-${'a'.repeat(48)}`,
+          subject: { type: 'user', id: 'usr_1' },
+          actor: { type: 'user', id: 'usr_1' },
+          enforcementRequested: false,
+        },
+      })
+    ).toThrow('Sandbox selection kind does not match session metadata');
+  });
+
+  it('rejects a kind on a legacy key selection', () => {
+    expect(() =>
+      buildControlPlaneSessionRegistration(metadata(), {
+        provider: 'cloudflare',
+        sandboxKind: 'isolated',
+      })
+    ).toThrow('Sandbox selection kind does not match session metadata');
+  });
+});
+
 describe('buildControlPlaneSessionRegistration session directory', () => {
   const SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
   const SHARED_SANDBOX_ID = `usr-${'a'.repeat(48)}`;
@@ -487,6 +530,25 @@ describe('buildControlPlaneSessionRegistration session directory', () => {
     );
 
     expect(registration.spec.directory).toBe('/workspace/app');
+  });
+
+  it.each([
+    ['isolated', '/workspace/app'],
+    ['code-review', getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)],
+    ['shared', getSessionWorkspacePath(undefined, 'usr_1', SESSION_ID)],
+  ] as const)('resolves a placed %s sandbox directory', (sandboxKind, directory) => {
+    const registration = buildControlPlaneSessionRegistration(
+      metadata({
+        workspace: {
+          sandboxId: `sbx-${'a'.repeat(48)}`,
+          sandboxProvider: 'cloudflare',
+          sandboxKind,
+        },
+      }),
+      { provider: 'cloudflare', sandboxKind }
+    );
+
+    expect(registration.spec.directory).toBe(directory);
   });
 
   it('keeps the per-session path for a shared personal sandbox', () => {

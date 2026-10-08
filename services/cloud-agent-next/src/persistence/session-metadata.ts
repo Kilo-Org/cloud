@@ -16,6 +16,11 @@ import {
   isValidSandboxId,
   type SandboxIdClass,
 } from '../sandbox-id.js';
+import {
+  sandboxKindMatchesKey,
+  sandboxKindSchema,
+  type SandboxKind,
+} from '../sandbox-placement.js';
 import { sessionPlaneFromId } from '../session-plane.js';
 import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
@@ -258,10 +263,37 @@ const SANDBOX_ALLOCATION_ID_CLASS: Record<
   'vercel-large': 'isolated-small',
 };
 
+function sandboxIdentityMatchesAllocation(
+  sandboxId: string,
+  workspace: { sandboxRoute?: unknown; sandboxKind?: SandboxKind },
+  allocation: SandboxAllocation
+): boolean {
+  const shared = allocation === 'cloudflare-shared';
+  if (workspace.sandboxKind !== undefined) {
+    return shared
+      ? workspace.sandboxKind === 'shared'
+      : allocation !== 'isolated-standard' && workspace.sandboxKind === 'isolated';
+  }
+  return shared
+    ? isGeneratedSharedSandboxId(sandboxId) && workspace.sandboxRoute !== undefined
+    : classifySandboxId(sandboxId) === SANDBOX_ALLOCATION_ID_CLASS[allocation];
+}
+
+/** Vercel and Cloudflare Containers serve only a single-session sandbox. */
+function isIsolatedProviderWorkspace(workspace: {
+  sandboxId?: string;
+  sandboxKind?: SandboxKind;
+}): boolean {
+  return workspace.sandboxKind !== undefined
+    ? workspace.sandboxKind === 'isolated'
+    : workspace.sandboxId?.startsWith('ses-') === true;
+}
+
 const MetadataWorkspaceSchema = z
   .object({
     sandboxId: SandboxIdSchema.optional(),
     sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
+    sandboxKind: sandboxKindSchema.optional(),
     sandboxProvider: SandboxProviderSchema.optional(),
     sandboxAllocation: sandboxAllocationSchema.optional(),
     providerRuntime: ProviderRuntimeSchema.optional(),
@@ -276,16 +308,24 @@ const MetadataWorkspaceSchema = z
   })
   .strip()
   .superRefine((workspace, context) => {
+    if (
+      workspace.sandboxId === undefined
+        ? workspace.sandboxKind !== undefined
+        : !sandboxKindMatchesKey(workspace.sandboxId, workspace.sandboxKind)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sandboxKind'],
+        message: 'Sandbox kind does not match the sandbox key',
+      });
+    }
     const allocation = workspace.sandboxAllocation;
     if (allocation !== undefined) {
-      const shared = allocation === 'cloudflare-shared';
       if (
         // Metadata written before an explicit provider defaults to Cloudflare.
         (workspace.sandboxProvider ?? 'cloudflare') !== getSandboxAllocationProvider(allocation) ||
         !workspace.sandboxId ||
-        (shared
-          ? !isGeneratedSharedSandboxId(workspace.sandboxId) || !workspace.sandboxRoute
-          : classifySandboxId(workspace.sandboxId) !== SANDBOX_ALLOCATION_ID_CLASS[allocation]) ||
+        !sandboxIdentityMatchesAllocation(workspace.sandboxId, workspace, allocation) ||
         workspace.devcontainerRequested === true
       ) {
         context.addIssue({
@@ -325,15 +365,14 @@ const MetadataWorkspaceSchema = z
     }
   })
   .refine(
-    workspace =>
-      workspace.sandboxProvider !== 'vercel' || workspace.sandboxId?.startsWith('ses-') === true,
-    'Vercel sandbox metadata requires an isolated ses-* sandbox'
+    workspace => workspace.sandboxProvider !== 'vercel' || isIsolatedProviderWorkspace(workspace),
+    'Vercel sandbox metadata requires an isolated sandbox'
   )
   .refine(
     workspace =>
       workspace.sandboxProvider !== 'cloudflare-containers' ||
-      workspace.sandboxId?.startsWith('ses-') === true,
-    'Cloudflare containers sandbox metadata requires an isolated ses-* sandbox'
+      isIsolatedProviderWorkspace(workspace),
+    'Cloudflare containers sandbox metadata requires an isolated sandbox'
   )
   .refine(
     workspace =>
@@ -417,6 +456,12 @@ export const CurrentSessionMetadataSchema = z
       !sandboxAllocationRequiresControlPlane(metadata.workspace?.sandboxAllocation) ||
       sessionPlaneFromId(metadata.identity.sessionId) === 'control',
     'Sandbox allocations for this provider require a control-plane session'
+  )
+  .refine(
+    metadata =>
+      metadata.workspace?.sandboxKind === undefined ||
+      sessionPlaneFromId(metadata.identity.sessionId) === 'control',
+    'Sandbox kind requires a control-plane session'
   )
   .refine(
     metadata =>

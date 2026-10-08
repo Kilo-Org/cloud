@@ -166,17 +166,19 @@ export function buildControlPlaneSandboxSelection(
 ): ControlPlaneSandboxSelection {
   const provider = metadata.workspace?.sandboxProvider ?? 'cloudflare';
   const allocation = metadata.workspace?.sandboxAllocation;
+  const sandboxKind = metadata.workspace?.sandboxKind;
   const enforcementRequested = isCloudAgentContainerBillingEnabled(env, metadata.identity);
   const billing = {
     ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
     enforcementRequested,
   };
+  const pinned = { billing, ...(sandboxKind ? { sandboxKind } : {}) };
   if (provider === 'vercel') {
     const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
     return {
       provider,
       configuration: resources === undefined ? { provider } : { provider, resources },
-      billing,
+      ...pinned,
     };
   }
   if (provider === 'cloudflare-containers') {
@@ -184,10 +186,10 @@ export function buildControlPlaneSandboxSelection(
     return {
       provider,
       configuration: instance === undefined ? { provider } : { provider, instance },
-      billing,
+      ...pinned,
     };
   }
-  return { provider, configuration: { provider }, billing };
+  return { provider, configuration: { provider }, ...pinned };
 }
 
 async function buildMetadata(

@@ -482,6 +482,7 @@ export function createSessionManagementHandlers() {
               sessionMetadata.identity.botId,
               {
                 createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+                legacyFallback: true,
               }
             ));
 
@@ -782,6 +783,7 @@ export function createSessionManagementHandlers() {
               metadata.identity.botId,
               {
                 createdOnPlatform: metadata.identity.createdOnPlatform,
+                legacyFallback: true,
               }
             ));
 

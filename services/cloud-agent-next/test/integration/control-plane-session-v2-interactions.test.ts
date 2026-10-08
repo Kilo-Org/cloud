@@ -189,6 +189,7 @@ function startWrapperPump(wrapper: FakeWrapper, recording: Recording): () => voi
   };
 }
 
+/** Two sessions on one sandbox: only a shared sandbox hosts more than one workspace. */
 async function setupSiblingPair(): Promise<{
   sandboxStub: DurableObjectStub<SandboxControlV2>;
   sessionA: string;
@@ -202,7 +203,9 @@ async function setupSiblingPair(): Promise<{
 }> {
   const sessionA = newSessionId();
   const sessionB = newSessionId();
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA);
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, sessionA, undefined, {
+    sandboxAllocation: 'cloudflare-shared',
+  });
   const provider = createFakeProvider();
   const sandboxStub = await installSandbox(sandboxId, provider.adapter);
 

@@ -9,12 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
-import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_TIER_CONFIG,
-} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { cn } from '@/lib/utils';
-import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 
 import { KiloPassTierCard } from './KiloPassTierCard';
 
@@ -23,7 +19,6 @@ export function KiloPassSubscribeCard(props: {
   setCadence: (cadence: KiloPassCadence) => void;
   pending: boolean;
   showFirstMonthPromo?: boolean;
-  showSecondMonthPromo: boolean;
   showHeader?: boolean;
   headerAction?: ReactNode;
   unframed?: boolean;
@@ -37,7 +32,6 @@ export function KiloPassSubscribeCard(props: {
     setCadence,
     pending,
     showFirstMonthPromo = false,
-    showSecondMonthPromo,
     showHeader = true,
     headerAction,
     unframed = false,
@@ -49,14 +43,9 @@ export function KiloPassSubscribeCard(props: {
 
   const tiers = Object.keys(KILO_PASS_TIER_CONFIG) as KiloPassTier[];
 
-  const promoCutoffLabel = formatIsoDateString_UsaDateOnlyFormat(
-    KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString()
-  );
   const monthlyPromoDescription =
     cadence === KiloPassCadence.Monthly && showFirstMonthPromo
-      ? showSecondMonthPromo
-        ? `First-time subscribers receive 50% free bonus credits for the first two months when they start before ${promoCutoffLabel}.`
-        : 'First-time subscribers receive 50% free bonus credits for the first month.'
+      ? 'First-time subscribers receive 50% free bonus credits for the second month, with the regular 5% bonus in the first month.'
       : null;
   const cadenceOptions = [
     { value: KiloPassCadence.Monthly, label: 'Monthly' },
@@ -97,7 +86,6 @@ export function KiloPassSubscribeCard(props: {
             cadence={cadence}
             pending={pending}
             showFirstMonthPromo={showFirstMonthPromo}
-            showSecondMonthPromo={showSecondMonthPromo}
             isRecommended={recommendedTier != null && tier === recommendedTier}
             onSelect={onSelectTier}
           />

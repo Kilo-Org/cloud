@@ -89,6 +89,7 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT,
   KILO_PASS_TIER_CONFIG,
 } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -403,10 +404,6 @@ function mapPlayCompletionError(error: unknown, userId: string): TRPCError {
     code: 'INTERNAL_SERVER_ERROR',
     message: 'We could not finish this Google Play purchase. Please try again.',
   });
-}
-
-function isTwoMonthPromoOfferActive(): boolean {
-  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
 }
 
 function roundToCents(usd: number): number {
@@ -1737,7 +1734,9 @@ export const kiloPassRouter = createTRPCRouter({
     if (!subscriptionBase) {
       return {
         subscription: null,
-        isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive(),
+        isEligibleForFirstMonthPromo:
+          dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF) ||
+          !dayjs().utc().isBefore(KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT),
       };
     }
 

@@ -3,6 +3,7 @@ import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT,
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
 } from '@kilocode/web-shared/lib/kilo-pass/constants';
@@ -36,18 +37,23 @@ export const computeMonthlyCadenceBonusPercent = (params: {
     throw new Error('streakMonths must be >= 1');
   }
 
-  if (streakMonths === 1 && isFirstTimeSubscriberEver) {
-    return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
-  }
+  if (isFirstTimeSubscriberEver && streakMonths <= 2) {
+    const startedAtUtc = subscriptionStartedAtIso ? dayjs(subscriptionStartedAtIso).utc() : null;
+    const usesSecondMonthPromo =
+      startedAtUtc != null &&
+      startedAtUtc.isValid() &&
+      !startedAtUtc.isBefore(KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT);
 
-  // Limited-time grandfathered promo: first-time subscribers who started strictly before the
-  // cutoff keep the 50% bonus for streak month 2.
-  if (streakMonths === 2 && isFirstTimeSubscriberEver) {
-    const startedAt = subscriptionStartedAtIso ?? null;
-    if (startedAt != null) {
-      const startedAtUtc = dayjs(startedAt).utc();
-
+    if (usesSecondMonthPromo) {
+      if (streakMonths === 2) {
+        return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
+      }
+    } else {
+      if (streakMonths === 1) {
+        return KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT;
+      }
       if (
+        startedAtUtc != null &&
         startedAtUtc.isValid() &&
         startedAtUtc.isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF)
       ) {

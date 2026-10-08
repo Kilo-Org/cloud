@@ -38,12 +38,6 @@ describe('kilo pass bonus utilities', () => {
   });
 
   describe('computeMonthlyCadenceBonusPercent', () => {
-    it('keeps the second-month grandfather cutoff at midnight May 7 UTC', () => {
-      expect(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString()).toBe(
-        '2026-05-07T00:00:00.000Z'
-      );
-    });
-
     it('applies the 50% promo for streak months 1 and 2 when eligible (strictly before cutoff)', () => {
       expect(
         computeMonthlyCadenceBonusPercent({
@@ -149,6 +143,59 @@ describe('kilo pass bonus utilities', () => {
           subscriptionStartedAtIso: '2026-01-26T23:59:59.000Z',
         })
       ).toBe(computeFallback({ streakMonths: 1, isFirstTimeSubscriberEver: false }));
+    });
+  });
+
+  describe('monthly welcome promo rollout', () => {
+    const startedAtIso = '2026-10-08T10:16:13.000Z';
+
+    it.each([KiloPassTier.Tier19, KiloPassTier.Tier49, KiloPassTier.Tier199])(
+      'moves the welcome bonus to month 2 for new %s subscriptions',
+      tier => {
+        const bonuses = [1, 2, 3].map(streakMonths =>
+          computeMonthlyCadenceBonusPercent({
+            tier,
+            streakMonths,
+            isFirstTimeSubscriberEver: true,
+            subscriptionStartedAtIso: startedAtIso,
+          })
+        );
+
+        expect(bonuses[0]).toBeCloseTo(0.05);
+        expect(bonuses[1]).toBe(0.5);
+        expect(bonuses[2]).toBeCloseTo(0.15);
+      }
+    );
+
+    it.each([
+      ['2026-10-08T10:16:12.999Z', [0.5, 0.1]],
+      ['2026-10-08T10:16:13.001Z', [0.05, 0.5]],
+      ['2026-10-08 10:16:13+00', [0.05, 0.5]],
+      ['2026-10-08T12:16:13+02:00', [0.05, 0.5]],
+      [null, [0.5, 0.1]],
+      ['not-a-timestamp', [0.5, 0.1]],
+    ])('preserves the schedule boundary for start %s', (subscriptionStartedAtIso, expected) => {
+      const bonuses = [1, 2].map(streakMonths =>
+        computeMonthlyCadenceBonusPercent({
+          tier: KiloPassTier.Tier19,
+          streakMonths,
+          isFirstTimeSubscriberEver: true,
+          subscriptionStartedAtIso,
+        })
+      );
+
+      expect(bonuses).toEqual(expected);
+    });
+
+    it('does not give returning subscribers the second-month welcome bonus', () => {
+      expect(
+        computeMonthlyCadenceBonusPercent({
+          tier: KiloPassTier.Tier19,
+          streakMonths: 2,
+          isFirstTimeSubscriberEver: false,
+          subscriptionStartedAtIso: startedAtIso,
+        })
+      ).toBeCloseTo(0.1);
     });
   });
 

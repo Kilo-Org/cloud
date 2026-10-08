@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
+  KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT,
   KILO_PASS_TIER_CONFIG,
 } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { cn } from '@/lib/utils';
@@ -26,19 +27,10 @@ export function KiloPassTierCard(props: {
   cadence: KiloPassCadence;
   pending: boolean;
   showFirstMonthPromo?: boolean;
-  showSecondMonthPromo?: boolean;
   isRecommended: boolean;
   onSelect: (tier: KiloPassTier) => void;
 }) {
-  const {
-    tier,
-    cadence,
-    pending,
-    showFirstMonthPromo = false,
-    showSecondMonthPromo = false,
-    isRecommended,
-    onSelect,
-  } = props;
+  const { tier, cadence, pending, showFirstMonthPromo = false, isRecommended, onSelect } = props;
   const config = KILO_PASS_TIER_CONFIG[tier];
   const handleSelect = () => {
     if (pending) return;
@@ -103,13 +95,13 @@ export function KiloPassTierCard(props: {
               <KiloPassBonusRampDialog
                 tier={tier}
                 showFirstMonthPromo={showFirstMonthPromo}
-                showSecondMonthPromo={showSecondMonthPromo}
+                subscriptionStartedAtIso={KILO_PASS_MONTHLY_SECOND_MONTH_PROMO_ROLLOUT.toISOString()}
               />
             </div>
 
             {showFirstMonthPromo && (
               <div className="text-xs leading-5 text-emerald-300">
-                {showSecondMonthPromo ? 'First 2 months:' : 'First month:'} +
+                Month 1: +{formatPercent(config.monthlyBaseBonusPercent)}; month 2: +
                 {formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
               </div>
             )}

@@ -2042,6 +2042,7 @@ describe('kiloPassRouter', () => {
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 0,
+        startedAt: new Date(currentPeriodStartSeconds * 1000).toISOString(),
       });
       await insertBaseCreditsIssuance({
         subscriptionId,
@@ -2055,19 +2056,10 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getState();
 
       const expectedNextBillingAt = new Date(currentPeriodEndSeconds * 1000).toISOString();
-      const predictedStreakMonths = 1;
-      const bonusPercentApplied = computeMonthlyCadenceBonusPercent({
-        tier: KiloPassTier.Tier19,
-        streakMonths: predictedStreakMonths,
-        isFirstTimeSubscriberEver: true,
-      });
       const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
-      const baseCents = Math.round(baseAmountUsd * 100);
-      const bonusCents = Math.round(baseCents * bonusPercentApplied);
-      const expectedNextBonusUsd = bonusCents / 100;
 
       expect(result.subscription?.nextBillingAt).toBe(expectedNextBillingAt);
-      expect(result.subscription?.nextBonusCreditsUsd).toBe(expectedNextBonusUsd);
+      expect(result.subscription?.nextBonusCreditsUsd).toBe(9.5);
       expect(result.subscription?.currentPeriodBaseCreditsUsd).toBe(baseAmountUsd);
       expect(result.subscription?.currentPeriodUsageUsd).toBe(0);
       expect(result.subscription?.isBonusUnlocked).toBe(false);
@@ -3318,6 +3310,19 @@ describe('kiloPassRouter', () => {
         google_user_email: 'kilo-pass-promo-cutoff-still-eligible@example.com',
       });
 
+      const caller = await createCallerForUser(user.id);
+      const result = await caller.kiloPass.getState();
+
+      expect(result.isEligibleForFirstMonthPromo).toBe(true);
+      expect(result.subscription).toBeNull();
+    });
+
+    it('offers the month-2 welcome bonus to a never-subscribed user after rollout', async () => {
+      freezeKiloPassClock('2026-10-08T10:16:13.000Z');
+
+      const user = await insertTestUser({
+        google_user_email: 'kilo-pass-month-two-welcome@example.com',
+      });
       const caller = await createCallerForUser(user.id);
       const result = await caller.kiloPass.getState();
 

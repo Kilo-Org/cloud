@@ -157,10 +157,11 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     Bonus-decision paths MUST clamp streak to at least `1` before applying the ramp.
 14. Yearly cadence MUST use a flat monthly bonus of 50% of the monthly price and MUST NOT use the monthly ramp or
     welcome-promo branch.
-15. An eligible first-time monthly subscriber MUST receive a 50% bonus in streak month 1 instead of the monthly ramp
-    value.
-16. An eligible first-time monthly subscriber whose subscription start is strictly before `2026-05-07T00:00:00Z` MUST
-    receive a 50% bonus in streak month 2 instead of the monthly ramp value.
+15. An eligible first-time monthly subscriber starting at or after `2026-10-08T10:16:13Z` MUST receive the regular 5%
+    bonus in streak month 1 and the 50% welcome bonus in streak month 2.
+16. Subscriptions starting before that rollout MUST retain their previous welcome schedule: 50% in streak month 1.
+    Those starting strictly before `2026-05-07T00:00:00Z` MUST also retain 50% in streak month 2.
+    Missing or invalid subscription starts MUST retain the legacy month-1 schedule.
 17. From streak month 3 onward, and in any month where the welcome promo does not apply, monthly cadence MUST use the
     monthly ramp value.
 18. New welcome-promo grants MUST use the `bonus` issuance-item kind with a 50% applied percent.
@@ -430,6 +431,13 @@ Passing the cancellation cooldown after 24 hours does not make a previously clai
 promo or Kilo Pass referral conversion.
 
 ## Changelog
+
+### 2026-10-08 -- New monthly welcome bonus moves to month 2
+
+- Moved the eligible new monthly subscriber's 50% welcome bonus from streak month 1 to streak month 2.
+- Preserved existing subscriptions with a fixed start boundary of `2026-10-08T10:16:13Z`.
+- Kept the regular monthly ramp, yearly bonuses, payment eligibility, and usage unlock unchanged.
+- Updated subscription offers, ramp previews, and KiloClaw upsells to show the new schedule.
 
 ### 2026-06-08 -- Yearly duplicate-card enforcement
 

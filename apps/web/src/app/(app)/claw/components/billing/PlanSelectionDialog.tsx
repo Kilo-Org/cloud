@@ -134,7 +134,7 @@ function TierCard({
           Up to <span className="text-emerald-300">40%</span> free bonus credits
         </div>
         <div className="text-xs leading-relaxed text-emerald-300">
-          First month: +50% free bonus credits
+          Month 1: +5%; month 2: +50% free bonus credits
         </div>
       </div>
 
@@ -320,7 +320,7 @@ function CreditsHowItWorks() {
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
             <span>
               First-time subscribers receive <span className="text-emerald-300">50%</span> free
-              bonus credits for the first month.
+              bonus credits for the second month, with the regular 5% bonus in the first month.
             </span>
           </div>
         </div>

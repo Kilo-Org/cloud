@@ -1,9 +1,11 @@
+import { APICallError, generateText, RetryError, tool } from 'ai';
 import { z } from 'zod';
 import { logger } from './logger.js';
 import type { SecurityFindingRecord } from './db/queries.js';
+import { createGatewayLanguageModel, resolveAiSdkProvider } from './gateway-model.js';
 import type { SecurityFindingTriage } from './types.js';
 
-const TRIAGE_SERVICE_VERSION = '5.0.0';
+const TRIAGE_SERVICE_VERSION = '5.1.0';
 const TRIAGE_SERVICE_USER_AGENT = `Kilo-Security-Triage/${TRIAGE_SERVICE_VERSION}`;
 
 const TRIAGE_SYSTEM_PROMPT = `You are a security analyst performing quick triage of dependency vulnerability alerts.
@@ -37,6 +39,8 @@ Your task is to analyze the vulnerability metadata and determine if deeper codeb
 
 Always err on the side of caution - if unsure, recommend codebase analysis or manual review.`;
 
+const TRIAGE_TIMEOUT_MS = 45_000;
+
 const TriagedResultSchema = z.object({
   needsSandboxAnalysis: z.boolean(),
   needsSandboxReasoning: z.string(),
@@ -44,25 +48,9 @@ const TriagedResultSchema = z.object({
   confidence: z.enum(['high', 'medium', 'low']),
 });
 
-const TriageResponseSchema = z.object({
-  choices: z.array(
-    z.object({
-      message: z.object({
-        content: z.string().nullable().optional(),
-        tool_calls: z
-          .array(
-            z.object({
-              type: z.literal('function'),
-              function: z.object({
-                name: z.string(),
-                arguments: z.string(),
-              }),
-            })
-          )
-          .optional(),
-      }),
-    })
-  ),
+const submitTriageResultTool = tool({
+  description: 'Submit triage result for this vulnerability finding',
+  inputSchema: TriagedResultSchema,
 });
 
 function buildTriagePrompt(finding: SecurityFindingRecord): string {
@@ -118,116 +106,82 @@ export async function triageSecurityFinding(params: {
   backendBaseUrl: string;
   organizationId?: string;
 }): Promise<SecurityFindingTriage> {
-  const requestBody = {
-    model: params.model,
-    messages: [
-      { role: 'system', content: TRIAGE_SYSTEM_PROMPT },
-      { role: 'user', content: buildTriagePrompt(params.finding) },
-    ],
-    tools: [
-      {
-        type: 'function',
-        function: {
-          name: 'submit_triage_result',
-          description: 'Submit triage result for this vulnerability finding',
-          parameters: {
-            type: 'object',
-            properties: {
-              needsSandboxAnalysis: {
-                type: 'boolean',
-              },
-              needsSandboxReasoning: {
-                type: 'string',
-              },
-              suggestedAction: {
-                type: 'string',
-                enum: ['dismiss', 'analyze_codebase', 'manual_review'],
-              },
-              confidence: {
-                type: 'string',
-                enum: ['high', 'medium', 'low'],
-              },
-            },
-            required: [
-              'needsSandboxAnalysis',
-              'needsSandboxReasoning',
-              'suggestedAction',
-              'confidence',
-            ],
-          },
-        },
-      },
-    ],
-    tool_choice: 'auto',
-    stream: false,
-  };
-
-  const headers = new Headers({
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${params.authToken}`,
+  const headers: Record<string, string> = {
     'X-KiloCode-Version': TRIAGE_SERVICE_VERSION,
     'User-Agent': TRIAGE_SERVICE_USER_AGENT,
-  });
-
+  };
   if (params.organizationId) {
-    headers.set('X-KiloCode-OrganizationId', params.organizationId);
+    headers['X-KiloCode-OrganizationId'] = params.organizationId;
   }
+  const connection = {
+    backendBaseUrl: params.backendBaseUrl,
+    authToken: params.authToken,
+    headers,
+    abortSignal: AbortSignal.timeout(TRIAGE_TIMEOUT_MS),
+  };
 
   try {
-    const response = await fetch(`${params.backendBaseUrl}/api/openrouter/chat/completions`, {
-      method: 'POST',
+    const provider = await resolveAiSdkProvider(params.model, connection);
+    const result = await generateText({
+      model: createGatewayLanguageModel(provider, params.model, connection),
+      system: TRIAGE_SYSTEM_PROMPT,
+      prompt: buildTriagePrompt(params.finding),
+      tools: { submit_triage_result: submitTriageResultTool },
+      toolChoice: 'auto',
+      // Call-level headers replace the provider's User-Agent, so the triage identity must be repeated here.
       headers,
-      body: JSON.stringify(requestBody),
-      signal: AbortSignal.timeout(45_000),
+      abortSignal: connection.abortSignal,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      logger.error('Triage request failed', {
-        finding_id: params.finding.id,
-        status: response.status,
-        error: errorText,
-      });
-      return createFallbackTriage(`API error: ${response.status}`);
-    }
-
-    const parsedResponse = TriageResponseSchema.safeParse(await response.json());
-    if (!parsedResponse.success) {
-      logger.warn('Triage response did not match expected shape', {
-        finding_id: params.finding.id,
-      });
-      return createFallbackTriage('Invalid response shape');
-    }
-
-    const message = parsedResponse.data.choices[0]?.message;
-    const toolCall = message?.tool_calls?.find(
-      candidate => candidate.function.name === 'submit_triage_result'
+    const toolCall = result.toolCalls.find(
+      candidate => candidate.toolName === 'submit_triage_result'
     );
-    const structuredJson = toolCall?.function.arguments ?? extractJsonContent(message?.content);
-    if (!structuredJson) {
-      return createFallbackTriage('Structured response missing');
+    let structuredResult: unknown = toolCall?.input;
+    if (structuredResult === undefined) {
+      const structuredJson = extractJsonContent(result.text);
+      if (!structuredJson) {
+        return createFallbackTriage('Structured response missing');
+      }
+      try {
+        structuredResult = JSON.parse(structuredJson);
+      } catch {
+        return createFallbackTriage('Structured response not valid JSON');
+      }
     }
 
-    let args: unknown;
-    try {
-      args = JSON.parse(structuredJson);
-    } catch {
-      return createFallbackTriage('Structured response not valid JSON');
-    }
-    const parsedArgs = TriagedResultSchema.safeParse(args);
-    if (!parsedArgs.success) {
+    const parsedResult = TriagedResultSchema.safeParse(structuredResult);
+    if (!parsedResult.success) {
       return createFallbackTriage('Structured response invalid');
     }
 
     return {
-      ...parsedArgs.data,
+      ...parsedResult.data,
       triageAt: new Date().toISOString(),
     };
   } catch (error) {
+    const apiError = findApiCallError(error);
+    if (apiError) {
+      logger.error('Triage request failed', {
+        finding_id: params.finding.id,
+        model: params.model,
+        status: apiError.statusCode,
+        error: apiError.responseBody,
+      });
+      return createFallbackTriage(`API error: ${apiError.statusCode ?? 'unknown'}`);
+    }
     logger.error('Triage call threw', {
       finding_id: params.finding.id,
+      model: params.model,
       error: error instanceof Error ? error.message : String(error),
     });
     return createFallbackTriage(error instanceof Error ? error.message : 'Unknown triage error');
   }
+}
+
+function findApiCallError(error: unknown): APICallError | undefined {
+  if (APICallError.isInstance(error)) return error;
+  if (RetryError.isInstance(error) && APICallError.isInstance(error.lastError)) {
+    return error.lastError;
+  }
+  return undefined;
 }

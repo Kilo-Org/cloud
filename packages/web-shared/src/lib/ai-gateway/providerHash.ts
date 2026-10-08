@@ -3,7 +3,10 @@ import { type Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/typ
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  OpenRouterChatCompletionRequest,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 /**
  * Generates a service-specific SHA256 hash.
@@ -79,4 +82,10 @@ export function applyTrackingIds(
     request.body.safety_identifier = userHash;
     request.body.user = userHash; // deprecated, but this is what OpenRouter uses
   }
+}
+
+export function removeTrackingIds(body: OpenRouterChatCompletionRequest) {
+  delete body.prompt_cache_key;
+  delete body.safety_identifier;
+  delete body.user;
 }

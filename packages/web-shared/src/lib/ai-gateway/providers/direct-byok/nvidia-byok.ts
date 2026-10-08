@@ -1,3 +1,4 @@
+import { removeTrackingIds } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
@@ -17,8 +18,7 @@ export default {
 
     delete request.body.transforms;
     delete request.body.reasoning;
-    delete request.body.safety_identifier;
-    delete request.body.prompt_cache_key;
+    removeTrackingIds(request.body);
   },
   models: cachedEnhancedDirectByokModelList({
     providerId: 'nvidia-byok',

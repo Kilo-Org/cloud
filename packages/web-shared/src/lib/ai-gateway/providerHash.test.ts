@@ -7,6 +7,7 @@ import {
   generateProviderSpecificHash,
   generateProviderSpecificSessionHash,
   generateVercelDownstreamSafetyIdentifier,
+  removeTrackingIds,
 } from './providerHash';
 
 describe('generateProviderSpecificHash', () => {
@@ -77,6 +78,18 @@ describe('session tracking identifiers', () => {
         ? trackedRequest.body.session_id
         : trackedRequest.body.prompt_cache_key;
     expect(trackedSession).toBeUndefined();
+  });
+
+  it('removes every Chat Completions tracking field', () => {
+    const trackedRequest: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'test-model', messages: [] },
+    };
+    applyTrackingIds(trackedRequest, OPENROUTER, userId, sessionId);
+
+    removeTrackingIds(trackedRequest.body);
+
+    expect(trackedRequest.body).toEqual({ model: 'test-model', messages: [] });
   });
 });
 

@@ -166,11 +166,14 @@ cat > .wrangler/kilo-startup/bin/pnpm <<SH
 #!/usr/bin/env bash
 export NODE_OPTIONS=--max-old-space-size=512
 if [[ \$PWD == */apps/web ]]; then
-  export NODE_OPTIONS=--max-old-space-size=1536
+  export NODE_OPTIONS=--max-old-space-size=2048
+  if [[ \${1:-} == run && \${2:-} == dev ]]; then
+    set -- "\$@" --webpack
+  fi
 fi
 for arg in "\$@"; do
   if [[ \$arg == *apps/web* ]]; then
-    export NODE_OPTIONS=--max-old-space-size=1536
+    export NODE_OPTIONS=--max-old-space-size=2048
   fi
 done
 exec "$real_pnpm" "\$@"
@@ -234,7 +237,7 @@ chmod +x "$WRANGLER_DOCKER_BIN"
 ln -sf "$WRANGLER_DOCKER_BIN" .wrangler/kilo-startup/bin/docker
 export PATH="$PWD/.wrangler/kilo-startup/bin:$PATH"
 export SHELL="$PWD/.wrangler/kilo-startup/bin/kilo-shell"
-"$SHELL" -lc "cd $(printf '%q' "$PWD/apps/web") && pnpm exec node -e 'if (process.env.NODE_OPTIONS !== \"--max-old-space-size=1536\") throw new Error(\"Web heap budget is not applied\")'"
+"$SHELL" -lc "cd $(printf '%q' "$PWD/apps/web") && pnpm exec node -e 'if (process.env.NODE_OPTIONS !== \"--max-old-space-size=2048\") throw new Error(\"Web heap budget is not applied\")'"
 if [[ $cloud_agents == true ]]; then
   cat > .wrangler/kilo-startup/buildkitd.toml <<'TOML'
 [worker.oci]

@@ -7,7 +7,6 @@ import {
   CLASSIFIER_WINNER_KV_KEY,
   ROUTING_TABLE_KV_KEY,
   resolveBenchmarkIdentity,
-  type BenchmarkConfig,
   type BenchmarkDeciderModel,
   type BenchmarkKind,
   type BenchmarkModelSummary,
@@ -68,12 +67,8 @@ import {
   runDeciderCaseViaCli,
   warmUpCliContainer,
 } from './cli-runner';
-import {
-  parsePersistedReasoningEffort,
-  variantFromReasoningEffort,
-  variantFromStorage,
-  variantToStorage,
-} from './reasoning-effort';
+import { variantFromStorage, variantToStorage } from './reasoning-effort';
+import { fetchPlatformRegistryEntries } from './platform-models';
 import { pickClassifierWinner } from './winner';
 
 /** One exact Pool entry identity used throughout a decider/classifier run. */
@@ -281,14 +276,7 @@ export async function sweepStaleRunsAndDrain(env: Env): Promise<{
   drained: StartedQueueRun[];
 }> {
   const staleRunIds = await sweepStaleRuns(env);
-  // `platform_requested` is what makes a pending row visible to the platform
-  // drain and to the publish guard, and only a reconcile sets it. Without this
-  // the timer could not pick up a newly configured decider model at all, and
-  // the guard would count a pending platform pair as settled and publish a
-  // table missing it.
-  await syncPlatformRegistry(env).catch(error => {
-    console.warn(JSON.stringify({ event: 'platform_registry_sync_failed', ...formatError(error) }));
-  });
+  // Each platform drain reconciles the catalog before claiming entries.
   const drained = await drainQueues(env, 'both');
   return { staleRunIds, drained };
 }
@@ -335,29 +323,19 @@ export async function drainQueues(
  * already have a `ready` row (measured for an owner pool, or by an earlier
  * platform run) keep it and are not re-benchmarked.
  */
-export async function syncPlatformRegistry(env: Env): Promise<{ desiredEntries: number }> {
+export async function syncPlatformRegistry(
+  env: Env,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ desiredEntries: number }> {
   const config = await getBenchmarkConfig(env.BENCH_DB);
   if (!config) return { desiredEntries: 0 };
-  const desired = platformRegistryEntries(config);
+  const desired = await fetchPlatformRegistryEntries(env, config, fetchImpl);
   await syncPlatformRegistryRows(
     env.BENCH_DB,
     { engineIdentity: computeEngineIdentity('decider'), repetitions: config.deciderRepetitions },
     desired
   );
   return { desiredEntries: desired.length };
-}
-
-/** The exact (model, variant) pairs the saved platform decider list wants. */
-export function platformRegistryEntries(
-  config: Pick<BenchmarkConfig, 'deciderModels'>
-): RunModelEntry[] {
-  return config.deciderModels.map(model => ({
-    model: model.id,
-    variant:
-      model.variant !== undefined
-        ? (model.variant ?? null)
-        : variantFromReasoningEffort(model.reasoningEffort ?? null),
-  }));
 }
 
 /**
@@ -372,7 +350,10 @@ export function platformRegistryEntries(
  * engine bump that can be a single model taking all routes. A permanently
  * failing model does not block publishing, because `failed` is settled.
  */
-export async function publishPlatformRoutingTable(env: Env): Promise<{ version: string } | null> {
+export async function publishPlatformRoutingTable(
+  env: Env,
+  fetchImpl: typeof fetch = fetch
+): Promise<{ version: string } | null> {
   const config = await getBenchmarkConfig(env.BENCH_DB);
   if (!config) return null;
 
@@ -380,10 +361,10 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
     engineIdentity: computeEngineIdentity('decider'),
     repetitions: config.deciderRepetitions,
   };
-  const desired = platformRegistryEntries(config);
-
-  // syncPlatformRegistry flags exactly the desired pairs, so the platform queue
-  // counts are this table's inputs.
+  const desired = await fetchPlatformRegistryEntries(env, config, fetchImpl);
+  // Reconcile against the live catalog before the settled guard. A new effort
+  // must become pending, and a removed effort must stop blocking publication.
+  await syncPlatformRegistryRows(env.BENCH_DB, current, desired);
   const queueCounts = await countCurrentProfilesByStatus(env.BENCH_DB, current, 'platform');
   const unsettled = queueCounts
     .filter(row => row.status === 'pending' || row.status === 'running')
@@ -411,26 +392,21 @@ export async function publishPlatformRoutingTable(env: Env): Promise<{ version: 
     ...new Set(readyEntries.map(r => r.runId)),
   ]);
   const generatedAt = new Date().toISOString();
-  // Platform artifact keeps emitting reasoningEffort for enum efforts (not
-  // variant) so the shape stays unchanged for auto-routing workers deployed
-  // before exact pairs. A non-enum catalog variant can only ride as `variant`;
-  // emitting effort would drop it.
-  const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => {
-    const effort = parsePersistedReasoningEffort(entry.variant);
-    if (effort === null && entry.variant !== null) {
-      return { id: entry.model, variant: entry.variant, reasoningEffort: null };
-    }
-    return { id: entry.model, reasoningEffort: effort };
-  });
+  const deciderModels: BenchmarkDeciderModel[] = readyEntries.map(({ entry }) => ({
+    id: entry.model,
+    variant: entry.variant,
+    reasoningEffort: null,
+  }));
   const table = buildRoutingTable({
-    version: computeRegistryRoutingTableVersion(
+    // Namespace the canonical artifact so identical legacy measurements republish.
+    version: `${computeRegistryRoutingTableVersion(
       readyEntries.map(r => ({ runId: r.runId, model: r.entry.model, variant: r.entry.variant })),
       {
         minAccuracy: config.minAccuracy,
         switchCostFactor: config.switchCostFactor,
         bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
       }
-    ),
+    )}-variants`,
     generatedAt,
     minAccuracy: config.minAccuracy,
     switchCostFactor: config.switchCostFactor,
@@ -914,6 +890,10 @@ export async function drainQueue(
     );
     return null;
   }
+
+  // Chained platform runs must also revalidate efforts before claiming work.
+  // Catalog failure cannot schedule stale configurations.
+  if (queue === 'platform') await syncPlatformRegistry(env);
 
   const engineIdentity = computeEngineIdentity('decider');
   const repetitions = config.deciderRepetitions;

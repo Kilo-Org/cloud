@@ -297,6 +297,7 @@ export {
 } from './normalize';
 
 export * from './reasoning';
+export * from './reasoning-variants';
 export * from './taxonomy';
 export * from './routing-table';
 export * from './benchmark';

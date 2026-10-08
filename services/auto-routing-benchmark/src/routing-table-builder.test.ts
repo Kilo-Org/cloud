@@ -8,9 +8,9 @@ import { RoutingTableSchema, TAXONOMY_ROUTE_KEYS } from '@kilocode/auto-routing-
 import { buildRoutingTable } from './routing-table-builder';
 
 const DECIDER_MODELS: BenchmarkDeciderModel[] = [
-  { id: 'model/cheap', reasoningEffort: null },
-  { id: 'model/value', reasoningEffort: 'medium' },
-  { id: 'model/weak', reasoningEffort: null },
+  { id: 'model/cheap', variant: null, reasoningEffort: null },
+  { id: 'model/value', variant: 'medium', reasoningEffort: null },
+  { id: 'model/weak', variant: null, reasoningEffort: null },
 ];
 
 function summary(
@@ -21,6 +21,7 @@ function summary(
 ): BenchmarkModelSummary {
   return {
     model,
+    variant: model === 'model/value' ? 'medium' : null,
     routeKey,
     accuracy,
     avgCostUsd,
@@ -86,7 +87,7 @@ describe('buildRoutingTable', () => {
     expect(table.routes[routeKey]?.map(c => c.model)).toEqual(['model/value']);
   });
 
-  it('carries reasoningEffort from the run snapshot', () => {
+  it('publishes canonical variant-only identities from the run snapshot', () => {
     const table = buildRoutingTable({
       version: 'test-run-4',
       generatedAt: '2026-01-01T00:00:00.000Z',
@@ -100,33 +101,14 @@ describe('buildRoutingTable', () => {
     const value = table.routes['implementation/code_generation']?.find(
       c => c.model === 'model/value'
     );
-    expect(value?.reasoningEffort).toBe('medium');
+    expect(value?.variant).toBe('medium');
+    expect(value).not.toHaveProperty('reasoningEffort');
 
     const cheap = table.routes['implementation/code_generation']?.find(
       c => c.model === 'model/cheap'
     );
-    expect(cheap?.reasoningEffort).toBeNull();
-  });
-
-  it('platform table JSON shape has reasoningEffort and no variant key', () => {
-    const table = buildRoutingTable({
-      version: 'test-run-platform-shape',
-      generatedAt: '2026-01-01T00:00:00.000Z',
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      bestAccuracySwitchThreshold: 0.05,
-      deciderModels: DECIDER_MODELS,
-      summaries: summariesForEveryRoute(),
-    });
-    const cand = table.routes['implementation/code_generation']?.[0];
-    expect(cand).toBeDefined();
-    expect(cand).toHaveProperty('reasoningEffort');
-    expect(Object.keys(cand ?? {})).not.toContain('variant');
-    // Serialize/parse as published artifact would.
-    const json = JSON.parse(JSON.stringify(table)) as typeof table;
-    const jCand = json.routes['implementation/code_generation']?.[0];
-    expect(jCand).toHaveProperty('reasoningEffort');
-    expect(jCand && 'variant' in jCand).toBe(false);
+    expect(cheap).not.toHaveProperty('reasoningEffort');
+    expect(cheap?.variant).toBeNull();
   });
 
   it('two variants of one model appear as distinct candidates with matched efforts', () => {
@@ -163,14 +145,13 @@ describe('buildRoutingTable', () => {
     // A swapping matcher that only checks the effort set would still fail here.
     const highAcc = cands.find(c => c.accuracy === 0.9);
     const lowAcc = cands.find(c => c.accuracy === 0.7);
-    expect(highAcc?.reasoningEffort).toBe('high');
-    expect(lowAcc?.reasoningEffort).toBe('low');
-    for (const c of cands) {
-      expect(Object.keys(c)).not.toContain('variant');
-    }
+    expect(highAcc?.variant).toBe('high');
+    expect(lowAcc?.variant).toBe('low');
+    expect(highAcc).not.toHaveProperty('reasoningEffort');
+    expect(lowAcc).not.toHaveProperty('reasoningEffort');
   });
 
-  it('binds reasoningEffort from an exact (model, variant) snapshot match', () => {
+  it('binds candidates to an exact (model, variant) snapshot match', () => {
     const routeKey = 'implementation/code_generation' as const;
     const table = buildRoutingTable({
       version: 'test-run-exact-pair',
@@ -190,24 +171,22 @@ describe('buildRoutingTable', () => {
     });
     const a = table.routes[routeKey]?.find(c => c.model === 'model/a');
     const b = table.routes[routeKey]?.find(c => c.model === 'model/b');
-    expect(a?.reasoningEffort).toBe('high');
-    expect(b?.reasoningEffort).toBe('medium');
+    expect(a?.variant).toBe('high');
+    expect(b?.variant).toBe('medium');
   });
 
-  it('legacy single-row snapshot binds when summary omits variant', () => {
-    const table = buildRoutingTable({
-      version: 'test-run-legacy-single',
-      generatedAt: '2026-01-01T00:00:00.000Z',
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      bestAccuracySwitchThreshold: 0.05,
-      deciderModels: DECIDER_MODELS,
-      summaries: summariesForEveryRoute(),
-    });
-    const value = table.routes['implementation/code_generation']?.find(
-      c => c.model === 'model/value'
-    );
-    expect(value?.reasoningEffort).toBe('medium');
+  it('rejects a mismatched effort even when the snapshot has only one model row', () => {
+    expect(() =>
+      buildRoutingTable({
+        version: 'test-run-no-alias-transfer',
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        minAccuracy: 0.7,
+        switchCostFactor: 3,
+        bestAccuracySwitchThreshold: 0.05,
+        deciderModels: [{ id: 'model/value', variant: 'thinking', reasoningEffort: null }],
+        summaries: summariesForEveryRoute(),
+      })
+    ).toThrow(/no snapshot row/);
   });
 
   it('throws when multiple snapshot rows exist and none matches the summary pair', () => {
@@ -256,24 +235,6 @@ describe('buildRoutingTable', () => {
     expect(table.routes['implementation/code_generation']).toHaveLength(3);
   });
 
-  it('keeps the exact effort-only shape for an enum reasoningEffort snapshot', () => {
-    const table = buildRoutingTable({
-      version: 'test-run-enum-shape',
-      generatedAt: '2026-01-01T00:00:00.000Z',
-      minAccuracy: 0.7,
-      switchCostFactor: 3,
-      bestAccuracySwitchThreshold: 0.05,
-      deciderModels: [{ id: 'model/value', variant: null, reasoningEffort: 'medium' }],
-      summaries: TAXONOMY_ROUTE_KEYS.map(routeKey => ({
-        ...summary('model/value', routeKey, 0.9, 0.002),
-        variant: 'medium',
-      })),
-    });
-    const cand = table.routes['implementation/code_generation']?.[0];
-    expect(cand?.reasoningEffort).toBe('medium');
-    expect(cand && 'variant' in cand ? cand.variant : undefined).toBeUndefined();
-  });
-
   it('emits variant for a snapshot entry whose key is outside the effort enum', () => {
     const table = buildRoutingTable({
       version: 'test-run-non-enum-variant',
@@ -290,7 +251,7 @@ describe('buildRoutingTable', () => {
     const cand = table.routes['implementation/code_generation']?.[0];
     expect(cand).toBeDefined();
     expect(cand?.variant).toBe('max');
-    expect(cand?.reasoningEffort).toBeNull();
+    expect(cand).not.toHaveProperty('reasoningEffort');
     // The published artifact must satisfy the contract schema (variant field allowed).
     expect(RoutingTableSchema.parse(table)).toEqual(table);
   });

@@ -47,12 +47,15 @@ fi
 node -e '
   const fs = require("node:fs");
   const parent = "/sys/fs/cgroup/kilo-workloads";
-  const stat = Object.fromEntries(fs.readFileSync(parent + "/memory.stat", "utf8").trim().split("\n").map(line => line.split(" ")));
+  function protectedMemory(directory) {
+    const stat = Object.fromEntries(fs.readFileSync(directory + "/memory.stat", "utf8").trim().split("\n").map(line => line.split(" ")));
+    const current = Number(fs.readFileSync(directory + "/memory.current", "utf8"));
+    return current - Number(stat.inactive_file || 0) + Number(stat.file_dirty || 0) + Number(stat.file_writeback || 0);
+  }
   const maximum = Number(fs.readFileSync(parent + "/memory.max", "utf8"));
-  const current = Number(fs.readFileSync(parent + "/memory.current", "utf8"));
   const available = Number(fs.readFileSync("/proc/meminfo", "utf8").match(/^MemAvailable:\s+(\d+)/m)[1]) * 1024;
-  const protectedBytes = current - Number(stat.inactive_file || 0) + Number(stat.file_dirty || 0) + Number(stat.file_writeback || 0);
-  const existing = fs.existsSync(process.env.KILO_STARTUP_CGROUP + "/memory.current") ? Number(fs.readFileSync(process.env.KILO_STARTUP_CGROUP + "/memory.current", "utf8")) : 0;
+  const protectedBytes = protectedMemory(parent);
+  const existing = fs.existsSync(process.env.KILO_STARTUP_CGROUP + "/memory.current") ? protectedMemory(process.env.KILO_STARTUP_CGROUP) : 0;
   const additional = Math.max(0, Number(process.env.KILO_STARTUP_MEMORY_MB) * 1048576 - existing);
   const safeBytes = Math.min(available, Number.isFinite(maximum) ? maximum - protectedBytes : available) - 2048 * 1048576;
   if (additional > safeBytes) throw new Error("Insufficient memory headroom: use the app profile, stop other workloads, or use a larger sandbox");
@@ -312,6 +315,10 @@ if node -e 'process.exit(JSON.parse(process.argv[1]).services.length ? 0 : 1)' "
     exit 1
   fi
   printf 'Reusing this sandbox startup script\x27s existing dev stack.\n'
+  while IFS= read -r service; do
+    printf 'Restarting unavailable service: %s\n' "$service"
+    timeout 1m pnpm dev:restart "$service"
+  done < <(node -e 'for (const s of JSON.parse(process.argv[1]).services) if (s.status !== "up") console.log(s.name)' "$status")
 else
   timeout --foreground 5m pnpm dev:start --no-attach "$@"
   printf '%s\n' "$selection" > .wrangler/kilo-startup/selection

@@ -56,14 +56,14 @@ beforeEach(() => {
 });
 
 describe('preflightAndQueuePromptMessage', () => {
-  it('retains legacy routing and preflight for a control-plane opted-in user', async () => {
+  it('retains legacy routing and preflight for an existing agent_ session', async () => {
     const { stub, admitSubmittedMessage, hasMessageAdmission } = makeDoStub({
       success: true,
       outcome: 'queued',
       messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
       compatibilityDelivery: 'queued',
     });
-    const env = { ...makeEnv(stub), CONTROL_PLANE_IDS: 'user_abc' } as Env;
+    const env = makeEnv(stub) as Env;
     const idFromName = vi.spyOn(env.CLOUD_AGENT_SESSION, 'idFromName');
     const getSandboxSession = vi.spyOn(env.SANDBOX_SESSION, 'get');
     const input: QueueMessageInput = {

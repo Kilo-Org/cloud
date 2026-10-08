@@ -37,16 +37,14 @@ describe('callback queue retry configuration', () => {
     expect(dev?.max_retries).toBe(CONFIGURED_REDELIVERIES);
   });
 
-  it('omits production enrollment from wrangler and enables control-plane, worktree, and sandbox selection on wrangler dev', () => {
+  it('sets the code-review control-plane rollout in wrangler and enables sandbox selection on wrangler dev', () => {
     const config = readWranglerConfig();
 
     expect(config.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
-    expect(config.vars?.CONTROL_PLANE_IDS).toBeUndefined();
-    expect(config.vars?.WORKTREE_CREATION_ENABLED_IDS).toBeUndefined();
+    expect(config.vars?.CODE_REVIEW_CONTROL_PLANE_IDS).toBe('*');
     expect(config.vars?.SANDBOX_SELECTION_IDS).toBeUndefined();
     expect(config.env?.dev?.vars?.VERCEL_SANDBOX_ORG_IDS).toBe('');
-    expect(config.env?.dev?.vars?.CONTROL_PLANE_IDS).toBe('*');
-    expect(config.env?.dev?.vars?.WORKTREE_CREATION_ENABLED_IDS).toBe('*');
+    expect(config.env?.dev?.vars?.CODE_REVIEW_CONTROL_PLANE_IDS).toBe('*');
     expect(config.env?.dev?.vars?.SANDBOX_SELECTION_IDS).toBe('*');
   });
 });

@@ -1447,7 +1447,6 @@ export const WORKTREE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: WORKTREE_CHAT_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runWorktreeChat,
   },
   'worktree-multi-chat': {
@@ -1456,7 +1455,6 @@ export const WORKTREE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: WORKTREE_MULTI_CHAT_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runWorktreeMultiChat,
   },
 };

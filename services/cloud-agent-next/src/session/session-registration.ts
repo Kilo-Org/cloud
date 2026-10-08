@@ -78,7 +78,6 @@ import type { GroupedRegisterSessionInput } from './session-registration-metadat
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
 import {
-  isWorktreeOwner,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
   type SessionPlane,
@@ -549,8 +548,7 @@ function worktreeEnabledForCreate(
   const recordedIds = canonicalSessionIds(row);
   if (recordedIds) return recordedIds.cloudAgentSessionId.startsWith('workspace_');
 
-  const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
-  return sessionPlaneForCreate(input, ctx) === 'control' && isWorktreeOwner(ctx.env, owner);
+  return sessionPlaneForCreate(input, ctx) === 'control';
 }
 
 export function assertRuntimeIsolationAdmission(env: Pick<Env, 'RUNTIME_ISOLATION_ENABLED'>): void {

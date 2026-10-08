@@ -323,7 +323,6 @@ describe('sandbox selection Worker API', () => {
       caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
     ).resolves.toEqual({ enabled: false, options: [] });
     ctx.env.SANDBOX_SELECTION_IDS = orgId;
-    ctx.env.CONTROL_PLANE_IDS = orgId;
     const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
     expect(result.enabled).toBe(true);
     expect(result.options.map(option => option.allocation)).toEqual([
@@ -460,7 +459,7 @@ describe('sandbox selection Worker API', () => {
     }
   );
 
-  it.each(['webhook', 'scheduled'])(
+  it.each(['auto-triage', 'autofix'])(
     'authorizes Dedicated Standard for an enrolled organization %s trigger',
     async createdOnPlatform => {
       const doStub = createMockDOStub();
@@ -506,7 +505,6 @@ describe('sandbox selection Worker API', () => {
       ctx.env.SANDBOX_SESSION = ctx.env
         .CLOUD_AGENT_SESSION as unknown as typeof ctx.env.SANDBOX_SESSION;
       ctx.env.SANDBOX_SELECTION_IDS = orgId;
-      ctx.env.CONTROL_PLANE_IDS = orgId;
       generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
       const sandboxAllocation =
         format === 'legacy'

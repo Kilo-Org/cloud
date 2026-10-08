@@ -97,7 +97,7 @@ if (( ${#tools[@]} )); then
     --global-bin-dir /usr/local/bin "${tools[@]}"
 fi
 export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
-export AGENT_BROWSER_ENGINE=chromium
+export AGENT_BROWSER_ENGINE=chrome
 export AGENT_BROWSER_SOCKET_DIR="${AGENT_BROWSER_SOCKET_DIR:-/tmp/kilo-browser}"
 export AGENT_BROWSER_ARGS="${AGENT_BROWSER_ARGS:---disable-gpu}"
 export AGENT_BROWSER_DEFAULT_TIMEOUT="${AGENT_BROWSER_DEFAULT_TIMEOUT:-120000}"

@@ -29,6 +29,7 @@ export KILO_ENV_SYNC_CONCURRENCY=1
 export SKIP_STRIPE_API="${SKIP_STRIPE_API:-true}"
 export KILO_PORT_OFFSET="${KILO_PORT_OFFSET:-auto}"
 KILO_STARTUP_RESERVE_MB=2048
+bridge_gateway=172.17.0.1
 
 if [[ $(uname -s) != Linux ]] || ! command -v apt-get >/dev/null; then
   printf 'This setup script requires a Debian/Ubuntu Linux sandbox.\n' >&2
@@ -104,7 +105,7 @@ else
   docker_packages+=(docker-compose)
 fi
 "${root[@]}" env DEBIAN_FRONTEND=noninteractive timeout --foreground 10m apt-get install -y --no-install-recommends \
-  ca-certificates chromium curl fuse-overlayfs git git-lfs openssl sudo unzip tmux "${docker_packages[@]}"
+  ca-certificates chromium curl dnsmasq-base fuse-overlayfs git git-lfs openssl sudo unzip tmux "${docker_packages[@]}"
 if ! docker compose version >/dev/null 2>&1; then
   printf 'Docker Compose v2 (the docker compose CLI plugin) is required, but %s did not provide it.\n' "${docker_packages[-1]}" >&2
   exit 1
@@ -298,8 +299,9 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
   fi
   # Own the socket by the invoking user's group so a non-root sandbox can use the daemon it starts.
+  # Without IP forwarding, bridge containers reach only the host, so their DNS goes to a forwarder on the bridge gateway.
   "${root[@]}" tmux new-session -d -s kilo-startup-docker \
-    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
+    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --dns=$bridge_gateway --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
   for (( attempt=0; attempt<30; attempt++ )); do
     docker info >/dev/null 2>&1 && break
     sleep 1
@@ -309,6 +311,9 @@ if ! docker info >/dev/null 2>&1; then
     "${root[@]}" tmux capture-pane -p -t kilo-startup-docker || true
     exit 1
   fi
+fi
+if pgrep -a -x dockerd | grep -qF -- "--dns=$bridge_gateway" && ! pgrep -f "dnsmasq .*--listen-address=$bridge_gateway" >/dev/null; then
+  "${root[@]}" dnsmasq --conf-file=/dev/null --no-hosts --bind-interfaces --listen-address="$bridge_gateway"
 fi
 if [[ $(docker info --format '{{.Driver}}') == vfs ]]; then
   printf 'The existing Docker daemon uses vfs. Stop it and restart with overlay2 or fuse-overlayfs before running this workload.\n' >&2

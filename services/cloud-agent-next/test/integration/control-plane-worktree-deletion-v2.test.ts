@@ -260,7 +260,9 @@ async function startSharedConnectedSandbox(): Promise<{
   kiloA: string;
   kiloB: string;
 }> {
-  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, newSessionId(), undefined, {
+    sandboxAllocation: 'cloudflare-shared',
+  });
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const worktreeA = worktreeId();

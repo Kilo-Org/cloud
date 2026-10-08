@@ -10,7 +10,7 @@ import {
   claude_opus_4_6_stealth_model,
   qwen36_plus_stealth_model,
   gemma_4_26b_a4b_it_free_model,
-  stepfun_37_flash_free_model,
+  stepfun_5_preview_free_model,
   glyph_cluster_stealth_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
@@ -25,7 +25,7 @@ describe('Kilo-exclusive model providers', () => {
     expect(findKiloExclusiveModel(model.public_id)?.provider).toBe(MARTIAN);
   });
 
-  test.each([gemma_4_26b_a4b_it_free_model, stepfun_37_flash_free_model])(
+  test.each([gemma_4_26b_a4b_it_free_model, stepfun_5_preview_free_model])(
     'serves $public_id through OpenRouter',
     model => {
       expect(findKiloExclusiveModel(model.public_id)?.provider).toBe(OPENROUTER);

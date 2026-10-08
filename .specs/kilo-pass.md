@@ -444,6 +444,8 @@ promo or Kilo Pass referral conversion.
 - Preserved the flag on renewals, replays, and tier or cadence changes.
 - Kept the regular monthly ramp, yearly bonuses, payment eligibility, and usage unlock unchanged.
 - Updated subscription offers, ramp previews, and KiloClaw upsells to show the new schedule.
+- Kept yearly upsell text at 50% every month and limited welcome callouts to the applicable promo window.
+- Preserved historical welcome bonuses in ramp previews after the welcome callout disappears.
 
 ### 2026-06-08 -- Yearly duplicate-card enforcement
 

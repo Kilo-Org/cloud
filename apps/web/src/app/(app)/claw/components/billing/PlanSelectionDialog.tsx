@@ -130,11 +130,15 @@ function TierCard({
         <div className="text-muted-foreground text-xs leading-relaxed">
           <span className="text-amber-300">{creditsLabel}</span>
         </div>
-        <div className="text-muted-foreground text-xs leading-relaxed">
-          Up to <span className="text-emerald-300">40%</span> free bonus credits
-        </div>
+        {!isYearly && (
+          <div className="text-muted-foreground text-xs leading-relaxed">
+            Up to <span className="text-emerald-300">40%</span> free bonus credits
+          </div>
+        )}
         <div className="text-xs leading-relaxed text-emerald-300">
-          Month 1: +5%; month 2: +50% free bonus credits
+          {isYearly
+            ? '+50% free bonus credits every month'
+            : 'Month 1: +5%; month 2: +50% free bonus credits'}
         </div>
       </div>
 
@@ -289,7 +293,7 @@ function HostingOnlyPlanCard({
   );
 }
 
-function CreditsHowItWorks() {
+function CreditsHowItWorks({ cadence }: { cadence: Cadence }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border-border/50 mb-3.5 overflow-hidden rounded-lg border">
@@ -319,8 +323,15 @@ function CreditsHowItWorks() {
           <div className="text-muted-foreground flex items-start gap-2 py-0.5 text-xs">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
             <span>
-              First-time subscribers receive <span className="text-emerald-300">50%</span> free
-              bonus credits for the second month, with the regular 5% bonus in the first month.
+              {cadence === 'yearly' ? (
+                <>Yearly subscribers receive 50% free bonus credits every month.</>
+              ) : (
+                <>
+                  First-time monthly subscribers receive{' '}
+                  <span className="text-emerald-300">50%</span> free bonus credits for the second
+                  month, with the regular 5% bonus in the first month.
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -735,7 +746,7 @@ export function PlanSelectionDialog({ open, onOpenChange }: PlanSelectionDialogP
                   ))}
                 </div>
 
-                <CreditsHowItWorks />
+                <CreditsHowItWorks cadence={cadence} />
 
                 {/* Warning */}
                 <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">

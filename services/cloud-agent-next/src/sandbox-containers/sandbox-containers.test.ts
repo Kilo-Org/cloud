@@ -33,6 +33,7 @@ import type { Env } from '../types.js';
 // The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
 // fails any attempt to snapshot the container so a stop that snapshots cannot pass silently.
 const RECORD_KEY = 'containers:record:v1';
+const SNAPSHOT_SIZE = 1_234_567;
 const REF_A = 'ref-a';
 const REF_B = 'ref-b';
 
@@ -165,10 +166,10 @@ class FakeContainer {
     if (this.snapshotBehavior.kind === 'reject')
       throw this.snapshotBehavior.error ?? new Error('snapshot failed');
     if (this.snapshotBehavior.kind === 'resolve')
-      return { id: this.snapshotBehavior.id } as ContainerSnapshot;
+      return { id: this.snapshotBehavior.id, size: SNAPSHOT_SIZE };
     return new Promise((resolve, reject) =>
       this.deferredSnapshots.push({
-        resolve: id => resolve({ id } as ContainerSnapshot),
+        resolve: id => resolve({ id, size: SNAPSHOT_SIZE }),
         reject,
       })
     );
@@ -306,7 +307,24 @@ function launch(
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
+
+type LogLine = { level: string; fields: Record<string, unknown>; message: string };
+
+/** Record every structured log line; `diagnostics(event)` narrows to one control diagnostic. */
+function captureLogs() {
+  const lines: LogLine[] = [];
+  vi.spyOn(logger, 'withFields').mockImplementation(((fields: Record<string, unknown>) => ({
+    info: (message: string) => lines.push({ level: 'info', fields, message }),
+    warn: (message: string) => lines.push({ level: 'warn', fields, message }),
+    error: (message: string) => lines.push({ level: 'error', fields, message }),
+  })) as unknown as typeof logger.withFields);
+  return {
+    lines,
+    diagnostics: (event: string) => lines.filter(line => line.fields.diagnosticEvent === event),
+  };
+}
 
 function attachOutbound(instance: SandboxContainers): void {
   const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
@@ -1488,6 +1506,65 @@ describe('SandboxContainers native start confirmation', () => {
     });
   });
 
+  it('logs the time to ready and the number of checks once PID 1 is the supervisor', async () => {
+    vi.useFakeTimers();
+    const { diagnostics } = captureLogs();
+    const { instance, container } = setup();
+    container.identityAfterStart = 'sleep';
+
+    const pending = launch(instance, REF_A);
+    await vi.advanceTimersByTimeAsync(1_500);
+    container.mainProcess = 'supervisor';
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
+
+    const lines = diagnostics('supervisor_confirm');
+    expect(lines.map(line => [line.level, line.fields])).toEqual([
+      [
+        'info',
+        expect.objectContaining({ result: 'ready', source: 'image', elapsedMs: 2_000, checks: 3 }),
+      ],
+    ]);
+    expect(lines[0]?.fields).not.toHaveProperty('lastSeen');
+  });
+
+  it('logs the last PID 1 reading that completed when confirmation times out', async () => {
+    vi.useFakeTimers();
+    const { diagnostics } = captureLogs();
+    const { instance, container } = setup();
+    container.identityAfterStart = 'sleep';
+    // The first read sees `sleep infinity`; every later read hangs, so the read in
+    // flight at the deadline is cut off and must not hide what was last seen.
+    const exec = container.exec.bind(container);
+    let reads = 0;
+    vi.spyOn(container, 'exec').mockImplementation((cmd, options) => {
+      if (cmd[0] === 'cat' && (reads += 1) > 1) return new Promise<ExecProcess>(() => {});
+      return exec(cmd, options);
+    });
+
+    const failed = expect(launch(instance, REF_A)).rejects.toThrow('wrapper exec timed out');
+    await vi.advanceTimersByTimeAsync(90_000);
+    await failed;
+
+    const lines = diagnostics('supervisor_confirm');
+    expect(lines.map(line => [line.level, line.fields])).toEqual([
+      [
+        'warn',
+        expect.objectContaining({
+          result: 'timeout',
+          source: 'image',
+          elapsedMs: 90_000,
+          checks: 2,
+          finalCutOff: true,
+          lastSeen: 'cmdline',
+          lastIdentity: 'sleep',
+          lastCmdline: 'sleep_infinity',
+          lastCmdlineBytes: 14,
+        }),
+      ],
+    ]);
+  });
+
   it('fences a failed running-record write after native startup and never starts or execs on retry', async () => {
     const { instance, container, readRecord, setPutGate } = setup();
     setPutGate(value => {
@@ -2039,6 +2116,42 @@ describe('SandboxContainers repository snapshots', () => {
     });
   });
 
+  it('logs the age and size of the snapshot it starts from, and no age for an older entry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000_000);
+    const { diagnostics } = captureLogs();
+    const key = await indexKeyFor();
+    const captured = fakeKv({
+      [key]: { snapshotId: 'snap-repo', capturedAt: 10_000_000 - 90_000, size: SNAPSHOT_SIZE },
+    });
+    const first = setup({ env: { REPO_SNAPSHOTS: captured.kv } });
+    await expect(launchFromRepo(first.instance, REF_A)).resolves.toMatchObject({
+      startSource: 'repository',
+    });
+    const older = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
+    const second = setup({ env: { REPO_SNAPSHOTS: older.kv } });
+    await expect(launchFromRepo(second.instance, REF_A)).resolves.toMatchObject({
+      startSource: 'repository',
+    });
+
+    const lookups = diagnostics('snapshot_lookup').map(line => line.fields);
+    expect(lookups).toEqual([
+      expect.objectContaining({
+        source: 'repository',
+        reason: 'index_hit',
+        ageMs: 90_000,
+        size: SNAPSHOT_SIZE,
+      }),
+      expect.objectContaining({ source: 'repository', reason: 'index_hit' }),
+    ]);
+    expect(lookups[1]).not.toHaveProperty('ageMs');
+    expect(lookups[1]).not.toHaveProperty('size');
+    expect(diagnostics('supervisor_confirm').map(line => line.fields.source)).toEqual([
+      'repository',
+      'repository',
+    ]);
+  });
+
   it('forgets the snapshot when its start fails, so the next start is from the image', async () => {
     const key = await indexKeyFor();
     const store = fakeKv({ [key]: { snapshotId: 'snap-missing' } });
@@ -2157,17 +2270,23 @@ describe('SandboxContainers repository capture', () => {
     return { ...harness, store };
   }
 
-  it('publishes the snapshot under the repo key and image with a 10 day ttl', async () => {
+  it('publishes the snapshot with its capture time and size under the repo key and image with a 10 day ttl', async () => {
     const { instance, container, store } = await runningWithIndex();
     container.snapshotBehavior = { kind: 'resolve', id: 'snap-captured' };
+    const before = Date.now();
 
     await expect(instance.captureRepository(REF_A, REPO_KEY, 'deadbeef')).resolves.toBe(true);
 
     const key = await indexKeyFor();
-    expect(JSON.parse(store.data.get(key) as string)).toEqual({
+    const entry = JSON.parse(store.data.get(key) as string);
+    expect(entry).toEqual({
       snapshotId: 'snap-captured',
+      capturedAt: expect.any(Number),
+      size: SNAPSHOT_SIZE,
       commit: 'deadbeef',
     });
+    expect(entry.capturedAt).toBeGreaterThanOrEqual(before);
+    expect(entry.capturedAt).toBeLessThanOrEqual(Date.now());
     expect(store.calls.find(call => call.op === 'put')).toEqual({
       op: 'put',
       key,
@@ -2176,12 +2295,8 @@ describe('SandboxContainers repository capture', () => {
     expect(container.snapshotCalls).toBe(1);
   });
 
-  it('logs one line per capture with its outcome and duration, and no key or id', async () => {
-    const lines: Array<{ level: string; fields: Record<string, unknown>; message: string }> = [];
-    vi.spyOn(logger, 'withFields').mockImplementation(((fields: Record<string, unknown>) => ({
-      info: (message: string) => lines.push({ level: 'info', fields, message }),
-      warn: (message: string) => lines.push({ level: 'warn', fields, message }),
-    })) as unknown as typeof logger.withFields);
+  it('logs one line per capture with its outcome, duration and size, and no key or id', async () => {
+    const { lines } = captureLogs();
 
     const stored = await runningWithIndex();
     await stored.instance.captureRepository(REF_A, REPO_KEY, 'abc123');
@@ -2199,9 +2314,14 @@ describe('SandboxContainers repository capture', () => {
       ['warn', 'index_unavailable', 'Repository snapshot not saved'],
     ]);
     for (const line of captures) expect(line.fields.durationMs).toEqual(expect.any(Number));
+    expect(captures.map(line => line.fields.size)).toEqual([
+      SNAPSHOT_SIZE,
+      undefined,
+      SNAPSHOT_SIZE,
+    ]);
     expect(JSON.stringify(lines)).not.toContain(REPO_KEY);
     expect(JSON.stringify(lines)).not.toContain('abc123');
-    vi.restoreAllMocks();
+    expect(JSON.stringify(lines)).not.toContain('snap-1');
   });
 
   it('does nothing without a KV binding, a running container or the running allocation', async () => {

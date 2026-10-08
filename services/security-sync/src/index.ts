@@ -25,6 +25,10 @@ import {
 import { eq, and, isNotNull, or } from 'drizzle-orm';
 import { SECURITY_SYNC_OWNER_BUDGET_MS, releaseOwnerSyncLease, syncOwner } from './sync';
 import { processSecurityFindingDismissal } from './dismiss';
+import {
+  isPermanentSecurityCommandError,
+  type PermanentSecurityCommandError,
+} from './permanent-command-error';
 import { runSecurityNotificationSweep } from './notifications/sweep';
 
 const SecuritySyncOwnerSchema = z
@@ -529,6 +533,54 @@ async function settleSecurityLedgerForTerminalCommand(
   }
 }
 
+/**
+ * Records a permanent command failure instead of requeueing: the command is
+ * marked failed with the classified result code, its operation ledger is
+ * settled, and the caller acks the delivery. Returns false when the terminal
+ * state could not be persisted (for example a database error or a vanished
+ * command row), so the caller falls back to the normal retry path.
+ */
+async function failSecurityAgentCommandPermanently(
+  env: CloudflareEnv,
+  correlation: CommandCorrelation & { commandId: string },
+  error: PermanentSecurityCommandError,
+  attempts: number
+): Promise<boolean> {
+  try {
+    const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
+    const outcome = await transitionSecurityAgentCommandWithCurrentState(db, {
+      commandId: correlation.commandId,
+      fromStatuses: ['accepted', 'running'],
+      status: 'failed',
+      resultCode: error.resultCode,
+      lastErrorRedacted: error.lastErrorRedacted,
+    });
+    if (!outcome.transitioned && !isTerminalSecurityAgentCommandTransitionOutcome(outcome)) {
+      return false;
+    }
+    if (outcome.command && correlation.ledger) {
+      await settleSecurityLedgerForTerminalCommand(db, outcome.command, correlation.ledger);
+    }
+    console.error('Security Agent command failed permanently', {
+      command_id: correlation.commandId,
+      command_type: correlation.commandType,
+      owner_type: correlation.ownerType,
+      result_code: outcome.command?.result_code ?? error.resultCode,
+      attempts,
+    });
+    return true;
+  } catch (recordError) {
+    console.error('Failed to record permanent Security Agent command failure', {
+      command_id: correlation.commandId,
+      command_type: correlation.commandType,
+      owner_type: correlation.ownerType,
+      attempts,
+      error_type: recordError instanceof Error ? recordError.name : 'UnknownError',
+    });
+    return false;
+  }
+}
+
 async function processSecurityDismissMessage(
   message: Message<SecuritySyncQueueMessage>,
   env: CloudflareEnv
@@ -998,6 +1050,19 @@ export default {
         await processSecuritySyncMessage(message, env);
       } catch (error) {
         const correlation = commandCorrelation(message.body);
+        if (isPermanentSecurityCommandError(error) && correlation.commandId) {
+          if (
+            await failSecurityAgentCommandPermanently(
+              env,
+              { ...correlation, commandId: correlation.commandId },
+              error,
+              message.attempts
+            )
+          ) {
+            message.ack();
+            continue;
+          }
+        }
         const syncBody = SecuritySyncMessageSchema.safeParse(message.body);
         if (message.attempts >= SECURITY_SYNC_COMMAND_MAX_ATTEMPTS && syncBody.success) {
           const syncLeaseOwner = resolveOwner(syncBody.data.owner);

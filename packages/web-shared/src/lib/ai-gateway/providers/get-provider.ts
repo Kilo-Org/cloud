@@ -23,7 +23,7 @@ import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema } from '@kilocode/db/schema-types';
 import {
-  findCustomLlm,
+  lookupCustomLlm,
   isPublicCustomLlm,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -233,9 +233,12 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     }
   }
 
-  const customLlm = await findCustomLlm(requestedModel);
-  if (customLlm) {
-    return await resolveCustomLlmProvider(customLlm, user, organizationId);
+  const customLlmLookup = await lookupCustomLlm(requestedModel);
+  if (customLlmLookup.kind === 'unknown') {
+    return { kind: 'custom-llm-temporarily-unavailable' };
+  }
+  if (customLlmLookup.kind === 'custom-llm') {
+    return await resolveCustomLlmProvider(customLlmLookup.customLlm, user, organizationId);
   }
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);

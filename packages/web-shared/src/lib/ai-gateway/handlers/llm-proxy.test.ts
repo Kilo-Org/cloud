@@ -57,7 +57,7 @@ import {
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
-  findCustomLlm,
+  lookupCustomLlm,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { NextRequest } from 'next/server';
@@ -114,7 +114,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', (
   ...(jest.requireActual(
     '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
   ) as Record<string, unknown>),
-  findCustomLlm: jest.fn(async () => null),
+  lookupCustomLlm: jest.fn(async () => ({ kind: 'none' })),
   isFreeModelIncludingCustomLlms: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
@@ -197,7 +197,10 @@ const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
-const mockedFindCustomLlm = jest.mocked(findCustomLlm);
+const mockedLookupCustomLlm = jest.mocked(lookupCustomLlm);
+function mockCustomLlm(customLlm: CustomLlm) {
+  mockedLookupCustomLlm.mockResolvedValue({ kind: 'custom-llm', customLlm });
+}
 
 const provider = {
   id: 'openrouter',
@@ -2095,7 +2098,7 @@ describe('custom LLM requests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedFindCustomLlm.mockResolvedValue(null);
+    mockedLookupCustomLlm.mockResolvedValue({ kind: 'none' });
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider: customProvider,
@@ -2110,7 +2113,7 @@ describe('custom LLM requests', () => {
 
   it('serves a public custom LLM to an anonymous caller', async () => {
     setAnonymousAuth();
-    mockedFindCustomLlm.mockResolvedValue(customLlm('acme/public-model', true));
+    mockCustomLlm(customLlm('acme/public-model', true));
 
     const response = await handleLlmProxyRequest(
       makeRequest(makeBody('acme/public-model')) as never
@@ -2128,7 +2131,7 @@ describe('custom LLM requests', () => {
       settings: undefined,
       plan: undefined,
     });
-    mockedFindCustomLlm.mockResolvedValue(customLlm('acme/public-model', true));
+    mockCustomLlm(customLlm('acme/public-model', true));
 
     const response = await handleLlmProxyRequest(
       makeRequest(makeBody('acme/public-model')) as never
@@ -2139,18 +2142,17 @@ describe('custom LLM requests', () => {
 
   it('requires sign-in for a private custom LLM that reuses a free Kilo-exclusive id', async () => {
     setAnonymousAuth();
-    mockedFindCustomLlm.mockResolvedValue(customLlm(stepfun_37_flash_free_model.public_id, false));
+    const freeExclusiveId = gemma_4_26b_a4b_it_free_model.public_id;
+    mockCustomLlm(customLlm(freeExclusiveId, false));
 
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id)) as never
-    );
+    const response = await handleLlmProxyRequest(makeRequest(makeBody(freeExclusiveId)) as never);
 
     expect(response.status).toBe(401);
     expect(mockedGetProvider).not.toHaveBeenCalled();
   });
 
   it('returns model not found instead of falling back when the caller is not eligible', async () => {
-    mockedFindCustomLlm.mockResolvedValue(customLlm('acme/private-model', false));
+    mockCustomLlm(customLlm('acme/private-model', false));
     mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
 
     const response = await handleLlmProxyRequest(
@@ -2162,7 +2164,7 @@ describe('custom LLM requests', () => {
   });
 
   it('returns service unavailable when custom LLM credentials cannot be resolved now', async () => {
-    mockedFindCustomLlm.mockResolvedValue(customLlm('acme/public-model', true));
+    mockCustomLlm(customLlm('acme/public-model', true));
     mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-temporarily-unavailable' });
 
     const response = await handleLlmProxyRequest(
@@ -2173,8 +2175,19 @@ describe('custom LLM requests', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('returns service unavailable when the custom LLM catalog cannot be read for an exclusive id', async () => {
+    mockedLookupCustomLlm.mockResolvedValue({ kind: 'unknown' });
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
+    );
+
+    expect(response.status).toBe(503);
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+  });
+
   it('rejects a public custom LLM when the request excludes its inference providers', async () => {
-    mockedFindCustomLlm.mockResolvedValue(customLlm('acme/public-model', true));
+    mockCustomLlm(customLlm('acme/public-model', true));
 
     const response = await handleLlmProxyRequest(
       makeRequest({ ...makeBody('acme/public-model'), provider: { only: ['openai'] } }) as never
@@ -2195,7 +2208,7 @@ describe('custom LLM requests', () => {
       allowed: false,
       denialSource: 'organization_provider',
     });
-    mockedFindCustomLlm.mockResolvedValue(customLlm('acme/public-model', true));
+    mockCustomLlm(customLlm('acme/public-model', true));
 
     const response = await handleLlmProxyRequest(
       makeRequest(makeBody('acme/public-model')) as never

@@ -3,6 +3,7 @@ import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { captureException } from '@sentry/nextjs';
 
 export type CustomLlm = {
@@ -45,33 +46,54 @@ export async function fetchCustomLlmsFromDatabase(): Promise<CustomLlm[]> {
 /** Short enough that admin edits reach every instance quickly; routing reads
  * this on every gateway request, so it must not hit the database each time. */
 const CACHE_TTL_MS = 60_000;
+/** After a failed read, wait this long before querying again so an outage does
+ * not turn every lookup into a database query and a Sentry event. */
+const FAILURE_RETRY_MS = 5_000;
+
+type CustomLlmCatalog = {
+  byId: ReadonlyMap<string, CustomLlm>;
+  /** False when the catalog could not be read and nothing was cached before. */
+  available: boolean;
+};
+
+const UNAVAILABLE_CATALOG: CustomLlmCatalog = { byId: new Map(), available: false };
 
 let cache: { byId: ReadonlyMap<string, CustomLlm>; at: number } | null = null;
 let inFlight: Promise<ReadonlyMap<string, CustomLlm>> | null = null;
-/** Bumped on invalidation so a load that started earlier cannot re-cache stale rows. */
+let lastFailureAt: number | null = null;
+/** Bumped on invalidation so a load that started earlier cannot update the cache. */
 let generation = 0;
 
 async function loadCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
   const loadGeneration = generation;
-  const byId = new Map<string, CustomLlm>();
-  for (const customLlm of await fetchCustomLlmsFromDatabase()) {
-    byId.set(customLlm.public_id.toLowerCase(), customLlm);
+  try {
+    const byId = new Map<string, CustomLlm>();
+    for (const customLlm of await fetchCustomLlmsFromDatabase()) {
+      byId.set(customLlm.public_id.toLowerCase(), customLlm);
+    }
+    if (loadGeneration === generation) {
+      cache = { byId, at: Date.now() };
+      lastFailureAt = null;
+    }
+    return byId;
+  } catch (error) {
+    if (loadGeneration === generation) lastFailureAt = Date.now();
+    console.error('Failed to load custom LLMs', error);
+    captureException(error, { tags: { source: 'custom_llm_catalog' } });
+    throw error;
   }
-  if (loadGeneration === generation) {
-    cache = { byId, at: Date.now() };
-  }
-  return byId;
 }
 
 /**
- * All valid custom LLMs keyed by lowercased public id. A failed refresh serves
- * the previous value. With nothing cached it serves an empty map without
- * caching it, so a database outage does not fail requests for built-in models;
- * the next call retries.
+ * A failed refresh serves the previous value. With nothing cached the catalog
+ * is unavailable; see `lookupCustomLlm` for how callers treat that.
  */
-export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
+async function getCustomLlmCatalog(): Promise<CustomLlmCatalog> {
   if (cache && Date.now() - cache.at < CACHE_TTL_MS) {
-    return cache.byId;
+    return { byId: cache.byId, available: true };
+  }
+  if (lastFailureAt !== null && Date.now() - lastFailureAt < FAILURE_RETRY_MS) {
+    return cache ? { byId: cache.byId, available: true } : UNAVAILABLE_CATALOG;
   }
   if (!inFlight) {
     const load = loadCustomLlmsById().finally(() => {
@@ -80,13 +102,15 @@ export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm
     inFlight = load;
   }
   try {
-    return await inFlight;
-  } catch (error) {
-    if (cache) return cache.byId;
-    console.error('Failed to load custom LLMs; treating every model id as built-in', error);
-    captureException(error, { tags: { source: 'custom_llm_catalog' } });
-    return new Map();
+    return { byId: await inFlight, available: true };
+  } catch {
+    return cache ? { byId: cache.byId, available: true } : UNAVAILABLE_CATALOG;
   }
+}
+
+/** All valid custom LLMs keyed by lowercased public id; empty while unavailable. */
+export async function getCustomLlmsById(): Promise<ReadonlyMap<string, CustomLlm>> {
+  return (await getCustomLlmCatalog()).byId;
 }
 
 /** Drops this instance's cache so admin edits apply here immediately. */
@@ -94,8 +118,35 @@ export function invalidateCustomLlmCache() {
   generation++;
   cache = null;
   inFlight = null;
+  lastFailureAt = null;
 }
 
+export type CustomLlmLookup =
+  | { kind: 'custom-llm'; customLlm: CustomLlm }
+  | { kind: 'none' }
+  | { kind: 'unknown' };
+
+/**
+ * Resolves a model id for routing. While the catalog is unavailable, an id is
+ * `unknown` only if it is a Kilo-exclusive id: a custom LLM may shadow it, and
+ * routing must not fall back to the exclusive model. Any other custom LLM id
+ * matches no built-in model, so treating it as built-in fails on its own.
+ */
+export async function lookupCustomLlm(modelId: string): Promise<CustomLlmLookup> {
+  const normalizedModelId = modelId.trim().toLowerCase();
+  const catalog = await getCustomLlmCatalog();
+  const customLlm = catalog.byId.get(normalizedModelId);
+  if (customLlm) return { kind: 'custom-llm', customLlm };
+  if (
+    !catalog.available &&
+    kiloExclusiveModels.some(model => model.public_id === normalizedModelId)
+  ) {
+    return { kind: 'unknown' };
+  }
+  return { kind: 'none' };
+}
+
+/** A custom LLM for the id, or null when there is none or the catalog is unavailable. */
 export async function findCustomLlm(modelId: string): Promise<CustomLlm | null> {
   return (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null;
 }

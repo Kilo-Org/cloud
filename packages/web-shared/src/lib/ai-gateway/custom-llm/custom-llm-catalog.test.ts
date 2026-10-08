@@ -4,9 +4,13 @@ import {
   getPublicCustomLlmInferenceProviders,
   invalidateCustomLlmCache,
   isFreeModelIncludingCustomLlms,
+  lookupCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { stepfun_37_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  isKiloExclusiveFreeModel,
+  kiloExclusiveModels,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
@@ -14,7 +18,8 @@ import {
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
-const freeExclusiveId = stepfun_37_flash_free_model.public_id;
+const freeExclusiveId =
+  kiloExclusiveModels.find(model => isKiloExclusiveFreeModel(model.public_id))?.public_id ?? '';
 
 describe('custom LLM catalog', () => {
   beforeAll(async () => {
@@ -32,15 +37,26 @@ describe('custom LLM catalog', () => {
     invalidateCustomLlmCache();
   });
 
-  test('treats every id as built-in when the first load fails, then retries', async () => {
+  test('fails closed only for Kilo-exclusive ids while the catalog cannot be read', async () => {
     invalidateCustomLlmCache();
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(readDb, 'select').mockImplementationOnce(() => {
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const select = jest.spyOn(readDb, 'select').mockImplementationOnce(() => {
       throw new Error('database unavailable');
     });
 
-    await expect(findCustomLlm('acme/public-model')).resolves.toBeNull();
-    await expect(findCustomLlm('acme/public-model')).resolves.not.toBeNull();
+    await expect(lookupCustomLlm(freeExclusiveId)).resolves.toEqual({ kind: 'unknown' });
+    await expect(lookupCustomLlm('acme/public-model')).resolves.toEqual({ kind: 'none' });
+    await expect(findCustomLlm(freeExclusiveId)).resolves.toBeNull();
+    expect(select).toHaveBeenCalledTimes(1);
+
+    clock.mockReturnValue(now + 5_000);
+    await expect(lookupCustomLlm('acme/public-model')).resolves.toMatchObject({
+      kind: 'custom-llm',
+      customLlm: { public_id: 'Acme/Public-Model' },
+    });
+    expect(select).toHaveBeenCalledTimes(2);
   });
 
   test('does not cache rows from a load that started before an invalidation', async () => {

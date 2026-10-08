@@ -42,7 +42,7 @@ import {
   isFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
-  findCustomLlm,
+  lookupCustomLlm,
   isPublicCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -485,7 +485,11 @@ export async function handleLlmProxyRequest(
 
   // A custom LLM takes precedence over any built-in model with the same id,
   // including Kilo-exclusive models, so exclusive-model rules do not apply to it.
-  const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
+  const customLlmLookup = await lookupCustomLlm(effectiveModelIdLowerCased);
+  if (customLlmLookup.kind === 'unknown') {
+    return temporarilyUnavailableResponse();
+  }
+  const customLlm = customLlmLookup.kind === 'custom-llm' ? customLlmLookup.customLlm : null;
   const isFreeRequestedModel = customLlm
     ? isPublicCustomLlm(customLlm.definition)
     : isFreeModel(effectiveModelIdLowerCased);

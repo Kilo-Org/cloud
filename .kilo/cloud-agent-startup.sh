@@ -19,7 +19,7 @@ cloud_agents=false
 if [[ "$*" != app ]]; then
   cloud_agents=true
 fi
-export KILO_STARTUP_MEMORY_MB="${KILO_STARTUP_MEMORY_MB:-7168}"
+export KILO_STARTUP_MEMORY_MB="${KILO_STARTUP_MEMORY_MB:-6912}"
 
 if [[ $(uname -s) != Linux ]] || ! command -v apt-get >/dev/null; then
   printf 'This startup script requires a Debian/Ubuntu Linux sandbox.\n' >&2

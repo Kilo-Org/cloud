@@ -421,7 +421,8 @@ if [[ ${KILO_STARTUP_BROWSER_SMOKE:-true} == true ]]; then
   agent-browser --session kilo-startup batch --bail \
     'cookies clear' \
     "open $KILO_TEST_LOGIN_URL" \
-    "wait --fn '(async () => window.location.pathname === \"/\" && (await (await fetch(\"/api/auth/session\")).json()).user?.email === \"$test_email\")()'" \
+    "wait --fn 'window.location.pathname === \"/\"'" \
+    "eval '(async () => { const session = await (await fetch(\"/api/auth/session\")).json(); if (window.location.pathname !== \"/\" || session.user?.email !== \"$test_email\") throw new Error(\"Seeded browser authentication did not match\"); return true; })()'" \
     'snapshot -i' 'close'
   printf 'Verified authenticated browser session email: %s\n' "$test_email"
 fi

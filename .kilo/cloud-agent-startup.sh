@@ -418,12 +418,18 @@ printf 'export AGENT_BROWSER_ENGINE=%q AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BR
   "$PATH" "$KILO_STARTUP_REAL_DOCKER" "$KILO_STARTUP_REAL_PNPM" "$KILO_STARTUP_BUILDER" "$NODE_OPTIONS" "$SHELL" \
   > .wrangler/kilo-startup/browser.env
 if [[ ${KILO_STARTUP_BROWSER_SMOKE:-true} == true ]]; then
-  agent-browser --session kilo-startup batch --bail \
-    'cookies clear' \
-    "open $KILO_TEST_LOGIN_URL" \
-    "wait --fn 'window.location.pathname === \"/\"'" \
-    "eval '(async () => { const session = await (await fetch(\"/api/auth/session\")).json(); if (window.location.pathname !== \"/\" || session.user?.email !== \"$test_email\") throw new Error(\"Seeded browser authentication did not match\"); return true; })()'" \
-    'snapshot -i' 'close'
+  agent-browser --session kilo-startup cookies clear
+  agent-browser --session kilo-startup open "$KILO_TEST_LOGIN_URL"
+  agent-browser --session kilo-startup wait --fn 'window.location.pathname === "/"'
+  authenticated=$(agent-browser --session kilo-startup eval \
+    "(async () => { const session = await (await fetch(\"/api/auth/session\")).json(); return window.location.pathname === \"/\" && session.user?.email === \"$test_email\"; })()")
+  if [[ $authenticated != true ]]; then
+    agent-browser --session kilo-startup close
+    printf 'Seeded browser authentication did not match.\n' >&2
+    exit 1
+  fi
+  agent-browser --session kilo-startup snapshot -i
+  agent-browser --session kilo-startup close
   printf 'Verified authenticated browser session email: %s\n' "$test_email"
 fi
 printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=%s&callbackPath=/\n' \

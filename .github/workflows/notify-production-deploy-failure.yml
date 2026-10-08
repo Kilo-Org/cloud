@@ -1,0 +1,59 @@
+name: Notify Scheduled Production Deployment Failure
+
+on:
+  workflow_run:
+    workflows: [Deploy to Production]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.event == 'schedule' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - name: Build Slack payload
+        id: payload
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const payload = {
+              text: `Scheduled production deployment failed on main: ${run.html_url}`,
+              blocks: [
+                {
+                  type: 'header',
+                  text: { type: 'plain_text', text: 'Scheduled production deployment failed' },
+                },
+                {
+                  type: 'section',
+                  text: { type: 'plain_text', text: run.name },
+                },
+                {
+                  type: 'section',
+                  fields: [
+                    { type: 'plain_text', text: 'Branch: main' },
+                    { type: 'plain_text', text: `Attempt: ${run.run_attempt}` },
+                  ],
+                },
+                {
+                  type: 'section',
+                  text: { type: 'mrkdwn', text: `<${run.html_url}|View failed production deployment>` },
+                },
+              ],
+            };
+            core.setOutput('payload', JSON.stringify(payload));
+
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          errors: true
+          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: ${{ steps.payload.outputs.payload }}

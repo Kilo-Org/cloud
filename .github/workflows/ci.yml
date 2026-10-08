@@ -59,6 +59,9 @@ jobs:
       - name: Test main workflow failure notifications
         run: node --test scripts/main-workflow-failure.test.mjs
 
+      - name: Test scheduled production deployment failure notifications
+        run: node --test scripts/production-deploy-failure.test.mjs
+
       - name: Test meta-janitor approval gates
         run: node --test scripts/meta-janitor-approve.test.mjs
 

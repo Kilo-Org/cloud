@@ -142,6 +142,134 @@ function fixture(rootCount = 1, childCount = 0) {
 beforeEach(() => vi.resetAllMocks());
 
 describe('deleteWorktree authorization and completion', () => {
+  it.each(['begin', 'finish'] as const)(
+    'bounds concurrent %s operations and waits before advancing phases',
+    async phase => {
+      const f = fixture(17, 2);
+      const gates = Array.from({ length: 17 }, () => Promise.withResolvers<void>());
+      let active = 0;
+      let peak = 0;
+      const operation = async (id: string) => {
+        active += 1;
+        peak = Math.max(peak, active);
+        await gates.find((_, index) => workspaceId(index) === id)?.promise;
+        active -= 1;
+      };
+      if (phase === 'begin') {
+        f.beginSession.mockImplementation(async id => {
+          await operation(id);
+          return location;
+        });
+      } else {
+        f.finishSession.mockImplementation(operation);
+      }
+      const pending = f.caller.deleteWorktree({ worktreeId });
+      const calls = phase === 'begin' ? f.beginSession : f.finishSession;
+      for (const start of [0, 8, 16]) {
+        const end = Math.min(start + 8, 17);
+        await vi.waitFor(() => expect(calls).toHaveBeenCalledTimes(end));
+        expect(active).toBe(end - start);
+        expect(f.complete).not.toHaveBeenCalled();
+        if (phase === 'begin') {
+          expect(f.record).not.toHaveBeenCalled();
+          expect(f.cleanup).not.toHaveBeenCalled();
+          expect(f.finishSession).not.toHaveBeenCalled();
+        } else {
+          expect(f.record).toHaveBeenCalledTimes(2);
+          expect(f.cleanup).toHaveBeenCalledTimes(1);
+        }
+        for (const gate of gates.slice(start, end)) gate.resolve();
+      }
+      await expect(pending).resolves.toMatchObject({ success: true });
+      expect(peak).toBe(8);
+      expect(active).toBe(0);
+    }
+  );
+
+  it.each(['begin', 'finish'] as const)(
+    'drains started %s siblings on failure without starting another batch',
+    async phase => {
+      const f = fixture(17);
+      const failed = Promise.withResolvers<void>();
+      const siblings = Promise.withResolvers<void>();
+      let settled = false;
+      const operation = async (id: string) => {
+        await (id === workspaceId(0) ? failed.promise : siblings.promise);
+      };
+      if (phase === 'begin') {
+        f.beginSession.mockImplementation(async id => {
+          await operation(id);
+          return location;
+        });
+      } else {
+        f.finishSession.mockImplementation(operation);
+      }
+      const pending = f.caller.deleteWorktree({ worktreeId }).catch(error => {
+        settled = true;
+        return error;
+      });
+      const calls = phase === 'begin' ? f.beginSession : f.finishSession;
+      await vi.waitFor(() => expect(calls).toHaveBeenCalledTimes(8));
+      failed.reject(new Error('deletion failed'));
+      await failed.promise.catch(() => undefined);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(settled).toBe(false);
+      expect(f.complete).not.toHaveBeenCalled();
+      if (phase === 'begin') {
+        expect(f.record).not.toHaveBeenCalled();
+        expect(f.cleanup).not.toHaveBeenCalled();
+        expect(f.finishSession).not.toHaveBeenCalled();
+      }
+      siblings.resolve();
+      await expect(pending).resolves.toMatchObject({
+        cause: { error: 'WORKTREE_DELETION_PENDING', retryable: true },
+      });
+      expect(calls).toHaveBeenCalledTimes(8);
+      expect(f.complete).not.toHaveBeenCalled();
+    }
+  );
+
+  it('records shared ingest manifests sequentially across both recording phases', async () => {
+    const f = fixture(2);
+    mocks.getSession.mockImplementation((_env, _ownerId, id: string) => ({
+      beginWorktreeDeletion: async () => ({
+        location: await f.beginSession(id),
+        children: [{ sessionId: kiloId(2), parentSessionId: kiloId(0) }],
+        directory: `/workspace/${id}`,
+      }),
+      finishWorktreeDeletion: () => f.finishSession(id),
+    }));
+    const record = f.record.getMockImplementation();
+    if (!record) throw new Error('Missing record fixture');
+    const gates = Array.from({ length: 4 }, () => Promise.withResolvers<void>());
+    let active = 0;
+    let peak = 0;
+    let index = 0;
+    f.record.mockImplementation(async input => {
+      const gate = gates[index++];
+      active += 1;
+      peak = Math.max(peak, active);
+      await gate.promise;
+      const result = await record(input);
+      active -= 1;
+      return result;
+    });
+    const pending = f.caller.deleteWorktree({ worktreeId });
+    for (let index = 0; index < gates.length; index++) {
+      await vi.waitFor(() => expect(f.record).toHaveBeenCalledTimes(index + 1));
+      expect(active).toBe(1);
+      expect(f.finishSession).not.toHaveBeenCalled();
+      expect(f.complete).not.toHaveBeenCalled();
+      expect(f.cleanup).toHaveBeenCalledTimes(index < 2 ? 0 : 1);
+      gates[index].resolve();
+    }
+    await expect(pending).resolves.toMatchObject({
+      deletedSessionIds: [kiloId(0), kiloId(1), kiloId(2)],
+    });
+    expect(peak).toBe(1);
+    expect(f.cleanup.mock.calls[0][0].sessionIds).toContain(kiloId(2));
+  });
+
   it('journals retained child lineage before cold runtime cleanup and keeps it on retry', async () => {
     const f = fixture();
     f.readChildren.mockResolvedValue([{ sessionId: kiloId(1), parentSessionId: kiloId(0) }]);

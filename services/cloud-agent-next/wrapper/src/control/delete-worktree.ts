@@ -156,12 +156,29 @@ function uniqueClients(clients: readonly WorktreeKiloCleanupClient[]): WorktreeK
   return [...new Set(clients)];
 }
 
+async function awaitCleanup<T>(operations: Promise<T>[]): Promise<T[]> {
+  const results = await Promise.allSettled(operations);
+  return results.map(result => {
+    if (result.status === 'rejected') throw result.reason;
+    return result.value;
+  });
+}
+
+async function cleanupInBatches<T>(
+  items: readonly T[],
+  cleanup: (item: T) => Promise<void>
+): Promise<void> {
+  for (let offset = 0; offset < items.length; offset += 8) {
+    await awaitCleanup(items.slice(offset, offset + 8).map(async item => cleanup(item)));
+  }
+}
+
 async function ownersForSession(
   clients: readonly WorktreeKiloCleanupClient[],
   directory: string,
   sessionId: string
 ): Promise<Array<{ client: WorktreeKiloCleanupClient; session: CleanupSession }>> {
-  const sessions = await Promise.all(
+  const sessions = await awaitCleanup(
     clients.map(async client => ({
       client,
       session: await client.getSession(directory, sessionId),
@@ -264,24 +281,26 @@ export async function deleteWorktree(
       string,
       Array<{ client: WorktreeKiloCleanupClient; session: CleanupSession }>
     >();
-    for (const sessionId of sessionIds) {
+    await cleanupInBatches(sessionIds, async sessionId => {
       const owners = await ownersForSession(clients, input.directory, sessionId);
       if (owners.some(({ session }) => session.directory !== input.directory))
         throw new Error('Worktree session directory conflict');
       ownersBySession.set(sessionId, owners);
-    }
+    });
     stage = 'process_cleanup';
-    for (const [sessionId, owners] of ownersBySession) {
-      await Promise.all(
-        owners.map(({ client }) => client.stopSessionProcesses(input.directory, sessionId))
+    await cleanupInBatches(sessionIds, async sessionId => {
+      const owners = ownersBySession.get(sessionId) ?? [];
+      await awaitCleanup(
+        owners.map(async ({ client }) => client.stopSessionProcesses(input.directory, sessionId))
       );
-    }
+    });
     stage = 'terminal_cleanup';
     await deps.detachTerminals?.(input.directory);
     for (const client of clients) {
       await client.closeTerminals(input.directory);
       stage = 'session_delete';
-      for (const [sessionId, owners] of [...ownersBySession].reverse()) {
+      for (const sessionId of [...sessionIds].reverse()) {
+        const owners = ownersBySession.get(sessionId) ?? [];
         if (!owners.some(owner => owner.client === client)) continue;
         await client.deleteSession(input.directory, sessionId);
       }

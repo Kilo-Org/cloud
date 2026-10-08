@@ -623,7 +623,7 @@ describe('turn resubmission', () => {
     result.reject(Object.assign(new Error('socket closed'), { code: 'ECONNRESET' }));
     await settle();
     expect(outcomeFrames(h.frames)).toEqual([]);
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     expect(h.client(spec).prompts).toEqual([]);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({
@@ -744,7 +744,7 @@ describe('turn resubmission', () => {
           type: 'session.outcome',
           sessionId: SESSION_ID,
           status: 'failed',
-          reason: 'agent_restarted',
+          reason: 'agent_unresponsive',
           lastMessageId: 'm1',
         },
       ]);
@@ -797,7 +797,7 @@ describe('turn resubmission', () => {
     expect(outcomeFrames(h.frames)).toHaveLength(1);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({
       status: 'failed',
-      reason: 'agent_restarted',
+      reason: 'agent_unresponsive',
       lastMessageId: 'm2',
     });
   });
@@ -1071,7 +1071,7 @@ describe('turn resubmission', () => {
         part: { sessionID: KILO_SESSION, messageID: 'assistant-1', type: 'tool', tool: 'bash' },
       })
     );
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     expect(client.prompts).toHaveLength(1);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'agent_restarted' });
@@ -1750,7 +1750,7 @@ describe('turn finalization', () => {
     h.setFlags(routeSpec(), { restarting: true, suspected: true });
     h.manager.submit(SESSION_ID, promptPayload('m2'));
     await settle();
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
@@ -1795,7 +1795,7 @@ describe('turn finalization', () => {
     await settle();
     h.manager.submit(SESSION_ID, promptPayload('m2'));
     await settle();
-    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'exit', key: DIRECTORY });
     await settle();
     const outcomes = outcomeFrames(h.frames);
     expect(outcomes).toHaveLength(1);
@@ -2189,6 +2189,29 @@ describe('native session outcome transitions', () => {
     ]);
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'cancelled' });
   });
+
+  it.each([
+    ['hang', 'agent_unresponsive', 'Kilo was not responding and was restarted'],
+    ['exit', 'agent_restarted', 'the agent restarted'],
+  ] as const)(
+    'reports a %s restart of native work without a Cloud turn as %s',
+    async (reason, expected, text) => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.onRuntimeRestart({
+        directory: DIRECTORY,
+        reason,
+        key: runtimeKey(routeSpec()),
+        interruptedExecutions: [
+          { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+        ],
+      });
+      await settle();
+      const error = eventFrames(h.frames).find(event => event.type === 'session.error');
+      expect(error?.properties).toMatchObject({ sessionID: KILO_SESSION, reason: expected });
+      expect(String(error?.properties.error)).toContain(text);
+    }
+  );
 
   it('projects a no_progress failure with the parsed outcomeReason', async () => {
     const h = createHarness();

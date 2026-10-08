@@ -114,6 +114,7 @@ export function classifyControlPlaneFailure(
     case 'sandbox_lost':
     case 'agent_restarted':
     case 'sandbox_out_of_memory':
+    case 'agent_unresponsive':
       return POST_DISPATCH_WRAPPER_DISCONNECTED;
     case 'no_progress':
     case 'no_outcome':

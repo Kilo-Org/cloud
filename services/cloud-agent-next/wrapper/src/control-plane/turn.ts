@@ -1038,7 +1038,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
     onRuntimeRestart(info: KiloRestartInfo & { key: string }): void {
       const ownedTurns = new Set(turnsForRuntimeKey(info.key).map(turn => turn.route.sessionId));
       void publishCommandsForRuntimeKey(info.key);
-      const outcomeReason = info.outcomeReason ?? 'agent_restarted';
+      const failure = info.reason === 'hang' ? 'agent_unresponsive' : 'agent_restarted';
+      const outcomeReason = info.outcomeReason ?? failure;
       for (const turn of turnsForRuntimeKey(info.key)) {
         turn.deferredCompletion = undefined;
         if (turn.phase === 'finalizing') {
@@ -1094,9 +1095,11 @@ export function createTurnManager(deps: TurnManagerDeps) {
             type: 'session.error',
             properties: {
               sessionID: execution.sessionId,
-              reason: 'agent_restarted',
+              reason: failure,
               error:
-                'Execution stopped because the agent restarted. You can continue in this chat.',
+                failure === 'agent_unresponsive'
+                  ? 'Execution stopped because Kilo was not responding and was restarted. You can continue in this chat.'
+                  : 'Execution stopped because the agent restarted. You can continue in this chat.',
             },
           },
         ]);

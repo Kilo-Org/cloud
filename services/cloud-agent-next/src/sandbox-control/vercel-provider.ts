@@ -11,6 +11,7 @@ import {
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
+import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 import { ProviderCreationError } from './provider.js';
@@ -100,6 +101,13 @@ export function createVercelProviderAdapter(deps: {
   restClient?: VercelControlRestClient;
   now?: () => number;
   billingLifetimeSink?: VercelBillingLifetimeSink;
+  /**
+   * Authoritative contained grants for this sandbox, read at create and on
+   * every credential refresh. Required: a Vercel sandbox must never open
+   * without a network policy derived from current grants, and a reader failure
+   * must prevent the REST create.
+   */
+  readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
 }): ProviderAdapter {
   const config = deps.config;
   if (!config) {
@@ -114,7 +122,7 @@ export function createVercelProviderAdapter(deps: {
       stop: async () => 'retryable',
       ensureLeaseAtLeast: unavailable,
       logs: async () => 'Vercel sandbox runtime configuration is unavailable',
-      updateNetworkPolicy: unavailable,
+      applyContainedCredentials: unavailable,
     };
   }
   const restClient =
@@ -157,6 +165,10 @@ export function createVercelProviderAdapter(deps: {
   return {
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
+      // Read the authoritative grants and build the policy before the REST
+      // create: the sandbox must never open with an empty or stale policy, so a
+      // reader failure prevents the create entirely.
+      const networkPolicy = buildControlNetworkPolicy(await deps.readContainedGrants());
       const created = await restClient
         .createSandbox({
           name: intent.allocationName ?? deps.sandboxName,
@@ -166,7 +178,7 @@ export function createVercelProviderAdapter(deps: {
           runtime: config.runtime,
           timeoutMs: config.initialTimeoutMs,
           ...(config.resources === undefined ? {} : { resources: config.resources }),
-          ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),
+          networkPolicy,
         })
         .catch((error: unknown) => {
           if (
@@ -310,9 +322,10 @@ export function createVercelProviderAdapter(deps: {
         return `vercel ${parsed.sessionId} logs unavailable`;
       }
     },
-    async updateNetworkPolicy(providerRef, networkPolicy) {
+    async applyContainedCredentials(providerRef, grants) {
       const parsed = decodeOwnedProviderRef(providerRef);
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
+      const networkPolicy = buildControlNetworkPolicy(grants);
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,
         parsed.sandboxName,

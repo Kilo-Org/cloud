@@ -150,6 +150,7 @@ function createFakeProvider(): { adapter: ProviderAdapter; createCalls: number }
       return 'terminal' as StopResult;
     },
     async ensureLeaseAtLeast() {},
+    async applyContainedCredentials() {},
     async logs() {
       return '';
     },

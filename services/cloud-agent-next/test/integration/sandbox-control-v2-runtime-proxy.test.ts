@@ -197,6 +197,7 @@ function createProvider(): FakeProvider {
       return 'terminal' as StopResult;
     },
     async ensureLeaseAtLeast() {},
+    async applyContainedCredentials() {},
     async logs() {
       return '';
     },

@@ -2,42 +2,24 @@ import { DurableObject } from 'cloudflare:workers';
 import { getSandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
-import {
-  clearBillingContext,
-  ContainerUsageAdmissionError,
-  createContainerUsageClient,
-  DEFAULT_BILLING_HEARTBEAT_SECONDS,
-  getBillingContext,
-  installBillingHeartbeat,
-  type BillingHeartbeatController,
-} from '@kilocode/container-usage';
+import { getBillingContext } from '@kilocode/container-usage';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
   forceDestroyControlPlaneSandbox,
-  assertSandboxBillingAllocation,
   parseSandboxBillingInput,
-  vercelBillingIdentity,
   type SandboxBillingInput,
-  type VercelBillingIdentity,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
-import { MeteredBillingLifecycle, type BillingIdentity } from '../../metered-billing-lifecycle.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
 import {
   assertContainerCapacity,
   isContainerConcurrencyLimitError,
 } from '../../container-concurrency.js';
 import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
-import {
-  VercelBilling,
-  VERCEL_BILLING_SETTLEMENT_CALLBACK,
-  deleteVercelBillingBinding,
-  loadVercelBillingBinding,
-  saveVercelBillingBinding,
-} from '../../sandbox-control/vercel-billing.js';
+import { createVercelBillingRuntime, type VercelBillingRuntime } from './vercel-billing-runtime.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -64,13 +46,11 @@ import {
 } from '../../sandbox-control/provider.js';
 import {
   createVercelProviderAdapter,
-  decodeVercelProviderRef,
   vercelProviderLocatorSchema,
   type VercelProviderLocator,
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
 import {
-  buildControlNetworkPolicy,
   kiloTokenHasRuntimeAuthorization,
   prepareCredentialGrant,
   resolveSessionCredential,
@@ -79,7 +59,6 @@ import {
 } from '../../sandbox-control/session-credentials.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { resolveVercelSandboxRuntimeConfig } from '../../agent-sandbox/vercel/vercel-runtime-config.js';
-import type { VercelSandboxNetworkPolicy } from '../../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
   getManagedOutboundContainerId,
   getOutboundContainerId,
@@ -237,10 +216,8 @@ const OWNER_KEY = 'control_plane_owner';
 /** Backstop over the container DO's own capture timeout; the wrapper waits slightly longer. */
 const REPOSITORY_CAPTURE_CALL_MS = 5 * 60_000 + 5_000;
 const ALLOCATION_ROW_ID = 'current';
-const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
-const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
 
-type StoredProviderPin = {
+export type StoredProviderPin = {
   provider: AgentSandboxProvider;
   allocationName: string | null;
   configuration: SandboxProviderConfiguration | null;
@@ -478,16 +455,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     { allocationId: string | null; ok?: boolean }
   >();
   private readonly billingSchedule: BillingScheduleTable;
-  private vercelBilling:
-    | {
-        identity: BillingIdentity | undefined;
-        lifecycle: MeteredBillingLifecycle;
-        heartbeat: BillingHeartbeatController;
-        billing: VercelBilling;
-      }
-    | undefined;
-  private vercelBillingBuild: Promise<void> | undefined;
-  private readonly vercelDeliveriesInFlight = new Set<string>();
+  /** Vercel metered-billing runtime; reads live pin/storage, never frozen config. */
+  private readonly billingRuntime: VercelBillingRuntime;
   /**
    * Outstanding worktree-change requests forwarded to the wrapper, keyed by
    * request id (spec §10). The wrapper answers with one result frame; the reply
@@ -531,6 +500,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
     this.billingSchedule = new BillingScheduleTable({
       storage: ctx.storage,
       recompose: async () => this.armAlarm(await this.readAllocation()),
+    });
+    this.billingRuntime = createVercelBillingRuntime({
+      storage: ctx.storage,
+      env: () => this.env,
+      sandboxId: this.sandboxId,
+      schedule: this.billingSchedule,
+      currentProvider: () => this.currentProvider(),
+      currentPin: () => this.providerPin,
+      readAllocation: () => this.readAllocation(),
+      requireOwner: () => this.requireOwner(),
+      isCreateInFlight: () => this.createInFlight,
+      provider: () => this.provider,
+      timers: () => this.sandboxTimers(),
+      stopRef: (ref, allocationId) => this.stopRef(ref, allocationId),
+      failUnconfirmedCleanup: state => this.failUnconfirmedVercelCleanup(state),
+      requestStop: () =>
+        this.dispatchResult({ type: 'stop-requested', at: Date.now(), reason: 'billing_blocked' }),
+      waitUntil: promise => this.ctx.waitUntil(promise),
     });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
@@ -1223,13 +1210,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /**
    * Vercel network policy entry point (spec §10 runtime credential proxy). The
-   * caller-supplied `networkPolicy` is accepted for RPC compatibility but not
-   * applied: the policy is rebuilt from the stored grants so this cannot become
-   * a second source of truth, and the caller must own the sandbox (B3 review 5).
+   * caller-supplied `networkPolicy` is accepted for RPC compatibility but its
+   * value is ignored: the policy is rebuilt from the stored grants so this
+   * cannot become a second source of truth, and the caller must own the sandbox
+   * (B3 review 5).
    */
   async updateNetworkPolicy(input: {
     ownerId: string;
-    networkPolicy: VercelSandboxNetworkPolicy;
+    networkPolicy?: unknown;
     requiredContainment: CredentialContainmentRequirements;
   }): Promise<void> {
     await this.initialized;
@@ -2171,10 +2159,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /**
    * Rebuilds the Vercel network policy from the stored grants (or a caller's
-   * candidate set). Runs inside the operation queue and does not stop the
-   * sandbox: it returns `false` on failure so callers can decide (retry vs.
-   * fail closed). Transient failures keep the route alive so a later send can
-   * retry (N2).
+   * candidate set) through the provider's contained-credential hook. Runs inside
+   * the operation queue and does not stop the sandbox: it returns `false` on
+   * failure so callers can decide (retry vs. fail closed). Transient failures
+   * keep the route alive so a later send can retry (N2). A live Vercel sandbox
+   * whose adapter lacks the hook cannot apply the policy, so it fails closed
+   * exactly like a throwing hook.
    */
   private async refreshVercelNetworkPolicy(
     grantsOverride?: readonly SessionCredentialGrant[]
@@ -2185,12 +2175,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const providerRef = state.providerRef;
       const provider = this.provider;
       if (state.kind === 'stopping' || state.kind === 'stopped') return true;
-      if (providerRef === null || !provider.updateNetworkPolicy) return true;
-      const policy = buildControlNetworkPolicy(
-        grantsOverride ?? (await this.activeGrants(Date.now()))
-      );
+      if (providerRef === null) return true;
+      if (!provider.applyContainedCredentials) return false;
+      const grants = grantsOverride ?? (await this.activeGrants(Date.now()));
       await withTimeout(
-        provider.updateNetworkPolicy(providerRef, policy),
+        provider.applyContainedCredentials(providerRef, grants),
         this.sandboxTimers().providerStopAttemptMs,
         'Sandbox network policy update timed out'
       );
@@ -2849,9 +2838,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
           allocationName: pin.allocationName ?? this.sandboxId,
           containment: this.resolvedContainment(),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
-          ...(pin.provider === 'vercel'
-            ? { networkPolicy: buildControlNetworkPolicy(await this.activeGrants(Date.now())) }
-            : {}),
         };
         // N2: create and launch share one bound (the create deadline).
         const created = await withTimeout(
@@ -3024,31 +3010,35 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async settleStoppedCreatedVercelRef(ref: string, confirmed: boolean): Promise<void> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return;
-    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    if (binding?.providerRef !== ref) return;
-    if (!confirmed && binding.terminalAtMs === undefined) {
-      const allocation = await this.readAllocation();
-      await this.billingSchedule.schedule(
-        VERCEL_BILLING_SETTLEMENT_CALLBACK,
-        Date.now() +
-          (allocation.kind === 'stopped'
-            ? DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000
-            : VERCEL_BILLING_DELIVERY_RETRY_MS),
-        context.generation
-      );
-      return;
+    await this.billingRuntime.settleStoppedCreatedRef(ref, confirmed);
+  }
+
+  /**
+   * Fail-closed cleanup for an unconfirmed Vercel stop: fails the preparing
+   * routes and the creating allocation. Runs inside the alarm's serial queue,
+   * so it must not enqueue.
+   */
+  private async failUnconfirmedVercelCleanup(state: AllocationState): Promise<void> {
+    for (const route of await listRoutes(this.db)) {
+      if (route.state === 'preparing') {
+        await failCurrentAttempt(
+          this.routeContext(state),
+          route.sessionId,
+          route.attemptId,
+          'sandbox_lost',
+          'cleanup_unconfirmed'
+        );
+      }
     }
-    const terminalAtMs =
-      binding.terminalAtMs ?? Math.max(binding.createdAtMs, context.usageMeasuredAtMs);
-    if (binding.terminalAtMs === undefined) {
-      await saveVercelBillingBinding(this.ctx.storage, { ...binding, terminalAtMs });
+    if (state.kind === 'creating' && state.allocationId !== null) {
+      await this.applyEvent({
+        type: 'create-failed',
+        at: Date.now(),
+        allocationId: state.allocationId,
+        nextAllocationId: crypto.randomUUID(),
+        retryAllowed: false,
+      });
     }
-    await (
-      await this.ensureVercelBillingRuntime()
-    )?.heartbeat.persistStop({ reason: 'runtime_signal' }, terminalAtMs);
-    await this.prepareVercelSettlement(context.generation);
   }
 
   private async runStop(stopAttempt: number): Promise<void> {
@@ -3563,117 +3553,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async admitVercelCreate(
     pin: StoredProviderPin
   ): Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'> {
-    const existing = await getBillingContext(this.ctx.storage);
-    if (existing !== undefined) {
-      await this.billingSchedule.ensure(
-        VERCEL_BILLING_SETTLEMENT_CALLBACK,
-        Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-        existing.generation
-      );
-      await this.prepareVercelSettlement(existing.generation);
-      return 'retry';
-    }
-    const billing = pin.billing;
-    const owner = await this.requireOwner();
-    if (billing === null) {
-      return owner !== null && !isCloudAgentContainerBillingEnabled(this.env, { userId: owner })
-        ? 'admitted'
-        : 'unavailable';
-    }
-    if (billing.sandboxId !== this.sandboxId) return 'unavailable';
-    if (
-      owner === null ||
-      (billing.subject.type === 'user' && billing.subject.id !== owner) ||
-      (billing.actor.type === 'user' && billing.actor.id !== owner)
-    )
-      return 'unavailable';
-    const enforced =
-      billing.enforcementRequested === true ||
-      isCloudAgentContainerBillingEnabled(this.env, {
-        userId: owner,
-        ...(billing.subject.type === 'org' ? { orgId: billing.subject.id } : {}),
-      });
-    const runtime = await this.ensureVercelBillingRuntime();
-    if (runtime?.identity === undefined) return 'unavailable';
-    try {
-      assertSandboxBillingAllocation(runtime.identity.sandboxClassName, billing);
-    } catch {
-      return 'unavailable';
-    }
-    const outcome = await runtime.lifecycle.openIntervalBeforeCreate(runtime.identity, {
-      ...billing,
-      enforcementRequested: enforced,
-    });
-    await this.billingSchedule.ensure(
-      VERCEL_BILLING_SETTLEMENT_CALLBACK,
-      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-      outcome.generation
-    );
-    if (outcome.kind === 'acked') return 'admitted';
-    if (outcome.kind === 'definite_rejection') {
-      await clearBillingContext(this.ctx.storage);
-      await deleteVercelBillingBinding(this.ctx.storage, outcome.generation);
-      await this.billingSchedule.remove(VERCEL_BILLING_SETTLEMENT_CALLBACK, outcome.generation);
-      return enforced &&
-        outcome.error instanceof ContainerUsageAdmissionError &&
-        outcome.error.code === 'insufficient_credits'
-        ? 'blocked'
-        : enforced
-          ? 'unavailable'
-          : 'admitted';
-    }
-    if (!enforced) return 'admitted';
-    await this.prepareVercelSettlement(outcome.generation);
-    return 'retry';
+    return this.billingRuntime.admitCreate(pin);
   }
 
   private async admitShadowAfterVercelBillingException(pin: StoredProviderPin): Promise<boolean> {
-    const billing = pin.billing;
-    const owner = await this.requireOwner();
-    const resources =
-      pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
-    if (
-      billing === null ||
-      owner === null ||
-      resources === undefined ||
-      billing.enforcementRequested ||
-      billing.sandboxId !== this.sandboxId ||
-      (billing.subject.type === 'user' && billing.subject.id !== owner) ||
-      (billing.actor.type === 'user' && billing.actor.id !== owner) ||
-      isCloudAgentContainerBillingEnabled(this.env, {
-        userId: owner,
-        ...(billing.subject.type === 'org' ? { orgId: billing.subject.id } : {}),
-      })
-    )
-      return false;
-    let identity: VercelBillingIdentity;
-    try {
-      identity = vercelBillingIdentity(resources);
-      assertSandboxBillingAllocation(identity.className, billing);
-    } catch {
-      return false;
-    }
-    const context = await getBillingContext(this.ctx.storage);
-    if (
-      context === undefined ||
-      context.pendingStop !== undefined ||
-      context.measurementStarted ||
-      context.instanceId !== this.sandboxId ||
-      context.service !== identity.service ||
-      context.sku !== identity.sku ||
-      context.subject.type !== billing.subject.type ||
-      context.subject.id !== billing.subject.id ||
-      context.actor.type !== billing.actor.type ||
-      context.actor.id !== billing.actor.id ||
-      (await loadVercelBillingBinding(this.ctx.storage, context.generation)) !== undefined
-    )
-      return false;
-    await this.billingSchedule.ensure(
-      VERCEL_BILLING_SETTLEMENT_CALLBACK,
-      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-      context.generation
-    );
-    return true;
+    return this.billingRuntime.admitShadow(pin);
   }
 
   private async failCreationRoutes(
@@ -3716,344 +3600,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
     createdAtMs?: number;
     terminalAtMs?: number;
   }): Promise<void> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return;
-    const existing = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    if (existing !== undefined && existing.providerRef !== evidence.providerRef) return;
-    const allocation = await this.readAllocation();
-    if (allocation.providerRef !== null) {
-      if (allocation.providerRef !== evidence.providerRef) return;
-    } else {
-      if (
-        allocation.kind === 'stopped' ||
-        existing !== undefined ||
-        evidence.createdAtMs === undefined
-      )
-        return;
-      const decoded = decodeVercelProviderRef(evidence.providerRef);
-      if (decoded?.sandboxName !== (this.providerPin?.allocationName ?? this.sandboxId)) return;
-    }
-    const createdAtMs = evidence.createdAtMs ?? existing?.createdAtMs;
-    if (createdAtMs === undefined) return;
-    const terminalAtMs = evidence.terminalAtMs ?? existing?.terminalAtMs;
-    if (existing?.createdAtMs === createdAtMs && existing.terminalAtMs === terminalAtMs) return;
-    await saveVercelBillingBinding(this.ctx.storage, {
-      generation: context.generation,
-      providerRef: evidence.providerRef,
-      createdAtMs,
-      ...(terminalAtMs === undefined ? {} : { terminalAtMs }),
-    });
-    if (terminalAtMs !== undefined) await this.prepareVercelSettlement(context.generation);
+    await this.billingRuntime.recordLifetime(evidence);
   }
 
   private async afterVercelBillingTransition(event: AllocationEvent): Promise<void> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return;
-    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    const state = await this.readAllocation();
-    if (
-      state.kind === 'stopped' &&
-      binding !== undefined &&
-      binding.terminalAtMs === undefined &&
-      !context.pendingStop &&
-      event.type !== 'provider-gone' &&
-      !(event.type === 'stop-result' && event.confirmed)
-    ) {
-      await this.billingSchedule.schedule(
-        VERCEL_BILLING_SETTLEMENT_CALLBACK,
-        Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS,
-        context.generation
-      );
-      return;
-    }
-    if (state.kind === 'stopped' && !context.pendingStop) {
-      await (
-        await this.ensureVercelBillingRuntime()
-      )?.heartbeat.persistStop(
-        { reason: 'runtime_signal' },
-        binding?.terminalAtMs ?? context.usageMeasuredAtMs
-      );
-    }
-    if (context.pendingStop || binding?.terminalAtMs !== undefined || state.kind === 'stopped') {
-      await this.prepareVercelSettlement(context.generation);
-    } else if (
-      binding !== undefined &&
-      !context.measurementStarted &&
-      (state.kind === 'starting' || state.kind === 'connected' || state.kind === 'disconnected')
-    ) {
-      await (
-        await this.ensureVercelBillingRuntime()
-      )?.lifecycle.pinMeasurementCursor(context.generation, binding.createdAtMs);
-    }
-  }
-
-  private async prepareVercelSettlement(generation: string): Promise<void> {
-    const runtime = await this.ensureVercelBillingRuntime();
-    if (runtime === undefined) return;
-    await runtime.billing.prepareSettlement({ generation });
+    await this.billingRuntime.afterTransition(event);
   }
 
   private async runBillingAlarm(): Promise<void> {
-    for (const entry of await this.billingSchedule.dueEntries()) {
-      const generation = typeof entry.payload === 'string' ? entry.payload : null;
-      if (generation === null) {
-        await this.billingSchedule.completeDue(entry);
-        continue;
-      }
-      const context = await getBillingContext(this.ctx.storage);
-      if (context?.generation !== generation) {
-        await this.billingSchedule.completeDue(entry);
-        await deleteVercelBillingBinding(this.ctx.storage, generation);
-        continue;
-      }
-      const runtime = await this.ensureVercelBillingRuntime();
-      if (runtime === undefined) {
-        await this.deferVercelBilling(generation, entry.callback);
-        continue;
-      }
-      if (entry.callback === VERCEL_BILLING_FORCE_STOP_CALLBACK) {
-        if (runtime.identity === undefined) {
-          await this.deferVercelBilling(generation, entry.callback);
-          continue;
-        }
-        try {
-          await runtime.lifecycle.billingForceStop(runtime.identity, generation);
-          if ((await this.readAllocation()).kind === 'stopped') {
-            await this.billingSchedule.completeDue(entry);
-          } else {
-            await this.deferVercelBilling(generation, entry.callback);
-          }
-        } catch {
-          await this.deferVercelBilling(generation, entry.callback);
-        }
-        continue;
-      }
-      if (entry.callback !== VERCEL_BILLING_SETTLEMENT_CALLBACK) {
-        await this.billingSchedule.completeDue(entry);
-        continue;
-      }
-      const binding = await loadVercelBillingBinding(this.ctx.storage, generation);
-      const state = await this.readAllocation();
-      if (
-        (state.kind === 'stopped' || (state.kind === 'creating' && !this.createInFlight)) &&
-        binding !== undefined &&
-        binding.terminalAtMs === undefined &&
-        !context.pendingStop
-      ) {
-        const observation = await withTimeout(
-          this.provider.observe(binding.providerRef),
-          this.sandboxTimers().providerStopAttemptMs,
-          'Sandbox billing cleanup observation timed out'
-        ).catch(() => ({ status: 'unknown' as const }));
-        const confirmed =
-          observation.status === 'terminal' ||
-          (await this.stopRef(binding.providerRef, state.allocationId));
-        await this.settleStoppedCreatedVercelRef(binding.providerRef, confirmed);
-        if (
-          !confirmed &&
-          Date.now() >= context.startEpochMs + this.sandboxTimers().providerCreateMs
-        ) {
-          for (const route of await listRoutes(this.db)) {
-            if (route.state === 'preparing') {
-              await failCurrentAttempt(
-                this.routeContext(state),
-                route.sessionId,
-                route.attemptId,
-                'sandbox_lost',
-                'cleanup_unconfirmed'
-              );
-            }
-          }
-          if (state.kind === 'creating' && state.allocationId !== null) {
-            await this.applyEvent({
-              type: 'create-failed',
-              at: Date.now(),
-              allocationId: state.allocationId,
-              nextAllocationId: crypto.randomUUID(),
-              retryAllowed: false,
-            });
-          }
-        }
-        continue;
-      }
-      if (
-        context.pendingStop ||
-        binding?.terminalAtMs !== undefined ||
-        state.kind === 'stopped' ||
-        (state.kind === 'creating' &&
-          !this.createInFlight &&
-          binding === undefined &&
-          !context.measurementStarted)
-      ) {
-        if (this.vercelDeliveriesInFlight.has(generation)) {
-          await this.deferVercelBilling(generation, entry.callback);
-          continue;
-        }
-        this.vercelDeliveriesInFlight.add(generation);
-        await this.deferVercelBilling(generation, entry.callback);
-        this.ctx.waitUntil(
-          runtime.billing
-            .deliverSettlement(generation)
-            .catch(() => this.deferVercelBilling(generation, entry.callback))
-            .finally(() => this.vercelDeliveriesInFlight.delete(generation))
-        );
-      } else if (!context.measurementStarted) {
-        await this.billingSchedule.schedule(
-          entry.callback,
-          Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-          generation
-        );
-      } else {
-        try {
-          await runtime.heartbeat.billingHeartbeatTick(generation);
-        } catch {
-          await this.deferVercelBilling(generation, entry.callback);
-        }
-      }
-    }
+    await this.billingRuntime.runAlarm();
   }
 
   private async deferVercelBilling(generation: string, callback: string): Promise<void> {
-    await this.billingSchedule.deferRetry(
-      callback,
-      generation,
-      Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS
-    );
-  }
-
-  private async ensureVercelBillingRuntime(): Promise<typeof this.vercelBilling> {
-    if (
-      this.vercelBilling !== undefined &&
-      (await getBillingContext(this.ctx.storage)) === undefined
-    ) {
-      const resources =
-        this.providerPin?.configuration?.provider === 'vercel'
-          ? this.providerPin.configuration.resources
-          : undefined;
-      const className =
-        resources === undefined ? undefined : vercelBillingIdentity(resources).className;
-      if (this.vercelBilling.identity?.sandboxClassName !== className)
-        this.vercelBilling = undefined;
-    }
-    if (this.vercelBilling !== undefined) return this.vercelBilling;
-    if (this.vercelBillingBuild !== undefined) {
-      await this.vercelBillingBuild;
-      return this.vercelBilling;
-    }
-    const build = this.buildVercelBillingRuntime();
-    this.vercelBillingBuild = build;
-    try {
-      await build;
-    } finally {
-      if (this.vercelBillingBuild === build) this.vercelBillingBuild = undefined;
-    }
-    return this.vercelBilling;
-  }
-
-  private async buildVercelBillingRuntime(): Promise<void> {
-    const resources =
-      this.providerPin?.configuration?.provider === 'vercel'
-        ? this.providerPin.configuration.resources
-        : undefined;
-    const vercelIdentity = resources === undefined ? undefined : vercelBillingIdentity(resources);
-    const service = vercelIdentity?.service ?? (await getBillingContext(this.ctx.storage))?.service;
-    if (service === undefined) return;
-    const identity: BillingIdentity | undefined =
-      vercelIdentity === undefined ? undefined : { sandboxClassName: vercelIdentity.className };
-    const usageClient = createContainerUsageClient(this.env.CONTAINER_USAGE_METER, { service });
-    const schedule = (delaySeconds: number, callback: string, payload?: unknown) =>
-      this.billingSchedule.schedule(callback, Date.now() + delaySeconds * 1_000, payload);
-    const deleteSchedules = (callback: string) => {
-      if (callback !== VERCEL_BILLING_SETTLEMENT_CALLBACK)
-        void this.billingSchedule.remove(callback).catch(() => undefined);
-    };
-    const getState = () => this.vercelBillingContainerState();
-    const stopContainer = async () => {
-      const generation = (await getBillingContext(this.ctx.storage))?.generation;
-      this.ctx.waitUntil(
-        this.dispatchResult({
-          type: 'stop-requested',
-          at: Date.now(),
-          reason: 'billing_blocked',
-        }).catch(async () => {
-          if (generation !== undefined) {
-            await this.billingSchedule.schedule(
-              VERCEL_BILLING_FORCE_STOP_CALLBACK,
-              Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS,
-              generation
-            );
-          }
-        })
-      );
-    };
-    const lifecycle = new MeteredBillingLifecycle({
-      storage: this.ctx.storage,
-      usageClient,
-      schedule,
-      deleteSchedules,
-      getState,
-      isContainerRunning: () => false,
-      stopContainer,
-      destroyContainer: stopContainer,
-      durableObjectId: this.sandboxId,
-      waitUntil: promise => this.ctx.waitUntil(promise),
-    });
-    const heartbeat = installBillingHeartbeat(
-      { schedule, deleteSchedules, getState } as unknown as Parameters<
-        typeof installBillingHeartbeat
-      >[0],
-      {
-        client: usageClient,
-        storage: this.ctx.storage,
-        stopOnStoppedState: false,
-        deferBudgetStopFinalSettlement: true,
-        beforeHeartbeatDelivery: context => lifecycle.ensureStartAcknowledged(context),
-        beforeStopDelivery: context => lifecycle.ensureStartAcknowledged(context),
-        onGenerationClosed: context => this.vercelBilling?.billing.onGenerationClosed(context),
-        enforceBudgetStop: async (budget, expected) => {
-          if (identity === undefined) throw new Error('Vercel billing identity is unavailable');
-          await lifecycle.enforceBudgetStop(identity, budget, expected);
-        },
-        onBudgetWarning: async budget => {
-          if (identity !== undefined) await lifecycle.onBudgetWarning(identity, budget);
-        },
-      }
-    );
-    lifecycle.attachHeartbeat(heartbeat);
-    this.vercelBilling = {
-      identity,
-      lifecycle,
-      heartbeat,
-      billing: new VercelBilling({
-        storage: this.ctx.storage,
-        lifecycle,
-        heartbeat,
-        schedule: this.billingSchedule,
-      }),
-    };
-  }
-
-  private async vercelBillingContainerState(): Promise<{ status: string; lastChange?: number }> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return { status: 'running' };
-    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    if (binding?.terminalAtMs !== undefined)
-      return { status: 'stopped', lastChange: binding.terminalAtMs };
-    if (binding === undefined || this.currentProvider() !== 'vercel') return { status: 'running' };
-    try {
-      const observed = await this.provider.observe(binding.providerRef);
-      if (observed.status !== 'terminal') return { status: 'running' };
-      const refreshed = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-      return {
-        status: 'stopped',
-        lastChange: refreshed?.terminalAtMs ?? context.usageMeasuredAtMs ?? binding.createdAtMs,
-      };
-    } catch {
-      return { status: 'running' };
-    }
+    await this.billingRuntime.defer(generation, callback);
   }
 
   // --- provider selection -----------------------------------------------------
+
+  private ensureVercelBillingRuntime() {
+    return this.billingRuntime.ensureRuntime();
+  }
 
   private createProviderAdapter(pin: StoredProviderPin): ProviderAdapter {
     const allocationName = pin.allocationName ?? this.sandboxId;
@@ -4066,6 +3632,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           sandboxName: allocationName,
           config,
           billingLifetimeSink: evidence => this.recordVercelBillingLifetime(evidence),
+          // Authoritative live grants: read at create and on every credential
+          // refresh, never frozen into the adapter at construction.
+          readContainedGrants: () => this.activeGrants(Date.now()),
         });
       }
       case 'cloudflare-containers': {

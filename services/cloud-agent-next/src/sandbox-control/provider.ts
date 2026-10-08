@@ -1,5 +1,5 @@
 import type { SandboxBillingInput } from '../container-usage-context.js';
-import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import type { SessionCredentialGrant } from './session-credentials.js';
 import {
   CLOUDFLARE_CONTAINERS_INSTANCES,
   vercelSandboxResourcesSchema,
@@ -79,7 +79,6 @@ export type ProviderAllocationIntent = {
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
-  networkPolicy?: VercelSandboxNetworkPolicy;
 };
 
 export type ProviderObservation = {
@@ -120,8 +119,11 @@ export type ProviderAdapter = {
    * that the caller ignores.
    */
   captureRepository?(ref: string, repoKey: string, commit?: string): Promise<boolean>;
-  updateNetworkPolicy?(
-    providerRef: string,
-    networkPolicy: VercelSandboxNetworkPolicy
-  ): Promise<void>;
+  /**
+   * Replace the live sandbox's contained-credential network policy with one
+   * built from the authoritative grants. Only a provider whose network policy
+   * carries contained credentials implements it; a missing hook on a live
+   * provider is a failure the caller treats as fail-closed.
+   */
+  applyContainedCredentials?(ref: string, grants: readonly SessionCredentialGrant[]): Promise<void>;
 };

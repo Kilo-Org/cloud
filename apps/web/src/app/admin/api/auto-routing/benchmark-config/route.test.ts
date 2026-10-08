@@ -6,7 +6,9 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type * as ExclusiveModelProviderModule from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider';
 import type * as OpenRouterModule from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
@@ -24,9 +26,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   const actual = jest.requireActual<typeof ModelsModule>(
     '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
   );
-  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
-    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
-  );
   const stubModel: KiloExclusiveModel = {
     public_id: 'test-exclusive/chat-only',
     display_name: 'Test chat-only model',
@@ -35,7 +34,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     max_completion_tokens: 4096,
     status: 'public',
     flags: [],
-    provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
+    provider: 'openrouter',
     internal_id: 'stub-internal',
     pricing: null,
     inference_provider_restriction: [],
@@ -44,6 +43,27 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     ...actual,
     findKiloExclusiveModel: (id: string) =>
       id === 'test-exclusive/chat-only' ? stubModel : actual.findKiloExclusiveModel(id),
+  };
+});
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider', () => {
+  const actual = jest.requireActual<typeof ExclusiveModelProviderModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider'
+  );
+  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
+  );
+  const chatOnlyProvider: Provider = {
+    ...OPENROUTER,
+    id: 'dev-tools',
+    supportedChatApis: ['chat_completions'],
+  };
+  return {
+    ...actual,
+    getKiloExclusiveModelProvider: (model: KiloExclusiveModel) =>
+      model.public_id === 'test-exclusive/chat-only'
+        ? chatOnlyProvider
+        : actual.getKiloExclusiveModelProvider(model),
   };
 });
 

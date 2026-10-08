@@ -1,5 +1,4 @@
 import { describe, expect, test } from '@jest/globals';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   applyFreeEndpointDataPolicy,
@@ -40,7 +39,7 @@ function freeExclusiveModel(
     max_completion_tokens: 1,
     status: 'public',
     flags: [],
-    provider: OPENROUTER,
+    provider: 'openrouter',
     pricing: null,
     inference_provider_restriction,
   };

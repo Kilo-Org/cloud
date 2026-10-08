@@ -21,6 +21,7 @@ import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { getKiloExclusiveModelProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
@@ -273,7 +274,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider: kiloExclusiveModel?.provider ?? OPENROUTER,
+    provider: kiloExclusiveModel ? getKiloExclusiveModelProvider(kiloExclusiveModel) : OPENROUTER,
     userByok: null,
     bypassAccessCheck: false,
   };

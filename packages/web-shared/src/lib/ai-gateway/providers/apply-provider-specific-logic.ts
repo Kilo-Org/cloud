@@ -11,7 +11,6 @@ import {
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,
@@ -372,10 +371,6 @@ export async function applyProviderSpecificLogic(
 
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
-  }
-
-  if (provider.id === 'vercel') {
-    await applyVercelSettings(requestedModel, requestToMutate, userByok);
   }
 
   await provider.transformRequest({

@@ -1,6 +1,4 @@
 import { describe, it, expect } from '@jest/globals';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   applyKiloExclusiveModelSettings,
   calculateCost_mUsd,
@@ -29,7 +27,7 @@ function makeModel(
     max_completion_tokens: 0,
     status: 'public',
     flags: [],
-    provider: OPENROUTER,
+    provider: 'openrouter',
     pricing: null,
     inference_provider_restriction: [],
     ...overrides,
@@ -95,21 +93,15 @@ describe('calculateCost_mUsd', () => {
 });
 
 describe('convertFromKiloExclusiveModel', () => {
-  it('does not expose the provider or its credentials in public metadata', () => {
+  it('does not expose the provider or upstream model in public metadata', () => {
     const model = makeModel({
       internal_id: 'private/upstream-model',
-      provider: {
-        ...OPENROUTER,
-        apiKey: 'exclusive-provider-secret',
-        apiUrl: 'https://private-provider.example/v1',
-      },
+      provider: 'martian',
     });
     const publicModel = convertFromKiloExclusiveModel(model);
     expect(publicModel).not.toHaveProperty('provider');
-    expect(publicModel).not.toHaveProperty('apiKey');
     const serialized = JSON.stringify(publicModel);
-    expect(serialized).not.toContain('exclusive-provider-secret');
-    expect(serialized).not.toContain('private-provider.example');
+    expect(serialized).not.toContain('martian');
     expect(serialized).not.toContain('private/upstream-model');
   });
 
@@ -144,7 +136,7 @@ describe('getInferenceProvider', () => {
   it('uses a single inference provider restriction before the gateway', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
-      provider: VERCEL_AI_GATEWAY,
+      provider: 'vercel',
       inference_provider_restriction: ['openai'],
     });
 
@@ -156,11 +148,12 @@ describe('getInferenceProvider', () => {
     });
   });
 
-  it('reports data collection for a concrete gateway provider', () => {
+  it('reports data collection for a restricted inference provider', () => {
     const model = makeModel({
       internal_id: 'vendor/x',
-      provider: { ...OPENROUTER, id: 'mistral' },
+      provider: 'openrouter',
       flags: ['requires-data-collection'],
+      inference_provider_restriction: ['mistral'],
     });
 
     expect(getInferenceProvider(model)).toEqual({

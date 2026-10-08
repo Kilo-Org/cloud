@@ -212,13 +212,13 @@ describe('getProvider exclusive model routing', () => {
       const result = await getProvider(providerInput(model.public_id));
       expect(result.kind).toBe('provider');
       if (result.kind !== 'provider') throw new Error('Expected a provider');
-      expect(result.provider).toBe(model.status === 'disabled' ? OPENROUTER : model.provider);
+      expect(result.provider.id).toBe(model.status === 'disabled' ? OPENROUTER.id : model.provider);
       expect(result.userByok).toBeNull();
       expect(result.bypassAccessCheck).toBe(false);
     }
   );
 
-  test.each(kiloExclusiveModels.filter(({ provider }) => provider === MARTIAN))(
+  test.each(kiloExclusiveModels.filter(({ provider }) => provider === 'martian'))(
     'does not divert $public_id to Vercel or BYOK',
     async model => {
       jest.mocked(shouldRouteToVercel).mockResolvedValue(true);

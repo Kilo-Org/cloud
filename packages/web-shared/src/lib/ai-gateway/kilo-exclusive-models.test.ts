@@ -13,6 +13,13 @@ import {
   stepfun_37_flash_free_model,
   glyph_cluster_stealth_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getKiloExclusiveModelProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider';
+
+function providerFor(publicId: string) {
+  const model = findKiloExclusiveModel(publicId);
+  if (!model) throw new Error(`${publicId} is not a live Kilo-exclusive model`);
+  return getKiloExclusiveModelProvider(model);
+}
 
 describe('Kilo-exclusive model providers', () => {
   test.each([
@@ -22,13 +29,13 @@ describe('Kilo-exclusive model providers', () => {
     claude_opus_4_6_stealth_model,
     qwen36_plus_stealth_model,
   ])('serves $public_id through Martian', model => {
-    expect(findKiloExclusiveModel(model.public_id)?.provider).toBe(MARTIAN);
+    expect(providerFor(model.public_id)).toBe(MARTIAN);
   });
 
   test.each([gemma_4_26b_a4b_it_free_model, stepfun_37_flash_free_model])(
     'serves $public_id through OpenRouter',
     model => {
-      expect(findKiloExclusiveModel(model.public_id)?.provider).toBe(OPENROUTER);
+      expect(providerFor(model.public_id)).toBe(OPENROUTER);
     }
   );
 
@@ -44,6 +51,6 @@ describe('Kilo-exclusive model providers', () => {
       pricing: null,
       inference_provider_restriction: [],
     });
-    expect(findKiloExclusiveModel('stealth/glyph-cluster')?.provider).toBe(VERCEL_AI_GATEWAY);
+    expect(providerFor('stealth/glyph-cluster')).toBe(VERCEL_AI_GATEWAY);
   });
 });

@@ -1,7 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from './model-api-kinds';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type * as ExclusiveModelProviderModule from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider';
 import type * as OpenRouterModule from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 // Stub the catalog so the rejection test doesn't depend on any specific provider file.
@@ -12,9 +14,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   const actual = jest.requireActual<typeof ModelsModule>(
     '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
   );
-  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
-    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
-  );
   const stubModels: KiloExclusiveModel[] = [
     {
       public_id: 'test-exclusive/chat-only',
@@ -24,7 +23,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
       max_completion_tokens: 4096,
       status: 'public',
       flags: [],
-      provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
+      provider: 'openrouter',
       internal_id: 'stub-internal',
       pricing: null,
       inference_provider_restriction: [],
@@ -37,7 +36,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
       max_completion_tokens: 4096,
       status: 'disabled',
       flags: [],
-      provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
+      provider: 'openrouter',
       internal_id: 'stub-internal-disabled',
       pricing: null,
       inference_provider_restriction: [],
@@ -48,6 +47,27 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     findKiloExclusiveModel: (id: string) =>
       stubModels.find(m => m.public_id === id && m.status !== 'disabled') ??
       actual.findKiloExclusiveModel(id),
+  };
+});
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider', () => {
+  const actual = jest.requireActual<typeof ExclusiveModelProviderModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider'
+  );
+  const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
+  );
+  const chatOnlyProvider: Provider = {
+    ...OPENROUTER,
+    id: 'dev-tools',
+    supportedChatApis: ['chat_completions'],
+  };
+  return {
+    ...actual,
+    getKiloExclusiveModelProvider: (model: KiloExclusiveModel) =>
+      model.public_id.startsWith('test-exclusive/')
+        ? chatOnlyProvider
+        : actual.getKiloExclusiveModelProvider(model),
   };
 });
 

@@ -235,13 +235,8 @@ describe('GET /api/openrouter/models', () => {
   test.each([
     ['/api/openrouter/models', GET],
     ['/api/gateway/v1/models', gatewayV1ModelsGET],
-  ] as const)('%s never serializes exclusive provider credentials', async (path, handler) => {
+  ] as const)('%s never serializes the exclusive model provider', async (path, handler) => {
     mockAuth = { user: null, organizationId: null };
-    jest.replaceProperty(qwen36_plus_stealth_model, 'provider', {
-      ...qwen36_plus_stealth_model.provider,
-      apiKey: 'exclusive-catalog-secret',
-      apiUrl: 'https://private-exclusive-provider.example/v1',
-    });
     jest
       .spyOn(global, 'fetch')
       .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
@@ -252,15 +247,11 @@ describe('GET /api/openrouter/models', () => {
     );
     expect(publicModel).toBeDefined();
     expect(publicModel).not.toHaveProperty('provider');
-    expect(publicModel).not.toHaveProperty('apiKey');
-    expect(JSON.stringify(catalog)).not.toContain('exclusive-catalog-secret');
 
     const response = await handler(createTestRequest(path));
     expect(response.status).toBe(200);
     const rawBody = await response.text();
     expect(rawBody).toContain(qwen36_plus_stealth_model.public_id);
-    expect(rawBody).not.toContain('exclusive-catalog-secret');
-    expect(rawBody).not.toContain('private-exclusive-provider.example');
     expect(rawBody).not.toContain('"apiKey"');
     expect(rawBody).not.toContain('"provider"');
   });

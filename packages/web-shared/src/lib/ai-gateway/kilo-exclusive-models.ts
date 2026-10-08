@@ -16,9 +16,6 @@ import type {
   PricingTiers,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { type ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 const CLAUDE_OPUS_STEALTH_PRICING: PricingTiers = [
   {
@@ -41,7 +38,7 @@ export const claude_opus_4_8_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  provider: MARTIAN,
+  provider: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
@@ -56,7 +53,7 @@ export const claude_opus_4_7_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  provider: MARTIAN,
+  provider: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
@@ -83,7 +80,7 @@ export const claude_sonnet_4_6_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 64_000,
-  provider: MARTIAN,
+  provider: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_SONNET_STEALTH_PRICING },
   inference_provider_restriction: [],
@@ -98,7 +95,7 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  provider: MARTIAN,
+  provider: 'martian',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
   pricing: { tiers: CLAUDE_OPUS_STEALTH_PRICING },
   inference_provider_restriction: [],
@@ -113,7 +110,7 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   max_completion_tokens: 32768,
   status: 'hidden', // usable through kilo-auto
   flags: ['vision', 'vercel-routing', 'rate-limited'],
-  provider: OPENROUTER,
+  provider: 'openrouter',
   internal_id: GEMMA_4_26B_A4B_IT_ID,
   pricing: null,
   inference_provider_restriction: [],
@@ -169,7 +166,7 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   max_completion_tokens: 65_536,
   status: 'public',
   flags: ['reasoning', 'vision', 'stealth', 'requires-data-collection'],
-  provider: MARTIAN,
+  provider: 'martian',
   internal_id: 'qwen/qwen3.6-plus',
   pricing: {
     tiers: makeTieredPricing(
@@ -208,7 +205,7 @@ export const stepfun_37_flash_free_model: KiloExclusiveModel = {
   max_completion_tokens: 262_144,
   status: 'public',
   flags: ['reasoning', 'vision', 'vercel-routing'],
-  provider: OPENROUTER,
+  provider: 'openrouter',
   internal_id: 'stepfun/step-3.7-flash',
   pricing: null,
   inference_provider_restriction: ['stepfun'],
@@ -223,7 +220,7 @@ export const glyph_cluster_stealth_free_model: KiloExclusiveModel = {
   max_completion_tokens: 256_000,
   status: 'public',
   flags: ['reasoning', 'stealth', 'requires-data-collection'],
-  provider: VERCEL_AI_GATEWAY,
+  provider: 'vercel',
   internal_id: 'stealth/glyph-cluster',
   pricing: null,
   inference_provider_restriction: [],

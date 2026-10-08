@@ -2,7 +2,7 @@ import {
   OpenRouterInferenceProviderIdSchema,
   type OpenRouterInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   isOpenRouterProviderConfig,
   type GatewayRequest,
@@ -16,6 +16,8 @@ export type KiloExclusiveModelFlag =
   | 'vercel-routing'
   | 'rate-limited'
   | 'requires-data-collection';
+
+export type KiloExclusiveModelProviderId = Extract<ProviderId, 'openrouter' | 'martian' | 'vercel'>;
 
 export type Usage = {
   uncachedInputTokens: number;
@@ -80,7 +82,11 @@ export type KiloExclusiveModel = {
   max_completion_tokens: number;
   status: 'public' | 'hidden' | 'disabled';
   flags: KiloExclusiveModelFlag[];
-  provider: Provider;
+  /**
+   * Resolve with `getKiloExclusiveModelProvider`. An id rather than the definition keeps the
+   * model registry out of provider transforms' import graph, which read the registry.
+   */
+  provider: KiloExclusiveModelProviderId;
   internal_id: string;
   pricing: KiloExclusivePricing | null;
   /**
@@ -202,9 +208,9 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
   const slug: OpenRouterInferenceProviderId | null =
     model.inference_provider_restriction.length === 1
       ? model.inference_provider_restriction[0]
-      : model.provider.id === 'openrouter' || model.provider.id === 'vercel'
+      : model.provider === 'openrouter' || model.provider === 'vercel'
         ? null
-        : OpenRouterInferenceProviderIdSchema.parse(model.provider.id);
+        : OpenRouterInferenceProviderIdSchema.parse(model.provider);
   if (!slug) return null;
 
   return {

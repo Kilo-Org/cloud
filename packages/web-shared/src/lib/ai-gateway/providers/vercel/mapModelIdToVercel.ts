@@ -61,7 +61,7 @@ export function mapResolvedModelIdToVercel(modelId: string) {
       m =>
         m.public_id === modelId &&
         m.status !== 'disabled' &&
-        (m.provider.id === 'vercel' || m.flags.includes('vercel-routing'))
+        (m.provider === 'vercel' || m.flags.includes('vercel-routing'))
     )?.internal_id ?? modelId;
 
   const slashIndex = internalId.indexOf('/');

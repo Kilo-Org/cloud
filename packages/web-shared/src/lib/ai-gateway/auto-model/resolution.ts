@@ -37,6 +37,7 @@ import {
   isKiloExclusiveFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getKiloExclusiveModelProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model-provider';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -92,7 +93,8 @@ async function getEligibleAutoFreeModels(
       const kiloModel = findKiloExclusiveModel(model);
       return (
         kiloModel !== null &&
-        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
+        (apiKind === null ||
+          getKiloExclusiveModelProvider(kiloModel).supportedChatApis.some(k => k === apiKind))
       );
     }
     return openRouterModels.has(model);

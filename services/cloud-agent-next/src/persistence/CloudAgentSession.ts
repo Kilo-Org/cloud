@@ -33,6 +33,7 @@ import {
   type SessionRuntimeLocator,
 } from '../sandbox-control/worktree-ownership.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
+import { renderRecentActivity } from '../callbacks/recent-activity.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import { sql } from 'drizzle-orm';
@@ -424,6 +425,23 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const lastAssistantMessageText =
       status === 'completed' ? await this.getLatestAssistantMessageText() : undefined;
 
+    let recentActivity: string | undefined;
+    if (status === 'completed' && messageId && metadata.auth.kiloSessionId) {
+      try {
+        recentActivity = renderRecentActivity(
+          this.eventQueries.getRecentAssistantMessagesForUserMessage(
+            sessionId,
+            metadata.auth.kiloSessionId,
+            messageId
+          )
+        );
+      } catch {
+        logger
+          .withFields({ sessionId, messageId })
+          .warn('Unable to include recent activity in the callback snapshot');
+      }
+    }
+
     const payload: CallbackJob['payload'] = {
       sessionId,
       cloudAgentSessionId: sessionId,
@@ -437,6 +455,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,
+      recentActivity,
     };
 
     if (messageId) {
@@ -590,6 +609,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           return resolvedSessionId ?? metadata?.identity.sessionId ?? '';
         },
         getCallbackQueue: () => this.env.CALLBACK_QUEUE,
+        getRecentAssistantMessagesForUserMessage: (sessionId, kiloSessionId, parentMessageId) =>
+          this.eventQueries.getRecentAssistantMessagesForUserMessage(
+            sessionId,
+            kiloSessionId,
+            parentMessageId
+          ),
         sendPushNotification: params =>
           this.env.NOTIFICATIONS.sendCloudAgentSessionNotification(params),
         hasConnectedStreamClients: () => getConnectedStreamClientCount(this.ctx) > 0,

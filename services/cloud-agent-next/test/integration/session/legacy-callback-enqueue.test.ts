@@ -2,6 +2,8 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, it, expect } from 'vitest';
 import type { CallbackJob } from '../../../src/callbacks/types.js';
 import { registerReadySession } from '../../helpers/session-setup.js';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { createEventQueries } from '../../../src/session/queries/events.js';
 
 function installCallbackQueue(
   instance: { env: unknown },
@@ -54,7 +56,7 @@ describe('legacy execution callback enqueue', () => {
     const sessionId = 'agent_legacy_callback_payload';
     const stub = sessionStub(userId, sessionId);
 
-    const jobs = await runInDurableObject(stub, async instance => {
+    const jobs = await runInDurableObject(stub, async (instance, state) => {
       const sentCallbackJobs: CallbackJob[] = [];
       installCallbackQueue(instance, async job => {
         sentCallbackJobs.push(job);
@@ -82,6 +84,41 @@ describe('legacy execution callback enqueue', () => {
         executionId: 'exc_legacy_callback_payload',
         status: 'running',
       });
+      const queries = createEventQueries(
+        drizzle(state.storage, { logger: false }),
+        state.storage.sql
+      );
+      queries.upsert({
+        executionId: 'exc_legacy_callback_payload',
+        sessionId,
+        streamEventType: 'kilocode',
+        timestamp: 1,
+        entityId: 'message/assistant',
+        payload: JSON.stringify({
+          event: 'message.updated',
+          properties: {
+            info: {
+              id: 'assistant',
+              role: 'assistant',
+              sessionID: '44444444-4444-4444-8444-444444444444',
+              parentID: 'msg_018f1e2d3c4bCallMsgAbCdEfG',
+            },
+          },
+        }),
+      });
+      queries.upsert({
+        executionId: 'exc_legacy_callback_payload',
+        sessionId,
+        streamEventType: 'kilocode',
+        timestamp: 2,
+        entityId: 'part/assistant/text',
+        payload: JSON.stringify({
+          event: 'message.part.updated',
+          properties: {
+            part: { id: 'text', messageID: 'assistant', type: 'text', text: 'Legacy activity' },
+          },
+        }),
+      });
       await instance.updateExecutionStatus({
         executionId: 'exc_legacy_callback_payload',
         status: 'completed',
@@ -95,6 +132,10 @@ describe('legacy execution callback enqueue', () => {
       executionId: 'exc_legacy_callback_payload',
       messageId: 'msg_018f1e2d3c4bCallMsgAbCdEfG',
       status: 'completed',
+    });
+    expect(JSON.parse(jobs[0].payload.recentActivity ?? 'null')).toEqual({
+      partial: true,
+      messages: [{ text: 'Legacy activity', tools: [] }],
     });
   });
 

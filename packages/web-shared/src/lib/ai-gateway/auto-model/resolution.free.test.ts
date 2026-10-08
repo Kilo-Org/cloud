@@ -38,14 +38,30 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   };
 });
 
+const actualFindKiloExclusiveModel = jest.requireActual<typeof ExclusiveModelsModule>(
+  '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+).findKiloExclusiveModel;
+
 function configure(models: string[]) {
   jest
     .mocked(getConfiguredAutoFreeModels)
     .mockResolvedValue(models.map(model => ({ model, weight: 1, reasoning: { enabled: true } })));
 }
 
+function restrictGemmaToChatCompletions() {
+  jest.mocked(findKiloExclusiveModel).mockImplementation(model =>
+    model === gemma_4_26b_a4b_it_free_model.public_id
+      ? {
+          ...gemma_4_26b_a4b_it_free_model,
+          provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
+        }
+      : actualFindKiloExclusiveModel(model)
+  );
+}
+
 describe('getAutoFreeCandidates', () => {
   beforeEach(() => {
+    jest.mocked(findKiloExclusiveModel).mockImplementation(actualFindKiloExclusiveModel);
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
     configure([
       ...kiloExclusiveModels.map(model => model.public_id),
@@ -69,10 +85,7 @@ describe('getAutoFreeCandidates', () => {
   );
 
   it('filters using the model provider capabilities', async () => {
-    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce({
-      ...gemma_4_26b_a4b_it_free_model,
-      provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
-    });
+    restrictGemmaToChatCompletions();
 
     expect(await getAutoFreeCandidates('messages')).toEqual(
       [
@@ -84,10 +97,7 @@ describe('getAutoFreeCandidates', () => {
   });
 
   it('does not filter provider capabilities when the API kind is null', async () => {
-    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce({
-      ...gemma_4_26b_a4b_it_free_model,
-      provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
-    });
+    restrictGemmaToChatCompletions();
 
     expect(await getAutoFreeCandidates(null)).toContain(gemma_4_26b_a4b_it_free_model.public_id);
   });

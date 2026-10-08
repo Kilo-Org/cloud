@@ -12,14 +12,13 @@
  */
 
 import type { Context } from 'hono';
-import { generateSandboxId } from '../sandbox-id.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { resolveSessionStub, type SessionStub } from '../sandbox-session/session-stub.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 import type { HonoContext } from '../hono-context.js';
 import type { AllocationView } from '../control-plane/sandbox/allocation.js';
-import type { SandboxId, SessionId } from '../types.js';
+import type { SessionId } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 
 export type AllocationInspection = {
@@ -83,16 +82,12 @@ export async function handleAllocationInspect(c: Context<HonoContext>): Promise<
     return new Response('Session not found', { status: 404 });
   }
 
-  const logicalSandboxId: SandboxId =
-    metadata.workspace?.sandboxId ??
-    (await generateSandboxId(
-      env.PER_SESSION_SANDBOX_ORG_IDS,
-      metadata.identity.orgId,
-      userId,
-      metadata.identity.sessionId,
-      metadata.identity.botId,
-      { createdOnPlatform: metadata.identity.createdOnPlatform, legacyFallback: true }
-    ));
+  // A control-plane session always stores its key; regenerating one would guess
+  // a legacy prefixed key and inspect the wrong sandbox.
+  const logicalSandboxId = metadata.workspace?.sandboxId;
+  if (logicalSandboxId === undefined) {
+    return new Response('Session has no sandbox', { status: 404 });
+  }
 
   const state = await withDORetry(
     () => getSandboxControlStub(env, logicalSandboxId),

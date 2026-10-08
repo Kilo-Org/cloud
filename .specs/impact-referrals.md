@@ -551,7 +551,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
       rewards represent up to five future monthly referral bonus applications.
 
 120.  At eligible Kilo Pass base monthly issuance time, if the beneficiary has one or more pending unexpired Kilo Pass
-      referral rewards and no permanent application blocker applies, the system MUST consume exactly one reward.
+      referral rewards, no permanent application blocker applies, and the issuance is not the beneficiary's welcome-month
+      issuance (Rule 123), the system MUST consume exactly one reward.
 
 121.  At most one pending Kilo Pass referral reward MUST be consumed per eligible monthly Kilo Pass base issuance.
 

@@ -221,17 +221,29 @@ export function checkExclusiveModelProviderAllowed(
   model: string,
   provider: OpenRouterProviderConfig | undefined
 ) {
-  if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
   const inferenceProvider = getInferenceProvider(exclusiveModel)?.slug;
   if (!inferenceProvider) return null;
-  if (
-    (!provider.only || provider.only.includes(inferenceProvider)) &&
-    (!provider.ignore || !provider.ignore.includes(inferenceProvider))
-  )
-    return null;
-  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProvider}`;
+  return checkInferenceProvidersAllowed([inferenceProvider], provider);
+}
+
+/**
+ * Rejects a request whose provider config excludes every provider that can
+ * serve the model. Used for models routed to a fixed set of providers.
+ */
+export function checkInferenceProvidersAllowed(
+  inferenceProviders: readonly string[],
+  provider: OpenRouterProviderConfig | undefined
+) {
+  if (!provider) return null;
+  const allowed = inferenceProviders.some(
+    inferenceProvider =>
+      (!provider.only || provider.only.includes(inferenceProvider)) &&
+      (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+  );
+  if (allowed) return null;
+  const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
       error: error,

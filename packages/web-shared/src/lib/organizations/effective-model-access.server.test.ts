@@ -1,4 +1,10 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  privateCustomLlmDefinition,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
@@ -135,7 +141,49 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    beforeAll(async () => {
+      await insertCustomLlmForTest('acme/private-model', privateCustomLlmDefinition());
+      await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/private-model');
+      await deleteCustomLlmForTest('acme/public-model');
+    });
+
+    it('keeps a private custom LLM exempt from effective Enterprise restrictions', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(context());
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/private-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+
+    it('routes a public custom LLM only to its allowed inference providers', async () => {
+      const withProviderAllowList = (provider_allow_list: string[]) =>
+        evaluateEffectiveModelAccessPolicy(
+          context({
+            organization: {
+              ...context().organization,
+              settings: { model_deny_list: [], provider_allow_list },
+            },
+            defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+          })
+        );
+      const allowsAcme = withProviderAllowList(['acme', 'openai']);
+      const allowsOpenAi = withProviderAllowList(['openai']);
+
+      await expect(
+        getEffectiveModelDecision(allowsAcme, 'acme/public-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['acme']) });
+      await expect(
+        getEffectiveModelDecision(allowsOpenAi, 'acme/public-model', async () => new Set())
+      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+    });
+  });
+
+  it.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from effective Enterprise restrictions',
     async modelId => {
       const policy = evaluateEffectiveModelAccessPolicy(context());

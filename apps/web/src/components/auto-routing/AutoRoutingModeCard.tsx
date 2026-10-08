@@ -33,7 +33,6 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { cn } from '@/lib/utils';
 
@@ -423,12 +422,13 @@ export function isEligiblePoolModel(model: {
   name?: string;
   isFree?: boolean;
   hasUserByokAvailable?: boolean;
+  isPrivateCustomLlm?: boolean;
   pricing?: { prompt?: string } | null;
 }): boolean {
   const id = model.id;
   if (!id) return false;
   if (isVirtualAutoModelId(id)) return false;
-  if (id.startsWith(CUSTOM_LLM_PREFIX)) return false;
+  if (model.isPrivateCustomLlm) return false;
   if (isDirectByokOnlyModel(model)) return false;
   return true;
 }
@@ -439,6 +439,7 @@ export type SelectorListModel = {
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
+  isPrivateCustomLlm?: boolean;
   pricing?: { prompt?: string } | null;
   opencode?: { variants?: Record<string, unknown> } | null;
 };

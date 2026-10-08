@@ -22,6 +22,16 @@ import {
 } from '@/components/ui/table';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   useCustomLlms,
   useCopyCustomLlm,
   useUpsertCustomLlm,
@@ -31,7 +41,6 @@ import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { toast } from 'sonner';
 import { Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
 import Editor from '@monaco-editor/react';
@@ -43,6 +52,7 @@ type EditorState = {
   open: boolean;
   mode: 'create' | 'edit';
   publicId: string;
+  wasPublic: boolean;
   credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
@@ -50,6 +60,7 @@ type EditorState = {
 
 type CopyState = {
   sourcePublicId: string;
+  sourceIsPublic: boolean;
   publicId: string;
   displayName: string;
   internalId: string;
@@ -74,10 +85,28 @@ const INITIAL_CREDENTIALS: CustomLlmCredentials = {
   api_key: '',
 };
 
+type UpsertInput = {
+  public_id: string;
+  definition: CustomLlmDefinition;
+  credentials: CustomLlmCredentials | undefined;
+};
+
+type CopyInput = {
+  source_public_id: string;
+  public_id: string;
+  display_name: string;
+  internal_id: string | undefined;
+};
+
+type PendingPublicChange =
+  | { kind: 'upsert'; input: UpsertInput }
+  | { kind: 'copy'; input: CopyInput };
+
 const initialEditorState: EditorState = {
   open: false,
   mode: 'create',
   publicId: '',
+  wasPublic: false,
   credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
   definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
   validationError: null,
@@ -90,12 +119,14 @@ export function CustomLlmsContent() {
   const deleteMutation = useDeleteCustomLlm();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
   const [copy, setCopy] = useState<CopyState | null>(null);
+  const [pendingPublicChange, setPendingPublicChange] = useState<PendingPublicChange | null>(null);
 
   const openCreate = useCallback(() => {
     setEditor({
       open: true,
       mode: 'create',
       publicId: '',
+      wasPublic: false,
       credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
       definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
       validationError: null,
@@ -107,6 +138,7 @@ export function CustomLlmsContent() {
       open: true,
       mode: 'edit',
       publicId,
+      wasPublic: definition.public !== undefined,
       credentialsJson: '',
       definitionJson: JSON.stringify(definition, null, 2),
       validationError: null,
@@ -117,22 +149,53 @@ export function CustomLlmsContent() {
     setEditor(initialEditorState);
   }, []);
 
-  const openCopy = useCallback(
-    (sourcePublicId: string, sourceDisplayName: string, sourceInternalId: string | undefined) => {
-      setCopy({
-        sourcePublicId,
-        publicId: sourcePublicId,
-        displayName: sourceDisplayName,
-        internalId: sourceInternalId ?? '',
-        validationError: null,
-      });
-    },
-    []
-  );
+  const openCopy = useCallback((sourcePublicId: string, source: CustomLlmDefinition) => {
+    setCopy({
+      sourcePublicId,
+      sourceIsPublic: source.public !== undefined,
+      publicId: sourcePublicId,
+      displayName: source.display_name,
+      internalId: source.internal_id ?? '',
+      validationError: null,
+    });
+  }, []);
 
   const closeCopy = useCallback(() => {
     setCopy(null);
   }, []);
+
+  const submitCopy = useCallback(
+    async (input: CopyInput) => {
+      try {
+        await copyMutation.mutateAsync(input);
+        toast.success('Custom LLM copied');
+        closeCopy();
+      } catch (error) {
+        setCopy(prev =>
+          prev
+            ? {
+                ...prev,
+                validationError: { field: null, message: formatZodError(error) },
+              }
+            : prev
+        );
+      }
+    },
+    [copyMutation, closeCopy]
+  );
+
+  const submitUpsert = useCallback(
+    async (input: UpsertInput) => {
+      try {
+        await upsertMutation.mutateAsync(input);
+        toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
+        closeEditor();
+      } catch (error) {
+        toast.error(formatZodError(error));
+      }
+    },
+    [editor.mode, upsertMutation, closeEditor]
+  );
 
   const handleCopy = useCallback(async () => {
     if (!copy) return;
@@ -153,21 +216,6 @@ export function CustomLlmsContent() {
       return;
     }
 
-    if (!publicId.startsWith(CUSTOM_LLM_PREFIX)) {
-      setCopy(prev =>
-        prev
-          ? {
-              ...prev,
-              validationError: {
-                field: 'publicId',
-                message: `New public ID must start with "${CUSTOM_LLM_PREFIX}"`,
-              },
-            }
-          : prev
-      );
-      return;
-    }
-
     if (!displayName) {
       setCopy(prev =>
         prev
@@ -180,39 +228,23 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await copyMutation.mutateAsync({
-        source_public_id: copy.sourcePublicId,
-        public_id: publicId,
-        display_name: displayName,
-        internal_id: internalId || undefined,
-      });
-      toast.success('Custom LLM copied');
-      closeCopy();
-    } catch (error) {
-      setCopy(prev =>
-        prev
-          ? {
-              ...prev,
-              validationError: { field: null, message: formatZodError(error) },
-            }
-          : prev
-      );
+    const input: CopyInput = {
+      source_public_id: copy.sourcePublicId,
+      public_id: publicId,
+      display_name: displayName,
+      internal_id: internalId || undefined,
+    };
+    if (copy.sourceIsPublic) {
+      setPendingPublicChange({ kind: 'copy', input });
+      return;
     }
-  }, [copy, copyMutation, closeCopy]);
+    await submitCopy(input);
+  }, [copy, submitCopy]);
 
   const handleSave = useCallback(async () => {
     const trimmedPublicId = editor.publicId.trim();
     if (!trimmedPublicId) {
       setEditor(prev => ({ ...prev, validationError: 'public_id is required' }));
-      return;
-    }
-
-    if (!trimmedPublicId.startsWith(CUSTOM_LLM_PREFIX)) {
-      setEditor(prev => ({
-        ...prev,
-        validationError: `public_id must start with "${CUSTOM_LLM_PREFIX}"`,
-      }));
       return;
     }
 
@@ -247,7 +279,11 @@ export function CustomLlmsContent() {
       return;
     }
 
-    const defResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    // The strict copy rejects unknown keys but drops cross-field rules, so check both.
+    const strictDefResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    const defResult = strictDefResult.success
+      ? CustomLlmDefinitionSchema.safeParse(parsedDefinition)
+      : strictDefResult;
     if (!defResult.success) {
       setEditor(prev => ({ ...prev, validationError: formatZodError(defResult.error) }));
       return;
@@ -261,18 +297,24 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await upsertMutation.mutateAsync({
-        public_id: trimmedPublicId,
-        definition: defResult.data,
-        credentials: parsedCredentials,
-      });
-      toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
-      closeEditor();
-    } catch (error) {
-      toast.error(formatZodError(error));
+    const input: UpsertInput = {
+      public_id: trimmedPublicId,
+      definition: defResult.data,
+      credentials: parsedCredentials,
+    };
+    if (input.definition.public !== undefined && !editor.wasPublic) {
+      setPendingPublicChange({ kind: 'upsert', input });
+      return;
     }
-  }, [editor, upsertMutation, closeEditor]);
+    await submitUpsert(input);
+  }, [editor, submitUpsert]);
+
+  const confirmPublicChange = useCallback(async () => {
+    const change = pendingPublicChange;
+    setPendingPublicChange(null);
+    if (change?.kind === 'upsert') await submitUpsert(change.input);
+    if (change?.kind === 'copy') await submitCopy(change.input);
+  }, [pendingPublicChange, submitUpsert, submitCopy]);
 
   const handleDelete = useCallback(
     async (publicId: string) => {
@@ -311,6 +353,7 @@ export function CustomLlmsContent() {
             <TableRow>
               <TableHead>Public ID</TableHead>
               <TableHead>Display Name</TableHead>
+              <TableHead>Access</TableHead>
               <TableHead>Internal ID</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -318,7 +361,7 @@ export function CustomLlmsContent() {
           <TableBody>
             {data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground text-center">
+                <TableCell colSpan={5} className="text-muted-foreground text-center">
                   No custom LLMs defined yet.
                 </TableCell>
               </TableRow>
@@ -327,6 +370,7 @@ export function CustomLlmsContent() {
               <TableRow key={item.public_id}>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
+                <TableCell>{item.definition.public ? 'Public' : 'Private'}</TableCell>
                 <TableCell className="font-mono text-sm">
                   {item.definition.internal_id ?? 'Not set'}
                 </TableCell>
@@ -344,13 +388,7 @@ export function CustomLlmsContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        openCopy(
-                          item.public_id,
-                          item.definition.display_name,
-                          item.definition.internal_id
-                        )
-                      }
+                      onClick={() => openCopy(item.public_id, item.definition)}
                       aria-label={`Copy ${item.public_id}`}
                       title="Copy custom LLM"
                     >
@@ -395,7 +433,7 @@ export function CustomLlmsContent() {
                   }))
                 }
                 disabled={editor.mode === 'edit'}
-                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-custom-model`}
+                placeholder="e.g. acme/my-custom-model"
                 className="font-mono"
               />
             </div>
@@ -486,6 +524,21 @@ export function CustomLlmsContent() {
                 <code>model</code>; omit <code>internal_id</code> to remove <code>model</code> from
                 the outbound request body.
               </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Public ID must not be an OpenRouter model or use a direct BYOK provider prefix. It
+                may reuse a Kilo-exclusive model ID, which the custom LLM then replaces.
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                To make the model available to every user for free, replace{' '}
+                <code>organization_ids</code> and <code>group_ids</code> with{' '}
+                <code>
+                  &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;]{' '}
+                  {'}'}
+                </code>
+                , add a <code>description</code>, and remove <code>pricing</code>. Organization
+                provider allow lists apply to these providers. Unknown providers appear in the
+                provider list after the next provider sync.
+              </p>
             </div>
 
             {editor.validationError && (
@@ -505,6 +558,36 @@ export function CustomLlmsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={pendingPublicChange !== null}
+        onOpenChange={open => {
+          if (!open) setPendingPublicChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make this custom LLM public?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-2">
+                <p>
+                  Every Kilo user, including signed-out users, will be able to use{' '}
+                  <code className="font-mono">{pendingPublicChange?.input.public_id}</code> for
+                  free. Kilo pays for all usage.
+                </p>
+                <p>
+                  Test this definition with a local web app before publishing it. A broken
+                  definition fails requests for everyone.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPublicChange}>Make public</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={copy !== null}
@@ -533,7 +616,7 @@ export function CustomLlmsContent() {
                     prev ? { ...prev, publicId: event.target.value, validationError: null } : prev
                   )
                 }
-                placeholder={`e.g. ${CUSTOM_LLM_PREFIX}my-copied-model`}
+                placeholder="e.g. acme/my-copied-model"
                 className="font-mono"
                 aria-invalid={copy?.validationError?.field === 'publicId'}
                 aria-describedby={

@@ -39,6 +39,11 @@ import {
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import {
+  getCustomLlmsById,
+  isPublicCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -125,11 +130,20 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels] = await Promise.all([
-    getOpenRouterModelsMetadataFromDatabase(),
-    getDataCollectionRequiredModelIds(),
-    getPreferredModels(),
-  ]);
+  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels, customLlmsById] =
+    await Promise.all([
+      getOpenRouterModelsMetadataFromDatabase(),
+      getDataCollectionRequiredModelIds(),
+      getPreferredModels(),
+      getCustomLlmsById(),
+    ]);
+  // A custom LLM takes precedence over any built-in model with the same id.
+  const isShadowedByCustomLlm = (modelId: string) => customLlmsById.has(modelId.toLowerCase());
+  const publicCustomLlmModels = [...customLlmsById.values()].flatMap(customLlm =>
+    isPublicCustomLlm(customLlm.definition)
+      ? [convertCustomLlmToCatalogModel(customLlm.public_id, customLlm.definition)]
+      : []
+  );
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
@@ -137,6 +151,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       .filter(
         model =>
           (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
+          !isShadowedByCustomLlm(model.id) &&
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
@@ -164,9 +179,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       })
       .concat(
         kiloExclusiveModels
-          .filter(m => m.status === 'public')
+          .filter(m => m.status === 'public' && !isShadowedByCustomLlm(m.public_id))
           .map(model => convertFromKiloExclusiveModel(model))
       )
+      .concat(publicCustomLlmModels)
       .concat(autoModels)
       .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {

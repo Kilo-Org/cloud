@@ -343,7 +343,9 @@ export async function applyProviderSpecificLogic(
 
   enableReasoningSummaries(requestToMutate);
 
-  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
+  // A custom LLM may reuse a Kilo-exclusive id and takes precedence over it.
+  const kiloExclusiveModel =
+    provider.id === 'custom' ? null : findKiloExclusiveModel(requestedModel);
   removeUnsupportedRequestServiceTier(requestedModel, requestToMutate, kiloExclusiveModel);
   if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);

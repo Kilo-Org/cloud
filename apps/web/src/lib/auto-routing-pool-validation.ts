@@ -7,7 +7,6 @@ import {
   type AutoRoutingSettingsResponse,
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getDirectByokModelsForOrganization,
@@ -101,10 +100,6 @@ function isHiddenExclusiveModel(modelId: string): boolean {
   return exclusive !== undefined && exclusive.status !== 'public';
 }
 
-function isCustomLlmId(modelId: string): boolean {
-  return modelId.startsWith(CUSTOM_LLM_PREFIX);
-}
-
 /**
  * Build the eligible managed catalog for pool membership.
  * Client-side filtering is never trusted; this is the authorization source.
@@ -147,7 +142,7 @@ export async function buildEligibleCatalog(params: {
     const id = model.id;
     if (isVirtualAutoModelId(id)) continue;
     if (byokOnlyIds.has(id)) continue;
-    if (isCustomLlmId(id)) continue;
+    if (model.isPrivateCustomLlm) continue;
     if (isHiddenExclusiveModel(id)) continue;
 
     byId.set(id, {

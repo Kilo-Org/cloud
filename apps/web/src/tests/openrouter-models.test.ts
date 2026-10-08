@@ -35,6 +35,11 @@ import { GET as statsGET } from '@/app/api/models/stats/route';
 import { GET as statGET } from '@/app/api/models/stats/[slug]/route';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as Byok from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type * as CustomLlmCatalog from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  getCustomLlmsById,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getTerminalBenchSummaries } from '@kilocode/web-shared/lib/model-stats/terminal-bench';
 import {
   kiloExclusiveModels,
@@ -126,6 +131,13 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
   );
   return { ...actual, getDirectByokModelsForUser: jest.fn(actual.getDirectByokModelsForUser) };
 });
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  ...jest.requireActual<typeof CustomLlmCatalog>(
+    '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
+  ),
+  getCustomLlmsById: jest.fn(async () => new Map()),
+}));
 
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
@@ -225,6 +237,7 @@ beforeEach(() => {
     .mockImplementation(realDirectByok.getDirectByokModelsForUser);
   jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
+  jest.mocked(getCustomLlmsById).mockReset().mockResolvedValue(new Map());
   invalidateModelStatsCache();
   mockRows.mockReset().mockResolvedValue(new Map());
   jest.spyOn(Date, 'now').mockReturnValue(Date.parse(enkryptBenchmark.ingestedAt));
@@ -454,6 +467,50 @@ describe('GET /api/openrouter/models', () => {
     }
     expect(responseData.data.some(item => item.id === 'kilo-internal/custom')).toBe(false);
     expect(responseData.data.some(item => item.id === 'byok/openai/model')).toBe(false);
+  });
+
+  test('lists public custom LLMs as free and lets them replace a Kilo-exclusive model', async () => {
+    mockAuth = { user: null, organizationId: null };
+    const exclusiveModel = kiloExclusiveModels.find(model => model.status === 'public');
+    if (!exclusiveModel) throw new Error('Expected a public Kilo-exclusive model fixture');
+    const customLlm = (public_id: string, isPublic: boolean): CustomLlm => ({
+      public_id,
+      encrypted_api_key: null,
+      definition: {
+        display_name: `Custom ${public_id}`,
+        context_length: 1000,
+        max_completion_tokens: 100,
+        base_url: 'https://upstream.example.com/v1',
+        ...(isPublic
+          ? { description: 'Public custom model', public: { inference_providers: ['acme'] } }
+          : { organization_ids: [] }),
+      },
+    });
+    jest.mocked(getCustomLlmsById).mockResolvedValue(
+      new Map([
+        ['acme/public-model', customLlm('acme/public-model', true)],
+        ['acme/private-model', customLlm('acme/private-model', false)],
+        [exclusiveModel.public_id, customLlm(exclusiveModel.public_id, true)],
+      ])
+    );
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+
+    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
+
+    expect(response.status).toBe(200);
+    expect(responseData.data.find(item => item.id === 'acme/public-model')).toMatchObject({
+      name: 'Custom acme/public-model',
+      description: 'Public custom model',
+      isFree: true,
+      mayTrainOnYourPrompts: true,
+    });
+    expect(responseData.data.some(item => item.id === 'acme/private-model')).toBe(false);
+    const sameIdModels = responseData.data.filter(item => item.id === exclusiveModel.public_id);
+    expect(sameIdModels).toHaveLength(1);
+    expect(sameIdModels[0].name).toBe(`Custom ${exclusiveModel.public_id}`);
   });
 
   test('omits the Enkrypt field when no score is available', async () => {

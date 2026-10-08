@@ -37,7 +37,7 @@ import {
   findKiloExclusiveModel,
   shouldRedactModelNameInMicrodollarUsage,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelIncludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -250,7 +250,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
-    is_free: isFreeModel(usageContextInfo.requested_model),
+    is_free: await isFreeModelIncludingCustomLlms(usageContextInfo.requested_model),
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -1329,7 +1329,10 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
+  const kiloExclusiveModel =
+    usageContext.provider === 'custom'
+      ? null
+      : findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
     const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
     if (exclusiveCost_mUsd !== undefined) {
@@ -1344,7 +1347,10 @@ export async function processTokenData(
   usageStats.market_cost ??= usageStats.cost_mUsd;
   usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
-  if (isFreeModel(usageContext.requested_model) || usageContext.user_byok) {
+  if (
+    (await isFreeModelIncludingCustomLlms(usageContext.requested_model)) ||
+    usageContext.user_byok
+  ) {
     usageStats.cost_mUsd = 0;
     usageStats.cacheDiscount_mUsd = 0;
   }
@@ -1436,7 +1442,7 @@ async function getGenerationLookupProvider(
   }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
-    isFreeModel(usageContext.requested_model) ||
+    (await isFreeModelIncludingCustomLlms(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);

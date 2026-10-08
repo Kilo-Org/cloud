@@ -139,6 +139,14 @@ vi.mock('@/lib/feedback', () => ({
   showFeedbackPrompt: vi.fn(),
 }));
 
+vi.mock('@/components/use-feedback-prompt', () => ({
+  useFeedbackPrompt: () => ({ requestPrompt: vi.fn(), promptDialog: null }),
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
+}));
+
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Building2: 'Building2',

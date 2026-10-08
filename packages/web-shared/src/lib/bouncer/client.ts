@@ -9,10 +9,10 @@ import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/confi
 /**
  * Client for the bouncer worker (https://bouncer.kiloapps.io, repo Kilo-Org/bouncer).
  *
- * A bouncer failure must never fail the caller: every best-effort function here resolves, and it
- * logs on failure. The request contracts mirror the typia types in the bouncer repo
- * (`src/credit-event.ts`, `src/usage-event.ts`, `src/decide.ts`). Bouncer rejects an invalid body
- * with 400.
+ * Best-effort event reports resolve and log on failure. Admission callers apply their own failure
+ * policy. The request contracts mirror the typia types in the bouncer repo
+ * (`src/credit-event.ts`, `src/usage-event.ts`, `src/decide.ts`, `src/signup.ts`).
+ * Bouncer rejects an invalid body with 400.
  *
  * `decide` returns bouncer's verdict, or null on a timeout, transport error, non-2xx, or a body that
  * is not a `DecideResponse`; the gateway rejects a request only when the verdict says
@@ -21,6 +21,8 @@ import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/confi
  * delivery result instead of swallowing it: the durable outbox drainers are their callers, and they
  * must distinguish a real HTTP success from a failure so a transport error can never mark an event
  * delivered. Webhooks and store notifications never call them: they only enqueue to the outbox.
+ * Signup admission returns null on an unavailable or invalid verdict. The caller rejects signup
+ * with a retryable error before creating a Stripe customer or account.
  */
 
 /** Bouncer keeps ids to 128 characters. */
@@ -43,7 +45,7 @@ const USAGE_OUTBOX_TIMEOUT_MS = 5_000;
 const RELEASE_TIMEOUT_MS = 5_000;
 
 /** Signup runs on the auth critical path, before Stripe or the user insert. */
-const SIGNUP_TIMEOUT_MS = 500;
+const SIGNUP_TIMEOUT_MS = 3_000;
 export type CreditFlow = 'auto_topup' | 'kilo_pass' | 'kiloclaw' | 'seats' | 'topup';
 
 type CreditSubject = {
@@ -250,7 +252,7 @@ const signupFlagSchema = z.strictObject({
   source: z.string().max(MAX_ID_LENGTH).optional(),
 });
 
-/** Only a complete, known enforced rejection may prevent an account from being created. */
+/** Signup requires a validated verdict; an unavailable verdict prevents account creation. */
 const signupResponseSchema = z.discriminatedUnion('enforced', [
   z.strictObject({
     enforced: z.literal(false),
@@ -649,7 +651,7 @@ export async function decide(
   return parsed.data;
 }
 
-/** Best-effort signup admission, using the same internal key as inference decide. Never retries. */
+/** Signup admission returns null on failure so the caller can reject it with a retryable error. */
 export async function signupDecide(
   request: SignupDecideRequest,
   { timeoutMs = SIGNUP_TIMEOUT_MS, signal }: { timeoutMs?: number; signal?: AbortSignal } = {}

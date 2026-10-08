@@ -101,7 +101,7 @@ import {
 } from '@kilocode/web-shared/lib/bouncer/client';
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
-import type { BouncerUsageEventEnqueue } from './usage-record-contract';
+import type { BouncerUsageEventEnqueue } from '@kilocode/usage-contracts';
 
 const posthogClient = PostHogClient();
 

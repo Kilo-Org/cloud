@@ -1,6 +1,6 @@
-import { describe, expect, test } from '@jest/globals';
+import { describe, expect, test } from 'vitest';
 
-import { UsageRecordRequestSchema } from './usage-record-contract';
+import { UsageRecordRequestSchema } from './index';
 
 function validCore() {
   return {

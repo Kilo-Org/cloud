@@ -102,6 +102,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
+  'container_limit_reached',
   'invalid_configuration',
   'connection_lost',
   'sandbox_lost',

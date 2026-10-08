@@ -1,7 +1,8 @@
-import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from '@kilocode/db/schema-types';
-import type { MicrodollarUsage } from '@kilocode/db/schema';
+import { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
 import { z } from 'zod';
-import type { UsageMetaData } from './processUsage.types';
+
+export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from './schema-types';
+export type { AbuseClassification, GatewayApiKind } from './schema-types';
 
 /**
  * Wire contract for `POST /api/internal/usage/record`.
@@ -146,28 +147,3 @@ export const UsageRecordResponseSchema = z.object({
 });
 
 export type UsageRecordResponse = z.infer<typeof UsageRecordResponseSchema>;
-
-/**
- * Compile-time proof that the wire schemas stay aligned with the database types.
- * If a column is added to `microdollar_usage` or a field to `UsageMetaData`
- * without updating the schemas above, these assignments stop type-checking.
- */
-type AssertExact<Actual, Expected> = [Actual] extends [Expected]
-  ? [Expected] extends [Actual]
-    ? true
-    : never
-  : never;
-
-export type CoreUsageContractMatchesDb = AssertExact<
-  z.infer<typeof CoreUsageSchema>,
-  MicrodollarUsage
->;
-export type UsageMetadataContractMatchesType = AssertExact<
-  z.infer<typeof UsageMetadataSchema>,
-  UsageMetaData
->;
-
-const _coreContractIsExact: CoreUsageContractMatchesDb = true;
-const _metadataContractIsExact: UsageMetadataContractMatchesType = true;
-void _coreContractIsExact;
-void _metadataContractIsExact;

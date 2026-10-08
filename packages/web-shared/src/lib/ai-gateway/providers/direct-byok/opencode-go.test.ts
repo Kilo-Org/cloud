@@ -84,12 +84,30 @@ describe('OpenCode Go session headers', () => {
       const trackedRequest = structuredClone(request);
       const context = createContext({ request: trackedRequest });
       applyTrackingIds(trackedRequest, context.provider, context.kilo_user_id, context.session_id);
+      const promptCacheKey = trackedRequest.body.prompt_cache_key;
 
       openCodeGo.transformRequest(context);
 
-      expect(context.extraHeaders['x-opencode-session']).toBe(trackedRequest.body.prompt_cache_key);
+      expect(promptCacheKey).toEqual(expect.any(String));
+      expect(context.extraHeaders['x-opencode-session']).toBe(promptCacheKey);
     }
   );
+
+  test('removes user tracking fields from Chat Completions requests', () => {
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'qwen3.7-plus', messages: [] },
+    };
+    const context = createContext({ request });
+    applyTrackingIds(request, context.provider, context.kilo_user_id, context.session_id);
+
+    openCodeGo.transformRequest(context);
+
+    expect(request.body).not.toHaveProperty('prompt_cache_key');
+    expect(request.body).not.toHaveProperty('safety_identifier');
+    expect(request.body).not.toHaveProperty('user');
+    expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
+  });
 
   test('keeps the header stable when the model, API key, or request body changes', () => {
     const first = createContext();

@@ -29,25 +29,24 @@ const owner = { userId: 'oauth/user', orgId: 'org-id' };
 describe('sandbox selection policy', () => {
   it.each([
     {
-      name: 'shared Cloudflare',
+      name: 'isolated Cloudflare without an allowlist',
       overrides: {},
-      expected: getSandboxAllocationRequest('cloudflare-shared'),
+      expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
-      name: 'isolated Cloudflare',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: owner.orgId },
+      name: 'isolated Cloudflare with an empty allowlist',
+      overrides: { PER_SESSION_SANDBOX_ORG_IDS: '' },
       expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
       name: 'Vercel with provider-default resources',
-      overrides: { PER_SESSION_SANDBOX_ORG_IDS: owner.orgId, VERCEL_SANDBOX_ORG_IDS: owner.orgId },
+      overrides: { VERCEL_SANDBOX_ORG_IDS: owner.orgId },
       expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
     },
     {
       name: 'Vercel with user-level control-plane enrollment',
       overrides: {
         CONTROL_PLANE_IDS: owner.userId,
-        PER_SESSION_SANDBOX_ORG_IDS: '*',
         VERCEL_SANDBOX_ORG_IDS: '*',
       },
       expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
@@ -56,20 +55,18 @@ describe('sandbox selection policy', () => {
       name: 'legacy isolation despite Vercel enrollment',
       overrides: {
         CONTROL_PLANE_IDS: '',
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
       },
       expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
-      name: 'shared routing despite Vercel enrollment',
-      overrides: { VERCEL_SANDBOX_ORG_IDS: owner.orgId },
-      expected: getSandboxAllocationRequest('cloudflare-shared'),
+      name: 'isolated Cloudflare outside the former allowlist',
+      overrides: { PER_SESSION_SANDBOX_ORG_IDS: 'other-org' },
+      expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
       name: 'missing Vercel configuration',
       overrides: {
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_TOKEN: undefined,
       },
@@ -78,7 +75,6 @@ describe('sandbox selection policy', () => {
     {
       name: 'enforced default skips Vercel even when explicit Vercel is enrolled',
       overrides: {
-        PER_SESSION_SANDBOX_ORG_IDS: owner.orgId,
         VERCEL_SANDBOX_ORG_IDS: owner.orgId,
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
         CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: owner.orgId,
@@ -95,12 +91,12 @@ describe('sandbox selection policy', () => {
       expected: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
     },
     {
-      name: 'unchanged shared Cloudflare when the owner is not isolated',
+      name: 'Cloudflare containers without an isolation allowlist',
       overrides: {
         VERCEL_SANDBOX_ORG_IDS: '',
         CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
       },
-      expected: getSandboxAllocationRequest('cloudflare-shared'),
+      expected: getSandboxAllocationRequest('cloudflare-containers-standard-4'),
     },
   ])('previews $name consistently with actual routing', async ({ overrides, expected }) => {
     const env = { ...configured, ...overrides } as Env;

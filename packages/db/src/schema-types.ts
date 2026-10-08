@@ -1249,9 +1249,6 @@ export type AuthProviderId =
   | 'fake-login'
   | 'workos';
 
-export { ABUSE_CLASSIFICATION, GatewayApiKindSchema } from '@kilocode/usage-contracts';
-export type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
-
 // --- Integration types ---
 
 export type IntegrationPermissions = Record<string, string>;

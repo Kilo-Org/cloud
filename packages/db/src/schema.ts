@@ -153,7 +153,6 @@ import type {
   AuditLogAction,
   EncryptedData,
   AuthProviderId,
-  AbuseClassification,
   PlatformRepository,
   IntegrationPermissions,
   BuildStatus,
@@ -175,9 +174,9 @@ import type {
   OpenRouterModel,
   StripeSubscriptionStatus,
   StoredModel,
-  GatewayApiKind,
   ContributorChampionTier,
 } from './schema-types';
+import type { AbuseClassification, GatewayApiKind } from '@kilocode/usage-contracts';
 import type { AnyPgColumn as DrizzleAnyPgColumn } from 'drizzle-orm/pg-core';
 import { INSTANCE_TYPE_VALUES } from '@kilocode/kiloclaw-instance-tiers';
 

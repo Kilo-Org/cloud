@@ -4,7 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { UsageRecordInsertResult } from './processUsage.types';
-import { UsageRecordResponseSchema, type UsageRecordRequest } from './usage-record-contract';
+import { UsageRecordResponseSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
 
 /**
  * Client for handing the AI-gateway usage write to a Frankfurt-local endpoint.

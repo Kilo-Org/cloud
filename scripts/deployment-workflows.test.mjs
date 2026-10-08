@@ -172,9 +172,21 @@ test('staging and production Worker changes use independent deployment baselines
     /git diff --quiet "\$BASE_SHA" HEAD -- "\$dir\/" packages pnpm-lock\.yaml/
   );
   assert.equal(
-    production.jobs['deploy-kiloclaw'].if,
-    "needs.check-changes.outputs.deploy_kiloclaw == 'true'"
+    production.jobs['deploy-kiloclaw'],
+    undefined,
+    'production must not run deploy-kiloclaw on the schedule: dispatch it manually'
   );
+  assert.doesNotMatch(
+    production.jobs['record-deployment'].if,
+    /deploy-kiloclaw/,
+    'production record-deployment must not wait on the manual kiloclaw deploy'
+  );
+  const kiloclaw = workflow('deploy-kiloclaw');
+  assert.ok(
+    Object.hasOwn(kiloclaw.on, 'workflow_dispatch'),
+    'deploy-kiloclaw must be dispatchable manually'
+  );
+  assert.ok(Object.hasOwn(kiloclaw.on.workflow_dispatch.inputs, 'source_sha'));
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],

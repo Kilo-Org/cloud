@@ -339,21 +339,9 @@ jobs:
         continue-on-error: true
         run: pnpm --filter cloudflare-gastown sentry:sourcemaps
 
-  deploy-kiloclaw:
-    needs: [check-changes, check-production-db-startup, run-migrations]
-    if: needs.check-changes.outputs.deploy_kiloclaw == 'true'
-    # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
-    # exceed the caller). The reusable workflow restricts further per job — only
-    # its isolated attest-sbom job actually uses id-token/attestations.
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-      attestations: write
-    uses: ./.github/workflows/deploy-kiloclaw.yml
-    with:
-      source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets: inherit
+  # The KiloClaw image and worker deploy (deploy-kiloclaw.yml) is not part of
+  # the scheduled pipeline. It runs manually via workflow_dispatch from the
+  # Actions tab.
 
   record-deployment:
     needs:
@@ -370,7 +358,6 @@ jobs:
         deploy-workers,
         detect-gastown-wasteland-changes,
         deploy-gastown-wasteland,
-        deploy-kiloclaw,
       ]
     if: >-
       ${{
@@ -386,8 +373,7 @@ jobs:
         needs.promote-ai-gateway.result == 'success' &&
         needs.deploy-workers.result == 'success' &&
         needs.detect-gastown-wasteland-changes.result == 'success' &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-kiloclaw.result)
+        contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result)
       }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

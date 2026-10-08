@@ -165,7 +165,7 @@ jobs:
 
           # Workers excluded from this workflow (they have custom deploy pipelines):
           EXCLUDED=(
-            services/kiloclaw  # Docker-based deploy in deploy-production.yml
+            services/kiloclaw  # Docker-based deploy in deploy-kiloclaw.yml (manual-only)
             services/gastown   # Deployed separately
             services/wasteland # Deployed separately
             services/deploy-infra/builder-docker-container/container-files  # Build artifact template, not a deployable worker

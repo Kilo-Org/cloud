@@ -68,6 +68,14 @@ type CloudAgentTransportConfig = {
   onInitialPageLoaded?: ((page: SessionSnapshotPage) => void) | undefined;
   websocketBaseUrl: string;
   onError?: ((message: string) => void) | undefined;
+  /**
+   * Fired when the open settles with no socket established: a null page read,
+   * a rejected ticket, or a rejected snapshot fetch. The manager settles its
+   * loading state and installs an error indicator here, because no
+   * `session.created` will arrive to do it. A typed page failure still
+   * connects, so it does not take this path.
+   */
+  onFatalOpenFailure?: (() => void) | undefined;
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
 };
@@ -206,6 +214,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       if (expectedGeneration !== lifecycleGeneration) return;
 
       const stoppedEvent: ServiceEvent = { type: 'stopped', reason: 'transport-disconnected' };
+      const reconnectingEvent: ServiceEvent = { type: 'reconnecting' };
 
       const nextConnection = createConnection({
         websocketUrl: buildWebsocketUrl,
@@ -258,6 +267,18 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
           if (event.type === 'stopped') {
             stoppedReceived = true;
+          }
+
+          // Clear the per-socket guard on every edge where service-state
+          // clears the transport terminal: a normalized `connected`, any root
+          // `session.status`, and `cloud.message.sent`. A child
+          // `session.status` never matches the root id and never clears it.
+          if (
+            event.type === 'connected' ||
+            event.type === 'cloud.message.sent' ||
+            (event.type === 'session.status' && event.sessionId === config.kiloSessionId)
+          ) {
+            stoppedReceived = false;
           }
 
           if (isChatEvent(event)) {
@@ -315,6 +336,15 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         onUnexpectedDisconnect: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           if (stoppedReceived) return;
+          sink.onServiceEvent(reconnectingEvent);
+        },
+        onReconnectExhaustionChange: exhausted => {
+          // Only the `true` edge is meaningful here. The `false` edge fires on
+          // every recovery path; recovery is the normalized `connected` event,
+          // a root `session.status`, or `cloud.message.sent`, so emitting a
+          // reconnecting event from it would be a second recovery path.
+          if (!exhausted) return;
+          if (stoppedReceived) return;
           stoppedReceived = true;
           sink.onServiceEvent(stoppedEvent);
         },
@@ -358,11 +388,21 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
 
         void fetchAndReplayInitial(expectedGeneration)
           .then(result => {
-            if (!result) return;
+            if (expectedGeneration !== lifecycleGeneration) return;
+            if (result === null) {
+              // Null with the generation still current is a fatal open: the
+              // page read returned null (`handleTicketError` already ran). No
+              // socket will be established, so loading must settle here.
+              config.onFatalOpenFailure?.();
+              return;
+            }
             connectWebSocket(result.ticket, expectedGeneration);
           })
           .catch(error => {
             handleTicketError(error, expectedGeneration);
+            if (expectedGeneration === lifecycleGeneration) {
+              config.onFatalOpenFailure?.();
+            }
           });
       },
 

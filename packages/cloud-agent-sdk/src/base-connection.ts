@@ -140,8 +140,16 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     } catch (err) {
       console.error('[Connection] Failed to refresh auth:', err);
       if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
-      config.onUnexpectedDisconnect?.();
-      scheduleReconnect(0, expectedGeneration);
+      // Consume the existing attempt budget instead of restarting at 0: a
+      // rejected refresh that resets the counter loops forever. The attempt
+      // that reaches the cap exhausts on the existing edge and must not emit
+      // an unexpected-disconnect (reconnecting) event on its way out.
+      if (reconnectAttempt >= maxReconnectAttempts) {
+        scheduleReconnect(reconnectAttempt, expectedGeneration);
+      } else {
+        config.onUnexpectedDisconnect?.();
+        scheduleReconnect(reconnectAttempt, expectedGeneration);
+      }
     } finally {
       if (expectedGeneration === generation) {
         preconnectAuthRefreshAttempted = false;

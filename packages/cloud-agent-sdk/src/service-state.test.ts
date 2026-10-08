@@ -332,6 +332,132 @@ describe('createServiceState', () => {
     });
   });
 
+  describe('reconnecting', () => {
+    it('sets activity, leaves status idle, and keeps pending messages', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.process({ type: 'cloud.message.queued', messageId: 'm1' });
+
+      state.process({ type: 'reconnecting' });
+
+      expect(state.getActivity()).toEqual({ type: 'reconnecting' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(onError).not.toHaveBeenCalled();
+      expect(state.getPendingMessages().get('m1')).toEqual({ status: 'queued' });
+    });
+
+    it('connected with no sessionStatus returns activity to idle after reconnecting', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'reconnecting' });
+      expect(state.getActivity()).toEqual({ type: 'reconnecting' });
+
+      state.process({ type: 'connected' });
+
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+    });
+
+    it('preserves a wrapper disconnect through reconnecting and a transport stop', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.process({ type: 'stopped', reason: 'disconnected' });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'reconnecting' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      // A non-empty setup log and cloud status make the no-write guard real:
+      // neither the reconnecting projection nor the synthetic stop may clear or
+      // notify while the wrapper terminal is authoritative.
+      state.process({ type: 'preparing', step: 'setup_commands', message: 'added 42 packages' });
+      state.setCloudStatus({ type: 'preparing' });
+      expect(state.getSetupLog()).toEqual(['added 42 packages']);
+
+      const notify = jest.fn();
+      state.subscribe(notify);
+
+      state.process({ type: 'reconnecting' });
+      expect(notify).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getCloudStatus()).toEqual({ type: 'preparing' });
+      expect(state.getSetupLog()).toEqual(['added 42 packages']);
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+      expect(notify).not.toHaveBeenCalled();
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getCloudStatus()).toEqual({ type: 'preparing' });
+      expect(state.getSetupLog()).toEqual(['added 42 packages']);
+      expect(onError).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['error', 'interrupted'] as const)(
+      'preserves a %s terminal through reconnecting and a transport stop',
+      reason => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        state.process({ type: 'stopped', reason });
+        const status = state.getStatus();
+        onError.mockClear();
+
+        // Populate the setup log and cloud status after the terminal so the
+        // no-write guard is not vacuously true on an empty log.
+        state.process({ type: 'preparing', step: 'setup_commands', message: 'added 42 packages' });
+        state.setCloudStatus({ type: 'preparing' });
+        expect(state.getSetupLog()).toEqual(['added 42 packages']);
+
+        const notify = jest.fn();
+        state.subscribe(notify);
+
+        state.process({ type: 'reconnecting' });
+        expect(notify).not.toHaveBeenCalled();
+        expect(state.getStatus()).toBe(status);
+        expect(state.getActivity()).toEqual({ type: 'idle' });
+        expect(state.getCloudStatus()).toEqual({ type: 'preparing' });
+        expect(state.getSetupLog()).toEqual(['added 42 packages']);
+        expect(onError).not.toHaveBeenCalled();
+
+        state.process({ type: 'stopped', reason: 'transport-disconnected' });
+        expect(notify).not.toHaveBeenCalled();
+        expect(state.getStatus()).toBe(status);
+        expect(state.getActivity()).toEqual({ type: 'idle' });
+        expect(state.getCloudStatus()).toEqual({ type: 'preparing' });
+        expect(state.getSetupLog()).toEqual(['added 42 packages']);
+        expect(onError).not.toHaveBeenCalled();
+      }
+    );
+
+    it('re-enters reconnecting from a transport disconnect and clears terminated', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+
+      state.process({ type: 'reconnecting' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(state.getActivity()).toEqual({ type: 'reconnecting' });
+
+      // `terminated` is false again: a session.error is not suppressed.
+      state.process({ type: 'session.error', error: 'After recovery' });
+      expect(onError).toHaveBeenCalledWith('After recovery');
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'After recovery' });
+    });
+
+    it('proceeds on a plain reconnecting with no prior terminal', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'connected', sessionStatus: { type: 'busy' } });
+
+      state.process({ type: 'reconnecting' });
+
+      expect(state.getActivity()).toEqual({ type: 'reconnecting' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+  });
+
   describe('session.error', () => {
     it('fires onError before stopped', () => {
       const onError = jest.fn();

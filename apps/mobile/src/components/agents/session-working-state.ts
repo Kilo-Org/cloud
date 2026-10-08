@@ -16,6 +16,14 @@ type SessionFooterRowInput = {
   hasStatusIndicator: boolean;
   /** True when the composer resolved a cannot-send reason to state. */
   hasSendReason: boolean;
+  /**
+   * The footer indicator's code and type. The preparing hide exempts the
+   * reconnecting indicator and every error indicator: the footer is their only
+   * render surface, so hiding it would drop recovery progress or a classified
+   * failure behind a stale preparation row.
+   */
+  statusIndicatorCode?: string | null | undefined;
+  statusIndicatorType?: string | null | undefined;
   messageCount: number;
 };
 
@@ -74,11 +82,19 @@ export function resolveSessionFooterRowItem({
   shouldShowFooterWorking,
   hasStatusIndicator,
   hasSendReason,
+  statusIndicatorCode,
+  statusIndicatorType,
   messageCount,
 }: SessionFooterRowInput): SessionFooterRowItem | null {
   const transcriptOwnsProgress =
     messageCount === 0 || (cloudStatusType === 'preparing' && hasInProgressTranscriptPreparation);
-  if (!transcriptOwnsProgress) {
+  // The footer is the only render surface for a reconnecting or error indicator,
+  // so a live preparation in the transcript must not hide it.
+  const indicatorMustStayVisible =
+    cloudStatusType === 'preparing' &&
+    hasInProgressTranscriptPreparation &&
+    (statusIndicatorCode === 'reconnecting-to-agent' || statusIndicatorType === 'error');
+  if (!transcriptOwnsProgress || indicatorMustStayVisible) {
     if (shouldShowFooterWorking) {
       return 'working';
     }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one module owns the session status copy tables, the classifier, and the terminal-error resolution that reads them; splitting them would put a decision in one file and the copy it names in another. */
 import { type SdkStatusMessageCode, type SessionStatusIndicator } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
@@ -150,6 +151,7 @@ const STATUS_COPY_KEY_BY_CODE = {
   'commit-failed': 'agentChat.session.commitFailed',
   'message-delivery-failed': 'agentChat.messageFailure.deliveryTitle',
   'failed-to-stop-execution': 'agentChat.session.failedToStopExecution',
+  'reconnecting-to-agent': 'agentChat.sessionConnection.reconnectingToAgent',
 } satisfies Partial<Record<SdkStatusMessageCode, string>>;
 
 /** The catalog key for a code that labels an SDK-written line, or undefined. */
@@ -429,6 +431,22 @@ export function resolveSessionTerminalError(input: {
 }): SessionTerminalError | null {
   if (input.messageCount > 0) {
     return null;
+  }
+  // Exhaustion sets `errorAtom` to "Connection to agent lost" and the indicator
+  // to `agent-connection-lost`. Check the indicator first so the connection-lost
+  // copy and its Retry win over the generic server failure below, which would
+  // otherwise be the only surface.
+  if (
+    input.statusIndicator?.type === 'error' &&
+    input.statusIndicator.code === 'agent-connection-lost'
+  ) {
+    return {
+      variant: 'server',
+      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+      message: i18n.t('agentChat.sessionConnection.connectionLost'),
+      retryable: true,
+      detail: input.error ?? input.statusIndicator.message,
+    };
   }
   if (input.error !== null) {
     // The atom carries the transport's own English text. Show the reader a

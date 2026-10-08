@@ -79,7 +79,8 @@ function receive(event: ReturnType<typeof createEvent>, socket = latestSocket())
 function createHarness() {
   const chatEvents: ChatEvent[] = [];
   const serviceEvents: ServiceEvent[] = [];
-  const state = createServiceState({ rootSessionId: 'ses-1' });
+  const onError = jest.fn();
+  const state = createServiceState({ rootSessionId: 'ses-1', onError });
   const send = jest.fn<ReturnType<CloudAgentApi['send']>, Parameters<CloudAgentApi['send']>>(
     async () => ({ accepted: true })
   );
@@ -119,6 +120,7 @@ function createHarness() {
     fetchSnapshot,
     chatEvents,
     serviceEvents,
+    onError,
     async submit() {
       if (!transport.send) throw new Error('Expected send support');
       return transport.send(input);
@@ -392,6 +394,256 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     resolveTicket({ ticket: 'late-ticket', expiresAt: Math.floor(Date.now() / 1000) + 60 });
     await jest.advanceTimersByTimeAsync(600_000);
     expect(sockets).toHaveLength(9);
+    harness.transport.destroy();
+  });
+
+  it('shows reconnecting on the first close and the transport stop only at exhaustion', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    closeSocket();
+    expect(harness.serviceEvents).toContainEqual({ type: 'reconnecting' });
+    expect(harness.serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
+    expect(harness.state.getActivity()).toEqual({ type: 'reconnecting' });
+
+    await exhaustRetries();
+
+    const stopped = harness.serviceEvents.filter(e => e.type === 'stopped');
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0]).toEqual({ type: 'stopped', reason: 'transport-disconnected' });
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    harness.transport.destroy();
+  });
+
+  it('treats a repeated auth close as terminal without a reconnecting event', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    closeSocket(4001);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(harness.serviceEvents).not.toContainEqual({ type: 'reconnecting' });
+    expect(harness.serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
+
+    closeSocket(4001);
+    await jest.advanceTimersByTimeAsync(0);
+    const stopped = harness.serviceEvents.filter(e => e.type === 'stopped');
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0]).toEqual({ type: 'stopped', reason: 'transport-disconnected' });
+    expect(harness.serviceEvents).not.toContainEqual({ type: 'reconnecting' });
+
+    harness.transport.destroy();
+  });
+
+  it('bounds a rejected ticket refresh through the existing retry budget', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    harness.getTicket.mockRejectedValue(new Error('ticket rejected'));
+
+    closeSocket(4001);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(harness.serviceEvents).toContainEqual({ type: 'reconnecting' });
+    expect(harness.serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
+
+    // Each close re-enters the rejected-refresh path; the attempt budget
+    // advances until the cap. The delays mirror scheduleReconnect's backoff
+    // with Math.random pinned to 0.
+    const delays = [500, 1000, 2000, 4000, 8000, 15000, 15000, 15000];
+    for (const [index, delay] of delays.entries()) {
+      await jest.advanceTimersByTimeAsync(delay);
+      closeSocket(4001);
+      await jest.advanceTimersByTimeAsync(0);
+      if (index < delays.length - 1) {
+        expect(harness.serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
+      }
+    }
+
+    const stopped = harness.serviceEvents.filter(e => e.type === 'stopped');
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0]).toEqual({ type: 'stopped', reason: 'transport-disconnected' });
+
+    const socketsAtExhaustion = sockets.length;
+    await jest.advanceTimersByTimeAsync(600_000);
+    expect(sockets).toHaveLength(socketsAtExhaustion);
+
+    harness.transport.destroy();
+  });
+
+  it('keeps the wrapper terminal through a reconnect and the transport exhaustion', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    receive(createEvent('wrapper_disconnected', {}));
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.state.getActivity()).toEqual({ type: 'idle' });
+    expect(harness.onError).toHaveBeenCalledTimes(1);
+
+    // The wire stop set the per-socket guard, so this close is silent.
+    closeSocket();
+    expect(harness.serviceEvents.filter(e => e.type === 'reconnecting')).toHaveLength(0);
+
+    await jest.advanceTimersByTimeAsync(600);
+    // A non-root-status message on the recovery socket fires onReconnected,
+    // which clears the transport guard, without clearing the wrapper terminal.
+    receive(createEvent('commands.available', { commands: [] }));
+
+    // Close before a normalized `connected`: the transport now emits
+    // reconnecting, but the wrapper terminal outranks the projection.
+    closeSocket();
+    expect(harness.serviceEvents).toContainEqual({ type: 'reconnecting' });
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.state.getActivity()).toEqual({ type: 'idle' });
+
+    await exhaustRetries();
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.onError).toHaveBeenCalledTimes(1);
+
+    harness.transport.destroy();
+  });
+
+  it('releases the wrapper terminal on a root busy status replay', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    receive(createEvent('wrapper_disconnected', {}));
+    closeSocket();
+    await jest.advanceTimersByTimeAsync(600);
+    receive(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    receive(createEvent('connected', {}));
+
+    expect(harness.state.getStatus()).toEqual({ type: 'idle' });
+
+    closeSocket();
+    expect(harness.serviceEvents).toContainEqual({ type: 'reconnecting' });
+    expect(harness.state.getActivity()).toEqual({ type: 'reconnecting' });
+
+    await exhaustRetries();
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.onError).toHaveBeenCalledTimes(2);
+
+    harness.transport.destroy();
+  });
+
+  it('does not release the wrapper terminal on a child status replay', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    receive(createEvent('wrapper_disconnected', {}));
+    closeSocket();
+    await jest.advanceTimersByTimeAsync(600);
+    receive(kilocode('session.status', { sessionID: 'child-1', status: { type: 'busy' } }));
+
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+
+    closeSocket();
+    // The close still emits reconnecting (onReconnected cleared the guard), but
+    // the projection preserves the wrapper terminal.
+    expect(harness.serviceEvents).toContainEqual({ type: 'reconnecting' });
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.state.getActivity()).toEqual({ type: 'idle' });
+
+    await exhaustRetries();
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.onError).toHaveBeenCalledTimes(1);
+
+    harness.transport.destroy();
+  });
+
+  it('clears the wrapper terminal and the transport guard when connected arrives', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    closeSocket();
+    await jest.advanceTimersByTimeAsync(600);
+    receive(createEvent('wrapper_disconnected', {}));
+
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.onError).toHaveBeenCalledTimes(1);
+
+    receive({ ...createEvent('connected', { sessionStatus: { type: 'idle' } }), eventId: 0 });
+    expect(harness.state.getStatus()).toEqual({ type: 'idle' });
+
+    const reconnectingBefore = harness.serviceEvents.filter(e => e.type === 'reconnecting').length;
+    closeSocket();
+    expect(harness.serviceEvents.filter(e => e.type === 'reconnecting').length).toBe(
+      reconnectingBefore + 1
+    );
+    expect(harness.state.getStatus()).toEqual({ type: 'idle' });
+
+    await exhaustRetries();
+    expect(harness.serviceEvents).toContainEqual({
+      type: 'stopped',
+      reason: 'transport-disconnected',
+    });
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    // The wrapper stop already called onError once; exhaustion calls it again.
+    expect(harness.onError).toHaveBeenCalledTimes(2);
+
+    harness.transport.destroy();
+  });
+
+  it('clears the exhaustion guard on the first connected of a recovered socket', async () => {
+    const harness = createHarness();
+    harness.transport.connect();
+    await jest.advanceTimersByTimeAsync(0);
+
+    closeSocket();
+    await exhaustRetries();
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+
+    await harness.submit();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(sockets).toHaveLength(10);
+
+    receive({ ...createEvent('connected', { sessionStatus: { type: 'idle' } }), eventId: 0 });
+    expect(harness.state.getStatus()).toEqual({ type: 'idle' });
+
+    const reconnectingBefore = harness.serviceEvents.filter(e => e.type === 'reconnecting').length;
+    closeSocket();
+    expect(harness.serviceEvents.filter(e => e.type === 'reconnecting').length).toBe(
+      reconnectingBefore + 1
+    );
+
+    harness.transport.destroy();
+  });
+
+  it('clears the transport guard on a same-socket root idle status', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    receive(createEvent('wrapper_disconnected', {}));
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+
+    receive(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
+    expect(harness.state.getStatus()).toEqual({ type: 'idle' });
+
+    const reconnectingBefore = harness.serviceEvents.filter(e => e.type === 'reconnecting').length;
+    closeSocket();
+    expect(harness.serviceEvents.filter(e => e.type === 'reconnecting').length).toBe(
+      reconnectingBefore + 1
+    );
+    expect(harness.state.getStatus()).toEqual({ type: 'idle' });
+
+    harness.transport.destroy();
+  });
+
+  it('does not clear the transport guard on a same-socket child idle status', async () => {
+    const harness = createHarness();
+    await connect(harness);
+
+    receive(createEvent('wrapper_disconnected', {}));
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+
+    receive(kilocode('session.status', { sessionID: 'child-1', status: { type: 'idle' } }));
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+
+    const reconnectingBefore = harness.serviceEvents.filter(e => e.type === 'reconnecting').length;
+    closeSocket();
+    expect(harness.serviceEvents.filter(e => e.type === 'reconnecting')).toHaveLength(
+      reconnectingBefore
+    );
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+
     harness.transport.destroy();
   });
 });

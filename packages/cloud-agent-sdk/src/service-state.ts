@@ -242,7 +242,43 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  function processReconnecting(): void {
+    // A reconnecting projection must not replace an authoritative non-transport
+    // terminal (a wrapper `disconnected`, an `error`, an `interrupted`). That
+    // is a projection invariant: the transport emits reconnecting after
+    // `onReconnected` already cleared its per-socket guard, so this is what
+    // keeps the real reason. It is not a second close policy.
+    if (terminated && disconnectedSource !== 'transport') {
+      return;
+    }
+
+    activity = { type: 'reconnecting' };
+
+    // Re-entry clear: our own transport terminal is the state reconnecting is
+    // leaving, so a close after `onReconnected` and before `connected` must not
+    // show progress beside a still-disconnected status.
+    if (status.type === 'disconnected' && disconnectedSource === 'transport') {
+      status = IDLE_STATUS;
+      disconnectedSource = null;
+      terminated = false;
+    }
+
+    notify();
+  }
+
   function processStopped(event: Extract<ServiceEvent, { type: 'stopped' }>): void {
+    // A synthetic transport stop must not replace a wrapper `disconnected`, an
+    // `error`, or an `interrupted`, and must not clear cloud status or the
+    // setup log on the way. Other reasons still run the existing function,
+    // including the activity and cloud-status clears.
+    if (
+      event.reason === 'transport-disconnected' &&
+      terminated &&
+      disconnectedSource !== 'transport'
+    ) {
+      return;
+    }
+
     activity = { type: 'idle' };
     cloudStatus = null;
     setupLog = [];
@@ -279,9 +315,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         break;
       case 'transport-disconnected':
         // Do NOT clear `pendingMessages` here. Only `cloud-agent-transport.ts`
-        // emits this reason, synthesized locally on any WebSocket hiccup
-        // (frequent, purely client-side, self-recovering via reconnect) —
-        // it never fires for CLI sessions. Cloud-agent sessions genuinely
+        // emits this reason, and only from the reconnect-exhaustion callback —
+        // not on every WebSocket hiccup. It never fires for CLI sessions.
+        // Cloud-agent sessions genuinely
         // populate `pendingMessages` via `cloud.message.queued`, and there is
         // no snapshot-replay mechanism that would repopulate it afterward
         // (unlike the CLI's always-on `session.queue.changed` replay), so
@@ -853,10 +889,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       completed = false;
     }
     if (sessionStatus === undefined) {
-      // Only default to idle on initial connect (activity === 'connecting').
-      // On reconnect, preserve existing activity — the server will send a
-      // separate session.status event with the authoritative state.
-      if (activity.type === 'connecting') {
+      // Default to idle on initial connect (activity === 'connecting') and on
+      // a reconnect that was showing progress (`reconnecting`). Otherwise
+      // preserve existing activity — the server will send a separate
+      // session.status event with the authoritative state.
+      if (activity.type === 'connecting' || activity.type === 'reconnecting') {
         activity = { type: 'idle' };
       }
     } else if (sessionStatus.type === 'busy') {
@@ -962,6 +999,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         break;
       case 'connected':
         processConnected(event);
+        break;
+      case 'reconnecting':
+        processReconnecting();
         break;
       case 'cloud.message.queued':
         processMessageQueued(event);

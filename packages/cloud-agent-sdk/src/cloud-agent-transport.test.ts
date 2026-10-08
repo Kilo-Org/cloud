@@ -447,7 +447,7 @@ describe('CloudAgentTransport event routing', () => {
 });
 
 describe('CloudAgentTransport unexpected disconnect', () => {
-  it('synthesizes stopped event on unexpected disconnect', async () => {
+  it('emits reconnecting on unexpected disconnect, not stopped', async () => {
     const { transport, serviceEvents } = createTransportWithSinks();
 
     transport.connect();
@@ -466,20 +466,17 @@ describe('CloudAgentTransport unexpected disconnect', () => {
       wasClean: false,
     } as CloseEvent);
 
-    const stoppedEvents = serviceEvents.filter(e => e.type === 'stopped');
-    expect(stoppedEvents).toHaveLength(1);
-    expect(stoppedEvents[0]).toEqual({
-      type: 'stopped',
-      reason: 'transport-disconnected',
-    });
+    expect(serviceEvents).toContainEqual({ type: 'reconnecting' });
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(0);
 
     transport.destroy();
   });
 
-  it('suppresses synthetic stopped if already received via event pipeline', () => {
+  it('suppresses reconnecting if a wire stopped was already received', async () => {
     const { transport, serviceEvents } = createTransportWithSinks();
 
     transport.connect();
+    await flushPromises();
     sendRaw(
       kilocode('session.status', {
         sessionID: 'ses-1',
@@ -487,18 +484,110 @@ describe('CloudAgentTransport unexpected disconnect', () => {
       })
     );
 
+    // complete → stopped(complete) through the normal pipeline
     sendRaw(createEvent('complete', { currentBranch: 'main' }));
 
-    const stoppedBefore = serviceEvents.filter(e => e.type === 'stopped').length;
+    // The wire stop is on the pipeline before the close: exactly one stopped.
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(1);
 
+    // Now close unexpectedly — the same socket must NOT generate another
+    // stopped or a reconnecting.
     mockWs.onclose?.({
       code: 1011,
       reason: 'network dropped',
       wasClean: false,
     } as CloseEvent);
 
-    const stoppedAfter = serviceEvents.filter(e => e.type === 'stopped').length;
-    expect(stoppedAfter).toBe(stoppedBefore);
+    expect(serviceEvents.filter(e => e.type === 'stopped')).toHaveLength(1);
+    expect(serviceEvents).not.toContainEqual({ type: 'reconnecting' });
+
+    transport.destroy();
+  });
+});
+
+describe('CloudAgentTransport fatal open', () => {
+  function createFatalTransport(options: {
+    getTicket?: (sessionId: string) => string | Promise<string>;
+    fetchSnapshotPage?: (
+      kiloSessionId: string,
+      opts: { cursor?: string }
+    ) => Promise<SessionSnapshotPageOutcome | null>;
+    onError?: (message: string) => void;
+    onFatalOpenFailure?: () => void;
+  }) {
+    const chatEvents: ChatEvent[] = [];
+    const serviceEvents: ServiceEvent[] = [];
+    const factory = createCloudAgentTransport({
+      sessionId: cloudAgentId('ses-1'),
+      kiloSessionId: kiloId('ses-1'),
+      api: createMockApi(),
+      getTicket: options.getTicket ?? (() => 'test-ticket'),
+      fetchSnapshot: () => Promise.resolve(emptySnapshot),
+      ...(options.fetchSnapshotPage ? { fetchSnapshotPage: options.fetchSnapshotPage } : {}),
+      websocketBaseUrl: 'ws://localhost:9999',
+      onError: options.onError,
+      onFatalOpenFailure: options.onFatalOpenFailure,
+    });
+    const transport = factory({
+      onChatEvent: event => chatEvents.push(event),
+      onServiceEvent: event => serviceEvents.push(event),
+    });
+    return { transport, chatEvents, serviceEvents };
+  }
+
+  it('calls onFatalOpenFailure when the ticket is rejected and opens no socket', async () => {
+    const onError = jest.fn();
+    const onFatalOpenFailure = jest.fn();
+    const { transport } = createFatalTransport({
+      getTicket: () => Promise.reject(new Error('Failed to get stream ticket')),
+      onError,
+      onFatalOpenFailure,
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    expect(onError).toHaveBeenCalledWith('Failed to get stream ticket');
+    expect(onFatalOpenFailure).toHaveBeenCalledTimes(1);
+    expect(webSocketConstructor).not.toHaveBeenCalled();
+
+    transport.destroy();
+  });
+
+  it('does not call onFatalOpenFailure for a typed page failure and still connects', async () => {
+    const onError = jest.fn();
+    const onFatalOpenFailure = jest.fn();
+    const { transport } = createFatalTransport({
+      fetchSnapshotPage: () => Promise.resolve({ kind: 'retryable_failure' }),
+      onError,
+      onFatalOpenFailure,
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    expect(onError).toHaveBeenCalledWith('Session history temporarily unavailable');
+    expect(onFatalOpenFailure).not.toHaveBeenCalled();
+    expect(webSocketConstructor).toHaveBeenCalledTimes(1);
+
+    transport.destroy();
+  });
+
+  it('calls onFatalOpenFailure for a null page and opens no socket', async () => {
+    const onError = jest.fn();
+    const onFatalOpenFailure = jest.fn();
+    const { transport } = createFatalTransport({
+      fetchSnapshotPage: () => Promise.resolve(null),
+      onError,
+      onFatalOpenFailure,
+    });
+
+    transport.connect();
+    await flushPromises();
+
+    expect(onError).toHaveBeenCalledWith('Session not found');
+    expect(onFatalOpenFailure).toHaveBeenCalledTimes(1);
+    expect(webSocketConstructor).not.toHaveBeenCalled();
 
     transport.destroy();
   });

@@ -1,7 +1,11 @@
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
+import { Button } from '@/components/ui/button';
 import { AlertCircle, Check } from '@/components/ui/icons';
-import { type SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
+import {
+  type SessionStatusIndicator as SessionStatusIndicatorType,
+  shouldOfferSessionRetry,
+} from '@kilocode/cloud-agent-sdk';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
@@ -12,17 +16,25 @@ import { sessionStatusErrorMessage, statusCopyKeyForCode } from './session-termi
 
 type SessionStatusIndicatorProps = {
   indicator: SessionStatusIndicatorType;
+  /** Reopens the session. Rendered only for an error indicator. */
+  onRetry?: () => void;
+  /** Disables the Retry control while a reopen is already in flight. */
+  disabled?: boolean;
 };
 
-export function SessionStatusIndicator({ indicator }: Readonly<SessionStatusIndicatorProps>) {
+export function SessionStatusIndicator({
+  indicator,
+  onRetry,
+  disabled,
+}: Readonly<SessionStatusIndicatorProps>) {
   return (
     <View className={`flex-row items-center gap-2 ${SESSION_FOOTER_ROW_ITEM_PADDING}`}>
-      <IndicatorContent indicator={indicator} />
+      <IndicatorContent indicator={indicator} onRetry={onRetry} disabled={disabled} />
     </View>
   );
 }
 
-function IndicatorContent({ indicator }: Readonly<SessionStatusIndicatorProps>) {
+function IndicatorContent({ indicator, onRetry, disabled }: Readonly<SessionStatusIndicatorProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -38,6 +50,17 @@ function IndicatorContent({ indicator }: Readonly<SessionStatusIndicatorProps>) 
           <Text className="shrink text-sm text-destructive">
             {sessionStatusErrorMessage(indicator)}
           </Text>
+          {shouldOfferSessionRetry(indicator) && onRetry ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={disabled}
+              accessibilityLabel={t('common.retry')}
+              onPress={onRetry}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          ) : null}
         </View>
       );
     }

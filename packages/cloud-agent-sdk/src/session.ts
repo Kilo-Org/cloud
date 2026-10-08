@@ -56,6 +56,11 @@ type CloudAgentSessionConfig = {
   websocketBaseUrl?: string;
   storage?: SessionStorage;
   onError?: (message: string) => void;
+  /**
+   * Fired when a Cloud Agent open settles with no socket established. The
+   * manager clears its loading state and installs an error indicator here.
+   */
+  onFatalOpenFailure?: () => void;
   onChildSessionError?: (sessionId: string, message: string) => void;
   onQuestionAsked?: (requestId: string, questions?: QuestionInfo[]) => void;
   onQuestionResolved?: (requestId: string) => void;
@@ -374,6 +379,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           onInitialPageLoaded: config.transport.onInitialPageLoaded,
           websocketBaseUrl: config.websocketBaseUrl,
           onError: config.onError,
+          onFatalOpenFailure: config.onFatalOpenFailure,
           lifecycleHooks: config.transport.lifecycleHooks,
           websocketHeaders: config.transport.websocketHeaders,
         });

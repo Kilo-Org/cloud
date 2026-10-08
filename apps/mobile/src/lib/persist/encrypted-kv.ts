@@ -3,7 +3,7 @@ import { and, asc, eq, like, sql } from 'drizzle-orm';
 // The `drizzle-orm/expo-sqlite` barrel also pulls in `useLiveQuery`, which
 // imports expo-sqlite for change listeners this store never uses; the driver
 // subpath is the same `drizzle()` without that.
-import { drizzle } from 'drizzle-orm/expo-sqlite/driver';
+import { drizzle, type ExpoSQLiteDatabase } from 'drizzle-orm/expo-sqlite/driver';
 import { migrate } from 'drizzle-orm/expo-sqlite/migrator';
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from '@/lib/auth/secure-store';
@@ -53,7 +53,7 @@ export function isValidDbKey(key: string): boolean {
   return DB_KEY_PATTERN.test(key);
 }
 
-type KVDatabase = ReturnType<typeof drizzle>;
+type KVDatabase = ExpoSQLiteDatabase & { $client: SQLite.SQLiteDatabase };
 
 /** One entry of {@link listEntries}; values are intentionally not returned. */
 export type KVPair = {

@@ -109,6 +109,22 @@ describe('isFreeModel', () => {
       }
     });
 
+    test.each(['vendor/priced-exclusive:free', 'stealth/priced-exclusive-alpha'])(
+      'returns false for priced Kilo exclusive model %s even when its id matches a free pattern',
+      modelId => {
+        const pricedModel = {
+          ...claude_opus_4_7_stealth_model,
+          public_id: modelId,
+        };
+        kiloExclusiveModels.push(pricedModel);
+        try {
+          expect(isFreeModel(modelId)).toBe(false);
+        } finally {
+          kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(pricedModel), 1);
+        }
+      }
+    );
+
     test('getInferenceProvider does not crash for any Kilo exclusive model', () => {
       expect(kiloExclusiveModels.length).toBeGreaterThan(0);
       for (const model of kiloExclusiveModels) {

@@ -235,6 +235,10 @@ export function isKiloExclusiveFreeModel(model: string): boolean {
   );
 }
 
+export function isKiloExclusivePricedModel(model: string): boolean {
+  return kiloExclusiveModels.some(m => m.public_id === model && !!m.pricing);
+}
+
 export function isKiloExclusiveModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.status !== 'disabled');
 }

@@ -1,6 +1,7 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   isKiloExclusiveFreeModel,
+  isKiloExclusivePricedModel,
   kiloExclusiveModels,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
@@ -11,6 +12,9 @@ import {
 
 export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';
+  if (isKiloExclusivePricedModel(modelId)) {
+    return false;
+  }
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||

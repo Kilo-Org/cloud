@@ -22,6 +22,169 @@ function makeSession(id: string, parentID?: string): Session {
 }
 
 describe('createServiceState', () => {
+  describe('replay batching', () => {
+    it('does not raise an unchanged error again on a subsequent restore', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.process({ type: 'session.error', error: 'Current failure' });
+      onError.mockClear();
+      state.beginReplay();
+      state.process({ type: 'connected', cloudStatus: { type: 'ready' } });
+      state.endReplay();
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Current failure' });
+      expect(onError).not.toHaveBeenCalled();
+      state.beginReplay();
+      state.process({ type: 'session.error', error: 'New failure' });
+      state.endReplay();
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('New failure');
+    });
+
+    it('preserves observed metadata and interaction resolutions when replay is interrupted', () => {
+      const onError = jest.fn();
+      const onSessionUpdated = jest.fn();
+      const onBranchChanged = jest.fn();
+      const onQuestionResolved = jest.fn();
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(
+        makeConfig({
+          onError,
+          onSessionUpdated,
+          onBranchChanged,
+          onQuestionResolved,
+          onPermissionResolved,
+        })
+      );
+      state.process({ type: 'session.created', info: makeSession('root-1') });
+      state.process({ type: 'question.asked', requestId: 'old-question', questions: [] });
+      state.process({
+        type: 'permission.asked',
+        requestId: 'old-permission',
+        permission: 'bash',
+        patterns: [],
+        metadata: {},
+        always: [],
+      });
+      state.beginReplay();
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', model: { providerID: 'provider', id: 'updated-model' } },
+      });
+      state.process({ type: 'stopped', reason: 'complete', branch: 'updated-branch' });
+      state.process({ type: 'connected' });
+      state.process({ type: 'session.error', error: 'Historical error' });
+      state.cancelReplay();
+      expect(onSessionUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ model: { providerID: 'provider', id: 'updated-model' } })
+      );
+      expect(onBranchChanged).toHaveBeenCalledWith('updated-branch');
+      expect(onQuestionResolved).toHaveBeenCalledWith('old-question');
+      expect(onPermissionResolved).toHaveBeenCalledWith('old-permission');
+      expect(onError).not.toHaveBeenCalled();
+      state.beginReplay();
+      state.process({ type: 'connected' });
+      state.endReplay();
+      expect(onBranchChanged).toHaveBeenCalledTimes(1);
+      expect(onQuestionResolved).toHaveBeenCalledTimes(1);
+      expect(onPermissionResolved).toHaveBeenCalledTimes(1);
+    });
+
+    it('coalesces metadata and branch callbacks, drops transient failures, and resumes live callbacks', () => {
+      const onError = jest.fn();
+      const onPreparationReady = jest.fn();
+      const onPreparationFailed = jest.fn();
+      const onBranchChanged = jest.fn();
+      const onSessionUpdated = jest.fn();
+      const onMessageQueued = jest.fn();
+      const state = createServiceState(
+        makeConfig({
+          onError,
+          onPreparationReady,
+          onPreparationFailed,
+          onBranchChanged,
+          onSessionUpdated,
+          onMessageQueued,
+        })
+      );
+      state.process({ type: 'session.created', info: makeSession('root-1') });
+      const notifications = jest.fn();
+      state.subscribe(notifications);
+      state.beginReplay();
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', model: { providerID: 'provider', id: 'old-model' } },
+      });
+      state.process({ type: 'preparing', step: 'failed', message: 'Old setup failure' });
+      state.process({ type: 'preparing', step: 'ready', message: 'Ready', branch: 'old-branch' });
+      state.process({ type: 'stopped', reason: 'complete', branch: 'final-branch' });
+      state.process({
+        type: 'session.updated',
+        info: { id: 'root-1', model: { providerID: 'provider', id: 'final-model' } },
+      });
+      state.process({ type: 'connected', cloudStatus: { type: 'ready' } });
+      expect(notifications).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+      expect(onPreparationReady).not.toHaveBeenCalled();
+      expect(onPreparationFailed).not.toHaveBeenCalled();
+      expect(onBranchChanged).not.toHaveBeenCalled();
+      expect(onSessionUpdated).not.toHaveBeenCalled();
+      state.endReplay();
+      expect(notifications).toHaveBeenCalledTimes(1);
+      expect(onError).not.toHaveBeenCalled();
+      expect(onBranchChanged).toHaveBeenCalledTimes(1);
+      expect(onBranchChanged).toHaveBeenCalledWith('final-branch');
+      expect(onSessionUpdated).toHaveBeenCalledTimes(1);
+      expect(onSessionUpdated).toHaveBeenCalledWith(
+        expect.objectContaining({ model: { providerID: 'provider', id: 'final-model' } })
+      );
+      state.process({ type: 'cloud.message.queued', messageId: 'live' });
+      expect(onMessageQueued).toHaveBeenCalledWith('live');
+      state.process({ type: 'session.error', error: 'Live error' });
+      expect(onError).toHaveBeenCalledWith('Live error');
+    });
+
+    it('does not resolve and re-ask a pending question midway through reconnect restoration', () => {
+      const onQuestionAsked = jest.fn();
+      const onQuestionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onQuestionAsked, onQuestionResolved }));
+      state.process({ type: 'question.asked', requestId: 'pending', questions: [] });
+      onQuestionAsked.mockClear();
+      state.beginReplay();
+      state.process({ type: 'connected' });
+      state.process({ type: 'question.asked', requestId: 'pending', questions: [] });
+      expect(onQuestionAsked).not.toHaveBeenCalled();
+      expect(onQuestionResolved).not.toHaveBeenCalled();
+      state.endReplay();
+      expect(onQuestionResolved).not.toHaveBeenCalled();
+      expect(onQuestionAsked).toHaveBeenCalledTimes(1);
+      onQuestionAsked.mockClear();
+      state.beginReplay();
+      state.process({ type: 'connected' });
+      state.endReplay();
+      expect(onQuestionResolved).toHaveBeenCalledWith('pending');
+      expect(onQuestionAsked).not.toHaveBeenCalled();
+    });
+
+    it('restores callbacks after canceling an incomplete replay', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.beginReplay();
+      state.process({ type: 'session.error', error: 'Historical error' });
+      state.cancelReplay();
+      state.process({ type: 'session.error', error: 'Current error' });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith('Current error');
+    });
+
+    it('supersedes a turn error when that active message completes successfully', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'cloud.message.sent', messageId: 'current' });
+      state.process({ type: 'session.error', error: 'Transient error' });
+      state.process({ type: 'cloud.message.completed', messageId: 'current' });
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+    });
+  });
+
   describe('initial state', () => {
     it('starts with connecting activity, idle status, no question, no permission', () => {
       const state = createServiceState(makeConfig());

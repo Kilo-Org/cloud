@@ -787,6 +787,70 @@ describe('delivery callback plumbing', () => {
 });
 
 describe('queued message cancellation replay', () => {
+  it('materializes only final delivery rows and publishes service state at bootstrap completion', async () => {
+    const session = createCloudAgentResolvedSession(createMockApi());
+    await connectSession(session);
+    const notifications = jest.fn();
+    session.state.subscribe(notifications);
+    const deliver = (streamEventType: string, data: unknown) => {
+      mockWs.onmessage?.({
+        data: JSON.stringify({
+          eventId: 0,
+          sessionId: cloudAgentSessionId,
+          streamEventType,
+          timestamp: new Date().toISOString(),
+          data,
+        }),
+      } as MessageEvent);
+    };
+    deliver('kilocode', {
+      type: 'session.error',
+      properties: { sessionID: kiloSessionId, error: 'Old overload' },
+    });
+    deliver('kilocode', {
+      type: 'session.status',
+      properties: { sessionID: kiloSessionId, status: { type: 'busy' } },
+    });
+    deliver('kilocode', {
+      type: 'session.status',
+      properties: { sessionID: kiloSessionId, status: { type: 'idle' } },
+    });
+    deliver('cloud.message.queued', { messageId: 'canceled', content: 'Old prompt' });
+    deliver('cloud.message.canceled', { messageId: 'canceled' });
+    deliver('connected', { bootstrapPending: true, cloudStatus: { type: 'ready' } });
+    deliver('cloud.message.queued', { messageId: 'queued', content: 'Queued prompt' });
+    deliver('cloud.message.queued', { messageId: 'accepted', content: 'Accepted prompt' });
+    deliver('cloud.message.sent', { messageId: 'accepted' });
+    deliver('cloud.message.queued', { messageId: 'failed', content: 'Failed prompt' });
+    deliver('cloud.message.failed', {
+      messageId: 'failed',
+      reason: 'exhausted',
+      error: 'Old delivery failure',
+    });
+    deliver('kilocode', {
+      type: 'question.asked',
+      properties: { id: 'current-question', sessionID: kiloSessionId, questions: [] },
+    });
+    expect(notifications).not.toHaveBeenCalled();
+    expect(session.storage.getMessageIds()).toEqual([]);
+
+    deliver('bootstrap.complete', {});
+    expect(notifications).toHaveBeenCalledTimes(1);
+    expect(session.state.getStatus()).toEqual({ type: 'idle' });
+    expect(session.storage.getMessageIds()).toHaveLength(3);
+    expect(session.storage.getMessageIds()).toEqual(
+      expect.arrayContaining(['queued', 'accepted', 'failed'])
+    );
+    expect(session.state.getPendingMessages().get('failed')).toMatchObject({ status: 'failed' });
+    expect(session.state.getQuestion()?.requestId).toBe('current-question');
+    deliver('kilocode', {
+      type: 'session.error',
+      properties: { sessionID: kiloSessionId, error: 'Live failure' },
+    });
+    expect(session.state.getStatus()).toEqual({ type: 'error', message: 'Live failure' });
+    session.destroy();
+  });
+
   it('replays cloud.message.queued then cloud.message.canceled to a net-empty transcript', async () => {
     const api = createMockApi();
     const session = createCloudAgentResolvedSession(api);
@@ -806,6 +870,7 @@ describe('queued message cancellation replay', () => {
       } as MessageEvent);
     };
 
+    deliver('connected', {});
     deliver('cloud.message.queued', { messageId, content: 'hello' });
     expect(session.state.getPendingMessages().has(messageId)).toBe(true);
     expect(session.storage.getMessageIds()).toContain(messageId);

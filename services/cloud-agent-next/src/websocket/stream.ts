@@ -155,6 +155,7 @@ export function createStreamHandler(
       const url = new URL(request.url);
       const filters = parseStreamFilters(url, sessionId);
       const skipReplay = url.searchParams.get('replay') === 'false';
+      const bootstrap = url.searchParams.get('bootstrap') === 'true';
       const pair = new WebSocketPair();
       const client = pair[0];
       const server = pair[1];
@@ -253,6 +254,7 @@ export function createStreamHandler(
       }
 
       const connectedData: ConnectedEventData = {};
+      if (bootstrap) connectedData.bootstrapPending = true;
       if (cloudStatus) connectedData.cloudStatus = cloudStatus;
       if (sessionStatus) connectedData.sessionStatus = sessionStatus;
       if (pendingInteractions) connectedData.pendingInteractions = pendingInteractions;
@@ -328,6 +330,18 @@ export function createStreamHandler(
             })
           );
         }
+      }
+
+      if (bootstrap) {
+        server.send(
+          JSON.stringify({
+            eventId: 0,
+            sessionId,
+            streamEventType: 'bootstrap.complete',
+            timestamp: new Date().toISOString(),
+            data: {},
+          })
+        );
       }
 
       return new Response(null, { status: 101, webSocket: client });

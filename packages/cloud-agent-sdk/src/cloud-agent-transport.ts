@@ -2,9 +2,8 @@
  * Cloud Agent transport — wraps createConnection to normalize raw wire events
  * and route them to separate chat/service sinks via the Transport interface.
  *
- * Messages are pre-loaded from the REST API and replayed into the sink before
- * the WebSocket connects with `?replay=false`, avoiding a blank flash while
- * the DO replays stored events.
+ * REST messages seed the transcript; WebSocket replay closes ingest lag while
+ * service-state notifications are batched until bootstrap completes.
  */
 import { createConnection, type Connection } from './cloud-agent-connection';
 import type { ConnectionLifecycleHooks, WebSocketHeaders } from './base-connection';
@@ -26,8 +25,6 @@ import type {
   TransportSendPayload,
   TransportSink,
 } from './transport';
-
-type SessionStatusEvent = Extract<ServiceEvent, { type: 'session.status' }>;
 
 function normalizeCloudAgentPayload(payload: TransportSendPayload): CloudAgentSendPayload {
   if (payload.type === 'command') return payload;
@@ -80,18 +77,37 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
     let lifecycleGeneration = 0;
     let stoppedReceived = false;
     let replaying = true;
-    // Latest replayed status per session, applied after connected unless
-    // connected already carries the authoritative root status.
-    const replayedStatuses = new Map<string, SessionStatusEvent>();
+    let awaitingConnectedSnapshot = true;
     // Last persisted event id seen on the wire (eventId 0 is the synthetic
     // sentinel). Used as a replay cursor on reconnect: the DO replays every
     // stored event after it, so content produced while the socket was dead is
     // re-delivered in order instead of being left to snapshot freshness.
     let lastEventId: number | null = null;
 
+    function startReplay(): void {
+      replaying = true;
+      awaitingConnectedSnapshot = true;
+      stoppedReceived = false;
+      sink.onReplayStarted?.();
+    }
+
+    function finishReplay(): void {
+      if (!replaying) return;
+      replaying = false;
+      sink.onReplayComplete?.();
+    }
+
+    function cancelReplay(): void {
+      if (!replaying) return;
+      replaying = false;
+      stoppedReceived = false;
+      sink.onReplayCanceled?.();
+    }
+
     function buildWebsocketUrl(): string {
       const url = new URL('/stream', websocketBaseUrl);
       url.searchParams.set('cloudAgentSessionId', config.sessionId);
+      url.searchParams.set('bootstrap', 'true');
       if (lastEventId !== null) {
         // Reconnect cursor or initial watermark: the DO replays everything
         // after this id — either a live cursor from the wire, or the
@@ -228,14 +244,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           const event = normalize(raw);
           if (!event) return;
 
-          if (event.type === 'connected') replaying = false;
-          if (replaying && event.type === 'session.status') {
-            replayedStatuses.set(event.sessionId, event);
+          if (event.type === 'bootstrap.complete') {
+            finishReplay();
             return;
           }
+          if (event.type === 'connected') awaitingConnectedSnapshot = false;
           // Pending interactions are restored separately after connected.
           if (
-            replaying &&
+            awaitingConnectedSnapshot &&
             (event.type === 'question.asked' ||
               event.type === 'question.replied' ||
               event.type === 'question.rejected' ||
@@ -267,20 +283,16 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
           }
 
           if (event.type === 'connected') {
-            const statuses = [...replayedStatuses.values()];
-            replayedStatuses.clear();
-            for (const status of statuses) {
-              if (status.sessionId === config.kiloSessionId && event.sessionStatus) continue;
-              sink.onServiceEvent(status);
-            }
+            if (!event.bootstrapPending) finishReplay();
           }
         },
-        onConnected: () => {},
+        onConnected: () => {
+          if (expectedGeneration !== lifecycleGeneration) return;
+          startReplay();
+        },
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
-          replaying = true;
-          replayedStatuses.clear();
-          stoppedReceived = false;
+          startReplay();
           // With a replay cursor the socket itself re-delivers everything
           // missed while dead — replaying a (possibly stale) snapshot on top
           // would overwrite newer parts. Only fall back to the snapshot when
@@ -311,14 +323,23 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
               );
           void replayRefetch;
         },
-        onDisconnected: () => {},
-        onUnexpectedDisconnect: () => {
-          if (expectedGeneration !== lifecycleGeneration) return;
-          if (stoppedReceived) return;
+        onDisconnected: () => {
+          if (expectedGeneration !== lifecycleGeneration || !replaying) return;
+          cancelReplay();
           stoppedReceived = true;
           sink.onServiceEvent(stoppedEvent);
         },
-        onError: streamError => config.onError?.(streamError.message),
+        onUnexpectedDisconnect: () => {
+          if (expectedGeneration !== lifecycleGeneration) return;
+          if (stoppedReceived && !replaying) return;
+          cancelReplay();
+          stoppedReceived = true;
+          sink.onServiceEvent(stoppedEvent);
+        },
+        onError: streamError => {
+          if (expectedGeneration !== lifecycleGeneration) return;
+          config.onError?.(streamError.message);
+        },
         onRefreshTicket: () => Promise.resolve(config.getTicket(config.sessionId)),
       });
 
@@ -353,7 +374,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         lifecycleGeneration += 1;
         stoppedReceived = false;
         replaying = true;
-        replayedStatuses.clear();
+        awaitingConnectedSnapshot = true;
         const expectedGeneration = lifecycleGeneration;
 
         void fetchAndReplayInitial(expectedGeneration)
@@ -367,11 +388,13 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       },
 
       disconnect() {
+        cancelReplay();
         lifecycleGeneration += 1;
         closeConnection('disconnect');
       },
 
       destroy() {
+        cancelReplay();
         lifecycleGeneration += 1;
         closeConnection('destroy');
       },

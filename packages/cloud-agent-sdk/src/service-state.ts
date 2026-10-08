@@ -95,6 +95,9 @@ type ServiceStateConfig = {
 
 type ServiceState = {
   process(event: ServiceEvent): void;
+  beginReplay(): void;
+  endReplay(): void;
+  cancelReplay(): void;
   getActivity(): SessionActivity;
   getStatus(): AgentStatus;
   getCloudStatus(): CloudStatus | null;
@@ -108,6 +111,7 @@ type ServiceState = {
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
+  getActiveMessageId(): string | null;
   /**
    * Remove one failed delivery entry (called after a successful retry).
    * Returns true when that entry was also the failure that set the terminal
@@ -128,6 +132,16 @@ type ServiceState = {
 const INITIAL_ACTIVITY: SessionActivity = { type: 'connecting' };
 const IDLE_STATUS: AgentStatus = { type: 'idle' };
 
+type ServiceReplayBatch = {
+  statusAtStart: AgentStatus;
+  questions: readonly QuestionState[];
+  permissions: readonly PermissionState[];
+  infos: Map<string, SessionInfo>;
+  childErrors: Map<string, string>;
+  branch: string | null;
+  hadSessionInfo: boolean;
+};
+
 /**
  * FIFO upsert. A repeat of the same requestId replaces the entry in place —
  * the wrapper replays pending requests after a snapshot, and a replay must
@@ -145,7 +159,8 @@ function upsertByRequestId<T extends { requestId: string }>(
   return copy;
 }
 
-function createServiceState(config: ServiceStateConfig): ServiceState {
+function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
+  let config = initialConfig;
   let rootSessionId = config.rootSessionId;
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
@@ -186,8 +201,10 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let terminalFailure: { messageId: string; status: AgentStatus } | null = null;
 
   const subscribers = new Set<() => void>();
+  let replay: ServiceReplayBatch | null = null;
 
   function notify(): void {
+    if (replay) return;
     for (const cb of subscribers) {
       cb();
     }
@@ -207,6 +224,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     }
 
     if (sessionStatus.type === 'busy') {
+      replay?.childErrors.delete(sessionId);
       if (isRootSession(sessionId)) {
         activity = { type: 'busy' };
         status = IDLE_STATUS;
@@ -707,7 +725,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processMessageCompleted(
     event: Extract<ServiceEvent, { type: 'cloud.message.completed' }>
   ): void {
-    if (activeMessageId === event.messageId) activeMessageId = null;
+    if (activeMessageId === event.messageId) {
+      activeMessageId = null;
+      terminalFailure = null;
+      if (status.type === 'error') status = IDLE_STATUS;
+    }
     pendingMessages.delete(event.messageId);
     config.onMessageCompleted?.(event.messageId);
     notify();
@@ -984,13 +1006,90 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       case 'session.idle':
       case 'session.turn.close':
       case 'warning':
+      case 'bootstrap.complete':
         // No-op events
         break;
     }
   }
 
+  function publishReplayEffects(batch: ServiceReplayBatch): void {
+    for (const info of batch.infos.values()) {
+      if (!batch.hadSessionInfo && isRootSession(info.id)) config.onSessionCreated?.(info);
+      else config.onSessionUpdated?.(info);
+    }
+    if (batch.branch !== null) config.onBranchChanged?.(batch.branch);
+    for (const entry of batch.questions) {
+      if (!questions.some(current => current.requestId === entry.requestId)) {
+        config.onQuestionResolved?.(entry.requestId);
+      }
+    }
+    for (const entry of batch.permissions) {
+      if (!permissions.some(current => current.requestId === entry.requestId)) {
+        config.onPermissionResolved?.(entry.requestId);
+      }
+    }
+    for (const entry of questions) {
+      if (!batch.questions.includes(entry))
+        config.onQuestionAsked?.(entry.requestId, entry.questions);
+    }
+    for (const entry of permissions) {
+      if (!batch.permissions.includes(entry)) {
+        config.onPermissionAsked?.(
+          entry.requestId,
+          entry.permission,
+          entry.patterns,
+          entry.metadata,
+          entry.always
+        );
+      }
+    }
+    for (const [id, error] of batch.childErrors) config.onChildSessionError?.(id, error);
+  }
+
   return {
     process,
+
+    beginReplay(): void {
+      if (replay) return;
+      const batch: ServiceReplayBatch = {
+        statusAtStart: status,
+        questions,
+        permissions,
+        infos: new Map(),
+        childErrors: new Map(),
+        branch: null,
+        hadSessionInfo: sessionInfo !== null,
+      };
+      replay = batch;
+      config = {
+        rootSessionId: initialConfig.rootSessionId,
+        isDeliveryFailureResolved: initialConfig.isDeliveryFailureResolved,
+        onSessionCreated: info => batch.infos.set(info.id, info),
+        onSessionUpdated: info => batch.infos.set(info.id, info),
+        onBranchChanged: branch => {
+          batch.branch = branch;
+        },
+        onChildSessionError: (id, error) => batch.childErrors.set(id, error),
+      };
+    },
+
+    endReplay(): void {
+      const batch = replay;
+      if (!batch) return;
+      replay = null;
+      config = initialConfig;
+      publishReplayEffects(batch);
+      if (status.type === 'error' && status !== batch.statusAtStart)
+        config.onError?.(status.message);
+      notify();
+    },
+
+    cancelReplay(): void {
+      const batch = replay;
+      replay = null;
+      config = initialConfig;
+      if (batch) publishReplayEffects(batch);
+    },
 
     getActivity: () => activity,
     getStatus: () => status,
@@ -1007,6 +1106,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
+    getActiveMessageId: () => activeMessageId,
 
     clearFailedMessage(messageId: string): boolean {
       pendingMessages.delete(messageId);
@@ -1063,6 +1163,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     },
 
     reset(): void {
+      replay = null;
+      config = initialConfig;
       activity = INITIAL_ACTIVITY;
       status = IDLE_STATUS;
       cloudStatus = null;

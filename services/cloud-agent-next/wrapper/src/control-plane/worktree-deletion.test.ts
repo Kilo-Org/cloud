@@ -7,6 +7,10 @@ import { deleteWorktree, type WorktreeKiloCleanupClient } from '../control/delet
 import { resetSessionDirectoryState } from '../control/session-directories.js';
 import { resetDirectoryOperationState } from '../control/worktree-operations.js';
 import {
+  controlDiagnosticFieldsSchema,
+  type ControlDiagnosticFields,
+} from '../../../src/shared/control-diagnostics.js';
+import {
   createControlPlaneWorktreeDeletion,
   type ControlPlaneWorktreeDeletionDeps,
 } from './worktree-deletion.js';
@@ -66,6 +70,54 @@ function harness(overrides: Partial<ControlPlaneWorktreeDeletionDeps> = {}) {
 function deferred() {
   return Promise.withResolvers<void>();
 }
+
+describe('worktree cleanup timing', () => {
+  test.each([false, true])('retains aggregate timing fields on failure=%s', async fail => {
+    const f = fixture();
+    f.sessions.set(sessionId(0), { id: sessionId(0), directory });
+    const diagnostics: ControlDiagnosticFields[] = [];
+    const run = deleteWorktree(
+      { worktreeId, directory, sessionIds: [sessionId(0)] },
+      {
+        clients: [f.client],
+        onDiagnostic: (_event, fields) =>
+          diagnostics.push(controlDiagnosticFieldsSchema.parse(fields)),
+        assertDirectory: async () => undefined,
+        removeDirectory: async () => {
+          if (fail) throw new Error('filesystem unavailable');
+        },
+      }
+    );
+    if (fail) {
+      const error = await run.then(
+        () => null,
+        error => error
+      );
+      expect(error).toEqual(new Error('filesystem unavailable'));
+    } else await run;
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics[0]).toMatchObject({
+      operation: 'worktree.prepareDeletion',
+      manifestDiscoveryMs: expect.any(Number),
+      sessionAbortMs: expect.any(Number),
+    });
+    expect(diagnostics[1]).toMatchObject({
+      operation: 'worktree.delete',
+      phase: fail ? 'failed' : 'completed',
+      ok: !fail,
+      processCleanupMs: expect.any(Number),
+      terminalCleanupMs: expect.any(Number),
+      sessionDeleteMs: expect.any(Number),
+      sessionDeleteConfirmationMs: expect.any(Number),
+      directoryDisposeMs: expect.any(Number),
+      runtimeRetirementMs: expect.any(Number),
+      directoryValidationMs: expect.any(Number),
+      directoryRemovalMs: expect.any(Number),
+    });
+    if (fail) expect(diagnostics[1].rootDetachMs).toBeUndefined();
+    else expect(diagnostics[1].rootDetachMs).toBeGreaterThanOrEqual(0);
+  });
+});
 
 async function flushMicrotasks() {
   for (let index = 0; index < 20; index++) await Promise.resolve();

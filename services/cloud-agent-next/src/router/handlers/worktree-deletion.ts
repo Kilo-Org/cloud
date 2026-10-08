@@ -70,6 +70,15 @@ export async function deleteWorktreeResources(
   };
   const startedAt = Date.now();
   let stage = 'authorize';
+  let stageStartedAt = startedAt;
+  const phaseDurations: Record<string, number> = {};
+  const setStage = (next: string): void => {
+    const now = Date.now();
+    const field = `${stage.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}Ms`;
+    phaseDurations[field] = (phaseDurations[field] ?? 0) + Math.max(0, now - stageStartedAt);
+    stageStartedAt = now;
+    stage = next;
+  };
   let outcome = 'failed';
   let sessionCount: number | undefined;
   let locationCount: number | undefined;
@@ -86,7 +95,7 @@ export async function deleteWorktreeResources(
     ) {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Worktree access denied' });
     }
-    stage = 'begin_deletion';
+    setStage('begin_deletion');
     let state = cloudAgentWorktreeDeletionStateSchema.parse(
       await ctx.env.SESSION_INGEST.beginCloudAgentWorktreeDeletion(params)
     );
@@ -102,7 +111,7 @@ export async function deleteWorktreeResources(
     const runtimeLocations = [...state.runtimeLocations];
     const directories = new Set<string>();
     const childSessions: NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']> = [];
-    stage = 'collect_sessions';
+    setStage('collect_sessions');
     const discoveries = await mapDeletionRoots(state.manifest.sessions, async session => {
       if (!session.cloudAgentSessionId) return null;
       const cloudAgentSessionId = session.cloudAgentSessionId;
@@ -141,10 +150,10 @@ export async function deleteWorktreeResources(
       directories.size > 0
         ? [...directories]
         : [getWorktreeWorkspacePath(params.organizationId, ctx.userId, params.worktreeId)];
-    stage = 'runtime_history';
+    setStage('runtime_history');
     locationCount = runtimeLocations.length;
     if (runtimeLocations.length === 0) throw new Error(WORKTREE_RUNTIME_HISTORY_UNAVAILABLE);
-    stage = 'record_manifest';
+    setStage('record_manifest');
     for (const directory of recordDirectories) {
       state = cloudAgentWorktreeDeletionStateSchema.parse(
         await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
@@ -158,7 +167,7 @@ export async function deleteWorktreeResources(
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
     for (const location of state.runtimeLocations) {
-      stage = 'runtime_cleanup';
+      setStage('runtime_cleanup');
       const locationStartedAt = Date.now();
       let cleanup: WorktreeDeleteResult | undefined;
       try {
@@ -188,7 +197,7 @@ export async function deleteWorktreeResources(
           cleanup ? 'info' : 'warn'
         );
       }
-      stage = 'record_cleanup';
+      setStage('record_cleanup');
       for (const directory of recordDirectories) {
         state = cloudAgentWorktreeDeletionStateSchema.parse(
           await ctx.env.SESSION_INGEST.recordCloudAgentWorktreeCleanup({
@@ -201,7 +210,7 @@ export async function deleteWorktreeResources(
       sessionCount = state.manifest.sessions.length;
       locationCount = state.runtimeLocations.length;
     }
-    stage = 'finish_sessions';
+    setStage('finish_sessions');
     await mapDeletionRoots(state.manifest.sessions, async session => {
       if (!session.cloudAgentSessionId) return;
       const cloudAgentSessionId = session.cloudAgentSessionId;
@@ -211,7 +220,7 @@ export async function deleteWorktreeResources(
         'finishWorktreeDeletion'
       );
     });
-    stage = 'complete_deletion';
+    setStage('complete_deletion');
     const output = DeleteWorktreeOutput.parse(
       await ctx.env.SESSION_INGEST.completeCloudAgentWorktreeDeletion(params)
     );
@@ -256,6 +265,7 @@ export async function deleteWorktreeResources(
       },
     });
   } finally {
+    setStage(stage);
     logControlDiagnostic(
       'worktree_deletion',
       {
@@ -268,6 +278,7 @@ export async function deleteWorktreeResources(
         errorCode,
         retryable,
         durationMs: Date.now() - startedAt,
+        ...phaseDurations,
       },
       outcome === 'completed' || outcome === 'replayed' || outcome === 'rejected' ? 'info' : 'warn'
     );

@@ -187,39 +187,63 @@ async function ownersForSession(
   return sessions.flatMap(({ client, session }) => (session ? [{ client, session }] : []));
 }
 
+function cleanupTiming(initialStage: ControlDiagnosticRecord['fields']['stage']) {
+  let stage = initialStage;
+  let startedAt = Date.now();
+  const durations: Record<string, number> = {};
+  return {
+    setStage(next: ControlDiagnosticRecord['fields']['stage']) {
+      const now = Date.now();
+      if (stage) {
+        const field = `${stage.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())}Ms`;
+        durations[field] = (durations[field] ?? 0) + Math.max(0, now - startedAt);
+      }
+      stage = next;
+      startedAt = now;
+    },
+    get stage() {
+      return stage;
+    },
+    durations,
+  };
+}
+
 export async function prepareWorktreeDeletion(
   raw: unknown,
   deps: WorktreeCleanupDeps
 ): Promise<string[]> {
   const startedAt = Date.now();
   const input = worktreeDeletePayloadSchema.parse(raw);
-  let stage: ControlDiagnosticRecord['fields']['stage'] = 'directory_validation';
+  const timing = cleanupTiming('directory_validation');
   let sessionCount = input.sessionIds.length;
-  const diagnostic = (phase: 'completed' | 'failed'): void =>
+  const diagnostic = (phase: 'completed' | 'failed'): void => {
+    timing.setStage(timing.stage);
     emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
       operation: 'worktree.prepareDeletion',
       phase,
-      stage,
+      stage: timing.stage,
       worktreeId: input.worktreeId,
       sessionCount,
       elapsedMs: Math.max(0, Date.now() - startedAt),
       ok: phase === 'completed',
+      ...timing.durations,
     });
+  };
   try {
     validateWorktreeDirectory(input);
-    stage = 'deletion_fence';
+    timing.setStage('deletion_fence');
     await fenceDirectoryOperations(input.directory);
-    stage = 'directory_validation';
+    timing.setStage('directory_validation');
     await (deps.assertDirectory ?? assertNoSymlinks)(input.directory);
     const clients = uniqueClients(deps.clients);
-    stage = 'manifest_discovery';
+    timing.setStage('manifest_discovery');
     const sessionIds = new Set([
       ...input.sessionIds,
       ...(await Promise.all(clients.map(client => client.listSessionIds(input.directory)))).flat(),
     ]);
     sessionCount = sessionIds.size;
     for (const sessionId of sessionIds) {
-      stage = 'manifest_discovery';
+      timing.setStage('manifest_discovery');
       const rememberedDirectory = directoryForSession(sessionId);
       if (rememberedDirectory && rememberedDirectory !== input.directory)
         throw new Error('Worktree session directory conflict');
@@ -227,11 +251,11 @@ export async function prepareWorktreeDeletion(
       if (owners.some(({ session }) => session.directory !== input.directory))
         throw new Error('Worktree session directory conflict');
       if (owners.length === 0) continue;
-      stage = 'session_abort';
+      timing.setStage('session_abort');
       await Promise.all(
         owners.map(({ client }) => client.abortSession(input.directory, sessionId))
       );
-      stage = 'manifest_discovery';
+      timing.setStage('manifest_discovery');
       for (const { client } of owners) {
         for (const child of await client.children(input.directory, sessionId)) {
           if (child.directory !== input.directory)
@@ -241,7 +265,7 @@ export async function prepareWorktreeDeletion(
         }
       }
     }
-    stage = 'manifest_discovery';
+    timing.setStage('manifest_discovery');
     diagnostic('completed');
     return [...sessionIds];
   } catch (error) {
@@ -256,24 +280,27 @@ export async function deleteWorktree(
 ): Promise<WorktreeDeleteResult> {
   const startedAt = Date.now();
   const input = worktreeDeletePayloadSchema.parse(raw);
-  let stage: ControlDiagnosticRecord['fields']['stage'] = 'manifest_discovery';
+  const timing = cleanupTiming('manifest_discovery');
   let sessionCount = input.sessionIds.length;
-  const diagnostic = (phase: 'completed' | 'failed'): void =>
+  const diagnostic = (phase: 'completed' | 'failed'): void => {
+    timing.setStage(timing.stage);
     emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
       operation: 'worktree.delete',
       phase,
-      stage,
+      stage: timing.stage,
       worktreeId: input.worktreeId,
       sessionCount,
       elapsedMs: Math.max(0, Date.now() - startedAt),
       ok: phase === 'completed',
+      ...timing.durations,
     });
+  };
   try {
     const sessionIds = await prepareWorktreeDeletion(input, deps);
     sessionCount = sessionIds.length;
     const journaled = new Set(input.sessionIds);
     if (sessionIds.some(id => !journaled.has(id))) {
-      stage = 'manifest_growth';
+      timing.setStage('manifest_growth');
       throw new Error('Worktree cleanup manifest changed');
     }
     const clients = uniqueClients(deps.clients);
@@ -287,45 +314,46 @@ export async function deleteWorktree(
         throw new Error('Worktree session directory conflict');
       ownersBySession.set(sessionId, owners);
     });
-    stage = 'process_cleanup';
+    timing.setStage('process_cleanup');
     await cleanupInBatches(sessionIds, async sessionId => {
       const owners = ownersBySession.get(sessionId) ?? [];
       await awaitCleanup(
         owners.map(async ({ client }) => client.stopSessionProcesses(input.directory, sessionId))
       );
     });
-    stage = 'terminal_cleanup';
+    timing.setStage('terminal_cleanup');
     await deps.detachTerminals?.(input.directory);
     for (const client of clients) {
+      timing.setStage('terminal_cleanup');
       await client.closeTerminals(input.directory);
-      stage = 'session_delete';
+      timing.setStage('session_delete');
       for (const sessionId of [...sessionIds].reverse()) {
         const owners = ownersBySession.get(sessionId) ?? [];
         if (!owners.some(owner => owner.client === client)) continue;
         await client.deleteSession(input.directory, sessionId);
       }
     }
-    stage = 'session_delete_confirmation';
+    timing.setStage('session_delete_confirmation');
     for (const [sessionId, owners] of ownersBySession) {
       for (const { client } of owners) {
         if (!(await client.getSession(input.directory, sessionId))) continue;
-        stage = 'session_delete_unconfirmed';
+        timing.setStage('session_delete_unconfirmed');
         throw new Error('Kilo session deletion was not confirmed');
       }
     }
-    stage = 'directory_dispose';
+    timing.setStage('directory_dispose');
     for (const client of clients) {
       await client.disposeDirectory(input.directory);
     }
-    stage = 'runtime_retirement';
+    timing.setStage('runtime_retirement');
     await deps.retireDirectory?.(input.directory);
-    stage = 'directory_validation';
+    timing.setStage('directory_validation');
     await (deps.assertDirectory ?? assertNoSymlinks)(input.directory);
-    stage = 'directory_removal';
+    timing.setStage('directory_removal');
     await (
       deps.removeDirectory ?? (directory => fs.rm(directory, { recursive: true, force: true }))
     )(input.directory);
-    stage = 'root_detach';
+    timing.setStage('root_detach');
     for (const sessionId of sessionIds) {
       forgetAttachedRoot(sessionId, input.directory);
       deps.detachRoot?.(sessionId);

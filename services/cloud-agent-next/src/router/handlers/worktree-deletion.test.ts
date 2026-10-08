@@ -12,7 +12,13 @@ import { getWorktreeWorkspacePath } from '../../workspace';
 import { router } from '../auth';
 import { deleteWorktree } from './worktree-deletion';
 
-const mocks = vi.hoisted(() => ({ getSession: vi.fn(), getControl: vi.fn(), getDb: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  getControl: vi.fn(),
+  getDb: vi.fn(),
+  diagnostic: vi.fn(),
+}));
+vi.mock('../../sandbox-control/diagnostics', () => ({ logControlDiagnostic: mocks.diagnostic }));
 vi.mock('../../sandbox-session/session-stub', () => ({
   getSandboxSessionStub: mocks.getSession,
 }));
@@ -142,6 +148,42 @@ function fixture(rootCount = 1, childCount = 0) {
 beforeEach(() => vi.resetAllMocks());
 
 describe('deleteWorktree authorization and completion', () => {
+  it.each([false, true])('reports aggregate phase timings when cleanup fails=%s', async fail => {
+    const f = fixture(2);
+    let now = 1000;
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    f.begin.mockImplementation(async () => {
+      now += 10;
+      return structuredClone(f.getState());
+    });
+    f.cleanup.mockImplementation(async input => {
+      now += 25;
+      if (fail) throw new Error('cleanup unavailable');
+      return { deleted: true, sessionIds: input.sessionIds };
+    });
+    try {
+      const pending = f.caller.deleteWorktree({ worktreeId });
+      if (fail) await expect(pending).rejects.toThrow('Worktree deletion is incomplete');
+      else await pending;
+      const summaries = mocks.diagnostic.mock.calls.filter(
+        ([event, fields]) => event === 'worktree_deletion' && fields.phase === 'finished'
+      );
+      expect(summaries).toHaveLength(1);
+      expect(summaries[0][1]).toMatchObject({
+        worktreeId,
+        beginDeletionMs: 10,
+        collectSessionsMs: 0,
+        runtimeCleanupMs: 25,
+        durationMs: 35,
+        result: fail ? 'pending' : 'completed',
+      });
+      if (fail) expect(summaries[0][1]).not.toHaveProperty('completeDeletionMs');
+      else expect(summaries[0][1]).toHaveProperty('completeDeletionMs', 0);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it.each(['begin', 'finish'] as const)(
     'bounds concurrent %s operations and waits before advancing phases',
     async phase => {

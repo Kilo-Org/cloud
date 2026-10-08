@@ -418,6 +418,62 @@ function database(rootCount = 1, descendantCount = 0) {
 beforeEach(() => vi.resetAllMocks());
 
 describe('durable worktree deletion journal', () => {
+  it.each(['none', 'ingest', 'transaction'] as const)(
+    'reports bounded SQL and DO timing summaries on failure=%s',
+    async failure => {
+      const fail = failure !== 'none';
+      const f = database(2, 1);
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        await beginWorktreeDeletion(env, params);
+        await recordWorktreeCleanup(env, params);
+        if (failure === 'ingest') f.fail(kiloId(1));
+        if (failure === 'transaction') f.failCommit(new Error('commit unavailable'));
+        if (fail) await expect(completeWorktreeDeletion(env, params)).rejects.toThrow();
+        else await completeWorktreeDeletion(env, params);
+        expect(log.mock.calls[0][0]).toMatchObject({
+          operation: 'begin',
+          sqlTransactionMs: expect.any(Number),
+        });
+        expect(log.mock.calls[1][0]).toMatchObject({
+          operation: 'record_cleanup',
+          lineageInferenceMs: expect.any(Number),
+          sqlTransactionMs: expect.any(Number),
+        });
+        const summaries = [...log.mock.calls, ...warn.mock.calls]
+          .map(([fields]) => fields)
+          .filter(fields => typeof fields === 'object' && fields.event === 'worktree_deletion');
+        const summary = summaries.find(fields => fields.operation === 'complete');
+        expect(summary).toMatchObject({
+          event: 'worktree_deletion',
+          operation: 'complete',
+          worktreeId,
+          sessionCount: 3,
+          ok: !fail,
+          durationMs: expect.any(Number),
+          readStateMs: expect.any(Number),
+          ingestCleanupMs: expect.any(Number),
+          accessCacheCleanupMs: expect.any(Number),
+          connectionCleanupMs: expect.any(Number),
+        });
+        if (failure === 'ingest') {
+          expect(summary).toMatchObject({ stage: 'ingestCleanup' });
+          expect(summary).not.toHaveProperty('sqlTransactionMs');
+        } else {
+          expect(summary).toHaveProperty('sqlTransactionMs', expect.any(Number));
+          if (failure === 'transaction') expect(summary).toMatchObject({ stage: 'sqlTransaction' });
+        }
+        expect(summaries).toHaveLength(3);
+        expect(JSON.stringify(summary)).not.toContain(userId);
+        expect(JSON.stringify(summary)).not.toContain(kiloId(0));
+      } finally {
+        log.mockRestore();
+        warn.mockRestore();
+      }
+    }
+  );
+
   it.each([null, organizationId])(
     'publishes only committed root and descendant deletions in scope %s, once per deleted row',
     async scope => {

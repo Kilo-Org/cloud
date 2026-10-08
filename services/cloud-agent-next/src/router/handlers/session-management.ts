@@ -689,10 +689,11 @@ export function createSessionManagementHandlers() {
             ? interval.rate
             : catalogRate
           : catalogRate;
-        const attribution =
-          sandboxId && isGeneratedSharedSandboxId(sandboxId)
-            ? ('payer_shared' as const)
-            : ('session' as const);
+        const sandboxKind = metadata.workspace?.sandboxKind;
+        const ownerScoped = sandboxKind
+          ? sandboxKind === 'shared'
+          : sandboxId !== undefined && isGeneratedSharedSandboxId(sandboxId);
+        const attribution = ownerScoped ? ('payer_shared' as const) : ('session' as const);
         const phase = !runtime
           ? ('unavailable' as const)
           : runtime.context || hasCurrentInterval

@@ -140,6 +140,7 @@ function materializeAttachPayload(
       directory: getControlPlaneSessionDirectory({
         workspacePath: metadata.workspace?.workspacePath,
         sandboxId: metadata.workspace?.sandboxId,
+        sandboxKind: metadata.workspace?.sandboxKind,
         orgId: metadata.identity.orgId,
         userId: metadata.identity.userId,
         sessionId: metadata.identity.sessionId,
@@ -196,6 +197,13 @@ export function buildControlPlaneSessionRegistration(
   }
   if (sandboxSelection.billing !== undefined && sandboxSelection.billing.sandboxId !== sandboxId) {
     throw new Error('Sandbox selection billing does not match the session sandbox');
+  }
+  const sandboxKind = metadata.workspace?.sandboxKind;
+  if (
+    sandboxSelection.sandboxKind !== sandboxKind ||
+    (sandboxSelection.billing !== undefined && sandboxSelection.billing.sandboxKind !== sandboxKind)
+  ) {
+    throw new Error('Sandbox selection kind does not match session metadata');
   }
   const containment =
     sandboxSelection.containment ??

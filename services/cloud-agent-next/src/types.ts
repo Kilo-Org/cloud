@@ -138,6 +138,7 @@ export type SandboxId =
   | `istd-${string}`
   | `crv-${string}`
   | `dind-${string}`
+  | `sbx-${string}`
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 

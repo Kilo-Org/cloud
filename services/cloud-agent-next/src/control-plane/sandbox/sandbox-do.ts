@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { getSandbox } from '@cloudflare/sandbox';
+import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import {
@@ -80,11 +80,12 @@ import {
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { resolveVercelSandboxRuntimeConfig } from '../../agent-sandbox/vercel/vercel-runtime-config.js';
 import type { VercelSandboxNetworkPolicy } from '../../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import { getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
-  getManagedOutboundContainerId,
-  getOutboundContainerId,
-  getSandboxNamespace,
-} from '../../sandbox-id.js';
+  resolveSandboxNamespace,
+  sandboxKindMatchesKey,
+  type SandboxKind,
+} from '../../sandbox-placement.js';
 import { sessionDoName } from '../../session-plane.js';
 import { logger } from '../../logger.js';
 import {
@@ -247,6 +248,8 @@ type StoredProviderPin = {
   locator: VercelProviderLocator | null;
   billing: SandboxBillingInput | null;
   containment: CredentialContainmentRequirements | null;
+  /** Stored kind of a placed key. Legacy prefixed keys have none. */
+  sandboxKind?: SandboxKind;
 };
 
 export type EnsureAllocationInput = {
@@ -256,6 +259,7 @@ export type EnsureAllocationInput = {
   locator?: VercelProviderLocator;
   billing?: SandboxBillingInput;
   containment?: CredentialContainmentRequirements;
+  sandboxKind?: SandboxKind;
 };
 
 const wrapperSocketAttachmentSchema = z.object({
@@ -1543,6 +1547,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private pinFromInput(input: EnsureAllocationInput): StoredProviderPin {
+    if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
+      throw new Error('Sandbox selection kind does not match the sandbox key');
+    }
     const provider = input.provider ?? 'cloudflare';
     return {
       provider,
@@ -1551,7 +1558,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
       locator: input.locator ?? null,
       billing: input.billing ?? null,
       containment: input.containment ?? null,
+      ...(input.sandboxKind ? { sandboxKind: input.sandboxKind } : {}),
     };
+  }
+
+  /** The Cloudflare Sandbox namespace for a physical sandbox: the pinned kind, else the legacy prefix. */
+  private sandboxNamespace(
+    pin: StoredProviderPin | null,
+    physicalSandboxId: string,
+    contained: boolean
+  ): DurableObjectNamespace<Sandbox> {
+    return resolveSandboxNamespace(this.env, {
+      sandboxId: physicalSandboxId,
+      sandboxKind: pin?.sandboxKind,
+      contained,
+    });
   }
 
   private async readLegacyCutover(): Promise<LegacyCutover> {
@@ -2102,12 +2123,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       decodeCloudflareProviderRef(state.providerRef)?.sandboxId ??
       this.providerPin?.allocationName ??
       this.sandboxId;
-    return (
-      getManagedOutboundContainerId(provider, this.env, {
-        logicalSandboxId: this.sandboxId,
-        physicalSandboxId,
-      }) ?? null
-    );
+    return this.sandboxNamespace(this.providerPin, physicalSandboxId, true)
+      .idFromName(physicalSandboxId)
+      .toString();
   }
 
   private sandboxCanResolveCredentials(state: AllocationState): boolean {
@@ -2870,9 +2888,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
             const containerInstanceId =
               pin.provider === 'cloudflare-containers'
                 ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
-                : getOutboundContainerId(this.env, intent.allocationName ?? this.sandboxId, {
-                    managedScmContainment: this.credentialContainmentEnabled(),
-                  });
+                : this.sandboxNamespace(
+                    pin,
+                    intent.allocationName ?? this.sandboxId,
+                    this.credentialContainmentEnabled()
+                  )
+                    .idFromName(intent.allocationName ?? this.sandboxId)
+                    .toString();
             logControlDiagnostic('container_launch_identity', {
               sandboxId: this.sandboxId,
               allocationId,
@@ -4082,15 +4104,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return createCloudflareProviderAdapter({
       sandboxId: allocationName,
       getSandbox: (id, options) =>
-        getSandbox(
-          getSandboxNamespace(this.env, id, { managedScmContainment: options.containment }),
-          id
-        ),
+        getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
       destroy: (id, options) =>
         forceDestroyControlPlaneSandbox(
-          getSandboxNamespace(this.env, id, {
-            managedScmContainment: options.containment,
-          }).getByName(id)
+          this.sandboxNamespace(pin, id, options.containment).getByName(id)
         ),
     });
   }

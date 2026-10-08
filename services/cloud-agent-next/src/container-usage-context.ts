@@ -14,12 +14,8 @@ import {
   type VercelSandboxResources,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { logger } from './logger.js';
-import {
-  classifySandboxId,
-  isIsolatedSandboxId,
-  isValidSandboxId,
-  type SandboxIdClass,
-} from './sandbox-id.js';
+import { isIsolatedSandboxId, isValidSandboxId, type SandboxIdClass } from './sandbox-id.js';
+import { resolveSandboxIdClass, sandboxKindSchema, type SandboxKind } from './sandbox-placement.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { BillingContext } from '@kilocode/container-usage';
@@ -180,6 +176,8 @@ export function vercelBillingIdentity(resources: VercelSandboxResources): Vercel
 export type SandboxBillingInput = Omit<UsageContext, 'service' | 'instanceId' | 'sku'> & {
   sandboxId: SandboxId;
   enforcementRequested?: boolean;
+  /** Present for a placed key, whose prefix does not say which pool may bill it. */
+  sandboxKind?: SandboxKind;
 };
 export type SandboxBillingAdmissionResult =
   | { success: true }
@@ -228,6 +226,7 @@ export const sandboxBillingInputEnvelopeSchema = z
       })
       .optional(),
     enforcementRequested: z.boolean().default(false),
+    sandboxKind: sandboxKindSchema.optional(),
   })
   .strict();
 
@@ -264,11 +263,13 @@ export function buildSandboxBillingInput(
   const actor = metadata.identity.botId
     ? { type: 'bot' as const, id: metadata.identity.botId }
     : { type: 'user' as const, id: metadata.identity.userId };
-  const isolated = isIsolatedSandboxId(sandboxId);
+  const sandboxKind = metadata.workspace?.sandboxKind;
+  const isolated = sandboxKind ? sandboxKind !== 'shared' : isIsolatedSandboxId(sandboxId);
 
   return {
     sandboxId,
     ...(enforcementRequested ? { enforcementRequested: true } : {}),
+    ...(sandboxKind ? { sandboxKind } : {}),
     subject,
     actor,
     ...(actor.type === 'bot' ? { onBehalfOf: subject } : {}),
@@ -281,7 +282,7 @@ export function buildSandboxBillingInput(
 
 export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
   const parsed = sandboxBillingInputEnvelopeSchema.parse(input);
-  const { sandboxId, enforcementRequested, ...usageInput } = parsed;
+  const { sandboxId, enforcementRequested, sandboxKind, ...usageInput } = parsed;
   const validated = usageContextSchema.parse({
     service: USAGE_SERVICE_ROOT,
     instanceId: 'validation',
@@ -289,7 +290,12 @@ export function parseSandboxBillingInput(input: unknown): SandboxBillingInput {
     ...usageInput,
   });
   const { service: _service, instanceId: _instanceId, sku: _sku, ...billingInput } = validated;
-  return { sandboxId, enforcementRequested, ...billingInput };
+  return {
+    sandboxId,
+    enforcementRequested,
+    ...(sandboxKind ? { sandboxKind } : {}),
+    ...billingInput,
+  };
 }
 
 /**
@@ -317,7 +323,7 @@ export function assertSandboxBillingAllocation(
   sandboxClassName: SandboxClassName,
   input: SandboxBillingInput
 ): void {
-  const sandboxIdClass = classifySandboxId(input.sandboxId);
+  const sandboxIdClass = resolveSandboxIdClass(input);
   const standardClass = sandboxClassName === 'Sandbox' || sandboxClassName === 'SandboxContainment';
   const isolatedPrefixedLegacyId =
     /^(ses|istd|crv|dind)-/.test(input.sandboxId) && input.sandboxId.includes('__');

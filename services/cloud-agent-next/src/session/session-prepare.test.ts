@@ -182,6 +182,7 @@ const WORKTREE_ID = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const ROW_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+const PLACED_SANDBOX_ID = `sbx-${'b'.repeat(48)}`;
 
 function makeLedgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLedgerRow {
   return {
@@ -3580,9 +3581,16 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       provider: 'cloudflare' as const,
       route: { kind: 'shared' as const, routeKey: sharedSandboxId },
     },
+    {
+      label: 'placed Cloudflare sandbox',
+      storedSandboxId: PLACED_SANDBOX_ID,
+      provider: 'cloudflare' as const,
+      route: undefined,
+      sandboxKind: 'shared' as const,
+    },
   ])(
     'restores the recorded $label without recomputing routing',
-    async ({ storedSandboxId, provider, route }) => {
+    async ({ storedSandboxId, provider, route, sandboxKind }) => {
       const input = request();
       const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
       const ctx = context(doStub);
@@ -3604,6 +3612,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
             sandboxId: storedSandboxId,
             sandboxProvider: provider,
             ...(route ? { sandboxRoute: route } : {}),
+            ...(sandboxKind ? { sandboxKind } : {}),
           }),
         }),
       });
@@ -3625,6 +3634,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
           }),
         })
       );
+      expect(createdMetadata(doStub)?.workspace?.sandboxKind).toBe(sandboxKind);
       expect(controlGet).toHaveBeenCalled();
       expect(legacyGet).not.toHaveBeenCalled();
       expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
@@ -3632,6 +3642,33 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       expect(createCliSessionMock).not.toHaveBeenCalled();
     }
   );
+
+  it.each([
+    ['without its kind', {}],
+    ['with a malformed kind', { sandboxKind: 'devcontainer' }],
+  ])('never rebuilds a recorded placed key %s', async (_label, kindProgress) => {
+    const input = request();
+    const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
+    const ctx = context(doStub);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: makeLedgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await canonicalProgress(input, {
+          sandboxId: PLACED_SANDBOX_ID,
+          ...kindProgress,
+        }),
+      }),
+    });
+    getPgDbMock.mockReturnValue(makeDb([[ownershipRow()], [{ email: 'test@example.com' }]]));
+
+    await expect(runCreate(ctx, input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'creation_in_progress',
+    });
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+  });
 
   it.each([
     ['workspace', { cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000' }],

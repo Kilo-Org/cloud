@@ -252,6 +252,8 @@ env_default() {
   env_default AGENT_BROWSER_SOCKET_DIR /tmp/kilo-browser
   env_default AGENT_BROWSER_ARGS --disable-gpu
   env_default AGENT_BROWSER_DEFAULT_TIMEOUT 120000
+  # The full agents stack does not fit the sandbox budget; these are not needed for fake-LLM sessions on public repositories.
+  env_default KILO_DEV_WITHOUT notifications,event-service,cloudflare-webhook-agent-ingest,container-usage-meter,cloudflare-git-token-service
   if [[ -n ${NODE_EXTRA_CA_CERTS:-} ]]; then
     env_default NODE_EXTRA_CA_CERTS "$NODE_EXTRA_CA_CERTS"
   fi
@@ -299,9 +301,8 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
   fi
   # Own the socket by the invoking user's group so a non-root sandbox can use the daemon it starts.
-  # Without IP forwarding, bridge containers reach only the host, so their DNS goes to a forwarder on the bridge gateway.
   "${root[@]}" tmux new-session -d -s kilo-startup-docker \
-    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --dns=$bridge_gateway --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
+    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
   for (( attempt=0; attempt<30; attempt++ )); do
     docker info >/dev/null 2>&1 && break
     sleep 1
@@ -312,8 +313,16 @@ if ! docker info >/dev/null 2>&1; then
     exit 1
   fi
 fi
-if pgrep -a -x dockerd | grep -qF -- "--dns=$bridge_gateway" && ! pgrep -f "dnsmasq .*--listen-address=$bridge_gateway" >/dev/null; then
-  "${root[@]}" dnsmasq --conf-file=/dev/null --no-hosts --bind-interfaces --listen-address="$bridge_gateway"
+if pgrep -a -x dockerd | grep -qF -- "--bip=$bridge_gateway/16"; then
+  # Without IP forwarding, bridge containers reach only the host. Workerd pins sandbox
+  # containers to public resolvers, so redirect all their DNS to a forwarder on the gateway.
+  if ! pgrep -f "dnsmasq .*--listen-address=$bridge_gateway" >/dev/null; then
+    "${root[@]}" dnsmasq --conf-file=/dev/null --no-hosts --bind-interfaces --listen-address="$bridge_gateway"
+  fi
+  for proto in udp tcp; do
+    dns_redirect=(PREROUTING -i docker0 -p "$proto" --dport 53 -j DNAT --to-destination "$bridge_gateway:53")
+    "${root[@]}" iptables -t nat -C "${dns_redirect[@]}" 2>/dev/null || "${root[@]}" iptables -t nat -I "${dns_redirect[@]}"
+  done
 fi
 if [[ $(docker info --format '{{.Driver}}') == vfs ]]; then
   printf 'The existing Docker daemon uses vfs. Stop it and restart with overlay2 or fuse-overlayfs before running this workload.\n' >&2
@@ -410,5 +419,6 @@ printf '\nSetup complete. Dev workload memory peak so far: %s MiB / %s MiB.\n' \
 printf 'Run from %s (pnpm there joins the capped cgroup and loads %s):\n' "$repo" "$env_file"
 printf '  pnpm dev:start --no-attach app                 # web app\n'
 printf '  pnpm dev:start --no-attach agents fake-llm     # Cloud Agents with local fake inference\n'
+printf 'KILO_DEV_WITHOUT skips services the sandbox does not need; pass --without= to start everything.\n'
 printf 'Then pnpm dev:status for ports; log in at http://localhost:<nextjs port>/users/sign_in?fakeUser=%s&callbackPath=/profile\n' "$test_email"
 printf 'Other shells (docker, agent-browser): source %q\n' "$env_file"

@@ -22,6 +22,8 @@ import {
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { computeMonthlyKiloPassBonusDecision } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
+import { getMonthlyWelcomePromoAccountContext } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
 import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import {
   getKiloPassMetadataFromStripeMetadata,
@@ -835,12 +837,36 @@ export async function handleKiloPassInvoicePaid(params: {
       didMutateBalance ||= baseCreditsResult.wasIssued;
 
       let referralBonusBlocksNormalBonus = false;
+      let monthlyStreakMonths = 1;
       if (cadence === KiloPassCadence.Monthly) {
+        const wasInactivePreviously =
+          priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
+        const computedStreak = await computeMonthlyKiloPassStreak(tx, {
+          subscriptionId: kiloPassSubscriptionId,
+          issueMonth,
+        });
+        monthlyStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);
+
+        // A referral bonus fills the issuance bonus slot. Keep the slot free for the welcome promo.
+        const welcomePromoAccountContext = await getMonthlyWelcomePromoAccountContext(tx, {
+          kiloUserId,
+          subscriptionId: kiloPassSubscriptionId,
+          paymentProvider: KiloPassPaymentProvider.Stripe,
+        });
+        const isWelcomePromoIssuance = computeMonthlyKiloPassBonusDecision({
+          tier,
+          startedAtIso: dayjs.unix(subscription.start_date).utc().toISOString(),
+          streakMonths: monthlyStreakMonths,
+          ...welcomePromoAccountContext,
+          issueMonth,
+        }).shouldIssueFirstMonthPromo;
+
         const referralBonusResult = await applyPendingKiloPassReferralBonusForIssuance(tx, {
           issuanceId: issuanceHeader.issuanceId,
           subscriptionId: kiloPassSubscriptionId,
           kiloUserId,
           stripeInvoiceId: invoice.id,
+          deferForWelcomePromo: isWelcomePromoIssuance,
         });
         referralBonusBlocksNormalBonus =
           referralBonusResult.wasIssued || referralBonusResult.issuanceItemId !== null;
@@ -883,17 +909,9 @@ export async function handleKiloPassInvoicePaid(params: {
         return null;
       }
 
-      const wasInactivePreviously = priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
-
-      const computedStreak = await computeMonthlyKiloPassStreak(tx, {
-        subscriptionId: kiloPassSubscriptionId,
-        issueMonth,
-      });
-      const newStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);
-
       await tx
         .update(kilo_pass_subscriptions)
-        .set({ current_streak_months: newStreakMonths, next_yearly_issue_at: null })
+        .set({ current_streak_months: monthlyStreakMonths, next_yearly_issue_at: null })
         .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
       return null;

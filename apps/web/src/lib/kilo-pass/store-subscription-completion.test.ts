@@ -137,6 +137,51 @@ describe('completeStoreKiloPassPurchase', () => {
     );
   });
 
+  it.each([KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay] as const)(
+    '%s subscription start survives tier/cadence changes and purchase replay',
+    async paymentProvider => {
+      const user = await insertTestUser();
+      const providerSubscriptionId = crypto.randomUUID();
+      const [legacy] = await db
+        .insert(kilo_pass_subscriptions)
+        .values({
+          kilo_user_id: user.id,
+          payment_provider: paymentProvider,
+          provider_subscription_id: providerSubscriptionId,
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'active',
+          started_at: '2026-01-01T00:00:00.000Z',
+        })
+        .returning();
+      const purchase = applePurchase({
+        paymentProvider,
+        providerSubscriptionId,
+        providerOriginalTransactionId: providerSubscriptionId,
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+        productId: 'kilopass.tier49.yearly.v1',
+        purchasedAtIso: '2026-06-01T00:00:00.000Z',
+        expiresAtIso: '2027-06-01T00:00:00.000Z',
+      });
+
+      const changed = await completeStoreKiloPassPurchase({ user, purchase });
+      const replayed = await completeStoreKiloPassPurchase({ user, purchase });
+      expect(replayed).toMatchObject({ subscriptionId: legacy?.id, alreadyProcessed: true });
+      expect(changed.subscriptionId).toBe(legacy?.id);
+      const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, changed.subscriptionId),
+      });
+      expect(subscription).toMatchObject({
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Yearly,
+      });
+      expect(
+        subscription?.started_at ? new Date(subscription.started_at).toISOString() : null
+      ).toBe('2026-01-01T00:00:00.000Z');
+    }
+  );
+
   it('persists nulls when a Google Play order carries no money', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const order = googlePlayOrder();
@@ -563,6 +608,13 @@ describe('completeStoreKiloPassPurchase', () => {
       cadence: first.cadence,
       alreadyProcessed: true,
     });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
+    });
+    expect(subscription?.started_at ? new Date(subscription.started_at).toISOString() : null).toBe(
+      purchase.subscriptionStartedAtIso ?? purchase.purchasedAtIso
+    );
 
     const storePurchases = await db
       .select()

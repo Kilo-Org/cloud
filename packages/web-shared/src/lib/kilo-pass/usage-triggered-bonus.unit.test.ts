@@ -1,8 +1,10 @@
 import { describe, expect, test } from '@jest/globals';
 
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   KiloPassPaymentProvider,
+  KiloPassCadence,
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
@@ -10,6 +12,7 @@ import {
   computeUsageTriggeredMonthlyBonusDecision,
   computeUsageTriggeredYearlyIssueMonth,
 } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import { computeKiloPassBonusCreditsUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
 import { getKiloPassWelcomePromoPolicy } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
 
 describe('usage-triggered-bonus (unit)', () => {
@@ -121,7 +124,7 @@ describe('usage-triggered-bonus (unit)', () => {
       }
     );
 
-    test('first-time month 2 before cutoff retains promo and bonusKind=promo-50pct', () => {
+    test('first-time month 2 before cutoff uses the normal ramp', () => {
       const d = computeUsageTriggeredMonthlyBonusDecision({
         tier: KiloPassTier.Tier49,
         startedAtIso: '2026-01-01T00:00:00.000Z',
@@ -131,28 +134,89 @@ describe('usage-triggered-bonus (unit)', () => {
         issueMonth: '2026-02-01',
       });
 
-      expect(d.shouldIssueFirstMonthPromo).toBe(true);
-      expect(d.bonusPercentApplied).toBe(0.5);
-      expect(d.description).toBe('Kilo Pass promo 50% bonus (tier_49, streak=2)');
-      expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'promo-50pct' }));
+      expect(d.shouldIssueFirstMonthPromo).toBe(false);
+      expect(d.bonusPercentApplied).toBe(0.1);
+      expect(d.description).toBe('Kilo Pass monthly bonus (tier_49, streak=2)');
+      expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'monthly-ramp' }));
     });
 
-    test('first-time month 2 at cutoff uses ramp and bonusKind=monthly-ramp', () => {
+    test('first-time month 2 at cutoff receives the welcome promo', () => {
       const d = computeUsageTriggeredMonthlyBonusDecision({
         tier: KiloPassTier.Tier49,
-        startedAtIso: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+        startedAtIso: KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF.toISOString(),
         currentStreakMonths: 2,
         isFirstTimeSubscriberEver: true,
         welcomePromoPolicy: 'account-history-only',
         issueMonth: '2026-06-01',
       });
 
-      expect(d.shouldIssueFirstMonthPromo).toBe(false);
-      expect(d.bonusPercentApplied).toBe(0.1);
-      expect(d.description).toBe('Kilo Pass monthly bonus (tier_49, streak=2)');
-      expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'monthly-ramp' }));
+      expect(d.shouldIssueFirstMonthPromo).toBe(true);
+      expect(d.bonusPercentApplied).toBe(0.5);
+      expect(d.description).toBe('Kilo Pass promo 50% bonus (tier_49, streak=2)');
+      expect(d.auditPayload).toEqual(expect.objectContaining({ bonusKind: 'promo-50pct' }));
     });
+
+    test.each([
+      [1, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.05],
+      [2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, true, 0.5],
+      [2, KiloPassWelcomePromoEligibilityReason.MissingFingerprint, true, 0.5],
+      [2, KiloPassWelcomePromoEligibilityReason.NoSupportedFingerprint, true, 0.5],
+      [2, KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed, true, 0.1],
+      [2, KiloPassWelcomePromoEligibilityReason.NoPositiveSettlement, true, 0.1],
+      [2, KiloPassWelcomePromoEligibilityReason.SettlementUnresolved, true, 0.1],
+      [2, null, true, 0.1],
+      [2, KiloPassWelcomePromoEligibilityReason.FirstPaymentFingerprintClaim, false, 0.1],
+    ] as const)(
+      'new subscription month %s with reason %s and first-time status %s receives %s',
+      (currentStreakMonths, welcomePromoEligibilityReason, isFirstTimeSubscriberEver, expected) => {
+        const decision = computeUsageTriggeredMonthlyBonusDecision({
+          tier: KiloPassTier.Tier19,
+          startedAtIso: '2026-10-09T00:00:00.000Z',
+          currentStreakMonths,
+          isFirstTimeSubscriberEver,
+          welcomePromoPolicy: 'settled-payment-required',
+          welcomePromoEligibilityReason,
+          issueMonth: currentStreakMonths === 1 ? '2026-10-01' : '2026-11-01',
+        });
+
+        expect(decision.bonusPercentApplied).toBeCloseTo(expected);
+        expect(decision.auditPayload).toEqual(
+          expect.objectContaining({
+            bonusKind: expected === 0.5 ? 'promo-50pct' : 'monthly-ramp',
+          })
+        );
+      }
+    );
   });
+
+  test.each([KiloPassTier.Tier19, KiloPassTier.Tier49, KiloPassTier.Tier199])(
+    'yearly %s remains at 50% across start cohorts and subscriber history',
+    tier => {
+      for (const startedAtIso of [
+        null,
+        'not-a-timestamp',
+        '2026-05-01T00:00:00Z',
+        '2026-10-09T00:00:00Z',
+      ]) {
+        for (const isFirstTimeSubscriberEver of [false, true]) {
+          for (const streakMonths of [1, 2, 3]) {
+            expect(
+              computeKiloPassBonusCreditsUsd({
+                tier,
+                cadence: KiloPassCadence.Yearly,
+                startedAtIso,
+                streakMonths,
+                isFirstTimeSubscriberEver,
+                welcomePromoPolicy: 'settled-payment-required',
+                welcomePromoEligibilityReason:
+                  KiloPassWelcomePromoEligibilityReason.FingerprintPreviouslyClaimed,
+              })
+            ).toBe(getMonthlyPriceUsd(tier) * 0.5);
+          }
+        }
+      }
+    }
+  );
 
   describe('getKiloPassWelcomePromoPolicy', () => {
     test.each([

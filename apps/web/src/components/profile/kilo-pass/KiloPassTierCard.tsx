@@ -5,10 +5,8 @@ import { ArrowRight, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import {
-  KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
-  KILO_PASS_TIER_CONFIG,
-} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { computeMonthlyCadenceBonusPercent } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { cn } from '@/lib/utils';
 
 import { KiloPassBonusRampDialog } from './KiloPassBonusRampDialog';
@@ -26,7 +24,7 @@ export function KiloPassTierCard(props: {
   cadence: KiloPassCadence;
   pending: boolean;
   showFirstMonthPromo?: boolean;
-  showSecondMonthPromo?: boolean;
+  subscriptionStartedAtIso: string;
   isRecommended: boolean;
   onSelect: (tier: KiloPassTier) => void;
 }) {
@@ -35,11 +33,23 @@ export function KiloPassTierCard(props: {
     cadence,
     pending,
     showFirstMonthPromo = false,
-    showSecondMonthPromo = false,
+    subscriptionStartedAtIso,
     isRecommended,
     onSelect,
   } = props;
   const config = KILO_PASS_TIER_CONFIG[tier];
+  const firstMonthPercent = computeMonthlyCadenceBonusPercent({
+    tier,
+    streakMonths: 1,
+    isFirstTimeSubscriberEver: showFirstMonthPromo,
+    subscriptionStartedAtIso,
+  });
+  const secondMonthPercent = computeMonthlyCadenceBonusPercent({
+    tier,
+    streakMonths: 2,
+    isFirstTimeSubscriberEver: showFirstMonthPromo,
+    subscriptionStartedAtIso,
+  });
   const handleSelect = () => {
     if (pending) return;
     onSelect(tier);
@@ -103,14 +113,14 @@ export function KiloPassTierCard(props: {
               <KiloPassBonusRampDialog
                 tier={tier}
                 showFirstMonthPromo={showFirstMonthPromo}
-                showSecondMonthPromo={showSecondMonthPromo}
+                subscriptionStartedAtIso={subscriptionStartedAtIso}
               />
             </div>
 
             {showFirstMonthPromo && (
               <div className="text-xs leading-5 text-emerald-300">
-                {showSecondMonthPromo ? 'First 2 months:' : 'First month:'} +
-                {formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
+                Month 1: +{formatPercent(firstMonthPercent)}; month 2: +
+                {formatPercent(secondMonthPercent)} free bonus credits
               </div>
             )}
           </>

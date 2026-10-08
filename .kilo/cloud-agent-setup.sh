@@ -196,8 +196,10 @@ function run(input) {
     if (source !== -1) args.splice(source + 2, 0, '-f', path.join(__dirname, 'compose.memory.yml'));
   }
   if (build) args.splice(0, 1, 'buildx', 'build', '--builder', process.env.KILO_STARTUP_BUILDER, '--allow=network.host');
+  // Stop the builder after each build so its 2 GiB does not stay inside the dev workload budget; buildx restarts it on demand.
+  const buildScript = '"$KILO_STARTUP_REAL_DOCKER" "$@"; status=$?; "$KILO_STARTUP_REAL_DOCKER" stop "buildx_buildkit_${KILO_STARTUP_BUILDER}0" >/dev/null 2>&1; exit $status';
   const command = build ? 'flock' : process.env.KILO_STARTUP_REAL_DOCKER;
-  const commandArgs = build ? [path.join(__dirname, 'image-build.lock'), process.env.KILO_STARTUP_REAL_DOCKER, ...args] : args;
+  const commandArgs = build ? [path.join(__dirname, 'image-build.lock'), 'sh', '-c', buildScript, 'sandbox-docker-build', ...args] : args;
   const child = spawn(command, commandArgs, { stdio: [input === undefined ? 'inherit' : 'pipe', 'inherit', 'inherit'] });
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
   child.on('error', error => { console.error(error.message); process.exitCode = 1; });
@@ -339,7 +341,6 @@ docker inspect "buildx_buildkit_${KILO_STARTUP_BUILDER}0" --format '{{json .Host
     if (config.Memory !== 2147483648 || config.CgroupParent !== parent) throw new Error("BuildKit is not inside its required memory budget");
   });
 '
-# Buildx restarts the builder on demand; keep its 2 GiB out of the budget until an image build needs it.
 docker stop "buildx_buildkit_${KILO_STARTUP_BUILDER}0" >/dev/null
 
 timeout 15m pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=4

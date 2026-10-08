@@ -16,7 +16,17 @@ function stripGitHubIssParam(request: NextRequest): NextRequest {
   return request;
 }
 
-async function handler(request: NextRequest, context: unknown) {
+async function handler(request: NextRequest, context: { params: Promise<{ nextauth: string[] }> }) {
+  if (request.method === 'GET') {
+    const { nextauth } = await context.params;
+    const [action, provider] = nextauth;
+
+    // NextAuth v4 returns 500 for unsupported GET callbacks to credentials providers.
+    if (action === 'callback' && (provider === 'email' || provider === 'passkey')) {
+      return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
+    }
+  }
+
   return nextAuthHttpHandler(stripGitHubIssParam(request), context);
 }
 

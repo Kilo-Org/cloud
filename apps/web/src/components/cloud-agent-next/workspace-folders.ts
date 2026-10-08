@@ -20,7 +20,7 @@ export function getWorkspaceFolderColor(color: WorkspaceFolderColor): string {
   );
 }
 
-const controlPlaneSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+export const controlPlaneSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const collapsedFolderIdsSchema = z.array(z.uuid());
 
 export function isFolderWorkspace(group: SidebarWorktreeGroup): boolean {
@@ -64,7 +64,8 @@ export function groupWorkspacesByFolder(
 
 export type WorkspaceFolderDragItem =
   | { type: 'worktree'; id: string }
-  | { type: 'folder'; id: string };
+  | { type: 'folder'; id: string }
+  | { type: 'session'; id: string };
 
 export type WorkspaceFolderDropTarget =
   | { type: 'folder'; id: string; placement: 'before' | 'after' }
@@ -72,7 +73,8 @@ export type WorkspaceFolderDropTarget =
 
 export type WorkspaceFolderDropAction =
   | { type: 'move-worktree'; worktreeId: string; folderId: string | null }
-  | { type: 'reorder-folders'; folderIds: string[] };
+  | { type: 'reorder-folders'; folderIds: string[] }
+  | { type: 'move-session'; sessionId: string; folderId: string | null };
 
 export function getWorkspaceFolderDropAction(
   drag: WorkspaceFolderDragItem | null,
@@ -82,6 +84,11 @@ export function getWorkspaceFolderDropAction(
 ): WorkspaceFolderDropAction | null {
   if (!drag || !target) return null;
   if (target.type === 'folder' && !folders.some(folder => folder.id === target.id)) return null;
+
+  if (drag.type === 'session') {
+    if (target.type === 'ungrouped') return null;
+    return { type: 'move-session', sessionId: drag.id, folderId: target.id };
+  }
 
   if (drag.type === 'worktree') {
     if (!worktreeIds.has(drag.id)) return null;

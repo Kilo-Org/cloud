@@ -8,7 +8,9 @@ import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { WorkspaceFolderColor } from '@/lib/cloud-agent/workspace-folders';
+import { invalidateSessionQueries } from '../session-deletion';
 import {
+  controlPlaneSessionIdSchema,
   getCollapsedWorkspaceFoldersStorageKey,
   parseCollapsedWorkspaceFolders,
 } from '../workspace-folders';
@@ -30,6 +32,9 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
   const { mutateAsync: removeFolder } = useMutation(trpc.workspaceFolders.delete.mutationOptions());
   const { mutateAsync: assignWorktree } = useMutation(
     trpc.workspaceFolders.moveWorktree.mutationOptions()
+  );
+  const { mutateAsync: assignSession } = useMutation(
+    trpc.workspaceFolders.moveSession.mutationOptions()
   );
   const { mutateAsync: reorder } = useMutation(trpc.workspaceFolders.reorder.mutationOptions());
   const [isSaving, setIsSaving] = useState(false);
@@ -114,6 +119,26 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
     [assignWorktree, organizationId, run, setCollapsedFolderIds]
   );
 
+  const moveSession = useCallback(
+    async (sessionId: string, folderId: string | null) => {
+      const moved = await run(
+        () =>
+          assignSession({
+            sessionId: controlPlaneSessionIdSchema.parse(sessionId),
+            folderId,
+            organizationId: organizationId ?? null,
+          }),
+        folderId ? 'Session moved to folder' : 'Session moved to Ungrouped'
+      );
+      if (moved) {
+        await invalidateSessionQueries({ queryClient, trpc });
+        if (folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
+      }
+      return moved;
+    },
+    [assignSession, organizationId, queryClient, run, setCollapsedFolderIds, trpc]
+  );
+
   const reorderFolders = useCallback(
     (folderIds: string[]) =>
       run(
@@ -142,6 +167,7 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
     setFolderColor,
     deleteFolder,
     moveWorktree,
+    moveSession,
     reorderFolders,
     refresh,
   };

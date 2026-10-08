@@ -37,6 +37,7 @@ import {
 } from './run';
 import {
   countCurrentProfilesByStatus,
+  listCurrentPlatformProfileStatuses,
   getClassifierWinner,
   getLatestRoutingTable,
   listRuns,
@@ -102,11 +103,9 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
           400
         );
       }
-      // Every decider measurement comes from the registry queue. Reconcile the
-      // platform queue first so newly configured models are pending, then drain
-      // the selected queues — the same path the timer takes.
+      // Registry drains reconcile current catalog efforts before claiming the
+      // platform queue; an unavailable catalog must not block owner work.
       if (kind === 'decider') {
-        if (queue !== 'user') await syncPlatformRegistry(c.env);
         const drainErrors: unknown[] = [];
         const started = await drainQueues(c.env, queue, drainErrors);
         // Drains never throw, so a wedged queue would otherwise return 200 and
@@ -156,9 +155,10 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       engineIdentity: computeEngineIdentity('decider'),
       repetitions: config.deciderRepetitions,
     };
-    const [platform, user] = await Promise.all([
+    const [platform, user, platformEntries] = await Promise.all([
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'platform'),
       countCurrentProfilesByStatus(c.env.BENCH_DB, current, 'user'),
+      listCurrentPlatformProfileStatuses(c.env.BENCH_DB, current),
     ]);
     const toQueue = (rows: Awaited<ReturnType<typeof countCurrentProfilesByStatus>>) => {
       const queue: BenchmarkRegistryQueue = { pending: 0, running: 0, ready: 0, failed: 0 };
@@ -170,6 +170,7 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       repetitions: current.repetitions,
       platform: toQueue(platform),
       user: toQueue(user),
+      platformEntries,
     });
   });
 

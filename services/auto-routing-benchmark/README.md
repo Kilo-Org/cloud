@@ -30,6 +30,26 @@ design, invariants, and rollout/rollback.
   the shared `AUTO_ROUTING_CONFIG` KV namespace (publish = delete the keys so the
   next read repopulates from D1).
 
+## Platform model selection
+
+- Select a model, not one effort, in the platform configuration.
+- The worker expands each selected model into every reasoning variant from the current `/api/openrouter/models` catalog.
+- Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
+- A model without reasoning controls creates one `(model, null)` entry.
+- If the catalog fails or omits a selected model, reconciliation fails. It does not infer a default effort.
+- Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
+- Owner pools still select exact pairs. Platform expansion does not change their entries.
+
+Each pair uses its own CLI variant, results, cost, latency, and registry provenance.
+The worker drains expanded entries in batches that fit the configured container budget.
+New routing tables rank exact pairs and emit `variant`, not `reasoningEffort`.
+Legacy nullable storage columns remain; this change requires no migration.
+
+The admin panel shows measured coverage and pending, running, or failed efforts per model.
+Each route starts collapsed with its first-ranked pair, accuracy, and cost.
+Expand a route to inspect every ranked model/effort pair.
+
+
 ## Admin endpoints
 
 All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
@@ -40,7 +60,7 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 | `GET/PUT /admin/config` | Read / save benchmark config (model lists, thresholds, `benchmarkUserId`, optional `benchmarkOrgId`) |
 | `GET /admin/runs` | List runs (sweeps stale `running` runs to `failed` first) |
 | `POST /admin/runs` | Classifier: start a run (`{kind: 'classifier', force}`). Decider: reconcile + drain the registry queues (`{kind: 'decider', queue: 'platform' \| 'user' \| 'both'}`) |
-| `GET /admin/registry` | Registry row counts per queue under the live engine identity |
+| `GET /admin/registry` | Queue counts and exact platform entry statuses under the current engine identity and repetitions |
 | `POST /admin/registry/requeue` | Put failed registry rows back to `pending` (`{scope}`); charges no owner quota |
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
@@ -65,7 +85,7 @@ row is global, so the pair is benchmarked once and serves both.
 
 | | Platform queue | User queue |
 |---|---|---|
-| Filled by | `syncPlatformRegistry` from the saved decider list (config save + daily cron) | `POST /admin/profiles/register` from owner pools (quota-charged) |
+| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, 15-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
 | Container budget | `maxConcurrency` | `userMaxConcurrency` |
@@ -74,10 +94,10 @@ row is global, so the pair is benchmarked once and serves both.
 The two budgets must sum to at most `BENCHMARK_CONTAINER_BUDGET` (200, the
 wrangler `max_instances`); the config contract rejects a larger pair.
 
-Neither queue publishes anything itself. After any decider run completes, the
-platform routing table is reassembled from ready+current registry rows for the
-configured decider list. Publishing is skipped (previous table stays live) when
-the registry cannot yet fill every taxonomy route.
+After any decider run completes, the worker assembles the platform table from ready, current registry entries for the current catalog pairs.
+If a desired pair remains pending or running, the previous table stays live.
+Failed pairs do not contribute scores.
+If any taxonomy route has no measured candidate, the worker skips publication and keeps the previous table.
 
 Rollback: turning off owner pools (or clearing a pool) leaves the platform table
 untouched — it only ever draws on rows the platform list asks for.

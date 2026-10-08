@@ -114,6 +114,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       GH_TOKEN: process.env.GH_TOKEN,
       GITLAB_TOKEN: process.env.GITLAB_TOKEN,
       GITLAB_HOST: process.env.GITLAB_HOST,
+      DATABASE_URL: process.env.DATABASE_URL,
       [PNPM_STORE_ENV_VAR]: process.env[PNPM_STORE_ENV_VAR],
     };
   });
@@ -1556,6 +1557,43 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progressText).not.toContain('\u001b');
   });
 
+  it('redacts a named non-heuristic secret from setup command output', async () => {
+    const secret = 'postgres://user:pass@localhost:5432/prod';
+    const request = makeRequest(tmpDir);
+    request.materialized.env.DATABASE_URL = secret;
+    request.materialized.secretEnvKeys = ['DATABASE_URL'];
+    const progress = mock(() => {});
+    const splitAt = Math.floor(secret.length / 2);
+
+    await prepareWrapperBootstrapWorkspace(request, progress, {
+      git: async (args, opts) => {
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        if (args[0] === 'rev-parse') return { stdout: '', stderr: '', exitCode: 1 };
+        opts?.onOutput?.('stderr', 'Updating files: 100% (1/1)\n');
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      runProcess: async (_command, _args, opts) => {
+        opts?.onOutput?.('stdout', `connecting ${secret.slice(0, splitAt)}`);
+        opts?.onOutput?.('stdout', `${secret.slice(splitAt)}\n`);
+        opts?.onOutput?.('stderr', `warning: ${secret}\n`);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    });
+
+    const progressText = JSON.stringify(progress.mock.calls);
+    expect(progressText).toContain('connecting [REDACTED]');
+    expect(progressText).toContain('warning: [REDACTED]');
+    expect(progressText).not.toContain('localhost');
+  });
+
   it('fetches and checks out strict GitHub pull refs directly', async () => {
     const request = makeRequest(tmpDir);
     request.workspace.branchName = 'refs/pull/123/head';
@@ -1886,6 +1924,8 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
   it('archives sanitized setup failure details before workspace cleanup', async () => {
     const request = makeRequest(tmpDir);
+    request.materialized.env.DATABASE_URL = 'named-url-secret';
+    request.materialized.secretEnvKeys = ['DATABASE_URL'];
     request.materialized.setupCommands = ['private-tool --token argv-secret'];
     const cliLogDir = path.join(request.workspace.sessionHome, '.local/share/kilo/log');
     const cliLogPath = path.join(cliLogDir, 'kilo.log');
@@ -1936,6 +1976,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
           'Authorization: Bearer bearer-secret',
           'Cookie: session=cookie-secret',
           'SECRET_VALUE=env-secret',
+          'DATABASE_URL=named-url-secret',
         ].join('\n'),
         exitCode: 1,
         elapsedMs: 17,
@@ -1975,6 +2016,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(detail).toContain('Authorization: Bearer [REDACTED]');
     expect(detail).toContain('Cookie: [REDACTED]');
     expect(detail).toContain('SECRET_VALUE=[REDACTED]');
+    expect(detail).toContain('DATABASE_URL=[REDACTED]');
     expect(detail).toContain('private-file-content');
     expect(detail).toContain('bare-unlabeled-token');
     await uploader.finalize();
@@ -1996,6 +2038,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       'bearer-secret',
       'cookie-secret',
       'env-secret',
+      'named-url-secret',
       request.session.workerAuthToken,
       request.materialized.env.KILOCODE_TOKEN,
     ]) {

@@ -193,6 +193,9 @@ The app follows https://github.com/Kilo-Org/kilo-design/ in general, except wher
 
 ## Debugging
 
+- Keep the simulator font size and font scaling at their defaults.
+- Never change simulator Dynamic Type, accessibility text size, or font scaling for testing or debugging.
+
 Add narrow temporary logs at the real boundaries. Reproduce. Read the tmux service logs. Fix the demonstrated cause. Remove the logs. Do not guess, and do not commit debug logging.
 
 ## Fixtures for End-to-End Testing

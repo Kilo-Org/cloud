@@ -48,7 +48,7 @@ export const configClassifierModels = sqliteTable('config_classifier_models', {
 
 export const configDeciderModels = sqliteTable('config_decider_models', {
   model: text('model').primaryKey(),
-  // Canonical catalog variant key. Null for legacy rows that hold reasoning_effort.
+  // Retained for rolling deploys; model-level config ignores and clears these columns.
   variant: text('variant'),
   reasoning_effort: text('reasoning_effort'),
 });

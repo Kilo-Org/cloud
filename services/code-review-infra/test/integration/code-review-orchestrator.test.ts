@@ -1340,6 +1340,42 @@ describe('CodeReviewOrchestrator recovery', () => {
     await expectPrepareFailureSchedulesFreshRetry(response, sessionId, cliSessionId);
   });
 
+  it.each([
+    {
+      name: '500 network connection lost',
+      firstPrepare: () =>
+        trpcError(
+          500,
+          '{"error":{"message":"Network connection lost.","code":-32603,"data":{"code":"INTERNAL_SERVER_ERROR","httpStatus":500,"path":"prepareSession","clientError":{"code":"INTERNAL_SERVER_ERROR","message":"Network connection lost.","retryable":true}}}}'
+        ),
+      sessionId: 'agent-network-lost-retry',
+      cliSessionId: 'ses_network_lost_retry',
+    },
+    {
+      name: 'thrown Durable Object reset for code update',
+      firstPrepare: () => {
+        throw new Error('Durable Object reset because its code was updated.');
+      },
+      sessionId: 'agent-do-reset-retry',
+      cliSessionId: 'ses_do_reset_retry',
+    },
+    {
+      name: 'thrown Durable Object instance no longer active',
+      firstPrepare: () => {
+        throw new Error(
+          'Connection closed: this Durable Object instance is no longer active. Reconnect or retry the request.'
+        );
+      },
+      sessionId: 'agent-do-inactive-retry',
+      cliSessionId: 'ses_do_inactive_retry',
+    },
+  ])(
+    'retries prepareSession once after transient transport error: $name',
+    async ({ firstPrepare, sessionId, cliSessionId }) => {
+      await expectPrepareFailureSchedulesFreshRetry(firstPrepare, sessionId, cliSessionId);
+    }
+  );
+
   it('retries prepareSession once after wrapper waitForPort readiness timeout', async () => {
     const stub = getReviewStub();
     let prepareCalls = 0;

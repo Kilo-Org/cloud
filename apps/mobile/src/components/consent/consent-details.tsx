@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { PRIVACY_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputController } from '@/lib/voice-input/native-voice-input';
 import {
@@ -161,8 +162,10 @@ export function VoiceTranscriptionControl() {
 export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const { t } = useTranslation();
   const contentContainerStyle = {
+    ...sideInsetStyle,
     paddingTop: 8,
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };

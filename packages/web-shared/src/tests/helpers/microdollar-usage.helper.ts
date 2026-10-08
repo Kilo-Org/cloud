@@ -67,6 +67,7 @@ function defineDefaultContextInfo(): UsageContextInfo {
     session_id: null,
     mode: null,
     auto_model: null,
+    reasoning_setting: null,
     ttfb_ms: null,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -124,6 +125,7 @@ export function createMockUsageContext(
     session_id: null,
     mode: null,
     auto_model: null,
+    reasoning_setting: null,
     ttfb_ms: null,
   };
 }

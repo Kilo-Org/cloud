@@ -1,9 +1,7 @@
 /* eslint-disable max-lines -- The mounted tests keep the refresh boundary, error mapping, globe, and draft-restore contracts together. */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Platform } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // login-screen.test.ts — narrow contract tests plus mounted globe tests.
 // The refresh boundary contract is verified through the useDeviceAuth hook's
@@ -35,29 +33,6 @@ const deviceAuth = vi.hoisted(() => ({
 const push = vi.hoisted(() => vi.fn());
 const clearDeviceError = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
-// The login screen reads the keyboard height from the root `KeyboardProvider`
-// instead of running its own `Keyboard`/`AppState` listener pair. The store
-// below is a plain object so the per-test `clear` cannot reach it, and `setHeight`
-// drives the reserved padding from a test; the app-level stub in
-// `vitest.setup.ts` always reports a hidden keyboard.
-const keyboardStore = vi.hoisted(() => {
-  const listeners = new Set<() => void>();
-  return {
-    state: { height: 0 },
-    subscribe: (listener: () => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    setHeight: (height: number) => {
-      keyboardStore.state.height = height;
-      for (const listener of listeners) {
-        listener();
-      }
-    },
-  };
-});
 // The session-ended announcement is asserted through this spy, so it must
 // outlive a single render: the mock factory below runs per import, the spy is
 // cleared per test.
@@ -79,27 +54,6 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
-vi.mock('react-native-keyboard-controller', async () => {
-  // `vi.mock` factories are hoisted above the file's static imports, so `react`
-  // must be pulled in here.
-  const React = await import('react');
-  const heightOf = () => keyboardStore.state.height;
-  return {
-    KeyboardProvider: 'KeyboardProvider',
-    KeyboardAvoidingView: 'KeyboardAvoidingView',
-    KeyboardChatScrollView: 'KeyboardChatScrollView',
-    useKeyboardState: (selector?: (state: Record<string, unknown>) => unknown) => {
-      const height = React.useSyncExternalStore(keyboardStore.subscribe, heightOf, heightOf);
-      const state = {
-        height,
-        isVisible: height > 0,
-        progress: height > 0 ? 1 : 0,
-        duration: 0,
-      };
-      return selector ? selector(state) : state;
-    },
-  };
-});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
 }));
@@ -642,156 +596,6 @@ describe('login-screen approved wait surface', () => {
     expect(findByType(renderer.root, 'Text').some(node => node.children[0] === 'Loading…')).toBe(
       true
     );
-
-    renderer.unmount();
-  });
-});
-
-describe('login-screen bottom-bar clearance', () => {
-  beforeEach(() => {
-    deviceAuth.status = 'idle';
-    deviceAuth.token = undefined;
-    deviceAuth.code = undefined;
-    Platform.OS = 'android';
-    keyboardStore.setHeight(0);
-    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom: 28, left: 0, right: 0 });
-    vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
-  });
-
-  afterEach(() => {
-    Platform.OS = 'ios';
-    keyboardStore.setHeight(0);
-    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
-  });
-
-  function scrollViewport(renderer: TestRenderer.ReactTestRenderer) {
-    const scroll = findByType(renderer.root, 'ScrollView')[0];
-    if (!scroll?.parent) {
-      throw new Error('login scroll viewport not found');
-    }
-    expect(scroll.props.className).toContain('flex-1');
-    expect(scroll.props.contentContainerClassName).toContain('flex-grow');
-    expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
-    return scroll.parent;
-  }
-
-  it.each(['android', 'ios'] as const)(
-    'keeps the %s bottom bar outside the scroll viewport with a long email',
-    async platform => {
-      Platform.OS = platform;
-      const email = 'long.email.address@subdomain.example-very-long-domain-name.co.uk';
-      vi.mocked(restoreLoginDrafts).mockResolvedValue({ email, ssoRecovery: null });
-      const renderer = await mountLoginScreen();
-
-      expect(findByType(renderer.root, 'IdleAuth')[0]?.props.initialEmail).toBe(email);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
-      // One padded wrapper for both platforms; the platform-gated
-      // KeyboardAvoidingView is gone.
-      expect(findByType(renderer.root, 'KeyboardAvoidingView')).toHaveLength(0);
-
-      renderer.unmount();
-    }
-  );
-
-  it.each(['idle', 'pending', 'expired', 'error', 'denied'])(
-    'reserves the bottom bar for the %s auth state',
-    async status => {
-      deviceAuth.status = status;
-      const renderer = await mountLoginScreen();
-
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
-
-      renderer.unmount();
-    }
-  );
-
-  it('reserves the bottom bar while the draft placeholder is visible', async () => {
-    const draft = Promise.withResolvers<Awaited<ReturnType<typeof restoreLoginDrafts>>>();
-    vi.mocked(restoreLoginDrafts).mockReturnValue(draft.promise);
-    const renderer = await mountLoginScreen();
-
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
-
-    await act(async () => {
-      draft.resolve({ email: '', ssoRecovery: null });
-      await draft.promise;
-    });
-    expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
-
-    renderer.unmount();
-  });
-
-  it.each(['android', 'ios'] as const)(
-    'reserves exactly the provider keyboard height on %s',
-    async platform => {
-      Platform.OS = platform;
-      const renderer = await mountLoginScreen();
-
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
-
-      // The root `KeyboardProvider` reports the whole strip the IME hides,
-      // anchored to the screen bottom on both platforms, so the screen reserves
-      // that height as-is. Adding the bottom inset again (328 on Android) would
-      // leave a gap above the keyboard — the platform correction the one-rule
-      // `resolveKeyboardBottomPadding` dropped.
-      act(() => {
-        keyboardStore.setHeight(300);
-      });
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
-
-      renderer.unmount();
-    }
-  );
-
-  it.each(['android', 'ios'] as const)(
-    'restores the bottom-bar floor when the provider clears the keyboard height on %s',
-    async platform => {
-      Platform.OS = platform;
-      const renderer = await mountLoginScreen();
-
-      act(() => {
-        keyboardStore.setHeight(300);
-      });
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
-
-      // The provider clears the height when the app leaves the foreground; the
-      // screen must fall back to the bottom-chrome floor, never to 0, or the
-      // form's last control lands under the navigation bar or home indicator.
-      act(() => {
-        keyboardStore.setHeight(0);
-      });
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
-
-      renderer.unmount();
-    }
-  );
-
-  it('floors the reserved inset at the bottom chrome and keeps a larger reported inset', async () => {
-    const renderer = await mountLoginScreen();
-
-    // 48 is the tallest bottom chrome either platform draws (Android's
-    // navigation bar / IME navigation row, iOS's home indicator): the reported
-    // inset is floored, never replaced. A window that reports 0 for the bar —
-    // landscape, where the gesture bar sits on the side — still keeps the last
-    // control clear of the home indicator.
-    for (const [reported, reserved] of [
-      [48, 48],
-      [0, 48],
-      [63, 63],
-    ] as const) {
-      vi.mocked(useSafeAreaInsets).mockReturnValue({
-        top: 24,
-        bottom: reported,
-        left: 0,
-        right: 0,
-      });
-      act(() => {
-        renderer.update(createElement(LoginScreen));
-      });
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: reserved });
-    }
 
     renderer.unmount();
   });

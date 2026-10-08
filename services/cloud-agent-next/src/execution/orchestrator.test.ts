@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ContainerConcurrencyLimitError } from '../container-concurrency.js';
 import {
   AgentSandboxUnavailableError,
   type AgentSandbox,
@@ -147,6 +148,22 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     vi.clearAllMocks();
     buildWrapperSessionReadyAndPromptRequestsMock.mockResolvedValue(buildPreparedRequests());
   });
+
+  it.each(['startup', 'readiness'] as const)(
+    'preserves RPC-wrapped quota denial during %s without wrapping or recovery destruction',
+    async stage => {
+      const harness = createOrchestrator();
+      const denial = new Error(
+        `remote RPC: ${new ContainerConcurrencyLimitError('personal', 20).message}`
+      );
+      (stage === 'startup' ? harness.ensureWrapper : harness.ensureSessionReady).mockRejectedValue(
+        denial
+      );
+      await expect(harness.orchestrator.execute(codeReviewPlan('org-test'))).rejects.toBe(denial);
+      expect(harness.deleteSandbox).not.toHaveBeenCalled();
+      expect(harness.prompt).not.toHaveBeenCalled();
+    }
+  );
 
   it('readies a wrapper before dispatching its prompt', async () => {
     const { orchestrator, ensureWrapper, ensureSessionReady, prompt } = createOrchestrator();

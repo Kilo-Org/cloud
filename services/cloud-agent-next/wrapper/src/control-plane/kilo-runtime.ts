@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,6 +21,14 @@ import {
   type KiloFeedEvent,
 } from './kilo-event-feed.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
+
+import {
+  createRuntimeActivity,
+  type RuntimeActivity,
+  type ActivityFault,
+} from './runtime-activity.js';
+import type { readSessionSnapshot } from './session-snapshot.js';
+import type { ExecutionIdentity, ExecutionFailure } from './session-supervisor.js';
 
 const PIDFILE_SUFFIX = '.pid.json';
 const KILO_STARTUP_READY_PATTERN = /^kilo server listening on (http:\/\/127\.0\.0\.1:\d+)\r?\n/m;
@@ -141,6 +150,11 @@ export async function cleanupStaleKiloPidfiles(deps: StaleKiloPidfileDeps): Prom
 }
 
 export type KiloRestartReason = KiloRestartFaultReason | 'credentials';
+export type KiloRestartInfo = {
+  directory: string;
+  reason: KiloRestartReason;
+  interruptedExecutions?: ExecutionIdentity[];
+};
 
 /**
  * The runtime's one lifecycle phase. `running` is healthy, `suspected` has seen
@@ -244,8 +258,11 @@ export type KiloRuntimeOptions = {
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   onEvent?: (event: KiloFeedEvent) => void;
+  onActivityChange?: () => void;
+  onDeadline?: (identity: ExecutionIdentity, reason: ExecutionFailure) => void;
+  readSnapshot?: typeof readSessionSnapshot;
   /** Fired after Kilo comes back with a fresh process; B8 hands over busy turns. */
-  onRestart?: (info: { directory: string; reason: KiloRestartReason }) => void;
+  onRestart?: (info: KiloRestartInfo) => void;
   /** Fired once when the 3-in-10-minutes budget is spent (spec §7 "Kilo supervision"). */
   onUnavailable?: (directory: string) => void;
   scheduler?: KiloRuntimeScheduler;
@@ -285,6 +302,9 @@ export type KiloRuntime = {
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
+  needsCompute(): boolean;
+  sessionState(id: string): ReturnType<RuntimeActivity['state']>;
+  refreshActivity(): Promise<void>;
   shutdown(): Promise<void>;
 };
 
@@ -309,7 +329,8 @@ type HealthRestartTrigger =
   | 'health_probe_false'
   | 'sse_reconnect_budget'
   | 'process_exit'
-  | 'no_client_retry';
+  | 'no_client_retry'
+  | ActivityFault;
 type HealthDecisionResolution = 'fulfilled_false' | 'rejected' | 'not_applicable';
 
 function createHealthProbe(
@@ -380,7 +401,7 @@ function createHealthProbe(
   };
 }
 
-/** Legacy `refreshCredentials` gate: every session idle and no PTY open. */
+/** PTY half of credential maintenance; native idle comes from the supervisor. */
 async function defaultIsIdle(
   client: WrapperKiloClient,
   directory: string,
@@ -393,8 +414,6 @@ async function defaultIsIdle(
   try {
     return await withTimeoutAndAbort(
       (async () => {
-        const statuses = await client.getSessionStatuses(directory, probeSignal);
-        if (Object.values(statuses).some(status => status.type !== 'idle')) return false;
         const url = new URL('/pty', client.serverUrl);
         url.searchParams.set('directory', directory);
         const response = await fetch(url, { signal: probeSignal });
@@ -462,6 +481,9 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   let pidfilePath: string | undefined;
   let client: WrapperKiloClient | undefined;
   let feed: KiloEventFeed | undefined;
+  let activity: RuntimeActivity | undefined;
+  let nativeRuntimeId = '';
+  let feedAttempt = 0;
   let probeHealth: ((signal: AbortSignal) => Promise<boolean>) | undefined;
   let healthObservation: HealthProbeObservation | undefined;
   let starting: Promise<WrapperKiloClient> | undefined;
@@ -492,7 +514,12 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
 
   /** A runtime is suspected once it leaves `running`: suspected, restarting or unavailable. */
   function isSuspectedPhase(): boolean {
-    return phase === 'suspected' || phase === 'restarting' || phase === 'unavailable';
+    return (
+      phase === 'suspected' ||
+      phase === 'restarting' ||
+      phase === 'unavailable' ||
+      (activity !== undefined && !activity.isReady())
+    );
   }
 
   function pruneRestarts(now: number): void {
@@ -514,6 +541,10 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
    * so the feed runs no watchdog of its own.
    */
   function openAttempt(url: string, signal?: AbortSignal): Promise<boolean> {
+    const attempt = ++feedAttempt;
+    const processId = nativeRuntimeId;
+    const currentActivity = activity;
+    currentActivity?.lost();
     return new Promise<boolean>(resolve => {
       const controller = new AbortController();
       let settled = false;
@@ -526,6 +557,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         if (recovered) {
           feed = next;
         } else {
+          controller.abort();
           next.close();
         }
         resolve(recovered);
@@ -540,22 +572,37 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         finish(false);
       };
       const next = openFeed(
-        { directory: options.directory, serverUrl: url },
+        { directory: options.directory, serverUrl: url, nativeRuntimeId: processId },
         {
           signal: controller.signal,
           onEvent: event => {
-            if (controller.signal.aborted || currentPhase() === 'stopped') return;
+            if (
+              controller.signal.aborted ||
+              currentPhase() === 'stopped' ||
+              processId !== nativeRuntimeId ||
+              attempt !== feedAttempt
+            )
+              return;
             // The first frame is always `server.connected`: it proves the stream
             // opened, not that Kilo is delivering events, so it must not clear
             // the silence episode (`lastActivityAt`, `suspected`, the probe).
             if (event.type !== KILO_CONNECTED_EVENT) onActivity();
+            currentActivity?.observe(event);
             options.onEvent?.(event);
             if (first) {
               first = false;
               finish(true);
+              currentActivity?.connected();
             }
           },
           onFailure: () => {
+            if (
+              controller.signal.aborted ||
+              processId !== nativeRuntimeId ||
+              attempt !== feedAttempt
+            )
+              return;
+            currentActivity?.lost();
             // A stream end completes the current attempt; with none in flight it
             // starts a new recovery episode. It never restarts Kilo directly.
             if (!finish(false)) void enterRecovery();
@@ -606,6 +653,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     if (watchdog !== undefined) return;
     const intervalMs = Math.max(1, Math.floor(timers.sseSilenceMs / SILENCE_CHECKS_PER_WINDOW));
     watchdog = scheduler.setInterval(() => {
+      activity?.tick();
       void checkSilence();
     }, intervalMs);
   }
@@ -671,6 +719,10 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   }
 
   async function stopProcess(): Promise<void> {
+    feedAttempt++;
+    activity?.dispose();
+    activity = undefined;
+    nativeRuntimeId = '';
     const current = kiloProcess;
     kiloProcess = undefined;
     // L3: never let `ensure` hand out the dead server's client.
@@ -720,6 +772,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       throw new Error('Kilo runtime is shutting down');
     }
     kiloProcess = spawned;
+    nativeRuntimeId = randomUUID();
     let file: string | undefined;
     const startTime = (options.readProcessStartTime ?? readLinuxProcessStartTime)(spawned.pid);
     if (startTime !== undefined) {
@@ -740,6 +793,20 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       spawned.url,
       options.directory
     );
+    const processId = nativeRuntimeId;
+    activity = createRuntimeActivity({
+      nativeRuntimeId: processId,
+      directory: options.directory,
+      client: kilo,
+      timers,
+      now: () => scheduler.now(),
+      readSnapshot: options.readSnapshot,
+      onDeadline: (identity, reason) => options.onDeadline?.(identity, reason),
+      onChange: () => options.onActivityChange?.(),
+      onFault: reason => {
+        if (nativeRuntimeId === processId) void restart('hang', reason);
+      },
+    });
     if (!(await openAttempt(spawned.url, controller.signal))) {
       // A failed start must not leave a usable-looking handle behind: clean up
       // so `ensure` re-spawns instead of returning a Kilo without a feed.
@@ -763,7 +830,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       });
     pendingCredentials = options.env !== env;
     void spawned.exited.then(() => {
-      if (phase !== 'running' && phase !== 'suspected') return;
+      if (spawned !== kiloProcess || (phase !== 'running' && phase !== 'suspected')) return;
       // Spec §7 "Kilo supervision": a Kilo process exit restarts Kilo.
       void restart('exit', 'process_exit');
     });
@@ -774,6 +841,9 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     // previous process must not send an ordinary drop straight to restart.
     reconnects.length = 0;
     startWatchdog();
+    await activity?.refresh();
+    if (nativeRuntimeId !== processId || currentPhase() === 'stopped')
+      throw new Error('Kilo runtime retired during activity snapshot');
     return kilo;
   }
 
@@ -803,6 +873,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         // Spec §7: 3 restarts in 10 minutes per runtime, then routes fail.
         phase = 'unavailable';
         stopWatchdog();
+        await stopProcess();
         log(`control-plane kilo runtime unavailable directory=${options.directory}`);
         options.onUnavailable?.(options.directory);
         options.onNativeDiagnostic?.('wrapper.lifecycle', { phase: 'kilo_unavailable' });
@@ -810,6 +881,8 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       }
       restarts.push(now);
     }
+    const interruptedExecutions =
+      activity?.executions().filter(execution => execution.activity !== 'stopping') ?? [];
     phase = 'restarting';
     let diagnostic = '';
     if (reason !== 'credentials') {
@@ -888,7 +961,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       });
     }
     try {
-      options.onRestart?.({ directory: options.directory, reason });
+      options.onRestart?.({ directory: options.directory, reason, interruptedExecutions });
     } catch (error) {
       log(
         `control-plane kilo restart handler failed directory=${options.directory} error=${
@@ -903,6 +976,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const applyPhase = currentPhase();
     if (
       !pendingCredentials ||
+      (activity !== undefined && !activity.isIdle()) ||
       applyPhase === 'stopped' ||
       applyPhase === 'unavailable' ||
       applyPhase === 'restarting'
@@ -924,6 +998,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const phaseAfterIdle = currentPhase();
     if (
       !idle ||
+      (activity !== undefined && !activity.isIdle()) ||
       !pendingCredentials ||
       client !== current ||
       starting !== undefined ||
@@ -955,6 +1030,9 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       pendingCredentials = true;
     },
     applyPendingCredentials,
+    needsCompute: () => activity?.needsCompute() ?? false,
+    sessionState: id => activity?.state(id),
+    refreshActivity: () => activity?.refresh() ?? Promise.resolve(),
     phase: currentPhase,
     isSuspected: isSuspectedPhase,
     isRestarting: () => phase === 'restarting',
@@ -972,13 +1050,21 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
 
 export type KiloRuntimesOptions = Omit<
   KiloRuntimeOptions,
-  'directory' | 'env' | 'pidfileDirectory' | 'onRestart' | 'onUnavailable'
+  | 'directory'
+  | 'env'
+  | 'pidfileDirectory'
+  | 'onRestart'
+  | 'onUnavailable'
+  | 'onDeadline'
+  | 'onActivityChange'
 > & {
   pidfileDirectory?: string;
   createRuntime?: (options: KiloRuntimeOptions) => KiloRuntime;
   /** Carries the runtime key so the handler can match its own turns (B8 finding 4). */
-  onRestart?: (info: { directory: string; reason: KiloRestartReason; key: string }) => void;
+  onRestart?: (info: KiloRestartInfo & { key: string }) => void;
   onUnavailable?: (directory: string, key: string) => void;
+  onDeadline?: (identity: ExecutionIdentity, reason: ExecutionFailure, key: string) => void;
+  onActivityChange?: (key: string) => void;
 };
 
 export type KiloRuntimes = {
@@ -990,6 +1076,7 @@ export type KiloRuntimes = {
   }): Promise<WrapperKiloClient>;
   get(key: string): KiloRuntime | undefined;
   remove(key: string): void;
+  needsCompute(): boolean;
   suspected(): boolean;
   unavailable(): boolean;
   /** One walk of the existing runtimes map for the native status line. */
@@ -1074,6 +1161,8 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         pidfileDirectory,
         ...(input.workload ? { workload: input.workload } : {}),
         onRestart: info => options.onRestart?.({ ...info, key: input.key }),
+        onDeadline: (identity, reason) => options.onDeadline?.(identity, reason, input.key),
+        onActivityChange: () => options.onActivityChange?.(input.key),
         onUnavailable: directory => options.onUnavailable?.(directory, input.key),
       });
       runtimes.set(input.key, runtime);
@@ -1086,6 +1175,7 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
       runtimes.delete(key);
       void runtime.shutdown();
     },
+    needsCompute: () => [...runtimes.values()].some(runtime => runtime.needsCompute()),
     suspected: anySuspected,
     unavailable: () => [...runtimes.values()].some(runtime => runtime.isUnavailable()),
     summary() {

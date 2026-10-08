@@ -75,7 +75,7 @@ import {
   controlPlaneEventsNotificationSchema,
   controlPlaneOutcomeSchema,
   controlPlanePromptPayloadSchema,
-  controlPlaneRouteSpecSchema,
+  controlPlaneRegistrationRouteSpecSchema,
   controlPlaneRouteUpdateSchema,
   controlPlaneRouteViewSchema,
   controlPlaneSetupEventSchema,
@@ -240,7 +240,7 @@ function persistedRouteView(
 export const controlPlaneSessionRegistrationSchema = z
   .object({
     sandboxId: z.string().min(1).max(256),
-    spec: controlPlaneRouteSpecSchema,
+    spec: controlPlaneRegistrationRouteSpecSchema,
     credentials: controlPlaneCredentialSourceSchema,
     /** Worker-selected provider pin (H1/H2); the DO applies it, never re-decides it. */
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),

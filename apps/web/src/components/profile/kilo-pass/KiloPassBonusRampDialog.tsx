@@ -11,7 +11,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { computeMonthlyCadenceBonusPercent } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import {
+  computeMonthlyCadenceBonusPercent,
+  getMonthlyWelcomePromoMonth,
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_TIER_CONFIG,
@@ -26,41 +29,33 @@ const clampMonth = (month: number) => Math.min(12, Math.max(1, Math.round(month)
 export function KiloPassBonusRampDialog(props: {
   tier: KiloPassTier;
   showFirstMonthPromo?: boolean;
-  showSecondMonthPromo?: boolean;
   streakMonths?: number;
   showSlider?: boolean;
-  subscriptionStartedAtIso?: string;
+  subscriptionStartedAtIso?: string | null;
 }) {
   const {
     tier,
     showFirstMonthPromo = false,
-    showSecondMonthPromo = false,
     streakMonths,
     showSlider = true,
     subscriptionStartedAtIso,
   } = props;
   const [open, setOpen] = useState(false);
 
-  const fallbackSubscriptionStartedAtIso = useMemo(() => {
-    const now = new Date();
-    now.setSeconds(0, 0);
-    return now.toISOString();
-  }, []);
-
-  const resolvedSubscriptionStartedAtIso =
-    subscriptionStartedAtIso ?? fallbackSubscriptionStartedAtIso;
   const resolvedMonth =
     typeof streakMonths === 'number' && !Number.isNaN(streakMonths) ? clampMonth(streakMonths) : 1;
   const [sliderMonth, setSliderMonth] = useState(resolvedMonth);
   const effectiveMonth = showSlider ? sliderMonth : resolvedMonth;
   const config = KILO_PASS_TIER_CONFIG[tier];
-  const showPromoCallout = showSlider && showFirstMonthPromo;
+  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
+  const showPromoCallout = showSlider && showFirstMonthPromo && resolvedMonth <= promoMonth;
+  const promoMonthLabel = promoMonth === 1 ? 'first paid month' : 'second paid month';
 
   const sliderPercent = computeMonthlyCadenceBonusPercent({
     tier,
     streakMonths: effectiveMonth,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
-    subscriptionStartedAtIso: resolvedSubscriptionStartedAtIso,
+    subscriptionStartedAtIso,
   });
 
   const totalBonusUsd = useMemo(
@@ -71,7 +66,7 @@ export function KiloPassBonusRampDialog(props: {
               tier,
               streakMonths: index + 1,
               isFirstTimeSubscriberEver: showFirstMonthPromo,
-              subscriptionStartedAtIso: resolvedSubscriptionStartedAtIso,
+              subscriptionStartedAtIso,
             })
           ).reduce((total, percent) => total + config.monthlyPriceUsd * percent, 0)
         : 0,
@@ -80,7 +75,7 @@ export function KiloPassBonusRampDialog(props: {
       effectiveMonth,
       showFirstMonthPromo,
       showSlider,
-      resolvedSubscriptionStartedAtIso,
+      subscriptionStartedAtIso,
       tier,
     ]
   );
@@ -172,9 +167,7 @@ export function KiloPassBonusRampDialog(props: {
 
             {showPromoCallout && (
               <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-emerald-100">
-                As a new subscriber, your{' '}
-                <strong>first {showSecondMonthPromo ? '2 paid months' : 'paid month'}</strong> get a
-                one-time promo of{' '}
+                Your welcome promo applies to the <strong>{promoMonthLabel}</strong>:{' '}
                 <strong>
                   +{formatPercent(KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT)} free bonus credits
                 </strong>{' '}

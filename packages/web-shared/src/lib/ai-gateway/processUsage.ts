@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto';
 import { db, isUSRegion } from '../drizzle';
 import { recordUsageInPrimaryRegion } from './usage-record-client';
+import { after } from 'next/server';
+import { USAGE_SHADOW_PUBLISH_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { enqueueUsage } from './usage-publisher';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -101,7 +104,7 @@ import {
 } from '@kilocode/web-shared/lib/bouncer/client';
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
-import type { BouncerUsageEventEnqueue } from './usage-record-contract';
+import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
 
 const posthogClient = PostHogClient();
 
@@ -169,6 +172,7 @@ export function extractUsageContextInfo(usageContext: MicrodollarUsageContext) {
     session_id: usageContext.session_id,
     mode: usageContext.mode,
     auto_model: usageContext.auto_model,
+    reasoning_setting: usageContext.reasoning_setting,
     ttfb_ms: usageContext.ttfb_ms,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -283,6 +287,39 @@ export async function toInsertableDbUsageRecord(
   return { core, metadata };
 }
 
+function scheduleUsageEnqueue(payload: UsageRecordRequest): void {
+  if (!USAGE_SHADOW_PUBLISH_ENABLED) return;
+
+  try {
+    // Each promise gets its own lifetime tracking even after an earlier callback queue drains.
+    // Start enqueueing only after registration succeeds, so missing request scope does no I/O.
+    const start = Promise.withResolvers<void>();
+    after(
+      start.promise.then(async () => {
+        try {
+          const outcome = await enqueueUsage(payload);
+          if (outcome.kind === 'accepted') {
+            console.info('usage enqueue accepted', { usageId: payload.core.id });
+          }
+        } catch {
+          console.warn('usage enqueue unavailable', {
+            usageId: payload.core.id,
+            kind: 'unavailable',
+            reason: 'unexpected_rejection',
+          });
+        }
+      })
+    );
+    start.resolve();
+  } catch {
+    console.warn('usage enqueue unavailable', {
+      usageId: payload.core.id,
+      kind: 'unavailable',
+      reason: 'registration_failed',
+    });
+  }
+}
+
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext,
@@ -291,6 +328,14 @@ export async function logMicrodollarUsage(
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
   const { core, metadata } = await toInsertableDbUsageRecord(usageStats, contextInfo);
+
+  scheduleUsageEnqueue({
+    core,
+    metadata,
+    prior_microdollar_usage: usageContext.prior_microdollar_usage,
+    posthog_distinct_id: usageContext.posthog_distinct_id ?? null,
+    bouncer_usage_event: bouncerUsageEvent,
+  });
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -827,6 +872,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
           , ${createUpsertCTE(sql`feature`, metadataFields.feature)}
           , ${createUpsertCTE(sql`mode`, metadataFields.mode)}
           , ${createUpsertCTE(sql`auto_model`, metadataFields.auto_model)}
+          , ${createUpsertCTE(sql`reasoning_setting`, metadataFields.reasoning_setting)}
           , metadata_ins AS (
             INSERT INTO microdollar_usage_metadata (
               id,
@@ -866,7 +912,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               api_kind_id,
               feature_id,
               mode_id,
-              auto_model_id
+              auto_model_id,
+              reasoning_setting_id
             )
             SELECT
               ${metadataFields.id},
@@ -906,7 +953,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               (SELECT api_kind_id FROM api_kind_cte),
               (SELECT feature_id FROM feature_cte),
               (SELECT mode_id FROM mode_cte),
-              (SELECT auto_model_id FROM auto_model_cte)
+              (SELECT auto_model_id FROM auto_model_cte),
+              (SELECT reasoning_setting_id FROM reasoning_setting_cte)
           )
           , balance_update AS (
             UPDATE kilocode_users

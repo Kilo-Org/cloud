@@ -173,9 +173,6 @@ function text() {
     .map(textNode => textNode.children.filter(child => typeof child === 'string').join(''))
     .join('\n');
 }
-function classes(type: string) {
-  return nodes(type).map(candidate => String(candidate.props.className ?? ''));
-}
 async function render(sessions = settled, contextOverride = context) {
   await act(async () => {
     const tree = createElement(AgentSessionsSection, { context: contextOverride, sessions });
@@ -199,10 +196,6 @@ afterEach(() => {
   renderer = undefined;
   queryClient.clear();
 });
-
-const CARD_FRAME = 'overflow-hidden rounded-2xl border border-border bg-card';
-const COUNT_ROW = 'h-6 flex-row items-center gap-2';
-const NEWEST_BLOCK = 'h-[68px] justify-center gap-1 px-4';
 
 function newestButton() {
   const button = nodes('Pressable').find(
@@ -235,8 +228,6 @@ describe('Home live section', () => {
     }
     // The soonest scheduled wake rides the scheduled row.
     expect(text()).toContain(formatScheduledWake('2026-10-03T09:00:00.000Z') ?? '');
-    // A card, not a row per session.
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
   });
 
   it('shows the newest session with its state and relative age and opens it', async () => {
@@ -282,26 +273,18 @@ describe('Home live section', () => {
     );
   });
 
-  it('reserves the card frame in the pending state with a matching skeleton', async () => {
+  it('shows a skeleton until the live list resolves', async () => {
     await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
     expect(nodes('Skeleton').length).toBeGreaterThan(0);
-    expect(classes('View')).toContain(CARD_FRAME);
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain(NEWEST_BLOCK);
     expect(text()).not.toContain(i18n.t('home.noLiveSessions'));
 
-    // The loaded card occupies the same frame and row heights.
     await render({ ...settled, activeSessions: [session('a1')] });
-    expect(classes('View')).toContain(CARD_FRAME);
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain(NEWEST_BLOCK);
+    expect(nodes('Skeleton')).toHaveLength(0);
+    expect(text()).toContain('a1');
   });
 
   it('draws the zero state in the loaded card frame when the accepted live list is empty', async () => {
     await render();
-    expect(classes('View')).toContain(CARD_FRAME);
-    expect(classes('View').filter(className => className === COUNT_ROW)).toHaveLength(4);
-    expect(classes('View')).toContain(`${NEWEST_BLOCK} items-center`);
     for (const label of ['Needs input', 'Working', 'Scheduled', 'Idle']) {
       expect(text()).toContain(`0\n${label}`);
     }

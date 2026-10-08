@@ -114,6 +114,8 @@ const cases: ReadonlyArray<
   ['workspace_setup_failed', 'accepted', 'failed', 'pre_dispatch', 'workspace_setup_failed'],
   ['billing_blocked', 'pre_dispatch', 'failed', 'pre_dispatch', 'payment_required'],
   ['billing_blocked', 'accepted', 'failed', 'pre_dispatch', 'payment_required'],
+  ['container_limit_reached', 'pre_dispatch', 'failed', 'pre_dispatch', 'container_limit_reached'],
+  ['container_limit_reached', 'accepted', 'failed', 'pre_dispatch', 'container_limit_reached'],
   ['invalid_configuration', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   ['invalid_configuration', 'accepted', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   [
@@ -152,6 +154,21 @@ const cases: ReadonlyArray<
 ];
 
 describe('classifyControlPlaneFailure', () => {
+  it('attributes quota denial to account capacity rather than provider or wrapper failure', () => {
+    expect(
+      classifyControlPlaneRunFailure({
+        reason: 'container_limit_reached',
+        dispatchState: 'pre_dispatch',
+        status: 'failed',
+      })
+    ).toEqual({
+      stage: 'pre_dispatch',
+      code: 'container_limit_reached',
+      reportStatus: 'failed',
+      responsibility: 'user',
+      failureReason: 'container_limit_reached',
+    });
+  });
   it('attributes Vercel billing credit denial to the user and admission outage to the platform', () => {
     expect(
       classifyControlPlaneRunFailure({

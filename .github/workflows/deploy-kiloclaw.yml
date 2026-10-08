@@ -1,7 +1,15 @@
 name: Deploy KiloClaw
 
+# Manual-only deploy: run from the Actions tab. The scheduled production
+# pipeline (deploy-production.yml) no longer calls this workflow.
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'Exact tested commit to deploy (defaults to the selected ref)'
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       source_sha:

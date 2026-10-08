@@ -28,6 +28,13 @@ export const REASONING_VARIANTS_LOW_MEDIUM_HIGH = {
   high: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
+export const REASONING_VARIANTS_LOW_MEDIUM_HIGH_XHIGH = {
+  low: { reasoning: { enabled: true, effort: 'low' } },
+  medium: { reasoning: { enabled: true, effort: 'medium' } },
+  high: { reasoning: { enabled: true, effort: 'high' } },
+  xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
+} as const;
+
 export const REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH_XHIGH = {
   minimal: { reasoning: { enabled: true, effort: 'minimal' } },
   low: { reasoning: { enabled: true, effort: 'low' } },
@@ -154,6 +161,9 @@ export function getFallbackModelVariants(model: string): OpenCodeSettings['varia
   }
   if (isStepModel(model)) {
     return REASONING_VARIANTS_LOW_MEDIUM_HIGH;
+  }
+  if (model === 'stealth/glyph-cluster') {
+    return REASONING_VARIANTS_LOW_MEDIUM_HIGH_XHIGH;
   }
   return undefined;
 }

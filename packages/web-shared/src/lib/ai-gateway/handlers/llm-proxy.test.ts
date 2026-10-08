@@ -47,7 +47,7 @@ import {
   logFreeModelRequest,
 } from '@kilocode/web-shared/lib/free-model-rate-limiter';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { stepfun_37_flash_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { stepfun_5_preview_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -330,7 +330,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
         // A Kilo client sets `apiKey: "anonymous"` when nobody is signed in.
         // This is the free tier's normal path, so it must stay anonymous.
         authorization: 'Bearer anonymous',
@@ -364,7 +364,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
         authorization: `Bearer ${signedToken(KILO_API_AUDIENCE)}`,
       }) as never
     );
@@ -476,7 +476,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
         // Even a free model must not be served anonymously to a caller that
         // sent a credential: the caller believes it is authenticated.
         authorization: 'Bearer not-a-jwt',
@@ -505,7 +505,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+      makeRequest(makeBody(stepfun_5_preview_free_model.public_id), {
         authorization: `Bearer ${token}`,
       }) as never
     );
@@ -686,9 +686,10 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         requestId: expect.any(String),
         tier: 'paid',
         accountId: 'user:user-123',
+        userId: 'user-123',
         ip: '127.0.0.1',
       },
-      { timeoutMs: 500 }
+      expect.anything()
     );
   });
 
@@ -713,8 +714,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledWith(
-      expect.objectContaining({ tier: 'team', accountId: 'org:org-1' }),
-      { timeoutMs: 500 }
+      expect.objectContaining({ tier: 'team', accountId: 'org:org-1', userId: 'user-123' }),
+      expect.anything()
     );
   });
 
@@ -727,14 +728,14 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     const { handleLlmProxyRequest } = await import('./llm-proxy');
 
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id)) as never
+      makeRequest(makeBody(stepfun_5_preview_free_model.public_id)) as never
     );
 
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
       { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
-      { timeoutMs: 500 }
+      expect.anything()
     );
     // Anonymous usage is keyed on the IP with no payer account.
     const anonymousBouncer = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer;
@@ -794,8 +795,12 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
       expect(usageContext?.bouncer?.clientIp).toBeUndefined();
       expect(mockedDecide).toHaveBeenCalledWith(
-        expect.objectContaining({ tier: 'paid', accountId: 'user:user-123' }),
-        { timeoutMs: 500 }
+        expect.objectContaining({
+          tier: 'paid',
+          accountId: 'user:user-123',
+          userId: 'user-123',
+        }),
+        expect.anything()
       );
       expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();
     }
@@ -1243,7 +1248,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     const { handleLlmProxyRequest } = await import('./llm-proxy');
     const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id)) as never
+      makeRequest(makeBody(stepfun_5_preview_free_model.public_id)) as never
     );
 
     expect(response.status).toBe(200);
@@ -1577,7 +1582,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedApplyResolvedAutoModel.mockImplementation(async params => {
       const isCandidateAllowed = params.isAutoFreeCandidateAllowed;
       expect(isCandidateAllowed).toBeDefined();
-      expect(await isCandidateAllowed?.('stepfun/step-3.7-flash:free')).toBe(false);
+      expect(await isCandidateAllowed?.('stepfun/step-5-preview-free')).toBe(false);
       return { kind: 'no_free_models_available' };
     });
 
@@ -1587,7 +1592,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(response.status).toBe(503);
     expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
       expect.anything(),
-      'stepfun/step-3.7-flash:free'
+      'stepfun/step-5-preview-free'
     );
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

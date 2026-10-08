@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import { I18nManager, Pressable, ScrollView, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import logo from '@/../assets/images/logo.png';
@@ -31,6 +30,7 @@ import {
   type SsoRecoveryDraft,
 } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
+import { useScreenInsets } from '@/lib/screen-insets';
 
 export function LoginScreen() {
   const { sessionEnded, signIn } = useAuth();
@@ -50,7 +50,7 @@ export function LoginScreen() {
     clearError,
   } = useDeviceAuth();
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   const { t } = useTranslation();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
   const [authFormBusy, setAuthFormBusy] = useState(false);
@@ -153,7 +153,9 @@ export function LoginScreen() {
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
   const globeDisabled = status === 'pending' || authFormBusy;
-  const globeTrailing = I18nManager.isRTL ? { left: 16 } : { right: 16 };
+  const globeTrailing = I18nManager.isRTL
+    ? { left: insets.left + 16 }
+    : { right: insets.right + 16 };
   // A terminal device-auth error — an expired code, denied access, or the poll
   // timing out — renders its message above the idle form. Idle, every terminal
   // error, and a start that has not answered yet share the same single IdleAuth
@@ -175,7 +177,11 @@ export function LoginScreen() {
     <View
       className="flex-1 bg-background"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
-      style={{ paddingBottom: bottomPadding }}
+      style={{
+        paddingBottom: bottomPadding,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }}
     >
       <ScrollView
         className="flex-1 bg-background"

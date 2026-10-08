@@ -62,6 +62,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
   billing_unavailable: 'Sandbox billing is unavailable',
+  container_limit_reached:
+    'Container limit reached (20 per personal account or 50 per organization). Stop an existing container before starting another.',
   invalid_configuration: 'Sandbox configuration is invalid or unsupported',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',

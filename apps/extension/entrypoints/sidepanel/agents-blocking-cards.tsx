@@ -8,8 +8,6 @@ import type {
 
 type QuestionOption = QuestionInfo['options'][number];
 
-// ---- Permission card ----
-
 const PermissionCard = ({
   permission,
   onRespond,
@@ -87,8 +85,6 @@ const PermissionCard = ({
     </div>
   );
 };
-
-// ---- Question card ----
 
 const QuestionOptionButton = ({
   option,
@@ -244,8 +240,6 @@ const QuestionCard = ({
     </div>
   );
 };
-
-// ---- Exported container ----
 
 export const AgentsBlockingCards = ({
   activeQuestion,

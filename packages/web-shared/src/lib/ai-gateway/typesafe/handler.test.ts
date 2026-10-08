@@ -834,6 +834,10 @@ describe('handleSystemOneRequest', () => {
     expect(response.status).toBe(200);
     const decideParams = jest.mocked(startBouncerDecide).mock.calls[0]?.[0];
     if (!decideParams || decideParams instanceof Promise) throw new Error('Expected decide params');
+    expect(decideParams.account).toMatchObject({
+      accountId: `user:${user.id}`,
+      userId: user.id,
+    });
     expect(logMicrodollarUsageAndReportToBouncer).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({

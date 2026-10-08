@@ -32,7 +32,6 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
 // Keyed by `${userId}:${operation}`.
 const store = new Map<string, RateLimitEntry>();
 
-// Periodic cleanup: evict entries older than 2 minutes every 30 seconds
 let lastCleanup = Date.now();
 const CLEANUP_INTERVAL_MS = 30_000;
 const ENTRY_TTL_MS = 120_000;
@@ -68,7 +67,6 @@ export function checkRateLimit(userId: string, operation: string): void {
     store.set(key, entry);
   }
 
-  // Prune timestamps outside the current window
   const windowStart = now - config.windowMs;
   entry.timestamps = entry.timestamps.filter(t => t > windowStart);
 

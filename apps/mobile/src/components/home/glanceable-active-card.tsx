@@ -24,8 +24,8 @@ import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 /**
  * The four ranked state counts, in the order every glanceable surface draws
  * them: what the user must act on, then what is making progress, then what will
- * wake later, then what is only connected. Zero rows still draw, so a session
- * changing state cannot reflow the card.
+ * wake later, then what is only connected. Zero rows still draw, so every
+ * state remains visible even when no session currently occupies it.
  */
 const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] = [
   { kind: 'needsInput', labelKey: 'glanceable.needsInput' },
@@ -34,19 +34,13 @@ const COUNT_LINES: readonly { kind: GlanceableStatusKind; labelKey: string }[] =
   { kind: 'idle', labelKey: 'common.idle' },
 ];
 
-/**
- * One frame for the loaded card and its pending skeleton, so the placeholder
- * occupies the exact box the card will. Every row is a fixed height rather than
- * sized to its text, so a longer count label or a scheduled wake cannot move a
- * row: 4 heights of 6 + 3 gaps of 2 + 3 padding = 144, a 1px divider, then a
- * 68px newest block whose two 20px lines sit vertically centered.
- */
+/** Shared minimum frame; text determines the loaded card's height. */
 const CARD_CLASS = 'overflow-hidden rounded-2xl border border-border bg-card';
 const COUNTS_CLASS = 'gap-2 px-4 py-3';
-const COUNT_ROW_CLASS = 'h-6 flex-row items-center gap-2';
+const COUNT_ROW_CLASS = 'min-h-6 flex-row items-center gap-2';
 const DIVIDER_CLASS = 'h-px bg-border';
-const NEWEST_BLOCK_CLASS = 'h-[68px] justify-center gap-1 px-4';
-const NEWEST_ROW_CLASS = 'h-5 flex-row items-center gap-2';
+const NEWEST_BLOCK_CLASS = 'min-h-[68px] justify-center gap-1 px-4 py-3';
+const NEWEST_ROW_CLASS = 'min-h-5 flex-row items-center gap-2';
 
 function labelKeyFor(kind: GlanceableStatusKind): string {
   return COUNT_LINES.find(line => line.kind === kind)?.labelKey ?? 'common.working';
@@ -63,7 +57,7 @@ type GlanceableActiveCardProps = {
  * scheduled wake beside its count, and the newest session with its state and
  * relative age. Tapping the newest session opens it; `See all` in the section
  * header opens the live index. With no sessions it is the zero state: every
- * count reads 0 and the newest block centers `Nothing running`, in the same box.
+ * count reads 0 and the newest block centers `Nothing running`.
  */
 export function GlanceableActiveCard({
   sessions,
@@ -105,15 +99,19 @@ export function GlanceableActiveCard({
             <View key={line.kind} className={COUNT_ROW_CLASS}>
               <SessionStatusIcon kind={line.kind} />
               <Text className="text-sm font-semibold text-foreground">{counts[line.kind]}</Text>
-              <Text
-                className={cn('text-sm', isPrimary ? 'text-foreground' : 'text-muted-foreground')}
-                numberOfLines={1}
-              >
-                {t(line.labelKey)}
-              </Text>
-              {line.kind === 'scheduled' && scheduledWake !== null ? (
-                <Text className="ml-auto text-xs text-muted-foreground">{scheduledWake}</Text>
-              ) : null}
+              <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
+                <Text
+                  className={cn(
+                    'shrink text-sm',
+                    isPrimary ? 'text-foreground' : 'text-muted-foreground'
+                  )}
+                >
+                  {t(line.labelKey)}
+                </Text>
+                {line.kind === 'scheduled' && scheduledWake !== null ? (
+                  <Text className="max-w-full text-xs text-muted-foreground">{scheduledWake}</Text>
+                ) : null}
+              </View>
             </View>
           );
         })}
@@ -133,25 +131,19 @@ export function GlanceableActiveCard({
         <View className={cn(NEWEST_BLOCK_CLASS, newestSession === null && 'items-center')}>
           {newestTitle !== null && newestKind !== null ? (
             <>
-              <View className="h-5 justify-center">
-                <Text className="text-sm text-foreground" numberOfLines={1}>
-                  {newestTitle}
-                </Text>
-              </View>
+              <Text className="text-sm text-foreground">{newestTitle}</Text>
               <View className={NEWEST_ROW_CLASS}>
                 <SessionStatusIcon kind={newestKind} />
-                <Text className="shrink text-sm text-muted-foreground" numberOfLines={1}>
-                  {stateLabel}
-                </Text>
-                {newestAge !== null ? (
-                  <Text className="ml-auto text-xs text-muted-foreground">{newestAge}</Text>
-                ) : null}
+                <View className="min-w-0 flex-1 flex-row flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <Text className="max-w-full text-sm text-muted-foreground">{stateLabel}</Text>
+                  {newestAge !== null ? (
+                    <Text className="max-w-full text-xs text-muted-foreground">{newestAge}</Text>
+                  ) : null}
+                </View>
               </View>
             </>
           ) : (
-            <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-              {t('home.noLiveSessions')}
-            </Text>
+            <Text className="text-sm text-muted-foreground">{t('home.noLiveSessions')}</Text>
           )}
         </View>
       </Pressable>
@@ -159,11 +151,7 @@ export function GlanceableActiveCard({
   );
 }
 
-/**
- * The pending placeholder. It repeats the card's exact frame and row heights so
- * the arriving card replaces it without moving the header, feedback or the
- * agent-create actions below.
- */
+/** The pending placeholder repeats the card's minimum frame and count rows. */
 export function GlanceableActiveCardSkeleton() {
   return (
     <View
@@ -182,7 +170,7 @@ export function GlanceableActiveCardSkeleton() {
       </View>
       <View className={DIVIDER_CLASS} />
       <View className={NEWEST_BLOCK_CLASS}>
-        <View className="h-5 justify-center">
+        <View className="min-h-5 justify-center">
           <Skeleton className="h-3 w-2/3 rounded" />
         </View>
         <View className={NEWEST_ROW_CLASS}>

@@ -1,5 +1,7 @@
+import { handleFetch, type Env } from './publish-usage';
+import { handleQueue } from './receipt-usage';
+
 export default {
-  fetch() {
-    return new Response('Not Found', { status: 404 });
-  },
-} satisfies ExportedHandler<CloudflareEnv>;
+  fetch: handleFetch,
+  queue: handleQueue,
+} satisfies ExportedHandler<Env>;

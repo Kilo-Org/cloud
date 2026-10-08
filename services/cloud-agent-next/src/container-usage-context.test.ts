@@ -599,7 +599,7 @@ describe('container usage context', () => {
     ).resolves.toBeUndefined();
   });
 
-  it('does not propagate shadow configuration delivery failures', async () => {
+  it('propagates attribution configuration failures before sandbox startup', async () => {
     const configureBilling = vi.fn().mockRejectedValue(new Error('meter unavailable'));
     await expect(
       configureSandboxBillingInput({ configureBilling } as unknown as SandboxInstance, {
@@ -609,7 +609,7 @@ describe('container usage context', () => {
         sessionId: 'agent_1',
         metadata: { origin: 'cloud-agent' },
       })
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('meter unavailable');
     expect(configureBilling).toHaveBeenCalledOnce();
   });
 });

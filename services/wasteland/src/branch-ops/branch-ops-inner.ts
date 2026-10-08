@@ -28,8 +28,6 @@ import {
 import { WantedBoardOpError } from '../wanted-board/errors';
 import { buildPullWebUrl } from '../util/dolthub-api.util';
 
-// ── Types ────────────────────────────────────────────────────────────────
-
 /** Status of a wanted item, normalized across upstream and branch reads. */
 export type BranchWantedStatus = 'open' | 'claimed' | 'in_review' | 'completed' | 'unknown';
 
@@ -83,8 +81,6 @@ export type BranchOpsInnerContext = {
   rigHandle: string;
   token: string;
 };
-
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 function makeClient(ctx: BranchOpsInnerContext, fetchImpl?: typeof fetch): WlClient {
   return new WlClient({
@@ -204,8 +200,6 @@ async function readWantedFromBranch(
     return null;
   }
 }
-
-// ── Public ops ───────────────────────────────────────────────────────────
 
 /**
  * Enumerate the user's `wl/<any-rig>/<wantedId>` branches on the fork and

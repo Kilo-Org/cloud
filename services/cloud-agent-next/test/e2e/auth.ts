@@ -199,7 +199,8 @@ export type MintedTokens = {
  */
 export function mintApiToken(
   user: { id: string; api_token_pepper?: string },
-  nextAuthSecret: string | undefined
+  nextAuthSecret: string | undefined,
+  expiresInSeconds = 60 * 60
 ): string {
   if (!nextAuthSecret) {
     throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
@@ -213,7 +214,7 @@ export function mintApiToken(
       tokenSource: 'cloud-agent',
     },
     nextAuthSecret,
-    { algorithm: 'HS256', expiresIn: '1h' }
+    { algorithm: 'HS256', expiresIn: expiresInSeconds }
   );
 }
 

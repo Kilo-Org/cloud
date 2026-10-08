@@ -245,6 +245,7 @@ export async function handleAudioTranscriptionsRequest(
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: false,
     organizationId,
@@ -311,6 +312,7 @@ export async function handleAudioTranscriptionsRequest(
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
       payer,
     },

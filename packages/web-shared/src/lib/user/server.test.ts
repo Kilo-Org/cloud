@@ -148,49 +148,48 @@ describe('isEmailBlacklistedByDomain', () => {
 });
 
 describe('isBlockedTLD', () => {
-  const blockedTlds = ['.shop', '.top'];
-
   test('should block .shop TLD', () => {
-    expect(isBlockedTLD('user@example.shop', blockedTlds)).toBe(true);
+    expect(isBlockedTLD('user@example.shop')).toBe(true);
   });
 
   test('should block .top TLD', () => {
-    expect(isBlockedTLD('user@example.top', blockedTlds)).toBe(true);
+    expect(isBlockedTLD('user@example.top')).toBe(true);
   });
 
   test('should block subdomains under blocked TLDs', () => {
-    expect(isBlockedTLD('user@sub.domain.shop', blockedTlds)).toBe(true);
-    expect(isBlockedTLD('user@sub.domain.top', blockedTlds)).toBe(true);
+    expect(isBlockedTLD('user@sub.domain.shop')).toBe(true);
+    expect(isBlockedTLD('user@sub.domain.top')).toBe(true);
   });
 
   test('should allow .com, .org, .io TLDs', () => {
-    expect(isBlockedTLD('user@example.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@example.org', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@example.io', blockedTlds)).toBe(false);
+    expect(isBlockedTLD('user@example.com')).toBe(false);
+    expect(isBlockedTLD('user@example.org')).toBe(false);
+    expect(isBlockedTLD('user@example.io')).toBe(false);
   });
 
   test('should be case insensitive', () => {
-    expect(isBlockedTLD('user@example.SHOP', blockedTlds)).toBe(true);
-    expect(isBlockedTLD('user@example.TOP', blockedTlds)).toBe(true);
-    expect(isBlockedTLD('USER@EXAMPLE.Shop', blockedTlds)).toBe(true);
+    expect(isBlockedTLD('user@example.SHOP')).toBe(true);
+    expect(isBlockedTLD('user@example.TOP')).toBe(true);
+    expect(isBlockedTLD('USER@EXAMPLE.Shop')).toBe(true);
   });
 
   test('should not block domains containing blocked TLD as a non-TLD part', () => {
-    expect(isBlockedTLD('user@shop.example.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@top.example.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@myshop.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@topnotch.com', blockedTlds)).toBe(false);
+    expect(isBlockedTLD('user@shop.example.com')).toBe(false);
+    expect(isBlockedTLD('user@top.example.com')).toBe(false);
+    expect(isBlockedTLD('user@myshop.com')).toBe(false);
+    expect(isBlockedTLD('user@topnotch.com')).toBe(false);
+    expect(isBlockedTLD('user@example.shop.com')).toBe(false);
+    expect(isBlockedTLD('user@example.top.com')).toBe(false);
   });
 
-  test('should return false when blocklist is empty', () => {
-    expect(isBlockedTLD('user@example.shop', [])).toBe(false);
+  test('should require a leading dot before the blocked TLD', () => {
+    expect(isBlockedTLD('user@exampleshop')).toBe(false);
+    expect(isBlockedTLD('user@exampletop')).toBe(false);
   });
 
-  test('should handle multi-part TLDs like .co.uk', () => {
-    const withMultiPart = ['.shop', '.co.uk'];
-    expect(isBlockedTLD('user@example.co.uk', withMultiPart)).toBe(true);
-    expect(isBlockedTLD('user@example.com', withMultiPart)).toBe(false);
-    expect(isBlockedTLD('user@example.uk', withMultiPart)).toBe(false);
+  test('should allow other TLDs including multi-part TLDs', () => {
+    expect(isBlockedTLD('user@example.co.uk')).toBe(false);
+    expect(isBlockedTLD('user@example.uk')).toBe(false);
   });
 });
 

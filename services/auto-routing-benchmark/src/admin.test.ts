@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_BENCHMARK_ORG_ID,
   DEFAULT_BENCHMARK_USER_ID,
@@ -12,10 +12,7 @@ import { CLASSIFIER_CASES } from './datasets/classifier-cases';
 
 const TEST_CONFIG: BenchmarkConfig = {
   classifierModels: ['google/gemini-2.5-flash-lite', 'google/gemini-2.5-flash'],
-  deciderModels: [
-    { id: 'google/gemini-2.5-flash-lite', reasoningEffort: null },
-    { id: 'anthropic/claude-sonnet-4.6', reasoningEffort: null },
-  ],
+  deciderModels: [{ id: 'google/gemini-2.5-flash-lite' }, { id: 'anthropic/claude-sonnet-4.6' }],
   minAccuracy: 0.7,
   switchCostFactor: 3,
   bestAccuracySwitchThreshold: 0.05,
@@ -55,7 +52,7 @@ const TEST_CONFIG_ROWS = {
   deciderModels: TEST_CONFIG.deciderModels.map(m => ({
     model: m.id,
     variant: null,
-    reasoning_effort: m.reasoningEffort ?? null,
+    reasoning_effort: null,
   })),
   autoDeciderModels: [],
   excludedAutoDeciderModels: [],
@@ -82,6 +79,7 @@ vi.mock('./db', async importOriginal => {
     listReadyCurrentProfilesForEntries: vi.fn(),
     getSummariesForRuns: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
+    listCurrentPlatformProfileStatuses: vi.fn(),
     requeueFailedCurrentProfiles: vi.fn(),
     markProfilesFailedForRun: vi.fn(),
     markProfilesRunningForRun: vi.fn(),
@@ -113,6 +111,8 @@ import {
   listReadyCurrentProfilesForEntries,
   getSummariesForRuns,
   syncPlatformRegistryRows,
+  listCurrentPlatformProfileStatuses,
+  countCurrentProfilesByStatus,
   listRuns,
   listStaleRunningDeciderRuns,
   markStaleRunsFailed,
@@ -128,6 +128,7 @@ const env = {
   BENCH_DB: {} as D1Database,
   BENCH_QUEUE: { sendBatch: queueSendBatch },
   AUTO_ROUTING_CONFIG: { put: vi.fn(), get: vi.fn(), delete: vi.fn() },
+  KILO_WEB_API_BASE_URL: 'https://app.test',
 } as unknown as Env;
 
 const executionCtx = {
@@ -163,9 +164,21 @@ function authedPut(path: string, body: unknown, extraHeaders: Record<string, str
   });
 }
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
   tokenGet.mockResolvedValue('bench-token');
+  vi.stubGlobal(
+    'fetch',
+    vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () =>
+        Response.json({ data: TEST_CONFIG.deciderModels.map(model => ({ id: model.id })) })
+      )
+  );
+  vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([]);
+  vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
   vi.mocked(getConfigRows).mockResolvedValue({
     config: null,
     classifierModels: [],
@@ -286,8 +299,8 @@ describe('PUT /admin/config', () => {
     const res = await authedPut('/admin/config', {
       ...TEST_CONFIG,
       deciderModels: [
-        { id: 'google/gemini-2.5-flash-lite', reasoningEffort: null },
-        { id: 'google/gemini-2.5-flash-lite', reasoningEffort: null },
+        { id: 'google/gemini-2.5-flash-lite' },
+        { id: 'google/gemini-2.5-flash-lite' },
       ],
     });
     expect(res.status).toBe(400);
@@ -302,12 +315,9 @@ describe('PUT /admin/config', () => {
     const validConfig = {
       ...TEST_CONFIG,
       minAccuracy: 0.85,
-      deciderModels: [
-        { id: 'manual/model', reasoningEffort: 'low' },
-        { id: 'auto/model', reasoningEffort: null },
-      ],
-      manualDeciderModels: [{ id: 'manual/model', reasoningEffort: 'low' }],
-      autoDeciderModels: [{ id: 'auto/model', reasoningEffort: null, avgAttemptCostUsd: 20 }],
+      deciderModels: [{ id: 'manual/model' }, { id: 'auto/model' }],
+      manualDeciderModels: [{ id: 'manual/model' }],
+      autoDeciderModels: [{ id: 'auto/model', avgAttemptCostUsd: 20 }],
       excludedAutoDeciderModels: ['auto/excluded'],
       updatedAt: null,
       updatedBy: null,
@@ -334,7 +344,7 @@ describe('PUT /admin/config', () => {
     expect(typeof configArg.updated_at).toBe('string');
     expect(configArg.updated_by).toBe('igor@kilocode.ai');
     expect(deciderModelRows).toEqual([
-      { model: 'manual/model', variant: null, reasoning_effort: 'low' },
+      { model: 'manual/model', variant: null, reasoning_effort: null },
     ]);
     expect(excludedAutoDeciderModels).toEqual(['auto/excluded']);
   });
@@ -457,7 +467,6 @@ describe('POST /admin/runs', () => {
     const res = await authedPost('/admin/runs', { kind: 'decider', queue: 'platform' });
 
     expect(res.status).toBe(200);
-    expect(syncPlatformRegistryRows).toHaveBeenCalledOnce();
     expect(listPendingCurrentProfiles).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
@@ -593,6 +602,24 @@ describe('POST /admin/runs', () => {
     expect(body.startedRuns.map(r => r.purpose)).toEqual(['platform']);
     expect(body.drainErrors).toHaveLength(1);
     expect(body.drainErrors[0]).toContain('requires at least one live container lane');
+  });
+});
+
+describe('GET /admin/registry', () => {
+  it('exposes exact current platform-pair coverage separately from aggregate queue counts', async () => {
+    vi.mocked(getConfigRows).mockResolvedValue(TEST_CONFIG_ROWS);
+    const platformEntries = [
+      { model: 'model/a', variant: 'thinking', status: 'ready' as const },
+      { model: 'model/a', variant: 'instant', status: 'failed' as const },
+      { model: 'model/b', variant: null, status: 'pending' as const },
+    ];
+    vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue(platformEntries);
+    const response = await authedGet('/admin/registry');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      repetitions: TEST_CONFIG.deciderRepetitions,
+      platformEntries,
+    });
   });
 });
 

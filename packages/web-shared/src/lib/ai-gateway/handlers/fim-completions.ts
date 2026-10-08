@@ -187,6 +187,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     promptInfo,
     max_tokens: requestBody.max_tokens ?? null,
     has_middle_out_transform: null, // N/A for FIM
+    reasoning_setting: null,
     fraudHeaders,
     isStreaming: requestBody.stream === true,
     organizationId,
@@ -268,6 +269,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
       payer,
     },

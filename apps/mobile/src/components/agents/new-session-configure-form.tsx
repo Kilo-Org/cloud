@@ -23,7 +23,7 @@ import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { useDetailScreenBottomPadding, useSideInsetStyle } from '@/lib/screen-insets';
 
 /**
  * The profile override the new-session screen adds to the shared contract: the
@@ -131,6 +131,7 @@ export function NewSessionConfigureForm({
   onRetryCloudCreate,
 }: Readonly<NewSessionConfigureFormProps & NewSessionProfileOverrideProps>) {
   const { t } = useTranslation();
+  const sideInsetStyle = useSideInsetStyle();
   // The footer reserves the platform inset. KeyboardAvoidingView lifts the
   // scroll body and footer together; the prompt yields height to the viewport.
   // The scroll view retains focused-input keyboard inset adjustment.
@@ -340,6 +341,7 @@ export function NewSessionConfigureForm({
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-background"
+      style={sideInsetStyle}
       behavior="padding"
       keyboardVerticalOffset={keyboardInsetOffset(bottom)}
     >

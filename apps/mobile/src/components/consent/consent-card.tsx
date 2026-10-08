@@ -19,6 +19,7 @@ import { PRIVACY_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useSideInsetStyle } from '@/lib/screen-insets';
 
 type ConsentCardProps = {
   readonly mode?: ConsentMode;
@@ -44,12 +45,13 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const { bottom, top } = useSafeAreaInsets();
+  const sideInsetStyle = useSideInsetStyle();
   const { signOut, token } = useAuth();
   const { userId } = useCurrentUserId({ enabled: token != null });
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const actions = getConsentActions(mode);
-  const rootStyle = { paddingTop: top };
+  const rootStyle = { paddingTop: top, ...sideInsetStyle };
   const contentContainerStyle = {
     paddingTop: 24,
     paddingBottom: 24,

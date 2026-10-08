@@ -36,6 +36,7 @@ import type { SessionMessageAdmissionResult } from '../execution/types.js';
 import type { SessionCreateRequest } from './session-requests.js';
 import type * as SandboxIdModule from '../sandbox-id.js';
 import type * as SharedSandboxRouteModule from '../shared-sandbox-route.js';
+import type * as SandboxPlacementModule from '../sandbox-placement.js';
 import type * as MessageIdModule from './message-id.js';
 import {
   assertSessionOperationIdentity,
@@ -67,6 +68,7 @@ const {
   recordSandboxIdentityMock,
   recordSessionFailureMock,
   generateSandboxRoutingTargetMock,
+  selectControlPlaneSandboxMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
@@ -81,6 +83,7 @@ const {
   recordSandboxIdentityMock: vi.fn().mockResolvedValue(undefined),
   recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
   generateSandboxRoutingTargetMock: vi.fn(),
+  selectControlPlaneSandboxMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
@@ -165,6 +168,12 @@ vi.mock('../sandbox-id.js', async importOriginal => {
   };
 });
 
+vi.mock('../sandbox-placement.js', async importOriginal => {
+  const actual = await importOriginal<typeof SandboxPlacementModule>();
+  selectControlPlaneSandboxMock.mockImplementation(actual.selectControlPlaneSandbox);
+  return { ...actual, selectControlPlaneSandbox: selectControlPlaneSandboxMock };
+});
+
 vi.mock('../shared-sandbox-route.js', async importOriginal => {
   const actual = await importOriginal<typeof SharedSandboxRouteModule>();
   return {
@@ -178,11 +187,16 @@ const USER_ID = 'test-user-123';
 const AUTH_TOKEN = 'test-auth-token';
 const CLOUD_AGENT_SESSION_ID = 'agent_12345678-1234-1234-1234-123456789abc';
 const WORKSPACE_SESSION_ID = 'workspace_420ae020-e3c4-4e67-878b-66672c3d997e';
+const PLACED_SANDBOX_ID = `sbx-${'b'.repeat(48)}`;
+const PLACED_SANDBOX_DECISION = {
+  sandboxId: PLACED_SANDBOX_ID,
+  provider: 'cloudflare',
+  sandboxKind: 'isolated',
+} as const;
 const WORKTREE_ID = 'worktree_420ae020-e3c4-4e67-878b-66672c3d997e';
 const KILO_SESSION_ID = 'ses_12345678901234567890123456';
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
 const ROW_ID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-const PLACED_SANDBOX_ID = `sbx-${'b'.repeat(48)}`;
 
 function makeLedgerRow(overrides: Partial<OperationLedgerRow> = {}): OperationLedgerRow {
   return {
@@ -483,6 +497,7 @@ describe('explicit sandbox session creation', () => {
         ctx,
         format === 'structured' ? requestFromStructuredAllocation(preset) : requestForPreset(preset)
       );
+      const sandboxKind = preset === 'cloudflare-shared' ? 'shared' : 'isolated';
       expect(recordOperationProgressMock).toHaveBeenCalledWith(
         expect.anything(),
         ROW_ID,
@@ -490,6 +505,11 @@ describe('explicit sandbox session creation', () => {
           sandboxAllocation: preset,
           [SESSION_CREATE_INTENT_FINGERPRINT_KEY]: expect.any(String),
         })
+      );
+      expect(recordOperationProgressMock).toHaveBeenCalledWith(
+        expect.anything(),
+        ROW_ID,
+        expect.objectContaining({ sandboxKind })
       );
       const command = createdMetadata(doStub);
       const metadata = parseSessionMetadata({
@@ -506,11 +526,13 @@ describe('explicit sandbox session creation', () => {
         kilocode: true,
       });
       expect(metadata.workspace).not.toHaveProperty('resources');
-      if (preset === 'cloudflare-shared') {
-        expect(resolveSharedSandboxAssignment).toHaveBeenCalledOnce();
-        expect(metadata.workspace?.sandboxRoute?.suffix).toBe(SHARED_SANDBOX_FAILOVER_SUFFIX);
-        expect(metadata.workspace?.sandboxId).not.toBe(metadata.workspace?.sandboxRoute?.routeKey);
-      }
+      // A control-plane key is neutral and routes only by its stored kind;
+      // the shared-sandbox failover override is legacy-only.
+      expect(metadata.workspace?.sandboxId).toMatch(/^sbx-[0-9a-f]{48}$/);
+      expect(metadata.workspace?.sandboxKind).toBe(sandboxKind);
+      expect(metadata.workspace?.sandboxRoute).toBeUndefined();
+      expect(resolveSharedSandboxAssignment).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     }
   );
 
@@ -546,8 +568,9 @@ describe('explicit sandbox session creation', () => {
       expect(command?.workspace).toMatchObject({
         sandboxAllocation: preset,
         sandboxProvider: 'vercel',
+        sandboxKind: 'isolated',
       });
-      expect(command?.workspace?.sandboxId).toMatch(/^ses-/);
+      expect(command?.workspace?.sandboxId).toMatch(/^sbx-/);
     }
   );
 
@@ -1531,6 +1554,7 @@ describe('createSessionWithLedger admission ladder', () => {
       ctx.env.CONTROL_PLANE_IDS = '*';
       ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
       generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+      selectControlPlaneSandboxMock.mockResolvedValueOnce(PLACED_SANDBOX_DECISION);
       const request = makeRequest({
         repository: { type: 'github', repo: 'acme/repo', branch: 'main' },
         finalization,
@@ -1555,7 +1579,7 @@ describe('createSessionWithLedger admission ladder', () => {
         'https://github.com/acme/repo',
         undefined,
         WORKTREE_ID,
-        { sandboxId: 'ses-0123456789abcdef', provider: 'cloudflare' }
+        { sandboxId: PLACED_SANDBOX_ID, provider: 'cloudflare' }
       );
       expect(createdMetadata(doStub)).toMatchObject(
         expect.objectContaining({
@@ -1564,7 +1588,8 @@ describe('createSessionWithLedger admission ladder', () => {
           workspace: expect.objectContaining({
             worktreeId: WORKTREE_ID,
             workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
-            sandboxId: 'ses-0123456789abcdef',
+            sandboxId: PLACED_SANDBOX_ID,
+            sandboxKind: PLACED_SANDBOX_DECISION.sandboxKind,
             sandboxProvider: 'cloudflare',
           }),
         })
@@ -3039,6 +3064,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
     generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
     generateKiloSessionIdMock.mockReturnValue(KILO_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValue({ kind: 'isolated', sandboxId });
+    selectControlPlaneSandboxMock.mockResolvedValue(PLACED_SANDBOX_DECISION);
     admitOperationMock.mockResolvedValue({ admission: 'admitted', row: makeLedgerRow() });
     settleOperationMock.mockResolvedValue({ settled: true });
     markReconcilePendingMock.mockResolvedValue({});
@@ -3228,7 +3254,9 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       expect(createCliSessionMock).toHaveBeenCalledTimes(1);
       expect(generateSessionIdMock).toHaveBeenCalledTimes(1);
       expect(generateKiloSessionIdMock).toHaveBeenCalledTimes(1);
-      expect(generateSandboxRoutingTargetMock).toHaveBeenCalledTimes(1);
+      // The replay rebuilds the recorded placed key; it never decides a second one.
+      expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(1);
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
       expect(createSessionReportMock).toHaveBeenCalledTimes(1);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
       const rpcInput = createdRpcInput(doStub);
@@ -3237,7 +3265,8 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
         auth: expect.objectContaining({ kiloSessionId: KILO_SESSION_ID }),
         finalization: { autoCommit, condenseOnComplete: true },
         workspace: expect.objectContaining({
-          sandboxId,
+          sandboxId: PLACED_SANDBOX_ID,
+          sandboxKind: PLACED_SANDBOX_DECISION.sandboxKind,
           sandboxProvider: 'cloudflare',
           worktreeId: WORKTREE_ID,
           workspacePath: `/workspace/${USER_ID}/worktrees/${WORKTREE_ID}`,
@@ -3638,6 +3667,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       expect(controlGet).toHaveBeenCalled();
       expect(legacyGet).not.toHaveBeenCalled();
       expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+      expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
       expect(generateSessionIdMock).not.toHaveBeenCalled();
       expect(createCliSessionMock).not.toHaveBeenCalled();
     }
@@ -3667,7 +3697,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       message: 'creation_in_progress',
     });
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    expect(selectControlPlaneSandboxMock).not.toHaveBeenCalled();
   });
 
   it.each([

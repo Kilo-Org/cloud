@@ -323,7 +323,7 @@ export function ChildSessionDrawer({
         <div className="relative min-h-0 flex-1">
           <div
             ref={scrollContainerRef}
-            className="h-full overflow-y-auto px-4 py-4 sm:px-6"
+            className="h-full overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-6"
             onScroll={handleScroll}
           >
             <div ref={messagesContentRef}>

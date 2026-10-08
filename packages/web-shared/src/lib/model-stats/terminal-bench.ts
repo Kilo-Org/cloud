@@ -18,49 +18,104 @@ export type TerminalBenchSummary = {
 
 export type TerminalBenchSummaries = ReadonlyMap<string, TerminalBenchSummary>;
 
+export type TerminalBenchLatestSummary = TerminalBenchSummary & {
+  release: string | null;
+  revision: string;
+  scope: string | null;
+};
+
+export type TerminalBenchLatestSummaries = ReadonlyMap<string, TerminalBenchLatestSummary>;
+
+const LEGACY_TASK_SOURCE = 'terminal-bench';
+const REVISIONED_EVAL_KEY = /^terminal-bench\/terminal-bench@(\d+)$/;
+const MIN_ATTEMPTS = 5;
+
 type Row = {
   openrouterId: string;
   isActive: boolean | null;
   benchmarks: unknown;
 };
 
-export function summarizeTerminalBench(rows: readonly Row[]): TerminalBenchSummaries {
+type KiloBenchEvals = NonNullable<
+  NonNullable<NonNullable<typeof TerminalBenchSchema._output>['kiloBench']>
+>['evals'];
+type KiloBenchEval = KiloBenchEvals[string];
+
+function parseEvals(row: Row): KiloBenchEvals | undefined {
+  if (!row.isActive || row.openrouterId.startsWith(CUSTOM_LLM_PREFIX)) return undefined;
+  const result = TerminalBenchSchema.safeParse(row.benchmarks);
+  return result.success ? result.data?.kiloBench?.evals : undefined;
+}
+
+function eligibleSummary(bench: KiloBenchEval | undefined): TerminalBenchSummary | undefined {
+  if (
+    !bench ||
+    (bench.nAttempts ?? 0) < MIN_ATTEMPTS ||
+    bench.avgAttemptCostUsd === null ||
+    bench.avgAttemptCostUsd === undefined
+  ) {
+    return undefined;
+  }
+  return { overallScore: bench.overallScore, avgAttemptCostUsd: bench.avgAttemptCostUsd };
+}
+
+export function summarizeTerminalBench(
+  rows: readonly Row[],
+  taskSource: string = LEGACY_TASK_SOURCE
+): TerminalBenchSummaries {
   const summaries = new Map<string, TerminalBenchSummary>();
 
   for (const row of rows) {
-    if (!row.isActive || row.openrouterId.startsWith(CUSTOM_LLM_PREFIX)) continue;
-    const result = TerminalBenchSchema.safeParse(row.benchmarks);
-    if (!result.success) continue;
-    const bench = result.data?.kiloBench?.evals['terminal-bench'];
-    if (
-      !bench ||
-      (bench.nAttempts ?? 0) < 5 ||
-      bench.avgAttemptCostUsd === null ||
-      bench.avgAttemptCostUsd === undefined
-    ) {
-      continue;
-    }
-    summaries.set(row.openrouterId, {
-      overallScore: bench.overallScore,
-      avgAttemptCostUsd: bench.avgAttemptCostUsd,
-    });
+    const summary = eligibleSummary(parseEvals(row)?.[taskSource]);
+    if (summary) summaries.set(row.openrouterId, summary);
   }
 
   return summaries;
 }
 
-export function terminalBenchFor(
-  summaries: TerminalBenchSummaries,
-  id: string
-): TerminalBenchSummary | undefined {
+/**
+ * Per model, the eligible `terminal-bench/terminal-bench@<n>` eval with the highest numeric
+ * Hub revision. Legacy `terminal-bench` is never considered.
+ */
+export function summarizeTerminalBenchLatest(rows: readonly Row[]): TerminalBenchLatestSummaries {
+  const summaries = new Map<string, TerminalBenchLatestSummary>();
+
+  for (const row of rows) {
+    const evals = parseEvals(row);
+    if (!evals) continue;
+    let best: { revision: number; summary: TerminalBenchLatestSummary } | undefined;
+    for (const [key, bench] of Object.entries(evals)) {
+      const match = REVISIONED_EVAL_KEY.exec(key);
+      if (!match) continue;
+      const revision = Number(match[1]);
+      if (best && revision <= best.revision) continue;
+      const summary = eligibleSummary(bench);
+      if (!summary) continue;
+      best = {
+        revision,
+        summary: {
+          ...summary,
+          release: bench.benchmarkRelease ?? null,
+          revision: match[1],
+          scope: bench.scope ?? null,
+        },
+      };
+    }
+    if (best) summaries.set(row.openrouterId, best.summary);
+  }
+
+  return summaries;
+}
+
+export function terminalBenchFor<T>(summaries: ReadonlyMap<string, T>, id: string): T | undefined {
   const exact = summaries.get(id);
   if (exact) return exact;
   const unprefixed = unprefixKiloGatewayModelId(id);
   return unprefixed ? summaries.get(unprefixed) : undefined;
 }
 
-async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
-  const rows = await readDb
+function loadTerminalBenchRows(): Promise<Row[]> {
+  return readDb
     .select({
       openrouterId: modelStats.openrouterId,
       isActive: modelStats.isActive,
@@ -70,10 +125,9 @@ async function loadTerminalBench(): Promise<TerminalBenchSummaries> {
     .where(
       and(eq(modelStats.isActive, true), notLike(modelStats.openrouterId, `${CUSTOM_LLM_PREFIX}%`))
     );
-  return summarizeTerminalBench(rows);
 }
 
-function createTerminalBenchFetch(load = loadTerminalBench) {
+function createTerminalBenchFetch<T>(load: () => Promise<ReadonlyMap<string, T>>) {
   return createCachedFetch(
     () =>
       load().catch(err => {
@@ -81,8 +135,14 @@ function createTerminalBenchFetch(load = loadTerminalBench) {
         throw err;
       }),
     TTL,
-    new Map<string, TerminalBenchSummary>()
+    new Map<string, T>() as ReadonlyMap<string, T>
   );
 }
 
-export const getTerminalBenchSummaries = createTerminalBenchFetch();
+export const getTerminalBenchSummaries = createTerminalBenchFetch(async () =>
+  summarizeTerminalBench(await loadTerminalBenchRows())
+);
+
+export const getTerminalBenchLatestSummaries = createTerminalBenchFetch(async () =>
+  summarizeTerminalBenchLatest(await loadTerminalBenchRows())
+);

@@ -5489,6 +5489,13 @@ export const ModelStatsBenchmarksSchema = z
           z.object({
             taskSource: z.string(),
             displayName: z.string().optional(),
+            datasetName: z.string().optional(),
+            benchmarkRelease: z.string().optional(),
+            benchmarkRevision: z.string().optional(),
+            datasetDigest: z.string().optional(),
+            scope: z.string().optional(),
+            includedTaskCount: z.number().optional(),
+            suiteTaskCount: z.number().optional(),
             overallScore: z.number(),
             totalScore: z.number(),
             avgCostUsd: z.number().nullable(),
@@ -5670,6 +5677,12 @@ export const model_eval_ingestions = pgTable(
     promoted_at: timestamp('promoted_at', { withTimezone: true, mode: 'string' }).notNull(),
     promoted_by_email: text('promoted_by_email').notNull(),
     promotion_note: text('promotion_note'),
+    benchmark_release: text('benchmark_release'),
+    benchmark_revision: text('benchmark_revision'),
+    benchmark_scope: text('benchmark_scope'),
+    included_task_count: integer('included_task_count'),
+    suite_task_count: integer('suite_task_count'),
+    dataset_digest: text('dataset_digest'),
     created_at: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull(),

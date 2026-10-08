@@ -1,3 +1,4 @@
+import { createServer } from 'node:http';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BenchmarkModelCatalogSchema,
@@ -110,4 +111,31 @@ describe('platform catalog expansion', () => {
       )
     ).rejects.toThrow(/catalog failed: HTTP 503/);
   });
+
+  // Native AbortSignal.timeout bypasses Vitest's fake clock; exercise real fetch body cancellation.
+  it('bounds stalled catalog body reads before queue work can remain blocked', async () => {
+    let finishBody: ReturnType<typeof setTimeout> | undefined;
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.write('{"data":[');
+      finishBody = setTimeout(() => response.end('{"id":"m"}]}'), 12_000);
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Missing local server port');
+    try {
+      await expect(
+        fetchPlatformRegistryEntries(
+          { KILO_WEB_API_BASE_URL: `http://127.0.0.1:${address.port}` },
+          { deciderModels: [{ id: 'm' }] }
+        )
+      ).rejects.toMatchObject({ name: expect.stringMatching(/^(AbortError|TimeoutError)$/) });
+    } finally {
+      clearTimeout(finishBody);
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  }, 20_000);
 });

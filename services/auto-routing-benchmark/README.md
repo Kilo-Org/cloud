@@ -37,6 +37,7 @@ design, invariants, and rollout/rollback.
 - Variants must contain explicit `reasoning.enabled` or `reasoning.effort` controls. Unrelated presets do not create benchmark entries.
 - A model without reasoning controls creates one `(model, null)` entry.
 - If the catalog fails or omits a selected model, reconciliation fails. It does not infer a default effort.
+- Catalog requests have a 10-second deadline, including body reads, so a stalled response cannot block both queues indefinitely.
 - Manual and automatic selections use the same expansion. Existing saved effort selections no longer restrict platform measurements.
 - Owner pools still select exact pairs. Platform expansion does not change their entries.
 

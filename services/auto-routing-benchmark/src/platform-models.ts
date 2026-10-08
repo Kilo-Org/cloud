@@ -44,7 +44,9 @@ export async function fetchPlatformRegistryEntries(
   config: Pick<BenchmarkConfig, 'deciderModels'>,
   fetchImpl: typeof fetch = fetch
 ): Promise<RunModelEntry[]> {
-  const response = await fetchImpl(new URL('/api/openrouter/models', env.KILO_WEB_API_BASE_URL));
+  const response = await fetchImpl(new URL('/api/openrouter/models', env.KILO_WEB_API_BASE_URL), {
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!response.ok) throw new Error(`benchmark model catalog failed: HTTP ${response.status}`);
   const catalog = BenchmarkModelCatalogSchema.parse(await response.json());
   return platformRegistryEntries(config, catalog);

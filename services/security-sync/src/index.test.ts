@@ -1279,6 +1279,56 @@ describe('manual dismissal dispatch', () => {
     expect(retry).toHaveBeenCalledTimes(1);
   });
 
+  it('persists the specific dismissal failure and acknowledges without retrying', async () => {
+    vi.mocked(processSecurityFindingDismissal).mockResolvedValue({
+      dismissed: false,
+      findingSource: 'dependabot',
+      commandStatus: 'failed',
+      resultCode: 'GITHUB_DISMISSAL_PERMISSION_REQUIRED',
+      lastErrorRedacted: 'GitHub App needs write access to Dependabot alerts.',
+    });
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'dismiss-message-123',
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              actor: { id: 'user-123' },
+              findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              installationId: 'installation-123',
+              reason: 'not_used',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      { HYPERDRIVE: { connectionString: 'postgres://worker' } } as CloudflareEnv
+    );
+
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        status: 'failed',
+        resultCode: 'GITHUB_DISMISSAL_PERMISSION_REQUIRED',
+        lastErrorRedacted: 'GitHub App needs write access to Dependabot alerts.',
+      })
+    );
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+    expect(markSecurityAgentCommandRetriesExhausted).not.toHaveBeenCalled();
+  });
+
   it('acks an invalid message on the dismiss queue without running sync', async () => {
     vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
     const ack = vi.fn();

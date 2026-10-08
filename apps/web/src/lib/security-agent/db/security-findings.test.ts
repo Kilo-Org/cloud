@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
+import { randomUUID } from 'crypto';
 import { db, pool } from '@kilocode/web-shared/lib/drizzle';
-import { security_findings, agent_configs } from '@kilocode/db/schema';
+import { security_findings, agent_configs, platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -78,6 +79,21 @@ function makeFinding(overrides: Partial<ParsedSecurityFinding> = {}): ParsedSecu
     dependency_scope: 'runtime',
     ...overrides,
   };
+}
+
+async function insertGithubIntegration(userId: string): Promise<string> {
+  const id = randomUUID();
+  await db.insert(platform_integrations).values({
+    id,
+    owned_by_user_id: userId,
+    platform: 'github',
+    integration_type: 'app',
+    platform_installation_id: `test-installation-${randomUUID()}`,
+    permissions: { vulnerability_alerts: 'read' },
+    integration_status: 'active',
+    github_connection_role: 'workflow',
+  });
+  return id;
 }
 
 describe('upsertSecurityFinding', () => {
@@ -373,6 +389,80 @@ describe('upsertSecurityFinding', () => {
       .where(eq(security_findings.id, result.findingId));
 
     expect(row.cwe_ids).toBeNull();
+  });
+
+  it('relinks a NULL platform_integration_id when supplied', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const integrationId = await insertGithubIntegration(user.id);
+    const first = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '31' }),
+      owner,
+      repoFullName: 'test-org/relink-null-repo',
+    });
+
+    await upsertSecurityFinding({
+      ...makeFinding({ source_id: '31' }),
+      owner,
+      repoFullName: 'test-org/relink-null-repo',
+      platformIntegrationId: integrationId,
+    });
+
+    const [row] = await db
+      .select({ platformIntegrationId: security_findings.platform_integration_id })
+      .from(security_findings)
+      .where(eq(security_findings.id, first.findingId));
+    expect(row?.platformIntegrationId).toBe(integrationId);
+  });
+
+  it('updates platform_integration_id when supplied with a new integration', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const integrationA = await insertGithubIntegration(user.id);
+    const integrationB = await insertGithubIntegration(user.id);
+    const first = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '32' }),
+      owner,
+      repoFullName: 'test-org/relink-changed-repo',
+      platformIntegrationId: integrationA,
+    });
+
+    await upsertSecurityFinding({
+      ...makeFinding({ source_id: '32' }),
+      owner,
+      repoFullName: 'test-org/relink-changed-repo',
+      platformIntegrationId: integrationB,
+    });
+
+    const [row] = await db
+      .select({ platformIntegrationId: security_findings.platform_integration_id })
+      .from(security_findings)
+      .where(eq(security_findings.id, first.findingId));
+    expect(row?.platformIntegrationId).toBe(integrationB);
+  });
+
+  it('preserves platform_integration_id when omitted on an existing finding', async () => {
+    const user = await insertTestUser();
+    const owner: SecurityReviewOwner = { userId: user.id };
+    const integrationId = await insertGithubIntegration(user.id);
+    const first = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '33' }),
+      owner,
+      repoFullName: 'test-org/relink-omitted-repo',
+      platformIntegrationId: integrationId,
+    });
+
+    await upsertSecurityFinding({
+      ...makeFinding({ source_id: '33', severity: 'critical' }),
+      owner,
+      repoFullName: 'test-org/relink-omitted-repo',
+    });
+
+    const [row] = await db
+      .select({ platformIntegrationId: security_findings.platform_integration_id })
+      .from(security_findings)
+      .where(eq(security_findings.id, first.findingId));
+    expect(row?.platformIntegrationId).toBe(integrationId);
   });
 });
 

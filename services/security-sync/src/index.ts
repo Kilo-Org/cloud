@@ -568,6 +568,7 @@ async function processSecurityDismissMessage(
     fromStatuses: ['running'],
     status: result.commandStatus,
     resultCode: result.resultCode,
+    ...(result.lastErrorRedacted ? { lastErrorRedacted: result.lastErrorRedacted } : {}),
   });
   requireSecurityAgentCommandTransitionOrTerminal(terminal, 'terminal');
   await settleSecurityLedgerForTerminalCommand(db, terminal.command, {

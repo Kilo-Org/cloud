@@ -16,6 +16,7 @@ import {
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   agent_configs,
+  github_app_installations,
   platform_integrations,
   security_findings,
   security_finding_notifications,
@@ -1162,22 +1163,13 @@ async function upsertSecurityFinding(
   const ownerOrganizationId = isOrgOwner(owner) ? owner.organizationId : null;
   const ownerUserId = isOrgOwner(owner) ? null : owner.userId;
 
-  // Only rewrite an existing finding when the source data actually changed. Re-syncing an
-  // unchanged finding otherwise rewrote the row on every run (bumping last_synced_at/
-  // updated_at), which — multiplied by ~13 indexes and the TOASTed raw_data column —
-  // produced large amounts of WAL for findings that had not changed.
-  //
-  // Every stored column is derived from the Dependabot alert (see parseDependabotAlert),
-  // and GitHub only advances the alert's updated_at on real changes, so comparing the
-  // stored raw_data (jsonb, order-independent) detects any source-driven change in one
-  // check. sla_due_at is the only value we compute ourselves, so it is compared separately
-  // to catch SLA-policy changes. When neither differs the DO UPDATE matches no row and the
-  // fallback SELECT below returns the existing finding with wasInserted=false and no
-  // status/severity delta, so notifications and audit events behave exactly as they did for
-  // an unchanged re-sync.
+  // Avoid WAL/TOAST churn on unchanged alerts. Metadata-only updates must not undo
+  // a dismissal applied after the source fetch.
+  const sourceDataChangedPredicate = sql`${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}`;
   const materialChangePredicate = sql`(
-        ${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}
+        ${sourceDataChangedPredicate}
         OR ${security_findings.sla_due_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)}
+        OR ${security_findings.platform_integration_id} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)}
       )`;
 
   const result = await db.execute<Record<string, unknown>>(sql`
@@ -1191,6 +1183,44 @@ async function upsertSecurityFinding(
         AND ${security_findings.source_id} = ${finding.source_id}
         AND ${findingOwnerPredicate(owner)}
       FOR UPDATE
+    ),
+    eligible_input AS (
+      SELECT 1
+      FROM ${platform_integrations}
+      LEFT JOIN ${github_app_installations}
+        ON ${platform_integrations.github_installation_id} = ${github_app_installations.id}
+      WHERE ${platform_integrations.id} = ${platformIntegrationId}
+        AND ${integrationOwnerFilter(owner)}
+        AND ${platform_integrations.platform} = 'github'
+        AND ${platform_integrations.github_connection_role} = 'workflow'
+        AND ${platform_integrations.integration_type} = 'app'
+        AND ${platform_integrations.integration_status} = 'active'
+        AND ${platform_integrations.suspended_at} IS NULL
+        AND ${platform_integrations.github_disconnected_at} IS NULL
+        AND ${platform_integrations.platform_installation_id} IS NOT NULL
+        AND (
+          (
+            ${platform_integrations.github_installation_id} IS NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM ${github_app_installations}
+              WHERE ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+                AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+            )
+          )
+          OR (
+            ${github_app_installations.lifecycle_state} = 'active'
+            AND ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+            AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+            AND ${github_app_installations.suspended_at} IS NULL
+            AND ${github_app_installations.deleted_at} IS NULL
+          )
+        )
+        AND COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})->>'vulnerability_alerts' IN ('read', 'write')
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
+          WHERE repository->>'full_name' = ${repoFullName}
+        )
     ),
     upserted AS (
       INSERT INTO ${security_findings} (
@@ -1250,10 +1280,11 @@ async function upsertSecurityFinding(
         ${sql.param(finding.cwe_ids)}::text[],
         ${finding.cvss_score?.toString() ?? null},
         ${finding.dependency_scope}
-      FROM (SELECT 1) AS input
+      FROM eligible_input
       LEFT JOIN existing_match ON true
       ON CONFLICT ${findingOwnerConflictTarget(owner)} DO UPDATE
       SET
+        ${sql.identifier(security_findings.platform_integration_id.name)} = EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)},
         ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
         ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
         ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
@@ -1265,18 +1296,24 @@ async function upsertSecurityFinding(
         ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
         ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
         ${sql.identifier(security_findings.status.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.status}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.status}
           ELSE EXCLUDED.${sql.identifier(security_findings.status.name)}
         END,
         ${sql.identifier(security_findings.ignored_reason.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.ignored_reason}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_reason}
           ELSE EXCLUDED.${sql.identifier(security_findings.ignored_reason.name)}
         END,
         ${sql.identifier(security_findings.ignored_by.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.ignored_by}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_by}
           ELSE EXCLUDED.${sql.identifier(security_findings.ignored_by.name)}
         END,
-        ${sql.identifier(security_findings.fixed_at.name)} = EXCLUDED.${sql.identifier(security_findings.fixed_at.name)},
+        ${sql.identifier(security_findings.fixed_at.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.fixed_at}
+          ELSE EXCLUDED.${sql.identifier(security_findings.fixed_at.name)}
+        END,
         ${sql.identifier(security_findings.sla_due_at.name)} = EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)},
         ${sql.identifier(security_findings.dependabot_html_url.name)} = EXCLUDED.${sql.identifier(security_findings.dependabot_html_url.name)},
         ${sql.identifier(security_findings.raw_data.name)} = EXCLUDED.${sql.identifier(security_findings.raw_data.name)},

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import type { SecurityDismissMessage } from './index.js';
 
@@ -29,10 +29,19 @@ const finding = {
 };
 
 function createDb(
-  selectedFinding = finding,
+  selectedFinding: Omit<typeof finding, 'platform_integration_id'> & {
+    platform_integration_id: string | null;
+  } = finding,
   options: {
     failAuditInsert?: boolean;
     actor?: { id: string; email: string; name: string; isAdmin: boolean };
+    integrations?: {
+      id: string;
+      installationId: string;
+      githubAppType: 'standard' | 'lite';
+      hasRepositoryAccess: boolean;
+      hasWritePermission: boolean;
+    }[];
   } = {}
 ) {
   const updates: unknown[] = [];
@@ -71,16 +80,26 @@ function createDb(
   const db = {
     select: () => ({
       from: () => ({
+        leftJoin: () => ({
+          where: async () => {
+            selectCount++;
+            return (
+              options.integrations ?? [
+                {
+                  id: finding.platform_integration_id,
+                  installationId: 'installation-123',
+                  githubAppType: 'standard',
+                  hasRepositoryAccess: true,
+                  hasWritePermission: true,
+                },
+              ]
+            );
+          },
+        }),
         where: () => ({
           limit: async () => {
             const currentSelect = selectCount++;
-            return [
-              currentSelect === 0
-                ? selectedFinding
-                : currentSelect === 1 && selectedFinding.source === 'dependabot'
-                  ? { githubAppType: 'standard' }
-                  : actor,
-            ];
+            return [currentSelect === 0 ? selectedFinding : actor];
           },
         }),
       }),
@@ -119,6 +138,9 @@ function createMessage(): SecurityDismissMessage {
 describe('processSecurityFindingDismissal', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('updates local finding state and audit only after upstream Dependabot dismissal succeeds', async () => {
@@ -188,6 +210,99 @@ describe('processSecurityFindingDismissal', () => {
       actor_email: 'customer-domain@example.com',
       actor_type: 'kilo_admin',
     });
+  });
+
+  it.each([null, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'])(
+    'resolves the current integration instead of the stored link %s or queued installation',
+    async storedIntegrationId => {
+      const integration = {
+        id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        installationId: 'replacement-installation',
+        githubAppType: 'standard' as const,
+        hasRepositoryAccess: true,
+        hasWritePermission: true,
+      };
+      const { db, updates } = createDb(
+        { ...finding, platform_integration_id: storedIntegrationId },
+        { integrations: [integration] }
+      );
+      const getToken = vi.fn().mockResolvedValue('github-token');
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+      await expect(
+        processSecurityFindingDismissal({
+          db,
+          gitTokenService: { getToken } as unknown as GitTokenService,
+          message: createMessage(),
+        })
+      ).resolves.toMatchObject({ commandStatus: 'succeeded' });
+
+      expect(getToken).toHaveBeenCalledWith(integration.installationId, 'standard', integration.id);
+      expect(updates[0]).toMatchObject({
+        platform_integration_id: integration.id,
+        status: 'ignored',
+      });
+    }
+  );
+
+  it('fails immediately without local changes when no active integration is available', async () => {
+    const { db, updates, auditRows } = createDb(finding, { integrations: [] });
+    const getToken = vi.fn();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken } as unknown as GitTokenService,
+        message: createMessage(),
+      })
+    ).resolves.toMatchObject({ commandStatus: 'failed', resultCode: 'GITHUB_TOKEN_UNAVAILABLE' });
+
+    expect(getToken).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('preserves the token-service lifecycle fence after resolving the integration', async () => {
+    const { db, updates, auditRows } = createDb();
+    const error = new Error('installation disconnected');
+    error.name = 'GitHubInstallationAccessDeniedError';
+    const getToken = vi.fn().mockRejectedValue(error);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken } as unknown as GitTokenService,
+        message: createMessage(),
+      })
+    ).resolves.toMatchObject({ commandStatus: 'failed', resultCode: 'GITHUB_TOKEN_UNAVAILABLE' });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('keeps token-service infrastructure failures retryable', async () => {
+    const { db, updates, auditRows } = createDb();
+    const getToken = vi.fn().mockRejectedValue(new Error('token service unavailable'));
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken } as unknown as GitTokenService,
+        message: createMessage(),
+      })
+    ).rejects.toThrow('token service unavailable');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
   });
 
   it('preserves local state when upstream Dependabot dismissal fails transiently', async () => {

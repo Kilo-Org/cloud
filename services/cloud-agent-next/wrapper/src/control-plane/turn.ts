@@ -24,7 +24,7 @@ import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js'
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
-import type { KiloRestartInfo } from './kilo-runtime.js';
+import { isUnresponsiveRestart, type KiloRestartInfo } from './kilo-runtime.js';
 import type {
   SessionSupervisor,
   ExecutionIdentity,
@@ -1038,7 +1038,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
     onRuntimeRestart(info: KiloRestartInfo & { key: string }): void {
       const ownedTurns = new Set(turnsForRuntimeKey(info.key).map(turn => turn.route.sessionId));
       void publishCommandsForRuntimeKey(info.key);
-      const failure = info.reason === 'hang' ? 'agent_unresponsive' : 'agent_restarted';
+      const failure = isUnresponsiveRestart(info) ? 'agent_unresponsive' : 'agent_restarted';
       const outcomeReason = info.outcomeReason ?? failure;
       for (const turn of turnsForRuntimeKey(info.key)) {
         turn.deferredCompletion = undefined;

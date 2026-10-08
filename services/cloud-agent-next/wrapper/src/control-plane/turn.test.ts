@@ -2191,16 +2191,18 @@ describe('native session outcome transitions', () => {
   });
 
   it.each([
-    ['hang', 'agent_unresponsive', 'Kilo was not responding and was restarted'],
-    ['exit', 'agent_restarted', 'the agent restarted'],
+    ['hang', undefined, 'agent_unresponsive', 'Kilo was not responding and was restarted'],
+    ['hang', 'activity_capacity', 'agent_restarted', 'the agent restarted'],
+    ['exit', undefined, 'agent_restarted', 'the agent restarted'],
   ] as const)(
-    'reports a %s restart of native work without a Cloud turn as %s',
-    async (reason, expected, text) => {
+    'reports a %s (%s) restart of native work without a Cloud turn as %s',
+    async (reason, trigger, expected, text) => {
       const h = createHarness();
       h.registerRoute(routeSpec());
       h.manager.onRuntimeRestart({
         directory: DIRECTORY,
         reason,
+        ...(trigger === undefined ? {} : { trigger }),
         key: runtimeKey(routeSpec()),
         interruptedExecutions: [
           { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },

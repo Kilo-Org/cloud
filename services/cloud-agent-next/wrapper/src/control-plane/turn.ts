@@ -96,6 +96,8 @@ type MaterializedPrompt = Awaited<ReturnType<typeof materializeMessageAttachment
 type PendingPrompt = {
   payload: ControlPlanePromptPayload;
   receivedAt: number;
+  /** A memory hold ended after receipt; the delivery deadline counts from here. */
+  deliveryResumedAt?: number;
   nativeObserved?: boolean;
   acknowledged?: boolean;
   abort: AbortController;
@@ -176,6 +178,10 @@ function markDispatched(
   if (turn.phase === 'finalizing') turn.idleWhileFinalizing = false;
 }
 
+/** Non-fatal notice for a turn whose Kilo is held under memory pressure; nothing acts on it. */
+export const MEMORY_HOLD_WARNING =
+  'Kilo is not responding while the sandbox is low on memory. Waiting for it to recover before restarting it.';
+
 export type TurnManager = ReturnType<typeof createTurnManager>;
 
 export function createTurnManager(deps: TurnManagerDeps) {
@@ -202,6 +208,8 @@ export function createTurnManager(deps: TurnManagerDeps) {
   const turns = new Map<string, Turn>();
   const turnByKiloSession = new Map<string, string>();
   const childRoots = new Map<string, string>();
+  /** Runtime keys whose Kilo is held under memory pressure (`onRuntimeMemoryHold`). */
+  const memoryHeldRuntimes = new Set<string>();
   const tickMs = 1_000;
   let tickHandle: ReturnType<typeof setInterval> | undefined;
 
@@ -220,6 +228,16 @@ export function createTurnManager(deps: TurnManagerDeps) {
   function emitWarning(sessionId: string, message: string): void {
     log(`turn: warning - ${message}`);
     emitEvents(sessionId, [{ type: 'error', properties: { error: message, fatal: false } }]);
+  }
+
+  /**
+   * Kilo has not observed this prompt within the 120 s delivery deadline. The deadline does not
+   * run while the runtime is memory-held, and restarts when the hold ends.
+   */
+  function deliveryExpired(turn: Turn, entry: PendingPrompt): boolean {
+    if (entry.nativeObserved || memoryHeldRuntimes.has(turn.route.runtimeKey)) return false;
+    const from = Math.max(entry.receivedAt, entry.deliveryResumedAt ?? 0);
+    return now() - from >= PROMPT_DELIVERY_TIMEOUT_MS;
   }
 
   function lastReceivedMessageId(turn: Turn): string {
@@ -326,6 +344,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       submitting: Promise.resolve(),
     };
     turns.set(route.sessionId, turn);
+    if (memoryHeldRuntimes.has(route.runtimeKey)) emitWarning(route.sessionId, MEMORY_HOLD_WARNING);
     ensureTick();
     return turn;
   }
@@ -747,9 +766,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         continue;
       }
       drainInbox(turn);
-      const pending = turn.prompts.find(
-        entry => !entry.nativeObserved && now() - entry.receivedAt >= PROMPT_DELIVERY_TIMEOUT_MS
-      );
+      const pending = turn.prompts.find(entry => deliveryExpired(turn, entry));
       if (pending && turn.phase !== 'finalizing') {
         pending.abort.abort(new Error('Prompt delivery timed out'));
         sendOutcome(turn, 'failed', 'prompt_failed');
@@ -1086,6 +1103,19 @@ export function createTurnManager(deps: TurnManagerDeps) {
       }
     },
 
+    /** Spec §7: a memory-held runtime warns its turns and holds their delivery deadlines. */
+    onRuntimeMemoryHold(info: { directory: string; held: boolean; key: string }): void {
+      if (info.held) memoryHeldRuntimes.add(info.key);
+      else memoryHeldRuntimes.delete(info.key);
+      for (const turn of turnsForRuntimeKey(info.key)) {
+        if (info.held) {
+          emitWarning(turn.route.sessionId, MEMORY_HOLD_WARNING);
+          continue;
+        }
+        for (const entry of turn.prompts) entry.deliveryResumedAt = now();
+      }
+    },
+
     onRuntimeUnavailable(_directory: string, key: string): void {
       for (const turn of turnsForRuntimeKey(key)) {
         sendOutcome(turn, 'failed', 'agent_unavailable');
@@ -1148,9 +1178,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       return [...turns.values()].some(
         turn =>
           turn.phase === 'finalizing' ||
-          turn.prompts.some(
-            entry => !entry.nativeObserved && now() - entry.receivedAt < PROMPT_DELIVERY_TIMEOUT_MS
-          )
+          turn.prompts.some(entry => !entry.nativeObserved && !deliveryExpired(turn, entry))
       );
     },
 

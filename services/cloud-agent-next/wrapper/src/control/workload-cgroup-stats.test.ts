@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
+  createWorkloadReporter,
   decideWorkloadStatsEmission,
   isWorkloadAtCap,
   readWorkloadStats,
@@ -24,7 +25,7 @@ afterEach(() => {
 });
 
 describe('readWorkloadStats', () => {
-  it('reads CPU, I/O, pressure, and memory-limit counters without process content', () => {
+  it('reads CPU, I/O, pressure, memory-split, and memory-limit counters without process content', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'workload-stats-'));
     directories.push(directory);
     writeFileSync(path.join(directory, 'memory.current'), '1024\n');
@@ -252,5 +253,19 @@ describe('isWorkloadAtCap', () => {
   it('is false below the cap or without a reading', () => {
     expect(isWorkloadAtCap({ ...snapshot, currentBytes: 5 * gib })).toBe(false);
     expect(isWorkloadAtCap({ ...snapshot, currentBytes: undefined })).toBe(false);
+  });
+});
+
+describe('createWorkloadReporter', () => {
+  it('reports a stats record when only a per-child counter changes', () => {
+    const reported: Array<Record<string, unknown>> = [];
+    const reporter = createWorkloadReporter((_event, fields) => reported.push(fields));
+    const stats = { phase: 'completed', workloadPhase: 'stats', currentBytes: 100 } as const;
+
+    reporter.emit('scope', { ...stats, toolCurrentBytes: 60, serverCurrentBytes: 40 });
+    reporter.emit('scope', { ...stats, toolCurrentBytes: 60, serverCurrentBytes: 40 });
+    reporter.emit('scope', { ...stats, toolCurrentBytes: 30, serverCurrentBytes: 70 });
+
+    expect(reported.map(fields => fields.serverCurrentBytes)).toEqual([40, 70]);
   });
 });

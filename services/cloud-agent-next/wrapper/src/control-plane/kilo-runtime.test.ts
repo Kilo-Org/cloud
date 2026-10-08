@@ -9,6 +9,7 @@ import {
 import type { KiloFeedEvent, KiloEventFeedSource } from './kilo-event-feed.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import { createTurnManager } from './turn.js';
+import { SESSION_SNAPSHOT_INTERVAL_MS } from './runtime-activity.js';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 import {
   cleanupStaleKiloPidfiles,
@@ -175,6 +176,9 @@ function createRuntime(options: {
   spawnKilo?: KiloProcessSpawner;
   timers?: ControlPlaneTimers;
   onRestart?: (info: { directory: string; reason: string }) => void;
+  sampleMemory?: KiloRuntimeOptions['sampleMemory'];
+  memoryHolds?: boolean[];
+  readSnapshot?: KiloRuntimeOptions['readSnapshot'];
 }) {
   const restarts: Array<{ reason: string }> = options.restarts ?? [];
   const restartingAtOnRestart: boolean[] = [];
@@ -183,7 +187,7 @@ function createRuntime(options: {
   const runtimeRef: { current?: ReturnType<typeof createKiloRuntime> } = {};
   let unavailable = options.unavailable ?? 0;
   const runtime = createKiloRuntime({
-    readSnapshot: async () => [],
+    readSnapshot: options.readSnapshot ?? (async () => []),
     directory: options.directory ?? '/tmp/kilo-runtime-test',
     env: options.env ?? { HOME: '/old' },
     timers: options.timers ?? TEST_TIMERS,
@@ -201,6 +205,8 @@ function createRuntime(options: {
         }
       : {}),
     ...(options.prepareFilesystem ? { prepareFilesystem: options.prepareFilesystem } : {}),
+    ...(options.sampleMemory ? { sampleMemory: options.sampleMemory } : {}),
+    onMemoryHold: info => options.memoryHolds?.push(info.held),
     onRestart: info => {
       restarts.push({ reason: info.reason });
       restartingAtOnRestart.push(runtimeRef.current?.isRestarting() ?? true);
@@ -1375,6 +1381,240 @@ describe('createKiloRuntime', () => {
   });
 });
 
+describe('Kilo hang restart under memory pressure', () => {
+  const LIMIT = 11 * 1024 * 1024 * 1024;
+
+  /** The workload parent sits at its cap and keeps hitting it, as during reclaim. */
+  function reclaimingAtCap() {
+    let maxEvents = 0;
+    return () => ({ currentBytes: LIMIT - 4096, limitBytes: LIMIT, maxEvents: (maxEvents += 1) });
+  }
+
+  function holdPhases(
+    nativeDiagnostics: Array<{ event: string; fields: ControlDiagnosticFields }>
+  ) {
+    return nativeDiagnostics
+      .map(record => record.fields)
+      .filter(fields => String(fields.phase).startsWith('kilo_memory_hold'))
+      .map(fields => [fields.phase, fields.memoryHoldOutcome]);
+  }
+
+  it('keeps a silent Kilo running while reclaiming and resumes it without a restart', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const memoryHolds: boolean[] = [];
+    const { runtime, restarts, nativeDiagnostics } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      sampleMemory: reclaimingAtCap(),
+      memoryHolds,
+    });
+
+    await runtime.ensure();
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => memoryHolds.length === 1);
+    // Each check probes again, so a Kilo that recovers is seen within one check.
+    scheduleTick(scheduler, TEST_TIMERS);
+    await waitFor(() => probe.calls.count === 2);
+    // Let the second decision settle; a check during an in-flight probe is skipped.
+    await Bun.sleep(5);
+    expect(restarts).toEqual([]);
+    expect(runtime.isSuspected()).toBe(true);
+
+    probe.set(true);
+    scheduleTick(scheduler, TEST_TIMERS);
+    await waitFor(() => feed.feeds.length === 2);
+    feed.feeds[1]!.callbacks.onEvent({
+      type: 'server.heartbeat',
+      properties: {},
+      nativeRuntimeId: 'r',
+    });
+    // The next check sees Kilo delivering events and observable, and ends the hold.
+    scheduleTick(scheduler, TEST_TIMERS);
+    await waitFor(() => memoryHolds.length === 2);
+
+    expect(spawner.spawnCount()).toBe(1);
+    expect(restarts).toEqual([]);
+    expect(memoryHolds).toEqual([true, false]);
+    expect(holdPhases(nativeDiagnostics)).toEqual([
+      ['kilo_memory_hold_started', undefined],
+      ['kilo_memory_hold_ended', 'recovered'],
+    ]);
+    await runtime.shutdown();
+  });
+
+  it('restarts Kilo once the hold reaches kiloMemoryHoldMs', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const memoryHolds: boolean[] = [];
+    const activeTimers = timers({ sseSilenceMs: 100, kiloMemoryHoldMs: 1_000 });
+    const { runtime, restarts, nativeDiagnostics } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      timers: activeTimers,
+      sampleMemory: reclaimingAtCap(),
+      memoryHolds,
+    });
+
+    await runtime.ensure();
+    scheduleSilence(scheduler, activeTimers);
+    await waitFor(() => memoryHolds.length === 1);
+    scheduler.advance(1_000);
+    scheduler.fire();
+    await waitFor(() => spawner.spawnCount() === 2);
+
+    expect(restarts).toEqual([{ reason: 'hang' }]);
+    expect(memoryHolds).toEqual([true, false]);
+    expect(holdPhases(nativeDiagnostics)).toEqual([
+      ['kilo_memory_hold_started', undefined],
+      ['kilo_memory_hold_ended', 'expired'],
+    ]);
+    await runtime.shutdown();
+  });
+
+  it('holds failed activity observation once, then restarts at kiloMemoryHoldMs', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const memoryHolds: boolean[] = [];
+    const activeTimers = timers({
+      sseSilenceMs: 100,
+      sseReconnectWindowMs: 1_000,
+      kiloMemoryHoldMs: 3_000,
+    });
+    const snapshots = { fail: false };
+    const { runtime, restarts, nativeDiagnostics } = createRuntime({
+      spawner,
+      feed,
+      probe: createProbe(true),
+      scheduler,
+      timers: activeTimers,
+      sampleMemory: reclaimingAtCap(),
+      memoryHolds,
+      readSnapshot: async () => {
+        if (snapshots.fail) throw new Error('Kilo activity request timed out');
+        return [];
+      },
+    });
+    /** The feed stays alive: Kilo heartbeats while its snapshot reads time out. */
+    async function heartbeatAndAdvance(ms: number) {
+      scheduler.advance(ms);
+      feed.feeds.at(-1)!.callbacks.onEvent({
+        type: 'server.heartbeat',
+        properties: {},
+        nativeRuntimeId: 'r',
+      });
+      scheduler.fire();
+      await Bun.sleep(1);
+    }
+
+    await runtime.ensure();
+    snapshots.fail = true;
+    await heartbeatAndAdvance(SESSION_SNAPSHOT_INTERVAL_MS);
+    await heartbeatAndAdvance(1_000);
+    expect(memoryHolds).toEqual([true]);
+    for (let elapsed = 0; elapsed < 2_500; elapsed += 500) await heartbeatAndAdvance(500);
+    expect(restarts).toEqual([]);
+    expect(memoryHolds).toEqual([true]);
+
+    await heartbeatAndAdvance(500);
+    await waitFor(() => spawner.spawnCount() === 2);
+    expect(restarts).toEqual([{ reason: 'hang' }]);
+    expect(holdPhases(nativeDiagnostics)).toEqual([
+      ['kilo_memory_hold_started', undefined],
+      ['kilo_memory_hold_ended', 'expired'],
+    ]);
+    await runtime.shutdown();
+  });
+
+  it('ends an observation hold as recovered when a snapshot succeeds again', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const memoryHolds: boolean[] = [];
+    const activeTimers = timers({
+      sseSilenceMs: 100,
+      sseReconnectWindowMs: 1_000,
+      kiloMemoryHoldMs: 60_000,
+    });
+    const snapshots = { fail: false };
+    const { runtime, restarts, nativeDiagnostics } = createRuntime({
+      spawner,
+      feed,
+      probe: createProbe(true),
+      scheduler,
+      timers: activeTimers,
+      sampleMemory: reclaimingAtCap(),
+      memoryHolds,
+      readSnapshot: async () => {
+        if (snapshots.fail) throw new Error('Kilo activity request timed out');
+        return [];
+      },
+    });
+    async function heartbeatAndAdvance(ms: number) {
+      scheduler.advance(ms);
+      feed.feeds.at(-1)!.callbacks.onEvent({
+        type: 'server.heartbeat',
+        properties: {},
+        nativeRuntimeId: 'r',
+      });
+      scheduler.fire();
+      await Bun.sleep(1);
+    }
+
+    await runtime.ensure();
+    snapshots.fail = true;
+    await heartbeatAndAdvance(SESSION_SNAPSHOT_INTERVAL_MS);
+    await heartbeatAndAdvance(1_000);
+    expect(memoryHolds).toEqual([true]);
+
+    snapshots.fail = false;
+    await heartbeatAndAdvance(SESSION_SNAPSHOT_INTERVAL_MS);
+    await heartbeatAndAdvance(500);
+
+    expect(spawner.spawnCount()).toBe(1);
+    expect(restarts).toEqual([]);
+    expect(memoryHolds).toEqual([true, false]);
+    expect(holdPhases(nativeDiagnostics)).toEqual([
+      ['kilo_memory_hold_started', undefined],
+      ['kilo_memory_hold_ended', 'recovered'],
+    ]);
+    await runtime.shutdown();
+  });
+
+  it('restarts at once when the cap is full of idle page cache', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const memoryHolds: boolean[] = [];
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      sampleMemory: () => ({ currentBytes: LIMIT, limitBytes: LIMIT, maxEvents: 7 }),
+      memoryHolds,
+    });
+
+    await runtime.ensure();
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => spawner.spawnCount() === 2);
+
+    expect(restarts).toEqual([{ reason: 'hang' }]);
+    expect(memoryHolds).toEqual([]);
+    await runtime.shutdown();
+  });
+});
+
 describe('kilo-runtime hang-rule ownership', () => {
   it('does not import the legacy sandbox-control-runtime module', async () => {
     const source = await fsp.readFile(path.join(import.meta.dir, 'kilo-runtime.ts'), 'utf8');
@@ -1520,13 +1760,14 @@ describe('createKiloRuntimes', () => {
     expect(runtimes.unavailable()).toBe(false);
   });
 
-  it('carries the runtime key into onRestart and onUnavailable', async () => {
+  it('carries the runtime key into onRestart, onUnavailable and onMemoryHold', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
     const feed = createFeedFactory();
     const probe = createProbe(false);
     const restarts: Array<{ directory: string; reason: string; key: string }> = [];
     const unavailable: Array<{ directory: string; key: string }> = [];
+    const memoryHolds: Array<{ directory: string; held: boolean; key: string }> = [];
     let captured: KiloRuntimeOptions | undefined;
     const runtimes = createKiloRuntimes({
       readSnapshot: async () => [],
@@ -1540,6 +1781,7 @@ describe('createKiloRuntimes', () => {
       log: () => undefined,
       onRestart: info => restarts.push(info),
       onUnavailable: (directory, key) => unavailable.push({ directory, key }),
+      onMemoryHold: info => memoryHolds.push(info),
       createRuntime: options => {
         captured = options;
         return createKiloRuntime(options);
@@ -1550,8 +1792,10 @@ describe('createKiloRuntimes', () => {
 
     captured!.onRestart?.({ directory: '/tmp/dir', reason: 'hang' });
     captured!.onUnavailable?.('/tmp/dir');
+    captured!.onMemoryHold?.({ directory: '/tmp/dir', held: true });
     expect(restarts).toEqual([{ directory: '/tmp/dir', reason: 'hang', key: 'session-a' }]);
     expect(unavailable).toEqual([{ directory: '/tmp/dir', key: 'session-a' }]);
+    expect(memoryHolds).toEqual([{ directory: '/tmp/dir', held: true, key: 'session-a' }]);
     await runtimes.shutdown();
   });
 

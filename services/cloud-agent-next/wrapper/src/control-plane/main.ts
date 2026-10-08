@@ -162,7 +162,7 @@ export function createControlPlaneLifecycle(
 export function createControlPlaneSessionHost(options: {
   runtime: Omit<
     KiloRuntimesOptions,
-    'onEvent' | 'onRestart' | 'onUnavailable' | 'onDeadline' | 'onActivityChange'
+    'onEvent' | 'onRestart' | 'onUnavailable' | 'onDeadline' | 'onActivityChange' | 'onMemoryHold'
   >;
   turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
   isPreparing(): boolean;
@@ -175,6 +175,7 @@ export function createControlPlaneSessionHost(options: {
     onDeadline: (identity, reason, key) => turns?.onNativeDeadline(identity, reason, key),
     onRestart: info => turns?.onRuntimeRestart(info),
     onUnavailable: (directory, key) => turns?.onRuntimeUnavailable(directory, key),
+    onMemoryHold: info => turns?.onRuntimeMemoryHold(info),
   });
   const turns = createTurnManager({ ...options.turn, timers: options.runtime.timers, runtimes });
   const manager = turns;

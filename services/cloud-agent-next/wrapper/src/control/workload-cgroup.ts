@@ -28,6 +28,8 @@ export const DEFAULT_CONTROL_RESERVE_BYTES = 1024 * 1024 * 1024;
  * OOM-killed inside the tools group while Kilo keeps this much room under the shared parent.
  */
 export const KILO_SERVER_HEADROOM_BYTES = 1536 * 1024 * 1024;
+/** Kilo's `memory.min`: reclaim at the shared cap takes tools and page cache before this. */
+export const KILO_SERVER_MIN_BYTES = 1024 * 1024 * 1024;
 export const MIN_WORKLOAD_CAP_BYTES = 1024 * 1024 * 1024;
 export const WORKLOAD_CPU_WEIGHT = 50;
 export const WORKLOAD_SWEEP_INTERVAL_MS = 1000;
@@ -76,6 +78,7 @@ export type WorkloadFailure =
 export type WorkloadPhase =
   | 'probe'
   | 'applied'
+  | 'protection'
   | 'migration'
   | 'oom'
   | 'stats'
@@ -113,6 +116,7 @@ export type WorkloadStats = {
   currentBytes?: number;
   peakBytes?: number;
   anonBytes?: number;
+  /** Page cache including `shmemBytes`; only the non-shmem part is reclaimable without swap. */
   fileBytes?: number;
   shmemBytes?: number;
   memoryMaxEvents?: number;
@@ -296,42 +300,7 @@ export function createWorkloadReporter(report?: ControlDiagnosticReporter): Work
   return {
     emit(scopeId, fields) {
       if (!report) return;
-      const key = [
-        fields.phase,
-        fields.workloadPhase,
-        fields.workloadFailure ?? '',
-        fields.oomKills ?? '',
-        fields.oomGroupKills ?? '',
-        fields.toolOomKills ?? '',
-        fields.serverOomKills ?? '',
-        fields.currentBytes ?? '',
-        fields.peakBytes ?? '',
-        fields.anonBytes ?? '',
-        fields.fileBytes ?? '',
-        fields.shmemBytes ?? '',
-        fields.memoryMaxEvents ?? '',
-        fields.memoryOomEvents ?? '',
-        fields.pressureSomeTotal ?? '',
-        fields.pressureFullTotal ?? '',
-        fields.cpuUsageUsec ?? '',
-        fields.cpuThrottledUsec ?? '',
-        fields.cpuThrottleCount ?? '',
-        fields.ioReadBytes ?? '',
-        fields.ioWriteBytes ?? '',
-        fields.toolCurrentBytes ?? '',
-        fields.toolPeakBytes ?? '',
-        fields.serverCurrentBytes ?? '',
-        fields.serverPeakBytes ?? '',
-        fields.toolCpuUsageUsec ?? '',
-        fields.serverCpuUsageUsec ?? '',
-        fields.toolIoReadBytes ?? '',
-        fields.toolIoWriteBytes ?? '',
-        fields.pressureAvailable ?? '',
-        fields.toolCount ?? '',
-        fields.serverCount ?? '',
-        fields.migratedCount ?? '',
-        fields.cpuController ?? '',
-      ].join(':');
+      const key = JSON.stringify(fields);
       const bucket = scopeId ?? 'global';
       if (last.get(bucket) === key) return;
       last.set(bucket, key);
@@ -1090,12 +1059,47 @@ export function initializeControlWorkload(options: ControlWorkloadOptions): Cont
   return { enabled: true, placement: probe.placement };
 }
 
+/** `memory.min` the kernel honoured on the Kilo server, or why it could not be applied. */
+export type ServerMemoryProtection =
+  | { ok: true; bytes: number }
+  | { ok: false; failure: 'write_failed' | 'readback_mismatch' };
+
+function writeMemoryMin(
+  reference: string,
+  bytes: number
+): 'ok' | 'write_failed' | 'readback_mismatch' {
+  try {
+    writeFileSync(path.join(reference, 'memory.min'), String(bytes));
+  } catch {
+    return 'write_failed';
+  }
+  const read = readControl(path.join(reference, 'memory.min'));
+  return read.ok && read.text.trim() === String(bytes) ? 'ok' : 'readback_mismatch';
+}
+
+/**
+ * Reclaim at the shared parent's cap takes tool and page-cache memory before Kilo's first
+ * `KILO_SERVER_MIN_BYTES`. A child's `memory.min` counts only up to its parent's, so the
+ * scope group carries the same value. Optional: an unsupported kernel keeps the hard caps.
+ */
+function protectServerMemory(input: {
+  parentReference: string;
+  serverReference: string;
+}): ServerMemoryProtection {
+  const bytes = KILO_SERVER_MIN_BYTES;
+  for (const reference of [input.parentReference, input.serverReference]) {
+    const outcome = writeMemoryMin(reference, bytes);
+    if (outcome !== 'ok') return { ok: false, failure: outcome };
+  }
+  return { ok: true, bytes };
+}
+
 export function applyManagedWorkloadLimits(input: {
   parentReference: string;
   serverReference: string;
   toolsReference: string;
   toolsMaxBytes: number;
-}): { cpuController: boolean } {
+}): { cpuController: boolean; serverProtection: ServerMemoryProtection } {
   try {
     writeFileSync(path.join(input.parentReference, 'cgroup.subtree_control'), '+memory +cpu');
   } catch {
@@ -1133,7 +1137,7 @@ export function applyManagedWorkloadLimits(input: {
   if (toolsSwap.ok ? toolsSwap.text.trim() !== '0' : !toolsSwap.missing) {
     throw new Error('Managed workload tool memory.swap.max readback mismatch');
   }
-  return readCpuWeight(input.toolsReference);
+  return { ...readCpuWeight(input.toolsReference), serverProtection: protectServerMemory(input) };
 }
 
 /**

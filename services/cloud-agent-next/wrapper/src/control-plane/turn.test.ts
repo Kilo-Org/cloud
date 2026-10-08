@@ -11,6 +11,7 @@ import type { KiloFeedEvent } from '../control/worktree-feed.js';
 import { runtimeKey } from './prepare.js';
 import {
   createTurnManager,
+  MEMORY_HOLD_WARNING,
   type TurnKiloRuntime,
   type TurnManagerDeps,
   type TurnScheduler,
@@ -391,6 +392,51 @@ describe('turn manager submission', () => {
     expect(h.client(routeSpec()).aborts).toEqual([]);
     expect(outcomeFrames(h.frames)).toHaveLength(1);
   });
+  it('warns and holds the prompt delivery deadline while the runtime is memory-held', async () => {
+    // Kilo never observes the prompt: its attachment materialization does not finish.
+    const h = createHarness({ materializeAttachments: () => new Promise(() => undefined) });
+    const key = runtimeKey(routeSpec());
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(60_000);
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: true, key });
+    expect(eventFrames(h.frames).filter(event => event.type === 'error')).toEqual([
+      { type: 'error', properties: { error: MEMORY_HOLD_WARNING, fatal: false } },
+    ]);
+    h.advance(10 * 60_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.manager.hasPendingWork()).toBe(true);
+
+    // The deadline starts again when the hold ends.
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: false, key });
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('warns a turn that starts while its runtime is memory-held', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.onRuntimeMemoryHold({
+      directory: DIRECTORY,
+      held: true,
+      key: runtimeKey(routeSpec()),
+    });
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(eventFrames(h.frames)).toContainEqual({
+      type: 'error',
+      properties: { error: MEMORY_HOLD_WARNING, fatal: false },
+    });
+  });
+
   it('submits a prompt with its messageId and completes on a completed turn-close', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());

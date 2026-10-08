@@ -2,6 +2,13 @@ import { createHash } from 'node:crypto';
 import { isRecord, kiloEventSessionId } from '../../../src/shared/kilo-event.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { KiloFeedEvent } from './kilo-event-feed.js';
+import {
+  beginPause,
+  endPause,
+  pausedMs,
+  restartPauses,
+  type ExecutionPauses,
+} from './execution-clock.js';
 
 export type ExecutionFailure = 'no_progress' | 'execution_limit';
 export type SessionActivity = 'running' | 'waiting' | 'stopping';
@@ -55,12 +62,10 @@ type Part = {
   bytes: number;
   digest?: string;
 };
-type Execution = {
+type Execution = ExecutionPauses & {
   id: number;
   startedAt: number;
   lastProgressAt: number;
-  pausedMs: number;
-  waitingSince?: number;
   progressed: boolean;
   status: 'busy' | 'retry' | 'idle';
   openRequests: number;
@@ -95,6 +100,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
   let snapshot: { id: number; revision: number } | undefined;
   let observed = true;
   let disposed = false;
+  /** The runtime holds Kilo under memory pressure; no-progress clocks pause meanwhile. */
+  let memoryHeld = false;
 
   function session(id: string, directory = options.directory): Session {
     const existing = sessions.get(id);
@@ -122,6 +129,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       startedAt: options.now(),
       lastProgressAt: options.now(),
       pausedMs: 0,
+      ...(memoryHeld ? { heldSince: options.now() } : {}),
       progressed: false,
       status: 'busy',
       openRequests: 0,
@@ -180,8 +188,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       if (execution && execution.activity !== 'stopping') {
         next.revision = revision;
         execution.lastProgressAt = options.now();
-        execution.pausedMs = 0;
-        if (execution.waitingSince !== undefined) execution.waitingSince = options.now();
+        restartPauses(execution, options.now());
         execution.progressed = true;
       }
       next = next.parentID ? sessions.get(next.parentID) : undefined;
@@ -225,12 +232,8 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       const execution = record.execution;
       if (!execution) continue;
       const next = activity(record);
-      if (next === 'waiting' && execution.waitingSince === undefined)
-        execution.waitingSince = options.now();
-      if (next !== 'waiting' && execution.waitingSince !== undefined) {
-        execution.pausedMs += Math.max(0, options.now() - execution.waitingSince);
-        execution.waitingSince = undefined;
-      }
+      if (next === 'waiting') beginPause(execution, 'waitingSince', options.now());
+      else endPause(execution, 'waitingSince', options.now());
       execution.activity = next;
     }
   }
@@ -487,9 +490,7 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
       const execution = record.execution;
       if (!execution || execution.activity === 'stopping') continue;
       if (ancestors(record).some(parent => parent.execution?.activity === 'stopping')) continue;
-      const paused =
-        execution.pausedMs +
-        (execution.waitingSince === undefined ? 0 : options.now() - execution.waitingSince);
+      const paused = pausedMs(execution, options.now());
       const reason =
         options.now() - execution.startedAt >= options.timers.turnHardCapMs
           ? 'execution_limit'
@@ -532,6 +533,14 @@ export function createSessionSupervisor(options: SessionSupervisorOptions) {
     tick,
     observationLost() {
       observed = false;
+    },
+    holdMemory(held: boolean) {
+      memoryHeld = held;
+      for (const record of sessions.values()) {
+        if (!record.execution) continue;
+        if (held) beginPause(record.execution, 'heldSince', options.now());
+        else endPause(record.execution, 'heldSince', options.now());
+      }
     },
     snapshotFailed(token: number) {
       if (token !== snapshot?.id) return;

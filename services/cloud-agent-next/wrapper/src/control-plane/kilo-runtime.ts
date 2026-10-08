@@ -26,6 +26,11 @@ import {
   type KiloFeedEvent,
 } from './kilo-event-feed.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
+import {
+  createKiloMemoryHold,
+  workloadMemorySampler,
+  type KiloMemorySample,
+} from './kilo-memory-hold.js';
 
 import {
   createRuntimeActivity,
@@ -276,6 +281,10 @@ export type KiloRuntimeOptions = {
   latestWorkloadSnapshot?: () => WorkloadSnapshot | undefined;
   /** Fired once when the 3-in-10-minutes budget is spent (spec §7 "Kilo supervision"). */
   onUnavailable?: (directory: string) => void;
+  /** Fired when a hang restart starts or stops waiting on memory pressure (spec §7). */
+  onMemoryHold?: (info: { directory: string; held: boolean }) => void;
+  /** Samples the memory cap Kilo shares with tools; defaults to the workload parent. */
+  sampleMemory?: () => KiloMemorySample | undefined;
   scheduler?: KiloRuntimeScheduler;
   spawnKilo?: KiloProcessSpawner;
   openFeed?: (source: KiloEventFeedSource, callbacks: KiloFeedCallbacks) => KiloEventFeed;
@@ -516,11 +525,31 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   /** Spec §7: at most `sseReconnectLimit` stream reconnects per `sseReconnectWindowMs`. */
   const reconnects: number[] = [];
   const retiredClients = new WeakSet<WrapperKiloClient>();
+  const memoryHold = createKiloMemoryHold({
+    directory: options.directory,
+    holdMs: timers.kiloMemoryHoldMs,
+    sample: options.sampleMemory ?? workloadMemorySampler(options.workload),
+    log,
+    ...(options.onNativeDiagnostic ? { report: options.onNativeDiagnostic } : {}),
+    onHeld: held => {
+      activity?.holdMemory(held);
+      options.onMemoryHold?.({ directory: options.directory, held });
+    },
+  });
 
   function onActivity(): void {
     lastActivityAt = scheduler.now();
     if (phase === 'suspected') phase = 'running';
     probedThisEpisode = false;
+  }
+
+  /** Kilo delivers events and its activity is observable, so a memory hold has recovered. */
+  function isHealthy(): boolean {
+    return (
+      phase === 'running' &&
+      scheduler.now() - lastActivityAt < timers.sseSilenceMs &&
+      (activity?.isReady() ?? false)
+    );
   }
 
   /** Reads the phase without TypeScript narrowing it to a stale assignment. */
@@ -638,7 +667,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       if (reconnects.length >= timers.sseReconnectLimit) {
         // Spec §7: too many reconnects inside the window without a recovered
         // stream; restart Kilo.
-        await restart('hang', 'sse_reconnect_budget');
+        await restartHung('sse_reconnect_budget');
         return;
       }
       reconnects.push(now);
@@ -650,6 +679,21 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       previous?.close();
       if (await openAttempt(current.url)) return;
     }
+  }
+
+  /**
+   * Spec §7: a hang restart waits while Kilo stalls in reclaim at the memory cap. The next
+   * check probes again, so a Kilo that recovers is seen within one check.
+   */
+  async function restartHung(
+    trigger: HealthRestartTrigger,
+    decisionResolution?: HealthDecisionResolution
+  ): Promise<void> {
+    if (memoryHold.holds(scheduler.now())) {
+      probedThisEpisode = false;
+      return;
+    }
+    await restart('hang', trigger, decisionResolution);
   }
 
   /** Runs `work` under the one single-flight owner for the probe and recovery. */
@@ -668,7 +712,10 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   function startWatchdog(): void {
     if (watchdog !== undefined) return;
     const intervalMs = Math.max(1, Math.floor(timers.sseSilenceMs / SILENCE_CHECKS_PER_WINDOW));
+    // The first check compares memory against this sample.
+    memoryHold.sample(scheduler.now(), false);
     watchdog = scheduler.setInterval(() => {
+      memoryHold.sample(scheduler.now(), isHealthy());
       activity?.tick();
       void checkSilence();
     }, intervalMs);
@@ -723,8 +770,8 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       });
       if (phase !== 'running' && phase !== 'suspected') return;
       if (!answered) {
-        // No HTTP answer: Kilo is hung; restart it at once.
-        await restart('hang', 'health_probe_false', decisionResolution);
+        // No HTTP answer: Kilo is hung; restart it at once unless memory holds it.
+        await restartHung('health_probe_false', decisionResolution);
         return;
       }
       // Kilo answered, so it is alive but its event stream stalled: recover the
@@ -823,7 +870,12 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       onDeadline: (identity, reason) => options.onDeadline?.(identity, reason),
       onChange: () => options.onActivityChange?.(),
       onFault: reason => {
-        if (nativeRuntimeId === processId) void restart('hang', reason);
+        if (nativeRuntimeId !== processId) return true;
+        // Spec §7: observation that fails while the workload reclaims at its cap is held like
+        // a silent Kilo; the activity keeps reading snapshots and faults again next check.
+        if (reason === 'activity_observation' && memoryHold.holds(scheduler.now())) return false;
+        void restart('hang', reason);
+        return true;
       },
     });
     if (!(await openAttempt(spawned.url, controller.signal))) {
@@ -884,6 +936,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     if (phase === 'stopped' || phase === 'unavailable') return false;
     if (phase === 'restarting') return false;
     const now = scheduler.now();
+    memoryHold.release(now, 'restarted');
     // A deliberate credential refresh is not a fault and does not spend the
     // 3-in-10-minutes crash budget (spec §7 "Kilo supervision").
     if (reason !== 'credentials') {
@@ -1083,6 +1136,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     async shutdown(): Promise<void> {
       if (phase === 'stopped') return;
       phase = 'stopped';
+      memoryHold.release(scheduler.now(), 'stopped');
       startAbort?.abort(new Error('Kilo runtime is shutting down'));
       stopWatchdog();
       await stopProcess();
@@ -1100,6 +1154,7 @@ export type KiloRuntimesOptions = Omit<
   | 'onUnavailable'
   | 'onDeadline'
   | 'onActivityChange'
+  | 'onMemoryHold'
 > & {
   pidfileDirectory?: string;
   createRuntime?: (options: KiloRuntimeOptions) => KiloRuntime;
@@ -1108,6 +1163,7 @@ export type KiloRuntimesOptions = Omit<
   onUnavailable?: (directory: string, key: string) => void;
   onDeadline?: (identity: ExecutionIdentity, reason: ExecutionFailure, key: string) => void;
   onActivityChange?: (key: string) => void;
+  onMemoryHold?: (info: { directory: string; held: boolean; key: string }) => void;
 };
 
 export type KiloRuntimes = {
@@ -1208,6 +1264,7 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         onDeadline: (identity, reason) => options.onDeadline?.(identity, reason, input.key),
         onActivityChange: () => options.onActivityChange?.(input.key),
         onUnavailable: directory => options.onUnavailable?.(directory, input.key),
+        onMemoryHold: info => options.onMemoryHold?.({ ...info, key: input.key }),
       });
       runtimes.set(input.key, runtime);
       return runtime.ensure();

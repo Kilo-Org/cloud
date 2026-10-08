@@ -561,8 +561,9 @@ has no key, so it restores and captures nothing: setup output is never published
     event cannot overwrite the outcome or settle a newly queued message.
     Assistant text/reasoning changes and actual tool output/state changes are progress.
     User input, repeated parts, metadata, busy/retry status and transport heartbeats are not.
-    Useful descendant progress advances its ancestors, never unrelated roots. User waits
-    pause only no-progress time; silent running tools have no exemption. The hard cap
+    Useful descendant progress advances its ancestors, never unrelated roots. User waits and a
+    memory hold of the Kilo runtime (see Kilo supervision) pause only no-progress time;
+    overlapping pauses count once. Silent running tools have no exemption. The hard cap
     includes user waits. A tool's own shorter timeout can still interrupt it earlier.
     Without a current Cloud turn, a routed native deadline emits an existing `session.error` event
     for replay/UI without inventing a message ID or rewriting the prior outcome.
@@ -601,6 +602,21 @@ native activity plus the existing Cloud-work and PTY protections.
   check, 15 s after the reconnect. Kilo sends heartbeats every 10–15 s, so silence means a real
   fault. Local runs on Kilo 7.6.2 and 7.8.1 show an intermittent hang after a prompt is accepted:
   Kilo stops emitting, never calls the model and does not answer HTTP.
+- Memory hold: the wrapper samples the shared workload cgroup at every 5 s check. Usage within
+  256 MiB of `memory.max` with the `memory.events` `max` count risen since the previous sample
+  means Kilo is stalled in reclaim, not hung. Before a hang restart (no health answer, the
+  reconnect budget, or failed activity observation), the wrapper then keeps Kilo running and
+  decides again at each check; an answer reconnects the stream as above, and failed observation
+  keeps reading snapshots. The hold ends as recovered once Kilo delivers events and its activity
+  is observable. It ends with the restart as above after two quiet samples in a row while Kilo is
+  still unhealthy, or after 10 minutes; one episode holds at most 10 minutes. A cap that is full
+  of idle page cache does not raise the count, so it does not hold a restart. The cost: a genuine
+  hang during real memory pressure waits up to 10 minutes. While held, the runtime's executions
+  pause their no-progress clocks, and the 120 s prompt delivery deadline does not run; it starts
+  again when the hold ends. Each turn on the held runtime, including one that starts during the
+  hold, gets a non-fatal `error` event saying Kilo is not responding while the sandbox is low on
+  memory; nothing acts on it. Hold start and end are logged (`kilo_memory_hold_started`,
+  `kilo_memory_hold_ended`).
 - Kilo process exit: restart Kilo.
 - From the detected silence until Kilo is back, new prompts wait in the per-session inbox.
 - Restart: kill the Kilo process group and start Kilo. Kilo continues its sessions from its own
@@ -704,7 +720,7 @@ them through one development-only override.
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
 | Wrapper crash | Supervisor | Restart wrapper; routes re-prepared | Accepted fail (`agent_restarted`) |
-| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_restarted`) |
+| Kilo hang (no events, no HTTP answer) | Wrapper, about 35 s; up to 10 min while the workload reclaims at its memory cap | Restart Kilo, at most 3 in 10 min | Busy turn without real progress: submitted again once; otherwise accepted fail (`agent_restarted`) |
 | Kilo crash or dead event stream | Wrapper | Restart Kilo, at most 3 in 10 min | Same as Kilo hang |
 | Kilo restart budget used up | Wrapper | None until the next message | Queued and accepted fail (`agent_unavailable`) |
 | Kilo final error | Wrapper | None (Kilo already retried) | Accepted fail with Kilo's reason |

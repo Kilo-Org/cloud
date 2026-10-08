@@ -195,7 +195,7 @@ type KiloPassCaller = {
     statusClass: 'healthy' | 'pending' | 'retryable' | 'terminal' | 'inactive';
     reason:
       | 'credits_not_sold_on_ios'
-      | 'kilo_pass_not_available_on_android'
+      | 'kilo_pass_not_sold_in_app'
       | 'unsupported_combination'
       | null;
     cta: { label: string | null; action: 'none' | 'open_web' | 'open_native' };
@@ -217,7 +217,7 @@ type KiloPassCaller = {
     statusClass: 'healthy' | 'pending' | 'retryable' | 'terminal' | 'inactive';
     reason:
       | 'credits_not_sold_on_ios'
-      | 'kilo_pass_not_available_on_android'
+      | 'kilo_pass_not_sold_in_app'
       | 'unsupported_combination'
       | 'unknown_product'
       | 'already_subscribed'
@@ -1422,7 +1422,7 @@ describe('kiloPassRouter', () => {
   });
 
   describe('getPurchasePresentation', () => {
-    it('returns native_iap for iOS App Store Kilo Pass', async () => {
+    it('returns unavailable for iOS App Store Kilo Pass', async () => {
       const user = await insertTestUser();
       const caller = await createCallerForUser(user.id);
 
@@ -1432,9 +1432,9 @@ describe('kiloPassRouter', () => {
         product: 'kilo_pass',
       });
 
-      expect(result.kind).toBe('native_iap');
+      expect(result.kind).toBe('unavailable');
       expect(result.statusClass).toBe('inactive');
-      expect(result.reason).toBeNull();
+      expect(result.reason).toBe('kilo_pass_not_sold_in_app');
       expect(result.cta).toEqual({ label: null, action: 'none' });
       expect(result.webUrl).toBeNull();
     });
@@ -1501,7 +1501,7 @@ describe('kiloPassRouter', () => {
       expect(result.webUrl).toContain('/subscriptions/kilo-pass');
     });
 
-    it('returns native_iap for Android Play Kilo Pass when the client mounts Play IAP', async () => {
+    it('returns unavailable for Android Play Kilo Pass from a client that mounts Play IAP', async () => {
       const user = await insertTestUser();
       const caller = await createCallerForUser(user.id);
 
@@ -1512,376 +1512,76 @@ describe('kiloPassRouter', () => {
         supportsNativePlayKiloPass: true,
       });
 
-      expect(result.kind).toBe('native_iap');
-      expect(result.statusClass).toBe('inactive');
-      expect(result.reason).toBeNull();
-      expect(result.cta).toEqual({ label: null, action: 'none' });
-      expect(result.webUrl).toBeNull();
+      expect(result.kind).toBe('unavailable');
+      expect(result.reason).toBe('kilo_pass_not_sold_in_app');
     });
   });
 
   describe('preflightPurchase', () => {
-    it('rejects a non-native presentation', async () => {
-      const user = await insertTestUser();
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
+    it.each([
+      {
+        platform: 'ios',
+        storefront: 'app_store',
+        product: 'kilo_pass',
+        appleProductId: 'kilopass.tier19.monthly.v1',
+      },
+      {
         platform: 'android',
         storefront: 'play',
         product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+        googleProductId: 'kilopass_tier19',
         appleProductId: 'kilopass.tier19.monthly.v1',
-      });
+      },
+    ] as const)(
+      'refuses a $platform Kilo Pass purchase for a user with no subscription',
+      async input => {
+        const user = await insertTestUser();
+        const caller = await createCallerForUser(user.id);
 
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'inactive',
-        reason: 'kilo_pass_not_available_on_android',
-      });
-    });
+        const result = await caller.kiloPass.preflightPurchase(input);
 
-    it('rejects an unknown Apple product id', async () => {
-      const user = await insertTestUser();
-      const caller = await createCallerForUser(user.id);
+        expect(result).toEqual({
+          allowed: false,
+          statusClass: 'inactive',
+          reason: 'kilo_pass_not_sold_in_app',
+        });
+      }
+    );
 
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'unknown.product.id',
-      });
-
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'terminal',
-        reason: 'unknown_product',
-      });
-    });
-
-    it('allows a native purchase with no subscription', async () => {
-      const user = await insertTestUser();
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
-    });
-
-    it("blocks a purchase when this device's subscription belongs to another Kilo account", async () => {
-      const owner = await insertTestUser();
-      const buyer = await insertTestUser();
-      const providerSubscriptionId = `orig_${crypto.randomUUID()}`;
-      const { id: subscriptionId } = await insertSubscription({
-        kiloUserId: owner.id,
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-        paymentProvider: KiloPassPaymentProvider.AppStore,
-        providerSubscriptionId,
-      });
-      await db.insert(kilo_pass_store_purchases).values({
-        kilo_pass_subscription_id: subscriptionId,
-        kilo_user_id: owner.id,
-        payment_provider: KiloPassPaymentProvider.AppStore,
-        product_id: 'kilopass.tier19.monthly.v1',
-        provider_subscription_id: providerSubscriptionId,
-        provider_transaction_id: `tx_${crypto.randomUUID()}`,
-        provider_original_transaction_id: providerSubscriptionId,
-        app_account_token: owner.app_store_account_token,
-        environment: 'Sandbox',
-        purchased_at: '2026-01-01T00:00:00.000Z',
-        expires_at: '2026-02-01T00:00:00.000Z',
-        raw_payload_json: {},
-      });
-
-      const caller = await createCallerForUser(buyer.id);
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-        appleOriginalTransactionId: providerSubscriptionId,
-      });
-
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'terminal',
-        reason: 'owned_by_another_account',
-      });
-    });
-
-    it('allows the owning account to buy with its own device transaction', async () => {
-      const owner = await insertTestUser();
-      const providerSubscriptionId = `orig_${crypto.randomUUID()}`;
-      const { id: subscriptionId } = await insertSubscription({
-        kiloUserId: owner.id,
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'canceled',
-        paymentProvider: KiloPassPaymentProvider.AppStore,
-        providerSubscriptionId,
-      });
-      await db.insert(kilo_pass_store_purchases).values({
-        kilo_pass_subscription_id: subscriptionId,
-        kilo_user_id: owner.id,
-        payment_provider: KiloPassPaymentProvider.AppStore,
-        product_id: 'kilopass.tier19.monthly.v1',
-        provider_subscription_id: providerSubscriptionId,
-        provider_transaction_id: `tx_${crypto.randomUUID()}`,
-        provider_original_transaction_id: providerSubscriptionId,
-        app_account_token: owner.app_store_account_token,
-        environment: 'Sandbox',
-        purchased_at: '2026-01-01T00:00:00.000Z',
-        expires_at: '2026-02-01T00:00:00.000Z',
-        raw_payload_json: {},
-      });
-
-      const caller = await createCallerForUser(owner.id);
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-        appleOriginalTransactionId: providerSubscriptionId,
-      });
-
-      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
-    });
-
-    it('blocks a live Stripe subscription', async () => {
-      const user = await insertTestUser();
-      await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_test_preflight_stripe',
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'terminal',
-        reason: 'already_subscribed',
-      });
-    });
-
-    it('allows a live App Store subscription (upgrade path)', async () => {
-      const user = await insertTestUser();
-      await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: null,
-        paymentProvider: KiloPassPaymentProvider.AppStore,
-        providerSubscriptionId: 'orig_preflight_app_store',
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
-    });
-
-    it.each(['canceled', 'unpaid', 'incomplete_expired'] as const)(
-      'allows a purchase when the existing subscription is ended (%s)',
-      async status => {
+    it.each([
+      [KiloPassPaymentProvider.AppStore, 'ios', 'app_store'],
+      [KiloPassPaymentProvider.GooglePlay, 'android', 'play'],
+    ] as const)(
+      'refuses a %s subscriber an in-app upgrade',
+      async (paymentProvider, platform, storefront) => {
         const user = await insertTestUser();
         await insertSubscription({
           kiloUserId: user.id,
-          stripeSubscriptionId: `sub_test_preflight_ended_${status}`,
+          stripeSubscriptionId: null,
+          paymentProvider,
+          providerSubscriptionId: `preflight_${crypto.randomUUID()}`,
           tier: KiloPassTier.Tier19,
           cadence: KiloPassCadence.Monthly,
-          status,
+          status: 'active',
         });
         const caller = await createCallerForUser(user.id);
 
         const result = await caller.kiloPass.preflightPurchase({
-          platform: 'ios',
-          storefront: 'app_store',
+          platform,
+          storefront,
           product: 'kilo_pass',
-          appleProductId: 'kilopass.tier19.monthly.v1',
+          googleProductId: 'kilopass_tier49',
+          appleProductId: 'kilopass.tier49.monthly.v1',
         });
 
-        expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
+        expect(result).toEqual({
+          allowed: false,
+          statusClass: 'healthy',
+          reason: 'kilo_pass_not_sold_in_app',
+        });
       }
     );
-
-    it('rejects a live Google Play subscription', async () => {
-      const user = await insertTestUser();
-      await insertSubscription({
-        kiloUserId: user.id,
-        paymentProvider: KiloPassPaymentProvider.GooglePlay,
-        providerSubscriptionId: 'gpa_preflight_play',
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'terminal',
-        reason: 'already_subscribed',
-      });
-    });
-
-    it('allows an Android Play purchase with the flag and a valid Google product id', async () => {
-      const user = await insertTestUser();
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'android',
-        storefront: 'play',
-        product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
-        googleProductId: 'kilopass_tier19',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
-    });
-
-    it('allows a live Google Play subscription on android+play (upgrade path)', async () => {
-      const user = await insertTestUser();
-      await insertSubscription({
-        kiloUserId: user.id,
-        paymentProvider: KiloPassPaymentProvider.GooglePlay,
-        providerSubscriptionId: 'gpa_preflight_play_owned',
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'android',
-        storefront: 'play',
-        product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
-        googleProductId: 'kilopass_tier19',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({ allowed: true, statusClass: 'healthy', reason: null });
-    });
-
-    it('rejects an unknown Google product id', async () => {
-      const user = await insertTestUser();
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'android',
-        storefront: 'play',
-        product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
-        googleProductId: 'unknown.google.product',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'terminal',
-        reason: 'unknown_product',
-      });
-    });
-
-    it('blocks a live Stripe subscription for an Android Play purchase', async () => {
-      const user = await insertTestUser();
-      await insertSubscription({
-        kiloUserId: user.id,
-        stripeSubscriptionId: 'sub_test_preflight_play_stripe',
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-      });
-      const caller = await createCallerForUser(user.id);
-
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'android',
-        storefront: 'play',
-        product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
-        googleProductId: 'kilopass_tier19',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      });
-
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'terminal',
-        reason: 'already_subscribed',
-      });
-    });
-
-    it("blocks a Play purchase when this device's token belongs to another Kilo account", async () => {
-      const owner = await insertTestUser();
-      const buyer = await insertTestUser();
-      const providerSubscriptionId = `gpa_${crypto.randomUUID()}`;
-      const { id: subscriptionId } = await insertSubscription({
-        kiloUserId: owner.id,
-        tier: KiloPassTier.Tier19,
-        cadence: KiloPassCadence.Monthly,
-        status: 'active',
-        paymentProvider: KiloPassPaymentProvider.GooglePlay,
-        providerSubscriptionId,
-      });
-      await db.insert(kilo_pass_store_purchases).values({
-        kilo_pass_subscription_id: subscriptionId,
-        kilo_user_id: owner.id,
-        payment_provider: KiloPassPaymentProvider.GooglePlay,
-        product_id: 'kilopass_tier19',
-        provider_subscription_id: providerSubscriptionId,
-        provider_transaction_id: `tx_${crypto.randomUUID()}`,
-        provider_original_transaction_id: providerSubscriptionId,
-        app_account_token: owner.app_store_account_token,
-        purchase_token: providerSubscriptionId,
-        environment: 'Sandbox',
-        purchased_at: '2026-01-01T00:00:00.000Z',
-        expires_at: '2026-02-01T00:00:00.000Z',
-        raw_payload_json: {},
-      });
-
-      const caller = await createCallerForUser(buyer.id);
-      const result = await caller.kiloPass.preflightPurchase({
-        platform: 'android',
-        storefront: 'play',
-        product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
-        googleProductId: 'kilopass_tier19',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-        googlePurchaseToken: providerSubscriptionId,
-      });
-
-      expect(result).toEqual({
-        allowed: false,
-        statusClass: 'terminal',
-        reason: 'owned_by_another_account',
-      });
-    });
   });
 
   describe('getState', () => {

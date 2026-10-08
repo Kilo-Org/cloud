@@ -54,6 +54,7 @@ for (const globalBackend of ['true', 'false']) {
     const env = {
       NODE_ENV: 'production',
       VERCEL_ENV: 'production',
+      VERCEL_TARGET_ENV: 'production',
       GLOBAL_KILO_BACKEND: globalBackend,
       AI_GATEWAY_PORT: '9999',
       KILO_PORT_OFFSET: '2500',
@@ -64,6 +65,24 @@ for (const globalBackend of ['true', 'false']) {
       assert.equal(result?.hostname, 'ai-gateway.kilo.ai', source);
       assert.equal(result?.pathname, destination, source);
       assert.deepEqual(result?.query, { source: 'extension', stream: 'true' }, source);
+    }
+  });
+
+  void test(`rewrites every legacy gateway route in staging with GLOBAL_KILO_BACKEND=${globalBackend}`, () => {
+    for (const vercelEnv of ['preview', 'production']) {
+      const env = {
+        NODE_ENV: 'production',
+        VERCEL_ENV: vercelEnv,
+        VERCEL_TARGET_ENV: 'staging',
+        GLOBAL_KILO_BACKEND: globalBackend,
+      };
+      for (const [source, destination] of routes) {
+        const result = rewrite(`${source}?source=extension&stream=true`, env);
+        assert.equal(result?.protocol, 'https:', source);
+        assert.equal(result?.hostname, 'staging-ai-gateway.kilo.ai', source);
+        assert.equal(result?.pathname, destination, source);
+        assert.deepEqual(result?.query, { source: 'extension', stream: 'true' }, source);
+      }
     }
   });
 }
@@ -79,6 +98,7 @@ void test('rewrites to the local gateway with default, offset, and explicit port
         ...env,
         NODE_ENV: 'development',
         VERCEL_ENV: 'production',
+        VERCEL_TARGET_ENV: 'staging',
       });
       assert.equal(result?.protocol, 'http:', source);
       assert.equal(result?.hostname, 'localhost', source);
@@ -91,6 +111,7 @@ void test('rewrites to the local gateway with default, offset, and explicit port
 void test('leaves preview, test, and non-Vercel production handlers on the web app', () => {
   for (const env of [
     { NODE_ENV: 'production', VERCEL_ENV: 'preview' },
+    { NODE_ENV: 'production', VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' },
     { NODE_ENV: 'production', VERCEL_ENV: 'development' },
     { NODE_ENV: 'production' },
     { NODE_ENV: 'test' },

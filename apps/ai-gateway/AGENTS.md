@@ -19,7 +19,8 @@ Next.js app that serves the AI gateway API on its own. It deploys to the
 - `pnpm dev` runs with the web app's environment files. `pnpm dev:start` starts
   it automatically as a dependency of the web app, on port 3010 plus the worktree
   port offset. The web app rewrites gateway requests to it in development and to
-  `https://ai-gateway.kilo.ai` in production, on both global and non-global backends.
+  `https://ai-gateway.kilo.ai` in production or `https://staging-ai-gateway.kilo.ai`
+  when `VERCEL_TARGET_ENV=staging`, on both global and non-global backends.
 - The scheduled `deploy-production.yml` and `deploy-staging.yml` deploy this
   app with the web apps, from the same CI-green commit, after migrations. A
   release is only recorded as complete once the gateway is live too.

@@ -2,9 +2,11 @@ export function getAiGatewayRewrites(env = process.env) {
   const origin =
     env.NODE_ENV === 'development'
       ? `http://localhost:${env.AI_GATEWAY_PORT || 3010 + Number(env.KILO_PORT_OFFSET || 0)}`
-      : env.VERCEL_ENV === 'production'
-        ? 'https://ai-gateway.kilo.ai'
-        : undefined;
+      : env.VERCEL_TARGET_ENV === 'staging'
+        ? 'https://staging-ai-gateway.kilo.ai'
+        : env.VERCEL_ENV === 'production'
+          ? 'https://ai-gateway.kilo.ai'
+          : undefined;
 
   if (!origin) return [];
 

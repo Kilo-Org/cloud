@@ -9,16 +9,16 @@ import type { SeedResult } from '../index';
 
 export const usage = '<email> [options]';
 
-// Five years, matching generateApiToken()'s default in
-// packages/web-shared/src/lib/tokens.ts (TOKEN_EXPIRY.default / FIVE_YEARS_IN_SECONDS).
+// One year, matching generateApiToken()'s default in
+// packages/web-shared/src/lib/tokens.ts (TOKEN_EXPIRY.default).
 // The resource-delegation policy (createControlTokenForRequest →
 // isKiloCredentialExchangeEligible, LEGACY_API_TOKEN_LIFETIMES_SECONDS in
-// @kilocode/worker-utils) only accepts legacy five-year API tokens for
+// @kilocode/worker-utils) only accepts legacy long-lived API tokens for
 // credential exchange, so any other lifetime is rejected by control-token
 // routes such as cloudAgentNext.prepareSession with 403 "Unsupported legacy
 // credential context" — the 2026-09-12 failure of the delegation-protected
 // prepareSession probe.
-export const DEFAULT_EXPIRES_DAYS = 1825;
+export const DEFAULT_EXPIRES_DAYS = 365;
 const SECONDS_PER_DAY = 24 * 60 * 60;
 
 /**
@@ -55,7 +55,7 @@ function printUsage(): void {
   console.log('authenticate a local kilo CLI or API client as that user.');
   console.log('');
   console.log('The token carries the shape generateApiToken() mints in production: a');
-  console.log('five-year legacy user API token with env="development" — the shape the');
+  console.log('one-year legacy user API token with env="development" — the shape the');
   console.log('resource-delegation policy accepts for control-token minting on the');
   console.log('local dev stack. Override the lifetime with --expires-days only when the');
   console.log('consumer never mints resource control tokens.');

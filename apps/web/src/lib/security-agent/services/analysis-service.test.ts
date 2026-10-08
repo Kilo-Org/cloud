@@ -68,7 +68,7 @@ jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateApiToken: mockGenerateApiToken,
   generateCloudAgentWorkflowToken: mockGenerateCloudAgentWorkflowToken,
   generateWorkflowGatewayToken: mockGenerateWorkflowGatewayToken,
-  TOKEN_EXPIRY: { default: 157_680_000 },
+  TOKEN_EXPIRY: { default: 31_536_000 },
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({

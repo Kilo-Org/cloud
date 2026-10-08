@@ -77,13 +77,13 @@ export type JWTTokenExtraPayload = {
   orgMemberships?: Array<{ orgId: string; role: OrganizationRole }>;
 };
 
-const FIVE_YEARS_IN_SECONDS = 5 * 365 * 24 * 60 * 60;
+const ONE_YEAR_IN_SECONDS = 365 * 24 * 60 * 60;
 const THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
 const ONE_HOUR_IN_SECONDS = 60 * 60;
 const FIVE_MINUTES_IN_SECONDS = 5 * 60;
 
 export const TOKEN_EXPIRY = {
-  default: FIVE_YEARS_IN_SECONDS,
+  default: ONE_YEAR_IN_SECONDS,
   thirtyDays: THIRTY_DAYS_IN_SECONDS,
   oneHour: ONE_HOUR_IN_SECONDS,
   fiveMinutes: FIVE_MINUTES_IN_SECONDS,
@@ -172,7 +172,7 @@ export function generateApiToken(
     NEXTAUTH_SECRET,
     {
       algorithm: jwtSigningAlgorithm,
-      expiresIn: options?.expiresIn ?? FIVE_YEARS_IN_SECONDS,
+      expiresIn: options?.expiresIn ?? ONE_YEAR_IN_SECONDS,
     }
   );
 }

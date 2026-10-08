@@ -861,7 +861,7 @@ describe('credential exchange bearer authentication guard', () => {
     expect(result.user?.id).toBe(user.id);
   });
 
-  test.each([157_680_000, 157_788_000])(
+  test.each([31_536_000, 157_680_000, 157_788_000])(
     'authorizes eligible legacy bearer tokens with a %i second lifetime',
     async expiresInSeconds => {
       const user = await insertTestUser({ api_token_pepper: `legacy-pepper-${expiresInSeconds}` });
@@ -882,7 +882,7 @@ describe('credential exchange bearer authentication guard', () => {
     }
   );
 
-  test.each([157_680_000, 157_788_000])(
+  test.each([31_536_000, 157_680_000, 157_788_000])(
     'authorizes a near-expiry legacy bearer token with a %i second lifetime',
     async lifetime => {
       const user = await insertTestUser({ api_token_pepper: `near-expiry-pepper-${lifetime}` });

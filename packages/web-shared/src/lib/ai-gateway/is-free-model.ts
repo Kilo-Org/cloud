@@ -1,9 +1,5 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import {
-  isKiloExclusiveFreeModel,
-  isKiloExclusivePricedModel,
-  kiloExclusiveModels,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
@@ -12,13 +8,16 @@ import {
 
 export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';
-  if (isKiloExclusivePricedModel(modelId)) {
+  const exclusiveModel = kiloExclusiveModels.find(m => m.public_id === modelId);
+  if (exclusiveModel?.pricing) {
     return false;
+  }
+  if (exclusiveModel && exclusiveModel.status !== 'disabled') {
+    return true;
   }
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&
       isLocalFakeLlmEnabled()) ||
-    isKiloExclusiveFreeModel(modelId) ||
     modelId === KILO_AUTO_FREE_MODEL.id ||
     modelId.endsWith(':free') ||
     modelId === 'openrouter/free' ||

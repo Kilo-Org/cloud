@@ -39,7 +39,8 @@ if [[ ! $KILO_STARTUP_MEMORY_MB =~ ^[0-9]+$ ]] || (( KILO_STARTUP_MEMORY_MB < 30
   printf 'KILO_STARTUP_MEMORY_MB must be an integer of at least 3072 MiB.\n' >&2
   exit 1
 fi
-export KILO_STARTUP_CGROUP="/sys/fs/cgroup/kilo-workloads/kilo-dev-$(basename "$PWD")"
+KILO_STARTUP_CGROUP="/sys/fs/cgroup/kilo-workloads/kilo-dev-$(basename "$PWD")"
+export KILO_STARTUP_CGROUP
 if [[ ! -f /sys/fs/cgroup/kilo-workloads/memory.max ]]; then
   printf 'Memory-safe startup requires the sandbox\x27s delegated cgroup v2 memory controller. No workloads were started.\n' >&2
   exit 1
@@ -58,7 +59,10 @@ node -e '
   const existing = fs.existsSync(process.env.KILO_STARTUP_CGROUP + "/memory.current") ? protectedMemory(process.env.KILO_STARTUP_CGROUP) : 0;
   const additional = Math.max(0, Number(process.env.KILO_STARTUP_MEMORY_MB) * 1048576 - existing);
   const safeBytes = Math.min(available, Number.isFinite(maximum) ? maximum - protectedBytes : available) - 2048 * 1048576;
-  if (additional > safeBytes) throw new Error("Insufficient memory headroom: use the app profile, stop other workloads, or use a larger sandbox");
+  if (additional > safeBytes) {
+    const mib = bytes => Math.floor(bytes / 1048576);
+    throw new Error("Insufficient memory headroom: " + Math.ceil(additional / 1048576) + " MiB additional capacity required, " + mib(Math.max(0, safeBytes)) + " MiB available after the 2048 MiB reserve (" + mib(protectedBytes) + " MiB parent protected memory). No workloads were started. Stop other workloads or use a larger sandbox; do not lower the reserve.");
+  }
 '
 "${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP"
 printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.max" >/dev/null
@@ -197,7 +201,8 @@ chmod +x .wrangler/kilo-startup/bin/pnpm .wrangler/kilo-startup/bin/kilo-shell
 "${root[@]}" ln -sfn "$PWD/.wrangler/kilo-startup/bin/pnpm" /usr/local/bin/pnpm
 export WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST=1
 export KILO_STARTUP_REAL_DOCKER="$real_docker"
-export KILO_STARTUP_BUILDER="kilo-lowmem-$(basename "$PWD")"
+KILO_STARTUP_BUILDER="kilo-lowmem-$(basename "$PWD")"
+export KILO_STARTUP_BUILDER
 export WRANGLER_DOCKER_BIN="$PWD/.wrangler/kilo-startup/sandbox-docker.cjs"
   cat > "$WRANGLER_DOCKER_BIN" <<'JS'
 #!/usr/bin/env node

@@ -59,7 +59,7 @@ node -e '
 '
 "${root[@]}" mkdir -p "$KILO_STARTUP_CGROUP"
 printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.max" >/dev/null
-printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 * 85 / 100 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.high" >/dev/null
+printf '%s\n' "$(( KILO_STARTUP_MEMORY_MB * 1048576 * 95 / 100 ))" | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.high" >/dev/null
 printf '0\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.swap.max" >/dev/null
 printf '1\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/memory.oom.group" >/dev/null
 printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/cgroup.subtree_control" >/dev/null

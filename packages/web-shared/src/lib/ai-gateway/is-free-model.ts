@@ -1,5 +1,8 @@
 import { KILO_AUTO_FREE_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  findKiloExclusiveModel,
+  kiloExclusiveModels,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   isLocalFakeDeterministicModel,
   isLocalFakeLlmEnabled,
@@ -8,12 +11,9 @@ import {
 
 export function isFreeModel(model: string): boolean {
   const modelId = model ?? '';
-  const exclusiveModel = kiloExclusiveModels.find(m => m.public_id === modelId);
-  if (exclusiveModel?.pricing) {
-    return false;
-  }
-  if (exclusiveModel && exclusiveModel.status !== 'disabled') {
-    return true;
+  const exclusiveModel = findKiloExclusiveModel(modelId);
+  if (exclusiveModel) {
+    return !exclusiveModel.pricing;
   }
   return (
     ((isLocalFakeDeterministicModel(modelId) || isLocalFakeTranscriptionModel(modelId)) &&

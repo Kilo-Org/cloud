@@ -172,7 +172,15 @@ for arg in "\$@"; do
 done
 exec "$real_pnpm" "\$@"
 SH
-chmod +x .wrangler/kilo-startup/bin/pnpm
+cat > .wrangler/kilo-startup/bin/kilo-shell <<'SH'
+#!/usr/bin/env bash
+if [[ ${1:-} == -lc ]]; then
+  shift
+  exec /bin/bash --noprofile --norc -c "$@"
+fi
+exec /bin/bash "$@"
+SH
+chmod +x .wrangler/kilo-startup/bin/pnpm .wrangler/kilo-startup/bin/kilo-shell
 export WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST=1
 export KILO_STARTUP_REAL_DOCKER="$real_docker"
 export KILO_STARTUP_BUILDER="kilo-lowmem-$(basename "$PWD")"
@@ -222,6 +230,8 @@ JS
 chmod +x "$WRANGLER_DOCKER_BIN"
 ln -sf "$WRANGLER_DOCKER_BIN" .wrangler/kilo-startup/bin/docker
 export PATH="$PWD/.wrangler/kilo-startup/bin:$PATH"
+export SHELL="$PWD/.wrangler/kilo-startup/bin/kilo-shell"
+"$SHELL" -lc "cd $(printf '%q' "$PWD/apps/web") && pnpm exec node -e 'if (process.env.NODE_OPTIONS !== \"--max-old-space-size=1536\") throw new Error(\"Web heap budget is not applied\")'"
 if [[ $cloud_agents == true ]]; then
   cat > .wrangler/kilo-startup/buildkitd.toml <<'TOML'
 [worker.oci]
@@ -241,6 +251,7 @@ if tmux list-sessions >/dev/null 2>&1; then
   tmux set-environment -g GOMAXPROCS "$GOMAXPROCS"
   tmux set-environment -g RAYON_NUM_THREADS "$RAYON_NUM_THREADS"
   tmux set-environment -g NODE_OPTIONS "$NODE_OPTIONS"
+  tmux set-environment -g SHELL "$SHELL"
   tmux set-environment -g KILO_ENV_SYNC_CONCURRENCY 1
   tmux set-environment -g KILO_STARTUP_BUILDER "$KILO_STARTUP_BUILDER"
   tmux set-environment -g KILO_STARTUP_REAL_DOCKER "$KILO_STARTUP_REAL_DOCKER"
@@ -361,11 +372,11 @@ node -e '
 printf '%s\n' "$status"
 export KILO_DEV_WEB_URL="$web_url"
 export KILO_TEST_LOGIN_URL="$web_url/users/sign_in?fakeUser=$test_email&callbackPath=/profile"
-printf 'export AGENT_BROWSER_ENGINE=%q AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q AGENT_BROWSER_DEFAULT_TIMEOUT=%q KILO_DEV_WEB_URL=%q KILO_TEST_LOGIN_URL=%q PATH=%q KILO_STARTUP_REAL_DOCKER=%q KILO_STARTUP_REAL_PNPM=%q KILO_STARTUP_BUILDER=%q NODE_OPTIONS=%q\n' \
+printf 'export AGENT_BROWSER_ENGINE=%q AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q AGENT_BROWSER_DEFAULT_TIMEOUT=%q KILO_DEV_WEB_URL=%q KILO_TEST_LOGIN_URL=%q PATH=%q KILO_STARTUP_REAL_DOCKER=%q KILO_STARTUP_REAL_PNPM=%q KILO_STARTUP_BUILDER=%q NODE_OPTIONS=%q SHELL=%q\n' \
   "$AGENT_BROWSER_ENGINE" \
   "$AGENT_BROWSER_EXECUTABLE_PATH" "$AGENT_BROWSER_SOCKET_DIR" "$AGENT_BROWSER_ARGS" \
   "$AGENT_BROWSER_DEFAULT_TIMEOUT" "$KILO_DEV_WEB_URL" "$KILO_TEST_LOGIN_URL" \
-  "$PATH" "$KILO_STARTUP_REAL_DOCKER" "$KILO_STARTUP_REAL_PNPM" "$KILO_STARTUP_BUILDER" "$NODE_OPTIONS" \
+  "$PATH" "$KILO_STARTUP_REAL_DOCKER" "$KILO_STARTUP_REAL_PNPM" "$KILO_STARTUP_BUILDER" "$NODE_OPTIONS" "$SHELL" \
   > .wrangler/kilo-startup/browser.env
 if [[ ${KILO_STARTUP_BROWSER_SMOKE:-true} == true ]]; then
   agent-browser --session kilo-startup batch --bail \

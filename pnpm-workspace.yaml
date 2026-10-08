@@ -144,7 +144,8 @@ overrides:
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
   hono: 4.13.5
-  '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
+  '@modelcontextprotocol/sdk@1.29.0': 1.31.0
+  '@modelcontextprotocol/sdk@1.31.0>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their
   # schemas into. apps/web pins asn1-schema/-x509 to 2.8.0 for its Apple App
@@ -170,9 +171,10 @@ overrides:
   js-yaml: 4.3.2
   linkify-it: 5.0.2
   protobufjs: 7.6.5
-  sharp: 0.35.4
+  sharp: 0.35.5
   tar: 7.5.21
-  shell-quote: 1.10.0
+  pbkdf2: 3.1.7
+  shell-quote: 1.11.0
   # Keep one @slack/web-api in the tree. @chat-adapter/slack needs ^7.18.0 while
   # @slack/oauth and @slack/socket-mode still ask for ^7.15.0, so without this we
   # end up with two copies of the WebClient. apps/web also depends on it directly

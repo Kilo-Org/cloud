@@ -106,7 +106,11 @@ export function createCloudflareContainersProviderAdapter(deps: {
         throw new ProviderCreationError(admission.code);
       }
     } else {
-      await container.configureBilling(input, instance);
+      await withDORetry(
+        () => deps.getContainer(deps.logicalSandboxId),
+        container => container.configureBilling(input, instance),
+        'configureSandboxContainersBilling'
+      );
     }
   };
 

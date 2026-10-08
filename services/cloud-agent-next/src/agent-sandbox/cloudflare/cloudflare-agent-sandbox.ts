@@ -63,6 +63,7 @@ import {
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
+import { withDORetry } from '../../utils/do-retry.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -230,10 +231,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
     bypassBilling?: boolean;
   }): Promise<SandboxInstance> {
     const sandboxId = await this.resolveSandboxId();
-    const sandbox = this.resolveSandbox(
-      sandboxId,
-      options?.sleepAfter === undefined ? undefined : { sleepAfter: options.sleepAfter }
-    );
+    const resolveSandbox = () =>
+      this.resolveSandbox(
+        sandboxId,
+        options?.sleepAfter === undefined ? undefined : { sleepAfter: options.sleepAfter }
+      );
+    let sandbox = resolveSandbox();
     const input = this.billingInput(sandboxId);
     if (!options?.bypassBilling) {
       const blocked = await this.sandboxBillingBlocked(sandbox);
@@ -248,7 +251,14 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           );
         }
       } else {
-        await this.configureBilling(sandbox, input);
+        sandbox = await withDORetry(
+          resolveSandbox,
+          async sandbox => {
+            await this.configureBilling(sandbox, input);
+            return sandbox;
+          },
+          'configureSandboxBilling'
+        );
       }
     }
     return sandbox;

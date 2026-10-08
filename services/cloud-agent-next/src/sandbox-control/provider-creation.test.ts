@@ -67,6 +67,77 @@ function cloudflareProvider(
 afterEach(() => vi.unstubAllGlobals());
 
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
+  it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
+    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
+    const failed = {
+      isBillingBlocked: vi.fn().mockResolvedValue(false),
+      configureBilling: vi.fn().mockRejectedValue(error),
+    };
+    const recovered = { configureBilling: vi.fn().mockResolvedValue(undefined) };
+    const resolveHandle = vi
+      .fn()
+      .mockReturnValueOnce(failed)
+      .mockReturnValueOnce(failed)
+      .mockReturnValue(recovered);
+    const provider =
+      kind === 'cloudflare'
+        ? createCloudflareProviderAdapter({
+            sandboxId: SANDBOX_ID,
+            getSandbox: resolveHandle,
+            destroy: async () => {},
+          })
+        : createCloudflareContainersProviderAdapter({
+            logicalSandboxId: SANDBOX_ID,
+            allocationName: SANDBOX_ID,
+            getContainer: resolveHandle,
+          });
+
+    await expect(
+      provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
+    ).resolves.toMatchObject({ providerRef: expect.any(String) });
+
+    expect(resolveHandle).toHaveBeenCalledTimes(3);
+    expect(failed.configureBilling).toHaveBeenCalledOnce();
+    expect(recovered.configureBilling).toHaveBeenCalledOnce();
+    expect(recovered.configureBilling.mock.calls[0]).toEqual(failed.configureBilling.mock.calls[0]);
+  });
+
+  it.each([
+    { flags: { retryable: true }, attempts: 3 },
+    { flags: { retryable: false }, attempts: 1 },
+    { flags: { overloaded: true }, attempts: 1 },
+  ])(
+    'propagates shadow configuration failure after $attempts attempts: $flags',
+    async ({ flags, attempts }) => {
+      const error = Object.assign(new Error('Billing configuration failed'), flags);
+      const configureBilling = vi.fn().mockRejectedValue(error);
+      const resolveHandle = vi.fn(() => ({
+        isBillingBlocked: async () => false,
+        configureBilling,
+      }));
+      const provider =
+        kind === 'cloudflare'
+          ? createCloudflareProviderAdapter({
+              sandboxId: SANDBOX_ID,
+              getSandbox: () => resolveHandle() as unknown as MeteredSandboxInstance,
+              destroy: async () => {},
+            })
+          : createCloudflareContainersProviderAdapter({
+              logicalSandboxId: SANDBOX_ID,
+              allocationName: SANDBOX_ID,
+              getContainer: () =>
+                resolveHandle() as unknown as DurableObjectStub<SandboxContainers>,
+            });
+
+      await expect(
+        provider.create({ ...intent, billing: { ...billing, enforcementRequested: false } })
+      ).rejects.toBe(error);
+
+      expect(configureBilling).toHaveBeenCalledTimes(attempts);
+      expect(resolveHandle).toHaveBeenCalledTimes(attempts + 1);
+    }
+  );
+
   it('preserves RPC-wrapped quota denial instead of converting it to a meter outage', async () => {
     const denial = new Error(
       `remote RPC: ${new ContainerConcurrencyLimitError('personal', 20).message}`

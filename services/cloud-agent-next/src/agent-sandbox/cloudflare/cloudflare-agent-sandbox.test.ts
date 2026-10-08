@@ -215,6 +215,57 @@ describe('CloudflareAgentSandbox', () => {
     expect(renewActivityTimeout).toHaveBeenCalledOnce();
   });
 
+  it('retries billing configuration on a fresh sandbox and uses the recovered handle', async () => {
+    const error = Object.assign(new Error('Durable Object reset'), { retryable: true });
+    const failed = {
+      configureBilling: vi.fn().mockRejectedValue(error),
+      renewActivityTimeout: vi.fn(),
+    };
+    const recovered = {
+      configureBilling: vi.fn().mockResolvedValue(undefined),
+      renewActivityTimeout: vi.fn(),
+    };
+    const resolveSandbox = vi
+      .fn()
+      .mockReturnValueOnce(failed)
+      .mockReturnValueOnce(failed)
+      .mockReturnValue(recovered);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), { resolveSandbox });
+
+    await sandbox.keepAlive();
+
+    expect(resolveSandbox).toHaveBeenCalledTimes(3);
+    expect(failed.configureBilling).toHaveBeenCalledOnce();
+    expect(recovered.configureBilling).toHaveBeenCalledWith(
+      failed.configureBilling.mock.calls[0][0]
+    );
+    expect(failed.renewActivityTimeout).not.toHaveBeenCalled();
+    expect(recovered.renewActivityTimeout).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { flags: { retryable: true }, attempts: 3 },
+    { flags: { retryable: false }, attempts: 1 },
+    { flags: { overloaded: true }, attempts: 1 },
+  ])(
+    'propagates billing configuration failure after $attempts attempts: $flags',
+    async ({ flags, attempts }) => {
+      const error = Object.assign(new Error('Billing configuration failed'), flags);
+      const configureBilling = vi.fn().mockRejectedValue(error);
+      const renewActivityTimeout = vi.fn();
+      const resolveSandbox = vi.fn(
+        () => ({ configureBilling, renewActivityTimeout }) as unknown as SandboxInstance
+      );
+      const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), { resolveSandbox });
+
+      await expect(sandbox.keepAlive()).rejects.toBe(error);
+
+      expect(configureBilling).toHaveBeenCalledTimes(attempts);
+      expect(resolveSandbox).toHaveBeenCalledTimes(attempts + 1);
+      expect(renewActivityTimeout).not.toHaveBeenCalled();
+    }
+  );
+
   it('starts an ordinary bootstrap wrapper through the adapter', async () => {
     const bootstrapSession = {};
     const createSession = vi.fn().mockResolvedValue(bootstrapSession);

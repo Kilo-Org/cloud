@@ -174,8 +174,10 @@ export type ServiceEvent =
       timestamp?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
+  | { type: 'bootstrap.complete' }
   | {
       type: 'connected';
+      bootstrapPending?: boolean | undefined;
       cloudSessionId?: string;
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
@@ -605,11 +607,15 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       if (!r.success) return null;
       return {
         type: 'connected',
+        ...(r.data.bootstrapPending !== undefined && { bootstrapPending: r.data.bootstrapPending }),
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
         ...(r.data.activeMessageId !== undefined && { activeMessageId: r.data.activeMessageId }),
       };
     }
+
+    case 'bootstrap.complete':
+      return z.object({}).safeParse(data).success ? { type: 'bootstrap.complete' } : null;
 
     case 'commands.available': {
       const r = commandsAvailableDataSchema.safeParse(data);

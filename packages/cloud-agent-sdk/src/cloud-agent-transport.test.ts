@@ -7,6 +7,7 @@ import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { SessionStatus } from './schemas';
 import { createCloudAgentTransport } from './cloud-agent-transport';
+import { createServiceState } from './service-state';
 import type { SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage } from './test-helpers';
 
@@ -72,6 +73,16 @@ function createTransportWithSinks(
 ) {
   const chatEvents: ChatEvent[] = [];
   const serviceEvents: ServiceEvent[] = [];
+  const stateErrors = jest.fn();
+  const questionAsked = jest.fn();
+  const state = createServiceState({
+    rootSessionId: 'ses-1',
+    onError: stateErrors,
+    onQuestionAsked: questionAsked,
+  });
+  const stateNotifications = jest.fn();
+  state.subscribe(stateNotifications);
+  const replayComplete = jest.fn();
 
   const factory = createCloudAgentTransport({
     sessionId: cloudAgentId('ses-1'),
@@ -85,10 +96,29 @@ function createTransportWithSinks(
 
   const transport = factory({
     onChatEvent: event => chatEvents.push(event),
-    onServiceEvent: event => serviceEvents.push(event),
+    onServiceEvent: event => {
+      serviceEvents.push(event);
+      state.process(event);
+    },
+    onReplayStarted: () => state.beginReplay(),
+    onReplayCanceled: () => state.cancelReplay(),
+    onReplayComplete: () => {
+      state.endReplay();
+      replayComplete();
+    },
   });
 
-  return { transport, chatEvents, serviceEvents, api };
+  return {
+    transport,
+    chatEvents,
+    serviceEvents,
+    api,
+    state,
+    stateNotifications,
+    stateErrors,
+    replayComplete,
+    questionAsked,
+  };
 }
 
 const { createEvent, kilocode, resetCounter } = createEventHelpers();
@@ -98,22 +128,229 @@ beforeEach(() => {
 });
 
 describe('CloudAgentTransport event routing', () => {
-  it('suppresses activity replay again on reconnect without dropping missed chat events', async () => {
+  it('completes bootstrap after a failed first socket and keeps live interactions and disconnects working', async () => {
     jest.useFakeTimers();
-    const { transport, serviceEvents, chatEvents } = createTransportWithSinks();
+    const { transport, state, stateNotifications, questionAsked, replayComplete } =
+      createTransportWithSinks();
     const flushMicrotasks = async () => {
       for (let i = 0; i < 10; i++) await Promise.resolve();
     };
     try {
       transport.connect();
       await flushMicrotasks();
-      sendRaw(createEvent('connected', { sessionStatus: { type: 'busy' } }));
+      mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+      jest.advanceTimersByTime(2000);
+      await flushMicrotasks();
+      mockWs.onopen?.(new Event('open'));
+      stateNotifications.mockClear();
+      sendRaw(createEvent('connected', { bootstrapPending: true, cloudStatus: { type: 'ready' } }));
+      sendRaw(
+        kilocode('question.asked', { id: 'restored-question', sessionID: 'ses-1', questions: [] })
+      );
+      expect(stateNotifications).not.toHaveBeenCalled();
+      expect(questionAsked).not.toHaveBeenCalled();
+      sendRaw(createEvent('bootstrap.complete', {}));
+      expect(replayComplete).toHaveBeenCalledTimes(1);
+      expect(stateNotifications).toHaveBeenCalledTimes(1);
+      expect(state.getStatus()).toEqual({ type: 'idle' });
+      expect(questionAsked).toHaveBeenCalledWith('restored-question', []);
+      sendRaw(
+        kilocode('question.asked', { id: 'live-question', sessionID: 'ses-1', questions: [] })
+      );
+      expect(questionAsked).toHaveBeenCalledWith('live-question', []);
+      mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+      expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    } finally {
+      transport.destroy();
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not mute state before the first stream message even if authentication is exhausted', async () => {
+    const { transport, state, stateNotifications } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
+    await flushPromises();
+    mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
+    stateNotifications.mockClear();
+    state.setStatus({ type: 'error', message: 'Authentication failed' });
+    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('publishes connection loss when authentication fails after a partial replay', async () => {
+    const { transport, state, stateNotifications, stateErrors } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    stateNotifications.mockClear();
+    sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Historical overload' }));
+    expect(stateNotifications).not.toHaveBeenCalled();
+    mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
+    await flushPromises();
+    mockWs.onclose?.({ code: 1008, reason: 'Unauthorized', wasClean: false } as CloseEvent);
+    expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    expect(stateErrors).not.toHaveBeenCalledWith('Historical overload');
+    transport.destroy();
+  });
+
+  it('keeps batching through a non-fatal stream error until bootstrap completion', async () => {
+    const onError = jest.fn();
+    const { transport, state, stateNotifications, stateErrors, replayComplete } =
+      createTransportWithSinks(() => 'ticket', onError);
+    transport.connect();
+    await flushPromises();
+    stateNotifications.mockClear();
+    sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Old failure' }));
+    mockWs.onmessage?.({
+      data: JSON.stringify({
+        type: 'error',
+        code: 'WS_INTERNAL_ERROR',
+        message: 'Replay read failed',
+      }),
+    } as MessageEvent);
+    expect(onError).toHaveBeenCalledWith('Replay read failed');
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    sendRaw(createEvent('connected', { bootstrapPending: true, sessionStatus: { type: 'idle' } }));
+    expect(stateNotifications).not.toHaveBeenCalled();
+    expect(stateErrors).not.toHaveBeenCalled();
+    sendRaw(createEvent('bootstrap.complete', {}));
+    expect(state.getStatus()).toEqual({ type: 'idle' });
+    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    expect(replayComplete).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('does not publish a historical overload after a later successful turn', async () => {
+    const { transport, state, stateNotifications, stateErrors, replayComplete } =
+      createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    expect(new URL(webSocketConstructor.mock.calls[0][0]).searchParams.get('bootstrap')).toBe(
+      'true'
+    );
+    stateNotifications.mockClear();
+
+    sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Old overload' }));
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
+    sendRaw(createEvent('complete', { currentBranch: 'feature' }));
+    sendRaw(createEvent('connected', { bootstrapPending: true, cloudStatus: { type: 'ready' } }));
+    sendRaw(
+      createEvent('cloud.message.queued', {
+        messageId: 'old-failure',
+        content: 'Old prompt',
+        delivery: 'queued',
+      })
+    );
+    sendRaw(
+      createEvent('cloud.message.failed', {
+        messageId: 'old-failure',
+        reason: 'exhausted',
+        error: 'Old overload',
+      })
+    );
+    expect(stateNotifications).not.toHaveBeenCalled();
+    expect(stateErrors).not.toHaveBeenCalled();
+    expect(replayComplete).not.toHaveBeenCalled();
+
+    sendRaw(createEvent('bootstrap.complete', {}));
+    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    expect(state.getStatus()).toEqual({ type: 'idle' });
+    expect(state.getPendingMessages().get('old-failure')).toMatchObject({
+      status: 'failed',
+      error: 'Old overload',
+    });
+    expect(stateErrors).not.toHaveBeenCalled();
+    expect(replayComplete).toHaveBeenCalledTimes(1);
+    sendRaw(createEvent('bootstrap.complete', {}));
+    expect(replayComplete).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('publishes a genuinely failed latest turn even when its activity is idle', async () => {
+    const { transport, state, stateNotifications, stateErrors } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    stateNotifications.mockClear();
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+    sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Current provider failure' }));
+    sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'idle' } }));
+    sendRaw(createEvent('connected', { bootstrapPending: true, cloudStatus: { type: 'ready' } }));
+    expect(stateNotifications).not.toHaveBeenCalled();
+    expect(stateErrors).not.toHaveBeenCalled();
+    sendRaw(createEvent('bootstrap.complete', {}));
+    expect(state.getActivity()).toEqual({ type: 'idle' });
+    expect(state.getStatus()).toEqual({ type: 'error', message: 'Current provider failure' });
+    expect(stateErrors).toHaveBeenCalledTimes(1);
+    expect(stateErrors).toHaveBeenCalledWith('Current provider failure');
+    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('restores only current questions and permissions at bootstrap completion', async () => {
+    const { transport, state, stateNotifications } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    stateNotifications.mockClear();
+    sendRaw(kilocode('question.asked', { id: 'old-question', sessionID: 'ses-1', questions: [] }));
+    sendRaw(createEvent('connected', { bootstrapPending: true }));
+    sendRaw(
+      kilocode('question.asked', { id: 'current-question', sessionID: 'ses-1', questions: [] })
+    );
+    sendRaw(
+      kilocode('permission.asked', {
+        id: 'current-permission',
+        sessionID: 'ses-1',
+        permission: 'bash',
+        patterns: ['*'],
+        metadata: {},
+        always: [],
+      })
+    );
+    expect(stateNotifications).not.toHaveBeenCalled();
+    sendRaw(createEvent('bootstrap.complete', {}));
+    expect(state.getQuestion()?.requestId).toBe('current-question');
+    expect(state.getPermission()?.requestId).toBe('current-permission');
+    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('releases the restoration batch on disconnect before bootstrap completion', async () => {
+    const { transport, state, stateNotifications, stateErrors } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    stateNotifications.mockClear();
+    sendRaw(createEvent('complete', {}));
+    sendRaw(kilocode('session.error', { sessionID: 'ses-1', error: 'Old failure' }));
+    expect(stateNotifications).not.toHaveBeenCalled();
+    mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
+    expect(state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(stateErrors).not.toHaveBeenCalledWith('Old failure');
+    expect(stateNotifications).toHaveBeenCalledTimes(1);
+    transport.destroy();
+  });
+
+  it('suppresses activity replay again on reconnect without dropping missed chat events', async () => {
+    jest.useFakeTimers();
+    const { transport, serviceEvents, chatEvents, stateNotifications } = createTransportWithSinks();
+    const flushMicrotasks = async () => {
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+    };
+    try {
+      transport.connect();
+      await flushMicrotasks();
+      sendRaw(
+        createEvent('connected', { bootstrapPending: true, sessionStatus: { type: 'busy' } })
+      );
+      sendRaw(createEvent('bootstrap.complete', {}));
       sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
       mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
       jest.advanceTimersByTime(2000);
       await flushMicrotasks();
       mockWs.onopen?.(new Event('open'));
-      const beforeReplay = [...serviceEvents];
+      const beforeReplay = stateNotifications.mock.calls.length;
       sendRaw(
         kilocode('session.status', {
           sessionID: 'ses-1',
@@ -130,9 +367,14 @@ describe('CloudAgentTransport event routing', () => {
           },
         })
       );
-      expect(serviceEvents).toEqual(beforeReplay);
+      expect(stateNotifications).toHaveBeenCalledTimes(beforeReplay);
       expect(chatEvents.at(-1)).toEqual(expect.objectContaining({ type: 'message.updated' }));
-      sendRaw(createEvent('connected', { sessionStatus: { type: 'idle' } }));
+      sendRaw(
+        createEvent('connected', { bootstrapPending: true, sessionStatus: { type: 'idle' } })
+      );
+      expect(stateNotifications).toHaveBeenCalledTimes(beforeReplay);
+      sendRaw(createEvent('bootstrap.complete', {}));
+      expect(stateNotifications).toHaveBeenCalledTimes(beforeReplay + 1);
       expect(serviceEvents.at(-1)).toEqual(
         expect.objectContaining({
           type: 'connected',
@@ -152,10 +394,10 @@ describe('CloudAgentTransport event routing', () => {
   });
 
   it('suppresses historical activity until the authoritative connected snapshot and keeps live updates', async () => {
-    const { transport, serviceEvents } = createTransportWithSinks();
+    const { transport, serviceEvents, stateNotifications } = createTransportWithSinks();
     transport.connect();
     await flushPromises();
-    const initialEvents = [...serviceEvents];
+    const initialNotifications = stateNotifications.mock.calls.length;
     for (const status of [
       { type: 'busy' },
       { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
@@ -163,7 +405,7 @@ describe('CloudAgentTransport event routing', () => {
     ]) {
       sendRaw(kilocode('session.status', { sessionID: 'ses-1', status }));
     }
-    expect(serviceEvents).toEqual(initialEvents);
+    expect(stateNotifications).toHaveBeenCalledTimes(initialNotifications);
     sendRaw(
       createEvent('connected', {
         sessionStatus: { type: 'retry', attempt: 2, message: 'Current retry', next: 5000 },
@@ -184,11 +426,12 @@ describe('CloudAgentTransport event routing', () => {
     transport.destroy();
   });
 
-  it('applies only the latest replayed status per session when connected omits sessionStatus', async () => {
-    const { transport, serviceEvents } = createTransportWithSinks();
+  it('folds all replayed statuses before publishing the final state when connected omits sessionStatus', async () => {
+    const { transport, serviceEvents, state, stateNotifications } = createTransportWithSinks();
     transport.connect();
     await flushPromises();
     const initialEvents = [...serviceEvents];
+    const initialNotifications = stateNotifications.mock.calls.length;
     sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
     sendRaw(kilocode('session.status', { sessionID: 'child-1', status: { type: 'busy' } }));
     sendRaw(
@@ -197,18 +440,21 @@ describe('CloudAgentTransport event routing', () => {
         status: { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
       })
     );
-    expect(serviceEvents).toEqual(initialEvents);
+    expect(stateNotifications).toHaveBeenCalledTimes(initialNotifications);
 
     sendRaw(createEvent('connected', {}));
     expect(serviceEvents.slice(initialEvents.length)).toEqual([
-      expect.objectContaining({ type: 'connected' }),
+      { type: 'session.status', sessionId: 'ses-1', status: { type: 'busy' } },
+      { type: 'session.status', sessionId: 'child-1', status: { type: 'busy' } },
       {
         type: 'session.status',
         sessionId: 'ses-1',
         status: { type: 'retry', attempt: 1, message: 'Overloaded', next: 5000 },
       },
-      { type: 'session.status', sessionId: 'child-1', status: { type: 'busy' } },
+      expect.objectContaining({ type: 'connected' }),
     ]);
+    expect(state.getActivity()).toEqual({ type: 'retrying', attempt: 1, message: 'Overloaded' });
+    expect(stateNotifications).toHaveBeenCalledTimes(initialNotifications + 1);
     transport.destroy();
   });
 
@@ -222,8 +468,9 @@ describe('CloudAgentTransport event routing', () => {
 
     sendRaw(createEvent('connected', { sessionStatus: { type: 'idle' } }));
     expect(serviceEvents.slice(initialEvents.length)).toEqual([
-      expect.objectContaining({ type: 'connected', sessionStatus: { type: 'idle' } }),
+      { type: 'session.status', sessionId: 'ses-1', status: { type: 'busy' } },
       { type: 'session.status', sessionId: 'child-1', status: { type: 'idle' } },
+      expect.objectContaining({ type: 'connected', sessionStatus: { type: 'idle' } }),
     ]);
     transport.destroy();
   });

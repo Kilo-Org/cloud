@@ -43,6 +43,7 @@ export type StreamEventType =
   | 'cloud.message.completed' // Accepted user message completed execution
   | 'cloud.message.failed' // User message delivery failed or was canceled before completion
   | 'connected' // Sent on WebSocket connect with current service state
+  | 'bootstrap.complete'
   // Wrapper -> DO -> /stream clients (slash command catalog)
   | 'commands.available'; // Catalog of kilo slash commands available in this session
 
@@ -244,6 +245,7 @@ export type SessionStatus =
 
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
+  bootstrapPending?: boolean;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
   activeMessageId?: string | null;

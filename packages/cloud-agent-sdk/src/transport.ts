@@ -68,6 +68,8 @@ type CloudAgentStreamTicketResult = string | CloudAgentStreamTicket;
 type TransportSink = {
   onChatEvent: (event: ChatEvent) => void;
   onServiceEvent: (event: ServiceEvent) => void;
+  onReplayStarted?: () => void;
+  onReplayCanceled?: () => void;
   /**
    * Fired once a connect/reconnect cycle has finished replaying history and
    * has switched to delivering live events. Lets consumers distinguish a

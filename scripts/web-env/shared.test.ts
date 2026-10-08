@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   decryptedEnvValues,
+  findRepoRoot,
   integrationSlugs,
   listEnvRecords,
   readVaultValues,
@@ -13,6 +14,7 @@ import {
   resolveVercelContexts,
   setVaultValue,
   stripSurroundingQuotes,
+  trackedEnvFiles,
   type VaultEnvironment,
 } from './shared.js';
 
@@ -672,5 +674,29 @@ void test('readVaultValues reads the production and staging fields of each item'
     if (originalExisting === undefined) delete process.env.FAKE_OP_EXISTING;
     else process.env.FAKE_OP_EXISTING = originalExisting;
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+function readAssignments(file: string): Map<string, string> {
+  const assignments = new Map<string, string>();
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    const match = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
+    if (match?.[1]) assignments.set(match[1], match[2] ?? '');
+  }
+  return assignments;
+}
+
+const GATEWAY_ONLY_ENV_VARS = new Set(['VERCEL_SUPPORT_LARGE_REQUEST_BODY']);
+
+void test('ai-gateway production env file is tracked and matches apps/web/.env', () => {
+  const repoRoot = findRepoRoot();
+  assert.ok(trackedEnvFiles(repoRoot).includes('apps/ai-gateway/.env.production'));
+
+  const web = readAssignments(path.join(repoRoot, 'apps/web/.env'));
+  const gateway = readAssignments(path.join(repoRoot, 'apps/ai-gateway/.env.production'));
+  assert.ok(gateway.size > 0);
+  for (const [name, value] of gateway) {
+    if (GATEWAY_ONLY_ENV_VARS.has(name)) continue;
+    assert.equal(value, web.get(name), `${name} must match apps/web/.env`);
   }
 });

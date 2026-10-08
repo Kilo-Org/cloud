@@ -134,6 +134,7 @@ run-milvus-test.sh
 !.env.example
 !.env.*.example
 !.env.test
+!/apps/ai-gateway/.env.production
 !.envrc
 .playwright-mcp
 

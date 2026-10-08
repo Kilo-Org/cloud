@@ -410,7 +410,7 @@ node -e '
 ' "$status"
 printf '%s\n' "$status"
 export KILO_DEV_WEB_URL="$web_url"
-export KILO_TEST_LOGIN_URL="$web_url/users/sign_in?fakeUser=$test_email&callbackPath=/profile"
+export KILO_TEST_LOGIN_URL="$web_url/users/sign_in?fakeUser=$test_email&callbackPath=/"
 printf 'export AGENT_BROWSER_ENGINE=%q AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BROWSER_SOCKET_DIR=%q AGENT_BROWSER_ARGS=%q AGENT_BROWSER_DEFAULT_TIMEOUT=%q KILO_DEV_WEB_URL=%q KILO_TEST_LOGIN_URL=%q PATH=%q KILO_STARTUP_REAL_DOCKER=%q KILO_STARTUP_REAL_PNPM=%q KILO_STARTUP_BUILDER=%q NODE_OPTIONS=%q SHELL=%q\n' \
   "$AGENT_BROWSER_ENGINE" \
   "$AGENT_BROWSER_EXECUTABLE_PATH" "$AGENT_BROWSER_SOCKET_DIR" "$AGENT_BROWSER_ARGS" \
@@ -421,10 +421,11 @@ if [[ ${KILO_STARTUP_BROWSER_SMOKE:-true} == true ]]; then
   agent-browser --session kilo-startup batch --bail \
     'cookies clear' \
     "open $KILO_TEST_LOGIN_URL" \
-    "wait --fn 'window.location.pathname === \"/profile\" && document.body.innerText.includes(\"$test_email\")'" \
+    "wait --fn '(async () => window.location.pathname === \"/\" && (await (await fetch(\"/api/auth/session\")).json()).user?.email === \"$test_email\")()'" \
     'snapshot -i' 'close'
+  printf 'Verified authenticated browser session email: %s\n' "$test_email"
 fi
-printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=%s&callbackPath=/profile\n' \
+printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=%s&callbackPath=/\n' \
   "$web_url" "$web_url" "$test_email"
 printf 'Browser setup: source .wrangler/kilo-startup/browser.env\n'
 printf 'Browser: agent-browser --session kilo-startup open %q, then agent-browser --session kilo-startup snapshot -i\n' "$KILO_TEST_LOGIN_URL"

@@ -237,7 +237,13 @@ if [[ $cloud_agents == true ]]; then
 [worker.oci]
   max-parallelism = 1
   networkMode = "host"
+[registry."docker.io"]
+  mirrors = ["mirror.gcr.io"]
 TOML
+  if [[ -n ${NODE_EXTRA_CA_CERTS:-} && -f $NODE_EXTRA_CA_CERTS ]]; then
+    ca_path=$(node -p 'JSON.stringify(process.env.NODE_EXTRA_CA_CERTS)')
+    printf '  ca = [%s]\n[registry."mirror.gcr.io"]\n  ca = [%s]\n' "$ca_path" "$ca_path" >> .wrangler/kilo-startup/buildkitd.toml
+  fi
   if ! docker buildx inspect "$KILO_STARTUP_BUILDER" >/dev/null 2>&1; then
     docker buildx create --name "$KILO_STARTUP_BUILDER" --driver docker-container \
       --driver-opt "image=mirror.gcr.io/moby/buildkit:v0.16.0,memory=2g,memory-swap=2g,network=host,cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers" \
@@ -245,6 +251,15 @@ TOML
       --buildkitd-flags '--allow-insecure-entitlement network.host'
   fi
   timeout 3m docker buildx inspect --bootstrap "$KILO_STARTUP_BUILDER"
+  docker inspect "buildx_buildkit_${KILO_STARTUP_BUILDER}0" --format '{{json .HostConfig}}' | node -e '
+    let input = "";
+    process.stdin.on("data", chunk => { input += chunk; });
+    process.stdin.on("end", () => {
+      const config = JSON.parse(input);
+      const parent = process.env.KILO_STARTUP_CGROUP.replace("/sys/fs/cgroup", "") + "/containers";
+      if (config.Memory !== 2147483648 || config.CgroupParent !== parent) throw new Error("BuildKit is not inside its required memory budget");
+    });
+  '
 fi
 if tmux list-sessions >/dev/null 2>&1; then
   tmux set-environment -g WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST 1
@@ -347,6 +362,7 @@ if node -e 'const m = require("./dev/logs/manifest.json"); process.exit(m.servic
     printf 'Cloud Agent images did not become ready within 15 minutes. See dev/logs/cloud-agent-next.log.\n' >&2
     exit 1
   fi
+  docker stop "buildx_buildkit_${KILO_STARTUP_BUILDER}0"
 fi
 
 test_email="kilo-$(basename "$HOME")-$(date -u +%Y%m%d%H%M%S)@example.com"
@@ -380,8 +396,9 @@ printf 'export AGENT_BROWSER_ENGINE=%q AGENT_BROWSER_EXECUTABLE_PATH=%q AGENT_BR
   > .wrangler/kilo-startup/browser.env
 if [[ ${KILO_STARTUP_BROWSER_SMOKE:-true} == true ]]; then
   agent-browser --session kilo-startup batch --bail \
+    'cookies clear' \
     "open $KILO_TEST_LOGIN_URL" \
-    "wait --fn 'window.location.pathname === \"/profile\"'" \
+    "wait --fn 'window.location.pathname === \"/profile\" && document.body.innerText.includes(\"$test_email\")'" \
     'snapshot -i' 'close'
 fi
 printf '\nWeb app: %s\nFake test-account login: %s/users/sign_in?fakeUser=%s&callbackPath=/profile\n' \

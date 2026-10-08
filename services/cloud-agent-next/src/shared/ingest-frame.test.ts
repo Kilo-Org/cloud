@@ -781,6 +781,83 @@ describe('slimPersistedKilocodeEvent', () => {
     });
   });
 
+  it('keeps task child-session linkage and routed model while dropping other tool metadata', () => {
+    const childSessionId = `ses_${'a'.repeat(26)}`;
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_task',
+            messageID: 'msg_asst',
+            tool: 'task',
+            state: {
+              status: 'running',
+              input: { description: 'Explore repo', subagent_type: 'explore' },
+              metadata: {
+                sessionId: childSessionId,
+                model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
+                diff: 'large',
+                snapshot: { huge: true },
+              },
+            },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_task',
+          messageID: 'msg_asst',
+          tool: 'task',
+          state: {
+            status: 'running',
+            input: { description: 'Explore repo', subagent_type: 'explore' },
+            metadata: {
+              sessionId: childSessionId,
+              model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it.each([
+    ['no linkage fields', { diff: 'large' }],
+    ['malformed session id', { sessionId: 42 }],
+    ['incomplete model only', { model: { providerID: 'kilo' } }],
+  ])('drops tool metadata that carries no usable child-session linkage (%s)', (_name, metadata) => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_task',
+            messageID: 'msg_asst',
+            tool: 'task',
+            state: { status: 'running', input: {}, metadata },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_task',
+          messageID: 'msg_asst',
+          tool: 'task',
+          state: { status: 'running', input: {} },
+        },
+      },
+    });
+  });
+
   it('drops wrapper top-level info and part aliases from persist payload', () => {
     const info = {
       id: 'msg_user',

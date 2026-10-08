@@ -20,7 +20,7 @@ import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatUsd } from '@/lib/format';
-import { getStoreLegalLinks } from '@/lib/kilo-pass/legal-links';
+import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';

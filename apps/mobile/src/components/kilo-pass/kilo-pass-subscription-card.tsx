@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { type ReactNode } from 'react';
 import { Linking, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import { Text } from '@/components/ui/text';
 import { KiloPassIcon } from '@/components/kilo-pass/kilo-pass-icon';
@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useTRPC } from '@/lib/trpc';
-import { getDevStoreKitRefundAppleProductId } from '@/lib/kilo-pass/dev-storekit-refund';
 import {
   getKiloPassSubscriptionCardAccessibility,
   getKiloPassSubscriptionCardContentState,
@@ -32,7 +31,6 @@ export function KiloPassSubscriptionCard({
   const colors = useThemeColors();
   const router = useRouter();
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
   // In a narrow window the fixed icon tile plus the fixed trailing label are
@@ -48,39 +46,13 @@ export function KiloPassSubscriptionCard({
       platform,
       storefront,
       product: 'kilo_pass',
-      supportsNativePlayKiloPass: true,
     })
   );
-  const stateQuery = useQuery(trpc.kiloPass.getState.queryOptions());
-  const mobileStoreProductsQuery = useQuery({
-    ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
-    // Dev-only: the profile card needs App Store product IDs only to expose the
-    // StoreKit refund sheet while testing sandbox refund/revocation flows.
-    enabled: Platform.OS === 'ios' && __DEV__,
-  });
-  const subscription = stateQuery.data?.subscription;
   const contentState = getKiloPassSubscriptionCardContentState({
     presentation: presentationQuery.data,
     presentationIsError: presentationQuery.isError,
     presentationIsPending: presentationQuery.isPending,
-    subscription,
-    stateIsError: stateQuery.isError,
-    stateIsPending: stateQuery.isPending,
-    platformOS: Platform.OS,
   });
-
-  const devRefundAppleProductId = getDevStoreKitRefundAppleProductId({
-    products: mobileStoreProductsQuery.data?.products ?? [],
-    subscription,
-  });
-  const invalidateKiloPassState = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
-      queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
-      queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
-      queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
-    ]);
-  };
 
   const handlePress = () => {
     if (contentState.kind !== 'card') {
@@ -88,9 +60,6 @@ export function KiloPassSubscriptionCard({
     }
 
     const cardState = contentState.state;
-    if (cardState.action === 'none') {
-      return;
-    }
 
     void Haptics.selectionAsync();
     if (cardState.action === 'open-web') {
@@ -100,33 +69,11 @@ export function KiloPassSubscriptionCard({
       }
       return;
     }
-    if (cardState.action === 'open-store-management') {
-      void (async () => {
-        const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
-        await openAppStoreManagement({ invalidateAfter: invalidateKiloPassState });
-      })();
-      return;
-    }
     router.push('/(app)/kilo-pass' as Href);
   };
   const handleRetryPress = () => {
     void Haptics.selectionAsync();
-    void stateQuery.refetch();
     void presentationQuery.refetch();
-  };
-  const handleDevRefundPress = () => {
-    if (!devRefundAppleProductId) {
-      return;
-    }
-
-    void Haptics.selectionAsync();
-    void (async () => {
-      const { requestDevAppStoreRefund } = await import('./kilo-pass-ios-manage');
-      requestDevAppStoreRefund({
-        appleProductId: devRefundAppleProductId,
-        invalidateAfterRefund: invalidateKiloPassState,
-      });
-    })();
   };
 
   const isUnavailable = presentationQuery.data?.kind === 'unavailable';
@@ -208,28 +155,13 @@ export function KiloPassSubscriptionCard({
         </Pressable>
       ) : null}
 
-      {contentState.kind === 'card' && contentState.state.action === 'none' ? (
-        <View className="rounded-lg border border-border bg-card p-3">
-          {cardBody(
-            <>
-              <Text className="font-semibold">{contentState.state.title}</Text>
-              <Text className="text-xs text-muted-foreground">
-                {contentState.state.description}
-              </Text>
-            </>
-          )}
-        </View>
-      ) : null}
-
-      {contentState.kind === 'card' && contentState.state.action !== 'none' ? (
+      {contentState.kind === 'card' ? (
         <Pressable
           accessibilityHint={
-            getKiloPassSubscriptionCardAccessibility(contentState.state, Platform.OS)
-              .accessibilityHint
+            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityHint
           }
           accessibilityLabel={
-            getKiloPassSubscriptionCardAccessibility(contentState.state, Platform.OS)
-              .accessibilityLabel
+            getKiloPassSubscriptionCardAccessibility(contentState.state).accessibilityLabel
           }
           accessibilityRole="button"
           className="rounded-lg border border-border bg-card p-3 active:opacity-80"
@@ -249,18 +181,6 @@ export function KiloPassSubscriptionCard({
               </Text>
             ) : undefined
           )}
-        </Pressable>
-      ) : null}
-
-      {devRefundAppleProductId ? (
-        <Pressable
-          accessibilityRole="button"
-          className="rounded-lg border border-destructive bg-card px-3 py-2 active:opacity-80"
-          onPress={handleDevRefundPress}
-        >
-          <Text className="text-center text-xs font-medium text-destructive">
-            {t('kiloPass.devRefund')}
-          </Text>
         </Pressable>
       ) : null}
     </View>

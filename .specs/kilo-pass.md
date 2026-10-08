@@ -93,9 +93,11 @@ rounding to whole cents uses round-half-up (ties round toward positive infinity)
 ## Overview
 
 Kilo Pass exchanges a recurring payment for monthly base credits and a usage-triggered bonus. Stripe supports monthly
-and yearly subscriptions. The exposed mobile store flow supports App Store monthly subscriptions, including purchase
-completion and App Store notification handling. Google Play identifiers, state handling, and generic persistence
-branches exist, but the repository does not expose a verified Google Play purchase completion or notification flow.
+and yearly subscriptions. The mobile app does not expose native Kilo Pass purchases, restores, or store management.
+Its Profile card and `/kilo-pass` route render the backend purchase presentation: `unavailable` has no purchase controls,
+while `web_management` exposes Manage, which opens the returned `webUrl`. Native credit-pack purchases are unchanged.
+Backend store verification, purchase completion, provider notifications, and expiry reconciliation remain available
+for existing Kilo Pass store subscriptions independently of the mobile presentation.
 
 A successful base-credit grant writes one threshold on the user row. When cumulative user usage reaches the effective
 threshold, bonus logic acts on the selected effective active subscription. Monthly subscriptions use the tenure ramp
@@ -107,7 +109,7 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
 |---|---|---|---|
 | Persisted provider representation | Yes | Yes | Yes |
 | Web state reads | Yes | Yes | Existing rows only |
-| Monthly subscription entrypoint | Yes | Yes | Not exposed |
+| Monthly subscription entrypoint | Yes | No native mobile UI | No native mobile UI |
 | Yearly subscription entrypoint | Yes | Not exposed | Not exposed |
 | Verified purchase completion ingress | Invoice-paid webhook | Signed transaction completion | Not exposed |
 | Provider notification handling | Stripe events | App Store server notifications | Not exposed |

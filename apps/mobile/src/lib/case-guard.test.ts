@@ -33,8 +33,6 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/pr-review/pending-review-provider.tsx': 'draft composition key',
   'lib/route-registry.ts': 'route composition key',
   'lib/persist/encrypted-kv.ts': 'SQLite pragma comparison',
-  'lib/kilo-pass/subscription-card-state.ts': 'app-account-token comparison',
-  'lib/kilo-pass/dev-storekit-refund.ts': 'refund-status comparison',
   'lib/voice-input/voice-input-language.ts': 'language-tag normalization',
   'lib/model-picker-rows.ts': 'model search folding',
   'lib/repo-picker-filter.ts': 'repo search folding',

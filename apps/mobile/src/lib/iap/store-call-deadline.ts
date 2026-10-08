@@ -17,7 +17,7 @@ const STORE_CALL_DEADLINE_MS = 15_000;
  * credit-product loader would otherwise spend another deadline per product id).
  * Carries only the label; the message never reaches the screen.
  */
-export class StoreDeadlineError extends Error {
+class StoreDeadlineError extends Error {
   constructor(label: string) {
     super(`${label} did not answer within ${STORE_CALL_DEADLINE_MS} ms`);
     this.name = 'StoreDeadlineError';

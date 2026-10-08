@@ -40,7 +40,7 @@ catalog:
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.10
   drizzle-orm: 0.45.2
-  hono: 4.13.5
+  hono: 4.13.7
   jose: 6.2.3
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
@@ -127,6 +127,7 @@ overrides:
   handlebars: 4.7.9
   brace-expansion: 5.0.12
   node-forge: 1.4.0
+  webpack-dev-middleware@^6: 7.4.6
   postcss: '>=8.5.23'
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.4
@@ -143,7 +144,7 @@ overrides:
   smol-toml: 1.7.1
   uuid@<11.1.1: 11.1.1
   serialize-javascript: '>=7.0.3'
-  hono: 4.13.5
+  hono: 4.13.7
   '@modelcontextprotocol/sdk@1.30.0>@hono/node-server': 2.0.10
   # @simplewebauthn/server's ASN.1 parser must come from the same
   # @peculiar/asn1-schema copy its asn1-ecc/asn1-rsa decorators register their

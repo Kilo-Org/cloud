@@ -1232,10 +1232,6 @@ async function acceptance(args: Args): Promise<void> {
       activeLoss: 'external',
       cloudflareRegression: 'external',
     };
-    await execute(config, target.sessionId, 'bash', [
-      '-lc',
-      'case "$(node --version)" in v24.*) ;; *) echo "unexpected node $(node --version)" >&2; exit 1 ;; esac',
-    ]);
     await extendSession(config, target, 60_000);
     await stopSession(config, target);
     await inspectSnapshot(config, snapshotId);

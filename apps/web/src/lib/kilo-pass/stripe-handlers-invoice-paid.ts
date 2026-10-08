@@ -49,6 +49,7 @@ import {
   KiloPassWelcomePromoEligibilityReason,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { captureException } from '@sentry/nextjs';
 import {
   acquireDuplicateCardSubscriptionLock,
@@ -658,6 +659,12 @@ export async function handleKiloPassInvoicePaid(params: {
 
       const kiloPassSubscriptionId = row.id;
       const priorStatus = existingSubscription?.status ?? null;
+      if (derivedEndedAt) {
+        await closePauseEvent(tx, {
+          kiloPassSubscriptionId,
+          resumedAt: dayjs().utc().toISOString(),
+        });
+      }
 
       let settledPaymentResolutionPromise: Promise<SettledInvoicePaymentResolution> | null = null;
       const getSettledPaymentResolution = (): Promise<SettledInvoicePaymentResolution> => {
@@ -713,10 +720,12 @@ export async function handleKiloPassInvoicePaid(params: {
           },
         });
 
+        const duplicateCardEndedAt = dayjs().utc().toISOString();
         await tx
           .update(kilo_pass_subscriptions)
-          .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
+          .set({ status: 'canceled', ended_at: duplicateCardEndedAt })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+        await closePauseEvent(tx, { kiloPassSubscriptionId, resumedAt: duplicateCardEndedAt });
 
         await blockUser({
           kiloUserId,

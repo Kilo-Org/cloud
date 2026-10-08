@@ -9,6 +9,7 @@ import {
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilocode_users,
+  kilo_pass_pause_events,
   kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
@@ -169,6 +170,38 @@ function apiDataForUser(
     ],
     ...overrides,
   });
+}
+
+async function insertOpenPauseForGooglePlayToken(
+  purchaseToken: string,
+  pausedAt = '2026-05-01T00:00:00.000Z'
+): Promise<string> {
+  const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+    where: and(
+      eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
+      eq(kilo_pass_subscriptions.provider_subscription_id, purchaseToken)
+    ),
+  });
+  if (!subscription) throw new Error('Google Play subscription not found');
+  await db.insert(kilo_pass_pause_events).values({
+    kilo_pass_subscription_id: subscription.id,
+    paused_at: pausedAt,
+    resumes_at: null,
+  });
+  return subscription.id;
+}
+
+async function getOpenPauseCount(subscriptionId: string): Promise<number> {
+  const rows = await db
+    .select({ id: kilo_pass_pause_events.id })
+    .from(kilo_pass_pause_events)
+    .where(
+      and(
+        eq(kilo_pass_pause_events.kilo_pass_subscription_id, subscriptionId),
+        sql`${kilo_pass_pause_events.resumed_at} IS NULL`
+      )
+    );
+  return rows.length;
 }
 
 async function insertGooglePlayUser(): Promise<{
@@ -716,6 +749,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         messageId: 'cancel-initial',
       }),
     });
+    const pausedSubscriptionId = await insertOpenPauseForGooglePlayToken('purchase-token-canceled');
 
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
       apiDataForUser(obfsAccountId, orderId, {
@@ -741,6 +775,60 @@ describe('processGooglePlayKiloPassNotification', () => {
     });
     expect(subscription?.cancel_at_period_end).toBe(true);
     expect(subscription?.status).toBe('active');
+    expect(await getOpenPauseCount(pausedSubscriptionId)).toBe(1);
+  });
+
+  it('closes a pause recorded after expiry at reconciliation time when a canceled notification reconciles an expired subscription', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    const orderId = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId, orderId));
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: 'purchase-token-canceled-expired',
+        messageId: 'cancel-expired-initial',
+      }),
+    });
+    const pausedSubscriptionId = await insertOpenPauseForGooglePlayToken(
+      'purchase-token-canceled-expired',
+      '2026-05-03T00:00:00.000Z'
+    );
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, orderId, {
+        subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            expiryTime: '2026-05-02T09:00:00.000Z',
+            latestSuccessfulOrderId: orderId,
+          },
+        ],
+      })
+    );
+
+    const reconcileStartedAtMs = new Date().getTime();
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 3,
+        purchaseToken: 'purchase-token-canceled-expired',
+        messageId: 'cancel-expired-1',
+      }),
+    });
+    const reconcileFinishedAtMs = new Date().getTime();
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, pausedSubscriptionId),
+    });
+    expect(subscription?.status).toBe('canceled');
+    expect(new Date(subscription!.ended_at!).toISOString()).toBe('2026-05-02T09:00:00.000Z');
+    const pauseEvents = await db
+      .select({ resumedAt: kilo_pass_pause_events.resumed_at })
+      .from(kilo_pass_pause_events)
+      .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, pausedSubscriptionId));
+    expect(pauseEvents).toHaveLength(1);
+    const resumedAtMs = new Date(pauseEvents[0]!.resumedAt!).getTime();
+    expect(resumedAtMs).toBeGreaterThanOrEqual(reconcileStartedAtMs);
+    expect(resumedAtMs).toBeLessThanOrEqual(reconcileFinishedAtMs);
   });
 
   it.each(['SUBSCRIPTION_STATE_ACTIVE', 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD'])(
@@ -797,6 +885,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         messageId: 'expire-initial',
       }),
     });
+    const pausedSubscriptionId = await insertOpenPauseForGooglePlayToken('purchase-token-expired');
 
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
       apiDataForUser(obfsAccountId, undefined, {
@@ -830,6 +919,7 @@ describe('processGooglePlayKiloPassNotification', () => {
     expect(subscription?.status).toBe('canceled');
     expect(subscription?.ended_at).not.toBeNull();
     expect(subscription?.cancel_at_period_end).toBe(false);
+    expect(await getOpenPauseCount(pausedSubscriptionId)).toBe(0);
   });
 
   it('ignores a stale expiry when Play still reports a future expiry', async () => {
@@ -883,6 +973,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       ),
     });
     expect(subscription).toBeDefined();
+    const pausedSubscriptionId = await insertOpenPauseForGooglePlayToken('purchase-token-revoked');
 
     const issuance = await db.query.kilo_pass_issuances.findFirst({
       where: eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription?.id ?? ''),
@@ -979,6 +1070,7 @@ describe('processGooglePlayKiloPassNotification', () => {
     expect(endedSubscription?.status).toBe('canceled');
     expect(endedSubscription?.ended_at).not.toBeNull();
     expect(endedSubscription?.cancel_at_period_end).toBe(false);
+    expect(await getOpenPauseCount(pausedSubscriptionId)).toBe(0);
   });
 
   it('does not claw back a different order when the revoked order was never granted', async () => {

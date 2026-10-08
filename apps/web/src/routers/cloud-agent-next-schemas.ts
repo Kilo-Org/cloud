@@ -774,6 +774,9 @@ export const baseGetSessionNextOutputSchema = z.object({
   preparedAt: z.number().optional(),
   initiatedAt: z.number().optional(),
 
+  // Route readiness for terminal ownership. Mirrors cloud-agent-next/router/schemas.ts.
+  routeReady: z.boolean().optional(),
+
   // Callback configuration is intentionally NOT exposed: the stored target
   // may carry service-to-service auth headers (e.g. X-Internal-Secret used
   // by Worker callback ingresses), and `getSession` is reachable by the

@@ -1160,6 +1160,7 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
         env: input.env,
         pidfileDirectory,
         ...(input.workload ? { workload: input.workload } : {}),
+        onEvent: event => options.onEvent?.({ ...event, runtimeKey: input.key }),
         onRestart: info => options.onRestart?.({ ...info, key: input.key }),
         onDeadline: (identity, reason) => options.onDeadline?.(identity, reason, input.key),
         onActivityChange: () => options.onActivityChange?.(input.key),

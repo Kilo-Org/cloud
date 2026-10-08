@@ -57,11 +57,13 @@ const mockManager = {
   destroy: jest.fn(),
   send: jest.fn(async () => true),
 };
-const mockQueryClient = { invalidateQueries: jest.fn() };
+const mockQueryClient = { invalidateQueries: jest.fn(), fetchQuery: jest.fn() };
 const mockUploadEndpoint = { mutationOptions: () => ({}) };
+const mockGetWithRuntimeState = { queryOptions: (input: unknown) => input };
 const mockTrpc = {
   cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint },
   organizations: { cloudAgentNext: { getAttachmentUploadUrl: mockUploadEndpoint } },
+  cliSessionsV2: { getWithRuntimeState: mockGetWithRuntimeState },
 };
 
 jest.mock('jotai', () => ({
@@ -402,6 +404,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     mockAtParam = null;
     mockWorktreeId = 'worktree_shared';
     mockClosedPtys.length = 0;
+    mockQueryClient.fetchQuery.mockReset();
     mockAtomValues = {
       sessionId: 'workspace_recent',
       fetchedSessionData: {
@@ -457,6 +460,68 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     mockAtomValues.sessionId = `workspace_${mockSessionId}`;
     render();
   }
+
+  it('binds the terminal to the viewed worktree session when its route is ready', () => {
+    mockAtomValues.sessionId = 'workspace_recent';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_recent',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+      routeReady: true,
+    };
+    render();
+
+    const terminal = openTerminal();
+    expect(terminal?.getAttribute('data-pty-owner')).toBe('workspace_recent');
+  });
+
+  it('binds the terminal to the ready sibling when the viewed route is not ready', async () => {
+    mockAtomValues.sessionId = 'workspace_recent';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_recent',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+      routeReady: false,
+    };
+    mockQueryClient.fetchQuery.mockImplementation(
+      async ({ session_id }: { session_id: string }) => ({
+        runtimeState: { routeReady: session_id === 'ses_historical' },
+      })
+    );
+    render();
+
+    await act(async () => {
+      mockTabs.onCreateTerminal();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(dom.container.querySelector('[data-pty-owner]')?.getAttribute('data-pty-owner')).toBe(
+      'workspace_historical'
+    );
+  });
+
+  it('keeps the viewed session as owner when no sibling route is ready', async () => {
+    mockAtomValues.sessionId = 'workspace_recent';
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: 'ses_recent',
+      organizationId: null,
+      worktreeId: 'worktree_shared',
+      routeReady: false,
+    };
+    mockQueryClient.fetchQuery.mockImplementation(async () => ({
+      runtimeState: { routeReady: false },
+    }));
+    render();
+
+    await act(async () => {
+      mockTabs.onCreateTerminal();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(dom.container.querySelector('[data-pty-owner]')?.getAttribute('data-pty-owner')).toBe(
+      'workspace_recent'
+    );
+  });
 
   it('keeps the mounted PTY and original owner through an uncached historical sibling and Back', () => {
     render();

@@ -404,7 +404,7 @@ export function createSessionManagementHandlers() {
 
           // Current work and the durability watermark come from the control-plane
           // snapshot for `workspace_*` sessions and the legacy reads otherwise.
-          const { currentWork, latestEventId } = await sessionFor(
+          const { currentWork, latestEventId, routeReady } = await sessionFor(
             sessionId,
             async (): Promise<{
               currentWork: {
@@ -413,6 +413,7 @@ export function createSessionManagementHandlers() {
                 health: 'healthy' | 'stale';
               } | null;
               latestEventId: number | null;
+              routeReady: boolean | undefined;
             }> => {
               const snapshot = await withDORetry<
                 DurableObjectStub<SandboxSessionV2>,
@@ -422,7 +423,9 @@ export function createSessionManagementHandlers() {
                 s => s.getSession(),
                 'getSession'
               );
-              if (snapshot.type !== 'found') return { currentWork: null, latestEventId: null };
+              if (snapshot.type !== 'found') {
+                return { currentWork: null, latestEventId: null, routeReady: undefined };
+              }
               const accepted = snapshot.messages.find(message => message.state === 'accepted');
               const queued = snapshot.messages.find(message => message.state === 'queued');
               return {
@@ -432,6 +435,9 @@ export function createSessionManagementHandlers() {
                     ? { messageId: queued.messageId, status: 'pending', health: 'healthy' }
                     : null,
                 latestEventId: snapshot.latestEventId,
+                // Route readiness is the control-plane owner of "can this
+                // session own a terminal": a terminal requires a ready route.
+                routeReady: snapshot.route?.state === 'ready',
               };
             },
             async (): Promise<{
@@ -441,6 +447,7 @@ export function createSessionManagementHandlers() {
                 health: 'healthy' | 'stale';
               } | null;
               latestEventId: number | null;
+              routeReady: boolean | undefined;
             }> => {
               const legacyStub = () => resolveLegacySessionStub(env, userId, sessionId);
               const currentWork = await withDORetry(
@@ -465,7 +472,11 @@ export function createSessionManagementHandlers() {
                   })
                   .warn('Failed to fetch latest event ID for getSession');
               }
-              return { currentWork, latestEventId };
+              return {
+                currentWork,
+                latestEventId,
+                routeReady: Boolean(metadata.lifecycle.preparedAt),
+              };
             }
           );
 
@@ -557,6 +568,11 @@ export function createSessionManagementHandlers() {
             // Lifecycle timestamps (critical for idempotency)
             preparedAt: sessionMetadata.lifecycle.preparedAt,
             initiatedAt: sessionMetadata.lifecycle.initiatedAt,
+
+            // Whether this session's route is ready to accept a terminal.
+            // Control-plane sessions answer from their route view; legacy
+            // sessions fall back to having been prepared at least once.
+            routeReady: routeReady ?? Boolean(sessionMetadata.lifecycle.preparedAt),
 
             // callbackTarget is intentionally NOT returned: it may carry
             // service-to-service auth headers and is reachable by the

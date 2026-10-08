@@ -347,6 +347,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           isInitiated: Boolean(rs?.initiatedAt),
           needsLegacyPrepare: Boolean(sessionResult.cloud_agent_session_id && !rs),
           isPreparingAsync: Boolean(rs && !rs.preparedAt),
+          routeReady: rs?.routeReady,
           prompt: rs?.prompt ?? null,
           initialMessageId: rs?.initialMessageId ?? null,
           runtimeAgents: rs?.runtimeAgents,

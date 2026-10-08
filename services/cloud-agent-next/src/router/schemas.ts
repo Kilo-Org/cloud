@@ -1178,6 +1178,15 @@ export const GetSessionOutput = z.object({
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),
   initiatedAt: z.number().optional().describe('Timestamp when session was initiated'),
 
+  // Route readiness for terminal ownership: control-plane sessions report
+  // whether their route view is `ready`; legacy sessions report whether they
+  // have been prepared. Consumers must not infer readiness from `preparedAt` or
+  // `initiatedAt`, which persist across route loss.
+  routeReady: z
+    .boolean()
+    .optional()
+    .describe('Whether the session currently has a ready route that can own a terminal'),
+
   // Callback configuration is intentionally NOT exposed here. The stored
   // `callbackTarget` may carry service-to-service auth headers (e.g. an
   // X-Internal-Secret used by downstream Worker callback ingresses), and

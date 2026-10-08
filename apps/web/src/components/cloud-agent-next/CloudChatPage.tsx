@@ -73,6 +73,7 @@ import { WorktreeFilePane } from './WorktreeFilePane';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
 import { WorktreeReviewDialog } from './WorktreeReviewDialog';
 import { useWorktreeReview } from './useWorktreeReview';
+import { selectTerminalOwner } from './terminal-owner';
 import type { WorktreeReviewComment } from './worktree-review';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { canOpenWorktreeChanges } from './worktree-changes';
@@ -886,26 +887,101 @@ export default function CloudChatPage({
     setSoundEnabled(prev => !prev);
   }, [setSoundEnabled]);
 
-  const handleCreateTerminalTab = useCallback(() => {
-    const preparedSiblingSessionId =
-      selectedWorktreeId && fetchedSessionData?.isInitiated === false
-        ? worktreeChats.find(
-            chat => chat.sessionId !== sessionIdFromParams && chat.cloudAgentSessionId
-          )?.cloudAgentSessionId
-        : null;
-    const terminalSessionId = sessionIdFromParams
-      ? (preparedSiblingSessionId ?? sessionId)
-      : worktreeChats.find(chat => chat.cloudAgentSessionId)?.cloudAgentSessionId;
-    if (!terminalSessionId) return;
+  const fetchRouteReady = useCallback(
+    async (kiloSessionId: string): Promise<boolean | undefined> => {
+      try {
+        const data = await queryClient.fetchQuery(
+          trpc.cliSessionsV2.getWithRuntimeState.queryOptions({ session_id: kiloSessionId })
+        );
+        return data.runtimeState?.routeReady;
+      } catch {
+        return undefined;
+      }
+    },
+    [queryClient, trpc]
+  );
 
-    const terminalId = uuidv4();
-    setWorkspaceTabs(state => addTerminalTab(state, terminalId, terminalSessionId));
+  const resolveTerminalOwner = useCallback(async (): Promise<string | null> => {
+    const loadedIsCurrent =
+      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+    const loadedRouteReady = loadedIsCurrent ? fetchedSessionData?.routeReady : undefined;
+
+    const candidates = worktreeChats.flatMap(chat =>
+      chat.cloudAgentSessionId
+        ? [
+            {
+              kiloSessionId: chat.sessionId,
+              cloudAgentSessionId: chat.cloudAgentSessionId,
+              routeReady: chat.sessionId === sessionIdFromParams ? loadedRouteReady : undefined,
+            },
+          ]
+        : []
+    );
+    if (candidates.length === 0) return null;
+
+    // Only the viewed session's route is known without a read; resolve the
+    // siblings' routes before choosing so a stopped sibling is never picked
+    // ahead of a ready one.
+    if (candidates.some(candidate => candidate.routeReady === undefined)) {
+      await Promise.all(
+        candidates.map(async candidate => {
+          if (candidate.routeReady === undefined) {
+            candidate.routeReady = await fetchRouteReady(candidate.kiloSessionId);
+          }
+        })
+      );
+    }
+
+    return selectTerminalOwner({
+      loadedKiloSessionId: sessionIdFromParams,
+      candidates,
+    });
   }, [
-    fetchedSessionData?.isInitiated,
+    fetchRouteReady,
+    fetchedSessionData?.kiloSessionId,
+    fetchedSessionData?.routeReady,
+    sessionIdFromParams,
+    worktreeChats,
+  ]);
+
+  const openTerminalTabForSession = useCallback(
+    (cloudAgentSessionId: string) => {
+      const terminalId = uuidv4();
+      setWorkspaceTabs(state => addTerminalTab(state, terminalId, cloudAgentSessionId));
+    },
+    [setWorkspaceTabs]
+  );
+
+  const handleCreateTerminalTab = useCallback(() => {
+    // Standalone sessions own their own route; the server reports readiness.
+    if (!selectedWorktreeId) {
+      if (sessionId) openTerminalTabForSession(sessionId);
+      return;
+    }
+
+    const loadedIsCurrent =
+      sessionIdFromParams !== null && fetchedSessionData?.kiloSessionId === sessionIdFromParams;
+    const loadedRouteReady = loadedIsCurrent ? fetchedSessionData?.routeReady : undefined;
+
+    // Any session with a ready route can own the worktree terminal. Prefer the
+    // viewed session while its route is not known to be unready; otherwise
+    // resolve the sibling whose route is ready.
+    if (sessionId && loadedRouteReady !== false) {
+      openTerminalTabForSession(sessionId);
+      return;
+    }
+
+    void resolveTerminalOwner().then(owner => {
+      if (owner) openTerminalTabForSession(owner);
+    });
+  }, [
+    fetchedSessionData?.kiloSessionId,
+    fetchedSessionData?.routeReady,
+    openTerminalTabForSession,
+    resolveTerminalOwner,
     selectedWorktreeId,
     sessionId,
     sessionIdFromParams,
-    worktreeChats,
   ]);
 
   const handleSelectWorkspaceTab = useCallback((tabId: WorkspaceTabId) => {

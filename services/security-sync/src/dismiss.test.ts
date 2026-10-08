@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { parseConfigFileTextToJson } from 'typescript';
+import { z } from 'zod';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import type { SecurityDismissMessage } from './index.js';
 
@@ -136,6 +139,20 @@ function createMessage(): SecurityDismissMessage {
 }
 
 describe('processSecurityFindingDismissal', () => {
+  it.each(['../wrangler.jsonc', '../../git-token-service/wrangler.jsonc'])(
+    'preserves custom RPC error names with the compatibility flags in %s',
+    path => {
+      const parsed = parseConfigFileTextToJson(
+        path,
+        readFileSync(new URL(path, import.meta.url), 'utf8')
+      );
+      expect(parsed.error).toBeUndefined();
+      const config = z.object({ compatibility_flags: z.array(z.string()) }).parse(parsed.config);
+      expect(config.compatibility_flags).toContain('enhanced_error_serialization');
+      expect(config.compatibility_flags).not.toContain('legacy_error_serialization');
+    }
+  );
+
   beforeEach(() => {
     vi.restoreAllMocks();
   });

@@ -157,15 +157,14 @@ with welcome-promo overrides. Yearly subscriptions use a flat 50% monthly bonus.
     Bonus-decision paths MUST clamp streak to at least `1` before applying the ramp.
 14. Yearly cadence MUST use a flat monthly bonus of 50% of the monthly price and MUST NOT use the monthly ramp or
     welcome-promo branch.
-15. For eligible first-time monthly subscribers with `welcome_promo_in_second_month = true`, streak month 1 MUST use 5%.
-    Streak month 2 MUST use the 50% welcome bonus.
-    New subscription writers MUST set this flag to `true`.
-16. Existing subscriptions MUST retain `welcome_promo_in_second_month = false`.
-    The database MUST default this flag to `false`, including inserts from application versions without this field.
-    Renewals, webhook replays, and tier or cadence changes MUST preserve the stored flag.
-    Eligible subscribers with this flag set to `false` MUST retain 50% in streak month 1.
-    Those starting strictly before `2026-05-07T00:00:00Z` MUST also retain 50% in streak month 2.
-    Missing or invalid subscription starts MUST retain the legacy month-1 schedule.
+15. For eligible first-time monthly subscribers started strictly before `2026-10-09T00:00:00Z`, streak month 1 MUST use
+    the 50% welcome bonus, month 2 MUST use the normal 10% ramp, and month 3 MUST use the normal 15% ramp.
+    This includes subscriptions started before May 7, 2026; no two-month welcome-promo grandfathering remains.
+16. For eligible first-time monthly subscribers started at or after `2026-10-09T00:00:00Z`, streak month 1 MUST use the
+    normal 5% ramp, month 2 MUST use the 50% welcome bonus, and month 3 MUST use the normal 15% ramp.
+    The subscription start timestamp MUST determine the schedule, with no persisted schedule flag.
+    Missing or invalid subscription starts MUST conservatively use the legacy month-1 schedule.
+    Non-first-time subscribers MUST always use the normal monthly ramp, regardless of subscription start.
 17. From streak month 3 onward, and in any month where the welcome promo does not apply, monthly cadence MUST use the
     monthly ramp value.
 18. New welcome-promo grants MUST use the `bonus` issuance-item kind with a 50% applied percent.
@@ -419,9 +418,8 @@ The following behavior or stronger guarantees are not implemented by current cod
 8. Explicit ended-state streak reset for reactivated store subscriptions.
 9. Guaranteed expiry for every granted bonus credit.
 10. Independent durable audit recording for every failed provider or issuance operation.
-11. Retirement of the grandfathered streak-month-2 promo branch after no eligible pre-cutoff subscriptions remain.
-12. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
-13. Atomic prevention of concurrent or repeated active Kilo Pass purchases by the same user. Duplicate-card Rules 51-55
+11. Store-provider welcome-promo anti-abuse signals equivalent to Stripe fingerprint claims.
+12. Atomic prevention of concurrent or repeated active Kilo Pass purchases by the same user. Duplicate-card Rules 51-55
     intentionally exclude same-user purchases.
 
 ## Adjacent Spec Compatibility
@@ -436,16 +434,16 @@ promo or Kilo Pass referral conversion.
 
 ## Changelog
 
-### 2026-10-08 -- New monthly welcome bonus moves to month 2
+### 2026-10-08 -- Timestamp-based monthly welcome bonus cutoff
 
-- Moved the eligible new monthly subscriber's 50% welcome bonus from streak month 1 to streak month 2.
-- Preserved existing subscriptions with a stored schedule flag that defaults to `false`.
-- Set the flag to `true` only when the new application creates a subscription.
-- Preserved the flag on renewals, replays, and tier or cadence changes.
+- Eligible first-time monthly starts strictly before October 9, 2026 at midnight UTC receive 50%, 10%, then 15%.
+- Starts at or after the cutoff receive 5%, 50%, then 15%; returning subscribers always use the normal ramp.
+- Removed the stored schedule flag and its unshipped migration; subscription start is the only schedule authority.
+- Removed the former pre-May-7 two-month welcome bonus, while keeping missing/invalid starts on the month-1 schedule.
 - Kept the regular monthly ramp, yearly bonuses, payment eligibility, and usage unlock unchanged.
 - Updated subscription offers, ramp previews, and KiloClaw upsells to show the new schedule.
 - Kept yearly upsell text at 50% every month and limited welcome callouts to the applicable promo window.
-- Preserved historical welcome bonuses in ramp previews after the welcome callout disappears.
+- Kept the selected welcome month in ramp totals after the welcome callout disappears.
 
 ### 2026-06-08 -- Yearly duplicate-card enforcement
 

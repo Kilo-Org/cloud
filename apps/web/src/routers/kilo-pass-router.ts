@@ -201,7 +201,6 @@ const KiloPassSubscriptionStateBaseSchema = z.object({
   currentStreakMonths: z.number(),
   nextYearlyIssueAt: z.string().nullable(),
   startedAt: z.string().nullable(),
-  welcomePromoInSecondMonth: z.boolean(),
   resumesAt: z.string().nullable(),
 });
 
@@ -439,7 +438,6 @@ function getNextKiloPassBonusCreditsUsd(params: {
     tier: params.subscription.tier,
     cadence: params.subscription.cadence,
     startedAtIso: params.subscription.startedAt,
-    welcomePromoInSecondMonth: params.subscription.welcomePromoInSecondMonth,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths + 1),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
     welcomePromoPolicy: params.welcomePromoPolicy,
@@ -457,7 +455,6 @@ function getCurrentKiloPassBonusCreditsUsd(params: {
     tier: params.subscription.tier,
     cadence: params.subscription.cadence,
     startedAtIso: params.subscription.startedAt,
-    welcomePromoInSecondMonth: params.subscription.welcomePromoInSecondMonth,
     streakMonths: Math.max(1, params.subscription.currentStreakMonths),
     isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
     welcomePromoPolicy: params.welcomePromoPolicy,

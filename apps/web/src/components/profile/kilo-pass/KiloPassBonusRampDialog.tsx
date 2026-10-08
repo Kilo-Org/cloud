@@ -11,7 +11,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { computeMonthlyCadenceBonusPercent } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import {
+  computeMonthlyCadenceBonusPercent,
+  getMonthlyWelcomePromoMonth,
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_TIER_CONFIG,
@@ -26,7 +29,6 @@ const clampMonth = (month: number) => Math.min(12, Math.max(1, Math.round(month)
 export function KiloPassBonusRampDialog(props: {
   tier: KiloPassTier;
   showFirstMonthPromo?: boolean;
-  welcomePromoInSecondMonth?: boolean;
   streakMonths?: number;
   showSlider?: boolean;
   subscriptionStartedAtIso?: string | null;
@@ -34,7 +36,6 @@ export function KiloPassBonusRampDialog(props: {
   const {
     tier,
     showFirstMonthPromo = false,
-    welcomePromoInSecondMonth = true,
     streakMonths,
     showSlider = true,
     subscriptionStartedAtIso,
@@ -46,37 +47,15 @@ export function KiloPassBonusRampDialog(props: {
   const [sliderMonth, setSliderMonth] = useState(resolvedMonth);
   const effectiveMonth = showSlider ? sliderMonth : resolvedMonth;
   const config = KILO_PASS_TIER_CONFIG[tier];
-  const firstMonthPercent = computeMonthlyCadenceBonusPercent({
-    tier,
-    streakMonths: 1,
-    isFirstTimeSubscriberEver: showFirstMonthPromo,
-    subscriptionStartedAtIso,
-    welcomePromoInSecondMonth,
-  });
-  const secondMonthPercent = computeMonthlyCadenceBonusPercent({
-    tier,
-    streakMonths: 2,
-    isFirstTimeSubscriberEver: showFirstMonthPromo,
-    subscriptionStartedAtIso,
-    welcomePromoInSecondMonth,
-  });
-  const showPromoCallout =
-    showSlider &&
-    showFirstMonthPromo &&
-    resolvedMonth <= (secondMonthPercent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT ? 2 : 1);
-  const promoMonthLabel =
-    firstMonthPercent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT
-      ? secondMonthPercent === KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT
-        ? 'first 2 paid months'
-        : 'first paid month'
-      : 'second paid month';
+  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
+  const showPromoCallout = showSlider && showFirstMonthPromo && resolvedMonth <= promoMonth;
+  const promoMonthLabel = promoMonth === 1 ? 'first paid month' : 'second paid month';
 
   const sliderPercent = computeMonthlyCadenceBonusPercent({
     tier,
     streakMonths: effectiveMonth,
     isFirstTimeSubscriberEver: showFirstMonthPromo,
     subscriptionStartedAtIso,
-    welcomePromoInSecondMonth,
   });
 
   const totalBonusUsd = useMemo(
@@ -88,7 +67,6 @@ export function KiloPassBonusRampDialog(props: {
               streakMonths: index + 1,
               isFirstTimeSubscriberEver: showFirstMonthPromo,
               subscriptionStartedAtIso,
-              welcomePromoInSecondMonth,
             })
           ).reduce((total, percent) => total + config.monthlyPriceUsd * percent, 0)
         : 0,
@@ -98,7 +76,6 @@ export function KiloPassBonusRampDialog(props: {
       showFirstMonthPromo,
       showSlider,
       subscriptionStartedAtIso,
-      welcomePromoInSecondMonth,
       tier,
     ]
   );

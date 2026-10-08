@@ -618,7 +618,6 @@ export async function handleKiloPassInvoicePaid(params: {
         .insert(kilo_pass_subscriptions)
         .values({
           kilo_user_id: kiloUserId,
-          welcome_promo_in_second_month: true,
           payment_provider: KiloPassPaymentProvider.Stripe,
           provider_subscription_id: subscription.id,
           stripe_subscription_id: subscription.id,

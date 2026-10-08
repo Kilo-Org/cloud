@@ -858,7 +858,6 @@ export async function completeStoreKiloPassPurchase(params: {
       .insert(kilo_pass_subscriptions)
       .values({
         kilo_user_id: user.id,
-        welcome_promo_in_second_month: true,
         payment_provider: purchase.paymentProvider,
         provider_subscription_id: purchase.providerSubscriptionId,
         stripe_subscription_id: null,

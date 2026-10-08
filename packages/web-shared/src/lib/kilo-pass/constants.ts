@@ -15,7 +15,6 @@ export const KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT = dayjs(
   '2026-05-28T12:06:20.000Z'
 ).utc();
 
-// Legacy first-time subscribers who started before this cutoff keep both promo months.
-export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF = dayjs('2026-05-07T00:00:00Z').utc();
-
-export const KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT = 0.5;
+// Eligible monthly subscriptions starting at this boundary receive their welcome promo in month 2.
+export const KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF =
+  dayjs('2026-10-09T00:00:00Z').utc();

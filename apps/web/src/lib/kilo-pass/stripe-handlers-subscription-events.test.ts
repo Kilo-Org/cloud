@@ -145,7 +145,6 @@ describe('handleKiloPassSubscriptionEvent', () => {
     });
     expect(subRow).toBeTruthy();
     expect(subRow?.kilo_user_id).toBe(user.id);
-    expect(subRow?.welcome_promo_in_second_month).toBe(true);
     expect(subRow?.tier).toBe(KiloPassTier.Tier49);
     expect(subRow?.cadence).toBe(KiloPassCadence.Monthly);
     expect(subRow?.status).toBe('active');
@@ -177,7 +176,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
     const replayed = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
-    expect(replayed?.welcome_promo_in_second_month).toBe(true);
+    expect(toIso(replayed?.started_at)).toBe(new Date(startDateSeconds * 1000).toISOString());
   });
 
   test('active subscription with cancel_at_period_end=true stores cancel_at_period_end flag', async () => {
@@ -333,9 +332,9 @@ describe('handleKiloPassSubscriptionEvent', () => {
     expect(endedAtSeconds).toBeLessThanOrEqual(afterSeconds + 1);
   });
 
-  test.each([false, true])(
-    'tier/cadence updates and replay preserve welcome schedule %s and streak',
-    async welcomePromoInSecondMonth => {
+  test.each(['2026-10-08T23:59:59.000Z', '2026-10-09T00:00:00.000Z'])(
+    'tier/cadence updates and replay preserve start %s and streak',
+    async startedAt => {
       const { handleKiloPassSubscriptionEvent } =
         await import('@/lib/kilo-pass/stripe-handlers-subscription-events');
 
@@ -344,21 +343,20 @@ describe('handleKiloPassSubscriptionEvent', () => {
 
       await db.insert(kilo_pass_subscriptions).values({
         kilo_user_id: user.id,
-        welcome_promo_in_second_month: welcomePromoInSecondMonth,
         provider_subscription_id: stripeSubId,
         stripe_subscription_id: stripeSubId,
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         cancel_at_period_end: false,
-        started_at: new Date('2026-01-01T00:00:00.000Z').toISOString(),
+        started_at: startedAt,
         ended_at: null,
         current_streak_months: 7,
       });
 
       const subscription = makeStripeSubscription({
         id: stripeSubId,
-        start_date_seconds: 1_767_225_600,
+        start_date_seconds: new Date(startedAt).valueOf() / 1000,
         status: 'active',
         cancel_at_period_end: true,
         metadata: kiloPassMetadata({
@@ -380,7 +378,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       expect(updated?.status).toBe('active');
       expect(updated?.cancel_at_period_end).toBe(true);
       expect(updated?.current_streak_months).toBe(7);
-      expect(updated?.welcome_promo_in_second_month).toBe(welcomePromoInSecondMonth);
+      expect(toIso(updated?.started_at)).toBe(startedAt);
       expect(updated?.tier).toBe(KiloPassTier.Tier199);
       expect(updated?.cadence).toBe(KiloPassCadence.Yearly);
 
@@ -392,7 +390,7 @@ describe('handleKiloPassSubscriptionEvent', () => {
       const replayed = await db.query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
       });
-      expect(replayed?.welcome_promo_in_second_month).toBe(welcomePromoInSecondMonth);
+      expect(toIso(replayed?.started_at)).toBe(startedAt);
     }
   );
 

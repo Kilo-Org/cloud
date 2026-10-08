@@ -48,8 +48,8 @@ import {
   getMonthlyPriceUsd,
 } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
+  KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
+  KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF,
   KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT,
 } from '@kilocode/web-shared/lib/kilo-pass/constants';
 
@@ -256,7 +256,6 @@ type KiloPassCaller = {
       cancelAtPeriodEnd: boolean;
       currentStreakMonths: number;
       nextYearlyIssueAt: string | null;
-      welcomePromoInSecondMonth: boolean;
       nextBonusCreditsUsd: number | null;
       nextBillingAt: string | null;
 
@@ -556,7 +555,6 @@ async function insertSubscription(params: {
   currentStreakMonths?: number;
   nextYearlyIssueAt?: string | null;
   startedAt?: string | null;
-  welcomePromoInSecondMonth?: boolean;
 }) {
   const now = new Date().toISOString();
   const isEnded =
@@ -564,7 +562,7 @@ async function insertSubscription(params: {
     params.status === 'unpaid' ||
     params.status === 'incomplete_expired';
 
-  const startedAt = params.startedAt ?? now;
+  const startedAt = params.startedAt === undefined ? '2026-06-01T00:00:00.000Z' : params.startedAt;
   const paymentProvider = params.paymentProvider ?? KiloPassPaymentProvider.Stripe;
   const stripeSubscriptionId = params.stripeSubscriptionId ?? null;
   const providerSubscriptionId =
@@ -585,7 +583,6 @@ async function insertSubscription(params: {
       current_streak_months: params.currentStreakMonths ?? 0,
       next_yearly_issue_at: params.nextYearlyIssueAt ?? null,
       started_at: startedAt,
-      welcome_promo_in_second_month: params.welcomePromoInSecondMonth ?? false,
       ended_at: isEnded ? now : null,
     })
     .returning({ id: kilo_pass_subscriptions.id });
@@ -2228,13 +2225,15 @@ describe('kiloPassRouter', () => {
     );
 
     it.each([
-      { welcomePromoInSecondMonth: false, currentPercent: 0.5, nextPercent: 0.1 },
-      { welcomePromoInSecondMonth: true, currentPercent: 0.05, nextPercent: 0.5 },
+      { startedAt: '2026-10-08T23:59:59.999Z', currentPercent: 0.5, nextPercent: 0.1 },
+      { startedAt: '2026-10-09T00:00:00.000Z', currentPercent: 0.05, nextPercent: 0.5 },
+      { startedAt: '2026-10-09T00:00:00.001Z', currentPercent: 0.05, nextPercent: 0.5 },
+      { startedAt: null, currentPercent: 0.5, nextPercent: 0.1 },
     ])(
-      'projects monthly bonuses using stored welcome schedule $welcomePromoInSecondMonth',
-      async ({ welcomePromoInSecondMonth, currentPercent, nextPercent }) => {
+      'projects monthly bonuses using subscription start $startedAt',
+      async ({ startedAt, currentPercent, nextPercent }) => {
         const stripeMock = getStripeMock();
-        const stripeSubscriptionId = `sub_test_monthly_new_card_${welcomePromoInSecondMonth}`;
+        const stripeSubscriptionId = `sub_test_monthly_cutoff_${startedAt}`;
         const currentPeriodEndSeconds = 1_700_123_456;
         const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
         stripeMock.subscriptions.retrieve.mockResolvedValue({
@@ -2251,7 +2250,7 @@ describe('kiloPassRouter', () => {
         });
 
         const user = await insertTestUser({
-          google_user_email: `kilo-pass-stored-schedule-${welcomePromoInSecondMonth}@example.com`,
+          google_user_email: `kilo-pass-cutoff-${startedAt}@example.com`,
         });
         const { id: subscriptionId } = await insertSubscription({
           kiloUserId: user.id,
@@ -2260,8 +2259,7 @@ describe('kiloPassRouter', () => {
           cadence: KiloPassCadence.Monthly,
           status: 'active',
           currentStreakMonths: 1,
-          startedAt: '2026-06-01T00:00:00.000Z',
-          welcomePromoInSecondMonth,
+          startedAt,
         });
         await insertBaseCreditsIssuance({
           subscriptionId,
@@ -2274,7 +2272,6 @@ describe('kiloPassRouter', () => {
         const result = await caller.kiloPass.getState();
 
         const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier199);
-        expect(result.subscription?.welcomePromoInSecondMonth).toBe(welcomePromoInSecondMonth);
         expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(
           Math.round(baseAmountUsd * currentPercent * 100) / 100
         );
@@ -2284,7 +2281,7 @@ describe('kiloPassRouter', () => {
       }
     );
 
-    it('uses ramp current bonus instead of grandfathered month-2 promo for reused cards', async () => {
+    it('uses the month-2 ramp for reused cards', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
       const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
@@ -2311,7 +2308,7 @@ describe('kiloPassRouter', () => {
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 2,
-        startedAt: '2026-01-01T00:00:00.000Z',
+        startedAt: '2026-10-09T00:00:00.000Z',
       });
       await insertBaseCreditsIssuance({
         subscriptionId,
@@ -2336,13 +2333,13 @@ describe('kiloPassRouter', () => {
         tier: KiloPassTier.Tier199,
         streakMonths: 2,
         isFirstTimeSubscriberEver: false,
-        subscriptionStartedAtIso: '2026-01-01T00:00:00.000Z',
+        subscriptionStartedAtIso: '2026-10-09T00:00:00.000Z',
       });
       const expectedCurrentBonusUsd = Math.round(baseAmountUsd * rampBonusPercent * 100) / 100;
 
       expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
       expect(result.subscription?.currentPeriodBonusCreditsUsd).not.toBe(
-        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) / 100
+        Math.round(baseAmountUsd * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT * 100) / 100
       );
     });
 
@@ -2747,7 +2744,7 @@ describe('kiloPassRouter', () => {
       );
     });
 
-    it('keeps App Store month-2 grandfather bonus after a post-cutoff renewal', async () => {
+    it('uses App Store month-2 normal ramp after a May 1 subscription start', async () => {
       freezeKiloPassClock('2026-06-15T00:00:00.000Z');
 
       const user = await insertTestUser({
@@ -2807,10 +2804,7 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getState();
 
       const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
-      const expectedCurrentBonusUsd =
-        Math.round(
-          Math.round(baseAmountUsd * 100) * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT
-        ) / 100;
+      const expectedCurrentBonusUsd = Math.round(Math.round(baseAmountUsd * 100) * 0.1) / 100;
 
       expect(result.subscription).toEqual(
         expect.objectContaining({
@@ -2823,7 +2817,7 @@ describe('kiloPassRouter', () => {
       );
     });
 
-    it('predicts monthly nextBonusCreditsUsd as 50% for promo month 2 (streak=1 -> predicted=2)', async () => {
+    it('predicts monthly nextBonusCreditsUsd as 10% before cutoff (streak=1 -> predicted=2)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
       const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
@@ -2867,8 +2861,7 @@ describe('kiloPassRouter', () => {
 
       const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
       const baseCents = Math.round(baseAmountUsd * 100);
-      const expectedNextBonusUsd =
-        Math.round(baseCents * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT) / 100;
+      const expectedNextBonusUsd = Math.round(baseCents * 0.1) / 100;
 
       expect(result.subscription?.nextBonusCreditsUsd).toBe(expectedNextBonusUsd);
     });
@@ -2880,7 +2873,7 @@ describe('kiloPassRouter', () => {
           KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT.valueOf() - 1
         ).toISOString(),
         expectedCurrentPercent: 0.5,
-        expectedNextPercent: 0.5,
+        expectedNextPercent: 0.1,
       },
       {
         label: 'at the fingerprint-policy rollout',
@@ -2971,7 +2964,7 @@ describe('kiloPassRouter', () => {
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 1,
-        startedAt: '2026-01-01T00:00:00.000Z',
+        startedAt: '2026-10-09T00:00:00.000Z',
       });
       await insertBaseCreditsIssuance({
         subscriptionId,
@@ -2990,17 +2983,17 @@ describe('kiloPassRouter', () => {
         tier: KiloPassTier.Tier19,
         streakMonths: 2,
         isFirstTimeSubscriberEver: false,
-        subscriptionStartedAtIso: '2026-01-01T00:00:00.000Z',
+        subscriptionStartedAtIso: '2026-10-09T00:00:00.000Z',
       });
       const expectedNextBonusUsd = Math.round(baseAmountUsd * expectedPercent * 100) / 100;
 
       expect(result.subscription?.nextBonusCreditsUsd).toBe(expectedNextBonusUsd);
       expect(result.subscription?.nextBonusCreditsUsd).not.toBe(
-        Math.round(baseAmountUsd * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT * 100) / 100
+        Math.round(baseAmountUsd * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT * 100) / 100
       );
     });
 
-    it('computes monthly currentPeriodBonusCreditsUsd as 50% for promo month 2 (streak=2)', async () => {
+    it('computes monthly currentPeriodBonusCreditsUsd as 10% before cutoff (streak=2)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
       const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
@@ -3049,15 +3042,12 @@ describe('kiloPassRouter', () => {
       const result = await caller.kiloPass.getState();
 
       const baseAmountUsd = getMonthlyPriceUsd(KiloPassTier.Tier19);
-      const expectedCurrentBonusUsd =
-        Math.round(
-          Math.round(baseAmountUsd * 100) * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT
-        ) / 100;
+      const expectedCurrentBonusUsd = Math.round(Math.round(baseAmountUsd * 100) * 0.1) / 100;
 
       expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
     });
 
-    it('does not apply 50% month-2 promo when started_at is at/after the cutoff (streak=2)', async () => {
+    it('applies 50% month-2 promo when started_at is at cutoff (streak=2)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
       const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;
@@ -3085,7 +3075,7 @@ describe('kiloPassRouter', () => {
         cadence: KiloPassCadence.Monthly,
         status: 'active',
         currentStreakMonths: 2,
-        startedAt: KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF.toISOString(),
+        startedAt: KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF.toISOString(),
       });
       await insertBaseCreditsIssuance({
         subscriptionId,
@@ -3110,18 +3100,18 @@ describe('kiloPassRouter', () => {
         tier: KiloPassTier.Tier19,
         streakMonths: 2,
         isFirstTimeSubscriberEver: true,
+        subscriptionStartedAtIso: KILO_PASS_MONTHLY_WELCOME_PROMO_SECOND_MONTH_CUTOFF.toISOString(),
       });
       const expectedCurrentBonusUsd = Math.round(baseAmountUsd * expectedPercent * 100) / 100;
 
       expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(expectedCurrentBonusUsd);
-      expect(result.subscription?.currentPeriodBonusCreditsUsd).not.toBe(
-        Math.round(
-          Math.round(baseAmountUsd * 100) * KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT
-        ) / 100
+      expect(result.subscription?.currentPeriodBonusCreditsUsd).toBe(
+        Math.round(Math.round(baseAmountUsd * 100) * KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT) /
+          100
       );
     });
 
-    it('keeps month 3+ bonus ramp unchanged even for grandfathered subscriptions (streak=3)', async () => {
+    it('keeps month 3+ bonus ramp unchanged for pre-cutoff subscriptions (streak=3)', async () => {
       const stripeMock = getStripeMock();
       const currentPeriodEndSeconds = 1_700_123_456;
       const currentPeriodStartSeconds = currentPeriodEndSeconds - 2_592_000;

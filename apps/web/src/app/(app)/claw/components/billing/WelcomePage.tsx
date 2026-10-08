@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
+import { getMonthlyWelcomePromoMonth } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   createKiloClawSignupDisplay,
   formatMicrodollars,
@@ -85,11 +86,15 @@ function TierCard({
   cadence,
   isSelected,
   onSelect,
+  showFirstMonthPromo,
+  subscriptionStartedAtIso,
 }: {
   tier: Tier;
   cadence: Cadence;
   isSelected: boolean;
   onSelect: () => void;
+  showFirstMonthPromo: boolean;
+  subscriptionStartedAtIso: string;
 }) {
   const data = TIER_DATA[tier];
   const isYearly = cadence === 'yearly';
@@ -98,6 +103,7 @@ function TierCard({
   const creditsLabel = isYearly
     ? `$${data.yearlyPrice}/year paid credits`
     : `$${data.monthlyPrice}/month paid credits`;
+  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
 
   return (
     <button
@@ -131,7 +137,11 @@ function TierCard({
         <div className="text-xs leading-relaxed text-emerald-300">
           {isYearly
             ? '+50% free bonus credits every month'
-            : 'Month 1: +5%; month 2: +50% free bonus credits'}
+            : !showFirstMonthPromo
+              ? 'Month 1: +5%; month 2: +10% free bonus credits'
+              : promoMonth === 1
+                ? 'Month 1: +50%; month 2: +10% free bonus credits'
+                : 'Month 1: +5%; month 2: +50% free bonus credits'}
         </div>
       </div>
 
@@ -286,8 +296,17 @@ function HostingOnlyPlanCard({
   );
 }
 
-function CreditsHowItWorks({ cadence }: { cadence: Cadence }) {
+function CreditsHowItWorks({
+  cadence,
+  showFirstMonthPromo,
+  subscriptionStartedAtIso,
+}: {
+  cadence: Cadence;
+  showFirstMonthPromo: boolean;
+  subscriptionStartedAtIso: string;
+}) {
   const [open, setOpen] = useState(false);
+  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
   return (
     <div className="border-border/50 mb-3.5 overflow-hidden rounded-lg border">
       <button
@@ -318,6 +337,17 @@ function CreditsHowItWorks({ cadence }: { cadence: Cadence }) {
             <span>
               {cadence === 'yearly' ? (
                 <>Yearly subscribers receive 50% free bonus credits every month.</>
+              ) : !showFirstMonthPromo ? (
+                <>
+                  Monthly subscribers start with 5% free bonus credits, increasing by 5 percentage
+                  points each consecutive month up to 40%.
+                </>
+              ) : promoMonth === 1 ? (
+                <>
+                  First-time monthly subscribers receive{' '}
+                  <span className="text-emerald-300">50%</span> free bonus credits for the first
+                  month, then the regular 10% bonus in the second month.
+                </>
               ) : (
                 <>
                   First-time monthly subscribers receive{' '}
@@ -513,6 +543,9 @@ export function WelcomePage() {
   const { data: billing, isPending: billingSummaryPending } = useQuery(
     trpc.kiloclaw.getPersonalBillingSummary.queryOptions()
   );
+  const { data: kiloPassState } = useQuery(trpc.kiloPass.getState.queryOptions());
+  const showFirstMonthPromo = kiloPassState?.isEligibleForFirstMonthPromo === true;
+  const subscriptionStartedAtIso = new Date().toISOString();
   const checkoutMutation = useMutation(trpc.kiloclaw.createSubscriptionCheckout.mutationOptions());
   const kiloPassUpsell = useMutation(
     trpc.kiloclaw.createKiloPassUpsellCheckout.mutationOptions({
@@ -731,13 +764,19 @@ export function WelcomePage() {
                     key={tier}
                     tier={tier}
                     cadence={cadence}
+                    showFirstMonthPromo={showFirstMonthPromo}
+                    subscriptionStartedAtIso={subscriptionStartedAtIso}
                     isSelected={selectedTier === tier}
                     onSelect={() => handleTierSelect(tier)}
                   />
                 ))}
               </div>
 
-              <CreditsHowItWorks cadence={cadence} />
+              <CreditsHowItWorks
+                cadence={cadence}
+                showFirstMonthPromo={showFirstMonthPromo}
+                subscriptionStartedAtIso={subscriptionStartedAtIso}
+              />
 
               {/* Warning */}
               <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">

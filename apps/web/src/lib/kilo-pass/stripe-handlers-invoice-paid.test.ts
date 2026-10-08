@@ -2353,7 +2353,6 @@ describe('handleKiloPassInvoicePaid', () => {
     });
     expect(subRow).toBeTruthy();
     expect(subRow?.kilo_user_id).toBe(user.id);
-    expect(subRow?.welcome_promo_in_second_month).toBe(true);
     expect(subRow?.tier).toBe(KiloPassTier.Tier19);
     expect(subRow?.cadence).toBe(KiloPassCadence.Monthly);
     expect(subRow?.status).toBe('active');
@@ -2698,7 +2697,11 @@ describe('handleKiloPassInvoicePaid', () => {
     const replayedSubscription = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubId),
     });
-    expect(replayedSubscription?.welcome_promo_in_second_month).toBe(true);
+    expect(
+      replayedSubscription?.started_at
+        ? new Date(replayedSubscription.started_at).toISOString()
+        : null
+    ).toBe(new Date(subscription.start_date * 1000).toISOString());
 
     const kinds = await db
       .select({ kind: kilo_pass_issuance_items.kind })
@@ -2707,9 +2710,9 @@ describe('handleKiloPassInvoicePaid', () => {
     expect(kinds.map(k => k.kind).sort()).toEqual([KiloPassIssuanceItemKind.Base]);
   });
 
-  test.each([false, true])(
-    'monthly: renewal and replay preserve welcome schedule %s and count consecutive months',
-    async welcomePromoInSecondMonth => {
+  test.each(['2026-10-08T23:59:59.999Z', '2026-10-09T00:00:00.000Z'])(
+    'monthly: renewal and replay preserve subscription start %s and count consecutive months',
+    async startedAt => {
       const { handleKiloPassInvoicePaid } =
         await import('@/lib/kilo-pass/stripe-handlers-invoice-paid');
 
@@ -2722,7 +2725,7 @@ describe('handleKiloPassInvoicePaid', () => {
       });
       const subscription = makeStripeSubscription({
         id: stripeSubId,
-        start_date_seconds: 1_735_689_600,
+        start_date_seconds: Math.floor(new Date(startedAt).valueOf() / 1000),
         metadata: meta,
       });
 
@@ -2739,13 +2742,12 @@ describe('handleKiloPassInvoicePaid', () => {
         .insert(kilo_pass_subscriptions)
         .values({
           kilo_user_id: user.id,
-          welcome_promo_in_second_month: welcomePromoInSecondMonth,
           provider_subscription_id: stripeSubId,
           stripe_subscription_id: stripeSubId,
           tier: KiloPassTier.Tier19,
           cadence: KiloPassCadence.Monthly,
           status: 'active',
-          started_at: new Date(subscription.start_date * 1000).toISOString(),
+          started_at: startedAt,
           ended_at: null,
           current_streak_months: 1,
         })
@@ -2757,7 +2759,7 @@ describe('handleKiloPassInvoicePaid', () => {
 
       await db.insert(kilo_pass_issuances).values({
         kilo_pass_subscription_id: subscriptionId,
-        issue_month: '2025-12-01',
+        issue_month: '2026-10-01',
         source: KiloPassIssuanceSource.Cron,
         stripe_invoice_id: null,
       });
@@ -2770,8 +2772,8 @@ describe('handleKiloPassInvoicePaid', () => {
       const invoice = makeStripeInvoice({
         id: invoiceId,
         amount_paid_cents: 1900,
-        period_start_seconds: 1_767_225_600, // 2026-01-01T00:00:00Z
-        created_seconds: 1_767_225_600,
+        period_start_seconds: Date.parse('2026-11-01T00:00:00Z') / 1000,
+        created_seconds: Date.parse('2026-11-01T00:00:00Z') / 1000,
         priceId,
         subscriptionIdOrExpanded: stripeSubId,
         metadata: meta,
@@ -2792,7 +2794,9 @@ describe('handleKiloPassInvoicePaid', () => {
         where: eq(kilo_pass_subscriptions.id, subscriptionId),
       });
       expect(updatedSub?.current_streak_months).toBe(2);
-      expect(updatedSub?.welcome_promo_in_second_month).toBe(welcomePromoInSecondMonth);
+      expect(updatedSub?.started_at ? new Date(updatedSub.started_at).toISOString() : null).toBe(
+        new Date(startedAt).toISOString()
+      );
 
       const issuance = await db.query.kilo_pass_issuances.findFirst({
         where: eq(kilo_pass_issuances.stripe_invoice_id, invoiceId),

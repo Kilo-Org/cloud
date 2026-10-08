@@ -1905,13 +1905,6 @@
       "when": 1791369247100,
       "tag": "0271_same_mephisto",
       "breakpoints": true
-    },
-    {
-      "idx": 272,
-      "version": "7",
-      "when": 1791456296654,
-      "tag": "0272_equal_human_robot",
-      "breakpoints": true
     }
   ]
 }

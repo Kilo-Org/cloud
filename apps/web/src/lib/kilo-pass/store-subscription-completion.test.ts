@@ -138,7 +138,7 @@ describe('completeStoreKiloPassPurchase', () => {
   });
 
   it.each([KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay] as const)(
-    '%s legacy schedule survives tier/cadence changes and purchase replay',
+    '%s subscription start survives tier/cadence changes and purchase replay',
     async paymentProvider => {
       const user = await insertTestUser();
       const providerSubscriptionId = crypto.randomUUID();
@@ -154,7 +154,6 @@ describe('completeStoreKiloPassPurchase', () => {
           started_at: '2026-01-01T00:00:00.000Z',
         })
         .returning();
-      expect(legacy?.welcome_promo_in_second_month).toBe(false);
       const purchase = applePurchase({
         paymentProvider,
         providerSubscriptionId,
@@ -174,10 +173,12 @@ describe('completeStoreKiloPassPurchase', () => {
         where: eq(kilo_pass_subscriptions.id, changed.subscriptionId),
       });
       expect(subscription).toMatchObject({
-        welcome_promo_in_second_month: false,
         tier: KiloPassTier.Tier49,
         cadence: KiloPassCadence.Yearly,
       });
+      expect(
+        subscription?.started_at ? new Date(subscription.started_at).toISOString() : null
+      ).toBe('2026-01-01T00:00:00.000Z');
     }
   );
 
@@ -305,7 +306,6 @@ describe('completeStoreKiloPassPurchase', () => {
       tier: to,
       current_streak_months: 2,
       provider_subscription_id: newToken,
-      welcome_promo_in_second_month: true,
     });
   });
 
@@ -538,7 +538,6 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(subscriptions).toHaveLength(1);
     expect(subscriptions[0]).toMatchObject({
       payment_provider: KiloPassPaymentProvider.AppStore,
-      welcome_promo_in_second_month: true,
       provider_subscription_id: purchase.providerSubscriptionId,
       stripe_subscription_id: null,
       status: 'active',
@@ -613,7 +612,9 @@ describe('completeStoreKiloPassPurchase', () => {
     const subscription = await db.query.kilo_pass_subscriptions.findFirst({
       where: eq(kilo_pass_subscriptions.id, first.subscriptionId),
     });
-    expect(subscription?.welcome_promo_in_second_month).toBe(true);
+    expect(subscription?.started_at ? new Date(subscription.started_at).toISOString() : null).toBe(
+      purchase.subscriptionStartedAtIso ?? purchase.purchasedAtIso
+    );
 
     const storePurchases = await db
       .select()
@@ -832,7 +833,6 @@ describe('completeStoreKiloPassPurchase', () => {
       '2026-05-01T00:00:00.000Z'
     );
     expect(subscription?.current_streak_months).toBe(2);
-    expect(subscription?.welcome_promo_in_second_month).toBe(true);
 
     const renewalPurchase = await db.query.kilo_pass_store_purchases.findFirst({
       where: eq(kilo_pass_store_purchases.provider_transaction_id, renewalTransactionId),

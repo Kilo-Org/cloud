@@ -1680,7 +1680,6 @@ function buildPendingKiloPassState(params: {
     currentStreakMonths: params.cadence === KiloPassCadence.Yearly ? 0 : 1,
     nextYearlyIssueAt: null,
     startedAt: new Date().toISOString(),
-    welcomePromoInSecondMonth: true,
     resumesAt: null,
   };
 }

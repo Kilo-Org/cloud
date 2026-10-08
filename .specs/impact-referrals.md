@@ -587,10 +587,10 @@ application, and Kilo Pass redeems after local referral bonus allocation.
       rewards but only an annual Kilo Pass subscription, rewards remain pending until an eligible monthly subscription is
       available or the rewards expire.
 
-132.  For subscriptions on the legacy welcome schedule, the referral launch cutoff MUST preserve the previous behavior.
-      First-time monthly subscribers who started before that cutoff keep legacy month-2 promo eligibility.
-      Those starting at or after that cutoff receive only the month-1 welcome promo.
-      New subscriptions use the month-2 welcome schedule defined in `.specs/kilo-pass.md`.
+132.  The monthly welcome schedule MUST follow the subscription-start cutoff in `.specs/kilo-pass.md`.
+      Eligible first-time subscribers starting before `2026-10-09T00:00:00Z` receive the welcome promo only in month 1.
+      Those starting at or after that cutoff receive the welcome promo only in month 2.
+      Returning subscribers MUST always use the normal monthly ramp.
 
 ### Shared Reward Granting
 

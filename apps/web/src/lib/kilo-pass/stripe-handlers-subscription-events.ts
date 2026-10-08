@@ -111,7 +111,6 @@ export async function handleKiloPassSubscriptionEvent(params: {
         .insert(kilo_pass_subscriptions)
         .values({
           ...baseValues,
-          welcome_promo_in_second_month: true,
           payment_provider: KiloPassPaymentProvider.Stripe,
           provider_subscription_id: eventSubscription.id,
           stripe_subscription_id: eventSubscription.id,

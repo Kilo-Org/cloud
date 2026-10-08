@@ -1,1 +1,0 @@
-ALTER TABLE "kilo_pass_subscriptions" ADD COLUMN "welcome_promo_in_second_month" boolean DEFAULT false NOT NULL;

@@ -2061,22 +2061,23 @@ describe('processGooglePlayKiloPassNotification', () => {
       toMicrodollars(19)
     );
   });
-  it.each([
-    [19, false, false],
-    [49, false, false],
-    [199, false, false],
-    [19, true, false],
-    [49, true, false],
-    [199, true, false],
-    [19, false, true],
-    [49, false, true],
-    [199, false, true],
-    [19, true, true],
-    [49, true, true],
-    [199, true, true],
-  ] as const)(
-    'grants tier %i bonus once and refunds spent credits (returning=%s, canceled=%s)',
-    async (tier, returning, canceled) => {
+  it.each(
+    ([19, 49, 199] as const).flatMap(tier =>
+      [false, true].flatMap(returning =>
+        [false, true].flatMap(canceled =>
+          ['2026-10-08T23:59:59.999Z', '2026-10-09T00:00:00.000Z'].map(start => ({
+            tier,
+            returning,
+            canceled,
+            start,
+            bonusPercent: returning || start === '2026-10-09T00:00:00.000Z' ? 0.05 : 0.5,
+          }))
+        )
+      )
+    )
+  )(
+    'grants tier $tier bonus once and refunds spent credits (returning=$returning, canceled=$canceled, start=$start)',
+    async ({ tier, returning, canceled, start, bonusPercent }) => {
       const { user, obfsAccountId } = await insertGooglePlayUser();
       if (returning)
         await db.insert(kilo_pass_subscriptions).values({
@@ -2088,9 +2089,8 @@ describe('processGooglePlayKiloPassNotification', () => {
           status: 'canceled',
           ended_at: '2025-01-01T00:00:00Z',
         });
-      const now = new Date();
+      const now = new Date(start);
       dateNowSpy.mockReturnValue(now.valueOf());
-      const start = now.toISOString();
       const end = new Date(now.valueOf() + 31 * 86400000).toISOString();
       const token = crypto.randomUUID();
       const orderId = crypto.randomUUID();
@@ -2150,7 +2150,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       const bonus = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
       });
-      const bonusUsd = tier * 0.05;
+      const bonusUsd = tier * bonusPercent;
       expect(bonus!.total_microdollars_acquired - paid!.total_microdollars_acquired).toBe(
         toMicrodollars(bonusUsd)
       );

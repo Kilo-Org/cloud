@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { getMonthlyWelcomePromoMonth } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { cn } from '@/lib/utils';
 
 import { KiloPassTierCard } from './KiloPassTierCard';
@@ -42,10 +43,14 @@ export function KiloPassSubscribeCard(props: {
   } = props;
 
   const tiers = Object.keys(KILO_PASS_TIER_CONFIG) as KiloPassTier[];
+  const subscriptionStartedAtIso = new Date().toISOString();
+  const promoMonth = getMonthlyWelcomePromoMonth(subscriptionStartedAtIso);
 
   const monthlyPromoDescription =
     cadence === KiloPassCadence.Monthly && showFirstMonthPromo
-      ? 'First-time subscribers receive 50% free bonus credits for the second month, with the regular 5% bonus in the first month.'
+      ? promoMonth === 1
+        ? 'First-time subscribers receive 50% free bonus credits for the first month, then the regular 10% bonus in the second month.'
+        : 'First-time subscribers receive 50% free bonus credits for the second month, with the regular 5% bonus in the first month.'
       : null;
   const cadenceOptions = [
     { value: KiloPassCadence.Monthly, label: 'Monthly' },
@@ -86,6 +91,7 @@ export function KiloPassSubscribeCard(props: {
             cadence={cadence}
             pending={pending}
             showFirstMonthPromo={showFirstMonthPromo}
+            subscriptionStartedAtIso={subscriptionStartedAtIso}
             isRecommended={recommendedTier != null && tier === recommendedTier}
             onSelect={onSelectTier}
           />

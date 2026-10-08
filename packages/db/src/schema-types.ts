@@ -2255,6 +2255,20 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
+export const GatewayModelIdSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9./:~-]+$/, 'Model IDs may only contain lowercase letters, digits, and . / : ~ -');
+
+/** Kilo-owned model namespaces; mirrors the prefixes in web-shared `model-utils.ts`. */
+const RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES = ['kilo/', 'kilo-auto/', 'kilocode/'];
+
+export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(id => !id.includes(':'), {
+  message: 'public_id must not contain ":"',
+}).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
+  message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
+});
+
 export const CustomLlmInferenceProviderSlugSchema = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
@@ -2322,13 +2336,7 @@ export const CustomLlmDefinitionSchema = z
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 export const AutoFreeModelSchema = z.object({
-  model: z
-    .string()
-    .trim()
-    .regex(
-      /^[a-z0-9./:~-]+$/,
-      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
-    ),
+  model: GatewayModelIdSchema,
   weight: z.number().int().positive(),
   reasoning: z.object({
     enabled: z.boolean().optional(),

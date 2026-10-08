@@ -36,7 +36,8 @@ const encryptedApiKey = encryptApiKey(
   JSON.stringify({ type: 'api_key', api_key: 'sk-upstream' }),
   BYOK_ENCRYPTION_KEY
 );
-const shadowedExclusiveId = kiloExclusiveModels[0].public_id;
+const shadowedExclusiveId =
+  kiloExclusiveModels.find(model => !model.public_id.includes(':'))?.public_id ?? '';
 
 function providerInput(
   requestedModel: string,

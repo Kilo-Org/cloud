@@ -37,7 +37,11 @@ import {
   useUpsertCustomLlm,
   useDeleteCustomLlm,
 } from '@/app/admin/api/custom-llms/hooks';
-import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
+import {
+  CustomLlmCredentialsSchema,
+  CustomLlmDefinitionSchema,
+  CustomLlmPublicIdSchema,
+} from '@kilocode/db/schema-types';
 import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
@@ -216,6 +220,22 @@ export function CustomLlmsContent() {
       return;
     }
 
+    const publicIdResult = CustomLlmPublicIdSchema.safeParse(publicId);
+    if (!publicIdResult.success) {
+      setCopy(prev =>
+        prev
+          ? {
+              ...prev,
+              validationError: {
+                field: 'publicId',
+                message: formatZodError(publicIdResult.error),
+              },
+            }
+          : prev
+      );
+      return;
+    }
+
     if (!displayName) {
       setCopy(prev =>
         prev
@@ -246,6 +266,14 @@ export function CustomLlmsContent() {
     if (!trimmedPublicId) {
       setEditor(prev => ({ ...prev, validationError: 'public_id is required' }));
       return;
+    }
+
+    if (editor.mode === 'create') {
+      const publicIdResult = CustomLlmPublicIdSchema.safeParse(trimmedPublicId);
+      if (!publicIdResult.success) {
+        setEditor(prev => ({ ...prev, validationError: formatZodError(publicIdResult.error) }));
+        return;
+      }
     }
 
     let parsedCredentials: CustomLlmCredentials | undefined = undefined;
@@ -525,8 +553,10 @@ export function CustomLlmsContent() {
                 the outbound request body.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
-                Public ID must not be an OpenRouter model or use a direct BYOK provider prefix. It
-                may reuse a Kilo-exclusive model ID, which the custom LLM then replaces.
+                Public ID may only contain lowercase letters, digits, and <code>. / ~ -</code>. It
+                must not start with <code>kilo/</code>, <code>kilo-auto/</code>, or{' '}
+                <code>kilocode/</code>, be an OpenRouter model, or use a direct BYOK provider
+                prefix. It may reuse a Kilo-exclusive model ID, which the custom LLM then replaces.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
                 To make the model available to every user for free, replace{' '}

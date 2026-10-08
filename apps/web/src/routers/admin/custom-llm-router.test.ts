@@ -448,23 +448,51 @@ describe('adminCustomLlmRouter', () => {
       expect(result.public_id).toBe('acme/model');
     });
 
-    it.each(['openai/gpt-4o', 'OpenAI/GPT-4o'])(
-      'rejects %s because it is an OpenRouter model',
-      async publicId => {
-        const caller = await createCallerForUser(admin.id);
+    it('rejects an OpenRouter model id', async () => {
+      const caller = await createCallerForUser(admin.id);
 
-        await expect(
-          caller.admin.customLlm.upsert({
-            public_id: publicId,
-            definition: validDefinition,
-            credentials,
-          })
-        ).rejects.toMatchObject({
-          code: 'BAD_REQUEST',
-          message: expect.stringContaining('OpenRouter'),
-        });
-      }
-    );
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'openai/gpt-4o',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('OpenRouter'),
+      });
+    });
+
+    it.each([
+      ['Acme/Model', 'lowercase letters'],
+      ['acme/my model', 'lowercase letters'],
+      ['acme/model:free', 'must not contain ":"'],
+      ['kilo/model', 'must not start with'],
+      ['kilo-auto/model', 'must not start with'],
+      ['kilocode/model', 'must not start with'],
+    ])('rejects the malformed or reserved id %s', async (publicId, message) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
+    });
+
+    it('trims a new id before storing it', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: '  acme/trimmed-model  ',
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.public_id).toBe('acme/trimmed-model');
+    });
 
     it('rejects an id with a direct BYOK provider prefix', async () => {
       const caller = await createCallerForUser(admin.id);
@@ -482,7 +510,10 @@ describe('adminCustomLlmRouter', () => {
     });
 
     it('accepts a Kilo-exclusive model id even when OpenRouter lists it', async () => {
-      const exclusiveModelId = kiloExclusiveModels[0].public_id;
+      const exclusiveModelId = kiloExclusiveModels.find(
+        model => !model.public_id.includes(':')
+      )?.public_id;
+      if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
       jest
         .mocked(getOpenRouterModelsMetadataFromDatabase)
         .mockResolvedValue({ [exclusiveModelId]: {} as StoredModel });
@@ -509,6 +540,13 @@ describe('adminCustomLlmRouter', () => {
         caller.admin.customLlm.copy({
           source_public_id: 'acme/copy-source',
           public_id: 'openai/gpt-4o',
+          display_name: 'Copy',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: 'acme/copy-source',
+          public_id: 'kilo/copy',
           display_name: 'Copy',
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });

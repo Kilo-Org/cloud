@@ -4,6 +4,7 @@ import { custom_llm2 } from '@kilocode/db/schema';
 import {
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
+  CustomLlmPublicIdSchema,
   type EncryptedData,
 } from '@kilocode/db/schema-types';
 import { asc, eq } from 'drizzle-orm';
@@ -16,15 +17,23 @@ import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/li
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
-const publicIdSchema = z.string().min(1, 'public_id is required');
+const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
 /**
  * A custom LLM takes precedence over any built-in model with its id, so a new
  * id must not hide an OpenRouter or direct BYOK model. Reusing a Kilo-exclusive
- * id is allowed on purpose.
+ * id is allowed on purpose. Existing rows keep their id, so this only runs when
+ * an id is claimed.
  */
 async function assertPublicIdIsClaimable(publicId: string) {
-  const modelId = publicId.trim().toLowerCase();
+  const parsedPublicId = CustomLlmPublicIdSchema.safeParse(publicId);
+  if (!parsedPublicId.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: parsedPublicId.error.issues.map(issue => issue.message).join('; '),
+    });
+  }
+  const modelId = parsedPublicId.data;
   const directByokProvider = DirectUserByokInferenceProviderIdSchema.options.find(providerId =>
     modelId.startsWith(`${providerId}/`)
   );
@@ -36,7 +45,7 @@ async function assertPublicIdIsClaimable(publicId: string) {
   }
   if (isKiloExclusiveModel(modelId)) return;
   const openRouterModels = await getOpenRouterModelsMetadataFromDatabase();
-  if (Object.hasOwn(openRouterModels, publicId) || Object.hasOwn(openRouterModels, modelId)) {
+  if (Object.hasOwn(openRouterModels, modelId)) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: `public_id "${publicId}" already exists in the OpenRouter model list`,

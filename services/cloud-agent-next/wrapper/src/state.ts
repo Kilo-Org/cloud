@@ -63,6 +63,7 @@ export class WrapperState {
   private _observedGateResult: 'pass' | 'fail' | null = null;
   private _sendToIngestFn: ((event: IngestEvent) => void) | null = null;
   private _logUploader: LogUploader | null = null;
+  private _secretEnvKeys: readonly string[] = [];
 
   get isIdle(): boolean {
     return !this.isActive;
@@ -144,6 +145,14 @@ export class WrapperState {
 
   get logUploader(): LogUploader | null {
     return this._logUploader;
+  }
+
+  get secretEnvKeys(): readonly string[] {
+    return this._secretEnvKeys;
+  }
+
+  setSecretEnvKeys(keys: readonly string[] | undefined): void {
+    this._secretEnvKeys = keys ?? [];
   }
 
   setLogUploader(uploader: LogUploader | null): void {
@@ -240,6 +249,7 @@ export class WrapperState {
     this._logUploader?.stop();
     this._logUploader = null;
     this.session = null;
+    this._secretEnvKeys = [];
     this.clearAllMessages();
     this._lastAssistantMessageId = null;
     this._publicationSignal = null;

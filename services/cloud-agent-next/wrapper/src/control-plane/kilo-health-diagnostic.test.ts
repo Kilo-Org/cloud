@@ -105,6 +105,7 @@ function harness(
   const exits: Array<() => void> = [];
   let unavailable = 0;
   const runtime = createKiloRuntime({
+    readSnapshot: async () => [],
     directory: `/tmp/${SENTINEL}`,
     env: {},
     pidfileDirectory: `/tmp/${SENTINEL}/pids`,
@@ -423,7 +424,7 @@ describe('default SDK health diagnostics', () => {
         );
       }
       expect(requests).toBe(4);
-      expect(test.counts).toEqual({ spawns: 4, stops: 3, opens: 4, restarts: 3 });
+      expect(test.counts).toEqual({ spawns: 4, stops: 4, opens: 4, restarts: 3 });
       expect(parseRestartDiagnostics(test.logs.join('\n'))).toHaveLength(3);
       expect(test.logs.filter(line => line.includes(' diagnostic='))).toHaveLength(3);
     } finally {
@@ -590,7 +591,7 @@ describe('default SDK health diagnostics', () => {
       test.exits.at(-1)?.();
       await waitFor(() => test.runtime.isUnavailable());
       expect(test.unavailable()).toBe(1);
-      expect(test.counts).toEqual({ spawns: 8, stops: 7, opens: 8, restarts: 7 });
+      expect(test.counts).toEqual({ spawns: 8, stops: 8, opens: 8, restarts: 7 });
       expect(test.logs.filter(line => line.includes(' diagnostic='))).toHaveLength(3);
       expect(fetchSpy.mock.calls).toHaveLength(0);
     } finally {

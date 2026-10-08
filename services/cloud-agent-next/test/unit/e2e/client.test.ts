@@ -783,7 +783,7 @@ describe('prepare transport', () => {
     internalApiSecret: SECRET,
   };
 
-  type SeenRequest = { url: string; headers: Record<string, string> };
+  type SeenRequest = { url: string; headers: Record<string, string>; body: unknown };
   const seen: SeenRequest[] = [];
 
   beforeEach(() => {
@@ -798,6 +798,7 @@ describe('prepare transport', () => {
         const request = {
           url: String(url),
           headers: (init?.headers ?? {}) as Record<string, string>,
+          body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined,
         };
         seen.push(request);
         const respond = responses[Math.min(index, responses.length - 1)];
@@ -839,6 +840,20 @@ describe('prepare transport', () => {
     expect(seen[0].headers['x-internal-api-key']).toBe(SECRET);
     expect(prepared.cloudAgentSessionId).toBe(SESSION_ID);
   });
+
+  it.each([undefined, 'test-owner/private-repo'])(
+    'prepares browser sessions with the configured repository source %s',
+    async githubRepo => {
+      installFetch([
+        () => okEnvelope({ cloudAgentSessionId: SESSION_ID, kiloSessionId: 'ses_source' }),
+      ]);
+      await prepareBrowserSession({ ...prepareConfig, githubRepo }, { prompt: 'echo:hi' });
+      expect(seen[0].body).toMatchObject(
+        githubRepo ? { githubRepo } : { gitUrl: prepareConfig.gitUrl }
+      );
+      expect(seen[0].body).not.toHaveProperty(githubRepo ? 'gitUrl' : 'githubRepo');
+    }
+  );
 
   it('never targets the removed surface prepare route', async () => {
     installFetch([

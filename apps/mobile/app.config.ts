@@ -117,7 +117,12 @@ const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlSche
 const permissionLocales = buildPermissionPromptLocales(PERMISSION_PROMPT_COPY);
 const focusFilterCatalog = buildFocusFilterStringsFiles(FOCUS_FILTER_COPY);
 const nativeLocales: ExpoConfig['locales'] = Object.fromEntries(
-  SUPPORTED_LANGUAGES.map(tag => [tag, { ios: permissionLocales[tag].ios }])
+  SUPPORTED_LANGUAGES.map(tag => {
+    const { NSLocalNetworkUsageDescription: _developmentPrompt, ...productionPrompts } =
+      permissionLocales[tag].ios;
+    // Keep dev-launcher's base description unchanged so its release strip still matches.
+    return [tag, { ios: isProductionBuild ? productionPrompts : permissionLocales[tag].ios }];
+  })
 );
 
 const config: ExpoConfig = {
@@ -127,7 +132,7 @@ const config: ExpoConfig = {
   // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: this is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.13',
+  version: '1.0.14',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -288,6 +293,8 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
+          // SDK 27 requires the scene lifecycle, including scene-based window and link handling.
+          enableSceneSupport: true,
           // iOS consumes React Native Core prebuilt by default, so the pnpm patch
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
@@ -320,6 +327,13 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    [
+      'expo-image-picker',
+      {
+        cameraPermission: PERMISSION_PROMPT_COPY.en.NSCameraUsageDescription,
+        photosPermission: PERMISSION_PROMPT_COPY.en.NSPhotoLibraryUsageDescription,
+      },
+    ],
     'expo-font',
     // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
     // writes the union of the SecureStore and AppsFlyer exclusions). Disable the
@@ -379,6 +393,11 @@ const config: ExpoConfig = {
       {
         locationWhenInUsePermission:
           'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
+        // The app requests only foreground location for weather setup.
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
+        motionUsagePermission: PERMISSION_PROMPT_COPY.en.NSMotionUsageDescription,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
         isAndroidForegroundServiceEnabled: false,

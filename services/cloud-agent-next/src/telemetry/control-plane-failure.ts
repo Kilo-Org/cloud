@@ -98,6 +98,8 @@ export function classifyControlPlaneFailure(
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'billing_blocked':
       return { stage: 'pre_dispatch', code: 'payment_required' };
+    case 'container_limit_reached':
+      return { stage: 'pre_dispatch', code: 'container_limit_reached' };
     case 'billing_unavailable':
       return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
     case 'invalid_configuration':

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from './db';
 import type * as CliRunnerModule from './cli-runner';
 
@@ -84,14 +84,12 @@ import {
 import {
   NoEntriesClaimedError,
   drainQueue,
-  platformRegistryEntries,
   drainQueues,
   failRunAndDrain,
   processJob,
   startRun,
   sweepStaleRunsAndDrain,
 } from './run';
-import { getBenchmarkConfig } from './config';
 
 const queueSendBatch = vi.fn();
 const kvDelete = vi.fn();
@@ -137,9 +135,22 @@ function mockConfig(overrides: Partial<typeof configRow> = {}) {
   });
 }
 
+const catalogFetch = vi.fn<typeof fetch>();
+
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockConfig();
+  vi.stubGlobal('fetch', catalogFetch);
+  catalogFetch.mockImplementation(async () =>
+    Response.json({
+      data: [
+        { id: 'platform/a' },
+        { id: 'platform/b', opencode: { variants: { high: { reasoning: { effort: 'high' } } } } },
+      ],
+    })
+  );
   vi.mocked(getRunningRun).mockResolvedValue(undefined);
   vi.mocked(getLatestSummariesByModel).mockResolvedValue(new Map());
   vi.mocked(insertRun).mockResolvedValue(undefined);
@@ -195,6 +206,50 @@ const RUN_ROW_BASE = {
 function runningRun(id: string, purpose: 'platform' | 'user') {
   return { ...RUN_ROW_BASE, id, purpose };
 }
+
+describe('all-effort platform scheduling', () => {
+  it('schedules every exact effort over bounded registry batches', async () => {
+    mockConfig({ max_concurrency: 2 });
+    const variants = ['none', 'low', 'medium', 'high', 'max'];
+    catalogFetch.mockImplementation(async () =>
+      Response.json({
+        data: [
+          {
+            id: 'platform/a',
+            opencode: {
+              variants: Object.fromEntries(
+                variants.map(variant => [variant, { reasoning: { effort: variant } }])
+              ),
+            },
+          },
+          { id: 'platform/b' },
+        ],
+      })
+    );
+    let pending = variants.map(variant => ({
+      model: 'platform/a',
+      variant,
+      requested_at: configRow.updated_at,
+    }));
+    vi.mocked(listPendingCurrentProfiles).mockImplementation(async () => pending);
+    vi.mocked(markProfilesRunningForRun).mockImplementation(async (_db, _runId, entries) => {
+      pending = pending.filter(
+        row => !entries.some(entry => entry.model === row.model && entry.variant === row.variant)
+      );
+      return [...entries];
+    });
+    while (pending.length > 0) await drainQueue(env, 'platform');
+    const batches = vi.mocked(insertRun).mock.calls.map(call => call[2]);
+    expect(batches.map(batch => batch.length)).toEqual([2, 2, 1]);
+    expect(batches.flat().map(row => row.variant)).toEqual(variants);
+  });
+
+  it('does not claim stale platform efforts when catalog refresh fails', async () => {
+    catalogFetch.mockResolvedValue(new Response('unavailable', { status: 503 }));
+    await expect(drainQueue(env, 'platform')).rejects.toThrow(/catalog failed/);
+    expect(markProfilesRunningForRun).not.toHaveBeenCalled();
+  });
+});
 
 describe('startRun — registry-backed decider runs', () => {
   it('starts a user-queue run from an explicit two-variants-of-one-model snapshot', async () => {
@@ -264,28 +319,6 @@ describe('startRun — registry-backed decider runs', () => {
     await expect(startRun(env, 'decider', { entries: [] })).rejects.toThrow(
       /non-empty registry entry snapshot/
     );
-  });
-
-  it('maps a saved canonical variant from the decider list into the registry entry', async () => {
-    vi.mocked(getConfigRows).mockResolvedValue({
-      config: configRow,
-      classifierModels: ['classifier/a'],
-      deciderModels: [{ model: 'platform/a', variant: 'max', reasoning_effort: null }],
-      autoDeciderModels: [],
-      excludedAutoDeciderModels: [],
-    });
-
-    const config = await getBenchmarkConfig(env.BENCH_DB);
-    expect(platformRegistryEntries(config!)).toEqual([{ model: 'platform/a', variant: 'max' }]);
-  });
-
-  it("keeps a legacy enum effort as today's exact pair", async () => {
-    // mockConfig() default: platform/b holds reasoning_effort 'high' (legacy shape).
-    const config = await getBenchmarkConfig(env.BENCH_DB);
-    expect(platformRegistryEntries(config!)).toEqual([
-      { model: 'platform/a', variant: null },
-      { model: 'platform/b', variant: 'high' },
-    ]);
   });
 
   it('carries the entry variant into the run_models row', async () => {
@@ -516,52 +549,68 @@ describe('decider run completion', () => {
     expect(markRunFailed).not.toHaveBeenCalled();
   });
 
-  it('publishes the platform table from ready registry rows', async () => {
-    const runId = 'decider-publish-1';
-    const { DECIDER_CASES } = await import('./datasets/decider-cases');
-    const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
-    mockRunState(runId, 'platform', [{ model: 'platform/a', variant: '' }]);
-    vi.mocked(countCaseResultsByLane).mockResolvedValue([
-      { model: 'platform/a', variant: '', rep: 0, n: DECIDER_CASES.length },
-    ]);
-    vi.mocked(getCaseResults).mockResolvedValue(await caseRowsFor(runId, 'platform/a', ''));
-    vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
-      { model: 'platform/a', variant: '', run_id: runId },
-      { model: 'platform/b', variant: 'high', run_id: runId },
-    ]);
-    // Every route needs at least one graded candidate or publishing is skipped.
-    vi.mocked(getSummariesForRuns).mockResolvedValue(
-      TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
-        [
-          { model: 'platform/a', variant: null },
-          { model: 'platform/b', variant: 'high' },
-        ].map(pair => ({
-          ...pair,
-          runId,
-          routeKey,
-          accuracy: 0.9,
-          avgCostUsd: 0.002,
-          avgLatencyMs: 100,
-          p50LatencyMs: 100,
-          p95LatencyMs: 150,
-          cases: 10,
-          errors: 0,
-          timeouts: 0,
-          routeAccuracy: null,
-        }))
-      )
-    );
+  it.each(['ready', 'pending', 'running', 'failed'] as const)(
+    'publishes ready exact pairs only when the platform queue is settled (%s)',
+    async status => {
+      const runId = 'decider-publish-1';
+      const { DECIDER_CASES } = await import('./datasets/decider-cases');
+      const { TAXONOMY_ROUTE_KEYS } = await import('@kilocode/auto-routing-contracts');
+      mockRunState(runId, 'platform', [{ model: 'platform/a', variant: '' }]);
+      vi.mocked(countCaseResultsByLane).mockResolvedValue([
+        { model: 'platform/a', variant: '', rep: 0, n: DECIDER_CASES.length },
+      ]);
+      vi.mocked(getCaseResults).mockResolvedValue(await caseRowsFor(runId, 'platform/a', ''));
+      vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([
+        { model: 'platform/a', variant: '', run_id: runId },
+        { model: 'platform/b', variant: 'high', run_id: runId },
+      ]);
+      // Every route needs at least one graded candidate or publishing is skipped.
+      vi.mocked(getSummariesForRuns).mockResolvedValue(
+        TAXONOMY_ROUTE_KEYS.flatMap(routeKey =>
+          [
+            { model: 'platform/a', variant: null },
+            { model: 'platform/b', variant: 'high' },
+          ].map(pair => ({
+            ...pair,
+            runId,
+            routeKey,
+            accuracy: 0.9,
+            avgCostUsd: 0.002,
+            avgLatencyMs: 100,
+            p50LatencyMs: 100,
+            p95LatencyMs: 150,
+            cases: 10,
+            errors: 0,
+            timeouts: 0,
+            routeAccuracy: null,
+          }))
+        )
+      );
+      vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([{ status, count: 1 }]);
 
-    await finalizeVia(runId, 'platform/a', null);
+      await finalizeVia(runId, 'platform/a', null);
+      if (status === 'pending' || status === 'running') {
+        expect(saveRoutingTable).not.toHaveBeenCalled();
+        return;
+      }
 
-    expect(saveRoutingTable).toHaveBeenCalledOnce();
-    const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
-    expect(table.source).toBe('benchmark');
-    // Version identifies the contributing registry rows, not a single run.
-    expect(table.version).toMatch(/^registry-/);
-    expect(Object.keys(table.routes)).toHaveLength(TAXONOMY_ROUTE_KEYS.length);
-    expect(kvDelete).toHaveBeenCalled();
-  });
+      expect(saveRoutingTable).toHaveBeenCalledOnce();
+      const [, table] = vi.mocked(saveRoutingTable).mock.calls[0];
+      expect(table.source).toBe('benchmark');
+      // Version identifies the contributing registry rows, not a single run.
+      expect(table.version).toMatch(/^registry-/);
+      expect(Object.keys(table.routes)).toHaveLength(TAXONOMY_ROUTE_KEYS.length);
+      expect(
+        table.routes['implementation/code_generation'].map(candidate => candidate.variant)
+      ).toEqual([null, 'high']);
+      expect(
+        table.routes['implementation/code_generation'].every(
+          candidate => candidate.reasoningEffort == null
+        )
+      ).toBe(true);
+      expect(kvDelete).toHaveBeenCalled();
+    }
+  );
 
   it('failRunAndDrain fails the claimed registry rows and drains both queues', async () => {
     vi.mocked(listPendingCurrentProfiles).mockResolvedValue([

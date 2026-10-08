@@ -1,3 +1,8 @@
+import { existsSync } from 'node:fs';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { profileConfigPath } from './runtime-profile.js';
 import { describe, expect, it, spyOn } from 'bun:test';
 import {
   CONTROL_PLANE_TIMERS,
@@ -106,6 +111,7 @@ function createHarness(
     hasGit?: boolean;
     capture?: boolean;
     beforeEnsure?: () => Promise<void>;
+    homeRoot?: string;
     beforeInstall?: () => Promise<void>;
   } = {}
 ): Harness {
@@ -186,7 +192,7 @@ function createHarness(
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     runtimes,
     inheritedEnv: {},
-    homeRoot: '/tmp/prepare-test-homes',
+    homeRoot: options.homeRoot ?? '/tmp/prepare-test-homes',
     allocationId: 'alloc-current',
     now: () => NOW,
     ...(options.capture
@@ -1366,6 +1372,32 @@ describe('createPreparationManager', () => {
     });
   });
 
+  it('redacts a named non-heuristic secret from setup output', async () => {
+    const secret = 'postgres://user:pass@localhost:5432/prod';
+    const harness = createHarness();
+    const splitAt = Math.floor(secret.length / 2);
+    harness.setSetupOutput(onOutput => {
+      onOutput('stdout', `connecting ${secret.slice(0, splitAt)}`);
+      onOutput('stdout', `${secret.slice(splitAt)}\n`);
+      onOutput('stderr', `warning: ${secret}\n`);
+    });
+    const spec = routeSpec({
+      setupCommands: ['pnpm install'],
+      env: { DATABASE_URL: secret },
+      secretEnvKeys: ['DATABASE_URL'],
+    });
+
+    await harness.manager.prepare(spec);
+
+    const outputs = harness.frames
+      .flatMap(frame => (frame.type === 'session.events' ? frame.events : []))
+      .filter(event => event.type === 'session.setup.output')
+      .map(event => event.properties.output);
+    expect(outputs).toContain('connecting [REDACTED]\n');
+    expect(outputs).toContain('warning: [REDACTED]\n');
+    expect(outputs.join('')).not.toContain('localhost');
+  });
+
   describe('managed GitHub invocation options', () => {
     const url = 'https://github.com/acme/repo.git';
     const token = `kcp1.${Buffer.from('synthetic-sandbox').toString('base64url')}.github.${'ab12'.repeat(16)}`;
@@ -1936,5 +1968,102 @@ describe('capturing a repository snapshot', () => {
     const withoutRepo = createHarness(FAST_TIMERS, { capture: true });
     await withoutRepo.manager.prepare(captureSpec({ git: undefined }));
     expect(withoutRepo.captureRequests).toEqual([]);
+  });
+});
+
+describe('control-plane runtime profiles', () => {
+  it('materializes skills, agents and commands before Kilo starts and retains them through credential refresh', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-'));
+    const profile = {
+      runtimeSkills: [
+        {
+          name: 'review',
+          rawMarkdown: '---\nname: review\ndescription: Review\n---\nReview changes',
+          files: { 'scripts/check.sh': 'echo checked' },
+        },
+      ],
+      runtimeAgents: [
+        {
+          slug: 'reviewer',
+          name: 'Reviewer',
+          config: {
+            prompt: 'Review carefully',
+            model: 'test-model',
+            variant: 'high',
+            permission: { bash: 'deny' },
+          },
+        },
+      ],
+      kiloCommands: [
+        {
+          name: 'review-now',
+          template: 'Review $ARGUMENTS',
+          agent: 'reviewer',
+          model: 'command-model',
+          subtask: true,
+        },
+      ],
+    };
+    const harness = createHarness(FAST_TIMERS, {
+      homeRoot: root,
+      beforeEnsure: async () => {
+        const env = harness.ensureInputs.at(-1)!.env;
+        if (!env.KILO_CONFIG) return;
+        expect(
+          await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/SKILL.md'), 'utf8')
+        ).toBe(profile.runtimeSkills[0].rawMarkdown);
+        expect(
+          await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/scripts/check.sh'), 'utf8')
+        ).toBe('echo checked');
+        expect(JSON.parse(await fs.readFile(env.KILO_CONFIG, 'utf8'))).toMatchObject({
+          agent: {
+            reviewer: {
+              mode: 'primary',
+              prompt: 'Review carefully',
+              model: 'kilo/test-model',
+              variant: 'high',
+              permission: { bash: 'deny' },
+            },
+          },
+          command: {
+            'review-now': {
+              template: 'Review $ARGUMENTS',
+              agent: 'reviewer',
+              model: 'kilo/command-model',
+              subtask: true,
+            },
+          },
+        });
+      },
+    });
+    try {
+      const spec = routeSpec({ ...profile, runtimeIsolation: 'per-session' });
+      await harness.manager.prepare(spec);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+      const env = harness.ensureInputs[0].env;
+      expect(env.KILO_CONFIG).toBe(profileConfigPath(env.HOME));
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        kilo: { token: 'rotated-token' },
+      });
+      expect(harness.installCalls[0].env.KILO_CONFIG).toBe(env.KILO_CONFIG);
+      expect(harness.installCalls[0].env.KILOCODE_TOKEN).toBe('rotated-token');
+      expect(
+        JSON.parse(await fs.readFile(env.KILO_CONFIG, 'utf8')).command['review-now'].agent
+      ).toBe('reviewer');
+      const sibling = routeSpec({
+        sessionId: 'ses_22222222222222222222222222',
+        runtimeIsolation: 'per-session',
+      });
+      await harness.manager.prepare(sibling);
+      const siblingEnv = harness.ensureInputs[1].env;
+      expect(siblingEnv.HOME).not.toBe(env.HOME);
+      expect(siblingEnv.KILO_CONFIG).toBeUndefined();
+      expect(existsSync(path.join(siblingEnv.HOME, '.kilocode/skills/review/SKILL.md'))).toBe(
+        false
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });

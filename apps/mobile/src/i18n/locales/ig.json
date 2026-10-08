@@ -586,8 +586,6 @@
     "reviewPullRequest": "Nyochaa arịrịọ njikọta",
     "headLine": "{{counts}} · ndekọ mgbanwe kacha ọhụrụ {{sha}}",
     "entry": {
-      "eyebrow": "Meghe arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta site na URL",
-      "pastePrLink": "Mado njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
       "noRecentPrs": "Enweghị nyocha ọhụrụ",
       "noRecentPrsDescription": "Mado njikọ n'elu iji malite nyocha — ọ ga-apụta ebe a oge ọzọ.",
       "couldNotLoad": "Enweghị ike ibudata.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Mmelite ozugbo",
     "liveUpdateSubtitle": "Gosi ndị nnọchi anya na-arụ ọrụ n'ọkwa gị",
     "push": "Ọkwa ozugbo",
-    "enabled": "Agbanyela ọkwa",
     "onDescription": "Agbanyela ọkwa ozugbo maka ngwaọrụ a.",
     "offDescription": "Enyeghị ikike ma ọ bụ agbanyụrụ ndebanye aha ngwaọrụ.",
     "retryPermission": "Nwaa ịlele ikike ọkwa ọzọ",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Zipu ọkwa site na ozi-e ma ọ bụ push nye ndị kọntaktị ịgba ụgwọ mgbe mmefu nke mpaghara a gafere oke ma ọ bụ rịgoro karịa ọnụ ọgụgụ awa ya.",
-    "enable": "Gbanye ọkwa gbasara mmefu",
     "thresholdTitle": "Ịgafe oke",
     "thresholdSubtitle": "Mmefu na-aga n'ihu na-agafe oke gị",
     "anomalyTitle": "Mmụba kwa awa",

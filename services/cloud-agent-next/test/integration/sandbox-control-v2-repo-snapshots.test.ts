@@ -133,6 +133,7 @@ type RouteOverrides = {
   directory?: string;
   git?: ControlPlaneRouteSpec['git'] | null;
   env?: Record<string, string>;
+  setupCommands?: string[];
   userId?: string;
   orgId?: string | null;
   sessionId?: string;
@@ -148,6 +149,7 @@ function prepareInput(overrides: RouteOverrides = {}) {
     attemptId: `${sessionId}-requested`,
     ...(git === undefined ? {} : { git }),
     ...(overrides.env === undefined ? {} : { env: overrides.env }),
+    ...(overrides.setupCommands === undefined ? {} : { setupCommands: overrides.setupCommands }),
   };
   return {
     spec,
@@ -400,6 +402,20 @@ describe('repository snapshot launch', () => {
     await stub.prepare(prepareInput());
 
     const { wrapper } = await connect('sbx__repo_launch_none', provider);
+
+    expect(provider.launchOptions).toEqual([{}]);
+    const frame = await prepareFrameOf(wrapper);
+    expect(frame.spec.capture).toBeUndefined();
+  });
+
+  it('launches without a key and never asks for a capture when setup commands are present', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup('sbx__repo_launch_setup', provider);
+    await stub.prepare(prepareInput({ setupCommands: ['pnpm install'] }));
+
+    expect(await repoKeyOf(stub)).toBeNull();
+
+    const { wrapper } = await connect('sbx__repo_launch_setup', provider);
 
     expect(provider.launchOptions).toEqual([{}]);
     const frame = await prepareFrameOf(wrapper);

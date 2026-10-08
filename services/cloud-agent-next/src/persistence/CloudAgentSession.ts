@@ -1039,6 +1039,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         metadata.identity.botId,
         {
           createdOnPlatform: metadata.identity.createdOnPlatform,
+          legacyFallback: true,
         }
       ));
 

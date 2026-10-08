@@ -25,6 +25,7 @@ import {
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
+import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import type {
   ControlPlaneCredentialRepository,
   ControlPlaneCredentialSource,
@@ -735,6 +736,29 @@ async function selectDirectKiloToken(
     return token;
   }
 }
+
+/**
+ * The environment key names the grant projection in `preparedPayload` owns. The
+ * frame builder restores any of these that the pre-overlay spec already carried
+ * (presence, not truthiness), so a profile secret of the same name cannot
+ * displace the issued credential.
+ */
+export const ISSUED_CREDENTIAL_ENV_KEYS = [
+  'KILOCODE_TOKEN',
+  'KILOCODE_ORGANIZATION_ID',
+  'GH_TOKEN',
+  'GITHUB_TOKEN',
+  'GITLAB_TOKEN',
+  'GLAB_IS_OAUTH2',
+  'GITLAB_HOST',
+  'GITLAB_SUBFOLDER',
+  'BITBUCKET_TOKEN',
+  'KILO_BITBUCKET_WORKSPACE_SLUG',
+  'KILO_BITBUCKET_REPOSITORY_SLUG',
+  'KILO_BITBUCKET_WORKSPACE_UUID',
+  'KILO_BITBUCKET_REPOSITORY_UUID',
+  ...CONTROL_RUNTIME_RESERVED_ENV_VARS,
+] as const;
 
 function preparedPayload(input: {
   payload: SessionAttachPayload;

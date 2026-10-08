@@ -15,7 +15,10 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './kilo-exclusive-models';
-import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
+import {
+  gemma_4_26b_a4b_it_free_model,
+  glyph_cluster_stealth_free_model,
+} from './kilo-exclusive-models';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -45,6 +48,21 @@ describe('Step 5 Preview', () => {
     });
     expect(isFreeModel('stepfun/step-5-preview-free')).toBe(true);
     expect(findKiloExclusiveModel('stepfun/step-3.7-flash:free')).toBeNull();
+  });
+});
+
+describe('Glyph Cluster stealth model', () => {
+  test('is free, stealth, and requires data collection', () => {
+    expect(isFreeModel('stealth/glyph-cluster')).toBe(true);
+    expect(hasBestEffortGuessDataCollectionRequirement('stealth/glyph-cluster')).toBe(true);
+    expect(shouldRedactModelNameInMicrodollarUsage('vercel', 'stealth/glyph-cluster')).toBe(true);
+    expect(shouldRedactErrorResponse('vercel', 'stealth/glyph-cluster')).toBe(true);
+    expect(getInferenceProvider(glyph_cluster_stealth_free_model)).toEqual({
+      slug: 'stealth',
+      name: 'Stealth',
+      training: true,
+      retainsPrompts: true,
+    });
   });
 });
 

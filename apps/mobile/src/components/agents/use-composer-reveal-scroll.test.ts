@@ -15,10 +15,9 @@
 // The hook is mounted by calling it as a plain function with stubbed React
 // primitives (the same pattern as use-reply-focus-scroll.test.ts): one
 // ref/effect/callback slot per hook slot, effects run immediately and collect
-// their cleanups. The node environment has no rAF; a synchronous stub stands in
-// (the hook defers nothing, so this is inert here).
+// their cleanups.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveComposerRevealOffset, useComposerRevealScroll } from './use-composer-reveal-scroll';
 
@@ -160,14 +159,6 @@ describe('useComposerRevealScroll', () => {
   beforeEach(() => {
     keyboardSubscribers.show = null;
     keyboardSubscribers.hide = null;
-    vi.stubGlobal('requestAnimationFrame', (onFrame: FrameRequestCallback) => {
-      onFrame(0);
-      return 0;
-    });
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it('arms the keyboard show and hide listeners and removes them on unmount', () => {
@@ -378,5 +369,22 @@ describe('useComposerRevealScroll', () => {
     expect(scrollTo).toHaveBeenCalledTimes(2);
     expect(scrollTo).toHaveBeenLastCalledWith({ y: 176, animated: false });
     unmount();
+  });
+
+  it('corrects a native focus scroll without overriding a user drag or looping', () => {
+    const hook = mountHook();
+    hook.onViewportLayout(200);
+    hook.onComposerLayout({ y: 16, height: 220 });
+    keyboardSubscribers.show?.();
+    hook.onScroll(36);
+    // iOS can scroll the focused field after the card reveal has settled.
+    hook.onScroll(128);
+    hook.onScroll(36);
+    hook.onScroll(36 + 1 / 3);
+    hook.onUserScroll();
+    hook.onScroll(128);
+    const reveal = { y: 36, animated: false };
+    expect(hook.scrollTo.mock.calls).toEqual([[reveal], [reveal]]);
+    hook.unmount();
   });
 });

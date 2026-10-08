@@ -856,6 +856,29 @@ export async function countCurrentProfilesByStatus(
   return rows.map(row => ({ status: row.status, count: row.n }));
 }
 
+/** Exact platform-pair coverage for the currently measured engine and repetitions. */
+export async function listCurrentPlatformProfileStatuses(
+  db: D1Database,
+  current: { engineIdentity: string; repetitions: number }
+): Promise<Array<{ model: string; variant: string | null; status: BenchmarkProfileStatus }>> {
+  const rows = await drizzle(db)
+    .select({
+      model: benchmarkProfiles.model,
+      variant: benchmarkProfiles.variant,
+      status: benchmarkProfiles.status,
+    })
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        eq(benchmarkProfiles.engine_identity, current.engineIdentity),
+        eq(benchmarkProfiles.repetitions, current.repetitions),
+        eq(benchmarkProfiles.platform_requested, true)
+      )
+    )
+    .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
+  return rows.map(row => ({ ...row, variant: variantFromStorage(row.variant) }));
+}
+
 /**
  * Admin requeue: put failed current-engine rows of a queue back to `pending`.
  * Charges no owner quota — this is the admin's own escape hatch, distinct from
@@ -1267,9 +1290,8 @@ export function routingTableToRows(
   const candidateRows: RoutingTableCandidateRow[] = [];
   for (const [routeKey, candidates] of Object.entries(table.routes)) {
     candidates.forEach((c, rank) => {
-      // Platform tables emit reasoningEffort only; mirror that effort key into
-      // the self-describing variant column ('' when null). Custom sparse tables
-      // (later slice) will emit variant and leave reasoning_effort null.
+      // New tables emit canonical variant keys. Preserve legacy effort identity
+      // when persisting an older table.
       const effortKey = c.reasoningEffort ?? null;
       const variantKey = c.variant ?? effortKey;
       candidateRows.push({
@@ -1300,17 +1322,16 @@ export function rowsToRoutingTable(
   });
   for (const row of sorted) {
     routeMap[row.route_key] ??= [];
-    // Platform artifact compatibility: a row with a reasoning_effort keeps the
-    // exact current read shape. A variant-only row (non-enum key) returns variant.
+    // Retain legacy effort-only reads; canonical rows always expose variant.
     const effort = parsePersistedReasoningEffort(row.reasoning_effort);
-    const variant = effort === null ? variantFromStorage(row.variant) : null;
     routeMap[row.route_key].push({
       model: row.model,
       accuracy: row.accuracy,
       avgCostUsd: row.avg_cost_usd,
       meetsThreshold: row.meets_threshold,
-      ...(variant !== null ? { variant } : {}),
-      reasoningEffort: effort,
+      ...(effort !== null
+        ? { reasoningEffort: effort }
+        : { variant: variantFromStorage(row.variant) }),
     });
   }
   return {

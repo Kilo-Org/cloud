@@ -619,8 +619,6 @@
     "reviewPullRequest": "Irrevedi t-talba għall-għaqda",
     "headLine": "{{counts}} · l-aħħar reġistrazzjoni {{sha}}",
     "entry": {
-      "eyebrow": "Iftaħ PR jew merge request permezz ta' URL",
-      "pastePrLink": "Waħħal ħolqa ta' PR jew merge request",
       "noRecentPrs": "L-ebda reviżjoni riċenti",
       "noRecentPrsDescription": "Waħħal ħolqa hawn fuq biex tibda reviżjoni — id-darba li jmiss tidher hawn.",
       "couldNotLoad": "Ma setax jitgħabba l-kontenut.",
@@ -852,7 +850,6 @@
     "liveUpdates": "Aġġornamenti f'ħin reali",
     "liveUpdateSubtitle": "Uri l-aġenti attivi fin-notifiki tiegħek",
     "push": "Notifiki awtomatiċi",
-    "enabled": "Notifiki attivati",
     "onDescription": "In-notifiki awtomatiċi huma attivati għal dan l-apparat.",
     "offDescription": "Il-permess jew ir-reġistrazzjoni tal-apparat mhumiex attivati.",
     "retryPermission": "Erġa' pprova tiċċekkja l-permess tan-notifiki",
@@ -3391,7 +3388,6 @@
   },
   "spendAlerts": {
     "subtitle": "Ibgħat twissija bil-posta elettronika jew push lill-kuntatti tal-ħlasijiet meta l-infiq ta' dan il-kamp jinqabeż limitu jew jogħla 'l fuq mir-rata tas-siegħa tas-soltu.",
-    "enable": "Attiva t-twissijiet tal-infiq",
     "thresholdTitle": "Qbiż tal-limitu",
     "thresholdSubtitle": "L-infiq attwali jaqbeż il-limitu tiegħek",
     "anomalyTitle": "Żieda fis-siegħa",

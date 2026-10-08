@@ -205,6 +205,7 @@ export function NewSessionPrompt({
   }, []);
 
   const promptInputStyle = {
+    color: colors.foreground,
     includeFontPadding: false,
     fontSize: PROMPT_INPUT_FONT_SIZE * fontScale,
     lineHeight: promptLineHeight,

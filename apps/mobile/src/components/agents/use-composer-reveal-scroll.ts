@@ -77,6 +77,9 @@ export type ComposerRevealScroll = {
  * attachment, a models error resolving) must not leave the body parked at the
  * old reveal offset: the reveal offset is valid only while the card is taller
  * than the viewport, so the shrink returns the user's own offset immediately.
+ *
+ * iOS can also scroll the focused field after the reveal. Until the user drags
+ * or the keyboard hides, each scroll event returns the body to the reveal.
  */
 export function useComposerRevealScroll(): ComposerRevealScroll {
   const scrollRef = useRef<ScrollView | null>(null);
@@ -123,7 +126,10 @@ export function useComposerRevealScroll(): ComposerRevealScroll {
       preRevealOffsetRef.current = currentOffsetRef.current;
       revealedRef.current = true;
     }
-    scrollRef.current?.scrollTo({ y: offset, animated: false });
+    // Native scroll offsets can round to a fraction of a point.
+    if (Math.abs(currentOffsetRef.current - offset) >= 1) {
+      scrollRef.current?.scrollTo({ y: offset, animated: false });
+    }
   }, []);
 
   useEffect(() => {
@@ -178,9 +184,17 @@ export function useComposerRevealScroll(): ComposerRevealScroll {
     userDraggedRef.current = true;
   }, []);
 
-  const onScroll = useCallback((offset: number) => {
-    currentOffsetRef.current = offset;
-  }, []);
+  const onScroll = useCallback(
+    (offset: number) => {
+      currentOffsetRef.current = offset;
+      // iOS can scroll the focused field after the committed card reveal.
+      // Keep that reveal until the user drags or the keyboard hides.
+      if (revealedRef.current) {
+        reveal();
+      }
+    },
+    [reveal]
+  );
 
   return { scrollRef, onViewportLayout, onComposerLayout, onScroll, onUserScroll };
 }

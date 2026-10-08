@@ -40,22 +40,13 @@ export type BenchmarkQueueSelector = z.infer<typeof BenchmarkQueueSelectorSchema
  */
 export const BENCHMARK_CONTAINER_BUDGET = 200;
 
-/**
- * Decider model identity for a benchmark run. Platform/admin config still
- * selects one legacy `reasoningEffort` per model. Profile runs (and exact
- * Pool-entry identity) use canonical `variant`. Both non-null is malformed —
- * same both-set rule as RankedCandidate / decisions.
- */
+/** Exact model/effort identity in persisted benchmark run snapshots. */
 export const BenchmarkDeciderModelSchema = z
   .object({
     id: z.string().trim().min(1),
-    // Canonical catalog variant key. Optional so platform admin config (effort
-    // only) still parses. Prefer this over reasoningEffort for new writers.
+    // Canonical catalog variant key. Legacy run snapshots may omit it.
     variant: z.string().trim().min(1).nullable().optional(),
-    // Passed to the kilo CLI as --variant during the benchmark and carried into
-    // the platform routing table so serving uses the same effort the model was
-    // graded with. Null for models without (or not using) configurable
-    // reasoning. Legacy; prefer `variant` when present.
+    // Legacy snapshot identity; new benchmark writers emit variant only.
     reasoningEffort: ReasoningEffortSchema.nullable().default(null),
   })
   .superRefine((model, ctx) => {
@@ -69,12 +60,18 @@ export const BenchmarkDeciderModelSchema = z
   });
 export type BenchmarkDeciderModel = z.infer<typeof BenchmarkDeciderModelSchema>;
 
+/** Platform selectors choose models; the current catalog supplies every effort. */
+export const BenchmarkPlatformModelSchema = z.object({
+  id: z.string().trim().min(1),
+});
+export type BenchmarkPlatformModel = z.infer<typeof BenchmarkPlatformModelSchema>;
+
 export const AUTO_DECIDER_DEFAULT_MIN_COST_USD = 15;
 export const AUTO_DECIDER_DEFAULT_MAX_COST_USD = 25;
 export const DEFAULT_BENCHMARK_USER_ID = 'ce12ef3d-ae95-4d77-b4f0-23735f0a0591';
 export const DEFAULT_BENCHMARK_ORG_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
-export const AutoBenchmarkDeciderModelSchema = BenchmarkDeciderModelSchema.extend({
+export const AutoBenchmarkDeciderModelSchema = BenchmarkPlatformModelSchema.extend({
   avgAttemptCostUsd: z.number().nonnegative(),
 });
 export type AutoBenchmarkDeciderModel = z.infer<typeof AutoBenchmarkDeciderModelSchema>;
@@ -100,10 +97,10 @@ function addDuplicateModelIssues(ids: string[], path: string, ctx: z.RefinementC
 export const BenchmarkConfigSchema = z
   .object({
     classifierModels: z.array(z.string().trim().min(1)).min(1),
-    deciderModels: z.array(BenchmarkDeciderModelSchema).min(1),
+    deciderModels: z.array(BenchmarkPlatformModelSchema).min(1),
     // Manual additions are operator-pinned decider candidates. When omitted by
     // older clients, the worker treats deciderModels as the manual list.
-    manualDeciderModels: z.array(BenchmarkDeciderModelSchema).optional(),
+    manualDeciderModels: z.array(BenchmarkPlatformModelSchema).optional(),
     // Auto additions are refreshed from Kilo Bench cost data by the benchmark
     // worker's scheduled sync. The effective deciderModels list is manual +
     // non-excluded auto models.
@@ -288,6 +285,12 @@ export const StartBenchmarkRunResponseSchema = z.object({
   drainErrors: z.array(z.string()).default([]),
 });
 
+/**
+ * Wire status for a Benchmark profile. Presentation maps pending/running to
+ * "Benchmarking"; "Unavailable" is a web-derived state and never a wire status.
+ */
+export const BenchmarkProfileStatusSchema = z.enum(['pending', 'running', 'ready', 'failed']);
+export type BenchmarkProfileStatus = z.infer<typeof BenchmarkProfileStatusSchema>;
 /** Registry row counts for one queue, under the live engine identity. */
 export const BenchmarkRegistryQueueSchema = z.object({
   pending: z.number().int(),
@@ -307,6 +310,15 @@ export const BenchmarkRegistryResponseSchema = z.object({
   repetitions: z.number().int(),
   platform: BenchmarkRegistryQueueSchema,
   user: BenchmarkRegistryQueueSchema,
+  platformEntries: z
+    .array(
+      z.object({
+        model: z.string().trim().min(1),
+        variant: z.string().trim().min(1).nullable(),
+        status: BenchmarkProfileStatusSchema,
+      })
+    )
+    .optional(),
 });
 export type BenchmarkRegistryResponse = z.infer<typeof BenchmarkRegistryResponseSchema>;
 
@@ -349,13 +361,6 @@ export const ClassifierWinnerResponseSchema = z.object({
 export type ClassifierWinnerResponse = z.infer<typeof ClassifierWinnerResponseSchema>;
 
 // --- Benchmark profile registry (global per Pool entry + engine) ---
-
-/**
- * Wire status for a Benchmark profile. Presentation maps pending/running to
- * "Benchmarking"; "Unavailable" is a web-derived state and never a wire status.
- */
-export const BenchmarkProfileStatusSchema = z.enum(['pending', 'running', 'ready', 'failed']);
-export type BenchmarkProfileStatus = z.infer<typeof BenchmarkProfileStatusSchema>;
 
 /** Bounded failure text stored on failed profile rows. */
 export const BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH = 500;

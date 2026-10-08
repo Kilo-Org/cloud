@@ -4,6 +4,7 @@ import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gat
 import {
   findKiloExclusiveModel,
   gemma_4_26b_a4b_it_free_model,
+  glyph_cluster_stealth_free_model,
   kiloExclusiveModels,
   stepfun_5_preview_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -59,6 +60,7 @@ describe('getAutoFreeCandidates', () => {
       expect(await getAutoFreeCandidates(apiKind)).toEqual(
         [
           gemma_4_26b_a4b_it_free_model.public_id,
+          glyph_cluster_stealth_free_model.public_id,
           stepfun_5_preview_free_model.public_id,
           'test/present:free',
         ].toSorted()
@@ -73,7 +75,11 @@ describe('getAutoFreeCandidates', () => {
     });
 
     expect(await getAutoFreeCandidates('messages')).toEqual(
-      [stepfun_5_preview_free_model.public_id, 'test/present:free'].toSorted()
+      [
+        glyph_cluster_stealth_free_model.public_id,
+        stepfun_5_preview_free_model.public_id,
+        'test/present:free',
+      ].toSorted()
     );
   });
 

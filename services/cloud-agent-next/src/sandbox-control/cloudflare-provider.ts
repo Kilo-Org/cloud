@@ -20,6 +20,7 @@ import type {
 import { ProviderCreationError } from './provider.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
+import { withDORetry } from '../utils/do-retry.js';
 
 export const WRAPPER_PROC_PROBE_TIMEOUT_MS = 5_000;
 
@@ -115,7 +116,11 @@ export function createCloudflareProviderAdapter(deps: {
         throw new ProviderCreationError(admission.code);
       }
     } else {
-      await configureSandboxBillingInput(sandbox, input).catch(() => undefined);
+      await withDORetry(
+        () => deps.getSandbox(parsed.sandboxId, { containment: parsed.containment }),
+        sandbox => configureSandboxBillingInput(sandbox, input),
+        'configureSandboxBilling'
+      );
     }
   };
 

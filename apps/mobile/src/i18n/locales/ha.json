@@ -586,8 +586,6 @@
     "reviewPullRequest": "Yi bitar buƙatar haɗawa",
     "headLine": "{{counts}} · rikodin ƙarshe {{sha}}",
     "entry": {
-      "eyebrow": "Buɗe buƙatar haɗa canje-canje ko buƙatar haɗawa ta URL",
-      "pastePrLink": "Manna mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa",
       "noRecentPrs": "Babu bitutu na baya-bayan nan",
       "noRecentPrsDescription": "Manna mahaɗi a sama don fara bita — zai bayyana a nan a karo na gaba.",
       "couldNotLoad": "Ba a iya lodawa ba.",
@@ -804,7 +802,6 @@
     "liveUpdates": "Sabuntawa kai tsaye",
     "liveUpdateSubtitle": "Nuna wakilai masu aiki a cikin sanarwarka",
     "push": "Sanarwar turawa",
-    "enabled": "An kunna sanarwa",
     "onDescription": "An kunna sanarwar turawa a wannan na'ura.",
     "offDescription": "An kashe izinin sanarwa ko rajistar na'urar.",
     "retryPermission": "Sake gwada duba izinin sanarwa",
@@ -3262,7 +3259,6 @@
   },
   "spendAlerts": {
     "subtitle": "Aika faɗakarwa ta imel ko turawa zuwa ga abokan hulɗar biyan kuɗi lokacin da kashe kuɗin wannan yanki ya wuce iyaka ko ya haura fiye da yawan sa'ar da ya saba.",
-    "enable": "Kunna faɗakarwar kashe kuɗi",
     "thresholdTitle": "Wucewar iyaka",
     "thresholdSubtitle": "Kashe kuɗin da ake yi ya wuce iyakarka",
     "anomalyTitle": "Hauhawar sa'a",

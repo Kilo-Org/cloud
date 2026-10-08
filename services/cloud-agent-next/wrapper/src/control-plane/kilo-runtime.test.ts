@@ -183,6 +183,7 @@ function createRuntime(options: {
   const runtimeRef: { current?: ReturnType<typeof createKiloRuntime> } = {};
   let unavailable = options.unavailable ?? 0;
   const runtime = createKiloRuntime({
+    readSnapshot: async () => [],
     directory: options.directory ?? '/tmp/kilo-runtime-test',
     env: options.env ?? { HOME: '/old' },
     timers: options.timers ?? TEST_TIMERS,
@@ -262,6 +263,7 @@ describe('Kilo startup lifecycle', () => {
     expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
     expect(environments).toEqual([{ HOME: '/old' }]);
     idle = true;
+    await runtime.refreshActivity();
     expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
     expect(environments).toEqual([{ HOME: '/old' }, { HOME: '/new' }]);
     expect(filesystemEnvironments).toEqual(environments);
@@ -1491,6 +1493,7 @@ describe('createKiloRuntimes', () => {
     const feed = createFeedFactory();
     const probe = createProbe(false);
     const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
       timers: TEST_TIMERS,
       pidfileDirectory: '/tmp/kilo-runtimes-test-pids',
       scheduler: scheduler.scheduler,
@@ -1526,6 +1529,7 @@ describe('createKiloRuntimes', () => {
     const unavailable: Array<{ directory: string; key: string }> = [];
     let captured: KiloRuntimeOptions | undefined;
     const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
       timers: TEST_TIMERS,
       pidfileDirectory: '/tmp/kilo-runtimes-key-test-pids',
       scheduler: scheduler.scheduler,
@@ -1558,6 +1562,7 @@ describe('createKiloRuntimes', () => {
     let firstEnsureCalls = 0;
     let created = 0;
     const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
       timers: TEST_TIMERS,
       pidfileDirectory: '/tmp/kilo-runtimes-retire-test-pids',
       createRuntime: () => {
@@ -1614,6 +1619,7 @@ describe('createKiloRuntimes', () => {
     const feed = createFeedFactory();
     const probe = createProbe(false);
     const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
       timers: TEST_TIMERS,
       pidfileDirectory: '/tmp/kilo-runtimes-summary-pids',
       scheduler: scheduler.scheduler,
@@ -1653,6 +1659,7 @@ describe('createKiloRuntimes', () => {
     let spawnCalls = 0;
     const baseSpawn = spawner.spawn;
     const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
       timers: TEST_TIMERS,
       pidfileDirectory: '/tmp/kilo-runtimes-summary-restart-pids',
       scheduler: scheduler.scheduler,
@@ -1679,6 +1686,7 @@ describe('createKiloRuntimes', () => {
   it('reuses a warm runtime for the same MCP config and rejects drift', async () => {
     let created = 0;
     const runtimes = createKiloRuntimes({
+      readSnapshot: async () => [],
       timers: TEST_TIMERS,
       pidfileDirectory: '/tmp/kilo-runtimes-mcp-test-pids',
       createRuntime: options => {

@@ -54,6 +54,15 @@ describe('repoSnapshotEligible', () => {
       })
     ).toBe(false);
   });
+
+  it('excludes a route with setup commands and treats empty or absent the same', () => {
+    const enrolled = gate({ enrolledIds: '*' });
+    expect(repoSnapshotEligible(enrolled, { ...route, setupCommands: ['pnpm install'] })).toBe(
+      false
+    );
+    expect(repoSnapshotEligible(enrolled, { ...route, setupCommands: [] })).toBe(true);
+    expect(repoSnapshotEligible(enrolled, route)).toBe(true);
+  });
 });
 
 describe('repoSnapshotEligibility', () => {

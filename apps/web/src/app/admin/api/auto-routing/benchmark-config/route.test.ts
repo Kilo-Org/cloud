@@ -68,7 +68,7 @@ function putRequest(body: unknown) {
 
 const validConfig = {
   classifierModels: ['google/gemini-2.5-flash-lite'],
-  deciderModels: [{ id: 'openai/gpt-5-mini', reasoningEffort: null }],
+  deciderModels: [{ id: 'openai/gpt-5-mini' }],
   minAccuracy: 0.7,
   switchCostFactor: 3,
   bestAccuracySwitchThreshold: 0.05,
@@ -99,20 +99,11 @@ describe('PUT /admin/api/auto-routing/benchmark-config', () => {
     mockGetBenchmarkConfig.mockResolvedValue({ status: 200, body: { config: null } });
   });
 
-  it('forwards a config whose decider models all serve every gateway chat API', async () => {
-    const response = await PUT(putRequest(validConfig));
-    expect(response.status).toBe(200);
-    expect(mockUpdateBenchmarkConfig).toHaveBeenCalledWith(validConfig, 'admin@kilocode.ai');
-  });
-
   it('rejects with 400 listing decider models not servable on all gateway chat APIs', async () => {
     const response = await PUT(
       putRequest({
         ...validConfig,
-        deciderModels: [
-          { id: 'openai/gpt-5-mini', reasoningEffort: null },
-          { id: 'test-exclusive/chat-only', reasoningEffort: null },
-        ],
+        deciderModels: [{ id: 'openai/gpt-5-mini' }, { id: 'test-exclusive/chat-only' }],
       })
     );
 

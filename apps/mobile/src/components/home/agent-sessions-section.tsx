@@ -337,11 +337,8 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
           failureLabel={failureLabel}
           inlineNotices={false}
         />
-        {/* One card, not a row per session: the skeleton, the zero state and
-            the loaded card share one frame and row heights
-            (`GlanceableActiveCardSkeleton` repeats `GlanceableActiveCard`'s
-            box), so settling cannot move the header, feedback or the
-            agent-create actions below. */}
+        {/* One card, not a row per session. The skeleton shares the loaded
+            card's minimum frame; scaled text can grow the loaded content. */}
         <Animated.View layout={LinearTransition}>
           {content === 'pending' && <GlanceableActiveCardSkeleton />}
           {(content === 'empty' || content === 'rows') && (

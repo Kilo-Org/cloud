@@ -29,7 +29,7 @@ import {
   MAX_ATTEMPTS,
   recordUsageInPrimaryRegion,
 } from './usage-record-client';
-import type { UsageRecordRequest } from './usage-record-contract';
+import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 
 const mockedCaptureException = jest.requireMock<typeof SentryNextjs>('@sentry/nextjs')
   .captureException as unknown as jest.Mock;

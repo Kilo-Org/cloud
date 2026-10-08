@@ -99,6 +99,8 @@ export type BouncerDecideParams = {
   ja4?: string | undefined;
   account?: {
     accountId: string;
+    /** The authenticated actor, independently of the paying account. */
+    userId: string;
     tier: Exclude<DecideTier, 'anonymous'>;
     /** The paying user's or organization's row, as the balance check read it. */
     payer?: BalancePayer;
@@ -127,6 +129,7 @@ export function startBouncerDecide(
             requestId,
             tier: account.tier,
             accountId: account.accountId,
+            userId: account.userId,
             ip,
             ja4,
             accountCreatedAt: account.payer?.createdAt,

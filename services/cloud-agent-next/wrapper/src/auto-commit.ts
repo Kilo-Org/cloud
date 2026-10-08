@@ -61,6 +61,8 @@ export type AutoCommitOptions = {
   commitCoAuthor?: WrapperCommitCoAuthor;
   signal?: AbortSignal;
   env?: NodeJS.ProcessEnv;
+  /** Env key names whose values must be redacted even when the name is not secret-like. */
+  secretEnvKeys?: readonly string[];
 };
 
 function emitStarted(
@@ -102,7 +104,7 @@ export async function runAutoCommit(opts: AutoCommitOptions): Promise<AutoCommit
   let locallyCommitted = false;
   let evidence: CommitEvidence | undefined;
   let pushStatus: PushStatus = 'not_attempted';
-  const redact = createSecretRedactor(process.env, env ?? {});
+  const redact = createSecretRedactor(process.env, env ? [env] : [], opts.secretEnvKeys ?? []);
   const logToFile = (message: string): void => writeLog(redact(message));
   const released = Promise.withResolvers<void>();
   const previous = worktreeAutoCommits.get(workspacePath) ?? Promise.resolve();

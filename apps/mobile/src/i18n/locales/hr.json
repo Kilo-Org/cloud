@@ -597,8 +597,6 @@
     "reviewPullRequest": "Pregledaj zahtjev za spajanje",
     "headLine": "{{counts}} · najnovija revizija {{sha}}",
     "entry": {
-      "eyebrow": "Otvori zahtjev za spajanje ili merge request putem URL-a",
-      "pastePrLink": "Zalijepi poveznicu na zahtjev za spajanje ili merge request",
       "noRecentPrs": "Nema nedavnih pregleda",
       "noRecentPrsDescription": "Za početak pregleda zalijepite poveznicu gore — sljedeći put će se pojaviti ovdje.",
       "couldNotLoad": "Učitavanje nije uspjelo.",
@@ -820,7 +818,6 @@
     "liveUpdates": "Ažuriranja uživo",
     "liveUpdateSubtitle": "Prikaži aktivne agente u obavijestima",
     "push": "Automatske obavijesti",
-    "enabled": "Obavijesti omogućene",
     "onDescription": "Automatske obavijesti uključene su za ovaj uređaj.",
     "offDescription": "Obavijesti nisu dopuštene ili uređaj nije registriran za njihovo primanje.",
     "retryPermission": "Pokušaj ponovno provjeriti dopuštenje za obavijesti",
@@ -3305,7 +3302,6 @@
   },
   "spendAlerts": {
     "subtitle": "Pošalji upozorenje e-poštom ili push porukom kontaktima za naplatu kada potrošnja ovog opsega prijeđe limit ili skoči iznad uobičajene satne stope.",
-    "enable": "Omogući upozorenja o potrošnji",
     "thresholdTitle": "Prekoračenje praga",
     "thresholdSubtitle": "Tekuća potrošnja prelazi tvoj limit",
     "anomalyTitle": "Satni skok",

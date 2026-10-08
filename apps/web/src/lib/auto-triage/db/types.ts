@@ -3,13 +3,9 @@
  */
 
 import type { AutoTriageTicket } from '@kilocode/db/schema';
+import type { Owner } from '@/lib/agent-config/core/owner';
 
-/**
- * Owner type - discriminated union for org or user ownership
- */
-export type Owner =
-  | { type: 'org'; id: string; userId: string }
-  | { type: 'user'; id: string; userId: string };
+export type { Owner };
 
 /**
  * Triage ticket status

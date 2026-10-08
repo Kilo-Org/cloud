@@ -26,6 +26,10 @@ import {
 import { resolveSecret } from '../../auth.js';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../../metered-billing-lifecycle.js';
 import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
+import {
+  assertContainerCapacity,
+  isContainerConcurrencyLimitError,
+} from '../../container-concurrency.js';
 import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import {
   VercelBilling,
@@ -120,6 +124,7 @@ import {
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
   controlPlanePrepareInputSchema,
+  controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
   controlPlaneTerminalInputSchema,
@@ -200,6 +205,7 @@ import {
   writeScopeGrant,
 } from './scope-grants.js';
 import { computeRepoKey, repoSnapshotEligibility } from './repo-key.js';
+import { buildFrameEnv } from './frame-env.js';
 import {
   beginRepositoryLaunch,
   captureRequested,
@@ -259,8 +265,34 @@ const wrapperSocketAttachmentSchema = z.object({
   connectionId: z.string().optional(),
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
+  redactsNamedSecrets: z.literal(true).optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
+
+/** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
+type PrepareFrameMaterializationStage =
+  | 'wrapper_redaction_unsupported'
+  | 'frame_materialization_failed';
+
+class PrepareFrameMaterializationError extends Error {
+  constructor(
+    readonly stage: PrepareFrameMaterializationStage,
+    readonly sourceErrorName?: string
+  ) {
+    super('session.prepare frame materialization failed');
+    this.name = 'PrepareFrameMaterializationError';
+  }
+}
+
+function errorClassName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
+}
+
+function materializationStage(error: unknown): PrepareFrameMaterializationStage {
+  return error instanceof PrepareFrameMaterializationError
+    ? error.stage
+    : 'frame_materialization_failed';
+}
 
 /**
  * The Sandbox DO -> Session DO notification surface (spec §10). The V2 Session
@@ -1774,7 +1806,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /**
    * The repository snapshot key for a route, or null when none applies. It is hashed
    * from the input spec: the grant rewrites `spec.env` with per-attempt credential
-   * aliases, so the stored spec would give every session its own key.
+   * aliases, so the stored spec would give every session its own key. A route with
+   * setup commands has no key, so it neither restores nor captures a snapshot.
    *
    * Emits one `snapshot_key` diagnostic per route so a missing snapshot can be
    * traced to the gate that rejected it (or to a missing key secret).
@@ -1793,7 +1826,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       userId: source.userId,
       orgId: source.orgId,
     };
-    const eligibility = repoSnapshotEligibility(gate, route);
+    const eligibility = repoSnapshotEligibility(gate, {
+      ...route,
+      setupCommands: spec.setupCommands,
+    });
     if (!eligibility.eligible) {
       this.logSnapshotKey(spec.sessionId, false, eligibility.reason);
       return null;
@@ -1940,6 +1976,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       directory: payload.directory ?? spec.directory,
       ...(spec.branch === undefined ? {} : { branch: spec.branch }),
       ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
+      ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
+      ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
+      ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
       ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
@@ -2361,38 +2400,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // A route without a grant never reaches `preparing` (issuance failure marks
     // it `failed`), so never send a spec that could carry raw issuer material.
     if (route.grant === null) return;
-    let mcp: ControlPlaneRouteSpec['mcp'];
+    if (route.grant.kilo.runtimeProxy !== undefined) {
+      // R1: minting the runtime credential proxy handle is a Session DO call that
+      // must stay off this DO's serial queue; the frame is sent once the handle
+      // is minted and bound. A mint failure fails the attempt closed.
+      this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
+      return;
+    }
+    let spec: ControlPlaneRouteSpec;
     try {
-      mcp = this.materializeRouteMcp(route);
+      spec = this.materializePrepareFrame(route, this.wrapperRedactsNamedSecrets(socket));
     } catch (error) {
-      // Preserve the sanitized, bounded MCP reason for diagnosis; the route
-      // contract has no MCP-specific reason, so the attempt fails immediately as
-      // `workspace_setup_failed` rather than waiting out its deadline.
-      logger
-        .withFields({
-          sandboxId: this.sandboxId,
-          reason: error instanceof McpAttachValidationError ? error.reason : 'unknown',
-        })
-        .warn('MCP materialization failed before session.prepare');
+      this.logPrepareFrameMaterializationFailure(route, error);
       this.ctx.waitUntil(
-        this.failPrepareAttempt(route.sessionId, route.attemptId).catch(() => {
+        this.failPrepareAttempt(
+          route.sessionId,
+          route.attemptId,
+          materializationStage(error)
+        ).catch(() => {
           logger
             .withFields({
               sandboxId: this.sandboxId,
               sessionId: route.sessionId,
               attemptId: route.attemptId,
             })
-            .warn('Could not persist MCP preparation failure');
+            .warn('Could not persist frame materialization failure');
         })
-      );
-      return;
-    }
-    if (route.grant.kilo.runtimeProxy !== undefined) {
-      // R1: minting the runtime credential proxy handle is a Session DO call that
-      // must stay off this DO's serial queue; the frame is sent once the handle
-      // is minted and bound. A mint failure fails the attempt closed.
-      this.ctx.waitUntil(
-        this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId, mcp)
       );
       return;
     }
@@ -2400,22 +2433,90 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // material only; the credential source stays DO-private.
     this.trySendFrame(socket, {
       type: 'session.prepare',
-      spec: this.prepareFrameSpec(route, mcp),
+      spec,
       credentials: this.prepareCredentials(route.grant, route.sessionId),
     });
   }
 
-  /** The route spec plus what only a frame carries: materialized MCP and the capture request. */
-  private prepareFrameSpec(
+  /** Whether the bound wrapper advertised that it redacts named secret keys. */
+  private wrapperRedactsNamedSecrets(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.redactsNamedSecrets === true;
+  }
+
+  /**
+   * A failure throws rather than sending a frame the wrapper would drop while the
+   * route waits out its preparation deadline.
+   */
+  private materializePrepareFrame(
     route: RouteRecord,
-    mcp: ControlPlaneRouteSpec['mcp']
+    redactsNamedSecrets: boolean
   ): ControlPlaneRouteSpec {
-    return {
-      ...route.spec,
-      createdOnPlatform: route.credentialSource?.createdOnPlatform,
-      ...(mcp === undefined ? {} : { mcp }),
-      ...(captureRequested(route, this.provider) ? { capture: true as const } : {}),
-    };
+    const encryptedSecrets = route.credentialSource?.encryptedSecrets;
+    try {
+      const frameEnv = buildFrameEnv({
+        specEnv: route.spec.env,
+        encryptedSecrets,
+        privateKey: this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+      });
+      // Fail closed only when a secret value would actually reach the frame and
+      // the wrapper cannot redact it by name; a snapshot whose keys are all
+      // restored or dropped sends nothing and needs no redaction.
+      if (frameEnv.secretEnvKeys.length > 0 && !redactsNamedSecrets) {
+        throw new PrepareFrameMaterializationError('wrapper_redaction_unsupported');
+      }
+      const mcp = this.materializeRouteMcp(route);
+      if (frameEnv.secretEnvKeys.length > 0) {
+        logger
+          .withFields({
+            sandboxId: this.sandboxId,
+            sessionId: route.sessionId,
+            secretCount: frameEnv.secretEnvKeys.length,
+          })
+          .info('Materialized session.prepare secrets');
+      }
+      return controlPlaneRouteSpecSchema.parse({
+        ...route.spec,
+        createdOnPlatform: route.credentialSource?.createdOnPlatform,
+        ...(frameEnv.env === undefined ? {} : { env: frameEnv.env }),
+        ...(mcp === undefined ? {} : { mcp }),
+        ...(frameEnv.secretEnvKeys.length === 0 ? {} : { secretEnvKeys: frameEnv.secretEnvKeys }),
+        ...(captureRequested(route, this.provider) ? { capture: true as const } : {}),
+      });
+    } catch (error) {
+      if (error instanceof PrepareFrameMaterializationError) throw error;
+      // Preserve the sanitized, bounded MCP reason for diagnosis.
+      if (error instanceof McpAttachValidationError) {
+        logger
+          .withFields({
+            sandboxId: this.sandboxId,
+            sessionId: route.sessionId,
+            reason: error.reason,
+          })
+          .warn('MCP materialization failed before session.prepare');
+      }
+      throw new PrepareFrameMaterializationError(
+        'frame_materialization_failed',
+        errorClassName(error)
+      );
+    }
+  }
+
+  /** One sanitized failure line: stage, error class and secret count only. */
+  private logPrepareFrameMaterializationFailure(route: RouteRecord, error: unknown): void {
+    const encrypted = route.credentialSource?.encryptedSecrets;
+    logger
+      .withFields({
+        sandboxId: this.sandboxId,
+        sessionId: route.sessionId,
+        attemptId: route.attemptId,
+        stage: materializationStage(error),
+        secretCount: encrypted === undefined ? 0 : Object.keys(encrypted).length,
+        errorClass:
+          error instanceof PrepareFrameMaterializationError
+            ? (error.sourceErrorName ?? error.name)
+            : errorClassName(error),
+      })
+      .warn('session.prepare frame materialization failed');
   }
 
   private prepareCredentials(
@@ -2435,8 +2536,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
    */
   private async sendSessionPrepareWithRuntimeProxy(
     sessionId: string,
-    attemptId: string,
-    mcp: ControlPlaneRouteSpec['mcp']
+    attemptId: string
   ): Promise<void> {
     try {
       let route = await readRoute(this.db, sessionId);
@@ -2513,11 +2613,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const sendFence = this.runtimeProxyFenceFor(state);
         if (sendFence === null || !sameRuntimeProxyControlBinding(mintedFence, sendFence)) return;
       }
+      // Materialize against the re-read route, after the fence checks, so a
+      // failure never sends a frame and never fails a newer attempt.
+      let spec: ControlPlaneRouteSpec;
+      try {
+        spec = this.materializePrepareFrame(route, this.wrapperRedactsNamedSecrets(socket));
+      } catch (error) {
+        this.logPrepareFrameMaterializationFailure(route, error);
+        await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
+        return;
+      }
       // The frame carries the wrapper-safe spec plus the issued credential
       // material only; the credential source stays DO-private.
       this.trySendFrame(socket, {
         type: 'session.prepare',
-        spec: this.prepareFrameSpec(route, mcp),
+        spec,
         credentials: this.prepareCredentials(route.grant, sessionId),
       });
     } catch {
@@ -2569,7 +2679,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /** Fail one preparation attempt, fenced by attempt id (late mint failure). */
-  private async failPrepareAttempt(sessionId: string, attemptId: string): Promise<void> {
+  private async failPrepareAttempt(
+    sessionId: string,
+    attemptId: string,
+    stage = 'prepare_dispatch_failed'
+  ): Promise<void> {
     await this.enqueue(async () => {
       const state = await this.readAllocation();
       await failCurrentAttempt(
@@ -2577,7 +2691,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         sessionId,
         attemptId,
         'workspace_setup_failed',
-        'prepare_dispatch_failed'
+        stage
       );
     });
   }
@@ -2677,6 +2791,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const launchEnv = await this.wrapperLaunchEnv(credential, allocationId);
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
+        if (pin.billing) {
+          await assertContainerCapacity(this.env, {
+            subject: pin.billing.subject,
+            instanceId: pin.billing.sandboxId,
+            checkpoint: 'control-plane-create',
+          });
+        }
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
         if (pin.provider === 'vercel') {
@@ -2819,6 +2940,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           },
           'warn'
         );
+        if (isContainerConcurrencyLimitError(error)) {
+          await this.failCreationRoutes(allocationId, false, 'container_limit_reached');
+          return;
+        }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;
@@ -3151,6 +3276,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId,
         wrapperId: frame.wrapperId,
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+        ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.

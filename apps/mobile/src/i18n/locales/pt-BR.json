@@ -268,7 +268,6 @@
     "liveUpdates": "Atualizações em tempo real",
     "liveUpdateSubtitle": "Mostrar agentes ativos nas suas notificações",
     "push": "Notificações push",
-    "enabled": "Notificações ativadas",
     "onDescription": "As notificações push estão ativadas para este dispositivo.",
     "offDescription": "A permissão de notificação ou o registro do dispositivo está desativado.",
     "retryPermission": "Tentar verificar a permissão de notificação novamente",
@@ -2674,8 +2673,6 @@
       "commentDeleteUnavailable": "Este comentário não pode ser excluído."
     },
     "entry": {
-      "eyebrow": "Abra um pull request ou merge request pela URL",
-      "pastePrLink": "Colar link de um pull request ou merge request",
       "noRecentPrs": "Nenhuma revisão recente",
       "noRecentPrsDescription": "Cole um link acima para iniciar uma revisão — ele aparecerá aqui na próxima vez.",
       "couldNotLoad": "Não foi possível carregar.",
@@ -3305,7 +3302,6 @@
   },
   "spendAlerts": {
     "subtitle": "Envie um alerta por e-mail ou notificação push aos contatos de cobrança quando os gastos deste escopo ultrapassarem um limite ou subirem acima do seu ritmo por hora habitual.",
-    "enable": "Ativar os alertas de gastos",
     "thresholdTitle": "Ultrapassagem do limite",
     "thresholdSubtitle": "Os gastos acumulados ultrapassam o seu limite",
     "anomalyTitle": "Pico por hora",

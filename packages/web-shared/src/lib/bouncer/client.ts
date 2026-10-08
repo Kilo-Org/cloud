@@ -42,6 +42,8 @@ const USAGE_OUTBOX_TIMEOUT_MS = 5_000;
 /** A lease release runs in `after()` once the request has ended. */
 const RELEASE_TIMEOUT_MS = 5_000;
 
+/** Signup runs on the auth critical path, before Stripe or the user insert. */
+const SIGNUP_TIMEOUT_MS = 500;
 export type CreditFlow = 'auto_topup' | 'kilo_pass' | 'kiloclaw' | 'seats' | 'topup';
 
 type CreditSubject = {
@@ -188,6 +190,8 @@ export type DecideRequest =
       requestId: string;
       tier: Exclude<DecideTier, 'anonymous'>;
       accountId: string;
+      /** The authenticated actor, independently of the paying account. */
+      userId?: string;
       /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
       ip?: string | null;
       /**
@@ -229,6 +233,43 @@ const decideResponseSchema = z.object({
 
 export type DecideResponse = z.infer<typeof decideResponseSchema>;
 export type DecideFlag = DecideResponse['flags'][number];
+
+const signupRequestSchema = z.strictObject({
+  operationId: z.string().min(1).max(MAX_ID_LENGTH),
+  ip: z.union([z.ipv4(), z.ipv6()]),
+  ja4: z.string().nullable().optional().transform(normalizeJa4),
+});
+
+export type SignupDecideRequest = z.input<typeof signupRequestSchema>;
+
+const signupFlagSchema = z.strictObject({
+  name: z.enum(['signup:burst', 'signup:sustained', 'signup:ja4', 'signup:saturated']),
+  decision: z.enum(['review', 'throttle', 'block']),
+  enforced: z.boolean(),
+  until: z.number().nonnegative().nullable(),
+  source: z.string().max(MAX_ID_LENGTH).optional(),
+});
+
+/** Only a complete, known enforced rejection may prevent an account from being created. */
+const signupResponseSchema = z.discriminatedUnion('enforced', [
+  z.strictObject({
+    enforced: z.literal(false),
+    flags: z.array(signupFlagSchema).max(5),
+  }),
+  z.strictObject({
+    enforced: z.literal(true),
+    code: z.literal('signup_rate_limited'),
+    retryAfterMs: z
+      .number()
+      .int()
+      .nonnegative()
+      // Allow clock and request-order skew beyond the longest supported window.
+      .max(31 * 24 * 60 * 60 * 1000),
+    flags: z.array(signupFlagSchema).max(5),
+  }),
+]);
+
+export type SignupDecideResponse = z.infer<typeof signupResponseSchema>;
 
 /** The explicit outcome of delivering one outbox event, for a durable outbox drainer. */
 export type BouncerDeliveryResult =
@@ -381,6 +422,7 @@ async function post(
 const CREDIT_EVENT_PATH = '/api/v2/credit-event';
 const USAGE_EVENT_PATH = '/api/v1/usage-event';
 const DECIDE_PATH = '/api/v1/decide';
+const SIGNUP_DECIDE_PATH = '/api/v1/signup-decide';
 const RELEASE_PATH = '/api/v1/release';
 
 const STORE_EVENT_TYPES: Record<StoreCreditEvent['type'], true> = {
@@ -588,6 +630,7 @@ export async function decide(
           requestId: id(request.requestId),
           tier: request.tier,
           accountId: request.accountId,
+          userId: request.userId,
           ip: request.ip ?? undefined,
           ja4: normalizeJa4(request.ja4),
           accountCreatedAt: isoTime(request.accountCreatedAt ?? undefined),
@@ -599,6 +642,26 @@ export async function decide(
   const parsed = decideResponseSchema.safeParse(response);
   if (!parsed.success) {
     console.error('[bouncer] decide returned an unknown verdict shape', {
+      issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
+/** Best-effort signup admission, using the same internal key as inference decide. Never retries. */
+export async function signupDecide(
+  request: SignupDecideRequest,
+  { timeoutMs = SIGNUP_TIMEOUT_MS, signal }: { timeoutMs?: number; signal?: AbortSignal } = {}
+): Promise<SignupDecideResponse | null> {
+  const parsedRequest = signupRequestSchema.safeParse(request);
+  if (!parsedRequest.success) return null;
+  const response = await post(SIGNUP_DECIDE_PATH, parsedRequest.data, timeoutMs, signal);
+  if (response === null) return null;
+  const parsed = signupResponseSchema.safeParse(response);
+  if (!parsed.success) {
+    console.error('[bouncer] signup-decide returned an unknown verdict shape', {
+      operationId: request.operationId,
       issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
     });
     return null;

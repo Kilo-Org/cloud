@@ -285,7 +285,6 @@
     "liveUpdates": "Mises à jour en direct",
     "liveUpdateSubtitle": "Afficher les agents actifs dans vos notifications",
     "push": "Notifications à distance",
-    "enabled": "Notifications activées",
     "onDescription": "Les notifications à distance sont activées sur cet appareil.",
     "offDescription": "Les notifications ne sont pas autorisées ou l'appareil n'est pas enregistré pour les recevoir.",
     "retryPermission": "Vérifier à nouveau l'autorisation des notifications",
@@ -2674,8 +2673,6 @@
       "commentDeleteUnavailable": "Ce commentaire ne peut pas être supprimé."
     },
     "entry": {
-      "eyebrow": "Ouvrez une PR ou une merge request à partir de son URL",
-      "pastePrLink": "Coller un lien de PR ou de merge request",
       "noRecentPrs": "Aucune revue récente",
       "noRecentPrsDescription": "Collez un lien ci-dessus pour démarrer une revue — elle apparaîtra ici la prochaine fois.",
       "couldNotLoad": "Le chargement est impossible.",
@@ -3305,7 +3302,6 @@
   },
   "spendAlerts": {
     "subtitle": "Envoyez une alerte par e-mail ou notification push aux contacts de facturation lorsque les dépenses de ce périmètre dépassent une limite ou s'envolent au-dessus de leur rythme horaire habituel.",
-    "enable": "Activer les alertes de dépenses",
     "thresholdTitle": "Franchissement du seuil",
     "thresholdSubtitle": "Les dépenses cumulées dépassent votre limite",
     "anomalyTitle": "Pic horaire",

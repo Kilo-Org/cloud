@@ -19,6 +19,7 @@ import {
   isOpenAiModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { GLM_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
+import { STEP_5_PREVIEW_FREE_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
 import type { AutoFreeModelConfig } from '@kilocode/db/schema-types';
 import { getRandomNumber } from '@kilocode/web-shared/lib/ai-gateway/getRandomNumber';
 
@@ -42,6 +43,8 @@ export function selectAutoFreeCandidate(
   return null;
 }
 
+const PREFERRED_KILO_EXCLUSIVE_FREE_MODELS = [STEP_5_PREVIEW_FREE_MODEL_ID];
+
 const PREFERRED_PAID_MODELS = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_SOL_CURRENT_MODEL_ID,
@@ -57,7 +60,9 @@ const PREFERRED_PAID_MODELS = [
  * read; use `getMonitoredModels` on the server.
  */
 export function buildMonitoredModels(freeModels: ReadonlyArray<string>): string[] {
-  return [...new Set([...freeModels, ...PREFERRED_PAID_MODELS])];
+  return [
+    ...new Set([...PREFERRED_KILO_EXCLUSIVE_FREE_MODELS, ...freeModels, ...PREFERRED_PAID_MODELS]),
+  ];
 }
 
 /**
@@ -66,9 +71,12 @@ export function buildMonitoredModels(freeModels: ReadonlyArray<string>): string[
  */
 export function buildPreferredModels(freeModels: ReadonlyArray<string>): string[] {
   return [
-    KILO_AUTO_EFFICIENT_MODEL.id,
-    KILO_AUTO_FREE_MODEL.id,
-    ...buildMonitoredModels(freeModels),
+    ...new Set([
+      KILO_AUTO_EFFICIENT_MODEL.id,
+      ...PREFERRED_KILO_EXCLUSIVE_FREE_MODELS,
+      KILO_AUTO_FREE_MODEL.id,
+      ...buildMonitoredModels(freeModels),
+    ]),
   ];
 }
 

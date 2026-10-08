@@ -21,7 +21,7 @@ export type PurchaseStorefront = (typeof PURCHASE_STOREFRONTS)[number];
 export const PURCHASE_PRODUCTS = ['kilo_pass', 'credits'] as const;
 export type PurchaseProduct = (typeof PURCHASE_PRODUCTS)[number];
 
-export const PURCHASE_PRESENTATION_KINDS = ['native_iap', 'web_management', 'unavailable'] as const;
+export const PURCHASE_PRESENTATION_KINDS = ['web_management', 'unavailable'] as const;
 export type PurchasePresentationKind = (typeof PURCHASE_PRESENTATION_KINDS)[number];
 
 export const PURCHASE_STATUS_CLASSES = [

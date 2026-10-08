@@ -189,9 +189,8 @@ type KiloPassCaller = {
     storefront?: 'app_store' | 'play' | 'web' | null;
     product: 'credits' | 'kilo_pass';
     program?: string | null;
-    supportsNativePlayKiloPass?: boolean;
   }) => Promise<{
-    kind: 'native_iap' | 'web_management' | 'unavailable';
+    kind: 'web_management' | 'unavailable';
     statusClass: 'healthy' | 'pending' | 'retryable' | 'terminal' | 'inactive';
     reason:
       | 'credits_not_sold_on_ios'
@@ -201,28 +200,6 @@ type KiloPassCaller = {
     cta: { label: string | null; action: 'none' | 'open_web' | 'open_native' };
     webUrl: string | null;
     program: string | null;
-  }>;
-  preflightPurchase: (input: {
-    platform: 'android' | 'ios';
-    storefront: 'app_store' | 'play' | 'web';
-    product: 'credits' | 'kilo_pass';
-    program?: string | null;
-    supportsNativePlayKiloPass?: boolean;
-    googleProductId?: string;
-    googlePurchaseToken?: string | null;
-    appleProductId: string;
-    appleOriginalTransactionId?: string | null;
-  }) => Promise<{
-    allowed: boolean;
-    statusClass: 'healthy' | 'pending' | 'retryable' | 'terminal' | 'inactive';
-    reason:
-      | 'credits_not_sold_on_ios'
-      | 'kilo_pass_not_sold_in_app'
-      | 'unsupported_combination'
-      | 'unknown_product'
-      | 'already_subscribed'
-      | 'owned_by_another_account'
-      | null;
   }>;
   completeAppStorePurchase: (input: {
     signedTransactionJws: string;
@@ -1501,7 +1478,7 @@ describe('kiloPassRouter', () => {
       expect(result.webUrl).toContain('/subscriptions/kilo-pass');
     });
 
-    it('returns unavailable for Android Play Kilo Pass from a client that mounts Play IAP', async () => {
+    it('returns unavailable for Android Play Kilo Pass without a live subscription', async () => {
       const user = await insertTestUser();
       const caller = await createCallerForUser(user.id);
 
@@ -1509,79 +1486,11 @@ describe('kiloPassRouter', () => {
         platform: 'android',
         storefront: 'play',
         product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
       });
 
       expect(result.kind).toBe('unavailable');
       expect(result.reason).toBe('kilo_pass_not_sold_in_app');
     });
-  });
-
-  describe('preflightPurchase', () => {
-    it.each([
-      {
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      },
-      {
-        platform: 'android',
-        storefront: 'play',
-        product: 'kilo_pass',
-        supportsNativePlayKiloPass: true,
-        googleProductId: 'kilopass_tier19',
-        appleProductId: 'kilopass.tier19.monthly.v1',
-      },
-    ] as const)(
-      'refuses a $platform Kilo Pass purchase for a user with no subscription',
-      async input => {
-        const user = await insertTestUser();
-        const caller = await createCallerForUser(user.id);
-
-        const result = await caller.kiloPass.preflightPurchase(input);
-
-        expect(result).toEqual({
-          allowed: false,
-          statusClass: 'inactive',
-          reason: 'kilo_pass_not_sold_in_app',
-        });
-      }
-    );
-
-    it.each([
-      [KiloPassPaymentProvider.AppStore, 'ios', 'app_store'],
-      [KiloPassPaymentProvider.GooglePlay, 'android', 'play'],
-    ] as const)(
-      'refuses a %s subscriber an in-app upgrade',
-      async (paymentProvider, platform, storefront) => {
-        const user = await insertTestUser();
-        await insertSubscription({
-          kiloUserId: user.id,
-          stripeSubscriptionId: null,
-          paymentProvider,
-          providerSubscriptionId: `preflight_${crypto.randomUUID()}`,
-          tier: KiloPassTier.Tier19,
-          cadence: KiloPassCadence.Monthly,
-          status: 'active',
-        });
-        const caller = await createCallerForUser(user.id);
-
-        const result = await caller.kiloPass.preflightPurchase({
-          platform,
-          storefront,
-          product: 'kilo_pass',
-          googleProductId: 'kilopass_tier49',
-          appleProductId: 'kilopass.tier49.monthly.v1',
-        });
-
-        expect(result).toEqual({
-          allowed: false,
-          statusClass: 'healthy',
-          reason: 'kilo_pass_not_sold_in_app',
-        });
-      }
-    );
   });
 
   describe('getState', () => {

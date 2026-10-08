@@ -1,21 +1,11 @@
 import { i18n } from '@/i18n';
 
-export function kiloPassLegalDisclosure(platformOS: string): string {
-  return i18n.t(
-    platformOS === 'android' ? 'kiloPass.legalDisclosurePlay' : 'kiloPass.legalDisclosure'
-  );
-}
-
 type StoreLegalLink = {
   label: string;
   url: string;
 };
 
-/**
- * The store-purchase legal links. Not Kilo Pass specific: the one-off credit
- * packs link to the same Terms and Privacy pages, so both purchase screens
- * share this helper.
- */
+/** The one-off credit-pack store-purchase legal links. */
 export function getStoreLegalLinks(webBaseUrl: string): readonly [StoreLegalLink, StoreLegalLink] {
   const baseUrl = webBaseUrl.replace(/\/+$/, '');
 

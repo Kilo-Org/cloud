@@ -66,7 +66,7 @@ import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-owners
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
-import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   isSignOutActive,
   setSignOutActive,

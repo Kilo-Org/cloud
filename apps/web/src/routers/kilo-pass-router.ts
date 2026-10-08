@@ -103,10 +103,7 @@ import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
 import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
-import {
-  buildPurchasePresentation,
-  getPurchasePresentationForUser,
-} from '@/lib/kilo-pass/purchase-presentation';
+import { getPurchasePresentationForUser } from '@/lib/kilo-pass/purchase-presentation';
 import {
   PURCHASE_PLATFORMS,
   PURCHASE_PRESENTATION_KINDS,
@@ -1086,33 +1083,6 @@ const GetPurchasePresentationInputSchema = z.object({
   storefront: PurchaseStorefrontSchema.nullable().optional(),
   product: PurchaseProductSchema,
   program: z.string().max(64).nullable().optional(),
-  /** Ignored. Shipped mobile clients still send it. */
-  supportsNativePlayKiloPass: z.boolean().optional(),
-});
-
-/**
- * The server refuses every in-app Kilo Pass purchase, so only `platform`, `storefront`,
- * `product`, and `program` are read. The other fields keep the input that shipped mobile
- * clients send.
- */
-const PreflightPurchaseInputSchema = z.object({
-  platform: PurchasePlatformSchema,
-  storefront: PurchaseStorefrontSchema,
-  product: PurchaseProductSchema,
-  program: z.string().max(64).nullable().optional(),
-  supportsNativePlayKiloPass: z.boolean().optional(),
-  googleProductId: z.string().min(1).optional(),
-  /**
-   * Play purchase token this device already owns. Untrusted: it can only deny
-   * a purchase. Old clients omit it.
-   */
-  googlePurchaseToken: z.string().min(1).max(256).nullable().optional(),
-  appleProductId: z.string().min(1),
-  /**
-   * Original transaction ID of a Kilo Pass this device already owns, when StoreKit
-   * reports one. Untrusted: it can only deny a purchase, never grant one.
-   */
-  appleOriginalTransactionId: z.string().min(1).max(64).nullable().optional(),
 });
 
 const PurchasePresentationCtaOutputSchema = z.object({
@@ -1129,21 +1099,6 @@ const GetPurchasePresentationOutputSchema = z.object({
   cta: PurchasePresentationCtaOutputSchema,
   webUrl: z.string().nullable(),
   program: z.string().nullable(),
-});
-
-const PreflightPurchaseOutputSchema = z.object({
-  allowed: z.boolean(),
-  statusClass: z.enum(PURCHASE_STATUS_CLASSES),
-  reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_sold_in_app',
-      'unsupported_combination',
-      'unknown_product',
-      'already_subscribed',
-      'owned_by_another_account',
-    ])
-    .nullable(),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -1388,30 +1343,6 @@ export const kiloPassRouter = createTRPCRouter({
         product: input.product,
         program: input.program,
       });
-    }),
-
-  preflightPurchase: baseProcedure
-    .input(PreflightPurchaseInputSchema)
-    .output(PreflightPurchaseOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
-      const presentation = buildPurchasePresentation({
-        subscription,
-        input: {
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-          program: input.program,
-        },
-      });
-
-      // No presentation is `native_iap` any more, so every in-app purchase is refused
-      // before the store sheet opens.
-      return {
-        allowed: false,
-        statusClass: presentation.statusClass,
-        reason: presentation.reason,
-      };
     }),
 
   completeAppStorePurchase: baseProcedure

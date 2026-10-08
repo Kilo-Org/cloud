@@ -58,27 +58,18 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
 
-## App Store Kilo Pass Subscriptions
+## Mobile Purchases
 
-App Store Kilo Pass subscriptions require an EAS development build or TestFlight
-build with the in-app purchase capability enabled. Expo Go is not supported for
-this feature.
+Credit packs retain their native App Store and Google Play purchase flow.
+They require a development or production build with in-app purchases enabled;
+Expo Go is not supported.
 
-Configured auto-renewable subscription product IDs:
+Kilo Pass has no native purchase, restore, or store-management flow in the app.
+The Profile card and `/kilo-pass` route render the backend
+`kiloPass.getPurchasePresentation` result:
 
-- `kilopass.tier19.monthly.v1`
-- `kilopass.tier49.monthly.v1`
-- `kilopass.tier199.monthly.v1`
+- `unavailable` shows the unavailable presentation without purchase controls.
+- `web_management` shows Manage, which opens the returned `webUrl`.
 
-Use App Store Connect sandbox tester accounts for local and TestFlight sandbox
-verification. Configure App Store Server Notifications V2 to post to
-`/api/kilo-pass/apple/notifications`.
-
-Backend environment variables:
-
-- `APPLE_IAP_ENVIRONMENT`
-- `APPLE_APP_APPLE_ID`
-- `APPLE_ROOT_CERTIFICATES_PEM`
-- `APPLE_IAP_KEY_ID`
-- `APPLE_IAP_ISSUER_ID`
-- `APPLE_IAP_PRIVATE_KEY`
+Kilo Pass store verification, provider notifications, and expiry reconciliation
+remain on the backend for existing store subscriptions.

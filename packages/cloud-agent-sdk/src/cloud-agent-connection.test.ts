@@ -134,7 +134,7 @@ describe('createConnection', () => {
     connection.destroy();
   });
 
-  it('treats ambiguous 1006 as a reconnectable transport failure', () => {
+  it('treats ambiguous 1006 as a reconnectable transport failure', async () => {
     jest.spyOn(Math, 'random').mockReturnValue(0);
     const onRefreshTicket = jest.fn().mockResolvedValue('new-ticket');
 
@@ -158,10 +158,12 @@ describe('createConnection', () => {
     expect(onRefreshTicket).not.toHaveBeenCalled();
     expect(webSocketMock).toHaveBeenCalledTimes(1);
 
-    jest.advanceTimersByTime(500);
+    await jest.advanceTimersByTimeAsync(500);
 
+    expect(onRefreshTicket).toHaveBeenCalledTimes(1);
     expect(webSocketMock).toHaveBeenCalledTimes(2);
-    expect(sockets[1]?.url).toContain('ticket=old-ticket');
+    expect(sockets[1]?.url).toContain('ticket=new-ticket');
+    expect(sockets[1]?.url).not.toContain('ticket=old-ticket');
 
     connection.destroy();
   });

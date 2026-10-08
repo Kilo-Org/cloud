@@ -11,6 +11,7 @@
   "observability": { "enabled": true },
   "queues": {
     "producers": [{ "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing" }],
+    "consumers": [{ "queue": "usage-ingest-processing" }],
   },
   "env": {
     "staging": {
@@ -20,6 +21,7 @@
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging" },
         ],
+        "consumers": [{ "queue": "usage-ingest-processing-staging" }],
       },
     },
   },

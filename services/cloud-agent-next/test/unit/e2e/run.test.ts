@@ -4,6 +4,9 @@ import {
   buildDeployedConfig,
   exitCodeFor,
   exitCodeForResults,
+  explicitAllocationApiError,
+  explicitAllocationProfileError,
+  explicitAllocationScenarioError,
   parseArgs,
   requireScenarioApi,
   resultOutcome,
@@ -11,6 +14,82 @@ import {
 } from '../../e2e/run.js';
 import type { LifecycleResult } from '../../e2e/lifecycle.js';
 import { SHARED_SCENARIOS } from '../../e2e/scenarios-shared.js';
+
+describe('run allocation option', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it.each(['vercel-small', 'vercel-large', 'cloudflare-containers-standard-4'] as const)(
+    'accepts the known allocation %s',
+    allocation => {
+      expect(parseArgs([`--allocation=${allocation}`, 'cold-hot', 'echo:hi'])).toMatchObject({
+        lifecycle: 'cold-hot',
+        allocation,
+      });
+    }
+  );
+
+  it('omits allocation when the flag is absent', () => {
+    expect(parseArgs(['cold-hot', 'echo:hi'])).not.toHaveProperty('allocation');
+  });
+
+  it('rejects an unknown allocation key', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(parseArgs(['--allocation=vercel-medium', 'cold-hot', 'echo:hi'])).toBeNull();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('invalid --allocation value'));
+  });
+
+  it('refuses an explicit allocation on the Docker local profile before side effects', () => {
+    expect(
+      explicitAllocationProfileError({ allocation: 'vercel-small', profile: 'local' })
+    ).toMatch(/local-http or deployed/);
+    expect(
+      explicitAllocationProfileError({ allocation: 'vercel-small', profile: 'local-http' })
+    ).toBeUndefined();
+    expect(
+      explicitAllocationProfileError({ allocation: 'vercel-small', profile: 'deployed' })
+    ).toBeUndefined();
+    expect(
+      explicitAllocationProfileError({ allocation: undefined, profile: 'local' })
+    ).toBeUndefined();
+  });
+
+  it('refuses an explicit allocation on the legacy API', () => {
+    expect(explicitAllocationApiError({ allocation: 'vercel-small', api: 'legacy' })).toMatch(
+      /unified API/
+    );
+    expect(
+      explicitAllocationApiError({ allocation: 'vercel-small', api: 'unified' })
+    ).toBeUndefined();
+    expect(
+      explicitAllocationApiError({ allocation: 'vercel-small', api: undefined })
+    ).toBeUndefined();
+    expect(explicitAllocationApiError({ allocation: undefined, api: 'legacy' })).toBeUndefined();
+  });
+
+  it('refuses an explicit allocation for a scenario that never observes the sandbox', () => {
+    // `cold` observes the physical sandbox; `cold-hot` never inspects it, so an
+    // explicit allocation would be unverifiable there.
+    expect(SHARED_SCENARIOS['cold'].requires).toContain('sessionSandbox');
+    expect(SHARED_SCENARIOS['cold-hot'].requires).not.toContain('sessionSandbox');
+    expect(
+      explicitAllocationScenarioError({
+        allocation: 'vercel-small',
+        requires: SHARED_SCENARIOS['cold-hot'].requires,
+      })
+    ).toMatch(/observes the physical sandbox/);
+    expect(
+      explicitAllocationScenarioError({
+        allocation: 'vercel-small',
+        requires: SHARED_SCENARIOS['cold'].requires,
+      })
+    ).toBeUndefined();
+    expect(
+      explicitAllocationScenarioError({ allocation: undefined, requires: [] })
+    ).toBeUndefined();
+  });
+});
 
 describe('run timeout option', () => {
   afterEach(() => {

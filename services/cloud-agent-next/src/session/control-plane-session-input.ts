@@ -171,23 +171,30 @@ export function buildControlPlaneSandboxSelection(
     ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
     enforcementRequested,
   };
-  if (provider === 'vercel') {
-    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
-    return {
-      provider,
-      configuration: resources === undefined ? { provider } : { provider, resources },
-      billing,
-    };
+  switch (provider) {
+    case 'vercel': {
+      const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
+      return {
+        provider,
+        configuration: resources === undefined ? { provider } : { provider, resources },
+        billing,
+      };
+    }
+    case 'cloudflare-containers': {
+      const instance = getSandboxAllocationInstance(allocation);
+      return {
+        provider,
+        configuration: instance === undefined ? { provider } : { provider, instance },
+        billing,
+      };
+    }
+    case 'cloudflare':
+      return { provider, configuration: { provider }, billing };
+    default: {
+      const exhaustive: never = provider;
+      throw new ControlPlaneRegistrationError(`Unsupported sandbox provider ${String(exhaustive)}`);
+    }
   }
-  if (provider === 'cloudflare-containers') {
-    const instance = getSandboxAllocationInstance(allocation);
-    return {
-      provider,
-      configuration: instance === undefined ? { provider } : { provider, instance },
-      billing,
-    };
-  }
-  return { provider, configuration: { provider }, billing };
 }
 
 async function buildMetadata(

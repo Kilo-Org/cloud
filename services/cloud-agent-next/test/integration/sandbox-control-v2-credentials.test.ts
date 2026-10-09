@@ -12,6 +12,7 @@ import {
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
+import { buildControlNetworkPolicy } from '../../src/sandbox-control/session-credentials.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
 import type {
   ProviderAdapter,
@@ -62,7 +63,7 @@ type FakeProvider = {
   /** Wrapper frames received at the moment each policy update was applied. */
   policyFrameCounts: number[];
   framesSeen: () => number;
-  /** When set, `updateNetworkPolicy` blocks on this until the test resolves it. */
+  /** When set, `applyContainedCredentials` blocks on this until the test resolves it. */
   policyGate: { promise: Promise<void>; resolve: () => void } | null;
   policyBlocked: boolean;
   failPolicy: boolean;
@@ -90,9 +91,6 @@ function createFakeProvider(): FakeProvider {
     failPolicy: false,
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.intents.push(intent);
@@ -115,14 +113,16 @@ function createFakeProvider(): FakeProvider {
       return 'terminal';
     },
     async ensureLeaseAtLeast() {},
-    async updateNetworkPolicy(_ref, policy) {
+    async applyContainedCredentials(_ref, grants) {
       if (provider.failPolicy) throw new Error('network policy update failed');
       if (provider.policyGate) {
         provider.policyBlocked = true;
         await provider.policyGate.promise;
         provider.policyBlocked = false;
       }
-      provider.policyCalls.push(policy);
+      // The real adapter builds the policy, so validation of the grant set
+      // (shared-scope alias/sandbox mismatch) must run here too.
+      provider.policyCalls.push(buildControlNetworkPolicy(grants));
       provider.policyFrameCounts.push(provider.framesSeen());
     },
     async logs() {
@@ -1627,6 +1627,27 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(await readRouteRow(stub, SESSION)).toBeNull();
   });
 
+  it('stops a live Vercel sandbox when the provider adapter lacks the policy hook', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, vercelSource(SESSION), routeSpec(SESSION))
+    );
+
+    // A live Vercel adapter without `applyContainedCredentials` cannot remove the
+    // released alias, so the reachable interface fails closed exactly like a
+    // throwing hook instead of reporting a false success.
+    provider.adapter.applyContainedCredentials = undefined;
+    await stub.release({ sessionId: SESSION });
+
+    const state = await stub.getAllocationState();
+    expect(state.kind === 'stopping' || state.kind === 'stopped').toBe(true);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+  });
+
   it('rejects prepare without a credential source and never emits raw material', async () => {
     const provider = createFakeProvider();
     const broker = createFakeCredentialBroker();
@@ -1768,13 +1789,13 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     // The provider credential policy refresh fails once, then succeeds.
     provider.failPolicy = true;
-    const update = provider.adapter.updateNetworkPolicy!.bind(provider.adapter);
-    provider.adapter.updateNetworkPolicy = async (ref, policy) => {
+    const update = provider.adapter.applyContainedCredentials!.bind(provider.adapter);
+    provider.adapter.applyContainedCredentials = async (ref, grants) => {
       if (provider.failPolicy) {
         provider.failPolicy = false;
         throw new Error('network policy update failed');
       }
-      return update(ref, policy);
+      return update(ref, grants);
     };
 
     const { prepareFrame } = await prepareWarmRoute(
@@ -1798,7 +1819,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     // A persistent policy failure is retried once, then fails the route. Each
     // attempt is one policy update, so two attempts means exactly two updates.
     let policyUpdates = 0;
-    provider.adapter.updateNetworkPolicy = async () => {
+    provider.adapter.applyContainedCredentials = async () => {
       policyUpdates += 1;
       throw new Error('network policy update failed');
     };

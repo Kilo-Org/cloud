@@ -125,9 +125,6 @@ export function createCloudflareProviderAdapter(deps: {
   };
 
   return {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     ensureBillingAdmission,
     async probeWrapperProcesses(ref) {
       const parsed = decodeOwnedProviderRef(ref);

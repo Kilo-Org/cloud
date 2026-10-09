@@ -155,6 +155,37 @@ describe('sandbox selection policy', () => {
     ]);
   });
 
+  it('reports the full catalog and omits Cloudflare containers when the owner is unenrolled', () => {
+    const missingContainers = { ...configured } as Env;
+    expect(
+      getSandboxSelectionCapabilities(missingContainers, owner).options.map(
+        option => option.allocation
+      )
+    ).toEqual([
+      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-shared'),
+      getSandboxAllocationRequest('vercel-small'),
+      getSandboxAllocationRequest('vercel-large'),
+    ]);
+
+    const enrolledContainers = {
+      ...configured,
+      CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
+    } as Env;
+    expect(
+      getSandboxSelectionCapabilities(enrolledContainers, owner).options.map(
+        option => option.allocation
+      )
+    ).toEqual([
+      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-shared'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      getSandboxAllocationRequest('cloudflare-containers-standard-4'),
+      getSandboxAllocationRequest('vercel-small'),
+      getSandboxAllocationRequest('vercel-large'),
+    ]);
+  });
+
   it('enables personal selection when the user is listed', () => {
     const env = { ...configured, SANDBOX_SELECTION_IDS: owner.userId } as Env;
     const capabilities = getSandboxSelectionCapabilities(env, { userId: owner.userId });

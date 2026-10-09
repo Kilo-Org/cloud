@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BILLING_HEARTBEAT_CALLBACK,
+  clearBillingContext,
   createContainerUsageClient,
   getBillingContext,
   installBillingHeartbeat,
@@ -12,13 +13,19 @@ import {
   type RecordAck,
   type RecordStartResult,
 } from '@kilocode/container-usage';
+import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
+import { VERCEL_BILLING_CAPACITIES } from '../container-usage-context.js';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../metered-billing-lifecycle.js';
+import type { AllocationState, SandboxTimers } from '../control-plane/sandbox/allocation.js';
+import { createVercelBillingRuntime } from '../control-plane/sandbox/vercel-billing-runtime.js';
+import type { ProviderAdapter } from './provider.js';
 import type { VercelSandboxSession } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { BillingScheduleTable } from './billing-schedule.js';
 import { createVercelProviderAdapter, type VercelControlRestClient } from './vercel-provider.js';
 import {
   loadVercelBillingBinding,
   saveVercelBillingBinding,
+  VERCEL_BILLING_SETTLEMENT_CALLBACK,
   VercelBilling,
   type VercelBillingBinding,
 } from './vercel-billing.js';
@@ -58,6 +65,7 @@ describe('Vercel provider lifetime sink', () => {
         stopSession: async () => ({ ...session, status: 'stopped', stoppedAt: 4_000 }),
       } as unknown as VercelControlRestClient,
       billingLifetimeSink: lifetime,
+      readContainedGrants: async () => [],
     });
     const created = await provider.create({
       intentId: 'attempt',
@@ -630,5 +638,244 @@ describe('onGenerationClosed', () => {
       callback: BILLING_HEARTBEAT_CALLBACK,
       payload: context.generation,
     });
+  });
+});
+
+describe('createVercelBillingRuntime', () => {
+  const classes = Object.entries(VERCEL_BILLING_CAPACITIES);
+  const [classA, capacityA] = classes[0]!;
+
+  function resourcesFor(capacity: { vcpu: number; memoryMiB: number }): VercelSandboxResources {
+    return {
+      vcpus: capacity.vcpu,
+      memory: capacity.memoryMiB,
+    } as unknown as VercelSandboxResources;
+  }
+
+  function helperSchedule() {
+    const due: Array<{ callback: string; payload?: unknown }> = [];
+    const calls: string[] = [];
+    return {
+      due,
+      calls,
+      async dueEntries() {
+        const entries = [...due];
+        due.length = 0;
+        return entries;
+      },
+      async completeDue(entry: { callback: string }) {
+        calls.push(`complete:${entry.callback}`);
+      },
+      async ensure(callback: string) {
+        calls.push(`ensure:${callback}`);
+      },
+      async schedule(callback: string) {
+        calls.push(`schedule:${callback}`);
+      },
+      async remove(callback: string) {
+        calls.push(`remove:${callback}`);
+      },
+      async deferRetry(callback: string) {
+        calls.push(`defer:${callback}`);
+      },
+      async markDue() {},
+    };
+  }
+
+  function harness(options: { requestStop?: () => Promise<void> } = {}) {
+    const { storage, meter, pending, heartbeat } = setup();
+    const schedule = helperSchedule();
+    let resources: VercelSandboxResources | undefined;
+    let allocation = { kind: 'stopped', allocationId: 'a1', providerRef: 'provider-ref-1' };
+    const stopRef = vi.fn(async () => false);
+    const failUnconfirmedCleanup = vi.fn(async () => undefined);
+    const requestStop = vi.fn(options.requestStop ?? (async () => undefined));
+    const runtime = createVercelBillingRuntime({
+      storage: storage as unknown as DurableObjectStorage,
+      env: () => ({ CONTAINER_USAGE_METER: meter }) as never,
+      sandboxId: 'ses-abcdef',
+      schedule: schedule as unknown as BillingScheduleTable,
+      currentProvider: () => 'vercel',
+      currentPin: () => ({
+        provider: 'vercel',
+        allocationName: 'ses-abcdef',
+        configuration:
+          resources === undefined ? null : { provider: 'vercel', resources: resources },
+        locator: null,
+        billing: null,
+        containment: null,
+      }),
+      readAllocation: async () => allocation as unknown as AllocationState,
+      requireOwner: async () => 'user-1',
+      isCreateInFlight: () => false,
+      provider: () =>
+        ({
+          observe: async () => ({ status: 'unknown' }),
+        }) as unknown as ProviderAdapter,
+      timers: () =>
+        ({ providerStopAttemptMs: 1_000, providerCreateMs: 1_000 }) as unknown as SandboxTimers,
+      stopRef,
+      failUnconfirmedCleanup,
+      requestStop,
+      waitUntil: promise => {
+        pending.push(promise);
+      },
+    });
+    return {
+      runtime,
+      storage,
+      schedule,
+      heartbeat,
+      pending,
+      stopRef,
+      failUnconfirmedCleanup,
+      requestStop,
+      setResources: (value: VercelSandboxResources | undefined) => {
+        resources = value;
+      },
+      setAllocation: (value: unknown) => {
+        allocation = value as typeof allocation;
+      },
+    };
+  }
+
+  it('restores from the stored context service and only rebuilds on a resource change after the context closes', async () => {
+    const h = harness();
+    await seedContext(h.storage);
+
+    // Evicted state: resources missing, so the runtime is rebuilt from the
+    // stored context service (identity unknown rather than a class).
+    const first = await h.runtime.ensureRuntime();
+    expect(first).toBeDefined();
+    expect(first?.identity).toBeUndefined();
+
+    // A resource change while the context is still open must keep the cached
+    // runtime: the cached object still describes the open generation.
+    h.setResources(resourcesFor(capacityA));
+    const cached = await h.runtime.ensureRuntime();
+    expect(cached).toBe(first);
+    expect(cached?.identity).toBeUndefined();
+
+    // Only once the context is closed does the changed resource class rebuild.
+    await clearBillingContext(h.storage);
+    const rebuilt = await h.runtime.ensureRuntime();
+    expect(rebuilt).not.toBe(first);
+    expect(rebuilt?.identity?.sandboxClassName).toBe(classA);
+  });
+
+  it('schedules an unconfirmed settlement, then binds the stored terminal time when confirmed', async () => {
+    const h = harness();
+    const context = await seedContext(h.storage, { usageMeasuredAtMs: T0 + 500 });
+    await saveVercelBillingBinding(h.storage, bindingFor(context.generation));
+    h.setAllocation({ kind: 'stopped', allocationId: 'a1', providerRef: 'provider-ref-1' });
+
+    await h.runtime.settleStoppedCreatedRef('provider-ref-1', false);
+    expect(h.schedule.calls).toContain(`schedule:${VERCEL_BILLING_SETTLEMENT_CALLBACK}`);
+    expect((await loadVercelBillingBinding(h.storage, context.generation))?.terminalAtMs).toBe(
+      undefined
+    );
+
+    await h.runtime.settleStoppedCreatedRef('provider-ref-1', true);
+    // The stored measurement time is used, not the current clock.
+    expect((await loadVercelBillingBinding(h.storage, context.generation))?.terminalAtMs).toBe(
+      T0 + 500
+    );
+  });
+
+  it('keeps a stored terminal time instead of a newer measurement', async () => {
+    const h = harness();
+    const context = await seedContext(h.storage, { usageMeasuredAtMs: T0 + 5_000 });
+    await saveVercelBillingBinding(h.storage, bindingFor(context.generation, { terminalAtMs: T0 }));
+    h.setAllocation({ kind: 'stopped', allocationId: 'a1', providerRef: 'provider-ref-1' });
+    const active = await h.runtime.ensureRuntime();
+    if (active === undefined) throw new Error('missing runtime');
+    const persistStop = vi.spyOn(active.heartbeat, 'persistStop');
+
+    await h.runtime.settleStoppedCreatedRef('provider-ref-1', true);
+
+    expect(persistStop).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'runtime_signal' }),
+      T0
+    );
+    expect((await loadVercelBillingBinding(h.storage, context.generation))?.terminalAtMs).toBe(T0);
+  });
+
+  it('fails unconfirmed cleanup only once the create deadline has passed', async () => {
+    const h = harness();
+    const context = await seedContext(h.storage, { startEpochMs: T0 - 500 });
+    await saveVercelBillingBinding(h.storage, bindingFor(context.generation));
+    h.setAllocation({ kind: 'creating', allocationId: 'a1', providerRef: 'provider-ref-1' });
+
+    h.schedule.due.push({
+      callback: VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      payload: context.generation,
+    });
+    await h.runtime.runAlarm();
+    expect(h.stopRef).toHaveBeenCalledWith('provider-ref-1', 'a1');
+    expect(h.failUnconfirmedCleanup).not.toHaveBeenCalled();
+    expect(h.schedule.calls).toContain(`schedule:${VERCEL_BILLING_SETTLEMENT_CALLBACK}`);
+
+    // Past the create deadline the unconfirmed stop fails cleanup closed.
+    vi.setSystemTime(T0 + 600);
+    h.schedule.due.push({
+      callback: VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      payload: context.generation,
+    });
+    await h.runtime.runAlarm();
+    expect(h.failUnconfirmedCleanup).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'creating' })
+    );
+  });
+
+  it('fails unconfirmed cleanup after the deadline and drops due entries for stale generations', async () => {
+    const h = harness();
+    const context = await seedContext(h.storage, { startEpochMs: T0 - 600_000 });
+    await saveVercelBillingBinding(h.storage, bindingFor(context.generation));
+    h.setAllocation({ kind: 'creating', allocationId: 'a1', providerRef: 'provider-ref-1' });
+
+    h.schedule.due.push({
+      callback: VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      payload: context.generation,
+    });
+    await h.runtime.runAlarm();
+    expect(h.stopRef).toHaveBeenCalledWith('provider-ref-1', 'a1');
+    expect(h.failUnconfirmedCleanup).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'creating' })
+    );
+    expect(h.schedule.calls).toContain(`schedule:${VERCEL_BILLING_SETTLEMENT_CALLBACK}`);
+
+    // A due entry for another generation is dropped and its binding removed
+    // without provider work.
+    h.schedule.due.push({
+      callback: VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      payload: 'stale-generation',
+    });
+    await h.runtime.runAlarm();
+    expect(h.schedule.calls).toContain(`complete:${VERCEL_BILLING_SETTLEMENT_CALLBACK}`);
+    expect(h.stopRef).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not await the stop request, so the billing alarm path returns without self-waiting', async () => {
+    vi.useRealTimers();
+    const never = new Promise<void>(() => undefined);
+    const h = harness({ requestStop: () => never });
+    const context = await seedContext(h.storage);
+    const active = await h.runtime.ensureRuntime();
+    if (active === undefined) throw new Error('missing runtime');
+
+    const outcome = await Promise.race([
+      active.lifecycle
+        .enforceBudgetStop(
+          { sandboxClassName: classA } as unknown as BillingIdentity,
+          { verdict: 'stop' },
+          { generation: context.generation, startEpochMs: context.startEpochMs }
+        )
+        .then(() => 'returned' as const),
+      new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), 250)),
+    ]);
+
+    expect(outcome).toBe('returned');
+    expect(h.requestStop).toHaveBeenCalledTimes(1);
+    expect(h.pending).toHaveLength(1);
   });
 });

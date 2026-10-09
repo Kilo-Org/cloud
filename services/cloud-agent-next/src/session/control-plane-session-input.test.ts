@@ -74,6 +74,41 @@ describe('buildControlPlaneCreateInput', () => {
     }
   );
 
+  it.each([
+    ['cloudflare-containers-standard-3', 'standard-3'],
+    ['cloudflare-containers-standard-4', 'standard-4'],
+  ] as const)(
+    'pins %s selection to its Cloudflare container instance',
+    async (allocation, instance) => {
+      const input = await buildControlPlaneCreateInput({
+        command: {
+          identity: {
+            sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+            userId: 'usr_1',
+          },
+          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          message: {
+            initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+            turn: { type: 'prompt', prompt: 'hi' },
+          },
+          agent: { mode: 'code', model: FULL_MODEL },
+          workspace: {
+            sandboxId: 'ses-0123456789abcdef',
+            sandboxProvider: 'cloudflare-containers',
+            sandboxAllocation: allocation,
+          },
+        },
+        env: {} as Env,
+        attachments: [],
+        agent: { mode: 'code', model: FULL_MODEL },
+      });
+      expect(input.sandboxSelection.configuration).toEqual({
+        provider: 'cloudflare-containers',
+        instance,
+      });
+    }
+  );
+
   it('keeps the full model in stored metadata while dispatching the stripped id', async () => {
     const input = await buildControlPlaneCreateInput({
       command: {

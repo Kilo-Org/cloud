@@ -77,9 +77,6 @@ function createFakeProvider(
     releaseStop: () => releaseStop(),
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };

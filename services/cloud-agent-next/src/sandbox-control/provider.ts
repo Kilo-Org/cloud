@@ -1,5 +1,5 @@
 import type { SandboxBillingInput } from '../container-usage-context.js';
-import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import type { SessionCredentialGrant } from './session-credentials.js';
 import {
   CLOUDFLARE_CONTAINERS_INSTANCES,
   vercelSandboxResourcesSchema,
@@ -42,24 +42,6 @@ export class ProviderCreationError extends AgentSandboxUnavailableError {
   }
 }
 
-export const vercelAllocationConfigSchema = z
-  .object({
-    projectId: z.string().min(1).optional(),
-    snapshotId: z.string().min(1).optional(),
-    runtimeBuildId: z.string().min(1).optional(),
-    runtime: z.string().min(1).optional(),
-    resources: z
-      .object({
-        vcpus: z.number().int().positive(),
-        memory: z.number().int().positive(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-
-export type VercelAllocationConfig = z.infer<typeof vercelAllocationConfigSchema>;
-
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('cloudflare') }).strict(),
   z
@@ -92,13 +74,11 @@ export type ProviderAllocationIntent = {
   intentId: string;
   createdAt: number;
   allocationName?: string;
-  vercel?: VercelAllocationConfig;
   containment?: CredentialContainmentRequirements;
 };
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
-  networkPolicy?: VercelSandboxNetworkPolicy;
 };
 
 export type ProviderObservation = {
@@ -119,11 +99,6 @@ export type ProviderLaunchOptions = {
 export type ProviderLaunchResult = { startSource: ProviderStartSource };
 
 export type ProviderAdapter = {
-  readonly resumable: boolean;
-  /** The workspace survives a stop; a persistent provider is never destroyed. */
-  readonly persistentWorkspace: boolean;
-  /** `stop` destroys the container rather than only stopping it. */
-  readonly destroysOnStop: boolean;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
@@ -144,65 +119,11 @@ export type ProviderAdapter = {
    * that the caller ignores.
    */
   captureRepository?(ref: string, repoKey: string, commit?: string): Promise<boolean>;
-  updateNetworkPolicy?(
-    providerRef: string,
-    networkPolicy: VercelSandboxNetworkPolicy
-  ): Promise<void>;
+  /**
+   * Replace the live sandbox's contained-credential network policy with one
+   * built from the authoritative grants. Only a provider whose network policy
+   * carries contained credentials implements it; a missing hook on a live
+   * provider is a failure the caller treats as fail-closed.
+   */
+  applyContainedCredentials?(ref: string, grants: readonly SessionCredentialGrant[]): Promise<void>;
 };
-
-export type MemoryProviderAdapter = ProviderAdapter & {
-  lastLeaseMs: number | null;
-};
-
-export function createMemoryProviderAdapter(options?: {
-  resumable?: boolean;
-  unresolved?: boolean;
-  stopRetryable?: boolean;
-}): MemoryProviderAdapter {
-  const instances = new Map<string, { stopped: boolean }>();
-  let lastLeaseMs: number | null = null;
-
-  return {
-    resumable: options?.resumable ?? false,
-    persistentWorkspace: false,
-    destroysOnStop: false,
-    get lastLeaseMs() {
-      return lastLeaseMs;
-    },
-    async ensureBillingAdmission() {},
-    async create(intent) {
-      if (options?.unresolved) return { unresolved: true };
-      const providerRef = `mem_${intent.intentId}`;
-      if (!instances.has(providerRef)) {
-        instances.set(providerRef, { stopped: false });
-      }
-      return { providerRef };
-    },
-    async launch() {
-      return { startSource: 'image' };
-    },
-    async observe(ref, intent) {
-      const providerRef = ref ?? (intent ? `mem_${intent.intentId}` : undefined);
-      if (!providerRef) return { status: 'terminal' };
-      const instance = instances.get(providerRef);
-      return { status: !instance || instance.stopped ? 'terminal' : 'active', providerRef };
-    },
-    async stop(ref, intent) {
-      if (options?.stopRetryable) return 'retryable';
-      const providerRef = ref ?? (intent ? `mem_${intent.intentId}` : undefined);
-      if (providerRef) {
-        const instance = instances.get(providerRef);
-        if (instance) instance.stopped = true;
-      }
-      return 'terminal';
-    },
-    async ensureLeaseAtLeast(_ref, ms) {
-      lastLeaseMs = ms;
-    },
-    async logs(ref) {
-      const instance = instances.get(ref);
-      if (!instance) return `memory ${ref} absent`;
-      return `memory ${ref} ${instance.stopped ? 'terminal' : 'active'}`;
-    },
-  };
-}

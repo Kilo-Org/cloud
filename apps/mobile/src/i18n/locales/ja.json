@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "このデバイスはApple Intelligenceに対応していません。",
         "modelNotReady": "モデルはまだダウンロード中か準備中です。しばらくしてからもう一度お試しください。",
         "unsupportedOs": "このモデルにはiOS 26以降が必要です。",
-        "unknown": "このモデルを利用できない理由はシステムから示されませんでした。"
+        "unknown": "このモデルを利用できない理由はシステムから示されませんでした。",
+        "androidUnsupportedOs": "このAndroidバージョンはGemini Nanoに対応していません。",
+        "androidModelUnavailable": "このデバイスはGemini Nanoに対応していないか、AICoreシステムアプリがまだセットアップ中です。しばらくしてからもう一度お試しください。",
+        "aicoreUpdateRequired": "このモデルを使用するには、AICoreアプリとシステムソフトウェアをアップデートしてください。",
+        "downloadable": "このモデルを使用するには、初回のみダウンロードが必要です。",
+        "downloading": "モデルをダウンロード中です。ダウンロードが完了すると使用可能になります。"
       },
       "unavailable": "オンデバイスモデルは現在利用できません。$t(modelChat.backends.title)で状態を確認してください。",
       "busy": "オンデバイスモデルは別の返信を処理中です。完了してからもう一度お試しください。",
-      "failed": "オンデバイスモデルはこのメッセージに回答できませんでした。もう一度試すか、言い換えてください。"
+      "failed": "オンデバイスモデルはこのメッセージに回答できませんでした。もう一度試すか、言い換えてください。",
+      "android": "Gemini Nano（デバイス上）",
+      "background": "Kiloが画面から離れたため、オンデバイスモデルが停止しました。「再試行」をタップしてもう一度質問してください。",
+      "download": "オンデバイスモデルをダウンロード",
+      "downloading": "ダウンロード中…",
+      "downloadProgress": "ダウンロード中… {{percent}}%",
+      "downloadFailed": "ダウンロードが完了しませんでした。接続と空き容量を確認してから、もう一度お試しください。"
     }
   },
   "settingsTools": {

@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "此裝置不支援 Apple Intelligence。",
         "modelNotReady": "模型仍在下載或準備中，請稍後再試。",
         "unsupportedOs": "此模型需要 iOS 26 或以上版本。",
-        "unknown": "系統未說明此模型無法使用的原因。"
+        "unknown": "系統未說明此模型無法使用的原因。",
+        "androidUnsupportedOs": "此 Android 版本不支援 Gemini Nano。",
+        "androidModelUnavailable": "此裝置不支援 Gemini Nano，或 AICore 系統應用程式仍在設定中。請稍後再試。",
+        "aicoreUpdateRequired": "請更新 AICore 應用程式和系統軟體，才能使用此模型。",
+        "downloadable": "此模型需要先下載一次才能使用。",
+        "downloading": "模型下載中，下載完成後即可使用。"
       },
       "unavailable": "裝置端模型目前無法使用。請在「$t(modelChat.backends.title)」中查看其狀態。",
       "busy": "裝置端模型正在產生另一則回覆，請在完成後再試一次。",
-      "failed": "裝置端模型無法回答此訊息。請再試一次或換個說法。"
+      "failed": "裝置端模型無法回答此訊息。請再試一次或換個說法。",
+      "android": "Gemini Nano（裝置端）",
+      "background": "由於 Kilo 已離開畫面，裝置端模型已停止。請點選「再試一次」重新提問。",
+      "download": "下載裝置端模型",
+      "downloading": "下載中…",
+      "downloadProgress": "下載中… {{percent}}%",
+      "downloadFailed": "下載未完成。請檢查網路連線和可用儲存空間，然後再試一次。"
     }
   },
   "settingsTools": {

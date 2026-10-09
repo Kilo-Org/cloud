@@ -62,6 +62,14 @@ const UNAVAILABLE_REASONS = new Set([
   'apple_intelligence_disabled',
   'model_not_ready',
   'model_unavailable',
+  // Android AICore: the model still needs, or is in, its system download.
+  'model_download_required',
+  'model_downloading',
+  // Android AICore: the system service must be updated first.
+  'aicore_incompatible',
+  'system_update_required',
+  // Android AICore: the per-app battery quota for inference is spent.
+  'battery_quota_exceeded',
 ]);
 
 /** A native promise rejection carries its stable reason as an Expo error code. */
@@ -72,6 +80,10 @@ let sequence = 0;
 function problemOf(reason: string | undefined): LocalModelProblem {
   if (reason === 'busy') {
     return 'busy';
+  }
+  // Android runs the model only while the app is in front; Retry works after returning.
+  if (reason === 'background_use_blocked') {
+    return 'background';
   }
   return reason !== undefined && UNAVAILABLE_REASONS.has(reason) ? 'unavailable' : 'failed';
 }

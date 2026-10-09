@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Kāore tēnei pūrere e tautoko i te Apple Intelligence.",
         "modelNotReady": "Kei te tikiake tonu, kei te whakarite tonu rānei te tauira. Ngana anō ā muri ake.",
         "unsupportedOs": "Me iOS 26, he putanga hou ake rānei mō tēnei tauira.",
-        "unknown": "Kāore te pūnaha i kī mai he aha i kore ai tēnei tauira e wātea."
+        "unknown": "Kāore te pūnaha i kī mai he aha i kore ai tēnei tauira e wātea.",
+        "androidUnsupportedOs": "Kāore a Gemini Nano e tautokona ana i tēnei putanga Android.",
+        "androidModelUnavailable": "Kāore tēnei pūrere e tautoko ana i a Gemini Nano, kei te whakarite tonu rānei te taupānga pūnaha AICore. Ngana anō ā muri ake.",
+        "aicoreUpdateRequired": "Whakahoutia te taupānga AICore me te pūmanawa pūnaha kia whakamahia ai tēnei tauira.",
+        "downloadable": "Me tikiake tēnei tauira kotahi te wā i mua i tō whakamahinga.",
+        "downloading": "Kei te tikiake te tauira. Ka rite ina oti te tikiake."
       },
       "unavailable": "Kāore te tauira i te pūrere e wātea ana i tēnei wā. Tirohia tōna tūnga i $t(modelChat.backends.title).",
       "busy": "Kei te pukumahi te tauira i te pūrere ki tētahi atu whakautu. Ngana anō ina oti.",
-      "failed": "Kāore i taea e te tauira i te pūrere te whakautu i tēnei karere. Ngana anō, kōrerotia anō rānei mā tētahi atu huarahi."
+      "failed": "Kāore i taea e te tauira i te pūrere te whakautu i tēnei karere. Ngana anō, kōrerotia anō rānei mā tētahi atu huarahi.",
+      "android": "Gemini Nano (i te pūrere)",
+      "background": "I mutu te tauira i te pūrere nā te mea i wehe atu a Kilo i te mata. Pātōhia te Whakamātau anō kia pātai anō.",
+      "download": "Tikiake i te tauira i te pūrere",
+      "downloading": "Kei te tikiake…",
+      "downloadProgress": "Kei te tikiake… {{percent}}%",
+      "downloadFailed": "Kāore i oti te tikiake. Tirohia tō hononga me te wāhi rokiroki wātea, kātahi ka ngana anō."
     }
   },
   "settingsTools": {

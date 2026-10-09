@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Bu cihaz Apple Intelligence funksiyasını dəstəkləmir.",
         "modelNotReady": "Model hələ yüklənir və ya hazırlanır. Sonra yenidən cəhd edin.",
         "unsupportedOs": "Bu model iOS 26 və ya daha yeni versiya tələb edir.",
-        "unknown": "Sistem bu modelin niyə əlçatan olmadığını bildirmədi."
+        "unknown": "Sistem bu modelin niyə əlçatan olmadığını bildirmədi.",
+        "androidUnsupportedOs": "Gemini Nano bu Android versiyasında dəstəklənmir.",
+        "androidModelUnavailable": "Bu cihaz Gemini Nano-nu dəstəkləmir və ya AICore sistem tətbiqi hələ quraşdırılır. Sonra yenidən cəhd edin.",
+        "aicoreUpdateRequired": "Bu modeldən istifadə etmək üçün AICore tətbiqini və sistem proqram təminatını yeniləyin.",
+        "downloadable": "Bu modeldən istifadə etməzdən əvvəl onu bir dəfə endirmək lazımdır.",
+        "downloading": "Model endirilir. Endirmə bitdikdən sonra istifadəyə hazır olacaq."
       },
       "unavailable": "Cihazdakı model hazırda əlçatan deyil. Onun statusunu $t(modelChat.backends.title) bölməsində yoxlayın.",
       "busy": "Cihazdakı model başqa cavabla məşğuldur. O bitdikdən sonra yenidən cəhd edin.",
-      "failed": "Cihazdakı model bu mesaja cavab verə bilmədi. Yenidən cəhd edin və ya mesajı başqa cür ifadə edin."
+      "failed": "Cihazdakı model bu mesaja cavab verə bilmədi. Yenidən cəhd edin və ya mesajı başqa cür ifadə edin.",
+      "android": "Gemini Nano (cihazda)",
+      "background": "Kilo ekrandan çıxdığı üçün cihazdakı model dayandı. Yenidən soruşmaq üçün \"Yenidən cəhd et\" düyməsinə toxunun.",
+      "download": "Cihazdakı modeli endir",
+      "downloading": "Endirilir…",
+      "downloadProgress": "Endirilir… {{percent}}%",
+      "downloadFailed": "Endirmə tamamlanmadı. İnternet bağlantınızı və boş yaddaşı yoxlayın, sonra yenidən cəhd edin."
     }
   },
   "settingsTools": {

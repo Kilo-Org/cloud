@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Dieses Gerät unterstützt Apple Intelligence nicht.",
         "modelNotReady": "Das Modell wird noch geladen oder vorbereitet. Versuche es später erneut.",
         "unsupportedOs": "Dieses Modell erfordert iOS 26 oder neuer.",
-        "unknown": "Das System hat keinen Grund angegeben, warum dieses Modell nicht verfügbar ist."
+        "unknown": "Das System hat keinen Grund angegeben, warum dieses Modell nicht verfügbar ist.",
+        "androidUnsupportedOs": "Gemini Nano wird auf dieser Android-Version nicht unterstützt.",
+        "androidModelUnavailable": "Dieses Gerät unterstützt Gemini Nano nicht, oder die System-App AICore wird noch eingerichtet. Versuche es später erneut.",
+        "aicoreUpdateRequired": "Aktualisiere die AICore-App und deine Systemsoftware, um dieses Modell zu nutzen.",
+        "downloadable": "Dieses Modell muss einmalig heruntergeladen werden, bevor du es nutzen kannst.",
+        "downloading": "Das Modell wird heruntergeladen. Es ist einsatzbereit, sobald der Download abgeschlossen ist."
       },
       "unavailable": "Das Modell auf dem Gerät ist gerade nicht verfügbar. Prüfe seinen Status unter $t(modelChat.backends.title).",
       "busy": "Das Modell auf dem Gerät erstellt gerade eine andere Antwort. Versuche es erneut, wenn es fertig ist.",
-      "failed": "Das Modell auf dem Gerät konnte diese Nachricht nicht beantworten. Versuche es erneut oder formuliere sie um."
+      "failed": "Das Modell auf dem Gerät konnte diese Nachricht nicht beantworten. Versuche es erneut oder formuliere sie um.",
+      "android": "Gemini Nano (auf dem Gerät)",
+      "background": "Das Modell auf dem Gerät wurde gestoppt, weil Kilo den Bildschirm verlassen hat. Tippe auf „Erneut versuchen“, um die Frage noch einmal zu stellen.",
+      "download": "Modell auf dem Gerät herunterladen",
+      "downloading": "Wird heruntergeladen…",
+      "downloadProgress": "Wird heruntergeladen… {{percent}} %",
+      "downloadFailed": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und den freien Speicherplatz und versuche es dann erneut."
     }
   },
   "settingsTools": {

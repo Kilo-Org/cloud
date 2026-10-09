@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Bu cihaz Apple Intelligence'ı desteklemiyor.",
         "modelNotReady": "Model hâlâ indiriliyor veya hazırlanıyor. Daha sonra yeniden deneyin.",
         "unsupportedOs": "Bu model iOS 26 veya sonrasını gerektirir.",
-        "unknown": "Sistem bu modelin neden kullanılamadığını belirtmedi."
+        "unknown": "Sistem bu modelin neden kullanılamadığını belirtmedi.",
+        "androidUnsupportedOs": "Gemini Nano bu Android sürümünde desteklenmiyor.",
+        "androidModelUnavailable": "Bu cihaz Gemini Nano'yu desteklemiyor veya AICore sistem uygulaması hâlâ kuruluyor. Daha sonra yeniden deneyin.",
+        "aicoreUpdateRequired": "Bu modeli kullanmak için AICore uygulamasını ve sistem yazılımınızı güncelleyin.",
+        "downloadable": "Bu modeli kullanabilmek için bir kereliğine indirmeniz gerekiyor.",
+        "downloading": "Model indiriliyor. İndirme tamamlandığında kullanıma hazır olacak."
       },
       "unavailable": "Cihazdaki model şu anda kullanılamıyor. Durumunu $t(modelChat.backends.title) bölümünden denetleyin.",
       "busy": "Cihazdaki model başka bir yanıtla meşgul. Tamamlandığında yeniden deneyin.",
-      "failed": "Cihazdaki model bu mesajı yanıtlayamadı. Yeniden deneyin veya mesajı farklı şekilde yazın."
+      "failed": "Cihazdaki model bu mesajı yanıtlayamadı. Yeniden deneyin veya mesajı farklı şekilde yazın.",
+      "android": "Gemini Nano (cihazda)",
+      "background": "Kilo ekrandan ayrıldığı için cihazdaki model durdu. Yeniden sormak için Tekrar dene'ye dokunun.",
+      "download": "Cihazdaki modeli indir",
+      "downloading": "İndiriliyor…",
+      "downloadProgress": "İndiriliyor… %{{percent}}",
+      "downloadFailed": "İndirme tamamlanamadı. Bağlantınızı ve boş depolama alanınızı kontrol edip yeniden deneyin."
     }
   },
   "settingsTools": {

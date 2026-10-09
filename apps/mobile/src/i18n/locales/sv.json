@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Den här enheten har inte stöd för Apple Intelligence.",
         "modelNotReady": "Modellen laddas fortfarande ned eller förbereds. Försök igen senare.",
         "unsupportedOs": "Den här modellen kräver iOS 26 eller senare.",
-        "unknown": "Systemet angav inte varför modellen inte är tillgänglig."
+        "unknown": "Systemet angav inte varför modellen inte är tillgänglig.",
+        "androidUnsupportedOs": "Gemini Nano stöds inte på den här Android-versionen.",
+        "androidModelUnavailable": "Enheten har inte stöd för Gemini Nano, eller så håller systemappen AICore fortfarande på att konfigureras. Försök igen senare.",
+        "aicoreUpdateRequired": "Uppdatera AICore-appen och systemprogramvaran för att använda den här modellen.",
+        "downloadable": "Modellen måste laddas ned en gång innan du kan använda den.",
+        "downloading": "Modellen laddas ned. Den är redo när nedladdningen är klar."
       },
       "unavailable": "Modellen på enheten är inte tillgänglig just nu. Kontrollera dess status i $t(modelChat.backends.title).",
       "busy": "Modellen på enheten är upptagen med ett annat svar. Försök igen när den är klar.",
-      "failed": "Modellen på enheten kunde inte svara på meddelandet. Försök igen eller formulera om det."
+      "failed": "Modellen på enheten kunde inte svara på meddelandet. Försök igen eller formulera om det.",
+      "android": "Gemini Nano (på enheten)",
+      "background": "Modellen på enheten stoppades eftersom Kilo lämnade skärmen. Tryck på Försök igen för att fråga igen.",
+      "download": "Ladda ned modell till enheten",
+      "downloading": "Laddar ned…",
+      "downloadProgress": "Laddar ned… {{percent}} %",
+      "downloadFailed": "Nedladdningen slutfördes inte. Kontrollera anslutningen och ledigt lagringsutrymme och försök sedan igen."
     }
   },
   "settingsTools": {

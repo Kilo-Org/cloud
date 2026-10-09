@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Þetta tæki styður ekki Apple Intelligence.",
         "modelNotReady": "Líkanið er enn að sækjast eða verða tilbúið. Reyndu aftur síðar.",
         "unsupportedOs": "Þetta líkan krefst iOS 26 eða nýrra.",
-        "unknown": "Kerfið gaf ekki upp hvers vegna þetta líkan er ekki í boði."
+        "unknown": "Kerfið gaf ekki upp hvers vegna þetta líkan er ekki í boði.",
+        "androidUnsupportedOs": "Gemini Nano er ekki stutt í þessari útgáfu af Android.",
+        "androidModelUnavailable": "Þetta tæki styður ekki Gemini Nano, eða AICore-kerfisforritið er enn í uppsetningu. Reyndu aftur síðar.",
+        "aicoreUpdateRequired": "Uppfærðu AICore-forritið og kerfishugbúnaðinn til að nota þetta líkan.",
+        "downloadable": "Það þarf að sækja þetta líkan einu sinni áður en hægt er að nota það.",
+        "downloading": "Verið er að sækja líkanið. Það verður tilbúið þegar niðurhalinu lýkur."
       },
       "unavailable": "Líkanið í tækinu er ekki í boði eins og er. Athugaðu stöðu þess í $t(modelChat.backends.title).",
       "busy": "Líkanið í tækinu er upptekið við annað svar. Reyndu aftur þegar því lýkur.",
-      "failed": "Líkanið í tækinu gat ekki svarað þessum skilaboðum. Reyndu aftur eða orðaðu þau öðruvísi."
+      "failed": "Líkanið í tækinu gat ekki svarað þessum skilaboðum. Reyndu aftur eða orðaðu þau öðruvísi.",
+      "android": "Gemini Nano (í tækinu)",
+      "background": "Líkanið í tækinu stöðvaðist vegna þess að Kilo fór af skjánum. Ýttu á Reyna aftur til að spyrja aftur.",
+      "download": "Sækja líkan í tækið",
+      "downloading": "Sæki…",
+      "downloadProgress": "Sæki… {{percent}}%",
+      "downloadFailed": "Niðurhalinu lauk ekki. Athugaðu nettenginguna og laust geymslupláss og reyndu svo aftur."
     }
   },
   "settingsTools": {

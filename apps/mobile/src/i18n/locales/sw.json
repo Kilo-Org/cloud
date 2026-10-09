@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Kifaa hiki hakitumii Apple Intelligence.",
         "modelNotReady": "Modeli bado inapakuliwa au inaandaliwa. Jaribu tena baadaye.",
         "unsupportedOs": "Modeli hii inahitaji iOS 26 au toleo jipya zaidi.",
-        "unknown": "Mfumo haukueleza kwa nini modeli hii haipatikani."
+        "unknown": "Mfumo haukueleza kwa nini modeli hii haipatikani.",
+        "androidUnsupportedOs": "Gemini Nano haitumiki kwenye toleo hili la Android.",
+        "androidModelUnavailable": "Kifaa hiki hakitumii Gemini Nano, au programu ya mfumo ya AICore bado inaandaliwa. Jaribu tena baadaye.",
+        "aicoreUpdateRequired": "Sasisha programu ya AICore na programu ya mfumo wako ili utumie modeli hii.",
+        "downloadable": "Modeli hii inahitaji kupakuliwa mara moja kabla ya kuitumia.",
+        "downloading": "Modeli inapakuliwa. Itakuwa tayari upakuaji utakapokamilika."
       },
       "unavailable": "Modeli ya kwenye kifaa haipatikani kwa sasa. Angalia hali yake katika $t(modelChat.backends.title).",
       "busy": "Modeli ya kwenye kifaa inashughulikia jibu jingine. Jaribu tena itakapomaliza.",
-      "failed": "Modeli ya kwenye kifaa haikuweza kujibu ujumbe huu. Jaribu tena au uuandike kwa njia nyingine."
+      "failed": "Modeli ya kwenye kifaa haikuweza kujibu ujumbe huu. Jaribu tena au uuandike kwa njia nyingine.",
+      "android": "Gemini Nano (kwenye kifaa)",
+      "background": "Modeli ya kwenye kifaa ilisimama kwa sababu Kilo iliondoka kwenye skrini. Gusa Jaribu tena ili uulize tena.",
+      "download": "Pakua modeli ya kwenye kifaa",
+      "downloading": "Inapakua…",
+      "downloadProgress": "Inapakua… {{percent}}%",
+      "downloadFailed": "Upakuaji haukukamilika. Angalia muunganisho wako na nafasi ya hifadhi, kisha ujaribu tena."
     }
   },
   "settingsTools": {

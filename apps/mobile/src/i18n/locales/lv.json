@@ -3379,11 +3379,22 @@
         "deviceNotEligible": "Šī ierīce neatbalsta Apple Intelligence.",
         "modelNotReady": "Modelis joprojām tiek lejupielādēts vai sagatavots. Mēģiniet vēlāk vēlreiz.",
         "unsupportedOs": "Šim modelim nepieciešama iOS 26 vai jaunāka versija.",
-        "unknown": "Sistēma nenorādīja, kāpēc šis modelis nav pieejams."
+        "unknown": "Sistēma nenorādīja, kāpēc šis modelis nav pieejams.",
+        "androidUnsupportedOs": "Šajā Android versijā Gemini Nano netiek atbalstīts.",
+        "androidModelUnavailable": "Šī ierīce neatbalsta Gemini Nano, vai arī AICore sistēmas lietotne vēl tiek iestatīta. Mēģiniet vēlāk vēlreiz.",
+        "aicoreUpdateRequired": "Lai izmantotu šo modeli, atjauniniet AICore lietotni un sistēmas programmatūru.",
+        "downloadable": "Pirms šī modeļa lietošanas tas ir vienreiz jālejupielādē.",
+        "downloading": "Modelis tiek lejupielādēts. Tas būs gatavs, kad lejupielāde beigsies."
       },
       "unavailable": "Ierīces modelis pašlaik nav pieejams. Pārbaudiet tā statusu sadaļā $t(modelChat.backends.title).",
       "busy": "Ierīces modelis ir aizņemts ar citu atbildi. Mēģiniet vēlreiz, kad tas būs pabeidzis.",
-      "failed": "Ierīces modelis nevarēja atbildēt uz šo ziņojumu. Mēģiniet vēlreiz vai pārformulējiet to."
+      "failed": "Ierīces modelis nevarēja atbildēt uz šo ziņojumu. Mēģiniet vēlreiz vai pārformulējiet to.",
+      "android": "Gemini Nano (ierīcē)",
+      "background": "Ierīces modelis apturēja darbu, jo Kilo aizvēra ekrānu. Pieskarieties “Mēģināt vēlreiz”, lai jautātu vēlreiz.",
+      "download": "Lejupielādēt ierīces modeli",
+      "downloading": "Notiek lejupielāde…",
+      "downloadProgress": "Notiek lejupielāde… {{percent}}%",
+      "downloadFailed": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un brīvo krātuvi, pēc tam mēģiniet vēlreiz."
     }
   },
   "settingsTools": {

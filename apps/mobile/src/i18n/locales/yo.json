@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Ẹ̀rọ yìí kò ṣe àtìlẹ́yìn fún Apple Intelligence.",
         "modelNotReady": "Awoṣe náà ṣì ń gbà sílẹ̀ tàbí ń múra sílẹ̀. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.",
         "unsupportedOs": "Awoṣe yìí nílò iOS 26 tàbí èyí tó jẹ́ tuntun jù bẹ́ẹ̀ lọ.",
-        "unknown": "Ètò náà kò sọ ìdí tí awoṣe yìí kò fi sí lárọ̀ọ́wọ́tó."
+        "unknown": "Ètò náà kò sọ ìdí tí awoṣe yìí kò fi sí lárọ̀ọ́wọ́tó.",
+        "androidUnsupportedOs": "Ẹ̀yà Android yìí kò ṣe àtìlẹ́yìn fún Gemini Nano.",
+        "androidModelUnavailable": "Ẹ̀rọ yìí kò ṣe àtìlẹ́yìn fún Gemini Nano, tàbí áàpù ètò AICore ṣì ń múra sílẹ̀. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.",
+        "aicoreUpdateRequired": "Ṣe àtúnṣe áàpù AICore àti sọ́fítíwọ̀ ètò rẹ kí o tó lè lo awoṣe yìí.",
+        "downloadable": "Awoṣe yìí nílò ìgbàsílẹ̀ ẹ̀ẹ̀kan ṣoṣo kí o tó lè lò ó.",
+        "downloading": "Awoṣe náà ń gbà sílẹ̀. Yóò ṣetán tí ìgbàsílẹ̀ bá parí."
       },
       "unavailable": "Awoṣe lórí ẹ̀rọ kò sí lárọ̀ọ́wọ́tó báyìí. Ṣàyẹ̀wò ipò rẹ̀ nínú $t(modelChat.backends.title).",
       "busy": "Awoṣe lórí ẹ̀rọ ń dá èsì míì lọ́wọ́. Gbìyànjú lẹ́ẹ̀kan sí i tí ó bá parí.",
-      "failed": "Awoṣe lórí ẹ̀rọ kò lè dáhùn ọ̀rọ̀ yìí. Gbìyànjú lẹ́ẹ̀kan sí i tàbí kọ ọ́ lọ́nà míì."
+      "failed": "Awoṣe lórí ẹ̀rọ kò lè dáhùn ọ̀rọ̀ yìí. Gbìyànjú lẹ́ẹ̀kan sí i tàbí kọ ọ́ lọ́nà míì.",
+      "android": "Gemini Nano (lórí ẹ̀rọ)",
+      "background": "Awoṣe lórí ẹ̀rọ dúró nítorí pé Kilo kúrò lójú ìbòjú. Tẹ Tún gbìyànjú láti béèrè lẹ́ẹ̀kan sí i.",
+      "download": "Gba awoṣe lórí ẹ̀rọ sílẹ̀",
+      "downloading": "Ó ń gbà sílẹ̀…",
+      "downloadProgress": "Ó ń gbà sílẹ̀… {{percent}}%",
+      "downloadFailed": "Ìgbàsílẹ̀ náà kò parí. Ṣàyẹ̀wò ìsopọ̀ rẹ àti àyè ìpamọ́ tó ṣófo, lẹ́yìn náà gbìyànjú lẹ́ẹ̀kan sí i."
     }
   },
   "settingsTools": {

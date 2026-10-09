@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Hierdie toestel ondersteun nie Apple Intelligence nie.",
         "modelNotReady": "Die model word nog afgelaai of gereedgemaak. Probeer later weer.",
         "unsupportedOs": "Hierdie model vereis iOS 26 of nuwer.",
-        "unknown": "Die stelsel het nie gesê waarom hierdie model onbeskikbaar is nie."
+        "unknown": "Die stelsel het nie gesê waarom hierdie model onbeskikbaar is nie.",
+        "androidUnsupportedOs": "Gemini Nano word nie op hierdie Android-weergawe ondersteun nie.",
+        "androidModelUnavailable": "Hierdie toestel ondersteun nie Gemini Nano nie, of die AICore-stelselprogram word nog opgestel. Probeer later weer.",
+        "aicoreUpdateRequired": "Werk die AICore-program en jou stelselsagteware by om hierdie model te gebruik.",
+        "downloadable": "Hierdie model moet eenmalig afgelaai word voordat jy dit kan gebruik.",
+        "downloading": "Die model word tans afgelaai. Dit sal gereed wees wanneer die aflaai klaar is."
       },
       "unavailable": "Die model op die toestel is nie nou beskikbaar nie. Kontroleer sy status in $t(modelChat.backends.title).",
       "busy": "Die model op die toestel is besig met 'n ander antwoord. Probeer weer wanneer dit klaar is.",
-      "failed": "Die model op die toestel kon nie hierdie boodskap beantwoord nie. Probeer weer of herformuleer dit."
+      "failed": "Die model op die toestel kon nie hierdie boodskap beantwoord nie. Probeer weer of herformuleer dit.",
+      "android": "Gemini Nano (op die toestel)",
+      "background": "Die model op die toestel het gestop omdat Kilo die skerm verlaat het. Tik op Probeer weer om weer te vra.",
+      "download": "Laai model op die toestel af",
+      "downloading": "Laai tans af…",
+      "downloadProgress": "Laai tans af… {{percent}}%",
+      "downloadFailed": "Die aflaai is nie voltooi nie. Kontroleer jou verbinding en vrye berging, en probeer dan weer."
     }
   },
   "settingsTools": {

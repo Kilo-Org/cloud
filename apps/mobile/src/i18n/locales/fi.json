@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Tämä laite ei tue Apple Intelligencea.",
         "modelNotReady": "Mallia ladataan tai valmistellaan vielä. Yritä myöhemmin uudelleen.",
         "unsupportedOs": "Tämä malli vaatii iOS 26:n tai uudemman.",
-        "unknown": "Järjestelmä ei kertonut, miksi malli ei ole saatavilla."
+        "unknown": "Järjestelmä ei kertonut, miksi malli ei ole saatavilla.",
+        "androidUnsupportedOs": "Tämä Android-versio ei tue Gemini Nanoa.",
+        "androidModelUnavailable": "Tämä laite ei tue Gemini Nanoa, tai AICore-järjestelmäsovelluksen käyttöönotto on vielä kesken. Yritä myöhemmin uudelleen.",
+        "aicoreUpdateRequired": "Jos haluat käyttää tätä mallia, päivitä AICore-sovellus ja laitteen järjestelmäohjelmisto.",
+        "downloadable": "Malli täytyy ladata kerran ennen käyttöä.",
+        "downloading": "Mallia ladataan. Se on käyttövalmis, kun lataus on valmis."
       },
       "unavailable": "Laitteessa toimiva malli ei ole nyt saatavilla. Tarkista sen tila kohdasta $t(modelChat.backends.title).",
       "busy": "Laitteessa toimiva malli kirjoittaa toista vastausta. Yritä uudelleen, kun se on valmis.",
-      "failed": "Laitteessa toimiva malli ei pystynyt vastaamaan tähän viestiin. Yritä uudelleen tai muotoile viesti toisin."
+      "failed": "Laitteessa toimiva malli ei pystynyt vastaamaan tähän viestiin. Yritä uudelleen tai muotoile viesti toisin.",
+      "android": "Gemini Nano (laitteessa)",
+      "background": "Laitteessa toimiva malli pysähtyi, koska Kilo poistui näytöltä. Kysy uudelleen napauttamalla Yritä uudelleen.",
+      "download": "Lataa laitteessa toimiva malli",
+      "downloading": "Ladataan…",
+      "downloadProgress": "Ladataan… {{percent}} %",
+      "downloadFailed": "Lataus ei valmistunut. Tarkista verkkoyhteys ja vapaa tallennustila ja yritä sitten uudelleen."
     }
   },
   "settingsTools": {

@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Meeshaan kun Apple Intelligence hin deeggaru.",
         "modelNotReady": "Moodeelli ammallee buufamaa ykn qophaa'aa jira. Booda irra deebi'ii yaali.",
         "unsupportedOs": "Moodeelli kun iOS 26 ykn isaa booda barbaada.",
-        "unknown": "Sirnichi moodeelli kun maaliif akka hin argamne hin ibsine."
+        "unknown": "Sirnichi moodeelli kun maaliif akka hin argamne hin ibsine.",
+        "androidUnsupportedOs": "Gemini Nano Android version kana irratti hin deeggaramu.",
+        "androidModelUnavailable": "Meeshaan kun Gemini Nano hin deeggaru, ykn appiin sirnaa AICore ammallee qophaa'aa jira. Booda irra deebi'ii yaali.",
+        "aicoreUpdateRequired": "Moodeela kana fayyadamuuf appii AICore fi sooftiweerii sirnaa kee haaromsi.",
+        "downloadable": "Moodeelli kun osoo hin fayyadamin dura al tokko buufamuu qaba.",
+        "downloading": "Moodeelli buufamaa jira. Yeroo buufachuun xumuramu qophaa'a."
       },
       "unavailable": "Moodeelli meeshaa irratti amma hin argamu. Haala isaa $t(modelChat.backends.title) keessatti ilaali.",
       "busy": "Moodeelli meeshaa irratti deebii biraatiin qabameera. Yeroo xumuru irra deebi'ii yaali.",
-      "failed": "Moodeelli meeshaa irratti ergaa kanaaf deebisuu hin dandeenye. Irra deebi'ii yaali ykn haala biraan barreessi."
+      "failed": "Moodeelli meeshaa irratti ergaa kanaaf deebisuu hin dandeenye. Irra deebi'ii yaali ykn haala biraan barreessi.",
+      "android": "Gemini Nano (meeshaa irratti)",
+      "background": "Kilo'n iskiriinii irraa waan baheef moodeelli meeshaa irratti dhaabbateera. Ammas gaafachuuf \"Irra deebi'ii yaali\" tuqi.",
+      "download": "Moodeela meeshaa irratti buufadhu",
+      "downloading": "Buufamaa jira…",
+      "downloadProgress": "Buufamaa jira… {{percent}}%",
+      "downloadFailed": "Buufachuun hin xumuramne. Walqunnamtii keessanii fi kuusaa duwwaa mirkaneessii irra deebi'ii yaali."
     }
   },
   "settingsTools": {

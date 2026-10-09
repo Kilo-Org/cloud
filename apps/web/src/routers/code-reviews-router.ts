@@ -163,9 +163,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
       return await createManualCodeReviewJob({ owner, input });
     }),
 
-  /**
-   * Gets the GitHub App installation status for personal user
-   */
   getGitHubStatus: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
     const integration = await getIntegrationForOwner(owner, 'github');
@@ -188,18 +185,12 @@ export const personalReviewAgentRouter = createTRPCRouter({
     };
   }),
 
-  /**
-   * List GitHub repositories accessible by the user's personal GitHub integration
-   */
   listGitHubRepositories: baseProcedure
     .input(z.object({ forceRefresh: z.boolean().optional().default(false) }).optional())
     .query(async ({ ctx, input }) => {
       return await fetchGitHubRepositoriesForUser(ctx.user.id, input?.forceRefresh ?? false);
     }),
 
-  /**
-   * Gets the GitLab OAuth integration status for personal user
-   */
   getGitLabStatus: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
     const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
@@ -230,18 +221,12 @@ export const personalReviewAgentRouter = createTRPCRouter({
     };
   }),
 
-  /**
-   * List GitLab repositories accessible by the user's personal GitLab integration
-   */
   listGitLabRepositories: baseProcedure
     .input(z.object({ forceRefresh: z.boolean().optional().default(false) }).optional())
     .query(async ({ ctx, input }) => {
       return await fetchGitLabRepositoriesForUser(ctx.user.id, input?.forceRefresh ?? false);
     }),
 
-  /**
-   * Gets the review agent configuration for personal user
-   */
   getReviewConfig: baseProcedure
     .input(z.object({ platform: PlatformSchema }).optional())
     .query(async ({ ctx, input }) => {
@@ -250,7 +235,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
       const config = await getAgentConfigForOwner(owner, 'code_review', platform);
 
       if (!config) {
-        // Return default configuration
         return {
           isEnabled: false,
           reviewStyle: 'balanced' as const,
@@ -308,10 +292,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
       };
     }),
 
-  /**
-   * Saves the review agent configuration for personal user
-   * For GitLab: optionally syncs webhooks for selected repositories
-   */
   saveReviewConfig: baseProcedure
     .input(SaveReviewConfigInputSchema)
     .mutation(async ({ input, ctx }) => {
@@ -319,7 +299,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
         const platform = input.platform ?? 'github';
 
-        // Get previous config to determine which repos were previously selected
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
         const previousRepoIds =
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
@@ -337,7 +316,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
           thinking_effort: override.thinkingEffort ?? null,
         }));
 
-        // Save the agent config
         await upsertAgentConfigForOwner({
           owner,
           agentType: 'code_review',
@@ -380,7 +358,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
 
             if (webhookSecret) {
               try {
-                // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration, {
                   userId: ctx.user.id,
                 });
@@ -400,7 +377,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                // Update integration metadata with new webhook configuration
                 await updateIntegrationMetadataForOwner(
                   owner,
                   PLATFORM.GITLAB,

@@ -1,10 +1,3 @@
-/**
- * Auto Fix tRPC Router
- *
- * API endpoints for managing auto-fix tickets and configuration.
- * Supports both organization and personal user auto-fix.
- */
-
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationMemberProcedure,
@@ -44,15 +37,10 @@ import {
 import { tryDispatchPendingFixes } from '@/lib/auto-fix/dispatch/dispatch-pending-fixes';
 
 export const autoFixRouter = createTRPCRouter({
-  /**
-   * List fix tickets for an organization
-   * Requires organization membership
-   */
   listTicketsForOrganization: organizationMemberProcedure
     .input(ListFixTicketsInputSchema.omit({ organizationId: true }))
     .query(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationMemberProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -93,9 +81,6 @@ export const autoFixRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * List fix tickets for the current user (personal)
-   */
   listTicketsForUser: baseProcedure
     .input(ListFixTicketsForUserInputSchema)
     .query(async ({ input, ctx }) => {
@@ -138,10 +123,6 @@ export const autoFixRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Get a specific fix ticket by ID
-   * Verifies user ownership
-   */
   getTicket: baseProcedure.input(GetFixTicketInputSchema).query(async ({ input, ctx }) => {
     try {
       const ticket = await getFixTicketById(input.ticketId);
@@ -153,12 +134,9 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -166,7 +144,6 @@ export const autoFixRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
@@ -182,10 +159,6 @@ export const autoFixRouter = createTRPCRouter({
     }
   }),
 
-  /**
-   * Retrigger a failed fix ticket
-   * Resets status to 'pending' and dispatches for processing
-   */
   retrigger: baseProcedure.input(RetriggerFixTicketInputSchema).mutation(async ({ input, ctx }) => {
     try {
       const ticket = await getFixTicketById(input.ticketId);
@@ -197,12 +170,9 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -210,7 +180,6 @@ export const autoFixRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
@@ -229,7 +198,6 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Determine owner for dispatch
       const owner: Owner = ticket.owned_by_organization_id
         ? {
             type: 'org',
@@ -242,10 +210,8 @@ export const autoFixRouter = createTRPCRouter({
             userId: ctx.user.id,
           };
 
-      // Reset the ticket for retry
       await resetFixTicketForRetry(input.ticketId);
 
-      // Trigger dispatch to process pending tickets
       await tryDispatchPendingFixes(owner);
 
       return successResult({ message: 'Fix ticket retriggered successfully' });
@@ -259,9 +225,6 @@ export const autoFixRouter = createTRPCRouter({
     }
   }),
 
-  /**
-   * Cancel a running fix ticket
-   */
   cancel: baseProcedure.input(CancelFixTicketInputSchema).mutation(async ({ input, ctx }) => {
     try {
       const ticket = await getFixTicketById(input.ticketId);
@@ -273,12 +236,9 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Authorization check based on owner type
       if (ticket.owned_by_organization_id) {
-        // Organization ticket: verify user is org member
         await ensureOrganizationAccess(ctx, ticket.owned_by_organization_id);
       } else if (ticket.owned_by_user_id) {
-        // Personal ticket: verify user owns it
         if (ticket.owned_by_user_id !== ctx.user.id) {
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -286,7 +246,6 @@ export const autoFixRouter = createTRPCRouter({
           });
         }
       } else {
-        // Should not happen, but handle edge case
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Invalid ticket ownership data',
@@ -301,7 +260,6 @@ export const autoFixRouter = createTRPCRouter({
         });
       }
 
-      // Cancel the ticket
       await cancelFixTicket(input.ticketId);
 
       return successResult({ message: 'Fix ticket cancelled successfully' });
@@ -313,15 +271,10 @@ export const autoFixRouter = createTRPCRouter({
     }
   }),
 
-  /**
-   * Get auto-fix configuration for an organization
-   * Requires organization membership
-   */
   getConfig: organizationMemberProcedure
     .input(GetAutoFixConfigInputSchema.omit({ organizationId: true }))
     .query(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationMemberProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -350,15 +303,10 @@ export const autoFixRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Save auto-fix configuration for an organization
-   * Requires organization owner role
-   */
   saveConfig: organizationBillingMutationProcedure
     .input(SaveAutoFixConfigSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationBillingMutationProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         const owner: Owner = {
@@ -367,7 +315,6 @@ export const autoFixRouter = createTRPCRouter({
           userId: ctx.user.id,
         };
 
-        // Build config object with defaults for optional fields
         const config: AutoFixAgentConfig = {
           enabled_for_issues: fullInput.enabled_for_issues,
           enabled_for_review_comments: fullInput.enabled_for_review_comments ?? false,
@@ -404,15 +351,10 @@ export const autoFixRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Toggle auto-fix agent on/off
-   * Requires organization owner role
-   */
   toggleAgent: organizationBillingProcedure
     .input(ToggleAutoFixAgentInputSchema.omit({ organizationId: true }))
     .mutation(async ({ input, ctx }) => {
       try {
-        // organizationId comes from organizationBillingProcedure's input
         const fullInput = input as typeof input & { organizationId: string };
 
         // Only enforce trial/subscription when enabling — expired orgs must
@@ -430,7 +372,6 @@ export const autoFixRouter = createTRPCRouter({
         const existingConfig = await getAgentConfigForOwner(owner, 'auto_fix', 'github');
 
         if (!existingConfig) {
-          // Create default config if it doesn't exist
           // Set enabled_for_issues to match the toggle state
           const config = {
             ...DEFAULT_AUTO_FIX_CONFIG,

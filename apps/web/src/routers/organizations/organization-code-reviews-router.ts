@@ -539,7 +539,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       const config = await getAgentConfig(input.organizationId, 'code_review', platform);
 
       if (!config) {
-        // Return default configuration
         return {
           isEnabled: false,
           reviewStyle: 'balanced' as const,
@@ -721,7 +720,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
             if (webhookSecret) {
               try {
-                // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration, {
                   userId: ctx.user.id,
                   organizationId: input.organizationId,
@@ -742,7 +740,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                // Update integration metadata with new webhook configuration
                 const existingMetadata = (integration.metadata as Record<string, unknown>) || {};
                 await updateIntegrationMetadata(integration.id, {
                   ...existingMetadata,

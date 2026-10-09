@@ -39,9 +39,6 @@ const PRIVILEGED_ORGANIZATION_IDS = [
   '03366a2a-b498-498a-8560-98bffe4a0997', // john's local test org
 ] as const;
 
-/**
- * Creates a human-readable diff message for model/provider access changes
- */
 function createAccessListsDiffMessage(
   oldSettings: OrganizationSettings | undefined,
   newSettings: OrganizationSettings
@@ -82,9 +79,6 @@ function createAccessListsDiffMessage(
   return changes.length > 0 ? changes.join('; ') : 'Updated access lists';
 }
 
-/**
- * Creates a human-readable diff message for default model changes
- */
 function createDefaultModelDiffMessage(
   oldSettings: OrganizationSettings | undefined,
   newSettings: OrganizationSettings
@@ -712,7 +706,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Update the data collection setting
       const updatedSettings = await updateOrganizationSettings(organizationId, {
         ...existingOrg.settings,
         data_collection: dataCollection,
@@ -729,7 +722,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { organizationId, projects_ui_enabled } = input;
 
-      // Check if organization is in the privileged list
       if (
         !PRIVILEGED_ORGANIZATION_IDS.includes(
           organizationId as (typeof PRIVILEGED_ORGANIZATION_IDS)[number]
@@ -749,14 +741,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
       const currentSettings = existingOrg.settings || {};
       const updatedSettings = await updateOrganizationSettings(organizationId, {
         ...currentSettings,
         projects_ui_enabled,
       });
 
-      // Create audit log if the value changed
       if (currentSettings.projects_ui_enabled !== projects_ui_enabled) {
         await createAuditLog({
           action: 'organization.settings.change',
@@ -787,14 +777,12 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      // Merge with existing settings
       const currentSettings = existingOrg.settings || {};
       const updatedSettings = await updateOrganizationSettings(organizationId, {
         ...currentSettings,
         code_indexing_enabled,
       });
 
-      // Create audit log if the value changed
       if (currentSettings.code_indexing_enabled !== code_indexing_enabled) {
         await createAuditLog({
           action: 'organization.settings.change',
@@ -835,7 +823,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
           minimum_balance_alert_email,
         });
       } else {
-        // Remove the fields when disabled
         const {
           minimum_balance: _mb,
           minimum_balance_alert_email: _mbae,
@@ -844,7 +831,6 @@ export const organizationsSettingsRouter = createTRPCRouter({
         updatedSettings = await updateOrganizationSettings(organizationId, rest);
       }
 
-      // Create audit log
       const wasEnabled =
         currentSettings.minimum_balance !== undefined &&
         currentSettings.minimum_balance_alert_email !== undefined;

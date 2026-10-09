@@ -74,7 +74,6 @@ const sharedHandlers = createAutoTriageRouter({
   agentEnabledSetter: async (owner, agentType, platform, isEnabled) => {
     if (owner.type !== 'org') return;
 
-    // Ensure bot user exists when enabling auto-triage for organizations
     if (isEnabled) {
       await ensureBotUserForOrg(owner.id, 'auto-triage');
     }

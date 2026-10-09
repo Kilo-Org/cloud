@@ -392,7 +392,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get overview KPIs
   getOverviewStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const statusTable =
@@ -512,7 +511,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get daily time series data
   getDailyStats: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
     const dayExpr = accountingDayExpr(input);
@@ -574,7 +572,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get cancellation reasons analysis
   getCancellationAnalysis: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const createdAt = accountingCreatedAt(input);
     const statusTable =
@@ -732,7 +729,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     };
   }),
 
-  // Get the 20 most recent sessions for a specific error message pattern (drill-down from error table)
   getErrorSessions: adminProcedure.input(ErrorSessionsFilterSchema).query(async ({ input }) => {
     const { errorMessage } = input;
     const statusTable =
@@ -1112,7 +1108,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
     }));
   }),
 
-  // Get CSV export data
   getExportData: adminProcedure.input(FilterSchema).query(async ({ input }) => {
     const conditions = buildBaseConditions(input);
 
@@ -1206,7 +1201,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       .limit(10000);
   }),
 
-  // Search users for filter dropdown
   searchUsers: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {
@@ -1229,7 +1223,6 @@ export const adminCodeReviewsRouter = createTRPCRouter({
       return result;
     }),
 
-  // Search organizations for filter dropdown
   searchOrganizations: adminProcedure
     .input(z.object({ query: z.string().min(1) }))
     .query(async ({ input }) => {

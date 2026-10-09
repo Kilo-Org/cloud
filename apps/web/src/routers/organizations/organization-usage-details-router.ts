@@ -195,7 +195,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { organizationId, startDate, endDate } = input;
 
-      // Fetch organization members (active only, not invited)
       const allMembers = await getOrganizationMembers(organizationId);
       const members = allMembers
         .filter((m): m is Extract<typeof m, { status: 'active' }> => m.status === 'active')
@@ -215,10 +214,8 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       extendedStartDate.setDate(extendedStartDate.getDate() - 14);
       const extendedStartDateStr = extendedStartDate.toISOString();
 
-      // Get user emails for PostHog query
       const userEmails = members.map(m => m.email);
 
-      // Fetch all component data in parallel
       const [agentInteractionsData, autocompleteData, cloudAgentSessionsData, codeReviewsData] =
         await Promise.all([
           getAgentInteractionsPerDay(organizationId, userIds, extendedStartDateStr, endDate),
@@ -232,7 +229,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           getCodeReviewsPerDay(organizationId, userIds, extendedStartDateStr, endDate),
         ]);
 
-      // Build activity data maps
       const activityData = buildActivityDataMaps(
         agentInteractionsData,
         autocompleteData,
@@ -240,7 +236,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         codeReviewsData
       );
 
-      // Generate daily timeseries
       const { timeseries: data, userMetricsByDate } = generateDailyTimeseries(
         startDate,
         endDate,
@@ -248,7 +243,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         activityData
       );
 
-      // Calculate trends
       const weeklyTrends = calculateWeeklyTrends(data);
 
       // Calculate per-user scores (anonymized - no identifying information)
@@ -256,8 +250,6 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         .map(member => calculateUserScore(member.userId, userMetricsByDate))
         .filter(score => score.total > 0);
 
-      // Check if this is a new organization (first activity < 3 days ago)
-      // Look at the earliest activity across all data sources
       const allDates = [
         ...agentInteractionsData.map(d => d.date),
         ...autocompleteData.map(d => d.date),

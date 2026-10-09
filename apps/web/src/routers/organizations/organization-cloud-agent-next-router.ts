@@ -170,7 +170,6 @@ async function assertOrganizationOwnsSession(params: {
   }
 }
 
-// Extend base schemas with organizationId for organization context
 const CreateWorktreeChatInput = baseCreateWorktreeChatNextSchema.extend({
   organizationId: z.uuid(),
 });
@@ -710,9 +709,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       }
     }),
 
-  /**
-   * Generate a presigned URL for uploading an image attachment.
-   */
   getImageUploadUrl: organizationMemberMutationProcedure
     .input(ImageUploadUrlInput)
     .mutation(async ({ ctx, input }) => {
@@ -726,9 +722,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       });
     }),
 
-  /**
-   * Generate a presigned URL for uploading a canonical Cloud Agent attachment.
-   */
   getAttachmentUploadUrl: organizationMemberMutationProcedure
     .input(AttachmentUploadUrlInput)
     .mutation(async ({ ctx, input }) => {

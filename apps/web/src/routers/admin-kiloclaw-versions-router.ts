@@ -13,10 +13,6 @@ import { TRPCError } from '@trpc/server';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
 
-/**
- * Resolve a user's active personal instance, throwing NOT_FOUND if none exists.
- * Used by admin pin operations that accept userId and need an instanceId.
- */
 async function requireActivePersonalInstance(userId: string) {
   const [instance] = await db
     .select({ id: kiloclaw_instances.id })

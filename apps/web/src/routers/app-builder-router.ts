@@ -16,10 +16,6 @@ import { buildAccessLevelEligibility } from '@/lib/access-level-eligibility';
 import { generateImageUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 
 export const appBuilderRouter = createTRPCRouter({
-  /**
-   * Create a new project without starting streaming
-   * Returns projectId for the client to navigate to before streaming
-   */
   createProject: baseProcedure.input(createProjectBaseSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
     const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
@@ -40,16 +36,10 @@ export const appBuilderRouter = createTRPCRouter({
     });
   }),
 
-  /**
-   * Get preview URL for a project
-   */
   getPreviewUrl: baseProcedure.input(projectIdBaseSchema).query(async ({ ctx, input }) => {
     return appBuilderService.getPreviewUrl(input.projectId, { type: 'user', id: ctx.user.id });
   }),
 
-  /**
-   * Triggers a build for the specified project
-   */
   triggerBuild: baseProcedure.input(projectIdBaseSchema).mutation(async ({ ctx, input }) => {
     return appBuilderService.triggerProjectBuild(input.projectId, {
       type: 'user',
@@ -57,9 +47,6 @@ export const appBuilderRouter = createTRPCRouter({
     });
   }),
 
-  /**
-   * Get a single project with all messages and session state
-   */
   getProject: baseProcedure.input(projectIdBaseSchema).query(async ({ ctx, input }) => {
     const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
       headers: ctx.headersList,
@@ -95,9 +82,6 @@ export const appBuilderRouter = createTRPCRouter({
     return appBuilderService.listProjects({ type: 'user', id: ctx.user.id });
   }),
 
-  /**
-   * Deploy an App Builder project to production
-   */
   deployProject: baseProcedure.input(projectIdBaseSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
     return appBuilderService.deployProject(input.projectId, owner, ctx.user.id);
@@ -136,10 +120,6 @@ export const appBuilderRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  /**
-   * Interrupt a running App Builder session
-   * Stops any ongoing Claude agent execution for the project
-   */
   interruptSession: baseProcedure.input(projectIdBaseSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
     const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
@@ -150,9 +130,6 @@ export const appBuilderRouter = createTRPCRouter({
     return { success: result.success };
   }),
 
-  /**
-   * Generate a presigned URL for uploading an image attachment
-   */
   getImageUploadUrl: baseProcedure
     .input(getImageUploadUrlSchema)
     .mutation(async ({ ctx, input }) => {
@@ -166,12 +143,7 @@ export const appBuilderRouter = createTRPCRouter({
       });
     }),
 
-  // ============================================================================
-  // WebSocket-based streaming mutations
-  // ============================================================================
-
   /**
-   * Start a Cloud Agent session for an existing project using WebSocket API.
    * Returns immediately with session info - client connects to WebSocket separately for events.
    *
    * This is a mutation (not subscription) - it triggers the action and returns immediately.
@@ -227,21 +199,11 @@ export const appBuilderRouter = createTRPCRouter({
     };
   }),
 
-  // ============================================================================
-  // GitHub Migration
-  // ============================================================================
-
-  /**
-   * Pre-flight check for GitHub migration.
-   */
   canMigrateToGitHub: baseProcedure.input(projectIdBaseSchema).query(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
     return appBuilderService.canMigrateToGitHub(input.projectId, owner);
   }),
 
-  /**
-   * Migrate an App Builder project to GitHub.
-   */
   migrateToGitHub: baseProcedure.input(migrateToGitHubSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
 

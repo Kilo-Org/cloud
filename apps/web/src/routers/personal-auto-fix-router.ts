@@ -66,7 +66,6 @@ export const personalAutoFixRouter = createTRPCRouter({
           userId: ctx.user.id,
         };
 
-        // Build config object with defaults for optional fields
         const config: AutoFixAgentConfig = {
           enabled_for_issues: input.enabled_for_issues,
           enabled_for_review_comments: input.enabled_for_review_comments ?? false,
@@ -119,7 +118,6 @@ export const personalAutoFixRouter = createTRPCRouter({
         const existingConfig = await getAgentConfigForOwner(owner, 'auto_fix', 'github');
 
         if (!existingConfig) {
-          // Create default config if it doesn't exist
           const config = {
             ...DEFAULT_AUTO_FIX_CONFIG,
             enabled_for_issues: input.isEnabled,
@@ -170,7 +168,6 @@ export const personalAutoFixRouter = createTRPCRouter({
       })
     )
     .query(async ({ input, ctx }) => {
-      // Forward to the main router's listTicketsForUser
       return await autoFixRouter.createCaller(ctx).listTicketsForUser(input);
     }),
 
@@ -181,7 +178,6 @@ export const personalAutoFixRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Forward to the main router's retrigger
       return await autoFixRouter.createCaller(ctx).retrigger({ ticketId: input.ticketId });
     }),
 
@@ -192,7 +188,6 @@ export const personalAutoFixRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Forward to the main router's cancel
       return await autoFixRouter.createCaller(ctx).cancel({ ticketId: input.ticketId });
     }),
 });

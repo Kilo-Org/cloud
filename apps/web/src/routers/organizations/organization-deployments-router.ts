@@ -64,7 +64,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       );
     }),
 
-  // Mutations
   deleteDeployment: organizationMemberMutationProcedure
     .input(
       z.object({
@@ -169,7 +168,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const { organizationId, deploymentId, key, value, isSecret } = input;
       const plaintextEnvVar = markAsPlaintext({ key, value, isSecret });
-      // Encrypt before storing
       const [encryptedEnvVar] = envVarsService.encryptEnvVars([plaintextEnvVar]);
       await envVarsService.setEnvVar(deploymentId, encryptedEnvVar, {
         type: 'org',
@@ -222,7 +220,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       });
     }),
 
-  // Password protection endpoints (org-only feature)
   getPasswordStatus: organizationMemberProcedure
     .input(
       z.object({
@@ -231,7 +228,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .query(async ({ input }) => {
-      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
@@ -249,7 +245,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,
@@ -266,7 +261,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ input }) => {
-      // Get deployment to verify ownership and get worker name
       const { deployment } = await deploymentsService.getDeployment(input.deploymentId, {
         type: 'org',
         id: input.organizationId,

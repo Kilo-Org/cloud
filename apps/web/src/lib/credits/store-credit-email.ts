@@ -24,6 +24,7 @@ import { findEffectiveStoreCreditRefundEvent } from './store-refund';
 const EMAIL_TYPE = 'store_credit_web_tip';
 const DELAY_MS = 24 * 60 * 60 * 1000;
 const MAX_BATCH_SIZE = 100;
+const MAX_DISPATCH_RUNTIME_MS = 180_000;
 const purchaseSchema = z.object({
   paymentProvider: z.enum([KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay]),
   providerTransactionId: z.string().min(1),
@@ -129,6 +130,7 @@ export async function dispatchStoreCreditWebTipEmails(
     sendEmail?: typeof sendStoreCreditWebTipEmail;
   } = {}
 ) {
+  const startedAt = performance.now();
   const now = options.now ?? new Date();
   const sendEmail = options.sendEmail ?? sendStoreCreditWebTipEmail;
   const candidates = await eligiblePurchases(
@@ -157,6 +159,8 @@ export async function dispatchStoreCreditWebTipEmails(
   };
 
   for (const candidate of candidates) {
+    // Leave two minutes for the current recipient before Vercel's five-minute limit.
+    if (performance.now() - startedAt >= MAX_DISPATCH_RUNTIME_MS) break;
     try {
       // Commit the unique claim before any external call. An overlapping cron
       // must never resend after a timeout that may have accepted the message.

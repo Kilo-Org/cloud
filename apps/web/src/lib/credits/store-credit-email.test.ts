@@ -254,6 +254,31 @@ describe('first store credit email delivery', () => {
     );
   });
 
+  it('stops at the runtime boundary without claiming recipients needed by the next run', async () => {
+    const users = await Promise.all([grant(), grant()]);
+    let elapsedMs = 0;
+    const clock = jest.spyOn(performance, 'now').mockImplementation(() => elapsedMs);
+    const sendEmail = recordingSender().mockImplementation(async () => {
+      elapsedMs = 180_000;
+      return { sent: true };
+    });
+    try {
+      const firstRun = await dispatchStoreCreditWebTipEmails({ now: NOW, sendEmail });
+      expect(firstRun).toMatchObject({ selected: 2, claimed: 1, sent: 1 });
+      const firstEmail = sendEmail.mock.calls[0]?.[0];
+      const waiting = users.find(({ user }) => user.google_user_email !== firstEmail);
+      if (!firstEmail || !waiting)
+        throw new Error('Expected one delivered and one waiting recipient');
+      expect(await markersFor(waiting.user.id)).toEqual([]);
+
+      await dispatchStoreCreditWebTipEmails({ now: NOW, sendEmail });
+      expect(sendEmail.mock.calls).toEqual([[firstEmail], [waiting.user.google_user_email]]);
+      expect(await markersFor(waiting.user.id)).toHaveLength(1);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
   it('does not backfill pre-feature production buyers or schedule sandbox purchases', async () => {
     const oldBuyer = await grant();
     await db

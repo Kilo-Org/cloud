@@ -519,6 +519,8 @@ The backend schedules one marketing email after the first production credit-pack
 - `/api/cron/store-credit-web-tip` runs hourly. A purchase becomes eligible 24 hours after the credit grant.
 - Existing production buyers receive no backfill. Sandbox purchases do not start the campaign.
 - The dispatcher excludes blocked, disabled, deleting, and bot accounts, web top-up buyers, and purchases with an effective refund.
+- The dispatcher stops starting recipients after three minutes. Deferred recipients remain unclaimed for the next hourly run.
+- Marketing Mailgun requests time out after 30 seconds. Transactional requests keep their existing timeout behavior.
 
 The sender uses `packages/web-shared/src/marketing-emails/storeCreditWebTip.html`, separate from the transactional template catalog.
 Mailgun applies its global and `marketing`-tag suppression lists.

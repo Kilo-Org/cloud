@@ -1829,6 +1829,7 @@ export default function CloudChatPage({
                                     <WorkingIndicator
                                       messages={dynamicMessages}
                                       isStreaming={isStreaming}
+                                      isPreparing={cloudStatus?.type === 'preparing'}
                                     />
                                   )}
                                   {!billingFailure &&

@@ -11,7 +11,6 @@ import {
   AlertCircle,
   Brain,
   FolderGit2,
-  Loader2,
   Lock,
   RefreshCw,
   Send,
@@ -48,6 +47,7 @@ import {
 } from './sandbox-selection';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
+import { WorkingIndicator } from './WorkingIndicator';
 import { MobileToolbarPopover } from './MobileToolbarPopover';
 import { BrowseCommandsDialog } from './BrowseCommandsDialog';
 
@@ -1439,6 +1439,8 @@ export function NewSessionPanel({
           />
         )}
 
+        {isPreparing && <WorkingIndicator messages={[]} isStreaming={false} isPreparing />}
+
         {/* Textarea + model toolbar container */}
         <div
           className={cn(
@@ -1650,7 +1652,6 @@ export function NewSessionPanel({
 
             <div className="flex-1" />
 
-            {isPreparing && <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />}
             <UIButton
               type="button"
               variant="ghost"

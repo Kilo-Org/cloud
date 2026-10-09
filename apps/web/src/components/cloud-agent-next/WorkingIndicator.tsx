@@ -9,6 +9,7 @@ import { StatusSpinner } from '@/components/shared/StatusSpinner';
 type WorkingIndicatorProps = {
   messages: StoredMessage[];
   isStreaming: boolean;
+  isPreparing?: boolean;
 };
 
 function formatElapsed(seconds: number): string {
@@ -18,12 +19,17 @@ function formatElapsed(seconds: number): string {
   return `${m}m ${s}s`;
 }
 
-export function WorkingIndicator({ messages, isStreaming }: WorkingIndicatorProps) {
+export function WorkingIndicator({
+  messages,
+  isStreaming,
+  isPreparing = false,
+}: WorkingIndicatorProps) {
+  const isWorking = isStreaming || isPreparing;
   const startTimeRef = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    if (!isStreaming) {
+    if (!isWorking) {
       startTimeRef.current = null;
       setElapsed(0);
       return;
@@ -39,13 +45,13 @@ export function WorkingIndicator({ messages, isStreaming }: WorkingIndicatorProp
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isStreaming]);
+  }, [isWorking]);
 
-  if (!isStreaming) return null;
+  if (!isWorking) return null;
 
-  let statusText = 'Considering next steps';
+  let statusText = isPreparing ? 'Setting up environment' : 'Considering next steps';
 
-  for (let i = messages.length - 1; i >= 0; i--) {
+  for (let i = messages.length - 1; !isPreparing && i >= 0; i--) {
     const msg = messages[i];
     if (isAssistantMessage(msg.info) && msg.parts.length > 0) {
       statusText = computeStatus(msg.parts[msg.parts.length - 1]);
@@ -54,11 +60,10 @@ export function WorkingIndicator({ messages, isStreaming }: WorkingIndicatorProp
   }
 
   return (
-    <div className="text-muted-foreground flex items-center gap-2 py-2 text-xs">
-      <StatusSpinner className="h-4 w-4" />
-      <span>
-        {statusText} · {formatElapsed(elapsed)}
-      </span>
+    <div className="text-foreground flex items-center gap-2 py-2 text-sm font-medium">
+      <StatusSpinner className="h-5 w-5 shrink-0" />
+      <span role="status">{statusText}</span>
+      <span className="text-muted-foreground tabular-nums">· {formatElapsed(elapsed)}</span>
     </div>
   );
 }

@@ -9,6 +9,8 @@ export type GlanceableClockFormat = (at: string, options?: { includeDate: boolea
 
 /** Translated Home widget copy; the layout never translates or formats on its own. */
 export type AndroidWidgetHomeCopy = {
+  /** The presented state: privacy/signed_out/unavailable centre a locked composition. */
+  statusKind: HomeWidgetPresentation['status'];
   primaryCount: string;
   primaryLabel: string | null;
   status: string | null;
@@ -112,6 +114,7 @@ export function buildAndroidHomeCopy(
           ...secondaryCounts.map(line => `${line.count} ${line.label}`),
         ];
   return {
+    statusKind: home.status,
     primaryCount: formatCount(home.primaryCount),
     primaryLabel,
     status,

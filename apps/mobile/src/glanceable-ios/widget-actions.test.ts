@@ -745,6 +745,54 @@ describe('activeAgentsWidgetLayout', () => {
     }
   });
 
+  it('draws a state glyph, never a placeholder dash, in the count-less circular', () => {
+    const expected = {
+      waiting: 'arrow.triangle.2.circlepath',
+      empty: 'checkmark.circle.fill',
+      privacy: 'lock.fill',
+      signed_out: 'person.fill',
+    } as const;
+    for (const status of Object.keys(expected) as (keyof typeof expected)[]) {
+      const snapshot = { ...snapshotFor([]), status };
+      const home = buildHomeWidgetPresentation(
+        { snapshot, details: EMPTY_HOME_WIDGET_DETAILS },
+        NOW
+      );
+      const tree = renderWidget({ home }, 'accessoryCircular');
+      const images = collectOfKind(tree, 'Image').map(image => image.props.systemName);
+      expect(images).toEqual([expected[status]]);
+      expect(collectText(tree)).not.toContain('—');
+    }
+  });
+
+  it('names up to two waiting agents in the medium column and falls back to counts', () => {
+    const waiting = renderWidget(
+      homeProps([{ status: 'permission' }], {
+        approvalKey: null,
+        primaryTitle: 'First wait',
+        waitingAgents: [
+          { title: 'First wait', kind: 'permission' },
+          { title: 'Second wait', kind: 'question' },
+          { title: 'Third wait', kind: 'retry' },
+        ],
+        scheduledAgents: [],
+      }),
+      'systemMedium'
+    );
+    const texts = collectText(waiting);
+    expect(texts).toContain('First wait');
+    expect(texts).toContain('Second wait');
+    expect(texts).not.toContain('Third wait');
+    expect(texts).toContain('Permission required');
+    // No entry rows: the column falls back to the support counts.
+    const counts = renderWidget(
+      homeProps([{ status: 'busy' }, { status: 'idle' }]),
+      'systemMedium'
+    );
+    expect(collectText(counts)).toContain('Working');
+    expect(collectText(counts)).toContain('Idle');
+  });
+
   it.each(HOME_FAMILIES)(
     'keeps New agent navigation available alongside approval in %s',
     family => {
@@ -803,8 +851,10 @@ describe('activeAgentsWidgetLayout', () => {
       expect(texts).not.toContain('Needs input');
       expect(texts).not.toContain('Scheduled');
       expect(texts).toContain('Checked');
+      // The square card has no room for a relative phrase, so it prints the
+      // clock time; the wide and large cards keep the relative form.
       const footer = collectOfKind(renderWidget(props, family), 'Text').find(
-        text => text.props.dateStyle === 'ago'
+        text => text.props.dateStyle === (family === 'systemSmall' ? 'time' : 'ago')
       );
       expect(footer?.props.date).toEqual(new Date(NOW));
     }

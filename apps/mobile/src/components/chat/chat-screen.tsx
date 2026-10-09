@@ -1,8 +1,9 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -30,9 +31,14 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { useChatBackends } from '@/lib/chat/backend-store';
+import { backendModelOptions, requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
+import { decodeBackendTarget, resolveChatTarget } from '@/lib/chat/backend-target';
 
 import { BetaPill } from './beta-pill';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
+import { BackendSettingsControl } from './backend-settings-sheet';
 
 /**
  * One conversation.
@@ -77,6 +83,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   // and the remote servers — is read here. The header draws its dot from the
   // Kilo view, so the control and the sheet cannot disagree.
   const [mcpOpen, setMcpOpen] = useState(false);
+  const backends = useChatBackends();
   const mcp = useMcpSettings(place, state.sessionId);
   const colors = useThemeColors();
 
@@ -95,6 +102,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     organizationId: organizationId ?? undefined,
     remoteModelState: NO_REMOTE,
   });
+  const availableOptions = useMemo(
+    () => [...modelOptions.options, ...backendModelOptions(backends)],
+    [backends, modelOptions.options]
+  );
 
   // The model the next message goes to. It starts as the one the conversation
   // is on and changes the moment the person picks another, which is what makes
@@ -102,6 +113,38 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const [picked, setPicked] = useState<string | null>(null);
   const [variant, setVariant] = useState('');
   const model = picked ?? state.model;
+  const customTarget = decodeBackendTarget(model);
+  const customModel = backends
+    .find(backend => backend.id === customTarget?.backendId)
+    ?.models.find(one => one.id === customTarget?.modelId);
+
+  const selectModel = (modelId: string, variantId: string) => {
+    const accept = () => {
+      setPicked(modelId);
+      setVariant(variantId);
+    };
+    if (!requiresBackendDisclosure(model, modelId)) {
+      accept();
+      return;
+    }
+    const epoch = currentAuthEpoch();
+    const name = availableOptions.find(option => option.id === modelId)?.name ?? modelId;
+    Alert.alert(
+      t('modelChat.backends.switchTitle'),
+      t('modelChat.backends.switchMessage', { name }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('modelChat.backends.switchConfirm'),
+          onPress: () => {
+            if (isCurrentAuthEpoch(epoch)) {
+              accept();
+            }
+          },
+        },
+      ]
+    );
+  };
 
   useEffect(() => {
     const shown = Keyboard.addListener('keyboardDidShow', () => {
@@ -145,12 +188,21 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
 
   const handleSend = useCallback(
     (text: string, options?: ChatComposerSendOptions) => {
+      try {
+        resolveChatTarget(model, backends);
+      } catch (error) {
+        Alert.alert(
+          t('modelChat.backends.title'),
+          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget')
+        );
+        throw error;
+      }
       // The question is on screen the moment it is asked, so the composer
       // empties now rather than when the answer lands.
       options?.onOptimisticSend?.();
       void send(text, model);
     },
-    [model, send]
+    [backends, model, send, t]
   );
 
   const handleStop = useCallback(() => {
@@ -219,6 +271,13 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         ) : null}
 
         <View style={composerPadding}>
+          {customModel !== undefined && (
+            <Text className="px-4 pt-2 text-xs text-muted-foreground">
+              {t(
+                customModel.tools ? 'modelChat.backends.modelTools' : 'modelChat.backends.textOnly'
+              )}
+            </Text>
+          )}
           <ChatComposer
             onSend={handleSend}
             onSendCommand={noSessionCommand}
@@ -234,15 +293,12 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             }}
             model={model}
             variant={variant}
-            modelOptions={modelOptions.options}
-            onModelSelect={(modelId, variantId) => {
-              setPicked(modelId);
-              setVariant(variantId);
-            }}
+            modelOptions={availableOptions}
+            onModelSelect={selectModel}
             attachmentsEnabled={false}
             activeSessionType={null}
             organizationId={organizationId ?? undefined}
-            disabled={modelsFailed && modelOptions.options.length === 0}
+            disabled={modelsFailed && availableOptions.length === 0}
           />
         </View>
       </>
@@ -262,20 +318,20 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           </View>
         }
         headerRight={
-          /* No switch here: the sheet is where the setting and the connection
-             are explained. The dot is inside the button's fixed size, so a
-             state change never changes the header's width. */
-          <Pressable
-            onPress={() => {
-              setMcpOpen(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={t('modelChat.mcp.title')}
-            className="h-11 w-11 items-center justify-center active:opacity-70"
-          >
-            <Wrench size={22} color={colors.foreground} />
-            <StatusDot tone={mcp.view.tone} className="absolute bottom-1 right-1" />
-          </Pressable>
+          <View className="flex-row">
+            <BackendSettingsControl />
+            <Pressable
+              onPress={() => {
+                setMcpOpen(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('modelChat.mcp.title')}
+              className="h-11 w-11 items-center justify-center active:opacity-70"
+            >
+              <Wrench size={22} color={colors.foreground} />
+              <StatusDot tone={mcp.view.tone} className="absolute bottom-1 right-1" />
+            </Pressable>
+          </View>
         }
         showBackButton
       />

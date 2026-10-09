@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  addChatBackend,
+  clearChatBackends,
+  listChatBackends,
+  waitForChatBackends,
+} from './backend-store';
 
 /**
  * What is dropped when the account goes.
@@ -26,10 +32,23 @@ vi.mock('./kilo-mcp', () => ({
   forgetMcpEnabled: vi.fn().mockResolvedValue(undefined),
 }));
 
+const storedQuestions = vi.hoisted(() => new Map<string, string>());
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   encryptedDatabase: async () => {
     await Promise.resolve();
     return {};
+  },
+  getItem: async (scope: string, key: string) => {
+    await Promise.resolve();
+    return storedQuestions.get(`${scope}:${key}`) ?? null;
+  },
+  setItem: async (scope: string, key: string, value: string) => {
+    await Promise.resolve();
+    storedQuestions.set(`${scope}:${key}`, value);
+  },
+  removeItem: async (scope: string, key: string) => {
+    await Promise.resolve();
+    storedQuestions.delete(`${scope}:${key}`);
   },
 }));
 
@@ -47,6 +66,7 @@ vi.mock('expo-secure-store', () => secureStore);
 vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'a0000000-0000-4000-8000-000000000001' }));
 
 const { chatPlaceOf, forgetChatPlaces } = await import('./scope');
 const { forgetKiloMcp, forgetMcpEnabled } = await import('./kilo-mcp');
@@ -56,6 +76,7 @@ const { remoteMcpState } = await import('./remote-mcp');
 const { clearSettingsToolsEnabled, isSettingsToolsEnabled, setSettingsToolsEnabled } =
   await import('./settings-tools-switch');
 const { clearChatsForSignOut, releaseChatsForAccountSwitch } = await import('./sign-out');
+const { askedIn, rememberAsked } = await import('./pending');
 
 /** A remote server the account added, so the clears have something to drop. */
 function addServer(): void {
@@ -69,10 +90,12 @@ function addServer(): void {
 
 beforeEach(() => {
   forgetChatPlaces();
+  storedQuestions.clear();
   vi.mocked(forgetKiloMcp).mockClear();
   vi.mocked(forgetMcpEnabled).mockClear();
   clearRemoteMcpServers();
   clearSettingsToolsEnabled();
+  clearChatBackends();
 });
 
 describe('the places remembered for a chat scope', () => {
@@ -114,6 +137,29 @@ describe('the Kilo MCP connection', () => {
   });
 });
 
+describe('remembered question targets', () => {
+  it('discards the questions and targets of wiped chats without touching another account', async () => {
+    await rememberAsked('gone', 'unsent custom question', 'backend:private:1:model');
+    await rememberAsked('kept', 'another account question', 'kilo/one');
+
+    await clearChatsForSignOut('user-1');
+
+    expect(await askedIn('gone')).toBeNull();
+    expect(await askedIn('kept')).toEqual({ text: 'another account question', model: 'kilo/one' });
+  });
+
+  it('keeps the questions and targets when an account switch retains its stored chats', async () => {
+    await rememberAsked('gone', 'unsent custom question', 'backend:private:1:model');
+
+    await releaseChatsForAccountSwitch();
+
+    expect(await askedIn('gone')).toEqual({
+      text: 'unsent custom question',
+      model: 'backend:private:1:model',
+    });
+  });
+});
+
 describe('the remote MCP connection and its stored servers', () => {
   it('are dropped when the account signs out', async () => {
     addServer();
@@ -142,5 +188,31 @@ describe('the remote MCP connection and its stored servers', () => {
     expect(listRemoteMcpServers()).toEqual([]);
     expect(remoteMcpState()).toEqual([]);
     expect(isSettingsToolsEnabled()).toBe(true);
+  });
+});
+
+describe('custom backend credentials at account boundaries', () => {
+  it.each([
+    [
+      'sign-out',
+      async () => {
+        await clearChatsForSignOut('user-1');
+      },
+    ],
+    ['account switch', releaseChatsForAccountSwitch],
+  ])('removes the departing account profile on %s', async (_boundary, clear) => {
+    await waitForChatBackends();
+    const backend = addChatBackend({
+      name: 'Private',
+      baseUrl: 'https://private.example/v1',
+      apiKind: 'chat_completions',
+      apiKey: 'test-account-key',
+      headers: { 'x-private-header': 'test-account-header' },
+      models: [{ id: 'model', name: 'Model', tools: false }],
+      allowLocalHttp: false,
+    });
+    expect(listChatBackends()).toEqual([backend]);
+    await clear();
+    expect(listChatBackends()).toEqual([]);
   });
 });

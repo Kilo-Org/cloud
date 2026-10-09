@@ -87,6 +87,8 @@ const myFetch: FetchLike = async (url, request) => {
     // Your runtime's own signal type. Dropping it leaves a cancelled call
     // still running, and still being charged for, on the provider.
     signal: (request.signal ?? null) as AbortSignal | null,
+    ...(request.redirect === undefined ? {} : { redirect: request.redirect }),
+    ...(request.credentials === undefined ? {} : { credentials: request.credentials }),
   });
   const body = response.body;
   return {
@@ -692,6 +694,7 @@ gets the same failures as a tagged `RemoteMcpError`, whose `kind` tells
 | `@kilocode/harness-sdk/core` | The contracts and the pure domain, no plugin. Wider than the root: it also holds the machinery a session runs on, which a plugin author sometimes needs |
 | `@kilocode/harness-sdk/plugins/fetch` | `webFetch`, for a runtime with a WHATWG `fetch` |
 | `@kilocode/harness-sdk/plugins/gateway` | The gateway plugin on its own |
+| `@kilocode/harness-sdk/plugins/remote-model` | Direct Chat Completions, Responses and Messages: `remoteModelClient`, `layerRemoteModel` |
 | `@kilocode/harness-sdk/plugins/prompt` | The assembler on its own |
 | `@kilocode/harness-sdk/plugins/remote-mcp` | Remote MCP servers: `remoteMcpTools`, and the Streamable HTTP client under it |
 | `@kilocode/harness-sdk/plugins/tools` | The tools the package ships |

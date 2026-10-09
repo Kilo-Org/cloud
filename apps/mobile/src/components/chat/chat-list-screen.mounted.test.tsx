@@ -78,11 +78,20 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/icons', () => ({ MessageCircle: 'MessageCircle', Plus: 'Plus' }));
+vi.mock('@/components/ui/icons', () => ({
+  MessageCircle: 'MessageCircle',
+  Plus: 'Plus',
+  Server: 'Server',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/chat/chat-row', () => ({ ChatRow: 'ChatRow' }));
 vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
+vi.mock('@/lib/chat/backend-store', () => ({ useChatBackends: () => [] }));
+vi.mock('@/components/chat/backend-settings-sheet', () => ({
+  BackendSettingsControl: 'BackendSettingsControl',
+}));
+vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 
 let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
 

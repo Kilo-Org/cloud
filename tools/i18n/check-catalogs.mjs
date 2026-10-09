@@ -117,6 +117,10 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // word is already as short as a compact count badge allows, so every catalog
   // keeps the same "{{count}} MCP" the MCP-server rows use.
   'profiles.counts.mcp',
+  // The inference protocols keep their published API names across locales.
+  'modelChat.backends.chatCompletions',
+  'modelChat.backends.responses',
+  'modelChat.backends.messages',
   'share.reviewPrSubtitle',
   // Format-only strings with no translatable words: a placeholder-only screen
   // title, a placeholder-plus-UTC time-range label, the GitLab merge request

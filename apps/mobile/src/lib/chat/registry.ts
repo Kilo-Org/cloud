@@ -21,8 +21,10 @@ import {
   setMcpEnabled as persistMcpEnabled,
 } from './kilo-mcp';
 import { type ChatPlace } from './scope';
-import { askedIn, forgetAsked, moveAsked, rememberAsked } from './pending';
+import { askedIn, forgetAsked, migrateAsked, moveAsked, rememberAsked } from './pending';
 import { chatToolNames, chatToolNamesStarting } from './tools';
+import { waitForChatBackends } from './backend-store';
+import { targetSupportsTools } from './backend-capabilities';
 import {
   forgetSession,
   modelOfSession,
@@ -101,6 +103,7 @@ async function open(): Promise<SQLiteDatabase> {
 }
 
 async function runtimeFor(place: ChatPlace): Promise<ChatRuntime> {
+  await waitForChatBackends();
   const held = runtimes.get(place.chatScope);
   if (held !== undefined) {
     return held;
@@ -175,7 +178,8 @@ export async function startChat(
   mcpEnabled = true
 ): Promise<string> {
   const runtime = await runtimeFor(place);
-  if (mcpEnabled && KILO_MCP_URL !== undefined) {
+  const toolsSupported = targetSupportsTools(model);
+  if (toolsSupported && mcpEnabled && KILO_MCP_URL !== undefined) {
     await ensureKiloMcp(place, 'automatic');
   }
   const { handle, scope } = await inOwnScope(
@@ -183,7 +187,7 @@ export async function startChat(
     openSession({
       system: SYSTEM,
       model,
-      tools: chatToolNamesStarting(organizationIdOf(place.org), mcpEnabled),
+      tools: toolsSupported ? chatToolNamesStarting(organizationIdOf(place.org), mcpEnabled) : [],
     })
   );
   rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
@@ -285,6 +289,10 @@ async function openOrMissing<E>(
 
 async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const runtime = await runtimeFor(place);
+  const storedModel = modelOfSession(await open(), sessionId);
+  if (storedModel !== null) {
+    await migrateAsked(sessionId, storedModel);
+  }
   const enabled = await mcpEnabledFor(sessionId);
   if (enabled && KILO_MCP_URL !== undefined) {
     /* An open, so the four-second bound: a server that is slow or down leaves
@@ -304,7 +312,12 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     });
     const model = modelOfSession(await open(), current) ?? '';
     const asked = await askedIn(current);
-    change(current, { model, asked, status: 'idle' });
+    change(current, {
+      model,
+      asked: asked?.text ?? null,
+      askedModel: asked?.model ?? null,
+      status: 'idle',
+    });
     return;
   }
   const { handle, scope } = opened;
@@ -325,7 +338,8 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       model,
       turns,
       status: 'idle',
-      asked,
+      asked: asked?.text ?? null,
+      askedModel: asked?.model ?? null,
     });
   } catch (error) {
     /* Reading the history or the pending question failed after the session
@@ -348,20 +362,20 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
 export async function say(sessionId: string, text: string, model: string): Promise<void> {
   /* Where the failure below belongs. It is the chat the move landed on, not
      the one it started from, or the report goes to a chat nobody is watching. */
-  let current = sessionId;
+  let current = snapshotOf(sessionId).sessionId;
   try {
     /* A person can type before the session has finished opening, and a
        question asked of a chat that is not there yet used to vanish with the
        composer reporting success. It waits for the open instead. */
-    await opening.get(sessionId);
-    const held = chats.get(sessionId);
+    await opening.get(current);
+    const held = chats.get(current);
     if (held?.answering !== undefined) {
       /* A session answers one question at a time, and the composer stays open
          while it works. So a second question joins the line rather than racing
          the first, and it is on screen while it waits. It is held in memory
          only: an answer that is still arriving is not written down either. */
       held.waiting.push({ text, model });
-      change(sessionId, { waiting: held.waiting.map(one => one.text) });
+      change(current, { waiting: held.waiting.map(one => one.text) });
       return;
     }
     /* One move, not two: the question is asked on the model on screen, and a
@@ -371,21 +385,38 @@ export async function say(sessionId: string, text: string, model: string): Promi
     if (held === undefined) {
       throw new Error('the chat is not open');
     }
-    current = await ontoForUse(sessionId, model, held);
+    /* Remember the requested target before the move can fail. The live model
+       stays unchanged until onto installs the session that actually moved. */
+    change(current, { asked: text, askedModel: model });
+    await rememberAsked(current, text, model);
+    current = await ontoForUse(current, model, held);
     const chat = chats.get(current);
     if (chat === undefined) {
       throw new Error('the chat is not open');
     }
     const runtime = await runtimeFor(chat);
-    await rememberAsked(current, text);
     touchChat(await open(), current, Date.now());
-    change(current, { status: 'working', answering: '', asked: text, failed: null });
+    change(current, {
+      status: 'working',
+      answering: '',
+      asked: text,
+      askedModel: model,
+      failed: null,
+    });
     chat.answering = runtime.runFork(reading(current, text, runtime));
   } catch (error) {
     /* The open, the move, or the write that remembers the question failed. The
        question is not lost: it stays on screen with a Retry under it, the same
        as one whose answer never arrived. */
-    change(current, { status: 'idle', answering: '', asked: text, failed: reason(error) });
+    /* onto may have installed the new session before its cleanup failed. */
+    current = snapshotOf(current).sessionId;
+    change(current, {
+      status: 'idle',
+      answering: '',
+      asked: text,
+      askedModel: model,
+      failed: reason(error),
+    });
   }
 }
 
@@ -399,9 +430,9 @@ const openReason = (error: unknown): string =>
 
 /** Asks again what was asked and never answered. */
 export async function retryChat(sessionId: string): Promise<void> {
-  const { asked, model } = snapshotOf(sessionId);
-  if (asked !== null) {
-    await say(sessionId, asked, model);
+  const { sessionId: current, asked, askedModel } = snapshotOf(sessionId);
+  if (asked !== null && askedModel !== null) {
+    await say(current, asked, askedModel);
   }
 }
 
@@ -480,6 +511,7 @@ async function settle(
     answering: '',
     status: 'idle',
     asked: failed === null ? null : snapshotOf(sessionId).asked,
+    askedModel: failed === null ? null : snapshotOf(sessionId).askedModel,
     failed,
   });
   /* The line moves only when the answer landed. A question that failed keeps
@@ -661,7 +693,9 @@ async function holdsTools(sessionId: string, names: readonly string[]): Promise<
 async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise<string> {
   const marked = chat.pendingTools !== undefined;
   chat.pendingTools = undefined;
-  const names = await chatToolNames(organizationIdOf(chat.org), sessionId);
+  const names = targetSupportsTools(model)
+    ? await chatToolNames(organizationIdOf(chat.org), sessionId)
+    : [];
   const stored = toolsOfSession(await open(), sessionId);
   const already =
     stored !== null &&
@@ -683,7 +717,9 @@ async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise
  * those names is left where it is — the switch that moved was not its own.
  */
 async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
-  const names = await chatToolNames(organizationIdOf(place.org), sessionId);
+  const names = targetSupportsTools(snapshotOf(sessionId).model)
+    ? await chatToolNames(organizationIdOf(place.org), sessionId)
+    : [];
   if (await holdsTools(sessionId, names)) {
     return sessionId;
   }
@@ -853,4 +889,9 @@ export async function releaseEveryChat(): Promise<void> {
     // eslint-disable-next-line no-await-in-loop -- one scope closes after another: the store has no lock, and two closes at once would write over each other
     await releaseChat(sessionId);
   }
+  for (const runtime of runtimes.values()) {
+    // eslint-disable-next-line no-await-in-loop -- close each runtime after all of its sessions
+    await runtime.dispose();
+  }
+  runtimes.clear();
 }

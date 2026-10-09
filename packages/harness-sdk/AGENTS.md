@@ -1953,6 +1953,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/store/migrate.ts` | Applying the migrations the bundle carries |
 | `src/plugins/store/node.ts`, `expo.ts` | One adapter per platform |
 | `src/plugins/gateway/` | The kilo gateway plugin |
+| `src/plugins/remote-model/` | Direct providers with backend-owned credentials and roots |
 | `src/plugins/conformance.test.ts` | The checks, against the shipped plugins and against seven broken ones |
 | `README.md` | What a consumer reads: the example, the events, the plugin table |
 | `PLUGINS.md` | What a plugin author reads: one worked example per point, and the invariants |
@@ -1963,10 +1964,11 @@ Inside `src/plugins/gateway/`:
 
 | Path | Purpose |
 |---|---|
-| `index.ts` | The layer: send, stream, and the resolved plugins |
+| `index.ts` | The Kilo layer: send and resolve plugins |
+| `stream.ts` | Stream-scoped cancellation and normalization shared with direct providers |
 | `wires.ts` | Asks the catalog and picks the best wire for a model |
 | `test-gateway.ts` | The gateway with test plugins, for the unit tests. Excluded from `dist/` |
-| `http.ts` | The post, the headers, the retry, and the abort handle |
+| `http.ts` | The Kilo post, headers and retry |
 | `api-kind.ts` | The three shapes and which one to pick |
 | `sse.ts` | A reader over `eventsource-parser` |
 | `wire/` | One file per shape, plus the shared `Wire` |
@@ -1987,9 +1989,10 @@ replacing it by hand means rebuilding the shared catalog — the trap this
 function closes. One line here against twelve a caller would have copied. Every
 other plugin is still replaced by composing the layers instead.
 
-There are ten entry points: `@kilocode/harness-sdk`, `/core`,
-`/plugins/fetch`, `/plugins/gateway`, `/plugins/prompt`, `/plugins/remote-mcp`,
-`/plugins/tools`, `/plugins/store/node`, `/plugins/store/expo` and `/testing`.
+There are eleven entry points: `@kilocode/harness-sdk`, `/core`,
+`/plugins/fetch`, `/plugins/gateway`, `/plugins/prompt`, `/plugins/remote-model`,
+`/plugins/remote-mcp`, `/plugins/tools`, `/plugins/store/node`, `/plugins/store/expo`
+and `/testing`.
 The two stores have
 subpaths of their own because each names a platform: exporting them from the
 root would pull `node:sqlite` or `expo-sqlite` into every bundle. `/plugins/fetch`
@@ -2001,7 +2004,7 @@ through the root barrel, which also pulls the gateway. Add a subpath when one of
 them is wanted on its own.
 
 `scripts/check-package.ts` reads `package.json` and the README's own table, so an
-eleventh entry point that reaches neither this list nor that one fails the build.
+additional entry point that reaches neither this list nor that one fails the build.
 
 The root is narrower than `/core` on purpose. It re-exports whole only the
 modules a caller uses whole, and names what it takes from the ones that hold

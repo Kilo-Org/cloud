@@ -176,6 +176,11 @@ const config: ExpoConfig = {
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Custom LAN backends require an app-level approval before each endpoint
+      // can use HTTP. ATS stays enabled for public HTTPS endpoints.
+      NSAppTransportSecurity: { NSAllowsLocalNetworking: true },
+      NSLocalNetworkUsageDescription:
+        'Allow Kilo to connect to the local model server you configure for Chat.',
       // iOS reads this list, not the JS catalog. Without it the system treats
       // the app as English-only, so OS-drawn text we cannot translate — the
       // native Sign in with Apple button above all — stays English on a

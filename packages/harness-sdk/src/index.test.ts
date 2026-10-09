@@ -49,7 +49,13 @@ const functions = [
 ] as const;
 
 /** What has an entry point of its own, and must not be reachable from the root. */
-const elsewhere = ['checkStore', 'checkAssembler', 'webFetch'] as const;
+const elsewhere = [
+  'checkStore',
+  'checkAssembler',
+  'webFetch',
+  'remoteModelClient',
+  'layerRemoteModel',
+] as const;
 
 const tags = [
   'ModelClient',

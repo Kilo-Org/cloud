@@ -84,6 +84,7 @@ import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
   ACTIVE_USER_ID_KEY,
   AUTH_TOKEN_KEY,
+  CHAT_BACKENDS_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   LIVE_SESSION_FILTERS_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
@@ -379,6 +380,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // run, so the provider's restore can never read the prior account's
         // marker.
         await deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY);
+        // Clear backend credentials durably before publishing another account.
+        // A terminated sign-in must not restore B with A's backend credentials.
+        await deleteAccountMetadata(CHAT_BACKENDS_KEY);
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.

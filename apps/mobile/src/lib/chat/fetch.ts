@@ -1,4 +1,6 @@
 import { type FetchLike } from '@kilocode/harness-sdk';
+import { fetch as expoFetch } from 'expo/fetch';
+import { assertBackendTransport } from './backend-transport';
 
 /**
  * The one call the harness makes, as this app makes it.
@@ -57,6 +59,29 @@ export const chatFetch: FetchLike = async (url, request) => {
     text: async () => {
       const said = await response.text();
       return said;
+    },
+    ...(body === null ? {} : { stream: () => decoded(body) }),
+  };
+};
+
+/** Custom endpoints never receive Kilo headers, cookies, or redirected credentials. */
+export const remoteChatFetch: FetchLike = async (url, request) => {
+  assertBackendTransport(url);
+  const response = await expoFetch(url, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+    signal: (request.signal ?? null) as AbortSignal | null,
+    credentials: 'omit',
+    redirect: 'error',
+  });
+  const { body } = response;
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: async () => {
+      const text = await response.text();
+      return text;
     },
     ...(body === null ? {} : { stream: () => decoded(body) }),
   };

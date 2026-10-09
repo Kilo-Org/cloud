@@ -119,6 +119,9 @@ vi.mock('@/lib/chat/remote-mcp', () => ({ forgetRemoteMcp: mocks.forgetRemoteMcp
 vi.mock('@/lib/chat/remote-mcp-store', () => ({
   clearRemoteMcpServers: mocks.clearRemoteMcpServers,
 }));
+// The backend store reaches native crypto and SecureStore. Its own tests cover
+// credential removal across account changes.
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: vi.fn() }));
 vi.mock('@/lib/chat/settings-tools-switch', () => ({
   clearSettingsToolsEnabled: mocks.clearSettingsToolsEnabled,
 }));

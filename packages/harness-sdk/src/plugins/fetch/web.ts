@@ -34,6 +34,8 @@ interface Sent {
   readonly headers: Record<string, string>;
   readonly body: string;
   readonly signal?: unknown;
+  readonly redirect?: 'error';
+  readonly credentials?: 'omit';
 }
 
 interface Decoder {
@@ -59,6 +61,8 @@ const webFetch: FetchLike = async (url, request) => {
        would leave a cancelled call still running, and still being charged for,
        on the provider. */
     ...(request.signal === undefined ? {} : { signal: request.signal }),
+    ...(request.redirect === undefined ? {} : { redirect: request.redirect }),
+    ...(request.credentials === undefined ? {} : { credentials: request.credentials }),
   });
   /* Named once, so the narrowing holds inside the closure below. */
   const { body } = response;

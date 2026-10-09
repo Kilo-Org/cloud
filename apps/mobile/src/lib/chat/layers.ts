@@ -1,11 +1,14 @@
 import { Effect, Layer } from 'effect';
 import {
+  CatalogError,
   EntropySource,
   layerAssembler,
   layerBackoff,
   layerKiloGateway,
   ModelCatalog,
+  ModelClient,
   type ModelFacts,
+  RetryPolicy,
   TokenError,
   TokenSource,
   type TokenSourceService,
@@ -17,7 +20,11 @@ import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
-import { chatFetch } from './fetch';
+import { chatFetch, remoteChatFetch } from './fetch';
+import { backendHeaders } from './backend-request';
+import { listChatBackends } from './backend-store';
+import { routedModelClient, targetModelFacts } from './backend-routing';
+import { assertBackendTransport } from './backend-transport';
 import { chatToolsWithMcp } from './tools';
 
 /**
@@ -86,7 +93,11 @@ const layerEntropy = Layer.succeed(EntropySource, {
 
 /** One catalog instance, shared by the session and the gateway as it must be. */
 const layerCatalog = Layer.succeed(ModelCatalog, {
-  facts: (model: string) => Effect.succeed(known.get(model) ?? RELAYED_SHAPE),
+  facts: (model: string) =>
+    Effect.try({
+      try: () => targetModelFacts(model, listChatBackends(), known.get(model) ?? RELAYED_SHAPE),
+      catch: cause => new CatalogError({ model, cause }),
+    }),
 });
 
 /**
@@ -146,12 +157,25 @@ export function chatLayers(database: SQLiteDatabase, org: ChatOrg) {
   const gateway = layerKiloGateway({ baseUrl: API_BASE_URL, org, fetch: chatFetch }).pipe(
     Layer.provide(Layer.mergeAll(layerCatalog, layerToken, layerBackoff(2)))
   );
+  const routed = Layer.effect(
+    ModelClient,
+    Effect.gen(function* routed() {
+      return routedModelClient({
+        kilo: yield* ModelClient,
+        retry: yield* RetryPolicy,
+        profiles: listChatBackends,
+        fetch: remoteChatFetch,
+        headers: backendHeaders,
+        validateTransport: assertBackendTransport,
+      });
+    })
+  ).pipe(Layer.provide(Layer.merge(gateway, layerBackoff(2))));
   return Layer.mergeAll(
     layerAssembler,
     layerEntropy,
     layerCatalog,
     layerToolsFor(organizationIdOf(org)),
-    gateway,
+    routed,
     layerExpoStore(database)
   );
 }

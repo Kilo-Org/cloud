@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { ModelSelector } from '@/components/agents/model-selector';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -20,6 +21,8 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { rememberModelFacts } from '@/lib/chat/layers';
 import { type ChatSummary } from '@/lib/chat/store';
 import { chatPlaceOf, newChat, useChatList } from '@/lib/chat/use-chat';
+import { useChatBackends } from '@/lib/chat/backend-store';
+import { backendModelOptions } from '@/lib/chat/backend-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -28,6 +31,7 @@ import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
+import { BackendSettingsControl } from './backend-settings-sheet';
 
 /**
  * The chats a person has, newest first.
@@ -68,6 +72,16 @@ function ScopedChatListScreen() {
     isError: modelsFailed,
     refetch: refetchModels,
   } = useAvailableModels(organizationId ?? undefined);
+  const backends = useChatBackends();
+  const [picked, setPicked] = useState<string | null>(null);
+  const options = useMemo(
+    () => [
+      ...models.map(model => ({ ...model, displayId: model.id, showGatewayMetadata: true })),
+      ...backendModelOptions(backends),
+    ],
+    [backends, models]
+  );
+  const selectedModel = picked ?? models.find(one => one.isPreferred)?.id ?? models[0]?.id;
 
   // The catalog is what tells a session its context window, and a session with
   // no window never compacts. It is handed over as it arrives.
@@ -78,8 +92,8 @@ function ScopedChatListScreen() {
   const { chats, isLoading, isError, refetch, remove } = useChatList(place);
 
   const nameOf = useCallback(
-    (id: string) => models.find(model => model.id === id)?.name ?? '',
-    [models]
+    (id: string) => options.find(model => model.id === id)?.name ?? '',
+    [options]
   );
 
   /* Starting a chat discovers the Kilo MCP server before the session opens, and
@@ -95,7 +109,7 @@ function ScopedChatListScreen() {
     if (startingRef.current) {
       return;
     }
-    const model = models.find(one => one.isPreferred)?.id ?? models[0]?.id;
+    const model = selectedModel;
     if (place === null || model === undefined) {
       return;
     }
@@ -123,7 +137,7 @@ function ScopedChatListScreen() {
         setStarting(false);
       }
     })();
-  }, [models, place, router, t]);
+  }, [selectedModel, place, router, t]);
 
   const open = useCallback(
     (sessionId: string) => {
@@ -155,8 +169,8 @@ function ScopedChatListScreen() {
   // Nothing to start a chat with is nothing for the button to do, and an empty
   // list carries its own button, so the corner one would be the second.
   const empty = !isLoading && chats.length === 0;
-  const failed = isError || (modelsFailed && chats.length === 0);
-  const showFab = !empty && !failed && place !== null && models.length > 0;
+  const failed = isError || (modelsFailed && options.length === 0 && chats.length === 0);
+  const showFab = !empty && !failed && place !== null && selectedModel !== undefined;
 
   const fabStyle = useMemo(
     () => ({
@@ -185,7 +199,7 @@ function ScopedChatListScreen() {
         />
       );
     }
-    if (modelsFailed && chats.length === 0) {
+    if (modelsFailed && options.length === 0 && chats.length === 0) {
       return (
         <QueryError
           variant="server"
@@ -218,7 +232,12 @@ function ScopedChatListScreen() {
           // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
           description={t('modelChat.empty.description')}
           action={
-            <Button onPress={start} loading={starting} accessibilityLabel={t('modelChat.list.new')}>
+            <Button
+              onPress={start}
+              loading={starting}
+              disabled={selectedModel === undefined}
+              accessibilityLabel={t('modelChat.list.new')}
+            >
               <Text>{t('modelChat.list.new')}</Text>
             </Button>
           }
@@ -257,7 +276,21 @@ function ScopedChatListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
+          headerRight={<BackendSettingsControl />}
         />
+        {options.length > 0 && (
+          <View className="px-[22px] py-2">
+            <ModelSelector
+              value={selectedModel ?? ''}
+              variant=""
+              options={options}
+              onSelect={modelId => {
+                setPicked(modelId);
+              }}
+              disabled={starting}
+            />
+          </View>
+        )}
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Pressable

@@ -91,6 +91,42 @@ fragments; collecting the fragments is the transport's job.
 Fail with `ModelError`. A transport that throws instead of failing takes the
 session down with it.
 
+#### Direct remote providers
+
+`@kilocode/harness-sdk/plugins/remote-model` exports `remoteModelClient(config,
+retry)` for routers and connection checks, and `layerRemoteModel(config)` for a
+session layer. The layer requires only `RetryPolicy`; neither API resolves a Kilo
+token or organization. `RemoteModelConfig` contains `baseUrl`, `apiKind`, `fetch`
+and `headers: () => Effect.Effect<Readonly<Record<string, string>>, ModelError>`.
+The optional `completionTokenField` selects `max_completion_tokens` (the default)
+or `max_tokens` for a legacy Chat Completions endpoint. This never changes Kilo's
+gateway requests.
+
+The root is the provider's API root (for example `https://api.openai.com/v1`).
+The adapter appends `/chat/completions`, `/responses` or `/messages`, and the
+request's `model` is the upstream model id. Chat Completions sends string text
+content and OpenAI `reasoning_effort`, not OpenRouter `reasoning`. Configure
+Anthropic `x-api-key` and `anthropic-version` in the header source yourself.
+Direct Chat Completions also replays supplied assistant reasoning through
+`reasoning_content`, including tool continuations. It does not invent reasoning.
+Headers are read before every attempt; the adapter owns JSON content type and
+rejects Kilo headers. A remote request never inherits Kilo auth, session or org.
+
+Supply a dedicated transport that adds no application credentials or tracking
+headers. It **must** honor `HttpRequest.redirect: 'error'` before following any
+redirect; detecting a changed response URL afterward cannot protect credentials.
+Remote requests also set `HttpRequest.credentials: 'omit'` to exclude ambient
+cookies and HTTP authentication. `webFetch` forwards both policies to WHATWG
+fetch. A runtime that ignores them must use a transport that enforces them, or
+refuse remote requests.
+
+The same SSE parser and protocol readers serve Kilo and remote clients.
+Interleaved remote tool fragments retain their ids, names and full arguments.
+A successful stream ends with exactly one `done`; provider errors fail without
+one, and errors expose only reason and HTTP status, never raw server bodies or
+credential-source exceptions. Interrupting or dropping the stream aborts its
+request, including a connection check wrapped in an Effect deadline.
+
 ### SessionStore
 
 Five functions. `create` records a new session, `read` gives it back, `append`

@@ -15,6 +15,33 @@ import { layerNodeStore } from '../src/plugins/store/node.js';
 import { DatabaseSync } from 'node:sqlite';
 import { webFetch } from '../src/plugins/fetch/web.js';
 import { said } from '../src/core/model.js';
+import type { FetchLike } from '../src/core/fetch.js';
+
+/* README, "Your fetch": preserve cancellation and credential/redirect policies. */
+export const myFetch: FetchLike = async (url, request) => {
+  const response = await fetch(url, {
+    method: request.method,
+    headers: { ...request.headers },
+    body: request.body,
+    signal: (request.signal ?? null) as AbortSignal | null,
+    ...(request.redirect === undefined ? {} : { redirect: request.redirect }),
+    ...(request.credentials === undefined ? {} : { credentials: request.credentials }),
+  });
+  const body = response.body;
+  return {
+    ok: response.ok,
+    status: response.status,
+    text: () => response.text(),
+    ...(body === null
+      ? {}
+      : {
+          stream: async function* stream() {
+            const decoder = new TextDecoder();
+            for await (const chunk of body) yield decoder.decode(chunk, { stream: true });
+          },
+        }),
+  };
+};
 
 /* README, "Your fetch": the adapter the package ships. */
 const shipped = layerKilo({

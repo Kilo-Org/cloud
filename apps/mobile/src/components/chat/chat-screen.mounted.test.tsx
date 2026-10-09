@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { ChatScreen } from '@/components/chat/chat-screen';
-import { type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { type StoredChatBackend } from '@/lib/chat/backend-store';
+import { backendTargetId } from '@/lib/chat/backend-target';
 
 /**
  * What the chat screen draws while it is opening.
@@ -21,8 +23,12 @@ const state = vi.hoisted(() => ({
   messages: [] as { info: { id: string } }[],
 }));
 
-// One stable sheet model, so a check can prove the screen hands this very model
-// to the sheet rather than a copy of it.
+type AlertAction = { onPress?: () => void };
+const backendUi = vi.hoisted(() => ({
+  profiles: [] as StoredChatBackend[],
+  alert: vi.fn<(title: string, message: string, actions?: AlertAction[]) => void>(),
+}));
+
 const mcpModel = vi.hoisted(() => ({
   view: {
     enabled: false,
@@ -97,6 +103,10 @@ vi.mock('@/lib/hooks/use-session-model-options', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black', mutedForeground: 'grey' }),
 }));
+vi.mock('@/lib/chat/backend-store', () => ({ useChatBackends: () => backendUi.profiles }));
+vi.mock('@/components/chat/backend-settings-sheet', () => ({
+  BackendSettingsControl: 'BackendSettingsControl',
+}));
 vi.mock('@/components/agents/chat-composer', () => ({ ChatComposer: 'ChatComposer' }));
 vi.mock('@/components/agents/message-bubble', () => ({ MessageBubble: 'MessageBubble' }));
 vi.mock('@/components/agents/session-message-list', () => ({
@@ -110,7 +120,11 @@ vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/ui/icons', () => ({ MessageCircle: 'MessageCircle', Wrench: 'Wrench' }));
+vi.mock('@/components/ui/icons', () => ({
+  MessageCircle: 'MessageCircle',
+  Wrench: 'Wrench',
+  Server: 'Server',
+}));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
@@ -122,6 +136,7 @@ vi.mock('@/components/chat/mcp-settings-sheet', () => ({
   useMcpSettings: () => mcpModel,
 }));
 vi.mock('react-native', () => ({
+  Alert: { alert: backendUi.alert },
   ActivityIndicator: 'ActivityIndicator',
   Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
@@ -138,6 +153,8 @@ let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefine
 beforeEach(() => {
   state.status = 'opening';
   state.messages = [];
+  backendUi.profiles = [];
+  backendUi.alert.mockClear();
 });
 afterEach(() => {
   view?.unmount();
@@ -178,12 +195,45 @@ describe('the chat transcript while it opens', () => {
     expect(count(tree, 'EmptyState')).toBe(0);
     expect(count(tree, 'SessionSkeletonMessages')).toBe(0);
   });
+});
 
-  it('hands the sheet the whole chat-tools model', async () => {
+describe('backend context-transfer approval', () => {
+  it('requires approval when returning from a picked custom backend before its queued move finishes', async () => {
+    state.status = 'working';
+    const backend: StoredChatBackend = {
+      id: 'backend-one',
+      revision: 1,
+      name: 'One',
+      baseUrl: 'https://one.example/v1',
+      apiKind: 'responses',
+      apiKey: '',
+      headers: {},
+      models: [{ id: 'shared', name: 'Shared', tools: false }],
+      allowLocalHttp: false,
+    };
+    backendUi.profiles = [backend];
+    const target = backendTargetId(backend, 'shared');
     const tree = await mount();
-    const sheet = tree.root.findAll(node => (node.type as string) === 'McpSettingsSheet')[0];
-
-    expect(sheet?.props.settings).toBe(mcpModel);
-    expect(sheet?.props.visible).toBe(false);
+    const composer = () =>
+      tree.root.find(node => (node.type as string) === 'ChatComposer').props as {
+        model: string;
+        onModelSelect: (model: string, variant: string) => void;
+      };
+    act(() => {
+      composer().onModelSelect(target, '');
+    });
+    expect(composer().model).toBe('m1');
+    act(() => {
+      backendUi.alert.mock.calls
+        .at(-1)?.[2]
+        ?.find(action => action.onPress)
+        ?.onPress?.();
+    });
+    expect(composer().model).toBe(target);
+    act(() => {
+      composer().onModelSelect('m1', '');
+    });
+    expect(backendUi.alert).toHaveBeenCalledTimes(2);
+    expect(composer().model).toBe(target);
   });
 });

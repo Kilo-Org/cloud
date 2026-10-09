@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
-import { ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
+import { CHAT_BACKENDS_KEY, ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
 
 // The mobile-app gate runs `vitest related` over ~170 files concurrently with
 // the device stack, so every real timer in this file stretches several-fold.
@@ -370,6 +370,7 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 vi.mock('@/lib/temp-file-registry', () => ({
   reapTempFiles: vi.fn(),
 }));
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: vi.fn() }));
 
 // The artifact mirror members of the same teardown read expo-file-system and
 // the native provider bridge. This suite asserts the teardown ordering of the
@@ -440,6 +441,7 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
 vi.mock('@/lib/storage-keys', () => ({
   ACTIVE_USER_ID_KEY: 'active-user-id',
   AUTH_TOKEN_KEY: 'auth-token',
+  CHAT_BACKENDS_KEY: 'chat-backends',
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
   KILOCLAW_OWNED_KEY: 'kiloclaw-owned',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
@@ -2084,6 +2086,57 @@ describe('reactive auth epoch', () => {
     expect(disk.get('auth-token')).toBe('account-b-token');
     expect(disk.has('active-user-id')).toBe(false);
     expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
+  });
+
+  it('cannot restore another account with the previous backend credentials after an interrupted sign-in', async () => {
+    const { getCtx, unmount } = await mountEpochTest();
+    onTestFinished(() => act(unmount));
+    const priorBackends = JSON.stringify([{ apiKey: 'synthetic-backend-key-a' }]);
+    const disk = new Map([
+      ['auth-token', 'account-a-token'],
+      [CHAT_BACKENDS_KEY, priorBackends],
+    ]);
+    const clearStarted = Promise.withResolvers<undefined>();
+    const clearAllowed = Promise.withResolvers<undefined>();
+    const credentialSnapshots: (string | undefined)[] = [];
+    const previousSet = hoisted.secureStore.setItemAsync.getMockImplementation();
+    const previousDelete = hoisted.secureStore.deleteItemAsync.getMockImplementation();
+    onTestFinished(() => {
+      clearAllowed.resolve(undefined);
+      if (previousSet) {
+        hoisted.secureStore.setItemAsync.mockImplementation(previousSet);
+      }
+      if (previousDelete) {
+        hoisted.secureStore.deleteItemAsync.mockImplementation(previousDelete);
+      }
+    });
+    hoisted.secureStore.setItemAsync.mockImplementation(async (key: string, value: string) => {
+      await Promise.resolve();
+      disk.set(key, value);
+      if (key === 'auth-token') {
+        credentialSnapshots.push(disk.get(CHAT_BACKENDS_KEY));
+      }
+    });
+    hoisted.secureStore.deleteItemAsync.mockImplementation(async (key: string) => {
+      if (key === CHAT_BACKENDS_KEY) {
+        clearStarted.resolve(undefined);
+        await clearAllowed.promise;
+      }
+      disk.delete(key);
+    });
+    const transition = getCtx().signIn('account-b-token');
+    await act(async () => {
+      await Promise.race([clearStarted.promise, transition]);
+    });
+    expect.soft(disk.get('auth-token')).toBe('account-a-token');
+    expect.soft(disk.get(CHAT_BACKENDS_KEY)).toBe(priorBackends);
+    await act(async () => {
+      clearAllowed.resolve(undefined);
+      await transition;
+    });
+    expect(disk.get('auth-token')).toBe('account-b-token');
+    expect(disk.has(CHAT_BACKENDS_KEY)).toBe(false);
+    expect(credentialSnapshots).toEqual([undefined]);
   });
 
   it('does not persist new credentials if removing the previous identity hint fails', async () => {

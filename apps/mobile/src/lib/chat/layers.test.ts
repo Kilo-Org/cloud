@@ -11,6 +11,9 @@ vi.mock('@kilocode/harness-sdk/plugins/store/expo', () => ({ layerExpoStore: () 
 vi.mock('@/lib/auth/token-owner', () => ({ getAuthTokenForRequest: vi.fn() }));
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'http://localhost:4700' }));
 vi.mock('./fetch', () => ({ chatFetch: () => undefined }));
+vi.mock('./backend-store', () => ({ listChatBackends: () => [] }));
+vi.mock('./backend-request', () => ({ backendHeaders: () => ({}) }));
+vi.mock('./backend-transport', () => ({ assertBackendTransport: () => undefined }));
 vi.mock('@/lib/intl-cache', () => ({
   dateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: 'Europe/Amsterdam' }) }),
 }));

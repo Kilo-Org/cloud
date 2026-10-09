@@ -13,6 +13,7 @@ import {
   stopChat,
 } from './registry';
 import { type ChatState, snapshotOf, watch, watchChats } from './state';
+import { forgetAsked } from './pending';
 import { type ChatSummary, deleteChat, listChats } from './store';
 
 /**
@@ -65,8 +66,10 @@ export function useChatList(place: ChatPlace | null): ChatList {
 
   const remove = useCallback(
     async (sessionId: string) => {
-      await releaseChat(sessionId);
-      deleteChat(await encryptedDatabase(), sessionId);
+      const current = snapshotOf(sessionId).sessionId;
+      await releaseChat(current);
+      await forgetAsked(current);
+      deleteChat(await encryptedDatabase(), current);
       await client.invalidateQueries({ queryKey: listKey(scope ?? '') });
     },
     [client, scope]

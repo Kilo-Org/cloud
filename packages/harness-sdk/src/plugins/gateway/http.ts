@@ -4,35 +4,6 @@ import { ModelError } from '../../core/model.js';
 import type { RetryPolicyService } from '../../core/retry.js';
 import { TokenError, type TokenSourceService } from '../../core/token.js';
 
-/**
- * Where a call gets the handle that cancels it.
- *
- * `AbortController` is a global in every runtime that has `fetch`, and this
- * package requires the caller to supply a `fetch`, so it is read off the global
- * rather than made into a plugin of its own. A runtime that lacks it still
- * works: the call simply cannot be stopped early.
- */
-interface AbortHandle {
-  readonly signal: AbortLike;
-  readonly abort: () => void;
-}
-
-interface AbortHost {
-  readonly AbortController?: new () => AbortHandle;
-}
-
-const host: AbortHost = globalThis;
-
-/**
- * A handle for one call, released when the caller stops listening.
- *
- * The release aborts whether the call ended or was interrupted. Aborting a
- * request whose body has already been read does nothing, and the alternative is
- * inspecting the exit for a case where the answer is the same.
- */
-const abortHandle = (): Effect.Effect<AbortHandle | undefined> =>
-  Effect.sync(() => (host.AbortController === undefined ? undefined : new host.AbortController()));
-
 /** Whose credit pays for the call. */
 type OrgContext =
   | { readonly kind: 'personal' }
@@ -138,5 +109,5 @@ const post = (caller: HttpCaller, sending: Sending): Effect.Effect<HttpResponse,
     Effect.retry(caller.retry.schedule)
   );
 
-export type { AbortHandle, HttpCaller, HttpConfig, OrgContext };
-export { abortHandle, post };
+export type { HttpCaller, HttpConfig, OrgContext };
+export { post };

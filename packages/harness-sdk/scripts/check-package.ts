@@ -38,6 +38,7 @@ const entries: readonly Entry[] = [
   { subpath: './plugins/fetch', promises: ['webFetch'] },
   { subpath: './plugins/gateway', promises: ['layerKiloGateway'] },
   { subpath: './plugins/prompt', promises: ['assemble', 'layerAssembler'] },
+  { subpath: './plugins/remote-model', promises: ['remoteModelClient', 'layerRemoteModel'] },
   {
     subpath: './plugins/remote-mcp',
     promises: ['remoteMcpClient', 'remoteMcpTools', 'mcpToolName'],
@@ -53,7 +54,7 @@ const entries: readonly Entry[] = [
 
 /** What the main entry must not carry, because nobody runs it in production. */
 const withheld: Readonly<Record<string, readonly string[]>> = {
-  '.': ['checkStore', 'checkAssembler', 'webFetch'],
+  '.': ['checkStore', 'checkAssembler', 'webFetch', 'remoteModelClient', 'layerRemoteModel'],
 };
 
 const map = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {

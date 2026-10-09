@@ -32,6 +32,8 @@ type WirePart =
       readonly kind: 'callStart';
       readonly id: string;
       readonly name: string;
+      /** Identifies interleaved remote tool calls within one response. */
+      readonly key?: string;
       /**
        * Arguments the opening frame already carried. One shape puts the name
        * and the first fragment on the same frame, and a reader that returns one
@@ -39,8 +41,13 @@ type WirePart =
        */
       readonly text?: string;
     }
-  | { readonly kind: 'callArguments'; readonly text: string }
-  | { readonly kind: 'callEnd' };
+  | {
+      readonly kind: 'callArguments';
+      readonly text: string;
+      readonly key?: string;
+      readonly name?: string;
+    }
+  | { readonly kind: 'callEnd'; readonly key?: string; readonly emptyArguments?: string };
 
 /**
  * One gateway shape. A wire maps a request onto a body and maps the reply back.
@@ -55,6 +62,9 @@ interface Wire {
   readonly path: string;
   readonly toBody: (request: ModelRequest) => unknown;
   readonly toDelta: (event: unknown) => WirePart | undefined;
+  /** Remote providers may interleave multiple tool fragments in one frame. */
+  readonly toParts?: (event: unknown) => readonly WirePart[] | undefined;
+  readonly isFailure?: (event: unknown) => boolean;
   readonly toUsage: (event: unknown) => Partial<ModelUsage> | undefined;
   /** Absent until the event that says why the model stopped. */
   readonly toStop: (event: unknown) => StopReason | undefined;

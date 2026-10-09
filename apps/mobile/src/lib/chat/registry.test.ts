@@ -1,6 +1,10 @@
 /* eslint-disable max-lines -- the registry suite pins one question at a time, the moves onto another model or tool set, and the MCP discovery around an open on one fake SDK harness. */
 import { Effect, Layer, Stream } from 'effect';
+import { type StoredChatBackend } from './backend-store';
+import { backendTargetId } from './backend-target';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
 
 /**
  * The line a chat keeps.
@@ -38,6 +42,9 @@ let missingToolsFor: string | undefined = undefined;
 let missingCloneFor: string | undefined = undefined;
 /** A session id whose history read fails, so the half-open path can be exercised. */
 let failHistoryFor: string | undefined = undefined;
+/** A cleanup failure after a move installed its session, before onto returned. */
+let failForgetFor: string | undefined = undefined;
+let failAnswerFor: string | undefined = undefined;
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
 const released: string[] = [];
 
@@ -58,6 +65,14 @@ const mcp = vi.hoisted(() => ({
   }),
 }));
 
+const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[] }));
+vi.mock('./backend-store', () => ({
+  listChatBackends: () => backendState.profiles,
+  waitForChatBackends: async () => {
+    await Promise.resolve();
+  },
+}));
+
 /** One stored turn, so a state that still holds turns can be told from an empty one. */
 const TURN = {
   id: 'trn_1',
@@ -68,8 +83,12 @@ const TURN = {
 
 const handleFor = (id: string) => ({
   id,
-  ask: (text: string) =>
-    Stream.asyncPush<{ kind: 'delta'; text: string }>(emit =>
+  ask: (text: string) => {
+    if (failAnswerFor === id) {
+      asked.push({ sessionId: id, text });
+      return Stream.fail(new Error('custom answer failed'));
+    }
+    return Stream.asyncPush<{ kind: 'delta'; text: string }>(emit =>
       Effect.sync(() => {
         asked.push({ sessionId: id, text });
         emit.single({ kind: 'delta', text: 'ok' });
@@ -78,7 +97,8 @@ const handleFor = (id: string) => ({
         };
         return Effect.void;
       })
-    ),
+    );
+  },
   history:
     failHistoryFor === id ? Effect.fail(new Error('history unreadable')) : Effect.succeed([TURN]),
 });
@@ -183,29 +203,32 @@ vi.mock('./kilo-mcp', () => ({
   kiloMcpTools: () => mcp.tools,
   kiloMcpToolNames: () => mcp.tools.map(tool => tool.definition.name),
 }));
+const storedQuestions = vi.hoisted(() => new Map<string, string>());
 vi.mock('@/lib/persist/encrypted-kv', () => ({
   encryptedDatabase: async () => {
     await Promise.resolve();
     return {};
   },
-}));
-vi.mock('./pending', () => ({
-  askedIn: async () => {
+  getItem: async (scope: string, key: string) => {
     await Promise.resolve();
-    return null;
+    return storedQuestions.get(`${scope}:${key}`) ?? null;
   },
-  forgetAsked: async () => {
+  setItem: async (scope: string, key: string, value: string) => {
     await Promise.resolve();
+    storedQuestions.set(`${scope}:${key}`, value);
   },
-  moveAsked: async () => {
+  removeItem: async (scope: string, key: string) => {
     await Promise.resolve();
-  },
-  rememberAsked: async () => {
-    await Promise.resolve();
+    storedQuestions.delete(`${scope}:${key}`);
   },
 }));
 vi.mock('./store', () => ({
-  forgetSession: () => undefined,
+  forgetSession: (_database: unknown, sessionId: string) => {
+    if (failForgetFor === sessionId) {
+      failForgetFor = undefined;
+      throw new Error('session cleanup failed after move');
+    }
+  },
   modelOfSession: () => 'kilo/one',
   moveChat: () => undefined,
   rememberChat: () => undefined,
@@ -217,6 +240,7 @@ const {
   enterChat,
   refreshChatTools,
   releaseChat,
+  retryChat,
   retryKiloMcp,
   say,
   setMcpEnabled,
@@ -225,6 +249,7 @@ const {
 } = await import('./registry');
 const { change, snapshotOf } = await import('./state');
 const { chatPlaceOf } = await import('./use-chat');
+const { askedIn, forgetAsked } = await import('./pending');
 
 const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
 
@@ -256,6 +281,9 @@ beforeEach(async () => {
   missingToolsFor = undefined;
   missingCloneFor = undefined;
   failHistoryFor = undefined;
+  failForgetFor = undefined;
+  failAnswerFor = undefined;
+  storedQuestions.clear();
   clonedWith = undefined;
   openedWith = undefined;
   storedTools = null;
@@ -263,6 +291,7 @@ beforeEach(async () => {
   mcp.tools.length = 0;
   mcp.enabled.clear();
   remote.tools.length = 0;
+  backendState.profiles = [];
   opened = await startChat(place, 'kilo/one');
   await settled();
   /* Cleared after the chat above, so a test counts only its own discoveries. */
@@ -705,5 +734,224 @@ describe('a question asked before the session has opened', () => {
        other question that never reached the model gets. */
     expect(snapshotOf(opened)).toMatchObject({ status: 'idle', asked: 'into nothing' });
     expect(snapshotOf(opened).failed).not.toBeNull();
+  });
+});
+
+describe('custom backend question targets', () => {
+  const backend: StoredChatBackend = {
+    id: 'custom-server',
+    revision: 1,
+    name: 'Custom',
+    baseUrl: 'https://custom.example/v1',
+    apiKind: 'chat_completions',
+    apiKey: '',
+    headers: {},
+    models: [{ id: 'same-model', name: 'Model', tools: false }],
+    allowLocalHttp: false,
+  };
+
+  it('drops all tool definitions when a queued question moves onto a text-only backend', async () => {
+    backendState.profiles = [backend];
+    storedTools = ['time', ...SETTINGS];
+    const target = backendTargetId(backend, 'same-model');
+    await say(opened, 'first', 'kilo/one');
+    await settled();
+    await say(opened, 'second', target);
+    expect(snapshotOf(opened).waiting).toEqual(['second']);
+    finish?.();
+    await settled();
+    expect(clonedWith).toEqual({ model: target, tools: [] });
+    expect(snapshotOf(opened).model).toBe(target);
+    expect(asked.at(-1)?.text).toBe('second');
+  });
+
+  it.each([
+    ['deleted', 'modelChat.backends.deletedBackend'],
+    ['edited', 'modelChat.backends.staleBackend'],
+  ] as const)(
+    'keeps a queued question on its original target after the backend is %s',
+    async (mutation, errorKey) => {
+      backendState.profiles = [backend];
+      const target = backendTargetId(backend, 'same-model');
+      await say(opened, 'first', 'kilo/one');
+      await settled();
+      await say(opened, 'custom question', target);
+      expect(snapshotOf(opened).waiting).toEqual(['custom question']);
+
+      backendState.profiles = mutation === 'deleted' ? [] : [{ ...backend, revision: 2 }];
+      finish?.();
+      await settled();
+
+      expect(asked).toEqual([{ sessionId: 's1', text: 'first' }]);
+      expect(clonedWith).toBeUndefined();
+      expect(snapshotOf(opened)).toMatchObject({
+        model: 'kilo/one',
+        turns: [TURN],
+        status: 'idle',
+        asked: 'custom question',
+        askedModel: target,
+        waiting: [],
+        failed: i18n.t(errorKey),
+      });
+      expect(await askedIn(opened)).toEqual({ text: 'custom question', model: target });
+
+      await retryChat(opened);
+      await settled();
+
+      expect(asked).toEqual([{ sessionId: 's1', text: 'first' }]);
+      expect(snapshotOf(opened)).toMatchObject({
+        model: 'kilo/one',
+        asked: 'custom question',
+        askedModel: target,
+        failed: i18n.t(errorKey),
+      });
+
+      // Closing and restoring must not replace the remembered target with Kilo.
+      await releaseChat(opened);
+      await enterChat(place, opened);
+      expect(snapshotOf(opened)).toMatchObject({
+        model: 'kilo/one',
+        asked: 'custom question',
+        askedModel: target,
+        turns: [TURN],
+      });
+      await retryChat(opened);
+      await settled();
+      expect(asked).toEqual([{ sessionId: 's1', text: 'first' }]);
+      expect(snapshotOf(opened).failed).toBe(i18n.t(errorKey));
+    }
+  );
+
+  it('reports a failure after a move on the resulting session and retries there', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    failForgetFor = opened;
+
+    await say(opened, 'custom question', target);
+
+    expect(asked).toEqual([]);
+    expect(snapshotOf(opened)).toMatchObject({
+      sessionId: 's2',
+      model: target,
+      asked: 'custom question',
+      askedModel: target,
+      failed: 'session cleanup failed after move',
+    });
+    expect(await askedIn('s1')).toBeNull();
+    expect(await askedIn('s2')).toEqual({ text: 'custom question', model: target });
+
+    // The route still names s1; Retry must follow the installed custom session.
+    await retryChat(opened);
+    await settled();
+
+    expect(asked).toEqual([{ sessionId: 's2', text: 'custom question' }]);
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, askedModel: null, failed: null });
+    expect(await askedIn('s2')).toBeNull();
+  });
+
+  it('retains the target when the custom request fails after a successful move', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    failAnswerFor = 's2';
+
+    await say(opened, 'custom question', target);
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({
+      sessionId: 's2',
+      model: target,
+      status: 'idle',
+      asked: 'custom question',
+      askedModel: target,
+      turns: [TURN],
+    });
+    expect(snapshotOf(opened).failed).not.toBeNull();
+    expect(await askedIn('s2')).toEqual({ text: 'custom question', model: target });
+
+    backendState.profiles = [];
+    await retryChat(opened);
+    await settled();
+
+    expect(asked).toEqual([{ sessionId: 's2', text: 'custom question' }]);
+    expect(snapshotOf(opened).failed).toBe(i18n.t('modelChat.backends.deletedBackend'));
+  });
+
+  it('replaces a failed question target when the person asks a different question', async () => {
+    const target = backendTargetId(backend, 'same-model');
+    await say(opened, 'invalid custom question', target);
+    expect(snapshotOf(opened).askedModel).toBe(target);
+
+    await say(opened, 'a new Kilo question', 'kilo/one');
+    await settled();
+    expect(await askedIn(opened)).toEqual({ text: 'a new Kilo question', model: 'kilo/one' });
+    finish?.();
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, askedModel: null });
+    expect(await askedIn(opened)).toBeNull();
+  });
+
+  it('migrates old text-only questions on restore without treating their text as target metadata', async () => {
+    await releaseChat(opened);
+    const text = '{"text":"do not reinterpret me","model":"backend:missing:1:model"}';
+    storedQuestions.set(`chat-asked:${opened}`, text);
+
+    await enterChat(place, opened);
+
+    expect(snapshotOf(opened)).toMatchObject({ asked: text, askedModel: 'kilo/one' });
+    expect(await askedIn(opened)).toEqual({ text, model: 'kilo/one' });
+    expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
+    expect(storedQuestions.get(`chat-asked-target:${opened}`)).toBe(
+      JSON.stringify({ text, model: 'kilo/one' })
+    );
+  });
+
+  it('migrates an old question before restoring onto a different tool set', async () => {
+    await releaseChat(opened);
+    storedQuestions.set(`chat-asked:${opened}`, 'remembered before the upgrade');
+    missingToolsFor = opened;
+
+    await enterChat(place, opened);
+
+    expect(snapshotOf(opened)).toMatchObject({
+      sessionId: 's2',
+      asked: 'remembered before the upgrade',
+      askedModel: 'kilo/one',
+    });
+    expect(await askedIn('s1')).toBeNull();
+    expect(await askedIn('s2')).toEqual({
+      text: 'remembered before the upgrade',
+      model: 'kilo/one',
+    });
+    expect(storedQuestions.has('chat-asked:s1')).toBe(false);
+  });
+
+  it('does not restore a new question record without its target as a Kilo question', async () => {
+    await releaseChat(opened);
+    storedQuestions.set(`chat-asked-target:${opened}`, JSON.stringify({ text: 'missing target' }));
+
+    await enterChat(place, opened);
+    await retryChat(opened);
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', asked: null, askedModel: null });
+    expect(snapshotOf(opened).failed).not.toBeNull();
+    expect(asked).toEqual([]);
+  });
+
+  it('forgets both the text and target when the question is discarded', async () => {
+    const target = backendTargetId(backend, 'same-model');
+    await say(opened, 'invalid custom question', target);
+    storedQuestions.set(`chat-asked:${opened}`, 'old question');
+
+    await releaseChat(opened);
+    await forgetAsked(opened);
+    await enterChat(place, opened);
+
+    expect(await askedIn(opened)).toBeNull();
+    expect(storedQuestions.has(`chat-asked:${opened}`)).toBe(false);
+    expect(snapshotOf(opened)).toMatchObject({ asked: null, askedModel: null });
   });
 });

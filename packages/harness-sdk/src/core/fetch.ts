@@ -29,6 +29,10 @@ interface HttpRequest {
   readonly method: 'POST';
   readonly headers: Readonly<Record<string, string>>;
   readonly body: string;
+  /** An adapter must reject redirects before forwarding credentials when set. */
+  readonly redirect?: 'error';
+  /** Prevents a remote request from inheriting the runtime's cookies or auth. */
+  readonly credentials?: 'omit';
   /**
    * Aborted when the caller stops reading. Absent when the runtime has no
    * `AbortController`, in which case a call cannot be stopped early.

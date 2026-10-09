@@ -106,6 +106,12 @@ export async function issueHomeWidgetCredential(
   if (authority.user.id !== user.id || authority.deviceSessionId === undefined) {
     unauthorized();
   }
+  if (authority.organizationId && authority.organizationId !== organizationId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Scoped credentials cannot mint widget credentials for another organization',
+    });
+  }
   const now = Math.floor(Date.now() / 1000);
   if (authority.expiresAt !== undefined && authority.expiresAt <= now) unauthorized();
   const claims = {

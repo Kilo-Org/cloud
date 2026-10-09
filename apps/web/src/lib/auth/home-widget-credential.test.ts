@@ -113,6 +113,27 @@ describe('dedicated Home widget credential', () => {
   });
 
   it.each([
+    ['another organization', '22222222-2222-4222-8222-222222222222'],
+    ['the personal account', null],
+  ])('refuses an organization-scoped credential minting for %s', async (_target, requested) => {
+    authority.mockResolvedValue({
+      user,
+      credentialKind: 'device-access',
+      deviceSessionId,
+      organizationId,
+      isModern: false,
+      runtimeAdmission: {
+        source: 'user',
+        authorizationUserId: user.id,
+        authorizationPepper: user.api_token_pepper,
+      },
+    });
+    await expect(issueHomeWidgetCredential(user, requested)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it.each([
     'user missing',
     'blocked',
     'pepper rotated',

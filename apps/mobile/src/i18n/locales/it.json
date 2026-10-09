@@ -3197,7 +3197,6 @@
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
     "openSession": "Apri",
     "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
-    "scheduledWakes": "si risveglia {{time}}",
     "checked": "Verificato",
     "lastKnown": "Ultimo stato noto",
     "awaitingUpdate": "In attesa di aggiornamento",

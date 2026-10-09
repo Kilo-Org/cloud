@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
-    "scheduledWakes": "{{time}} بیدار ہوگا",
     "checked": "آخری تصدیق",
     "lastKnown": "آخری معلوم حالت",
     "awaitingUpdate": "اپ ڈیٹ کا انتظار",

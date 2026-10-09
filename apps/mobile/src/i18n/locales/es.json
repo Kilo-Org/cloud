@@ -3197,7 +3197,6 @@
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo.",
     "openSession": "Abrir",
     "approveFailed": "No se pudo aprobar. Toca $t(common.approve) para intentarlo de nuevo.",
-    "scheduledWakes": "se activa {{time}}",
     "checked": "Comprobado",
     "lastKnown": "Último estado conocido",
     "awaitingUpdate": "En espera de actualización",

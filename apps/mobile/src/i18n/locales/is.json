@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
     "openSession": "Opna",
     "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
-    "scheduledWakes": "vaknar {{time}}",
     "checked": "Staðfest",
     "lastKnown": "Síðast þekkta staða",
     "awaitingUpdate": "Bíður eftir uppfærslu",

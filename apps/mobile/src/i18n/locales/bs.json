@@ -3197,7 +3197,6 @@
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
     "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovo.",
-    "scheduledWakes": "budi se {{time}}",
     "checked": "Provjereno",
     "lastKnown": "Posljednje poznato",
     "awaitingUpdate": "Čeka ažuriranje",

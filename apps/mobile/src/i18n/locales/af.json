@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
-    "scheduledWakes": "word wakker {{time}}",
     "checked": "Gekontroleer",
     "lastKnown": "Laas bekend",
     "awaitingUpdate": "Wag op opdatering",

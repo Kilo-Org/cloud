@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
     "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
-    "scheduledWakes": "mifoha {{time}}",
     "checked": "Voamarina",
     "lastKnown": "Fantatra farany",
     "awaitingUpdate": "Miandry fanavaozana",

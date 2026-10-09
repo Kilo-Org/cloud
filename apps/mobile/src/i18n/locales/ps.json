@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
-    "scheduledWakes": "{{time}} بیداریږي",
     "checked": "تایید شوی",
     "lastKnown": "وروستی معلوم حالت",
     "awaitingUpdate": "د تازه کېدو په تمه",

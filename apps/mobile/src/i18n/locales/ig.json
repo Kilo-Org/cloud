@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
     "openSession": "Meghe",
     "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ.",
-    "scheduledWakes": "ga-eteta {{time}}",
     "checked": "Enyochara",
     "lastKnown": "Nke ikpeazụ a maara",
     "awaitingUpdate": "Na-eche mmelite",

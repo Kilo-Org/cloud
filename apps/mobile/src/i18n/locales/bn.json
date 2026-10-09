@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।",
     "openSession": "খুলুন",
     "approveFailed": "অনুমোদন করা যায়নি। আবার চেষ্টা করতে $t(common.approve) স্পর্শ করুন।",
-    "scheduledWakes": "{{time}} জাগবে",
     "checked": "যাচাই করা হয়েছে",
     "lastKnown": "সর্বশেষ জানা",
     "awaitingUpdate": "আপডেটের অপেক্ষায়",

@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
     "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
-    "scheduledWakes": "{{time}} uyg'onadi",
     "checked": "Tekshirilgan",
     "lastKnown": "So‘nggi ma’lum holat",
     "awaitingUpdate": "Yangilanish kutilmoqda",

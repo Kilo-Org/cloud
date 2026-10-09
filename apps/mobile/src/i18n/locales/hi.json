@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।",
     "openSession": "खोलें",
     "approveFailed": "स्वीकार नहीं किया जा सका। फिर से कोशिश करने के लिए $t(common.approve) पर टैप करें।",
-    "scheduledWakes": "{{time}} जागेगा",
     "checked": "जाँच की गई",
     "lastKnown": "अंतिम ज्ञात",
     "awaitingUpdate": "अपडेट का इंतज़ार",

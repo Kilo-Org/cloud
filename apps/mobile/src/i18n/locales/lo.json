@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
-    "scheduledWakes": "ຕື່ນ {{time}}",
     "checked": "ກວດສອບແລ້ວ",
     "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້",
     "awaitingUpdate": "ລໍການອັບເດດ",

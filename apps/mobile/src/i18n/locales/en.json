@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
-    "scheduledWakes": "wakes {{time}}",
     "checked": "Checked",
     "lastKnown": "Last known",
     "awaitingUpdate": "Awaiting update",

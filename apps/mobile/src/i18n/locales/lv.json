@@ -3197,7 +3197,6 @@
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",
     "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz.",
-    "scheduledWakes": "pamostas {{time}}",
     "checked": "Pārbaudīts",
     "lastKnown": "Pēdējais zināmais",
     "awaitingUpdate": "Gaida atjauninājumu",

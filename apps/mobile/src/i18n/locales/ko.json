@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
     "openSession": "열기",
     "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요.",
-    "scheduledWakes": "{{time}}에 깨어남",
     "checked": "마지막 확인",
     "lastKnown": "마지막 알려진 상태",
     "awaitingUpdate": "업데이트 대기",

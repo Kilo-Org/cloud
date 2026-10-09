@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
     "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
-    "scheduledWakes": "herää {{time}}",
     "checked": "Tarkistettu",
     "lastKnown": "Viimeisin tiedossa oleva",
     "awaitingUpdate": "Odottaa päivitystä",

@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
-    "scheduledWakes": "vågner {{time}}",
     "checked": "Kontrolleret",
     "lastKnown": "Sidst kendt",
     "awaitingUpdate": "Afventer opdatering",

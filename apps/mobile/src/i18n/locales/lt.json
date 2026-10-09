@@ -3238,7 +3238,6 @@
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
-    "scheduledWakes": "prabunda {{time}}",
     "checked": "Patikrinta",
     "lastKnown": "Paskutinė žinoma",
     "awaitingUpdate": "Laukiama atnaujinimo",

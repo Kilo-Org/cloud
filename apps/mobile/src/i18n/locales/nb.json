@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
     "openSession": "Åpne",
     "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen.",
-    "scheduledWakes": "våkner {{time}}",
     "checked": "Sjekket",
     "lastKnown": "Sist kjent",
     "awaitingUpdate": "Venter på oppdatering",

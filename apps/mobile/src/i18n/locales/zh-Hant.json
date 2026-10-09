@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
     "openSession": "開啟",
     "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
-    "scheduledWakes": "{{time}}喚醒",
     "checked": "上次確認",
     "lastKnown": "最後已知",
     "awaitingUpdate": "等待更新",

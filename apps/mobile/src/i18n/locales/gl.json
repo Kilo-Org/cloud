@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo.",
     "openSession": "Abrir",
     "approveFailed": "Non se puido aprobar. Toca $t(common.approve) para tentalo de novo.",
-    "scheduledWakes": "esperta {{time}}",
     "checked": "Comprobado",
     "lastKnown": "Último estado coñecido",
     "awaitingUpdate": "Agardando actualización",

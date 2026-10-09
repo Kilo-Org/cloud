@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
     "openSession": "ክፈት",
     "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።",
-    "scheduledWakes": "{{time}} ይነቃል",
     "checked": "የተረጋገጠ",
     "lastKnown": "ለመጨረሻ ጊዜ የታወቀ",
     "awaitingUpdate": "ዝማኔ በመጠበቅ ላይ",

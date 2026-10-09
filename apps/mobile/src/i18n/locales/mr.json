@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
     "openSession": "उघडा",
     "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा.",
-    "scheduledWakes": "{{time}} जागेल",
     "checked": "तपासले",
     "lastKnown": "शेवटची ज्ञात स्थिती",
     "awaitingUpdate": "अपडेटची प्रतीक्षा",

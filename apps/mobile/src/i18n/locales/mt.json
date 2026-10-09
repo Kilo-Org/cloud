@@ -3279,7 +3279,6 @@
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
-    "scheduledWakes": "iqum {{time}}",
     "checked": "Iċċekkjat",
     "lastKnown": "L-aħħar magħruf",
     "awaitingUpdate": "Jistenna aġġornament",

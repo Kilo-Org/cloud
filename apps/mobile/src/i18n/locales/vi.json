@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
-    "scheduledWakes": "thức dậy {{time}}",
     "checked": "Đã kiểm tra",
     "lastKnown": "Ghi nhận gần nhất",
     "awaitingUpdate": "Đang chờ cập nhật",

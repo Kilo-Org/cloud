@@ -70,7 +70,7 @@ function visible(snapshot: GlanceableAgentsSnapshot) {
       android.countLines,
     ],
     primaryLabel: [ios.primaryLabel, android.primaryLabel],
-    feedbackLine: [ios.actionLine, android.homeCopy?.detail ?? null],
+    feedback: [ios.actionFeedback, android.actionFeedback],
     actions: [
       { approve: ios.actions.approve, newAgent: ios.actions.newAgent },
       { approve: android.actions.approve, newAgent: android.actions.newAgent },
@@ -108,14 +108,14 @@ describe('iOS and Android widget props parity', () => {
     expect(seen.primaryLabel[1]).toBe(seen.primaryLabel[0]);
   });
 
-  const FEEDBACK: { label: string; feedback: GlanceableActionFeedback; expected: string }[] = [
-    { label: 'approving', feedback: 'approving', expected: 'Approving…' },
-    { label: 'could not approve', feedback: 'couldNotApprove', expected: 'Could not approve' },
+  const FEEDBACK: { label: string; feedback: GlanceableActionFeedback }[] = [
+    { label: 'approving', feedback: 'approving' },
+    { label: 'could not approve', feedback: 'couldNotApprove' },
   ];
 
-  it.each(FEEDBACK)('draws the same action feedback for $label', ({ feedback, expected }) => {
+  it.each(FEEDBACK)('carries the same action feedback for $label', ({ feedback }) => {
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: feedback });
     const seen = visible(snapshotFor([{ status: 'busy' }, { status: 'idle' }]));
-    expect(seen.feedbackLine).toEqual([expected, expected]);
+    expect(seen.feedback).toEqual([feedback, feedback]);
   });
 });

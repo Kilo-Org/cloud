@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
     "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
-    "scheduledWakes": "{{time}} જાગશે",
     "checked": "ચકાસ્યું",
     "lastKnown": "છેલ્લે જાણીતું",
     "awaitingUpdate": "અપડેટની રાહમાં",

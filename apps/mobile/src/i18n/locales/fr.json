@@ -3197,7 +3197,6 @@
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
     "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
-    "scheduledWakes": "se réveille {{time}}",
     "checked": "Vérifié",
     "lastKnown": "Dernier état connu",
     "awaitingUpdate": "En attente de mise à jour",

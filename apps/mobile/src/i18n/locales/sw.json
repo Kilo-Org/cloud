@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
     "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
-    "scheduledWakes": "itaamka {{time}}",
     "checked": "Imethibitishwa",
     "lastKnown": "Hali ya mwisho iliyojulikana",
     "awaitingUpdate": "Inasubiri sasisho",

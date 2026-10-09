@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
     "openSession": "Fur",
     "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo.",
-    "scheduledWakes": "wuxuu soo toosaa {{time}}",
     "checked": "La hubiyay",
     "lastKnown": "Ugu dambayn la ogaa",
     "awaitingUpdate": "Cusboonaysiin sugaya",

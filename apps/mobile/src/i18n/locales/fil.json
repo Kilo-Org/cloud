@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
-    "scheduledWakes": "gigising {{time}}",
     "checked": "Nakumpirma",
     "lastKnown": "Huling nalaman",
     "awaitingUpdate": "Naghihintay ng update",

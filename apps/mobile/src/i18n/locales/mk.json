@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "openSession": "Отвори",
     "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно.",
-    "scheduledWakes": "се буди {{time}}",
     "checked": "Проверено",
     "lastKnown": "Последно познато",
     "awaitingUpdate": "Чека ажурирање",

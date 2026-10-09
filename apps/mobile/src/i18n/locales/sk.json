@@ -3238,7 +3238,6 @@
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
     "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova.",
-    "scheduledWakes": "prebudí sa {{time}}",
     "checked": "Overené",
     "lastKnown": "Posledný známy stav",
     "awaitingUpdate": "Čaká na aktualizáciu",

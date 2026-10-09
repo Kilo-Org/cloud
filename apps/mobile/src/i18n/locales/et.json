@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
     "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
-    "scheduledWakes": "ärkab {{time}}",
     "checked": "Kontrollitud",
     "lastKnown": "Viimane teadaolev",
     "awaitingUpdate": "Ootab uuendust",

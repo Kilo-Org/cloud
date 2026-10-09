@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
     "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
-    "scheduledWakes": "leve {{time}}",
     "checked": "Verifye",
     "lastKnown": "Dènye eta koni",
     "awaitingUpdate": "Ap tann mizajou",

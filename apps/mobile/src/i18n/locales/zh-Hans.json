@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
     "approveFailed": "无法批准。点按$t(common.approve)重试。",
-    "scheduledWakes": "{{time}}唤醒",
     "checked": "上次确认",
     "lastKnown": "上次已知状态",
     "awaitingUpdate": "等待更新",

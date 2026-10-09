@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
     "openSession": "Buka",
     "approveFailed": "Tidak dapat meluluskan. Ketik $t(common.approve) untuk mencuba semula.",
-    "scheduledWakes": "bangun {{time}}",
     "checked": "Disemak",
     "lastKnown": "Terakhir diketahui",
     "awaitingUpdate": "Menunggu kemas kini",

@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "openSession": "Buka",
     "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi.",
-    "scheduledWakes": "bangun {{time}}",
     "checked": "Diperiksa",
     "lastKnown": "Terakhir diketahui",
     "awaitingUpdate": "Menunggu pembaruan",

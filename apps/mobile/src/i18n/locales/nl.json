@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
-    "scheduledWakes": "wordt wakker {{time}}",
     "checked": "Gecontroleerd",
     "lastKnown": "Laatst bekend",
     "awaitingUpdate": "Wacht op update",

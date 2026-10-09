@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
     "openSession": "開く",
     "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
-    "scheduledWakes": "{{time}}に起動",
     "checked": "最終確認",
     "lastKnown": "最終記録",
     "awaitingUpdate": "更新待ち",

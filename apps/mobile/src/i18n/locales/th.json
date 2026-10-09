@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
     "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
-    "scheduledWakes": "ตื่น {{time}}",
     "checked": "ตรวจสอบล่าสุด",
     "lastKnown": "สถานะล่าสุดที่ทราบ",
     "awaitingUpdate": "รออัปเดต",

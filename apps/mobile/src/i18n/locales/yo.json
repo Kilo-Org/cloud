@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa.",
     "openSession": "Ṣí",
     "approveFailed": "A kò lè fọwọ́ sí. Tẹ $t(common.approve) láti tún gbìyànjú.",
-    "scheduledWakes": "yoo ji {{time}}",
     "checked": "Ti ṣàyẹ̀wò",
     "lastKnown": "Tí a mọ̀ kẹ́yìn",
     "awaitingUpdate": "Ń dúró de ìmúdójúìwọ̀n",

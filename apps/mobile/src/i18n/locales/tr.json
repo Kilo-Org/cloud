@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
     "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
-    "scheduledWakes": "{{time}} uyanır",
     "checked": "Kontrol edildi",
     "lastKnown": "Son bilinen",
     "awaitingUpdate": "Güncelleme bekleniyor",

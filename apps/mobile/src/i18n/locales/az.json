@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
     "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
-    "scheduledWakes": "{{time}} oyanır",
     "checked": "Yoxlanılıb",
     "lastKnown": "Son məlum vəziyyət",
     "awaitingUpdate": "Yenilənmə gözlənilir",

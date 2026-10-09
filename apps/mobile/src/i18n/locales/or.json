@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।",
     "openSession": "ଖୋଲନ୍ତୁ",
     "approveFailed": "ଅନୁମୋଦନ କରିହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ $t(common.approve) ଟାପ୍ କରନ୍ତୁ।",
-    "scheduledWakes": "{{time}} ଉଠିବ",
     "checked": "ଯାଞ୍ଚ ହୋଇଛି",
     "lastKnown": "ଶେଷ ଜଣା ସ୍ଥିତି",
     "awaitingUpdate": "ଅପଡେଟ୍ ଅପେକ୍ଷାରେ",

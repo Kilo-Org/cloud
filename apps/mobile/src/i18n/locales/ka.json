@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
     "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
-    "scheduledWakes": "{{time}} იღვიძებს",
     "checked": "შემოწმდა",
     "lastKnown": "ბოლო ცნობილი",
     "awaitingUpdate": "განახლებას ელის",

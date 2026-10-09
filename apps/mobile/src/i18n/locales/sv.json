@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
-    "scheduledWakes": "vaknar {{time}}",
     "checked": "Kontrollerad",
     "lastKnown": "Senast kända",
     "awaitingUpdate": "Väntar på uppdatering",

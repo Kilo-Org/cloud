@@ -3238,7 +3238,6 @@
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
     "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
-    "scheduledWakes": "zbudi se {{time}}",
     "checked": "Preverjeno",
     "lastKnown": "Nazadnje znano",
     "awaitingUpdate": "Čaka na posodobitev",

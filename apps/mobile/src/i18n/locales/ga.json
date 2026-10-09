@@ -3279,7 +3279,6 @@
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
     "openSession": "Oscail",
     "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as.",
-    "scheduledWakes": "dúisíonn {{time}}",
     "checked": "Seiceáilte",
     "lastKnown": "Stádas deireanach ar eolas",
     "awaitingUpdate": "Ag fanacht le nuashonrú",

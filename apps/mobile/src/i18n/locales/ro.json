@@ -3197,7 +3197,6 @@
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
     "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
-    "scheduledWakes": "se trezește {{time}}",
     "checked": "Verificat",
     "lastKnown": "Ultima stare cunoscută",
     "awaitingUpdate": "Așteaptă actualizarea",

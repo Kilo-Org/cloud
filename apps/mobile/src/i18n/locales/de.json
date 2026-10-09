@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
     "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
-    "scheduledWakes": "wacht {{time}} auf",
     "checked": "Geprüft",
     "lastKnown": "Zuletzt bekannt",
     "awaitingUpdate": "Aktualisierung ausstehend",

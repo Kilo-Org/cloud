@@ -3156,7 +3156,6 @@
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
     "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
-    "scheduledWakes": "{{time}} بیدار می‌شود",
     "checked": "آخرین بررسی",
     "lastKnown": "آخرین وضعیت شناخته‌شده",
     "awaitingUpdate": "در انتظار به‌روزرسانی",

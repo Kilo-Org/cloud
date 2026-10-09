@@ -602,6 +602,9 @@ importers:
       jotai:
         specifier: 2.20.2
         version: 2.20.2(@babel/core@7.29.7)(@babel/template@7.29.7)(@types/react@19.2.14)(react@19.2.3)
+      llama.rn:
+        specifier: 0.12.9
+        version: 0.12.9(react-native@0.86.3(patch_hash=80d299ea0bcfd0cff3f7749611f42ee55953ed7e7456552820693b83a0853ebc)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3)
       lowlight:
         specifier: 3.3.0
         version: 3.3.0
@@ -15474,6 +15477,14 @@ packages:
     resolution: {integrity: sha512-7I5knELsJKTUjXG+A6BkKAiGkW1i25fNa/xlUl9hFtk15WbE9jndA89xu5FzQKrY5llajE1hfZZFMILXkDHk/Q==}
     engines: {node: '>=22.13.0'}
 
+  llama.rn@0.12.9:
+    resolution: {integrity: sha512-uRsTVARp1KnDkDg00FvOGIrN6SZfMqYVJfCOdxN9FSyGufLC+Aad6oFWZVEO8vmtNqu+JBlsCGevP4sJGifAvg==}
+    engines: {node: '>= 16.0.0'}
+    hasBin: true
+    peerDependencies:
+      react: '*'
+      react-native: '*'
+
   loader-runner@4.3.1:
     resolution: {integrity: sha512-IWqP2SCPhyVFTBtRcgMHdzlf9ul25NwaFx4wCEH/KjAXuuHY4yNjvPXsBokp8jCB936PyWRaPKUNh8NvylLp2Q==}
     engines: {node: '>=6.11.5'}
@@ -17443,6 +17454,7 @@ packages:
 
   react-native-render-html@6.3.4:
     resolution: {integrity: sha512-H2jSMzZjidE+Wo3qCWPUMU1nm98Vs2SGCvQCz/i6xf0P3Y9uVtG/b0sDbG/cYFir2mSYBYCIlS1Dv0WC1LjYig==}
+    deprecated: This package has been replaced with @native-html/render
     peerDependencies:
       react: '*'
       react-native: '*'
@@ -34509,6 +34521,11 @@ snapshots:
       log-update: 6.1.0
       rfdc: 1.4.1
       wrap-ansi: 10.0.0
+
+  llama.rn@0.12.9(react-native@0.86.3(patch_hash=80d299ea0bcfd0cff3f7749611f42ee55953ed7e7456552820693b83a0853ebc)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6))(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+      react-native: 0.86.3(patch_hash=80d299ea0bcfd0cff3f7749611f42ee55953ed7e7456552820693b83a0853ebc)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.3)(utf-8-validate@6.0.6)
 
   loader-runner@4.3.1: {}
 

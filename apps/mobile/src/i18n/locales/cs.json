@@ -3410,6 +3410,33 @@
       "deleteMessage": "Smazat {{name}} a uložené přihlašovací údaje? Chaty používající tento server budou pro pokračování potřebovat nový server.",
       "completionTokenFieldHelp": "Pole pro výstupní tokeny: pro moderní API použijte max_completion_tokens, nebo max_tokens, pokud váš koncový bod vyžaduje původní pole."
     },
+    "gguf": {
+      "title": "Modely ke stažení",
+      "help": "Stáhněte si otevřený model a spusťte ho v tomto telefonu s llama.cpp. Vaše dotazy a odpovědi zůstávají v zařízení. Modely jsou velké, proto použijte Wi-Fi.",
+      "details": "{{size}} · Licence: {{license}}",
+      "download": "Stáhnout model",
+      "pause": "Pozastavit stahování",
+      "resume": "Pokračovat ve stahování",
+      "downloading": "Stahování: {{written}} z {{total}}",
+      "downloadingUnknown": "Stahování: {{written}}",
+      "paused": "Pozastaveno: {{written}} z {{total}}",
+      "verifying": "Kontrola staženého souboru…",
+      "downloaded": "Staženo · {{size}}",
+      "url": "Přímý odkaz ke stažení",
+      "urlHelp": "Vložte odkaz HTTPS na soubor .gguf, například odkaz resolve z Hugging Face. Modely stahujte pouze ze zdrojů, kterým důvěřujete.",
+      "downloadUrl": "Stáhnout z odkazu",
+      "deleteTitle": "Smazat tento model?",
+      "deleteMessage": "Smazat {{name}} z tohoto zařízení? Konverzace, které ho používají, potřebují jiný model, než budou moci pokračovat.",
+      "errors": {
+        "invalidUrl": "Zadejte platný odkaz.",
+        "insecureUrl": "Použijte odkaz HTTPS. Modely nelze stahovat přes HTTP.",
+        "credentialsUrl": "Odstraňte z odkazu uživatelské jméno a heslo.",
+        "notGguf": "Odkaz musí odkazovat na soubor .gguf.",
+        "space": "Pro tento model není dostatek volného úložiště. Uvolněte místo a zkuste to znovu.",
+        "network": "Stahování se nedokončilo. Zkontrolujte připojení a zkuste to znovu.",
+        "invalidFile": "Stažený soubor není model, který by tato aplikace mohla spustit, proto byl odstraněn."
+      }
+    },
     "localModels": {
       "title": "Modely v zařízení",
       "help": "Modely v zařízení běží přímo v tomto telefonu. Vaše dotazy a odpovědi zůstávají v zařízení a tyto modely nemohou používat nástroje.",

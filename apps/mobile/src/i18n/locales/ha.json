@@ -3324,6 +3324,33 @@
       "deleteMessage": "A share {{name}} da bayanan shigarta da aka adana? Tattaunawar da suke amfani da wannan uwar garken za su buƙaci sabuwar uwar garke kafin su iya ci gaba.",
       "completionTokenFieldHelp": "Filin gutsuren rubutun amsa: yi amfani da max_completion_tokens don API na zamani, ko max_tokens idan wurin karɓar buƙatunka yana buƙatar tsohon filin."
     },
+    "gguf": {
+      "title": "Samfuran da ake iya saukewa",
+      "help": "Sauke buɗaɗɗen samfuri ka gudanar da shi a wannan wayar da llama.cpp. Saƙonninka da amsoshi suna zama a kan na'urar. Samfuran manya ne, don haka yi amfani da Wi-Fi.",
+      "details": "{{size}} · Lasisi: {{license}}",
+      "download": "Sauke samfuri",
+      "pause": "Dakatar da saukewa",
+      "resume": "Ci gaba da saukewa",
+      "downloading": "Ana saukewa: {{written}} cikin {{total}}",
+      "downloadingUnknown": "Ana saukewa: {{written}}",
+      "paused": "An dakata: {{written}} cikin {{total}}",
+      "verifying": "Ana duba fayil ɗin da aka sauke…",
+      "downloaded": "An sauke · {{size}}",
+      "url": "Hanyar haɗin sauke kai tsaye",
+      "urlHelp": "Manna hanyar haɗi ta HTTPS zuwa fayil ɗin .gguf, kamar hanyar haɗin resolve ta Hugging Face. Ka sauke samfura daga tushen da ka amince da su kawai.",
+      "downloadUrl": "Sauke daga hanyar haɗi",
+      "deleteTitle": "Share wannan samfurin?",
+      "deleteMessage": "Share {{name}} daga wannan na'urar? Tattaunawar da ke amfani da shi tana buƙatar wani samfuri kafin ta iya ci gaba.",
+      "errors": {
+        "invalidUrl": "Shigar da ingantaccen hanyar haɗi.",
+        "insecureUrl": "Yi amfani da hanyar haɗi ta HTTPS. Ba a iya sauke samfura ta HTTP ba.",
+        "credentialsUrl": "Cire sunan mai amfani da kalmar sirri daga hanyar haɗin.",
+        "notGguf": "Dole ne hanyar haɗin ta nuna fayil ɗin .gguf.",
+        "space": "Babu isasshen sarari kyauta don wannan samfurin. Ka yantar da sarari sannan ka sake gwadawa.",
+        "network": "Saukarwar ba ta kammala ba. Duba haɗin ka sannan ka sake gwadawa.",
+        "invalidFile": "Fayil ɗin da aka sauke ba samfurin da wannan manhajar za ta iya gudanarwa ba ne, don haka an cire shi."
+      }
+    },
     "localModels": {
       "title": "Samfuran da ke kan na'ura",
       "help": "Samfuran da ke kan na'ura suna aiki a wannan wayar. Saƙonninka da amsoshi suna zama a kan na'urar, kuma waɗannan samfuran ba sa iya amfani da kayan aiki.",

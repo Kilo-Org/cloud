@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
 import { type LocalProvider, localTargetId } from './backend-target';
+import { ggufModelProvider } from './gguf-models';
 import {
   type NativeAvailability,
   type NativeModelBridge,
@@ -139,7 +140,7 @@ statuses = statusesOf();
 
 /** The provider for a decoded `local:` target, or undefined when this build has none. */
 export function localModelProvider(provider: LocalProvider): LocalModelProvider | undefined {
-  return system.find(one => one.provider === provider)?.model;
+  return provider === 'gguf' ? ggufModelProvider : system.find(one => one.provider === provider)?.model;
 }
 
 function subscribe(listener: () => void): () => void {

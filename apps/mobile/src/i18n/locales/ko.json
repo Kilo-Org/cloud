@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} 및 저장된 인증 정보를 삭제할까요? 이 백엔드를 사용하는 채팅을 계속하려면 새 백엔드를 선택해야 합니다.",
       "completionTokenFieldHelp": "출력 토큰 필드: 최신 API에는 max_completion_tokens를 사용하고, 엔드포인트에서 기존 필드를 요구하는 경우 max_tokens를 사용하세요."
     },
+    "gguf": {
+      "title": "다운로드 가능한 모델",
+      "help": "공개 모델을 다운로드하여 이 휴대폰에서 llama.cpp로 실행하세요. 프롬프트와 답변은 기기에만 저장됩니다. 모델은 크기가 크므로 Wi-Fi를 사용하세요.",
+      "details": "{{size}} · 라이선스: {{license}}",
+      "download": "모델 다운로드",
+      "pause": "다운로드 일시 중지",
+      "resume": "다운로드 재개",
+      "downloading": "다운로드 중: {{written}}/{{total}}",
+      "downloadingUnknown": "다운로드 중: {{written}}",
+      "paused": "일시 중지됨: {{written}}/{{total}}",
+      "verifying": "다운로드한 파일을 확인하는 중…",
+      "downloaded": "다운로드됨 · {{size}}",
+      "url": "직접 다운로드 링크",
+      "urlHelp": ".gguf 파일의 HTTPS 링크를 붙여넣으세요(예: Hugging Face resolve 링크). 신뢰할 수 있는 출처의 모델만 다운로드하세요.",
+      "downloadUrl": "링크에서 다운로드",
+      "deleteTitle": "이 모델을 삭제할까요?",
+      "deleteMessage": "이 기기에서 {{name}}을(를) 삭제할까요? 이 모델을 사용하는 채팅은 계속하려면 다른 모델이 필요합니다.",
+      "errors": {
+        "invalidUrl": "올바른 링크를 입력하세요.",
+        "insecureUrl": "HTTPS 링크를 사용하세요. 모델은 HTTP로 다운로드할 수 없습니다.",
+        "credentialsUrl": "링크에서 사용자 이름과 비밀번호를 제거하세요.",
+        "notGguf": "링크는 .gguf 파일을 가리켜야 합니다.",
+        "space": "이 모델을 저장할 공간이 부족합니다. 공간을 확보한 후 다시 시도하세요.",
+        "network": "다운로드가 완료되지 않았습니다. 연결을 확인한 후 다시 시도하세요.",
+        "invalidFile": "다운로드한 파일은 이 앱에서 실행할 수 있는 모델이 아니므로 삭제되었습니다."
+      }
+    },
     "localModels": {
       "title": "기기 내 모델",
       "help": "기기 내 모델은 이 휴대폰에서 실행됩니다. 프롬프트와 답변은 기기에만 저장되며, 이 모델은 도구를 사용할 수 없습니다.",

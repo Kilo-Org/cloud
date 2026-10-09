@@ -3324,6 +3324,33 @@
       "deleteMessage": "要刪除 {{name}} 及其儲存的驗證憑證嗎？使用此後端的聊天必須選擇新的後端才能繼續。",
       "completionTokenFieldHelp": "輸出詞元欄位：新版應用程式介面請使用 max_completion_tokens；若您的端點要求使用舊版欄位，則使用 max_tokens。"
     },
+    "gguf": {
+      "title": "可下載的模型",
+      "help": "下載開放模型，並用 llama.cpp 在這支手機上執行。你的提示和回覆都會保留在裝置上。模型檔案很大，請使用 Wi-Fi。",
+      "details": "{{size}} · 授權條款：{{license}}",
+      "download": "下載模型",
+      "pause": "暫停下載",
+      "resume": "繼續下載",
+      "downloading": "下載中：{{written}}／{{total}}",
+      "downloadingUnknown": "下載中：{{written}}",
+      "paused": "已暫停：{{written}}／{{total}}",
+      "verifying": "正在檢查下載的檔案…",
+      "downloaded": "已下載 · {{size}}",
+      "url": "直接下載連結",
+      "urlHelp": "貼上 .gguf 檔案的 HTTPS 連結，例如 Hugging Face 的 resolve 連結。請只從你信任的來源下載模型。",
+      "downloadUrl": "從連結下載",
+      "deleteTitle": "要刪除這個模型嗎？",
+      "deleteMessage": "要從這部裝置刪除 {{name}} 嗎？使用該模型的對話需要改用其他模型才能繼續。",
+      "errors": {
+        "invalidUrl": "請輸入有效的連結。",
+        "insecureUrl": "請使用 HTTPS 連結。無法透過 HTTP 下載模型。",
+        "credentialsUrl": "請從連結中移除使用者名稱和密碼。",
+        "notGguf": "連結必須指向 .gguf 檔案。",
+        "space": "沒有足夠的可用儲存空間容納這個模型。請清出空間後再試一次。",
+        "network": "下載未完成。請檢查網路連線後再試一次。",
+        "invalidFile": "下載的檔案不是這個應用程式可執行的模型，因此已將其移除。"
+      }
+    },
     "localModels": {
       "title": "裝置端模型",
       "help": "裝置端模型會在這支手機上執行。你的提示和回覆都會保留在裝置上，且這些模型無法使用工具。",

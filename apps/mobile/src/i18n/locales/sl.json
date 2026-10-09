@@ -3410,6 +3410,33 @@
       "deleteMessage": "Izbrišem {{name}} in shranjene poverilnice? Klepeti, ki uporabljajo to zaledje, bodo za nadaljevanje potrebovali novo zaledje.",
       "completionTokenFieldHelp": "Polje za izhodne žetone: uporabite max_completion_tokens za sodobne API-je ali max_tokens, če vaša končna točka zahteva starejše polje."
     },
+    "gguf": {
+      "title": "Modeli za prenos",
+      "help": "Prenesite odprt model in ga zaženite v tem telefonu z llama.cpp. Vaši pozivi in odgovori ostanejo v napravi. Modeli so veliki, zato uporabite Wi-Fi.",
+      "details": "{{size}} · Licenca: {{license}}",
+      "download": "Prenesi model",
+      "pause": "Začasno ustavi prenos",
+      "resume": "Nadaljuj prenos",
+      "downloading": "Prenašanje: {{written}} od {{total}}",
+      "downloadingUnknown": "Prenašanje: {{written}}",
+      "paused": "Začasno ustavljeno: {{written}} od {{total}}",
+      "verifying": "Preverjanje prenesene datoteke…",
+      "downloaded": "Preneseno · {{size}}",
+      "url": "Neposredna povezava za prenos",
+      "urlHelp": "Prilepite povezavo HTTPS do datoteke .gguf, na primer povezavo resolve s Hugging Face. Modele prenašajte samo iz virov, ki jim zaupate.",
+      "downloadUrl": "Prenesi s povezave",
+      "deleteTitle": "Ali želite izbrisati ta model?",
+      "deleteMessage": "Ali želite izbrisati {{name}} iz te naprave? Klepeti, ki ga uporabljajo, potrebujejo drug model, preden se lahko nadaljujejo.",
+      "errors": {
+        "invalidUrl": "Vnesite veljavno povezavo.",
+        "insecureUrl": "Uporabite povezavo HTTPS. Modelov ni mogoče prenesti prek HTTP.",
+        "credentialsUrl": "Odstranite uporabniško ime in geslo iz povezave.",
+        "notGguf": "Povezava mora kazati na datoteko .gguf.",
+        "space": "Na voljo ni dovolj prostora za shranjevanje tega modela. Sprostite prostor in poskusite znova.",
+        "network": "Prenos se ni dokončal. Preverite povezavo in poskusite znova.",
+        "invalidFile": "Prenesena datoteka ni model, ki bi ga ta aplikacija lahko izvajala, zato je bila odstranjena."
+      }
+    },
     "localModels": {
       "title": "Modeli v napravi",
       "help": "Modeli v napravi se izvajajo v tem telefonu. Vaši pozivi in odgovori ostanejo v napravi, ti modeli pa ne morejo uporabljati orodij.",

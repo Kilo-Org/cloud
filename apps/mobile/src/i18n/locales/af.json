@@ -3324,6 +3324,33 @@
       "deleteMessage": "Skrap {{name}} en sy gestoorde aanmeldbesonderhede? Kletse wat hierdie agtergrondstelsel gebruik, sal 'n nuwe agtergrondstelsel nodig hê voordat hulle kan voortgaan.",
       "completionTokenFieldHelp": "Veld vir voltooiingstekseenhede: gebruik max_completion_tokens vir moderne API's, of max_tokens as jou eindpunt die verouderde veld vereis."
     },
+    "gguf": {
+      "title": "Modelle wat afgelaai kan word",
+      "help": "Laai 'n oop model af en laat dit op hierdie foon met llama.cpp loop. Jou opdragte en antwoorde bly op die toestel. Modelle is groot, so gebruik Wi-Fi.",
+      "details": "{{size}} · Lisensie: {{license}}",
+      "download": "Laai model af",
+      "pause": "Pouseer aflaai",
+      "resume": "Hervat aflaai",
+      "downloading": "Laai af: {{written}} van {{total}}",
+      "downloadingUnknown": "Laai af: {{written}}",
+      "paused": "Gepouseer: {{written}} van {{total}}",
+      "verifying": "Kontroleer die afgelaaide lêer…",
+      "downloaded": "Afgelaai · {{size}}",
+      "url": "Direkte aflaai-skakel",
+      "urlHelp": "Plak 'n HTTPS-skakel na 'n .gguf-lêer, soos 'n Hugging Face-resolve-skakel. Laai slegs modelle af van bronne wat jy vertrou.",
+      "downloadUrl": "Laai af vanaf skakel",
+      "deleteTitle": "Vee hierdie model uit?",
+      "deleteMessage": "Vee {{name}} van hierdie toestel uit? Gesprekke wat dit gebruik, het 'n ander model nodig voordat hulle kan voortgaan.",
+      "errors": {
+        "invalidUrl": "Voer 'n geldige skakel in.",
+        "insecureUrl": "Gebruik 'n HTTPS-skakel. Modelle kan nie oor HTTP afgelaai word nie.",
+        "credentialsUrl": "Verwyder die gebruikersnaam en wagwoord uit die skakel.",
+        "notGguf": "Die skakel moet na 'n .gguf-lêer wys.",
+        "space": "Daar is nie genoeg gratis berging vir hierdie model nie. Maak spasie vry en probeer weer.",
+        "network": "Die aflaai het nie klaargemaak nie. Kontroleer jou verbinding en probeer weer.",
+        "invalidFile": "Die afgelaaide lêer is nie 'n model wat hierdie app kan loop nie, so dit is verwyder."
+      }
+    },
     "localModels": {
       "title": "Modelle op die toestel",
       "help": "Modelle op die toestel loop op hierdie foon. Jou opdragte en antwoorde bly op die toestel, en hierdie modelle kan nie gereedskap gebruik nie.",

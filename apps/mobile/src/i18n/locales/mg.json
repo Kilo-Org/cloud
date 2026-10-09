@@ -3324,6 +3324,33 @@
       "deleteMessage": "Hamafa an'i {{name}} sy ny mombamomba ny fidirana voatahiry ao aminy? Mila rafitra mpizara vaovao ny resaka mampiasa ity rafitra mpizara ity vao afaka mitohy.",
       "completionTokenFieldHelp": "Saha ho an'ny singa lahatsoratra amin'ny valiny: ampiasao max_completion_tokens ho an'ny API maoderina, na max_tokens raha mitaky ilay saha taloha ny teboka fiafaran'ny fifandraisanao."
     },
+    "gguf": {
+      "title": "Modely azo alaina",
+      "help": "Alaivo ny modely misokatra ary ampandehano amin'ity finday ity amin'ny alalan'ny llama.cpp. Mijanona ao amin'ny fitaovana ny fangatahanao sy ny valiny. Lehibe ny modely, koa mampiasà Wi-Fi.",
+      "details": "{{size}} · Fahazoan-dalana: {{license}}",
+      "download": "Alaivo ny modely",
+      "pause": "Ajanony ny fampidinana",
+      "resume": "Tohizano ny fampidinana",
+      "downloading": "Mampidina: {{written}} amin'ny {{total}}",
+      "downloadingUnknown": "Mampidina: {{written}}",
+      "paused": "Najanona: {{written}} amin'ny {{total}}",
+      "verifying": "Manamarina ny rakitra voampidina…",
+      "downloaded": "Voampidina · {{size}}",
+      "url": "Rohy fampidinana mivantana",
+      "urlHelp": "Apetaho ny rohy HTTPS manondro rakitra .gguf, toy ny rohy resolve avy amin'ny Hugging Face. Alaivo amin'ny loharano matokyanao ihany ny modely.",
+      "downloadUrl": "Alaivo amin'ny rohy",
+      "deleteTitle": "Hamafa ity modely ity?",
+      "deleteMessage": "Hamafa an'i {{name}} amin'ity fitaovana ity? Mila modely hafa ny resadresaka mampiasa azy vao afaka manohy.",
+      "errors": {
+        "invalidUrl": "Ampidiro ny rohy manan-kery.",
+        "insecureUrl": "Mampiasà rohy HTTPS. Tsy azo alaina amin'ny HTTP ny modely.",
+        "credentialsUrl": "Esory ao amin'ny rohy ny anaran'ny mpampiasa sy ny tenimiafina.",
+        "notGguf": "Tsy maintsy manondro rakitra .gguf ny rohy.",
+        "space": "Tsy ampy ny toerana malalaka ho an'ity modely ity. Afaho ny toerana ary andramo indray.",
+        "network": "Tsy vita ny fampidinana. Hamarino ny fifandraisanao ary andramo indray.",
+        "invalidFile": "Tsy modely azon'ity rindranasa ity ampiasaina ny rakitra voampidina, ka nesorina izy."
+      }
+    },
     "localModels": {
       "title": "Modely ao amin'ny fitaovana",
       "help": "Mandeha ao amin'ity finday ity ny modely ao amin'ny fitaovana. Mijanona ao amin'ny fitaovana ny fangatahanao sy ny valiny, ary tsy afaka mampiasa fitaovana ireo modely ireo.",

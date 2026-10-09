@@ -3367,6 +3367,33 @@
       "deleteMessage": "Ștergi {{name}} și credențialele stocate ale acestuia? Chaturile care folosesc acest backend vor avea nevoie de un backend nou înainte de a putea continua.",
       "completionTokenFieldHelp": "Câmpul pentru tokenuri de ieșire: folosește max_completion_tokens pentru API-urile moderne sau max_tokens dacă punctul tău de acces necesită câmpul vechi."
     },
+    "gguf": {
+      "title": "Modele descărcabile",
+      "help": "Descarcă un model deschis și rulează-l pe acest telefon cu llama.cpp. Solicitările și răspunsurile tale rămân pe dispozitiv. Modelele sunt mari, așa că folosește Wi-Fi.",
+      "details": "{{size}} · Licență: {{license}}",
+      "download": "Descarcă modelul",
+      "pause": "Întrerupe descărcarea",
+      "resume": "Reia descărcarea",
+      "downloading": "Se descarcă: {{written}} din {{total}}",
+      "downloadingUnknown": "Se descarcă: {{written}}",
+      "paused": "În pauză: {{written}} din {{total}}",
+      "verifying": "Se verifică fișierul descărcat…",
+      "downloaded": "Descărcat · {{size}}",
+      "url": "Link de descărcare directă",
+      "urlHelp": "Lipește un link HTTPS către un fișier .gguf, cum ar fi un link resolve de pe Hugging Face. Descarcă modele doar din surse în care ai încredere.",
+      "downloadUrl": "Descarcă de la link",
+      "deleteTitle": "Ștergi acest model?",
+      "deleteMessage": "Ștergi {{name}} de pe acest dispozitiv? Conversațiile care îl folosesc au nevoie de un alt model înainte de a putea continua.",
+      "errors": {
+        "invalidUrl": "Introdu un link valid.",
+        "insecureUrl": "Folosește un link HTTPS. Modelele nu pot fi descărcate prin HTTP.",
+        "credentialsUrl": "Elimină numele de utilizator și parola din link.",
+        "notGguf": "Linkul trebuie să trimită la un fișier .gguf.",
+        "space": "Nu există suficient spațiu liber pentru acest model. Eliberează spațiu și încearcă din nou.",
+        "network": "Descărcarea nu s-a finalizat. Verifică conexiunea și încearcă din nou.",
+        "invalidFile": "Fișierul descărcat nu este un model pe care această aplicație îl poate rula, așa că a fost eliminat."
+      }
+    },
     "localModels": {
       "title": "Modele pe dispozitiv",
       "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv, iar aceste modele nu pot folosi instrumente.",

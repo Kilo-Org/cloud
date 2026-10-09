@@ -3324,6 +3324,33 @@
       "deleteMessage": "Hapus {{name}} beserta kredensial yang tersimpan? Obrolan yang menggunakan layanan ini akan memerlukan layanan baru sebelum dapat dilanjutkan.",
       "completionTokenFieldHelp": "Kolom token keluaran: gunakan max_completion_tokens untuk API modern, atau max_tokens jika endpoint Anda memerlukan kolom lama."
     },
+    "gguf": {
+      "title": "Model yang dapat diunduh",
+      "help": "Unduh model terbuka dan jalankan di ponsel ini dengan llama.cpp. Perintah dan balasan Anda tetap ada di perangkat. Model berukuran besar, jadi gunakan Wi-Fi.",
+      "details": "{{size}} · Lisensi: {{license}}",
+      "download": "Unduh model",
+      "pause": "Jeda unduhan",
+      "resume": "Lanjutkan unduhan",
+      "downloading": "Mengunduh: {{written}} dari {{total}}",
+      "downloadingUnknown": "Mengunduh: {{written}}",
+      "paused": "Dijeda: {{written}} dari {{total}}",
+      "verifying": "Memeriksa file yang diunduh…",
+      "downloaded": "Terunduh · {{size}}",
+      "url": "Tautan unduhan langsung",
+      "urlHelp": "Tempel tautan HTTPS ke file .gguf, seperti tautan resolve Hugging Face. Hanya unduh model dari sumber yang Anda percaya.",
+      "downloadUrl": "Unduh dari tautan",
+      "deleteTitle": "Hapus model ini?",
+      "deleteMessage": "Hapus {{name}} dari perangkat ini? Obrolan yang menggunakannya memerlukan model lain sebelum dapat dilanjutkan.",
+      "errors": {
+        "invalidUrl": "Masukkan tautan yang valid.",
+        "insecureUrl": "Gunakan tautan HTTPS. Model tidak dapat diunduh melalui HTTP.",
+        "credentialsUrl": "Hapus nama pengguna dan kata sandi dari tautan.",
+        "notGguf": "Tautan harus mengarah ke file .gguf.",
+        "space": "Ruang penyimpanan tidak cukup untuk model ini. Kosongkan ruang dan coba lagi.",
+        "network": "Unduhan tidak selesai. Periksa koneksi Anda dan coba lagi.",
+        "invalidFile": "File yang diunduh bukan model yang dapat dijalankan aplikasi ini, sehingga file tersebut dihapus."
+      }
+    },
     "localModels": {
       "title": "Model di perangkat",
       "help": "Model di perangkat berjalan di ponsel ini. Perintah dan balasan Anda tetap ada di perangkat, dan model ini tidak dapat menggunakan alat.",

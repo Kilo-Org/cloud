@@ -3367,6 +3367,33 @@
       "deleteMessage": "Supprimer {{name}} et ses identifiants d'authentification enregistrés ? Les discussions utilisant ce service devront utiliser un nouveau service pour pouvoir continuer.",
       "completionTokenFieldHelp": "Champ des jetons de sortie : utilisez max_completion_tokens pour les API modernes, ou max_tokens si votre point de terminaison nécessite le champ hérité."
     },
+    "gguf": {
+      "title": "Modèles téléchargeables",
+      "help": "Téléchargez un modèle ouvert et exécutez-le sur ce téléphone avec llama.cpp. Vos requêtes et les réponses restent sur l'appareil. Les modèles sont volumineux, utilisez donc le Wi-Fi.",
+      "details": "{{size}} · Licence : {{license}}",
+      "download": "Télécharger le modèle",
+      "pause": "Mettre en pause le téléchargement",
+      "resume": "Reprendre le téléchargement",
+      "downloading": "Téléchargement : {{written}} sur {{total}}",
+      "downloadingUnknown": "Téléchargement : {{written}}",
+      "paused": "En pause : {{written}} sur {{total}}",
+      "verifying": "Vérification du fichier téléchargé…",
+      "downloaded": "Téléchargé · {{size}}",
+      "url": "Lien de téléchargement direct",
+      "urlHelp": "Collez un lien HTTPS vers un fichier .gguf, comme un lien resolve de Hugging Face. Ne téléchargez des modèles qu'à partir de sources fiables.",
+      "downloadUrl": "Télécharger depuis le lien",
+      "deleteTitle": "Supprimer ce modèle ?",
+      "deleteMessage": "Supprimer {{name}} de cet appareil ? Les conversations qui l'utilisent ont besoin d'un autre modèle avant de pouvoir continuer.",
+      "errors": {
+        "invalidUrl": "Saisissez un lien valide.",
+        "insecureUrl": "Utilisez un lien HTTPS. Les modèles ne peuvent pas être téléchargés via HTTP.",
+        "credentialsUrl": "Supprimez le nom d'utilisateur et le mot de passe du lien.",
+        "notGguf": "Le lien doit pointer vers un fichier .gguf.",
+        "space": "L'espace de stockage disponible est insuffisant pour ce modèle. Libérez de l'espace et réessayez.",
+        "network": "Le téléchargement ne s'est pas terminé. Vérifiez votre connexion et réessayez.",
+        "invalidFile": "Le fichier téléchargé n'est pas un modèle que cette application peut exécuter ; il a donc été supprimé."
+      }
+    },
     "localModels": {
       "title": "Modèles sur l'appareil",
       "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos requêtes et les réponses restent sur l'appareil, et ces modèles ne peuvent pas utiliser d'outils.",

@@ -3324,6 +3324,33 @@
       "deleteMessage": "Efase {{name}} ansanm ak enfòmasyon pou otantifikasyon li yo ki estoke? Chat ki sèvi ak sèvis sa a ap bezwen yon nouvo sèvis anvan yo ka kontinye.",
       "completionTokenFieldHelp": "Chan pou jeton nan repons lan: itilize max_completion_tokens pou API modèn yo, oswa max_tokens si pwen aksè ou a mande ansyen chan an."
     },
+    "gguf": {
+      "title": "Modèl ou ka telechaje",
+      "help": "Telechaje yon modèl ouvè epi fè li mache sou telefòn sa a ak llama.cpp. Mesaj ou voye ak repons yo rete sou aparèy la. Modèl yo gwo, kidonk sèvi ak Wi-Fi.",
+      "details": "{{size}} · Lisans: {{license}}",
+      "download": "Telechaje modèl",
+      "pause": "Met telechajman an pòz",
+      "resume": "Reprann telechajman an",
+      "downloading": "Ap telechaje: {{written}} sou {{total}}",
+      "downloadingUnknown": "Ap telechaje: {{written}}",
+      "paused": "An pòz: {{written}} sou {{total}}",
+      "verifying": "Ap verifye fichye ki telechaje a…",
+      "downloaded": "Telechaje · {{size}}",
+      "url": "Lyen telechajman dirèk",
+      "urlHelp": "Kole yon lyen HTTPS ki mennen nan yon fichye .gguf, tankou yon lyen resolve sou Hugging Face. Telechaje modèl sèlman nan sous ou fè konfyans.",
+      "downloadUrl": "Telechaje ak lyen an",
+      "deleteTitle": "Efase modèl sa a?",
+      "deleteMessage": "Efase {{name}} sou aparèy sa a? Chat ki sèvi avè l bezwen yon lòt modèl anvan yo ka kontinye.",
+      "errors": {
+        "invalidUrl": "Antre yon lyen ki valid.",
+        "insecureUrl": "Sèvi ak yon lyen HTTPS. Yo pa ka telechaje modèl sou HTTP.",
+        "credentialsUrl": "Retire non itilizatè a ak modpas la nan lyen an.",
+        "notGguf": "Lyen an dwe mennen nan yon fichye .gguf.",
+        "space": "Pa gen ase espas lib pou modèl sa a. Lage espas epi eseye ankò.",
+        "network": "Telechajman an pa fini. Verifye koneksyon ou epi eseye ankò.",
+        "invalidFile": "Fichye ki telechaje a pa yon modèl aplikasyon sa a ka fè mache, kidonk li te retire."
+      }
+    },
     "localModels": {
       "title": "Modèl sou aparèy la",
       "help": "Modèl sou aparèy la mache sou telefòn sa a. Mesaj ou voye ak repons yo rete sou aparèy la, epi modèl sa yo pa ka sèvi ak zouti.",

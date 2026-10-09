@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} eta gordetako kredentzialak ezabatu? Atzeko zerbitzu hau erabiltzen duten txatek atzeko zerbitzu berri bat beharko dute jarraitu ahal izateko.",
       "completionTokenFieldHelp": "Irteerako tokenen eremua: erabili max_completion_tokens API modernoetarako, edo max_tokens zure amaiera-puntuak eremu zaharra eskatzen badu."
     },
+    "gguf": {
+      "title": "Deskargatzeko modeloak",
+      "help": "Deskargatu modelo ireki bat eta exekutatu telefono honetan llama.cpp erabiliz. Zure galderak eta erantzunak gailuan geratzen dira. Modeloak handiak dira, beraz, erabili Wi-Fi.",
+      "details": "{{size}} · Lizentzia: {{license}}",
+      "download": "Deskargatu modeloa",
+      "pause": "Pausatu deskarga",
+      "resume": "Berrekin deskargari",
+      "downloading": "Deskargatzen: {{written}}/{{total}}",
+      "downloadingUnknown": "Deskargatzen: {{written}}",
+      "paused": "Pausatuta: {{written}}/{{total}}",
+      "verifying": "Deskargatutako fitxategia egiaztatzen…",
+      "downloaded": "Deskargatuta · {{size}}",
+      "url": "Deskarga-esteka zuzena",
+      "urlHelp": "Itsatsi HTTPS esteka bat .gguf fitxategi batera, adibidez Hugging Face resolve esteka bat. Deskargatu modeloak fidagarriak diren iturrietatik soilik.",
+      "downloadUrl": "Deskargatu estekatik",
+      "deleteTitle": "Modelo hau ezabatu?",
+      "deleteMessage": "{{name}} gailu honetatik ezabatu? Hura erabiltzen duten txatek beste modelo bat behar dute jarraitu ahal izateko.",
+      "errors": {
+        "invalidUrl": "Sartu baliozko esteka bat.",
+        "insecureUrl": "Erabili HTTPS esteka bat. Modeloak ezin dira HTTP bidez deskargatu.",
+        "credentialsUrl": "Kendu erabiltzaile-izena eta pasahitza estekatik.",
+        "notGguf": "Estekak .gguf fitxategi batera eraman behar du.",
+        "space": "Ez dago nahikoa biltegiratze libre modelo honetarako. Askatu lekua eta saiatu berriro.",
+        "network": "Deskarga ez da amaitu. Egiaztatu zure konexioa eta saiatu berriro.",
+        "invalidFile": "Deskargatutako fitxategia ez da aplikazio honek exekutatu dezakeen modeloa, beraz, kendu egin da."
+      }
+    },
     "localModels": {
       "title": "Gailuko modeloak",
       "help": "Gailuko modeloak telefono honetan exekutatzen dira. Zure galderak eta erantzunak gailuan geratzen dira, eta modelo hauek ezin dute tresnarik erabili.",

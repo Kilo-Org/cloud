@@ -3324,6 +3324,33 @@
       "deleteMessage": "Vil du slette {{name}} og dens gemte loginoplysninger? Chats, der bruger denne server, skal have en ny server, før de kan fortsætte.",
       "completionTokenFieldHelp": "Felt til outputtokens: Brug max_completion_tokens til moderne API'er eller max_tokens, hvis dit endpoint kræver det ældre felt."
     },
+    "gguf": {
+      "title": "Downloadbare modeller",
+      "help": "Download en åben model, og kør den på denne telefon med llama.cpp. Dine prompter og svar bliver på enheden. Modeller er store, så brug Wi-Fi.",
+      "details": "{{size}} · Licens: {{license}}",
+      "download": "Download model",
+      "pause": "Sæt download på pause",
+      "resume": "Genoptag download",
+      "downloading": "Downloader: {{written}} af {{total}}",
+      "downloadingUnknown": "Downloader: {{written}}",
+      "paused": "Sat på pause: {{written}} af {{total}}",
+      "verifying": "Tjekker den downloadede fil…",
+      "downloaded": "Downloadet · {{size}}",
+      "url": "Direkte downloadlink",
+      "urlHelp": "Indsæt et HTTPS-link til en .gguf-fil, f.eks. et Hugging Face-resolve-link. Download kun modeller fra kilder, du har tillid til.",
+      "downloadUrl": "Download fra link",
+      "deleteTitle": "Slet denne model?",
+      "deleteMessage": "Slet {{name}} fra denne enhed? Chats, der bruger den, har brug for en anden model, før de kan fortsætte.",
+      "errors": {
+        "invalidUrl": "Indtast et gyldigt link.",
+        "insecureUrl": "Brug et HTTPS-link. Modeller kan ikke downloades over HTTP.",
+        "credentialsUrl": "Fjern brugernavn og adgangskode fra linket.",
+        "notGguf": "Linket skal pege på en .gguf-fil.",
+        "space": "Der er ikke nok ledig lagerplads til denne model. Frigør plads, og prøv igen.",
+        "network": "Downloadet blev ikke færdigt. Tjek din forbindelse, og prøv igen.",
+        "invalidFile": "Den downloadede fil er ikke en model, som denne app kan køre, så den blev fjernet."
+      }
+    },
     "localModels": {
       "title": "Modeller på enheden",
       "help": "Modeller på enheden kører på denne telefon. Dine prompter og svar bliver på enheden, og disse modeller kan ikke bruge værktøjer.",

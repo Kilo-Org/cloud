@@ -3324,6 +3324,33 @@
       "deleteMessage": "Kas kustutada {{name}} ja selle salvestatud autentimisandmed? Seda taustsüsteemi kasutavad vestlused vajavad jätkamiseks uut taustsüsteemi.",
       "completionTokenFieldHelp": "Väljundtokenite väli: kasuta tänapäevaste API-de puhul max_completion_tokens või max_tokens, kui sinu lõpp-punkt nõuab vanemat välja."
     },
+    "gguf": {
+      "title": "Allalaaditavad mudelid",
+      "help": "Laadi avatud mudel alla ja käivita see selles telefonis programmiga llama.cpp. Sinu päringud ja vastused jäävad seadmesse. Mudelid on suured, seega kasuta Wi-Fi-t.",
+      "details": "{{size}} · Litsents: {{license}}",
+      "download": "Laadi mudel alla",
+      "pause": "Peata allalaadimine",
+      "resume": "Jätka allalaadimist",
+      "downloading": "Allalaadimine: {{written}} / {{total}}",
+      "downloadingUnknown": "Allalaadimine: {{written}}",
+      "paused": "Peatatud: {{written}} / {{total}}",
+      "verifying": "Allalaaditud faili kontrollimine…",
+      "downloaded": "Allalaaditud · {{size}}",
+      "url": "Otsene allalaadimislink",
+      "urlHelp": "Kleebi HTTPS-link .gguf failile, näiteks Hugging Face'i resolve-link. Laadi mudeleid alla ainult usaldusväärsetest allikatest.",
+      "downloadUrl": "Laadi alla lingilt",
+      "deleteTitle": "Kas kustutada see mudel?",
+      "deleteMessage": "Kas kustutada {{name}} sellest seadmest? Vestlused, mis seda kasutavad, vajavad jätkamiseks teist mudelit.",
+      "errors": {
+        "invalidUrl": "Sisesta kehtiv link.",
+        "insecureUrl": "Kasuta HTTPS-linki. Mudeleid ei saa HTTP kaudu alla laadida.",
+        "credentialsUrl": "Eemalda lingilt kasutajanimi ja parool.",
+        "notGguf": "Link peab osutama .gguf failile.",
+        "space": "Selle mudeli jaoks pole piisavalt vaba salvestusruumi. Vabasta ruumi ja proovi uuesti.",
+        "network": "Allalaadimine ei lõppenud. Kontrolli ühendust ja proovi uuesti.",
+        "invalidFile": "Allalaaditud fail ei ole mudel, mida see rakendus saab käivitada, seega see eemaldati."
+      }
+    },
     "localModels": {
       "title": "Seadmesisesed mudelid",
       "help": "Seadmesisesed mudelid töötavad selles telefonis. Sinu päringud ja vastused jäävad seadmesse ning need mudelid ei saa tööriistu kasutada.",

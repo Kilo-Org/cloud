@@ -3410,6 +3410,33 @@
       "deleteMessage": "Ištrinti {{name}} ir jo išsaugotus prisijungimo duomenis? Pokalbiams, naudojantiems šį serverį, reikės pasirinkti naują serverį, kad būtų galima juos tęsti.",
       "completionTokenFieldHelp": "Išvesties žetonų laukas: šiuolaikinėms API naudokite max_completion_tokens arba max_tokens, jei jūsų galinis taškas reikalauja senojo lauko."
     },
+    "gguf": {
+      "title": "Atsisiunčiami modeliai",
+      "help": "Atsisiųskite atvirą modelį ir paleiskite jį šiame telefone su llama.cpp. Jūsų užklausos ir atsakymai lieka įrenginyje. Modeliai yra dideli, todėl naudokite Wi-Fi.",
+      "details": "{{size}} · Licencija: {{license}}",
+      "download": "Atsisiųsti modelį",
+      "pause": "Pristabdyti atsisiuntimą",
+      "resume": "Tęsti atsisiuntimą",
+      "downloading": "Atsisiunčiama: {{written}} iš {{total}}",
+      "downloadingUnknown": "Atsisiunčiama: {{written}}",
+      "paused": "Pristabdyta: {{written}} iš {{total}}",
+      "verifying": "Tikrinamas atsisiųstas failas…",
+      "downloaded": "Atsisiųsta · {{size}}",
+      "url": "Tiesioginė atsisiuntimo nuoroda",
+      "urlHelp": "Įklijuokite HTTPS nuorodą į .gguf failą, pavyzdžiui, Hugging Face resolve nuorodą. Atsisiųskite modelius tik iš šaltinių, kuriais pasitikite.",
+      "downloadUrl": "Atsisiųsti iš nuorodos",
+      "deleteTitle": "Ištrinti šį modelį?",
+      "deleteMessage": "Ištrinti {{name}} iš šio įrenginio? Pokalbių, kurie jį naudoja, tęsimui reikia kito modelio.",
+      "errors": {
+        "invalidUrl": "Įveskite galiojančią nuorodą.",
+        "insecureUrl": "Naudokite HTTPS nuorodą. Modelių negalima atsisiųsti per HTTP.",
+        "credentialsUrl": "Pašalinkite vartotojo vardą ir slaptažodį iš nuorodos.",
+        "notGguf": "Nuoroda turi nurodyti į .gguf failą.",
+        "space": "Šiam modeliui nepakanka laisvos vietos. Atlaisvinkite vietos ir bandykite dar kartą.",
+        "network": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir bandykite dar kartą.",
+        "invalidFile": "Atsisiųstas failas nėra modelis, kurį ši programa gali paleisti, todėl jis buvo pašalintas."
+      }
+    },
     "localModels": {
       "title": "Įrenginio modeliai",
       "help": "Įrenginio modeliai veikia šiame telefone. Jūsų užklausos ir atsakymai lieka įrenginyje, o šie modeliai negali naudoti įrankių.",

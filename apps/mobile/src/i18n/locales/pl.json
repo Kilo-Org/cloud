@@ -3410,6 +3410,33 @@
       "deleteMessage": "Usunąć {{name}} i zapisane dane uwierzytelniające? Czaty korzystające z tego backendu będą wymagać nowego backendu, zanim będzie można je kontynuować.",
       "completionTokenFieldHelp": "Pole liczby tokenów wyjściowych: użyj max_completion_tokens w nowoczesnych interfejsach API lub max_tokens, jeśli Twój punkt końcowy wymaga starszego pola."
     },
+    "gguf": {
+      "title": "Modele do pobrania",
+      "help": "Pobierz otwarty model i uruchom go na tym telefonie z llama.cpp. Twoje prompty i odpowiedzi pozostają na urządzeniu. Modele są duże, więc korzystaj z Wi-Fi.",
+      "details": "{{size}} · Licencja: {{license}}",
+      "download": "Pobierz model",
+      "pause": "Wstrzymaj pobieranie",
+      "resume": "Wznów pobieranie",
+      "downloading": "Pobieranie: {{written}} z {{total}}",
+      "downloadingUnknown": "Pobieranie: {{written}}",
+      "paused": "Wstrzymano: {{written}} z {{total}}",
+      "verifying": "Sprawdzanie pobranego pliku…",
+      "downloaded": "Pobrano · {{size}}",
+      "url": "Bezpośredni link do pobrania",
+      "urlHelp": "Wklej link HTTPS do pliku .gguf, na przykład link resolve z Hugging Face. Pobieraj modele tylko ze źródeł, którym ufasz.",
+      "downloadUrl": "Pobierz z linku",
+      "deleteTitle": "Usunąć ten model?",
+      "deleteMessage": "Usunąć {{name}} z tego urządzenia? Czaty, które go używają, potrzebują innego modelu, zanim będą mogły kontynuować.",
+      "errors": {
+        "invalidUrl": "Wprowadź prawidłowy link.",
+        "insecureUrl": "Użyj linku HTTPS. Modeli nie można pobierać przez HTTP.",
+        "credentialsUrl": "Usuń nazwę użytkownika i hasło z linku.",
+        "notGguf": "Link musi wskazywać plik .gguf.",
+        "space": "Brak wystarczającej ilości wolnego miejsca na ten model. Zwolnij miejsce i spróbuj ponownie.",
+        "network": "Pobieranie nie zostało ukończone. Sprawdź połączenie i spróbuj ponownie.",
+        "invalidFile": "Pobrany plik nie jest modelem, który ta aplikacja może uruchomić, więc został usunięty."
+      }
+    },
     "localModels": {
       "title": "Modele na urządzeniu",
       "help": "Modele na urządzeniu działają na tym telefonie. Twoje prompty i odpowiedzi pozostają na urządzeniu, a te modele nie mogą korzystać z narzędzi.",

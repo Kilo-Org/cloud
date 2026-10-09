@@ -70,6 +70,22 @@ newer. The minimum iOS version does not change.
 - Switching between Kilo, a custom backend, and an on-device model shows the context-transfer warning.
 - Usage comes from the model when it reports counts, then its token counter, then an estimate of three characters per token, so compaction still runs on the small window.
 
+### Downloaded GGUF models
+
+**Manage backends → Downloadable models** lists small instruct models the app
+can download and run locally with `llama.rn` (llama.cpp). Each entry states its
+size and license and pins one Hugging Face revision, so the bytes cannot change
+underneath a download. A direct HTTPS link to a `.gguf` file works too. The user
+starts every download; it can be paused, resumed, or cancelled, and a cancelled
+or failed download deletes its partial file. Storage is checked before a
+download and again as soon as the server states a length.
+
+- Model files live in the app's document directory. They hold no account data, so the downloaded list survives sign-out and account changes.
+- A downloaded model appears in the picker once its file has been read by llama.cpp, which is where its context window comes from. Only one model is loaded at a time; switching releases the previous one, and the app releases it in the background.
+- Tools are sent only to a model whose own chat template was verified to render tool definitions and earlier tool calls; every other GGUF model is text-only.
+- An answer streams as it is written, interruption stops llama.cpp, and the token counts and stop reason come from llama.cpp itself. A second question while one is running fails as busy.
+- `llama.rn` ships prebuilt iOS and Android binaries fetched by its `postinstall` (allowed in `pnpm-workspace.yaml`). It needs React Native's New Architecture (this app), minSdk 24 (llama.rn requires 23), and the `llama.rn` Expo plugin in `app.config.ts`; iOS pods must be reinstalled after the dependency changes.
+
 ## App Store Kilo Pass Subscriptions
 
 App Store Kilo Pass subscriptions require an EAS development build or TestFlight

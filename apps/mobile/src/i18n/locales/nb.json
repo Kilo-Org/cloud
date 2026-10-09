@@ -3324,6 +3324,33 @@
       "deleteMessage": "Slette {{name}} og den lagrede påloggingsinformasjonen? Chatter som bruker dette baksystemet, trenger et nytt baksystem før de kan fortsette.",
       "completionTokenFieldHelp": "Felt for utdatatokener: Bruk max_completion_tokens for moderne API-er, eller max_tokens hvis endepunktet ditt krever det eldre feltet."
     },
+    "gguf": {
+      "title": "Nedlastbare modeller",
+      "help": "Last ned en åpen modell og kjør den på denne telefonen med llama.cpp. Ledetekstene og svarene dine blir på enheten. Modellene er store, så bruk Wi-Fi.",
+      "details": "{{size}} · Lisens: {{license}}",
+      "download": "Last ned modell",
+      "pause": "Sett nedlastingen på pause",
+      "resume": "Fortsett nedlastingen",
+      "downloading": "Laster ned: {{written}} av {{total}}",
+      "downloadingUnknown": "Laster ned: {{written}}",
+      "paused": "På pause: {{written}} av {{total}}",
+      "verifying": "Sjekker den nedlastede filen …",
+      "downloaded": "Lastet ned · {{size}}",
+      "url": "Direkte nedlastingslenke",
+      "urlHelp": "Lim inn en HTTPS-lenke til en .gguf-fil, for eksempel en Hugging Face-resolve-lenke. Last bare ned modeller fra kilder du stoler på.",
+      "downloadUrl": "Last ned fra lenke",
+      "deleteTitle": "Slette denne modellen?",
+      "deleteMessage": "Slette {{name}} fra denne enheten? Samtaler som bruker den, trenger en annen modell før de kan fortsette.",
+      "errors": {
+        "invalidUrl": "Skriv inn en gyldig lenke.",
+        "insecureUrl": "Bruk en HTTPS-lenke. Modeller kan ikke lastes ned over HTTP.",
+        "credentialsUrl": "Fjern brukernavnet og passordet fra lenken.",
+        "notGguf": "Lenken må peke til en .gguf-fil.",
+        "space": "Det er ikke nok ledig lagringsplass til denne modellen. Frigjør plass, og prøv igjen.",
+        "network": "Nedlastingen ble ikke fullført. Sjekk tilkoblingen, og prøv igjen.",
+        "invalidFile": "Den nedlastede filen er ikke en modell denne appen kan kjøre, så den ble fjernet."
+      }
+    },
     "localModels": {
       "title": "Modeller på enheten",
       "help": "Modeller på enheten kjører på denne telefonen. Meldingene og svarene dine blir på enheten, og disse modellene kan ikke bruke verktøy.",

@@ -259,6 +259,9 @@ allowBuilds:
   esbuild: true
   libpq: true
   workerd: true
+  # Downloads its prebuilt iOS xcframework and Android JNI libraries from the
+  # matching GitHub release and verifies each archive's SHA-256 (Quick Chat GGUF).
+  llama.rn: true
   '@sentry/cli': false
   bufferutil: false
   core-js: false

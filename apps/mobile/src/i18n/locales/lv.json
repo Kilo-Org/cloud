@@ -3367,6 +3367,33 @@
       "deleteMessage": "Dzēst {{name}} un tās saglabātos piekļuves datus? Lai turpinātu tērzēšanas, kas izmanto šo aizmugursistēmu, būs jāizvēlas jauna aizmugursistēma.",
       "completionTokenFieldHelp": "Izvades tokenu lauks: jaunākajām API izmantojiet max_completion_tokens vai max_tokens, ja jūsu galapunktam nepieciešams mantotais lauks."
     },
+    "gguf": {
+      "title": "Lejupielādējamie modeļi",
+      "help": "Lejupielādējiet atvērtu modeli un palaidiet to šajā tālrunī ar llama.cpp. Jūsu uzvednes un atbildes paliek ierīcē. Modeļi ir lieli, tāpēc izmantojiet Wi-Fi.",
+      "details": "{{size}} · Licence: {{license}}",
+      "download": "Lejupielādēt modeli",
+      "pause": "Pauzēt lejupielādi",
+      "resume": "Turpināt lejupielādi",
+      "downloading": "Lejupielāde: {{written}} no {{total}}",
+      "downloadingUnknown": "Lejupielāde: {{written}}",
+      "paused": "Pauzēta: {{written}} no {{total}}",
+      "verifying": "Pārbauda lejupielādēto failu…",
+      "downloaded": "Lejupielādēts · {{size}}",
+      "url": "Tiešā lejupielādes saite",
+      "urlHelp": "Ielīmējiet HTTPS saiti uz .gguf failu, piemēram, Hugging Face resolve saiti. Lejupielādējiet modeļus tikai no uzticamiem avotiem.",
+      "downloadUrl": "Lejupielādēt no saites",
+      "deleteTitle": "Dzēst šo modeli?",
+      "deleteMessage": "Dzēst {{name}} no šīs ierīces? Tērzēšanām, kas to izmanto, pirms turpināšanas ir nepieciešams cits modelis.",
+      "errors": {
+        "invalidUrl": "Ievadiet derīgu saiti.",
+        "insecureUrl": "Izmantojiet HTTPS saiti. Modeļus nevar lejupielādēt, izmantojot HTTP.",
+        "credentialsUrl": "Noņemiet lietotājvārdu un paroli no saites.",
+        "notGguf": "Saitei ir jānorāda uz .gguf failu.",
+        "space": "Šim modelim nav pietiekami daudz brīvas krātuves vietas. Atbrīvojiet vietu un mēģiniet vēlreiz.",
+        "network": "Lejupielāde netika pabeigta. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
+        "invalidFile": "Lejupielādētais fails nav modelis, ko šī lietotne var palaist, tāpēc tas tika noņemts."
+      }
+    },
     "localModels": {
       "title": "Ierīces modeļi",
       "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē, un šie modeļi nevar izmantot rīkus.",

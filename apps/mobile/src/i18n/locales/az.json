@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} və onun saxlanılmış giriş məlumatları silinsin? Bu arxa xidmətdən istifadə edən söhbətlərin davam etməsi üçün yeni arxa xidmət seçilməlidir.",
       "completionTokenFieldHelp": "Çıxış tokenləri sahəsi: müasir API-lər üçün max_completion_tokens sahəsindən, son nöqtəniz köhnə sahəni tələb edirsə, max_tokens sahəsindən istifadə edin."
     },
+    "gguf": {
+      "title": "Yüklənə bilən modellər",
+      "help": "Açıq model yükləyin və onu bu telefonda llama.cpp ilə işlədin. Sorğularınız və cavablarınız cihazda qalır. Modellər böyükdür, ona görə Wi-Fi-dan istifadə edin.",
+      "details": "{{size}} · Lisenziya: {{license}}",
+      "download": "Modeli yüklə",
+      "pause": "Yükləməni dayandır",
+      "resume": "Yükləməni davam etdir",
+      "downloading": "Yüklənir: {{written}} / {{total}}",
+      "downloadingUnknown": "Yüklənir: {{written}}",
+      "paused": "Dayandırıldı: {{written}} / {{total}}",
+      "verifying": "Yüklənmiş fayl yoxlanılır…",
+      "downloaded": "Yükləndi · {{size}}",
+      "url": "Birbaşa yükləmə linki",
+      "urlHelp": ".gguf faylına HTTPS linki yapışdırın, məsələn Hugging Face resolve linki. Modelləri yalnız etibarlı hesab etdiyiniz mənbələrdən yükləyin.",
+      "downloadUrl": "Linkdən yüklə",
+      "deleteTitle": "Bu model silinsin?",
+      "deleteMessage": "{{name}} bu cihazdan silinsin? Ondan istifadə edən söhbətlərin davam etməsi üçün başqa model lazımdır.",
+      "errors": {
+        "invalidUrl": "Etibarlı link daxil edin.",
+        "insecureUrl": "HTTPS linkdən istifadə edin. Modellər HTTP ilə yüklənə bilməz.",
+        "credentialsUrl": "Linkdən istifadəçi adını və parolu silin.",
+        "notGguf": "Link .gguf faylına yönəlməlidir.",
+        "space": "Bu model üçün kifayət qədər boş yaddaş yoxdur. Yer boşaldın və yenidən cəhd edin.",
+        "network": "Yükləmə tamamlanmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
+        "invalidFile": "Yüklənmiş fayl bu tətbiqin işlədə biləcəyi model deyil, ona görə silindi."
+      }
+    },
     "localModels": {
       "title": "Cihazdakı modellər",
       "help": "Cihazdakı modellər bu telefonda işləyir. Sorğularınız və cavablar cihazda qalır, bu modellər isə alətlərdən istifadə edə bilmir.",

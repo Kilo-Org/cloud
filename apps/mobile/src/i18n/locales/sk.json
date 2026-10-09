@@ -3410,6 +3410,33 @@
       "deleteMessage": "Odstrániť {{name}} a jeho uložené prihlasovacie údaje? Chaty používajúce tento server budú na pokračovanie potrebovať nový server.",
       "completionTokenFieldHelp": "Pole pre výstupné tokeny: pre moderné API použite max_completion_tokens alebo max_tokens, ak váš koncový bod vyžaduje staršie pole."
     },
+    "gguf": {
+      "title": "Modely na stiahnutie",
+      "help": "Stiahnite si otvorený model a spustite ho v tomto telefóne pomocou llama.cpp. Vaše výzvy a odpovede zostávajú v zariadení. Modely sú veľké, preto použite Wi-Fi.",
+      "details": "{{size}} · Licencia: {{license}}",
+      "download": "Stiahnuť model",
+      "pause": "Pozastaviť sťahovanie",
+      "resume": "Pokračovať v sťahovaní",
+      "downloading": "Sťahovanie: {{written}} z {{total}}",
+      "downloadingUnknown": "Sťahovanie: {{written}}",
+      "paused": "Pozastavené: {{written}} z {{total}}",
+      "verifying": "Kontrola stiahnutého súboru…",
+      "downloaded": "Stiahnuté · {{size}}",
+      "url": "Priamy odkaz na stiahnutie",
+      "urlHelp": "Vložte odkaz HTTPS na súbor .gguf, napríklad odkaz na Hugging Face typu resolve. Modely sťahujte iba zo zdrojov, ktorým dôverujete.",
+      "downloadUrl": "Stiahnuť z odkazu",
+      "deleteTitle": "Odstrániť tento model?",
+      "deleteMessage": "Odstrániť {{name}} z tohto zariadenia? Konverzácie, ktoré ho používajú, potrebujú pred pokračovaním iný model.",
+      "errors": {
+        "invalidUrl": "Zadajte platný odkaz.",
+        "insecureUrl": "Použite odkaz HTTPS. Modely nie je možné sťahovať cez HTTP.",
+        "credentialsUrl": "Odstráňte z odkazu používateľské meno a heslo.",
+        "notGguf": "Odkaz musí smerovať na súbor .gguf.",
+        "space": "Na tento model nie je dostatok voľného úložiska. Uvoľnite miesto a skúste to znova.",
+        "network": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a skúste to znova.",
+        "invalidFile": "Stiahnutý súbor nie je model, ktorý by táto aplikácia mohla spustiť, preto bol odstránený."
+      }
+    },
     "localModels": {
       "title": "Modely v zariadení",
       "help": "Modely v zariadení bežia priamo v tomto telefóne. Vaše výzvy a odpovede zostávajú v zariadení a tieto modely nemôžu používať nástroje.",

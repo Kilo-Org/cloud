@@ -3367,6 +3367,33 @@
       "deleteMessage": "Vols eliminar {{name}} i les seves credencials desades? Els xats que utilitzen aquest servidor necessitaran un servidor nou per poder continuar.",
       "completionTokenFieldHelp": "Camp de tòkens de compleció: utilitza max_completion_tokens per a les API modernes, o max_tokens si el teu punt de connexió requereix el camp antic."
     },
+    "gguf": {
+      "title": "Models descarregables",
+      "help": "Descarrega un model obert i executa'l en aquest telèfon amb llama.cpp. Les teves peticions i respostes es queden al dispositiu. Els models són grans, així que fes servir Wi-Fi.",
+      "details": "{{size}} · Llicència: {{license}}",
+      "download": "Descarrega el model",
+      "pause": "Pausa la descàrrega",
+      "resume": "Reprèn la descàrrega",
+      "downloading": "S'està descarregant: {{written}} de {{total}}",
+      "downloadingUnknown": "S'està descarregant: {{written}}",
+      "paused": "En pausa: {{written}} de {{total}}",
+      "verifying": "S'està comprovant el fitxer descarregat…",
+      "downloaded": "Descarregat · {{size}}",
+      "url": "Enllaç de descàrrega directa",
+      "urlHelp": "Enganxa un enllaç HTTPS a un fitxer .gguf, com ara un enllaç resolve de Hugging Face. Descarrega models només de fonts de confiança.",
+      "downloadUrl": "Descarrega des de l'enllaç",
+      "deleteTitle": "Vols eliminar aquest model?",
+      "deleteMessage": "Vols eliminar {{name}} d'aquest dispositiu? Els xats que el fan servir necessiten un altre model abans de poder continuar.",
+      "errors": {
+        "invalidUrl": "Introdueix un enllaç vàlid.",
+        "insecureUrl": "Fes servir un enllaç HTTPS. Els models no es poden descarregar per HTTP.",
+        "credentialsUrl": "Elimina el nom d'usuari i la contrasenya de l'enllaç.",
+        "notGguf": "L'enllaç ha d'apuntar a un fitxer .gguf.",
+        "space": "No hi ha prou espai d'emmagatzematge lliure per a aquest model. Allibera espai i torna-ho a provar.",
+        "network": "La descàrrega no s'ha acabat. Comprova la connexió i torna-ho a provar.",
+        "invalidFile": "El fitxer descarregat no és un model que aquesta aplicació pugui executar, així que s'ha eliminat."
+      }
+    },
     "localModels": {
       "title": "Models al dispositiu",
       "help": "Els models al dispositiu s'executen en aquest telèfon. Les teves peticions i respostes es queden al dispositiu, i aquests models no poden fer servir eines.",

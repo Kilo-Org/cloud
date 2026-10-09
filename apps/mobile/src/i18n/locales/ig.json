@@ -3324,6 +3324,33 @@
       "deleteMessage": "Hichapụ {{name}} na ozi njirimara ya echekwara? Nkata ndị na-eji sava a ga-achọ sava ọhụrụ tupu ha enwee ike ịga n'ihu.",
       "completionTokenFieldHelp": "Oghere iberibe ederede azịza: jiri max_completion_tokens maka API ọgbara ọhụrụ, ma ọ bụ max_tokens ma ọ bụrụ na ebe njedebe gị chọrọ oghere ochie."
     },
+    "gguf": {
+      "title": "Ụdị nlereanya ndị enwere ike ibudata",
+      "help": "Budata ụdị nlereanya mepere emepe ma jiri llama.cpp mee ya na ekwentị a. Ajụjụ gị na nzaghachi gị na-anọ na ngwaọrụ ahụ. Ụdị nlereanya ndị a buru ibu, ya mere jiri Wi-Fi.",
+      "details": "{{size}} · Ikikere: {{license}}",
+      "download": "Budata ụdị nlereanya",
+      "pause": "Kwụsị ibudata",
+      "resume": "Maliteghachi ibudata",
+      "downloading": "Na-ebudata: {{written}} n'ime {{total}}",
+      "downloadingUnknown": "Na-ebudata: {{written}}",
+      "paused": "A kwụsịrị: {{written}} n'ime {{total}}",
+      "verifying": "Na-enyocha faịlụ e budatara…",
+      "downloaded": "E budatara · {{size}}",
+      "url": "Njikọ ibudata kpọmkwem",
+      "urlHelp": "Tinye njikọ HTTPS na faịlụ .gguf, dị ka njikọ resolve nke Hugging Face. Naanị budata ụdị nlereanya site na isi mmalite ndị ị tụkwasịrị obi.",
+      "downloadUrl": "Budata site na njikọ",
+      "deleteTitle": "Hichapụ ụdị nlereanya a?",
+      "deleteMessage": "Hichapụ {{name}} na ngwaọrụ a? Mkparịta ụka ndị na-eji ya chọrọ ụdị nlereanya ọzọ tupu ha enwee ike ịga n'ihu.",
+      "errors": {
+        "invalidUrl": "Tinye njikọ ziri ezi.",
+        "insecureUrl": "Jiri njikọ HTTPS. Enweghị ike ibudata ụdị nlereanya site na HTTP.",
+        "credentialsUrl": "Wepụ aha onye ọrụ na paswọọdụ na njikọ ahụ.",
+        "notGguf": "Njikọ ahụ ga-arụtụ aka na faịlụ .gguf.",
+        "space": "Enweghị ebe nchekwa zuru ezu maka ụdị nlereanya a. Hapụ ohere ma nwaa ọzọ.",
+        "network": "Ibudata ahụ agwụchaghị. Lelee njikọ gị ma nwaa ọzọ.",
+        "invalidFile": "Faịlụ e budatara abụghị ụdị nlereanya ngwa a nwere ike ịgba, ya mere ewepụrụ ya."
+      }
+    },
     "localModels": {
       "title": "Ụdị nlereanya na ngwaọrụ",
       "help": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na ekwentị a. Ajụjụ gị na nzaghachi gị na-anọ na ngwaọrụ ahụ, ụdị nlereanya ndị a enweghịkwa ike iji ngwá ọrụ.",

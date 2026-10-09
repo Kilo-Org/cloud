@@ -187,6 +187,10 @@ const completionResult = z
   })
   .transform(flags => ({
     ...flags,
+    // `answerOf` reads a present `accumulated_text` as "the parser ran", so a
+    // native null has to become absent rather than stay a value.
+    content: flags.content ?? undefined,
+    accumulated_text: flags.accumulated_text ?? undefined,
     tool_calls: flags.tool_calls.map(call => ({
       id: call.id ?? undefined,
       function: { name: call.function.name, arguments: call.function.arguments ?? '' },

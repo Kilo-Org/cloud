@@ -168,6 +168,8 @@ describe('reading what llama.rn resolves with', () => {
   };
 
   it('reads null where the native object uses null', () => {
+    // A null `accumulated_text` must not read as "the parser ran": that would
+    // take the answer from `content`, which is absent for a plain answer.
     const read = readCompletion({
       ...full,
       content: null,
@@ -181,6 +183,8 @@ describe('reading what llama.rn resolves with', () => {
 
     expect(read.ok && read.value.text).toBe('Hello');
     expect(read.ok && read.value.tool_calls).toEqual([]);
+    expect(read.ok && read.value.accumulated_text).toBeUndefined();
+    expect(read.ok && answerOf(read.value)).toBe('Hello');
   });
 
   it('reads a tool call the model left unfinished', () => {
@@ -195,8 +199,8 @@ describe('reading what llama.rn resolves with', () => {
   });
 
   it('answers from a shape the full read refuses, without inventing counts', () => {
-    // The unknown key is what the full read rejects; the text is real.
-    const read = readCompletion({ ...full, tokens_evaluated: 'twelve', timing: {} });
+    // The string in a numeric field is what the full read rejects; the text is real.
+    const read = readCompletion({ ...full, tokens_evaluated: 'twelve' });
 
     expect(read.ok && read.value.text).toBe('Hello');
     expect(read.ok && read.value.tokens_evaluated).toBe(0);

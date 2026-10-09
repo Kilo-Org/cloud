@@ -45,7 +45,7 @@ import { i18n } from '@/i18n';
 import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { pickAgentAttachments } from '@/components/agents/attachment-picker';
+import { pickAgentAttachments, pickAgentImages } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Text } from '@/components/ui/text';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
@@ -95,6 +95,7 @@ import {
   type UploadPendingResult,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
 import {
@@ -154,6 +155,8 @@ export type ChatComposerControl = {
 export type ChatComposerSendOptions = {
   attachments?: AgentAttachmentWire;
   submission?: AgentAttachmentSubmissionPayload;
+  /** The images read for `local` attachment delivery. */
+  images?: readonly LocalImage[];
   onOptimisticSend?: () => void;
 };
 
@@ -193,8 +196,13 @@ type ChatComposerProps = {
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
   organizationId?: string;
-  /** Only Cloud Agent sessions can receive attachments. */
+  /** Only Cloud Agent sessions and image-capable chat models can receive attachments. */
   attachmentsEnabled?: boolean;
+  /**
+   * `upload` sends files to Cloud Agent storage. `local` accepts images only,
+   * keeps them on the device, and hands their bytes to `onSend`.
+   */
+  attachmentDelivery?: 'upload' | 'local';
   /** Active resolved session type — drives slash command selection. */
   activeSessionType?: 'cloud-agent' | 'remote' | 'read-only' | null;
   /** Wrapper commands; remote presentation adds /new and capability-gated /exit after stripping aliases. */
@@ -258,6 +266,7 @@ export function ChatComposer({
   modelLockLabel,
   organizationId,
   attachmentsEnabled = true,
+  attachmentDelivery = 'upload',
   activeSessionType = null,
   commands = [],
   commandCatalogStatus = null,
@@ -371,7 +380,7 @@ export function ChatComposer({
       }
     },
   } satisfies { current: boolean };
-  const upload = useAgentAttachmentUpload({ organizationId });
+  const upload = useAgentAttachmentUpload({ organizationId, delivery: attachmentDelivery });
 
   // Leave confirm for unsent uploads. The composer registers its own
   // `beforeRemove` listener so header back, the iOS swipe-back gesture, and
@@ -958,6 +967,11 @@ export function ChatComposer({
       toast.error(i18n.t('agentChat.composer.removeOrRetryFailed'));
       return;
     }
+    // The model changed after the images were attached, to one that reads none.
+    if (!attachmentsEnabled && attachmentDelivery === 'local' && upload.attachments.length > 0) {
+      toast.error(i18n.t('agentChat.composer.modelCannotReadImages'));
+      return;
+    }
 
     const submission = parseChatComposerSubmission(trimmed, commandList, {
       hasAttachments: upload.attachments.length > 0,
@@ -1038,6 +1052,7 @@ export function ChatComposer({
               await onSend(prompt, {
                 attachments: uploaded?.wire,
                 submission: uploaded?.submission,
+                images: uploaded?.images,
                 onOptimisticSend: () => {
                   // The optimistic row is already in the transcript. Clear the
                   // draft and chips (non-destructively) and stop the spinner so
@@ -1192,7 +1207,7 @@ export function ChatComposer({
     // and the composer's send flow consults `upload.isUploading` /
     // `upload.hasFailedAttachments` to gate admission.
     void addCandidates(
-      await pickAgentAttachments(
+      await (attachmentDelivery === 'local' ? pickAgentImages : pickAgentAttachments)(
         showActionSheetWithOptions,
         {
           userId,
@@ -1202,7 +1217,14 @@ export function ChatComposer({
         themedSheet
       )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId, sessionId, themedSheet]);
+  }, [
+    addCandidates,
+    attachmentDelivery,
+    showActionSheetWithOptions,
+    userId,
+    sessionId,
+    themedSheet,
+  ]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,

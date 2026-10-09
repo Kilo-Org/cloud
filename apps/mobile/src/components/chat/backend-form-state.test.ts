@@ -30,6 +30,7 @@ const fields: BackendFormFields = {
       contextWindow: '',
       maxOutputTokens: '',
       tools: false,
+      images: false,
     },
   ],
 };

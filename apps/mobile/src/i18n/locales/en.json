@@ -2573,7 +2573,11 @@
       "preparingPlaceholder": "Setting up environment...",
       "finalizingPlaceholder": "Wrapping up...",
       "cannotReceiveFiles": "This session can't receive files. Remove the attachments to send your message.",
-      "couldNotAttachFiles": "Couldn't attach files. Tap send to try again."
+      "couldNotAttachFiles": "Couldn't attach files. Tap send to try again.",
+      "imagesOnly": "Only images can be attached here.",
+      "imageTooLarge": "This image is too large to send, even after it is made smaller. Choose a smaller image.",
+      "imageUnreadable": "This image could not be read. Choose another image.",
+      "modelCannotReadImages": "This model does not read images. Remove the images or choose another model."
     },
     "chatLink": {
       "linkCopied": "Link copied",
@@ -3250,7 +3254,10 @@
       "contextWindow": "Context window (optional)",
       "maxOutputTokens": "Maximum output tokens (optional)",
       "modelTools": "This model supports tool calls",
+      "modelImages": "This model reads images",
+      "modelToolsImages": "This model supports tool calls and reads images",
       "textOnly": "This model is text-only; no tools are sent.",
+      "imagesNoTools": "This model reads images; no tools are sent.",
       "addModel": "Add model manually",
       "removeModel": "Remove this model",
       "discover": "Discover available models",

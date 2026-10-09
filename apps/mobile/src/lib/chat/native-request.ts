@@ -12,7 +12,7 @@ export type NativeToolCall = {
  * One transcript entry. The text roles reach every provider. The tool roles
  * reach only a provider that runs tools, and each output names its call.
  */
-export type NativeMessage =
+type NativeMessage =
   | { readonly role: 'user' | 'assistant'; readonly text: string }
   | { readonly role: 'toolCalls'; readonly calls: readonly NativeToolCall[] }
   | {

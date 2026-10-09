@@ -6,7 +6,7 @@ import { z } from 'zod';
  * The native module builds the Foundation Models schema from this tree, one
  * node for one node, so every rule about what fits is decided here.
  */
-export type NativeSchema =
+type NativeSchema =
   | { readonly type: 'string'; readonly description?: string; readonly choices?: readonly string[] }
   | { readonly type: 'integer' | 'number' | 'boolean'; readonly description?: string }
   | {
@@ -22,7 +22,7 @@ export type NativeSchema =
       readonly properties: readonly NativeProperty[];
     };
 
-export type NativeProperty = {
+type NativeProperty = {
   readonly name: string;
   readonly description?: string;
   readonly optional: boolean;

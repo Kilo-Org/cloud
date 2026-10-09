@@ -331,6 +331,7 @@ private actor AppleModelEngine {
     let session = LanguageModelSession(
       model: model, tools: tools, transcript: Transcript(entries: inputEntries.dropLast())
     )
+    reference.history = session.transcript.count
     reference.session = session
     var options = GenerationOptions()
     options.maximumResponseTokens = request.maxTokens
@@ -547,11 +548,14 @@ private actor AppleModelEngine {
 @available(iOS 26.0, *)
 private final class SessionReference: @unchecked Sendable {
   weak var session: LanguageModelSession?
+  /// How many entries the session started with: the history JavaScript sent.
+  var history = 0
 
-  /// The calls of the newest tool-call entry: the turn the model is in.
+  /// The calls of the newest tool-call entry this generation wrote: the turn
+  /// the model is in. Calls in the history were answered in earlier requests.
   func newestCalls() -> (id: String, calls: [PendingToolCall])? {
     guard let transcript = session?.transcript else { return nil }
-    for entry in transcript.reversed() {
+    for entry in transcript.dropFirst(history).reversed() {
       if case .toolCalls(let calls) = entry {
         return (calls.id, calls.map {
           PendingToolCall(id: $0.id, name: $0.toolName, arguments: $0.arguments.jsonString)

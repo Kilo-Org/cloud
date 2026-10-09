@@ -21,10 +21,61 @@ import {
   updateChatBackend,
   useChatBackends,
 } from '@/lib/chat/backend-store';
+import { type LocalModelStatus, useLocalModels } from '@/lib/chat/local-models';
 
 import { BackendForm } from './backend-form';
 
 type FormTarget = { kind: 'add' } | { kind: 'edit'; backend: StoredChatBackend };
+
+/** Fixed copy for the stable reason codes the native providers report. */
+const UNAVAILABLE_REASON_KEYS = new Map([
+  ['apple_intelligence_disabled', 'modelChat.localModels.reasons.appleIntelligenceDisabled'],
+  ['device_not_eligible', 'modelChat.localModels.reasons.deviceNotEligible'],
+  ['model_not_ready', 'modelChat.localModels.reasons.modelNotReady'],
+  ['unsupported_os', 'modelChat.localModels.reasons.unsupportedOs'],
+]);
+
+function LocalModelRow({ status }: Readonly<{ status: LocalModelStatus }>) {
+  const { t } = useTranslation();
+  const { availability } = status;
+  let statusKey = 'modelChat.localModels.notAvailable';
+  if (availability === undefined) {
+    statusKey = 'modelChat.localModels.checking';
+  } else if (availability.status === 'available') {
+    statusKey = 'modelChat.localModels.ready';
+  }
+  const reasonKey =
+    availability === undefined || availability.status === 'available'
+      ? undefined
+      : (UNAVAILABLE_REASON_KEYS.get(availability.reason ?? '') ??
+        'modelChat.localModels.reasons.unknown');
+  return (
+    <View className="gap-1 rounded-xl border border-border p-4">
+      <Text className="font-semibold">{t(status.nameKey)}</Text>
+      <Text className="text-sm">{t(statusKey)}</Text>
+      {reasonKey !== undefined && (
+        <Text className="text-sm text-muted-foreground">{t(reasonKey)}</Text>
+      )}
+    </View>
+  );
+}
+
+function LocalModelSection() {
+  const { t } = useTranslation();
+  const localModels = useLocalModels();
+  if (localModels.length === 0) {
+    return null;
+  }
+  return (
+    <View className="gap-2">
+      <Text className="font-semibold">{t('modelChat.localModels.title')}</Text>
+      <Text className="text-sm text-muted-foreground">{t('modelChat.localModels.help')}</Text>
+      {localModels.map(status => (
+        <LocalModelRow key={status.provider} status={status} />
+      ))}
+    </View>
+  );
+}
 
 export function BackendSettingsControl() {
   const { t } = useTranslation();
@@ -134,6 +185,7 @@ function BackendSettingsContent({ onClose }: Readonly<{ onClose: () => void }>) 
       >
         <Text>{t('modelChat.backends.defaultKilo')}</Text>
         <Text className="text-sm text-muted-foreground">{t('modelChat.backends.kiloHelp')}</Text>
+        <LocalModelSection />
         {!loaded ? (
           <Text>{t('common.loading')}</Text>
         ) : (

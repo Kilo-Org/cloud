@@ -3323,6 +3323,24 @@
       "deleteTitle": "Pa ètò ẹ̀yìn ìjíròrò yìí rẹ́?",
       "deleteMessage": "Pa {{name}} àti àwọn ẹ̀rí ìwọlé rẹ̀ tí a fi pamọ́ rẹ́? Àwọn ìjíròrò tí ń lo ètò ẹ̀yìn yìí yóò nílò ètò ẹ̀yìn tuntun kí wọ́n tó lè tẹ̀síwájú.",
       "completionTokenFieldHelp": "Ààyè àwọn àmì àbájáde: lo max_completion_tokens fún àwọn API òde òní, tàbí max_tokens bí ojú òpin rẹ bá nílò ààyè àtijọ́."
+    },
+    "localModels": {
+      "title": "Àwọn awoṣe lórí ẹ̀rọ",
+      "help": "Àwọn awoṣe lórí ẹ̀rọ ń ṣiṣẹ́ lórí fóònù yìí. Àwọn ìbéèrè àti èsì rẹ máa wà lórí ẹ̀rọ náà, àwọn awoṣe yìí kò sì lè lo irinṣẹ́.",
+      "apple": "Apple Intelligence (lórí ẹ̀rọ)",
+      "checking": "A ń ṣàyẹ̀wò bóyá ó wà…",
+      "ready": "Ó ti ṣetán fún lílò",
+      "notAvailable": "Kò sí lárọ̀ọ́wọ́tó",
+      "reasons": {
+        "appleIntelligenceDisabled": "Tan Apple Intelligence nínú áàpù Settings láti lo awoṣe yìí.",
+        "deviceNotEligible": "Ẹ̀rọ yìí kò ṣe àtìlẹ́yìn fún Apple Intelligence.",
+        "modelNotReady": "Awoṣe náà ṣì ń gbà sílẹ̀ tàbí ń múra sílẹ̀. Gbìyànjú lẹ́ẹ̀kan sí i nígbà míì.",
+        "unsupportedOs": "Awoṣe yìí nílò iOS 26 tàbí èyí tó jẹ́ tuntun jù bẹ́ẹ̀ lọ.",
+        "unknown": "Ètò náà kò sọ ìdí tí awoṣe yìí kò fi sí lárọ̀ọ́wọ́tó."
+      },
+      "unavailable": "Awoṣe lórí ẹ̀rọ kò sí lárọ̀ọ́wọ́tó báyìí. Ṣàyẹ̀wò ipò rẹ̀ nínú $t(modelChat.backends.title).",
+      "busy": "Awoṣe lórí ẹ̀rọ ń dá èsì míì lọ́wọ́. Gbìyànjú lẹ́ẹ̀kan sí i tí ó bá parí.",
+      "failed": "Awoṣe lórí ẹ̀rọ kò lè dáhùn ọ̀rọ̀ yìí. Gbìyànjú lẹ́ẹ̀kan sí i tàbí kọ ọ́ lọ́nà míì."
     }
   },
   "settingsTools": {

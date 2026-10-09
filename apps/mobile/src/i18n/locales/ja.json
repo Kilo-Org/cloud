@@ -3323,6 +3323,24 @@
       "deleteTitle": "このチャットバックエンドを削除しますか？",
       "deleteMessage": "{{name}}と保存されている認証情報を削除しますか？このバックエンドを使用しているチャットを続行するには、新しいバックエンドを選ぶ必要があります。",
       "completionTokenFieldHelp": "出力トークン数のフィールド：新しいAPIでは max_completion_tokens を使用し、エンドポイントで従来のフィールドが必要な場合は max_tokens を使用してください。"
+    },
+    "localModels": {
+      "title": "オンデバイスモデル",
+      "help": "オンデバイスモデルはこのスマートフォン上で動作します。プロンプトと返信はデバイス内にとどまり、これらのモデルはツールを使用できません。",
+      "apple": "Apple Intelligence（デバイス上）",
+      "checking": "利用可能か確認中…",
+      "ready": "使用可能",
+      "notAvailable": "利用できません",
+      "reasons": {
+        "appleIntelligenceDisabled": "このモデルを使用するには、「設定」アプリでApple Intelligenceをオンにしてください。",
+        "deviceNotEligible": "このデバイスはApple Intelligenceに対応していません。",
+        "modelNotReady": "モデルはまだダウンロード中か準備中です。しばらくしてからもう一度お試しください。",
+        "unsupportedOs": "このモデルにはiOS 26以降が必要です。",
+        "unknown": "このモデルを利用できない理由はシステムから示されませんでした。"
+      },
+      "unavailable": "オンデバイスモデルは現在利用できません。$t(modelChat.backends.title)で状態を確認してください。",
+      "busy": "オンデバイスモデルは別の返信を処理中です。完了してからもう一度お試しください。",
+      "failed": "オンデバイスモデルはこのメッセージに回答できませんでした。もう一度試すか、言い換えてください。"
     }
   },
   "settingsTools": {

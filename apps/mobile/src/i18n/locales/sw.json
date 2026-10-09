@@ -3323,6 +3323,24 @@
       "deleteTitle": "Ufute huduma hii ya gumzo?",
       "deleteMessage": "Ufute {{name}} na taarifa zake za uthibitishaji zilizohifadhiwa? Gumzo zinazotumia huduma hii zitahitaji huduma mpya kabla ya kuendelea.",
       "completionTokenFieldHelp": "Sehemu ya tokeni za matokeo: tumia max_completion_tokens kwa API za kisasa, au max_tokens ikiwa kiishio chako kinahitaji sehemu ya zamani."
+    },
+    "localModels": {
+      "title": "Modeli za kwenye kifaa",
+      "help": "Modeli za kwenye kifaa hufanya kazi kwenye simu hii. Maombi na majibu yako hubaki kwenye kifaa, na modeli hizi haziwezi kutumia zana.",
+      "apple": "Apple Intelligence (kwenye kifaa)",
+      "checking": "Inakagua upatikanaji…",
+      "ready": "Iko tayari kutumika",
+      "notAvailable": "Haipatikani",
+      "reasons": {
+        "appleIntelligenceDisabled": "Washa Apple Intelligence katika programu ya Mipangilio ili utumie modeli hii.",
+        "deviceNotEligible": "Kifaa hiki hakitumii Apple Intelligence.",
+        "modelNotReady": "Modeli bado inapakuliwa au inaandaliwa. Jaribu tena baadaye.",
+        "unsupportedOs": "Modeli hii inahitaji iOS 26 au toleo jipya zaidi.",
+        "unknown": "Mfumo haukueleza kwa nini modeli hii haipatikani."
+      },
+      "unavailable": "Modeli ya kwenye kifaa haipatikani kwa sasa. Angalia hali yake katika $t(modelChat.backends.title).",
+      "busy": "Modeli ya kwenye kifaa inashughulikia jibu jingine. Jaribu tena itakapomaliza.",
+      "failed": "Modeli ya kwenye kifaa haikuweza kujibu ujumbe huu. Jaribu tena au uuandike kwa njia nyingine."
     }
   },
   "settingsTools": {

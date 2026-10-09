@@ -3409,6 +3409,24 @@
       "deleteTitle": "Smazat tento server chatu?",
       "deleteMessage": "Smazat {{name}} a uložené přihlašovací údaje? Chaty používající tento server budou pro pokračování potřebovat nový server.",
       "completionTokenFieldHelp": "Pole pro výstupní tokeny: pro moderní API použijte max_completion_tokens, nebo max_tokens, pokud váš koncový bod vyžaduje původní pole."
+    },
+    "localModels": {
+      "title": "Modely v zařízení",
+      "help": "Modely v zařízení běží přímo v tomto telefonu. Vaše dotazy a odpovědi zůstávají v zařízení a tyto modely nemohou používat nástroje.",
+      "apple": "Apple Intelligence (v zařízení)",
+      "checking": "Ověřování dostupnosti…",
+      "ready": "Připraveno k použití",
+      "notAvailable": "Nedostupné",
+      "reasons": {
+        "appleIntelligenceDisabled": "Chcete-li tento model používat, zapněte Apple Intelligence v aplikaci Nastavení.",
+        "deviceNotEligible": "Toto zařízení nepodporuje Apple Intelligence.",
+        "modelNotReady": "Model se stále stahuje nebo připravuje. Zkuste to později.",
+        "unsupportedOs": "Tento model vyžaduje iOS 26 nebo novější.",
+        "unknown": "Systém neuvedl, proč je tento model nedostupný."
+      },
+      "unavailable": "Model v zařízení teď není dostupný. Zkontrolujte jeho stav v sekci $t(modelChat.backends.title).",
+      "busy": "Model v zařízení právě generuje jinou odpověď. Zkuste to znovu, až skončí.",
+      "failed": "Model v zařízení nedokázal na tuto zprávu odpovědět. Zkuste to znovu nebo zprávu přeformulujte."
     }
   },
   "settingsTools": {

@@ -3323,6 +3323,24 @@
       "deleteTitle": "ይህ የውይይት የጀርባ አገልግሎት ይሰረዝ?",
       "deleteMessage": "{{name}} እና የተቀመጠው የመግቢያ መረጃው ይሰረዙ? ይህን የጀርባ አገልግሎት የሚጠቀሙ ውይይቶች ከመቀጠላቸው በፊት አዲስ የጀርባ አገልግሎት ያስፈልጋቸዋል።",
       "completionTokenFieldHelp": "የምላሽ ቶከን መስክ፦ ለዘመናዊ ኤፒአይዎች max_completion_tokens ይጠቀሙ፤ ወይም የመጨረሻ ነጥብዎ የቀድሞውን መስክ የሚፈልግ ከሆነ max_tokens ይጠቀሙ።"
+    },
+    "localModels": {
+      "title": "በመሣሪያ ላይ ያሉ ሞዴሎች",
+      "help": "በመሣሪያ ላይ ያሉ ሞዴሎች በዚህ ስልክ ላይ ይሠራሉ። ጥያቄዎችዎና ምላሾችዎ በመሣሪያው ላይ ይቆያሉ፤ እነዚህ ሞዴሎች መሳሪያዎችን መጠቀም አይችሉም።",
+      "apple": "Apple Intelligence (በመሣሪያ ላይ)",
+      "checking": "መገኘቱን በማረጋገጥ ላይ…",
+      "ready": "ለአገልግሎት ዝግጁ",
+      "notAvailable": "አይገኝም",
+      "reasons": {
+        "appleIntelligenceDisabled": "ይህን ሞዴል ለመጠቀም በቅንብሮች መተግበሪያ ውስጥ Apple Intelligenceን ያብሩ።",
+        "deviceNotEligible": "ይህ መሣሪያ Apple Intelligenceን አይደግፍም።",
+        "modelNotReady": "ሞዴሉ አሁንም በመውረድ ወይም በመዘጋጀት ላይ ነው። ቆይተው እንደገና ይሞክሩ።",
+        "unsupportedOs": "ይህ ሞዴል iOS 26 ወይም ከዚያ በኋላ ያለውን ይፈልጋል።",
+        "unknown": "ሥርዓቱ ይህ ሞዴል ለምን እንደማይገኝ አልገለጸም።"
+      },
+      "unavailable": "በመሣሪያ ላይ ያለው ሞዴል አሁን አይገኝም። ሁኔታውን በ$t(modelChat.backends.title) ውስጥ ያረጋግጡ።",
+      "busy": "በመሣሪያ ላይ ያለው ሞዴል ሌላ ምላሽ በመስጠት ተጠምዷል። ሲጨርስ እንደገና ይሞክሩ።",
+      "failed": "በመሣሪያ ላይ ያለው ሞዴል ለዚህ መልዕክት መልስ መስጠት አልቻለም። እንደገና ይሞክሩ ወይም በሌላ አገላለጽ ይጻፉት።"
     }
   },
   "settingsTools": {

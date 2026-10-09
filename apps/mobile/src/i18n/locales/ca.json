@@ -3366,6 +3366,24 @@
       "deleteTitle": "Vols eliminar aquest servidor de xat?",
       "deleteMessage": "Vols eliminar {{name}} i les seves credencials desades? Els xats que utilitzen aquest servidor necessitaran un servidor nou per poder continuar.",
       "completionTokenFieldHelp": "Camp de tòkens de compleció: utilitza max_completion_tokens per a les API modernes, o max_tokens si el teu punt de connexió requereix el camp antic."
+    },
+    "localModels": {
+      "title": "Models al dispositiu",
+      "help": "Els models al dispositiu s'executen en aquest telèfon. Les teves peticions i respostes es queden al dispositiu, i aquests models no poden fer servir eines.",
+      "apple": "Apple Intelligence (al dispositiu)",
+      "checking": "S'està comprovant la disponibilitat…",
+      "ready": "A punt per fer servir",
+      "notAvailable": "No disponible",
+      "reasons": {
+        "appleIntelligenceDisabled": "Activa Apple Intelligence a l'app Configuració per fer servir aquest model.",
+        "deviceNotEligible": "Aquest dispositiu no és compatible amb Apple Intelligence.",
+        "modelNotReady": "El model encara s'està baixant o preparant. Torna-ho a provar més tard.",
+        "unsupportedOs": "Aquest model requereix iOS 26 o posterior.",
+        "unknown": "El sistema no ha indicat per què aquest model no està disponible."
+      },
+      "unavailable": "El model al dispositiu no està disponible ara mateix. Comprova'n l'estat a $t(modelChat.backends.title).",
+      "busy": "El model al dispositiu està ocupat amb una altra resposta. Torna-ho a provar quan acabi.",
+      "failed": "El model al dispositiu no ha pogut respondre aquest missatge. Torna-ho a provar o reformula'l."
     }
   },
   "settingsTools": {

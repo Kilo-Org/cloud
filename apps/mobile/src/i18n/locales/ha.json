@@ -3323,6 +3323,24 @@
       "deleteTitle": "A share wannan uwar garken tattaunawa?",
       "deleteMessage": "A share {{name}} da bayanan shigarta da aka adana? Tattaunawar da suke amfani da wannan uwar garken za su buƙaci sabuwar uwar garke kafin su iya ci gaba.",
       "completionTokenFieldHelp": "Filin gutsuren rubutun amsa: yi amfani da max_completion_tokens don API na zamani, ko max_tokens idan wurin karɓar buƙatunka yana buƙatar tsohon filin."
+    },
+    "localModels": {
+      "title": "Samfuran da ke kan na'ura",
+      "help": "Samfuran da ke kan na'ura suna aiki a wannan wayar. Saƙonninka da amsoshi suna zama a kan na'urar, kuma waɗannan samfuran ba sa iya amfani da kayan aiki.",
+      "apple": "Apple Intelligence (a kan na'ura)",
+      "checking": "Ana duba samuwa…",
+      "ready": "A shirye don amfani",
+      "notAvailable": "Babu shi",
+      "reasons": {
+        "appleIntelligenceDisabled": "Kunna Apple Intelligence a manhajar Settings don amfani da wannan samfurin.",
+        "deviceNotEligible": "Wannan na'urar ba ta goyon bayan Apple Intelligence.",
+        "modelNotReady": "Samfurin yana ci gaba da saukewa ko shiryawa. Sake gwadawa daga baya.",
+        "unsupportedOs": "Wannan samfurin yana buƙatar iOS 26 ko sama da haka.",
+        "unknown": "Tsarin bai faɗi dalilin da ya sa wannan samfurin ba ya samuwa ba."
+      },
+      "unavailable": "Samfurin da ke kan na'ura ba ya samuwa a yanzu. Duba matsayinsa a $t(modelChat.backends.title).",
+      "busy": "Samfurin da ke kan na'ura yana aiki da wata amsa. Sake gwadawa idan ya gama.",
+      "failed": "Samfurin da ke kan na'ura bai iya amsa wannan saƙon ba. Sake gwadawa ko ka sake rubuta shi."
     }
   },
   "settingsTools": {

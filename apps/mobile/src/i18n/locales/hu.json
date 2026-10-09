@@ -3323,6 +3323,24 @@
       "deleteTitle": "Törlöd ezt a csevegési háttérrendszert?",
       "deleteMessage": "Törlöd a(z) {{name}} háttérrendszert és a tárolt hitelesítési adatait? Az ezt használó csevegések folytatásához új háttérrendszert kell választani.",
       "completionTokenFieldHelp": "Kimeneti tokenek mezője: modern API-k esetén a max_completion_tokens mezőt használja, vagy a max_tokens mezőt, ha a végpont a régi mezőt igényli."
+    },
+    "localModels": {
+      "title": "Eszközön futó modellek",
+      "help": "Az eszközön futó modellek ezen a telefonon működnek. A kérései és a válaszok az eszközön maradnak, és ezek a modellek nem használhatnak eszközöket.",
+      "apple": "Apple Intelligence (az eszközön)",
+      "checking": "Elérhetőség ellenőrzése…",
+      "ready": "Használatra kész",
+      "notAvailable": "Nem érhető el",
+      "reasons": {
+        "appleIntelligenceDisabled": "A modell használatához kapcsolja be az Apple Intelligence funkciót a Beállítások appban.",
+        "deviceNotEligible": "Ez az eszköz nem támogatja az Apple Intelligence funkciót.",
+        "modelNotReady": "A modell letöltése vagy előkészítése még folyamatban van. Próbálja újra később.",
+        "unsupportedOs": "Ehhez a modellhez iOS 26 vagy újabb szükséges.",
+        "unknown": "A rendszer nem adta meg, miért nem érhető el ez a modell."
+      },
+      "unavailable": "Az eszközön futó modell jelenleg nem érhető el. Ellenőrizze az állapotát itt: $t(modelChat.backends.title).",
+      "busy": "Az eszközön futó modell épp egy másik válaszon dolgozik. Próbálja újra, ha végzett.",
+      "failed": "Az eszközön futó modell nem tudott válaszolni erre az üzenetre. Próbálja újra, vagy fogalmazza át."
     }
   },
   "settingsTools": {

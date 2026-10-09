@@ -56,6 +56,20 @@ The warning covers unencrypted prompts, responses, credentials, and headers.
 - iOS permits approved local HTTP endpoints through the local networking exception.
 - Public HTTP endpoints are rejected. HTTPS certificate checks remain enabled.
 
+### On-device models
+
+On iOS 26 or later with Apple Intelligence on, the model picker offers
+**Apple Intelligence (on device)**. The `kilo-apple-model` local module runs
+Apple's Foundation Models system model for inference only; the SDK still owns
+the conversation. Building the module requires Xcode with the iOS 26.4 SDK or
+newer. The minimum iOS version does not change.
+
+- **Manage backends** shows its status and why it is unavailable: Apple Intelligence off, device not eligible, model not ready, or iOS older than 26.
+- On-device models are text-only. They never receive tool definitions.
+- An unavailable or busy model fails the send with fixed copy. It never falls back to Kilo or another backend.
+- Switching between Kilo, a custom backend, and an on-device model shows the context-transfer warning.
+- Usage comes from the model when it reports counts, then its token counter, then an estimate of three characters per token, so compaction still runs on the small window.
+
 ## App Store Kilo Pass Subscriptions
 
 App Store Kilo Pass subscriptions require an EAS development build or TestFlight

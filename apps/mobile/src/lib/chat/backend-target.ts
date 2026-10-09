@@ -1,8 +1,15 @@
+import { ModelError } from '@kilocode/harness-sdk';
+
 import { i18n } from '@/i18n';
 
 import { type BackendModel, type StoredChatBackend } from './backend-store';
+import { LocalModelError } from './local-model-error';
 
 const PREFIX = 'backend:';
+const LOCAL_PREFIX = 'local:';
+const GGUF_PREFIX = 'gguf:';
+/** A system provider serves one model, and the OS chooses its version. */
+const SYSTEM_MODEL = 'system';
 
 type BackendTargetProblem = 'invalidTarget' | 'deletedBackend' | 'staleBackend' | 'missingModel';
 
@@ -24,14 +31,29 @@ class BackendTargetError extends Error {
 
 /** Fixed UI copy only: provider failures may contain credentials or response bodies. */
 export function backendFailureKey(error: unknown): string {
-  return error instanceof BackendTargetError
-    ? TARGET_ERROR_KEYS[error.problem]
-    : 'common.somethingWentWrong';
+  // The routed model client reports target and local failures as a ModelError cause.
+  for (const failure of [error, error instanceof ModelError ? error.cause : undefined]) {
+    if (failure instanceof BackendTargetError) {
+      return TARGET_ERROR_KEYS[failure.problem];
+    }
+    if (failure instanceof LocalModelError) {
+      return failure.key;
+    }
+  }
+  return 'common.somethingWentWrong';
 }
 
 type BackendTarget = {
   readonly backendId: string;
   readonly revision: number;
+  readonly modelId: string;
+};
+
+export type LocalProvider = 'apple' | 'android' | 'gguf';
+
+type LocalTarget = {
+  readonly provider: LocalProvider;
+  /** `system` for the OS model providers, or the decoded GGUF file id. */
   readonly modelId: string;
 };
 
@@ -42,7 +64,44 @@ export type ResolvedChatTarget =
       readonly backend: StoredChatBackend;
       readonly model: BackendModel;
       readonly modelId: string;
-    };
+    }
+  | ({ readonly kind: 'local' } & LocalTarget);
+
+/** `local:apple`, `local:android`, or `local:gguf:<encodeURIComponent(fileId)>`. */
+export function localTargetId(provider: 'apple' | 'android'): string;
+export function localTargetId(provider: 'gguf', fileId: string): string;
+export function localTargetId(provider: LocalProvider, fileId?: string): string {
+  return provider === 'gguf'
+    ? `${LOCAL_PREFIX}${GGUF_PREFIX}${encodeURIComponent(fileId ?? '')}`
+    : `${LOCAL_PREFIX}${provider}`;
+}
+
+function decodedFileId(encoded: string): string | null {
+  try {
+    const fileId = decodeURIComponent(encoded);
+    // One spelling per file, so one file is exactly one backend identity.
+    return fileId !== '' && encodeURIComponent(fileId) === encoded ? fileId : null;
+  } catch {
+    return null;
+  }
+}
+
+export function decodeLocalTarget(id: string): LocalTarget | null {
+  if (!id.startsWith(LOCAL_PREFIX)) {
+    return null;
+  }
+  const rest = id.slice(LOCAL_PREFIX.length);
+  if (rest === 'apple' || rest === 'android') {
+    return { provider: rest, modelId: SYSTEM_MODEL };
+  }
+  const fileId = rest.startsWith(GGUF_PREFIX)
+    ? decodedFileId(rest.slice(GGUF_PREFIX.length))
+    : null;
+  if (fileId === null) {
+    throw new BackendTargetError('invalidTarget');
+  }
+  return { provider: 'gguf', modelId: fileId };
+}
 
 /** The SDK persists this opaque identity in its existing model field. */
 export function backendTargetId(backend: StoredChatBackend, modelId: string): string {
@@ -87,6 +146,10 @@ export function resolveChatTarget(
   id: string,
   backends: readonly StoredChatBackend[]
 ): ResolvedChatTarget {
+  const local = decodeLocalTarget(id);
+  if (local !== null) {
+    return { kind: 'local', ...local };
+  }
   const target = decodeBackendTarget(id);
   if (target === null) {
     return { kind: 'kilo', modelId: id };

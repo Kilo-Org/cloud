@@ -3323,6 +3323,24 @@
       "deleteTitle": "Eliminar este servizo de chat?",
       "deleteMessage": "Eliminar {{name}} e as súas credenciais gardadas? Os chats que usan este servizo necesitarán un servizo novo para poder continuar.",
       "completionTokenFieldHelp": "Campo de tókens de saída: usa max_completion_tokens para as API modernas, ou max_tokens se o teu punto de acceso require o campo antigo."
+    },
+    "localModels": {
+      "title": "Modelos no dispositivo",
+      "help": "Os modelos no dispositivo execútanse neste teléfono. As túas solicitudes e respostas quedan no dispositivo, e estes modelos non poden usar ferramentas.",
+      "apple": "Apple Intelligence (no dispositivo)",
+      "checking": "Comprobando a dispoñibilidade…",
+      "ready": "Listo para usar",
+      "notAvailable": "Non dispoñible",
+      "reasons": {
+        "appleIntelligenceDisabled": "Activa Apple Intelligence na app Axustes para usar este modelo.",
+        "deviceNotEligible": "Este dispositivo non é compatible con Apple Intelligence.",
+        "modelNotReady": "O modelo aínda se está descargando ou preparando. Téntao de novo máis tarde.",
+        "unsupportedOs": "Este modelo require iOS 26 ou posterior.",
+        "unknown": "O sistema non indicou por que este modelo non está dispoñible."
+      },
+      "unavailable": "O modelo no dispositivo non está dispoñible agora mesmo. Comproba o seu estado en $t(modelChat.backends.title).",
+      "busy": "O modelo no dispositivo está ocupado con outra resposta. Téntao de novo cando remate.",
+      "failed": "O modelo no dispositivo non puido responder a esta mensaxe. Téntao de novo ou reformúlaa."
     }
   },
   "settingsTools": {

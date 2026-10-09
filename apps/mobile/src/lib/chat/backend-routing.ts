@@ -10,6 +10,8 @@ import { Effect, Stream } from 'effect';
 
 import { type StoredChatBackend } from './backend-store';
 import { resolveChatTarget } from './backend-target';
+import { LocalModelError } from './local-model-error';
+import { localModelProvider } from './local-models';
 
 type ChatRoutingDependencies = {
   readonly kilo: ModelClientService;
@@ -53,6 +55,18 @@ export function routedModelClient({
             if (target.kind === 'kilo') {
               return kilo.stream(request);
             }
+            if (target.kind === 'local') {
+              // A build without this provider fails explicitly; it never falls back.
+              const local = localModelProvider(target.provider);
+              return local === undefined
+                ? Stream.fail(
+                    new ModelError({
+                      reason: 'unsupported',
+                      cause: new LocalModelError('unavailable'),
+                    })
+                  )
+                : local.client.stream({ ...request, model: target.modelId });
+            }
             const { backend } = target;
             const key = `${backend.id}:${backend.revision}`;
             let client = clients.get(key);
@@ -84,6 +98,9 @@ export function targetModelFacts(
   const target = resolveChatTarget(targetId, profiles);
   if (target.kind === 'kilo') {
     return gatewayFacts;
+  }
+  if (target.kind === 'local') {
+    return localModelProvider(target.provider)?.facts(target.modelId) ?? { apiKinds: [] };
   }
   return {
     apiKinds: [target.backend.apiKind],

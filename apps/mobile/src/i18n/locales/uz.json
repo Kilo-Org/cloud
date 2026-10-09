@@ -3323,6 +3323,24 @@
       "deleteTitle": "Bu suhbat serveri oʻchirilsinmi?",
       "deleteMessage": "{{name}} va uning saqlangan kirish maʼlumotlari oʻchirilsinmi? Bu serverdan foydalanayotgan suhbatlarni davom ettirish uchun yangi server tanlash kerak boʻladi.",
       "completionTokenFieldHelp": "Javob tokenlari maydoni: zamonaviy APIlar uchun max_completion_tokens dan, yoki endpointingiz eski maydonni talab qilsa, max_tokens dan foydalaning."
+    },
+    "localModels": {
+      "title": "Qurilmadagi modellar",
+      "help": "Qurilmadagi modellar shu telefonda ishlaydi. So‘rovlaringiz va javoblar qurilmada qoladi, bu modellar esa vositalardan foydalana olmaydi.",
+      "apple": "Apple Intelligence (qurilmada)",
+      "checking": "Mavjudligi tekshirilmoqda…",
+      "ready": "Foydalanishga tayyor",
+      "notAvailable": "Mavjud emas",
+      "reasons": {
+        "appleIntelligenceDisabled": "Bu modeldan foydalanish uchun Sozlamalar ilovasida Apple Intelligence’ni yoqing.",
+        "deviceNotEligible": "Bu qurilma Apple Intelligence’ni qo‘llab-quvvatlamaydi.",
+        "modelNotReady": "Model hali yuklanmoqda yoki tayyorlanmoqda. Keyinroq qayta urining.",
+        "unsupportedOs": "Bu model uchun iOS 26 yoki undan keyingi versiya kerak.",
+        "unknown": "Tizim bu model nima uchun mavjud emasligini bildirmadi."
+      },
+      "unavailable": "Qurilmadagi model hozir mavjud emas. Uning holatini $t(modelChat.backends.title) bo‘limida tekshiring.",
+      "busy": "Qurilmadagi model boshqa javob bilan band. U tugagach, qayta urining.",
+      "failed": "Qurilmadagi model bu xabarga javob bera olmadi. Qayta urining yoki boshqacha yozing."
     }
   },
   "settingsTools": {

@@ -3323,6 +3323,24 @@
       "deleteTitle": "Padam sistem pelayan sembang ini?",
       "deleteMessage": "Padam {{name}} dan bukti kelayakannya yang disimpan? Sembang yang menggunakan sistem pelayan ini memerlukan sistem pelayan baharu sebelum boleh diteruskan.",
       "completionTokenFieldHelp": "Medan token output: gunakan max_completion_tokens untuk API moden, atau max_tokens jika titik akhir anda memerlukan medan legasi."
+    },
+    "localModels": {
+      "title": "Model pada peranti",
+      "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti, dan model ini tidak boleh menggunakan alat.",
+      "apple": "Apple Intelligence (pada peranti)",
+      "checking": "Menyemak ketersediaan…",
+      "ready": "Sedia untuk digunakan",
+      "notAvailable": "Tidak tersedia",
+      "reasons": {
+        "appleIntelligenceDisabled": "Hidupkan Apple Intelligence dalam app Seting untuk menggunakan model ini.",
+        "deviceNotEligible": "Peranti ini tidak menyokong Apple Intelligence.",
+        "modelNotReady": "Model masih dimuat turun atau sedang disediakan. Cuba lagi kemudian.",
+        "unsupportedOs": "Model ini memerlukan iOS 26 atau lebih baharu.",
+        "unknown": "Sistem tidak menyatakan sebab model ini tidak tersedia."
+      },
+      "unavailable": "Model pada peranti tidak tersedia buat masa ini. Semak statusnya dalam $t(modelChat.backends.title).",
+      "busy": "Model pada peranti sedang sibuk dengan balasan lain. Cuba lagi apabila ia selesai.",
+      "failed": "Model pada peranti tidak dapat menjawab mesej ini. Cuba lagi atau tulis semula mesej itu."
     }
   },
   "settingsTools": {

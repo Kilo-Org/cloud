@@ -3323,6 +3323,24 @@
       "deleteTitle": "Hichapụ sava nkata a?",
       "deleteMessage": "Hichapụ {{name}} na ozi njirimara ya echekwara? Nkata ndị na-eji sava a ga-achọ sava ọhụrụ tupu ha enwee ike ịga n'ihu.",
       "completionTokenFieldHelp": "Oghere iberibe ederede azịza: jiri max_completion_tokens maka API ọgbara ọhụrụ, ma ọ bụ max_tokens ma ọ bụrụ na ebe njedebe gị chọrọ oghere ochie."
+    },
+    "localModels": {
+      "title": "Ụdị nlereanya na ngwaọrụ",
+      "help": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na ekwentị a. Ajụjụ gị na nzaghachi gị na-anọ na ngwaọrụ ahụ, ụdị nlereanya ndị a enweghịkwa ike iji ngwá ọrụ.",
+      "apple": "Apple Intelligence (na ngwaọrụ)",
+      "checking": "Na-elele ma ọ dị…",
+      "ready": "Dị njikere iji",
+      "notAvailable": "Adịghị",
+      "reasons": {
+        "appleIntelligenceDisabled": "Gbanye Apple Intelligence na ngwa Settings iji ụdị nlereanya a.",
+        "deviceNotEligible": "Ngwaọrụ a anaghị akwado Apple Intelligence.",
+        "modelNotReady": "Ụdị nlereanya ahụ ka na-ebudata ma ọ bụ na-akwado onwe ya. Nwaa ọzọ ma emechaa.",
+        "unsupportedOs": "Ụdị nlereanya a chọrọ iOS 26 ma ọ bụ nke ọhụrụ karịa.",
+        "unknown": "Sistemụ ekwughị ihe kpatara na ụdị nlereanya a adịghị."
+      },
+      "unavailable": "Ụdị nlereanya na ngwaọrụ adịghị ugbu a. Lelee ọnọdụ ya na $t(modelChat.backends.title).",
+      "busy": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na nzaghachi ọzọ. Nwaa ọzọ mgbe ọ gwụchara.",
+      "failed": "Ụdị nlereanya na ngwaọrụ enweghị ike ịza ozi a. Nwaa ọzọ ma ọ bụ dee ya n'ụzọ ọzọ."
     }
   },
   "settingsTools": {

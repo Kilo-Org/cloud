@@ -3495,6 +3495,24 @@
       "deleteTitle": "Dileu'r ôl-ben sgwrs hwn?",
       "deleteMessage": "Dileu {{name}} a'i fanylion adnabod sydd wedi'u storio? Bydd angen ôl-ben newydd ar sgyrsiau sy'n defnyddio'r ôl-ben hwn cyn y gallant barhau.",
       "completionTokenFieldHelp": "Maes tocynnau cwblhau: defnyddiwch max_completion_tokens ar gyfer rhyngwynebau API modern, neu max_tokens os yw eich pwynt terfyn yn gofyn am y maes etifeddol."
+    },
+    "localModels": {
+      "title": "Modelau ar y ddyfais",
+      "help": "Mae modelau ar y ddyfais yn rhedeg ar y ffôn hwn. Mae eich anogwyr a'r atebion yn aros ar y ddyfais, ac ni all y modelau hyn ddefnyddio offer.",
+      "apple": "Apple Intelligence (ar y ddyfais)",
+      "checking": "Yn gwirio argaeledd…",
+      "ready": "Yn barod i'w ddefnyddio",
+      "notAvailable": "Ddim ar gael",
+      "reasons": {
+        "appleIntelligenceDisabled": "Trowch Apple Intelligence ymlaen yn yr ap Gosodiadau i ddefnyddio'r model hwn.",
+        "deviceNotEligible": "Nid yw'r ddyfais hon yn cefnogi Apple Intelligence.",
+        "modelNotReady": "Mae'r model yn dal i lwytho i lawr neu'n paratoi. Rhowch gynnig arall arni nes ymlaen.",
+        "unsupportedOs": "Mae angen iOS 26 neu'n hwyrach ar y model hwn.",
+        "unknown": "Ni ddywedodd y system pam nad yw'r model hwn ar gael."
+      },
+      "unavailable": "Nid yw'r model ar y ddyfais ar gael ar hyn o bryd. Gwiriwch ei statws yn $t(modelChat.backends.title).",
+      "busy": "Mae'r model ar y ddyfais yn brysur gydag ateb arall. Rhowch gynnig arall arni pan fydd wedi gorffen.",
+      "failed": "Methodd y model ar y ddyfais ag ateb y neges hon. Rhowch gynnig arall arni neu aralleiriwch hi."
     }
   },
   "settingsTools": {

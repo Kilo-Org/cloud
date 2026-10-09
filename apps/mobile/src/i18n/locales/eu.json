@@ -3323,6 +3323,24 @@
       "deleteTitle": "Txataren atzeko zerbitzu hau ezabatu?",
       "deleteMessage": "{{name}} eta gordetako kredentzialak ezabatu? Atzeko zerbitzu hau erabiltzen duten txatek atzeko zerbitzu berri bat beharko dute jarraitu ahal izateko.",
       "completionTokenFieldHelp": "Irteerako tokenen eremua: erabili max_completion_tokens API modernoetarako, edo max_tokens zure amaiera-puntuak eremu zaharra eskatzen badu."
+    },
+    "localModels": {
+      "title": "Gailuko modeloak",
+      "help": "Gailuko modeloak telefono honetan exekutatzen dira. Zure galderak eta erantzunak gailuan geratzen dira, eta modelo hauek ezin dute tresnarik erabili.",
+      "apple": "Apple Intelligence (gailuan)",
+      "checking": "Erabilgarritasuna egiaztatzen…",
+      "ready": "Erabiltzeko prest",
+      "notAvailable": "Ez dago erabilgarri",
+      "reasons": {
+        "appleIntelligenceDisabled": "Modelo hau erabiltzeko, aktibatu Apple Intelligence Ezarpenak aplikazioan.",
+        "deviceNotEligible": "Gailu honek ez du Apple Intelligence onartzen.",
+        "modelNotReady": "Modeloa deskargatzen edo prestatzen ari da oraindik. Saiatu berriro geroago.",
+        "unsupportedOs": "Modelo honek iOS 26 edo berriagoa behar du.",
+        "unknown": "Sistemak ez du esan zergatik ez dagoen modelo hau erabilgarri."
+      },
+      "unavailable": "Gailuko modeloa ez dago erabilgarri une honetan. Egiaztatu haren egoera hemen: $t(modelChat.backends.title).",
+      "busy": "Gailuko modeloa beste erantzun batekin lanpetuta dago. Saiatu berriro amaitzen duenean.",
+      "failed": "Gailuko modeloak ezin izan dio mezu honi erantzun. Saiatu berriro edo idatzi beste modu batera."
     }
   },
   "settingsTools": {

@@ -3323,6 +3323,24 @@
       "deleteTitle": "Eyða þessum bakenda spjalls?",
       "deleteMessage": "Eyða {{name}} og vistuðum auðkenningarupplýsingum hans? Spjöll sem nota þennan bakenda þurfa nýjan bakenda áður en hægt er að halda áfram.",
       "completionTokenFieldHelp": "Reitur fyrir úttakstákn: notaðu max_completion_tokens fyrir nýrri forritaskil eða max_tokens ef endapunkturinn þinn krefst eldri reitsins."
+    },
+    "localModels": {
+      "title": "Líkön í tækinu",
+      "help": "Líkön í tækinu keyra á þessum síma. Fyrirmæli þín og svör verða eftir í tækinu og þessi líkön geta ekki notað verkfæri.",
+      "apple": "Apple Intelligence (í tækinu)",
+      "checking": "Athugar framboð…",
+      "ready": "Tilbúið til notkunar",
+      "notAvailable": "Ekki í boði",
+      "reasons": {
+        "appleIntelligenceDisabled": "Kveiktu á Apple Intelligence í Stillingum til að nota þetta líkan.",
+        "deviceNotEligible": "Þetta tæki styður ekki Apple Intelligence.",
+        "modelNotReady": "Líkanið er enn að sækjast eða verða tilbúið. Reyndu aftur síðar.",
+        "unsupportedOs": "Þetta líkan krefst iOS 26 eða nýrra.",
+        "unknown": "Kerfið gaf ekki upp hvers vegna þetta líkan er ekki í boði."
+      },
+      "unavailable": "Líkanið í tækinu er ekki í boði eins og er. Athugaðu stöðu þess í $t(modelChat.backends.title).",
+      "busy": "Líkanið í tækinu er upptekið við annað svar. Reyndu aftur þegar því lýkur.",
+      "failed": "Líkanið í tækinu gat ekki svarað þessum skilaboðum. Reyndu aftur eða orðaðu þau öðruvísi."
     }
   },
   "settingsTools": {

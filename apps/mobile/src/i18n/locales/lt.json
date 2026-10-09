@@ -3409,6 +3409,24 @@
       "deleteTitle": "Ištrinti šį pokalbių serverį?",
       "deleteMessage": "Ištrinti {{name}} ir jo išsaugotus prisijungimo duomenis? Pokalbiams, naudojantiems šį serverį, reikės pasirinkti naują serverį, kad būtų galima juos tęsti.",
       "completionTokenFieldHelp": "Išvesties žetonų laukas: šiuolaikinėms API naudokite max_completion_tokens arba max_tokens, jei jūsų galinis taškas reikalauja senojo lauko."
+    },
+    "localModels": {
+      "title": "Įrenginio modeliai",
+      "help": "Įrenginio modeliai veikia šiame telefone. Jūsų užklausos ir atsakymai lieka įrenginyje, o šie modeliai negali naudoti įrankių.",
+      "apple": "Apple Intelligence (įrenginyje)",
+      "checking": "Tikrinamas pasiekiamumas…",
+      "ready": "Paruošta naudoti",
+      "notAvailable": "Nepasiekiama",
+      "reasons": {
+        "appleIntelligenceDisabled": "Norėdami naudoti šį modelį, įjunkite Apple Intelligence programoje „Nustatymai“.",
+        "deviceNotEligible": "Šis įrenginys nepalaiko Apple Intelligence.",
+        "modelNotReady": "Modelis vis dar atsisiunčiamas arba ruošiamas. Bandykite vėliau.",
+        "unsupportedOs": "Šiam modeliui reikia iOS 26 ar naujesnės versijos.",
+        "unknown": "Sistema nenurodė, kodėl šis modelis nepasiekiamas."
+      },
+      "unavailable": "Įrenginio modelis šiuo metu nepasiekiamas. Patikrinkite jo būseną skiltyje $t(modelChat.backends.title).",
+      "busy": "Įrenginio modelis užimtas kitu atsakymu. Bandykite dar kartą, kai jis baigs.",
+      "failed": "Įrenginio modelis negalėjo atsakyti į šią žinutę. Bandykite dar kartą arba performuluokite."
     }
   },
   "settingsTools": {

@@ -3323,6 +3323,24 @@
       "deleteTitle": "Mukua tēnei pūnaha tuarā kōrerorero?",
       "deleteMessage": "Mukua a {{name}} me ōna taipitopito motuhēhēnga kua tiakina? Me whai pūnaha tuarā hou ngā kōrerorero e whakamahi ana i tēnei pūnaha tuarā i mua i te haere tonu.",
       "completionTokenFieldHelp": "Āpure waeine kupu whakaoti: whakamahia max_completion_tokens mō ngā API hou, max_tokens rānei mēnā e hiahiatia ana te āpure tawhito e tō pito mutunga."
+    },
+    "localModels": {
+      "title": "Ngā tauira i te pūrere",
+      "help": "Ka rere ngā tauira i te pūrere ki runga i tēnei waea. Ka noho ō tono me ngā whakautu ki te pūrere, ā, kāore e taea e ēnei tauira te whakamahi taputapu.",
+      "apple": "Apple Intelligence (i te pūrere)",
+      "checking": "Kei te tirotiro mēnā e wātea ana…",
+      "ready": "Kua rite hei whakamahi",
+      "notAvailable": "Kāore e wātea ana",
+      "reasons": {
+        "appleIntelligenceDisabled": "Whakakāngia te Apple Intelligence i te taupānga Settings kia whakamahia ai tēnei tauira.",
+        "deviceNotEligible": "Kāore tēnei pūrere e tautoko i te Apple Intelligence.",
+        "modelNotReady": "Kei te tikiake tonu, kei te whakarite tonu rānei te tauira. Ngana anō ā muri ake.",
+        "unsupportedOs": "Me iOS 26, he putanga hou ake rānei mō tēnei tauira.",
+        "unknown": "Kāore te pūnaha i kī mai he aha i kore ai tēnei tauira e wātea."
+      },
+      "unavailable": "Kāore te tauira i te pūrere e wātea ana i tēnei wā. Tirohia tōna tūnga i $t(modelChat.backends.title).",
+      "busy": "Kei te pukumahi te tauira i te pūrere ki tētahi atu whakautu. Ngana anō ina oti.",
+      "failed": "Kāore i taea e te tauira i te pūrere te whakautu i tēnei karere. Ngana anō, kōrerotia anō rānei mā tētahi atu huarahi."
     }
   },
   "settingsTools": {

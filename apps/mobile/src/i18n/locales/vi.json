@@ -3323,6 +3323,24 @@
       "deleteTitle": "Xóa máy chủ trò chuyện này?",
       "deleteMessage": "Xóa {{name}} và thông tin xác thực đã lưu của máy chủ này? Các cuộc trò chuyện dùng máy chủ này sẽ cần một máy chủ mới để tiếp tục.",
       "completionTokenFieldHelp": "Trường token đầu ra: dùng max_completion_tokens cho các API hiện đại, hoặc max_tokens nếu điểm cuối của bạn yêu cầu trường cũ."
+    },
+    "localModels": {
+      "title": "Mô hình trên thiết bị",
+      "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị, và các mô hình này không thể dùng công cụ.",
+      "apple": "Apple Intelligence (trên thiết bị)",
+      "checking": "Đang kiểm tra khả dụng…",
+      "ready": "Sẵn sàng sử dụng",
+      "notAvailable": "Không khả dụng",
+      "reasons": {
+        "appleIntelligenceDisabled": "Bật Apple Intelligence trong ứng dụng Cài đặt để sử dụng mô hình này.",
+        "deviceNotEligible": "Thiết bị này không hỗ trợ Apple Intelligence.",
+        "modelNotReady": "Mô hình vẫn đang tải xuống hoặc đang chuẩn bị. Hãy thử lại sau.",
+        "unsupportedOs": "Mô hình này yêu cầu iOS 26 trở lên.",
+        "unknown": "Hệ thống không cho biết lý do mô hình này không khả dụng."
+      },
+      "unavailable": "Mô hình trên thiết bị hiện không khả dụng. Hãy kiểm tra trạng thái trong $t(modelChat.backends.title).",
+      "busy": "Mô hình trên thiết bị đang bận trả lời tin nhắn khác. Hãy thử lại khi hoàn tất.",
+      "failed": "Mô hình trên thiết bị không thể trả lời tin nhắn này. Hãy thử lại hoặc diễn đạt theo cách khác."
     }
   },
   "settingsTools": {

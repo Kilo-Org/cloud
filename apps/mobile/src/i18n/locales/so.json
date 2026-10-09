@@ -3323,6 +3323,24 @@
       "deleteTitle": "Ma tirtiraa adeeggan gadaale ee wada sheekaysiga?",
       "deleteMessage": "Ma tirtiraa {{name}} iyo xogtiisa aqoonsiga ee kaydsan? Wada sheekaysiyada isticmaala adeeggan gadaale waxay u baahan doonaan adeeg gadaale oo cusub ka hor inta aysan sii socon.",
       "completionTokenFieldHelp": "Goobta unugyada qoraalka jawaabta: u isticmaal max_completion_tokens API-yada casriga ah, ama max_tokens haddii bartaada dhammaadku u baahan tahay goobtii hore."
+    },
+    "localModels": {
+      "title": "Moodeelada aaladda gudaheeda",
+      "help": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan taleefankan. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda, moodeeladanina ma isticmaali karaan qalab.",
+      "apple": "Apple Intelligence (aaladda gudaheeda)",
+      "checking": "Waxaa la hubinayaa helitaanka…",
+      "ready": "Diyaar u ah isticmaal",
+      "notAvailable": "Lama heli karo",
+      "reasons": {
+        "appleIntelligenceDisabled": "Ka shid Apple Intelligence app-ka Settings si aad u isticmaasho moodeelkan.",
+        "deviceNotEligible": "Aaladdani ma taageerto Apple Intelligence.",
+        "modelNotReady": "Moodeelka weli waa la soo dejinayaa ama waa la diyaarinayaa. Mar dambe isku day.",
+        "unsupportedOs": "Moodeelkani wuxuu u baahan yahay iOS 26 ama ka dambe.",
+        "unknown": "Nidaamku ma sheegin sababta moodeelkan loo heli waayay."
+      },
+      "unavailable": "Moodeelka aaladda gudaheeda hadda lama heli karo. Ka hubi xaaladdiisa $t(modelChat.backends.title).",
+      "busy": "Moodeelka aaladda gudaheeda wuxuu ku mashquulsan yahay jawaab kale. Isku day marka uu dhammeeyo.",
+      "failed": "Moodeelka aaladda gudaheeda wuu ka jawaabi waayay fariintan. Isku day mar kale ama si kale u qor."
     }
   },
   "settingsTools": {

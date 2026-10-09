@@ -3323,6 +3323,24 @@
       "deleteTitle": "Bu söhbət arxa xidməti silinsin?",
       "deleteMessage": "{{name}} və onun saxlanılmış giriş məlumatları silinsin? Bu arxa xidmətdən istifadə edən söhbətlərin davam etməsi üçün yeni arxa xidmət seçilməlidir.",
       "completionTokenFieldHelp": "Çıxış tokenləri sahəsi: müasir API-lər üçün max_completion_tokens sahəsindən, son nöqtəniz köhnə sahəni tələb edirsə, max_tokens sahəsindən istifadə edin."
+    },
+    "localModels": {
+      "title": "Cihazdakı modellər",
+      "help": "Cihazdakı modellər bu telefonda işləyir. Sorğularınız və cavablar cihazda qalır, bu modellər isə alətlərdən istifadə edə bilmir.",
+      "apple": "Apple Intelligence (cihazda)",
+      "checking": "Əlçatanlıq yoxlanılır…",
+      "ready": "İstifadəyə hazırdır",
+      "notAvailable": "Əlçatan deyil",
+      "reasons": {
+        "appleIntelligenceDisabled": "Bu modeldən istifadə etmək üçün Parametrlər tətbiqində Apple Intelligence funksiyasını aktiv edin.",
+        "deviceNotEligible": "Bu cihaz Apple Intelligence funksiyasını dəstəkləmir.",
+        "modelNotReady": "Model hələ yüklənir və ya hazırlanır. Sonra yenidən cəhd edin.",
+        "unsupportedOs": "Bu model iOS 26 və ya daha yeni versiya tələb edir.",
+        "unknown": "Sistem bu modelin niyə əlçatan olmadığını bildirmədi."
+      },
+      "unavailable": "Cihazdakı model hazırda əlçatan deyil. Onun statusunu $t(modelChat.backends.title) bölməsində yoxlayın.",
+      "busy": "Cihazdakı model başqa cavabla məşğuldur. O bitdikdən sonra yenidən cəhd edin.",
+      "failed": "Cihazdakı model bu mesaja cavab verə bilmədi. Yenidən cəhd edin və ya mesajı başqa cür ifadə edin."
     }
   },
   "settingsTools": {

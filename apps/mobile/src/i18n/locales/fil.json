@@ -3323,6 +3323,24 @@
       "deleteTitle": "Burahin ang sistemang ito ng chat?",
       "deleteMessage": "Burahin ang {{name}} at ang mga nakaimbak nitong kredensyal? Kakailanganin ng mga chat na gumagamit ng sistemang ito ng bagong sistema bago makapagpatuloy.",
       "completionTokenFieldHelp": "Patlang para sa token ng sagot: gamitin ang max_completion_tokens para sa mga makabagong API, o ang max_tokens kung kailangan ng iyong dulo ng koneksyon ang lumang patlang."
+    },
+    "localModels": {
+      "title": "Mga modelong nasa device",
+      "help": "Tumatakbo sa teleponong ito ang mga modelong nasa device. Mananatili sa device ang iyong mga prompt at sagot, at hindi makakagamit ng mga tool ang mga modelong ito.",
+      "apple": "Apple Intelligence (sa device)",
+      "checking": "Tinitingnan kung available…",
+      "ready": "Handa nang gamitin",
+      "notAvailable": "Hindi available",
+      "reasons": {
+        "appleIntelligenceDisabled": "I-on ang Apple Intelligence sa Settings app para magamit ang modelong ito.",
+        "deviceNotEligible": "Hindi sinusuportahan ng device na ito ang Apple Intelligence.",
+        "modelNotReady": "Nagda-download o inihahanda pa ang modelo. Subukang muli mamaya.",
+        "unsupportedOs": "Kailangan ng modelong ito ang iOS 26 o mas bago.",
+        "unknown": "Hindi sinabi ng system kung bakit hindi available ang modelong ito."
+      },
+      "unavailable": "Hindi available ngayon ang modelong nasa device. Tingnan ang status nito sa $t(modelChat.backends.title).",
+      "busy": "Abala pa ang modelong nasa device sa ibang sagot. Subukang muli kapag tapos na ito.",
+      "failed": "Hindi nasagot ng modelong nasa device ang mensaheng ito. Subukang muli o baguhin ang pagkakasabi."
     }
   },
   "settingsTools": {

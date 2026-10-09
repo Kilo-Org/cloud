@@ -3323,6 +3323,24 @@
       "deleteTitle": "Dieses Chat-Backend löschen?",
       "deleteMessage": "{{name}} und die gespeicherten Zugangsdaten löschen? Chats, die dieses Backend verwenden, benötigen ein neues Backend, bevor sie fortgesetzt werden können.",
       "completionTokenFieldHelp": "Feld für Ausgabetokens: Verwenden Sie max_completion_tokens für moderne APIs oder max_tokens, wenn Ihr Endpunkt das ältere Feld erfordert."
+    },
+    "localModels": {
+      "title": "Modelle auf dem Gerät",
+      "help": "Modelle auf dem Gerät laufen auf diesem Telefon. Deine Eingaben und Antworten bleiben auf dem Gerät, und diese Modelle können keine Tools verwenden.",
+      "apple": "Apple Intelligence (auf dem Gerät)",
+      "checking": "Verfügbarkeit wird geprüft …",
+      "ready": "Einsatzbereit",
+      "notAvailable": "Nicht verfügbar",
+      "reasons": {
+        "appleIntelligenceDisabled": "Aktiviere Apple Intelligence in der Einstellungen-App, um dieses Modell zu verwenden.",
+        "deviceNotEligible": "Dieses Gerät unterstützt Apple Intelligence nicht.",
+        "modelNotReady": "Das Modell wird noch geladen oder vorbereitet. Versuche es später erneut.",
+        "unsupportedOs": "Dieses Modell erfordert iOS 26 oder neuer.",
+        "unknown": "Das System hat keinen Grund angegeben, warum dieses Modell nicht verfügbar ist."
+      },
+      "unavailable": "Das Modell auf dem Gerät ist gerade nicht verfügbar. Prüfe seinen Status unter $t(modelChat.backends.title).",
+      "busy": "Das Modell auf dem Gerät erstellt gerade eine andere Antwort. Versuche es erneut, wenn es fertig ist.",
+      "failed": "Das Modell auf dem Gerät konnte diese Nachricht nicht beantworten. Versuche es erneut oder formuliere sie um."
     }
   },
   "settingsTools": {

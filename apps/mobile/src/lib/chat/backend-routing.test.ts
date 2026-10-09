@@ -1,12 +1,137 @@
-import { type FetchLike, type ModelClientService } from '@kilocode/harness-sdk';
-import { Effect, Schedule, Stream } from 'effect';
-import { expect, it, vi } from 'vitest';
+import { type FetchLike, type ModelClientService, type ModelRequest } from '@kilocode/harness-sdk';
+import { Effect, Either, Schedule, Stream } from 'effect';
+import { beforeEach, expect, it, vi } from 'vitest';
 
-import { routedModelClient } from './backend-routing';
+import { targetSupportsTools } from './backend-capabilities';
+import { routedModelClient, targetModelFacts } from './backend-routing';
 import { type StoredChatBackend } from './backend-store';
-import { backendTargetId } from './backend-target';
+import { backendFailureKey, backendTargetId } from './backend-target';
+import { type NativeAvailability, type NativeModelEvent } from './native-model-client';
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
+vi.mock('./backend-store', () => ({ listChatBackends: () => [] }));
+vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+
+const apple = vi.hoisted(() => {
+  const listeners = new Set<(event: NativeModelEvent) => void>();
+  const available: NativeAvailability = {
+    status: 'available',
+    modelId: 'apple-system-language-model',
+    contextWindow: 4096,
+    maxOutputTokens: 4096,
+    systemInstructions: true,
+    tokenCounting: true,
+  };
+  return {
+    available,
+    availability: vi.fn<() => Promise<NativeAvailability>>(),
+    generate: vi.fn(async (request: { id: string }) => {
+      await Promise.resolve();
+      for (const listener of listeners) {
+        listener({ id: request.id, kind: 'delta', text: 'On device' });
+        listener({
+          id: request.id,
+          kind: 'done',
+          stop: 'end',
+          usageSource: 'counted',
+          inputTokens: 9,
+          outputTokens: 2,
+        });
+      }
+    }),
+    cancel: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
+    countTokens: vi.fn<() => Promise<number>>().mockResolvedValue(9),
+    addListener: (_name: string, listener: (event: NativeModelEvent) => void) => {
+      listeners.add(listener);
+      return {
+        remove: () => {
+          listeners.delete(listener);
+        },
+      };
+    },
+  };
+});
+
+vi.mock('expo', () => ({
+  requireOptionalNativeModule: (name: string) => (name === 'KiloAppleModel' ? apple : null),
+}));
+
+beforeEach(() => {
+  apple.availability.mockReset().mockResolvedValue(apple.available);
+  apple.generate.mockClear();
+});
+
+function localRouter() {
+  const kilo = vi.fn<ModelClientService['stream']>(() => Stream.empty);
+  const fetch = vi.fn<FetchLike>();
+  const client = routedModelClient({
+    kilo: { stream: kilo },
+    retry: { schedule: Schedule.recurs(0) },
+    profiles: () => [],
+    fetch,
+    headers: () => ({}),
+    validateTransport: () => undefined,
+  });
+  return { client, kilo, fetch };
+}
+
+const question = (model: string): ModelRequest => ({
+  model,
+  maxTokens: 512,
+  tools: [
+    {
+      name: 'time',
+      description: 'Current time',
+      parameters: { type: 'object', properties: {} },
+    },
+  ],
+  prompt: {
+    system: [{ text: 'System', cache: false }],
+    messages: [{ role: 'user', cache: false, parts: [{ kind: 'text', text: 'Question' }] }],
+  },
+});
+
+it('routes an on-device target to its native model without Kilo or tool definitions', async () => {
+  const { client, kilo, fetch } = localRouter();
+  const events = await Effect.runPromise(Stream.runCollect(client.stream(question('local:apple'))));
+  expect([...events]).toMatchObject([
+    { kind: 'delta', text: 'On device' },
+    { kind: 'done', stop: 'end', usage: { inputTokens: 9, outputTokens: 2 } },
+  ]);
+  expect(kilo).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(apple.generate).toHaveBeenCalledOnce();
+  expect(apple.generate.mock.calls[0]?.[0]).not.toHaveProperty('tools');
+  expect(targetSupportsTools('local:apple')).toBe(false);
+  expect(targetSupportsTools('kilo/default')).toBe(true);
+  // The availability read at send time supplies the window that drives compaction.
+  expect(targetModelFacts('local:apple', [], { apiKinds: ['messages'] })).toEqual({
+    apiKinds: [],
+    contextWindow: 4096,
+    maxOutputTokens: 4096,
+  });
+});
+
+it.each([
+  ['Apple Intelligence is off', 'local:apple'],
+  ['the provider is not in this build', 'local:android'],
+])('fails explicitly without calling Kilo when %s', async (_label, model) => {
+  apple.availability.mockResolvedValue({
+    ...apple.available,
+    status: 'unavailable',
+    reason: 'apple_intelligence_disabled',
+  });
+  const { client, kilo, fetch } = localRouter();
+  const result = await Effect.runPromise(
+    Effect.either(Stream.runCollect(client.stream(question(model))))
+  );
+  expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+    'modelChat.localModels.unavailable'
+  );
+  expect(apple.generate).not.toHaveBeenCalled();
+  expect(kilo).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
 
 async function* responseStream() {
   await Promise.resolve();

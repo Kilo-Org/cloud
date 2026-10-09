@@ -3323,6 +3323,24 @@
       "deleteTitle": "Efase sèvis chat sa a?",
       "deleteMessage": "Efase {{name}} ansanm ak enfòmasyon pou otantifikasyon li yo ki estoke? Chat ki sèvi ak sèvis sa a ap bezwen yon nouvo sèvis anvan yo ka kontinye.",
       "completionTokenFieldHelp": "Chan pou jeton nan repons lan: itilize max_completion_tokens pou API modèn yo, oswa max_tokens si pwen aksè ou a mande ansyen chan an."
+    },
+    "localModels": {
+      "title": "Modèl sou aparèy la",
+      "help": "Modèl sou aparèy la mache sou telefòn sa a. Mesaj ou voye ak repons yo rete sou aparèy la, epi modèl sa yo pa ka sèvi ak zouti.",
+      "apple": "Apple Intelligence (sou aparèy la)",
+      "checking": "N ap verifye disponiblite…",
+      "ready": "Pare pou sèvi",
+      "notAvailable": "Pa disponib",
+      "reasons": {
+        "appleIntelligenceDisabled": "Aktive Apple Intelligence nan aplikasyon Settings la pou w ka sèvi ak modèl sa a.",
+        "deviceNotEligible": "Aparèy sa a pa sipòte Apple Intelligence.",
+        "modelNotReady": "Modèl la toujou ap telechaje oswa l ap prepare. Eseye ankò pita.",
+        "unsupportedOs": "Modèl sa a bezwen iOS 26 oswa yon vèsyon ki pi resan.",
+        "unknown": "Sistèm nan pa di poukisa modèl sa a pa disponib."
+      },
+      "unavailable": "Modèl sou aparèy la pa disponib kounye a. Verifye estati li nan $t(modelChat.backends.title).",
+      "busy": "Modèl sou aparèy la okipe ak yon lòt repons. Eseye ankò lè li fini.",
+      "failed": "Modèl sou aparèy la pa t ka reponn mesaj sa a. Eseye ankò oswa ekri l yon lòt jan."
     }
   },
   "settingsTools": {

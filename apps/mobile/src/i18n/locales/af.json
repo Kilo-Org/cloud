@@ -3323,6 +3323,24 @@
       "deleteTitle": "Skrap hierdie kletsagtergrondstelsel?",
       "deleteMessage": "Skrap {{name}} en sy gestoorde aanmeldbesonderhede? Kletse wat hierdie agtergrondstelsel gebruik, sal 'n nuwe agtergrondstelsel nodig hê voordat hulle kan voortgaan.",
       "completionTokenFieldHelp": "Veld vir voltooiingstekseenhede: gebruik max_completion_tokens vir moderne API's, of max_tokens as jou eindpunt die verouderde veld vereis."
+    },
+    "localModels": {
+      "title": "Modelle op die toestel",
+      "help": "Modelle op die toestel loop op hierdie foon. Jou opdragte en antwoorde bly op die toestel, en hierdie modelle kan nie gereedskap gebruik nie.",
+      "apple": "Apple Intelligence (op die toestel)",
+      "checking": "Kontroleer beskikbaarheid…",
+      "ready": "Gereed vir gebruik",
+      "notAvailable": "Nie beskikbaar nie",
+      "reasons": {
+        "appleIntelligenceDisabled": "Skakel Apple Intelligence aan in die Instellings-app om hierdie model te gebruik.",
+        "deviceNotEligible": "Hierdie toestel ondersteun nie Apple Intelligence nie.",
+        "modelNotReady": "Die model word nog afgelaai of gereedgemaak. Probeer later weer.",
+        "unsupportedOs": "Hierdie model vereis iOS 26 of nuwer.",
+        "unknown": "Die stelsel het nie gesê waarom hierdie model onbeskikbaar is nie."
+      },
+      "unavailable": "Die model op die toestel is nie nou beskikbaar nie. Kontroleer sy status in $t(modelChat.backends.title).",
+      "busy": "Die model op die toestel is besig met 'n ander antwoord. Probeer weer wanneer dit klaar is.",
+      "failed": "Die model op die toestel kon nie hierdie boodskap beantwoord nie. Probeer weer of herformuleer dit."
     }
   },
   "settingsTools": {

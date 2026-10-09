@@ -3323,6 +3323,24 @@
       "deleteTitle": "Slet denne chatserver?",
       "deleteMessage": "Vil du slette {{name}} og dens gemte loginoplysninger? Chats, der bruger denne server, skal have en ny server, før de kan fortsætte.",
       "completionTokenFieldHelp": "Felt til outputtokens: Brug max_completion_tokens til moderne API'er eller max_tokens, hvis dit endpoint kræver det ældre felt."
+    },
+    "localModels": {
+      "title": "Modeller på enheden",
+      "help": "Modeller på enheden kører på denne telefon. Dine prompter og svar bliver på enheden, og disse modeller kan ikke bruge værktøjer.",
+      "apple": "Apple Intelligence (på enheden)",
+      "checking": "Tjekker tilgængelighed…",
+      "ready": "Klar til brug",
+      "notAvailable": "Ikke tilgængelig",
+      "reasons": {
+        "appleIntelligenceDisabled": "Slå Apple Intelligence til i appen Indstillinger for at bruge denne model.",
+        "deviceNotEligible": "Denne enhed understøtter ikke Apple Intelligence.",
+        "modelNotReady": "Modellen downloades eller klargøres stadig. Prøv igen senere.",
+        "unsupportedOs": "Denne model kræver iOS 26 eller nyere.",
+        "unknown": "Systemet oplyste ikke, hvorfor denne model ikke er tilgængelig."
+      },
+      "unavailable": "Modellen på enheden er ikke tilgængelig lige nu. Tjek dens status i $t(modelChat.backends.title).",
+      "busy": "Modellen på enheden er optaget af et andet svar. Prøv igen, når den er færdig.",
+      "failed": "Modellen på enheden kunne ikke besvare denne besked. Prøv igen, eller omformuler den."
     }
   },
   "settingsTools": {

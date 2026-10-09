@@ -3323,6 +3323,24 @@
       "deleteTitle": "Poistetaanko tämä keskustelun taustapalvelu?",
       "deleteMessage": "Poistetaanko {{name}} ja sen tallennetut tunnistetiedot? Tätä taustapalvelua käyttävät keskustelut tarvitsevat uuden taustapalvelun ennen kuin niitä voi jatkaa.",
       "completionTokenFieldHelp": "Vastauksen tokenien kenttä: käytä max_completion_tokens nykyaikaisissa API-rajapinnoissa tai max_tokens, jos päätepisteesi edellyttää vanhaa kenttää."
+    },
+    "localModels": {
+      "title": "Laitteessa toimivat mallit",
+      "help": "Laitteessa toimivat mallit toimivat tässä puhelimessa. Kehotteesi ja vastaukset pysyvät laitteessa, eivätkä nämä mallit voi käyttää työkaluja.",
+      "apple": "Apple Intelligence (laitteessa)",
+      "checking": "Tarkistetaan saatavuutta…",
+      "ready": "Käyttövalmis",
+      "notAvailable": "Ei saatavilla",
+      "reasons": {
+        "appleIntelligenceDisabled": "Laita Apple Intelligence päälle Asetukset-apissa, jotta voit käyttää tätä mallia.",
+        "deviceNotEligible": "Tämä laite ei tue Apple Intelligencea.",
+        "modelNotReady": "Mallia ladataan tai valmistellaan vielä. Yritä myöhemmin uudelleen.",
+        "unsupportedOs": "Tämä malli vaatii iOS 26:n tai uudemman.",
+        "unknown": "Järjestelmä ei kertonut, miksi malli ei ole saatavilla."
+      },
+      "unavailable": "Laitteessa toimiva malli ei ole nyt saatavilla. Tarkista sen tila kohdasta $t(modelChat.backends.title).",
+      "busy": "Laitteessa toimiva malli kirjoittaa toista vastausta. Yritä uudelleen, kun se on valmis.",
+      "failed": "Laitteessa toimiva malli ei pystynyt vastaamaan tähän viestiin. Yritä uudelleen tai muotoile viesti toisin."
     }
   },
   "settingsTools": {

@@ -3323,6 +3323,24 @@
       "deleteTitle": "Bu sohbet arka ucu silinsin mi?",
       "deleteMessage": "{{name}} ve kayıtlı kimlik bilgileri silinsin mi? Bu arka ucu kullanan sohbetlerin devam edebilmesi için yeni bir arka uç seçilmesi gerekir.",
       "completionTokenFieldHelp": "Tamamlama belirteci alanı: Modern API'ler için max_completion_tokens kullanın; uç noktanız eski alanı gerektiriyorsa max_tokens kullanın."
+    },
+    "localModels": {
+      "title": "Cihazdaki modeller",
+      "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır ve bu modeller araç kullanamaz.",
+      "apple": "Apple Intelligence (cihazda)",
+      "checking": "Kullanılabilirlik denetleniyor…",
+      "ready": "Kullanıma hazır",
+      "notAvailable": "Kullanılamıyor",
+      "reasons": {
+        "appleIntelligenceDisabled": "Bu modeli kullanmak için Ayarlar uygulamasında Apple Intelligence'ı açın.",
+        "deviceNotEligible": "Bu cihaz Apple Intelligence'ı desteklemiyor.",
+        "modelNotReady": "Model hâlâ indiriliyor veya hazırlanıyor. Daha sonra yeniden deneyin.",
+        "unsupportedOs": "Bu model iOS 26 veya sonrasını gerektirir.",
+        "unknown": "Sistem bu modelin neden kullanılamadığını belirtmedi."
+      },
+      "unavailable": "Cihazdaki model şu anda kullanılamıyor. Durumunu $t(modelChat.backends.title) bölümünden denetleyin.",
+      "busy": "Cihazdaki model başka bir yanıtla meşgul. Tamamlandığında yeniden deneyin.",
+      "failed": "Cihazdaki model bu mesajı yanıtlayamadı. Yeniden deneyin veya mesajı farklı şekilde yazın."
     }
   },
   "settingsTools": {

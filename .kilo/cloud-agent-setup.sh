@@ -422,3 +422,4 @@ printf '  pnpm dev:start --no-attach agents fake-llm     # Cloud Agents with loc
 printf 'KILO_DEV_WITHOUT skips services the sandbox does not need; pass --without= to start everything.\n'
 printf 'Then pnpm dev:status for ports; log in at http://localhost:<nextjs port>/users/sign_in?fakeUser=%s&callbackPath=/profile\n' "$test_email"
 printf 'Other shells (docker, agent-browser): source %q\n' "$env_file"
+printf 'Usage, limits, and troubleshooting: .kilo/skills/cloud-agent-sandbox/SKILL.md\n'

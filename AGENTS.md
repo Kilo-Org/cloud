@@ -59,6 +59,7 @@ package manifests before running repository JavaScript or package scripts. Load
 | TypeScript implementation or review | `code-quality` skill |
 | Verification or pre-commit checks | `repository-verification` skill |
 | Local services, ports, and fake login | `local-development` skill |
+| Cloud Agent sandbox setup, memory cap, and fake-LLM sessions | `cloud-agent-sandbox` skill and `.kilo/cloud-agent-setup.sh` |
 | Shared web environment changes | `apps/web/AGENTS.md` and `DEVELOPMENT.md` |
 | PostgreSQL schema or migration work | `packages/db/AGENTS.md` and `database-migrations` skill |
 | Service, Durable Object, or Worker code | `services/AGENTS.md`, nearest owning service's `AGENTS.md`, and relevant Durable Objects or Workers skills |

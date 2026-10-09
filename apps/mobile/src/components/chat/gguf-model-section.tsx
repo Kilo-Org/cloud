@@ -34,10 +34,15 @@ function progressKey(download: GgufDownload): string {
   if (download.phase === 'verifying') {
     return 'modelChat.gguf.verifying';
   }
+  // The phase decides first: a paused link download has no stated length yet,
+  // and its row must not read "Downloading" beside a Resume button.
+  if (download.phase === 'paused') {
+    return 'modelChat.gguf.paused';
+  }
   if (download.total <= 0) {
     return 'modelChat.gguf.downloadingUnknown';
   }
-  return download.phase === 'paused' ? 'modelChat.gguf.paused' : 'modelChat.gguf.downloading';
+  return 'modelChat.gguf.downloading';
 }
 
 function confirmDelete(record: GgufModelRecord, t: TFunction) {

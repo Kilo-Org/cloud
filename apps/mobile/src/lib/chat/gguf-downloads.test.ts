@@ -294,6 +294,41 @@ describe('the saved list', () => {
     h.store.load();
     expect(h.store.snapshot().models).toEqual([]);
   });
+
+  it('keeps every readable model when one entry cannot be read', () => {
+    const h = harness();
+    const saved: GgufModelRecord = {
+      fileId: 'kept',
+      name: 'Kept',
+      url: 'https://example.com/k.gguf',
+      sizeBytes: 10,
+      contextWindow: 4096,
+      tools: false,
+    };
+    // A record written by another build: the shape this one cannot read.
+    h.index.text = JSON.stringify([saved, { fileId: 'other', name: 'Other' }]);
+    h.files.set(ggufModelName('kept'), 10);
+    h.files.set(ggufModelName('other'), 20);
+
+    h.store.load();
+
+    expect(h.store.snapshot().models.map(model => model.fileId)).toEqual(['kept']);
+    // The unreadable entry's file is left alone rather than deleted: otherwise a
+    // shape change would destroy a download the person cannot get back.
+    expect(h.files.has(ggufModelName('other'))).toBe(true);
+    expect(h.files.has(ggufModelName('kept'))).toBe(true);
+  });
+
+  it('deletes nothing when the index cannot be read at all', () => {
+    const h = harness();
+    h.index.text = '{ not json';
+    h.files.set(ggufModelName('unlisted'), 20);
+
+    h.store.load();
+
+    expect(h.files.has(ggufModelName('unlisted'))).toBe(true);
+    expect(h.store.snapshot().models).toEqual([]);
+  });
 });
 
 describe('deleting a model', () => {

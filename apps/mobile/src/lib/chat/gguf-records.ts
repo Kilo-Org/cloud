@@ -102,23 +102,78 @@ export const ggufModelName = (fileId: string) => `${fileId}.gguf`;
 /** A partial download is never resumed across launches, so its name is not a model's. */
 export const ggufPartialName = (fileId: string) => `${fileId}.gguf.part`;
 
-const modelIndex = z.array(
-  z.object({
-    fileId: z.string().min(1),
-    name: z.string(),
-    url: z.string(),
-    sizeBytes: z.number(),
-    contextWindow: z.number().positive(),
-    tools: z.boolean(),
-  })
-);
+const modelRecord = z.object({
+  fileId: z.string().min(1),
+  name: z.string(),
+  url: z.string(),
+  sizeBytes: z.number(),
+  contextWindow: z.number().positive(),
+  tools: z.boolean(),
+});
 
-/** The saved list, which is file input: an entry this build cannot read is dropped. */
+/**
+ * The saved list, which is file input: an entry this build cannot read is
+ * dropped and the others are kept. Dropping all of them would delete every
+ * downloaded model on the next cleanup, which no user action can undo.
+ */
 export function readModelIndex(text: string | null): readonly GgufModelRecord[] {
+  let parsed: unknown;
   try {
-    const parsed = modelIndex.safeParse(JSON.parse(text ?? '[]'));
-    return parsed.success ? parsed.data : [];
+    parsed = JSON.parse(text ?? '[]');
   } catch {
     return [];
   }
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+  const records: GgufModelRecord[] = [];
+  for (const entry of parsed) {
+    const record = modelRecord.safeParse(entry);
+    if (record.success) {
+      records.push(record.data);
+    }
+  }
+  return records;
+}
+
+/**
+ * Whether the saved list could be read at all. A list that cannot be read is
+ * not evidence that nothing is downloaded, so cleanup must not run on it.
+ */
+export function modelIndexIsReadable(text: string | null): boolean {
+  try {
+    return Array.isArray(JSON.parse(text ?? '[]'));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Every model file the saved list names, read without trusting its shape.
+ *
+ * An entry this build cannot parse is still an entry that describes a
+ * downloaded model, so its file is protected from cleanup. Reading the list
+ * strictly and then deleting whatever it does not name would destroy downloads
+ * the moment a record shape changed.
+ */
+export function modelIndexMentionedNames(text: string | null): ReadonlySet<string> {
+  const names = new Set<string>();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text ?? '[]');
+  } catch {
+    return names;
+  }
+  if (!Array.isArray(parsed)) {
+    return names;
+  }
+  for (const entry of parsed) {
+    if (typeof entry === 'object' && entry !== null && 'fileId' in entry) {
+      const { fileId } = entry;
+      if (typeof fileId === 'string' && fileId.length > 0) {
+        names.add(ggufModelName(fileId));
+      }
+    }
+  }
+  return names;
 }

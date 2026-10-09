@@ -99,17 +99,30 @@ const downloads = ggufDownloads({
 
 let loaded = false;
 
+/**
+ * The background listener, kept on the global scope so a module reload (fast
+ * refresh) removes the one the previous instance added instead of stacking a
+ * second subscription that could never be torn down.
+ */
+const BACKGROUND_LISTENER = Symbol.for('kilo.gguf.backgroundListener');
+
 /** The saved list is read on first use rather than at import, so startup does no file work. */
 function ggufStore() {
   if (!loaded) {
     loaded = true;
     downloads.load();
+    const previous = (globalThis as Partial<Record<symbol, { remove: () => void }>>)[
+      BACKGROUND_LISTENER
+    ];
+    previous?.remove();
     // A background app may be killed for its memory; the context loads again on the next answer.
-    AppState.addEventListener('change', state => {
+    const subscription = AppState.addEventListener('change', state => {
       if (state === 'background') {
         void model.release();
       }
     });
+    (globalThis as Partial<Record<symbol, { remove: () => void }>>)[BACKGROUND_LISTENER] =
+      subscription;
   }
   return downloads;
 }

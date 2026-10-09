@@ -1,343 +1,301 @@
-/* eslint-disable react-native/no-inline-styles -- the Android widget host requires native style objects */
 'use no memo';
 
-import { FlexWidget, type WidgetInfo } from 'react-native-android-widget';
+import { type ReactNode } from 'react';
 
+import { canCreate, roundActions } from './active-agents-widget-actions';
+import { lock, logo } from './active-agents-widget-glyphs';
 import {
-  ACTION_TARGET,
+  bar,
+  boxTop,
   type Copy,
-  countRow,
-  detail,
-  entryRows,
-  footer,
-  header,
-  hero,
-  heroVariantFor,
-  type Paint,
-  readingOrder,
-  text,
+  dot,
+  dotInk,
+  estimateWidth,
+  type Frame,
+  type Ink,
+  label,
+  lineBox,
 } from './active-agents-widget-parts';
-import { type AndroidWidgetProps } from './widget-props';
-
-/** Keep the existing native renderer's height buckets. */
-export const SHORT_HEIGHT = 180;
-/** Every card insets its content by this much on every side. */
-export const MARGIN = 12;
-/** Footer line height: the checked stamp owns only its own line, not the leftover. */
-const FOOTER_HEIGHT = 16;
-/** One line of secondary copy between the hero and the entries. */
-const DETAIL_HEIGHT = 24;
-/** Copy size is a fraction of the card width so a locked portrait cell reads deliberate. */
-const COPY_RATIO = 0.078;
-/** Capped so a locked cell reads as a state panel, not a headline stretched to the width. */
-const COPY_MAX = 24;
-/** The lock is sized from the copy, not the cell: its full height is ~1.35x the copy's
- * cap height (the host font's cap height is ~0.75 of its size) so glyph and words match. */
-const LOCK_PER_COPY = 1.35 * 0.75;
-/** The host font's line box and the glyph-to-copy gap, both per unit of copy size. */
-const COPY_LINE = 1.32;
-const LOCK_GAP = 0.5;
-
-/** Everything one layout needs to draw a placed widget in one palette. */
-export type Frame = {
-  props: AndroidWidgetProps;
-  copy: Copy;
-  paint: Paint;
-  info: WidgetInfo;
-};
-
-/** One of the three equal flexible gaps that spread the free height down the card. */
-function gap(key: string) {
-  return <FlexWidget key={key} style={{ width: 'match_parent', flex: 1 }} />;
-}
-
-/** The primary line for a band, told how much width it actually has. */
-export function rowDetail(
-  copy: Copy,
-  paint: Paint,
-  slot: { height: number; size: number; available: number }
-) {
-  return detail(copy, paint, { ...slot, fallback: false });
-}
-
-/** Row typography scales with the height a cell can afford a row. */
-const ENTRY_SIZES = [
-  { min: 60, title: 16, reason: 13 },
-  { min: 50, title: 15, reason: 12 },
-];
-
-function entrySizes(rowHeight: number) {
-  return (
-    ENTRY_SIZES.find(entry => rowHeight >= entry.min) ?? {
-      title: 14,
-      reason: 12,
-    }
-  );
-}
+import { stackedStatus } from './active-agents-widget-status';
+import { fitRows, phaseOf, stack } from './active-agents-widget-stack';
 
 /**
- * The list owns exactly the height its rows need: rows stay capped so a tall cell
- * shows roomy rows rather than two blocks pushed to the edges, and the block keeps
- * its rows centred. The leftover belongs to the three gaps around it.
+ * Small (2x2, 2x3), plus what Medium and Large share. Cards draw at the design
+ * coordinates of a 170x170 / 364x170 / 364x382 widget. A taller cell keeps the
+ * layout: the extra height first buys agent rows (up to 3), then splits evenly
+ * across the gaps; the footer stays 18dp above the bottom edge.
  */
-function entries(copy: Copy, paint: Paint, slot: { slots: number; rowHeight: number }) {
-  const { title: titleSize, reason: reasonSize } = entrySizes(slot.rowHeight);
-  return (
-    <FlexWidget
-      style={{
-        width: 'match_parent',
-        height: slot.slots * slot.rowHeight,
-        justifyContent: 'center',
-      }}
-    >
-      {entryRows(copy)
-        .slice(0, slot.slots)
-        .map((row, index) => (
-          <FlexWidget
-            key={index}
-            style={{
-              width: 'match_parent',
-              height: slot.rowHeight,
-              justifyContent: 'center',
-              // The host lays text out from its left edge; a row is mirrored by hand so
-              // an RTL catalogue keeps every line on its reading-start side.
-              alignItems: paint.rtl ? 'flex-end' : 'flex-start',
-            }}
-          >
-            {text(row.title, paint, { size: titleSize })}
-            {row.time === null ? null : text(row.time, paint, { size: reasonSize, muted: true })}
-          </FlexWidget>
-        ))}
-    </FlexWidget>
-  );
+
+/** Header ink ends at 36dp (the 24dp glyphs centred on y=24). */
+export const HEADER_BOTTOM = 36;
+
+export function brand(f: Frame) {
+  return [
+    logo(f, { x: 16, y: 15, size: 18 }),
+    label(f, 'brand', { x: 40, baseline: 29, width: 40, value: 'Kilo', size: 13, weight: '600' }),
+  ];
 }
 
-/** The natural hero height for a body, picked in bands so no count or label is clipped. */
-function naturalHero(body: number): number {
-  if (body >= 300) {
-    return 84;
-  }
-  if (body >= 210) {
-    return 68;
-  }
-  if (body >= 140) {
-    return 44;
-  }
-  return 32;
-}
-
-/**
- * The full card: brand header, a hero block scaled to the cell (the primary line
- * and support counts travel with it), the entry rows, then the footer. Three equal
- * flexible gaps spread the leftover, so the free height never pools in one place.
- */
-export function card({ props, copy, paint, info }: Frame) {
-  const wide = info.width >= 266;
-  const inner = info.height - MARGIN * 2;
-  const rows = entryRows(copy);
-  const hasDetail = copy.detail !== null && copy.detail !== '';
-  // The primary line and the first entry are the same agent while it waits: show it once.
-  const firstEntry = rows[0];
-  const duplicatesEntry =
-    copy.detail !== null &&
-    copy.detail !== '' &&
-    firstEntry !== undefined &&
-    firstEntry.title !== '' &&
-    copy.detail.includes(firstEntry.title);
-  // Wide cards show the support counts beside the hero, so the hero must clear them.
-  const besideCounts = wide ? Math.min(3, copy.secondaryCounts.length) * 26 : 0;
-  const heroFloor = Math.max(32, besideCounts);
-  // Keep as many stacked counts as the card can hold without squeezing the hero out.
-  let supportRows = wide ? 0 : Math.min(3, copy.secondaryCounts.length);
-  while (supportRows > 0 && inner - ACTION_TARGET - FOOTER_HEIGHT - supportRows * 26 < heroFloor) {
-    supportRows -= 1;
-  }
-  const plan = (suppressDetail: boolean) => {
-    const body =
-      inner -
-      ACTION_TARGET -
-      (suppressDetail || !hasDetail ? 0 : DETAIL_HEIGHT) -
-      supportRows * 26 -
-      FOOTER_HEIGHT;
-    const heroHeight = Math.max(besideCounts, Math.min(naturalHero(body), Math.max(32, body)));
-    const slots = Math.max(0, Math.min(3, Math.floor((body - heroHeight) / 44)));
-    const rowHeight =
-      slots === 0 ? 0 : Math.max(44, Math.min(64, Math.floor((body - heroHeight) / slots)));
-    return { heroHeight, slots, rowHeight };
+/** The content edges: under the header, down to the top of the footer line 18dp above the bottom. */
+export function cardEdges(f: Frame) {
+  return {
+    top: HEADER_BOTTOM,
+    bottom: boxTop(f.copy.footer ?? f.copy.status ?? '', 11, f.height - 18),
   };
-  // Suppressing the primary line is only worth it while its entry is actually listed.
-  let suppressed = duplicatesEntry;
-  let planned = plan(suppressed);
-  if (suppressed && planned.slots === 0) {
-    suppressed = false;
-    planned = plan(suppressed);
-  }
-  const { rowHeight } = planned;
-  // Never reserve height for rows the copy does not carry.
-  const slots = Math.min(planned.slots, rows.length);
-  // A short card cannot hold a hero, a detail line, the footer and the counts together: drop the detail first.
-  const bodyRoom = inner - ACTION_TARGET - supportRows * 26 - FOOTER_HEIGHT;
-  const showDetail = !(suppressed || !hasDetail) && bodyRoom - DETAIL_HEIGHT >= heroFloor;
-  // The hero keeps its floor and clears the counts beside it.
-  const free = bodyRoom - (showDetail ? DETAIL_HEIGHT : 0);
-  const heroHeight = slots === 0 ? Math.max(heroFloor, Math.min(free, 140)) : planned.heroHeight;
-  const variant = heroVariantFor(heroHeight);
-  // A 172dp-wide card can only fit the longest agent title at 11dp.
-  const detailSize = info.width >= 280 ? 12 : 11;
-  const avail = info.width - MARGIN * 2;
-  return (
-    <FlexWidget style={{ width: 'match_parent', height: 'match_parent' }}>
-      {header(props, paint, wide)}
-      {gap('gap-top')}
-      <FlexWidget key="hero-block" style={{ width: 'match_parent' }}>
-        <FlexWidget
-          style={{
-            width: 'match_parent',
-            height: heroHeight,
-            flexDirection: 'row',
-            alignItems: 'center',
-            flexGap: 12,
-          }}
-        >
-          {readingOrder(
-            [
-              <FlexWidget key="hero" style={{ width: 0, flex: 1 }}>
-                {hero(copy, paint, variant)}
-              </FlexWidget>,
-              wide ? (
-                <FlexWidget
-                  key="support"
-                  style={{
-                    width: Math.floor((info.width - 36) * 0.46),
-                    height: heroHeight,
-                    justifyContent: 'center',
-                  }}
-                >
-                  {copy.secondaryCounts.map(line => countRow(line, paint))}
-                </FlexWidget>
-              ) : null,
-            ],
-            paint.rtl
-          )}
-        </FlexWidget>
-        {showDetail
-          ? rowDetail(copy, paint, {
-              height: DETAIL_HEIGHT,
-              size: detailSize,
-              available: avail,
-            })
-          : null}
-        {wide ? null : (
-          <FlexWidget style={{ width: 'match_parent', height: supportRows * 26 }}>
-            {copy.secondaryCounts.slice(0, supportRows).map(line => countRow(line, paint))}
-          </FlexWidget>
-        )}
-      </FlexWidget>
-      {slots > 0 ? gap('gap-middle') : null}
-      {slots > 0 ? entries(copy, paint, { slots, rowHeight }) : null}
-      {gap('gap-bottom')}
-      {footer(copy, paint, FOOTER_HEIGHT)}
-    </FlexWidget>
-  );
 }
 
-/** A padlock drawn from two rectangles: a rounded shackle sitting on a rounded body. */
-function lockGlyph(paint: Paint, size: number) {
-  const stroke = Math.max(2, Math.round(size * 0.13));
-  const bodyHeight = Math.round(size * 0.6);
-  const shackleWidth = Math.round(size * 0.54);
-  return (
-    <FlexWidget
-      key="lock"
-      style={{
-        width: size,
-        height: size,
-        flexDirection: 'column',
-        alignItems: 'center',
-      }}
-    >
-      <FlexWidget
-        style={{
-          width: shackleWidth,
-          height: size - bodyHeight,
-          borderWidth: stroke,
-          borderBottomWidth: 0,
-          borderColor: paint.palette.foreground,
-          borderTopLeftRadius: Math.round(shackleWidth / 2),
-          borderTopRightRadius: Math.round(shackleWidth / 2),
-        }}
-      />
-      <FlexWidget
-        style={{
-          width: size,
-          height: bodyHeight,
-          borderRadius: Math.max(2, Math.round(size * 0.16)),
-          backgroundColor: paint.palette.foreground,
-        }}
-      />
-    </FlexWidget>
-  );
+/** "Checked …" / "Last known · …", "Updating agents", or (`long`) the failed-approve sentence. */
+export function footer(f: Frame, long: boolean) {
+  const phase = phaseOf(f.copy);
+  const failed = long && f.props.actionFeedback === 'couldNotApprove' && phase === 'content';
+  let value = f.copy.footer ?? '';
+  if (phase === 'updating') {
+    value = f.copy.status ?? '';
+  } else if (failed) {
+    value = f.copy.approveFailed;
+  }
+  if (value === '') {
+    return null;
+  }
+  return label(f, 'footer', {
+    x: 16,
+    baseline: f.height - 18,
+    width: f.width - 32,
+    value,
+    size: 11,
+    ...(failed ? { weight: '600' as const, ink: 'warn' as const } : { ink: 'muted' as const }),
+  });
 }
 
 /**
- * The locked card (privacy/signed-out): the brand header, then one state block -
- * a lock and the existing privacy copy - centred in the free height. The copy is
- * sized from the cell so a portrait card reads as a deliberate composition.
+ * The locked composition: logo + Kilo, a centred lock and the copy under it; no
+ * actions, no footer. The copy may always wrap to a second line (an instruction
+ * never ellipsizes); `wrap` centres the block for two lines, as Small is drawn.
  */
-export function locked({ copy, paint, info }: Frame) {
-  const band = info.height < SHORT_HEIGHT;
-  const brandHeight = band ? 22 : ACTION_TARGET;
-  let brandSize = 18;
-  if (band) {
-    brandSize = 14;
+export function locked(
+  f: Frame,
+  spec: {
+    height: number;
+    lockY: number;
+    lockSize: number;
+    baseline: number;
+    size: number;
+    wrap: boolean;
   }
-  if (info.height < 96) {
-    brandSize = 12;
+) {
+  const value = f.copy.status ?? '';
+  const lines = spec.wrap || estimateWidth(value, spec.size, true) > f.width - 32 ? 2 : 1;
+  const { nodes } = stack({
+    blocks: [
+      {
+        top: spec.lockY - spec.lockSize / 2 - 2,
+        bottom: boxTop(value, spec.size, spec.baseline) + lineBox(value, spec.size) * lines,
+        shrink: 10,
+        draw: dy => [
+          ...lock(f, { cx: f.width / 2, cy: spec.lockY + dy, size: spec.lockSize }),
+          label(f, 'status', {
+            x: 16,
+            baseline: spec.baseline + dy,
+            width: f.width - 32,
+            value,
+            size: spec.size,
+            weight: '600',
+            lines: 2,
+            align: 'center',
+          }),
+        ],
+      },
+    ],
+    design: { top: HEADER_BOTTOM, bottom: spec.height - 15 },
+    edges: { top: HEADER_BOTTOM, bottom: f.height - 15 },
+    tailShrink: 10,
+  });
+  return [...brand(f), ...nodes];
+}
+
+export type Entry = { title: string; sub: string | null; ink: 'warn' | 'info' };
+
+/** The agents a card lists: earliest waits while input is needed, else the next wakes. */
+export function entries(copy: Copy): Entry[] {
+  if (copy.primaryKind === 'needsInput') {
+    return copy.waitingAgents.map(agent => ({
+      title: agent.title,
+      sub: agent.reason,
+      ink: 'warn',
+    }));
   }
-  // The thinnest bands drop the glyph: a copy on one line beats a squeezed lock.
-  const showLock = info.height >= 92;
-  const footerHeight = copy.checked === null ? 0 : FOOTER_HEIGHT;
-  // Copy is capped by width; the free height then bounds it through the whole stack
-  // (glyph, gap and one line), so the block stays whole and the spacing carries the rest.
-  const byWidth = Math.min(COPY_MAX, Math.max(12, Math.round(info.width * COPY_RATIO)));
-  const stack = showLock ? LOCK_PER_COPY + LOCK_GAP + COPY_LINE : COPY_LINE;
-  const inner = info.height - (band ? 0 : MARGIN * 2) - brandHeight - footerHeight - 8;
-  const size = Math.max(11, Math.min(byWidth, Math.floor(inner / stack)));
-  const lockSize = Math.max(12, Math.round(size * LOCK_PER_COPY));
-  return (
-    <FlexWidget
-      style={{
-        width: 'match_parent',
-        height: 'match_parent',
-        marginHorizontal: band ? MARGIN : 0,
-      }}
-    >
-      <FlexWidget
-        style={{
-          width: 'match_parent',
-          height: brandHeight,
-          flexDirection: 'row',
-          alignItems: 'center',
-          // Brand sits on the reading-start edge: left in LTR, right in RTL.
-          justifyContent: paint.rtl ? 'flex-end' : 'flex-start',
-        }}
-      >
-        {text('Kilo', paint, { size: brandSize, bold: true })}
-      </FlexWidget>
-      <FlexWidget
-        key="state"
-        style={{
-          width: 'match_parent',
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexGap: Math.round(size * LOCK_GAP),
-        }}
-      >
-        {showLock ? lockGlyph(paint, lockSize) : null}
-        {text(copy.status ?? '', paint, { size, align: 'center' })}
-      </FlexWidget>
-      {copy.checked === null ? null : footer(copy, paint, FOOTER_HEIGHT)}
-    </FlexWidget>
-  );
+  if (copy.primaryKind === 'scheduled') {
+    return copy.scheduledAgents.map(agent => ({
+      title: agent.title,
+      sub: agent.time,
+      ink: 'info',
+    }));
+  }
+  return [];
+}
+
+/** Secondary counts as "3 Working" lines, each with its dot. */
+export function countLines(
+  f: Frame,
+  spec: { x: number; baseline: number; step: number; width: number }
+) {
+  return f.copy.secondaryCounts.flatMap((line, index) => {
+    const baseline = spec.baseline + index * spec.step;
+    return [
+      dot(f, `count-${line.kind}-dot`, {
+        cx: spec.x,
+        cy: baseline - 4,
+        r: 4,
+        fill: dotInk(line.kind),
+      }),
+      label(f, `count-${line.kind}`, {
+        x: spec.x + 12,
+        baseline,
+        width: spec.width,
+        value: `${line.count} ${line.label}`,
+        size: 13,
+      }),
+    ];
+  });
+}
+
+type Line = { value: string; ink: Ink; weight?: '600' };
+
+/**
+ * The Small cell's agent lines: a failed approve first, else the scheduled wake
+ * or the lead title; a taller cell adds the next waiting or scheduled titles.
+ */
+function smallLines(f: Frame): Line[] {
+  const { copy } = f;
+  const lines: Line[] = [];
+  if (f.props.actionFeedback === 'couldNotApprove') {
+    lines.push({ value: copy.actionLine ?? '', ink: 'warn', weight: '600' });
+  }
+  if (copy.primaryKind === 'needsInput' && copy.waitingAgents.length > 0) {
+    lines.push(
+      ...copy.waitingAgents.map(agent => ({ value: agent.title, ink: 'foreground' as const }))
+    );
+  } else if (copy.primaryKind === 'scheduled') {
+    if (copy.wake !== null) {
+      lines.push({ value: copy.wake, ink: copy.wakeOverdue ? 'muted' : 'foreground' });
+    }
+    lines.push(
+      ...copy.scheduledAgents.map(agent => ({ value: agent.title, ink: 'foreground' as const }))
+    );
+  } else if (copy.title !== null) {
+    lines.push({ value: copy.title, ink: 'foreground' });
+  }
+  return lines.slice(0, 3);
+}
+
+function smallBody(f: Frame): ReactNode[] {
+  const { width: W, copy } = f;
+  const design = { top: HEADER_BOTTOM, bottom: 140.4 };
+  const edges = cardEdges(f);
+  const phase = phaseOf(copy);
+  if (phase === 'updating') {
+    return stack({
+      blocks: [
+        {
+          top: 62,
+          bottom: 114,
+          shrink: 10,
+          draw: dy => [
+            bar(f, 'bar-count', { x: 16, y: 62 + dy, width: 44, height: 30 }),
+            bar(f, 'bar-label', { x: 16, y: 102 + dy, width: 96, height: 12 }),
+          ],
+        },
+      ],
+      design,
+      edges,
+      tailShrink: 10,
+    }).nodes;
+  }
+  if (phase === 'empty') {
+    const value = copy.status ?? '';
+    const status = {
+      x: 16,
+      baseline: 104,
+      width: W - 32,
+      value,
+      size: 17,
+      weight: '600',
+      lines: 2,
+    } as const;
+    return stack({
+      blocks: [
+        {
+          top: boxTop(value, 17, 104),
+          bottom: 128.5,
+          height: lineBox(value, 17) * 2,
+          shrink: 20,
+          draw: dy => [label(f, 'status', { ...status, baseline: 104 + dy })],
+        },
+      ],
+      design,
+      edges,
+      tailShrink: 4,
+    }).nodes;
+  }
+  const lines = smallLines(f);
+  const layout = (count: number) =>
+    stack({
+      blocks: [
+        {
+          top: 31.5,
+          bottom: 101.7,
+          shrink: 4,
+          draw: dy =>
+            stackedStatus(f, {
+              x: 16,
+              countBaseline: 78 + dy,
+              countSize: 44,
+              labelBaseline: 98 + dy,
+              labelSize: 14,
+              r: 4,
+              width: W - 32,
+            }),
+        },
+        {
+          top: 103.3,
+          bottom: 120.5,
+          height: 17.2 + Math.max(0, count - 1) * 19,
+          ...(count === 0
+            ? {}
+            : {
+                draw: (dy: number) =>
+                  lines.slice(0, count).map((line, index) =>
+                    label(f, `line-${index}`, {
+                      x: 16,
+                      baseline: 117 + index * 19 + dy,
+                      width: W - 32,
+                      value: line.value,
+                      size: 13,
+                      ink: line.ink,
+                      ...(line.weight === undefined ? {} : { weight: line.weight }),
+                    })
+                  ),
+              }),
+        },
+      ],
+      design,
+      edges,
+      tailShrink: 12,
+    });
+  return layout(fitRows(lines.length, layout)).nodes;
+}
+
+export function small(f: Frame): ReactNode[] {
+  if (phaseOf(f.copy) === 'locked') {
+    return locked(f, { height: 170, lockY: 76, lockSize: 26, baseline: 108, size: 13, wrap: true });
+  }
+  const actions = roundActions(f, {
+    cy: 24,
+    r: 12,
+    plus: f.width - 28,
+    approve: f.width - 56,
+    plusTarget: f.width - 48,
+    create: canCreate(f),
+  });
+  return [...brand(f), ...actions, ...smallBody(f), footer(f, false)];
 }

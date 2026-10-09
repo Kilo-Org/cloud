@@ -13,7 +13,7 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
  * separator in a two-character number is only noise.
  */
 export function formatGlanceableCount(value: number): string {
-  return numberFormat(i18n.language, { useGrouping: false }).format(value);
+  return numberFormat(i18n.language, { useGrouping: true }).format(value);
 }
 
 /**
@@ -42,8 +42,8 @@ export function formatGlanceableAgo(at: string): string {
   return timeAgo(parseTimestamp(at));
 }
 
-/** Checked dates stay absolute because a widget bitmap cannot advance a relative age offline. */
-export function formatGlanceableClock(at: string, options?: { includeDate: boolean }): string {
+/** Clock time for today, date and time otherwise: a widget bitmap cannot advance a relative age offline. */
+export function formatGlanceableClock(at: string): string {
   const date = parseTimestamp(at);
   const now = new Date();
   const today =
@@ -52,7 +52,7 @@ export function formatGlanceableClock(at: string, options?: { includeDate: boole
     date.getDate() === now.getDate();
   const uses24hourClock = getCalendars().at(0)?.uses24hourClock ?? null;
   return dateTimeFormat(i18n.language, {
-    ...(today && !options?.includeDate
+    ...(today
       ? { timeStyle: 'short' as const }
       : { dateStyle: 'short' as const, timeStyle: 'short' as const }),
     ...(uses24hourClock === null

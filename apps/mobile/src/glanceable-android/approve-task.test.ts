@@ -89,6 +89,7 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 vi.mock('./android-sink', () => ({
   androidSink: mocks.sink,
   setGlanceableActionNotice: mocks.setGlanceableActionNotice,
+  setGlanceableActionApproving: (): void => undefined,
   renderStoredSnapshotWithNotice: mocks.renderStoredSnapshotWithNotice,
 }));
 
@@ -167,7 +168,8 @@ describe('handleApproveTask', () => {
     // clear it again, and an approval is not a failure to report.
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
-    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
+    // One render: the Approving… draw before the answer.
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
       userId: 'u1',
@@ -191,7 +193,7 @@ describe('handleApproveTask', () => {
     expect(mocks.setGlanceableActionNotice).toHaveBeenCalledTimes(2);
     expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(1, APPROVE_FAILED);
     expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(2, APPROVE_FAILED);
-    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(3);
     expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenNthCalledWith(1, {
       userId: 'u1',
       organizationId: 'org_1',
@@ -205,10 +207,11 @@ describe('handleApproveTask', () => {
     // republish, which writes the notification again and re-selects the ask from
     // the tray — a line drawn only first could be pruned by that render.
     const firstNotice = mocks.setGlanceableActionNotice.mock.invocationCallOrder[0];
-    const firstRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[0];
+    // Render 0 is the Approving… draw before the answer.
+    const firstRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[1];
     const refreshOrder = mocks.refreshGlanceableSnapshot.mock.invocationCallOrder[0];
     const lastNotice = mocks.setGlanceableActionNotice.mock.invocationCallOrder[1];
-    const lastRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[1];
+    const lastRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[2];
     expect(firstNotice).toBeLessThan(firstRender ?? Number.POSITIVE_INFINITY);
     expect(firstRender).toBeLessThan(refreshOrder ?? Number.POSITIVE_INFINITY);
     expect(refreshOrder).toBeLessThan(lastNotice ?? Number.POSITIVE_INFINITY);
@@ -227,15 +230,20 @@ describe('handleApproveTask', () => {
   it('waits for the failure line before it republishes and finishes', async () => {
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'retryable' });
     const firstRender = deferredRender();
-    mocks.renderStoredSnapshotWithNotice.mockImplementationOnce(async () => {
-      await firstRender.promise;
-    });
+    // The Approving… draw resolves; the failure draw after it stays in flight.
+    mocks.renderStoredSnapshotWithNotice
+      .mockImplementationOnce(async () => {
+        await Promise.resolve();
+      })
+      .mockImplementationOnce(async () => {
+        await firstRender.promise;
+      });
 
     const pending = handleApproveTask();
     // The task must not republish, let alone resolve, while the first draw is
     // still in flight: the headless process would exit with the line unshown.
     await vi.waitFor(() => {
-      expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
+      expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
     });
     expect(mocks.refreshGlanceableSnapshot).not.toHaveBeenCalled();
 
@@ -243,7 +251,7 @@ describe('handleApproveTask', () => {
     await pending;
 
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
-    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(3);
   });
 
   it('renders the failure line from the stored snapshot when the republish rejects', async () => {
@@ -295,7 +303,8 @@ describe('handleApproveTask', () => {
     expect(mocks.recordWaitingAsk).toHaveBeenCalledTimes(1);
     expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
-    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
+    // One render: the Approving… draw before the answer.
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
     // The ask is gone, so its stale tray row is skipped like an answered one.
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
@@ -313,7 +322,8 @@ describe('handleApproveTask', () => {
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
-    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
+    // One render: the Approving… draw before the answer.
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
     // The ask is neither answered nor gone: it is still there, so the republish
     // re-selects it and the notification keeps the Open it names.

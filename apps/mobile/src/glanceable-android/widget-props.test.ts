@@ -1,6 +1,5 @@
 import {
   buildHomeWidgetData,
-  EMPTY_HOME_WIDGET_DETAILS,
   type HomeWidgetData,
   type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
@@ -12,10 +11,8 @@ import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
 import {
   buildAndroidWidgetProps,
-  buildCompactNotificationText,
   buildCurrentWidgetProps,
   buildGenericWidgetProps,
-  buildOngoingNotificationText,
 } from './widget-props';
 
 const NOW = 1_750_000_000_000;
@@ -91,8 +88,8 @@ describe('shared Home presentation localization', () => {
     expect(props.homeCopy).toMatchObject({
       primaryCount: '2',
       primaryLabel: 'Needs input',
-      detail: 'Permission title',
-      checked: `Checked clock:${MIXED.snapshot.updatedAt}`,
+      title: 'Permission title',
+      footer: `Checked clock:${MIXED.snapshot.updatedAt}`,
     });
     expect(props.homeCopy?.secondaryCounts).toEqual([
       { kind: 'running', count: '1', label: 'Working' },
@@ -128,7 +125,7 @@ describe('shared Home presentation localization', () => {
       canCreate: true,
       canApprove: true,
     });
-    expect(props.homeCopy?.checked).toBe(`Checked clock:${MIXED.snapshot.updatedAt}`);
+    expect(props.homeCopy?.footer).toBe(`Last known · clock:${MIXED.snapshot.updatedAt}`);
     expect(props.homeCopy?.accessibilityLabel).toContain('Last known');
     // Activity expiry still wins for the counts-only props used by notification lifetime.
     expect(props.statusLine).toBe('Status expired');
@@ -173,7 +170,8 @@ describe('shared Home presentation localization', () => {
         canApprove: false,
       });
       expect(props.homeCopy?.secondaryCounts).toEqual([]);
-      expect(props.homeCopy?.checked).toBeNull();
+      expect(props.homeCopy?.footer).toBeNull();
+      expect(props.homeCopy?.title).toBeNull();
       expect(JSON.stringify(props)).not.toContain('Permission title');
     }
   );
@@ -208,10 +206,13 @@ describe('shared Home presentation localization', () => {
       { status: 'scheduled', title: 'Wake', scheduledAt: WAKE },
       { status: 'idle' },
     ]);
-    expect(propsFor(data).homeCopy?.detail).toBe(`Next run clock:${WAKE}`);
+    expect(propsFor(data).homeCopy).toMatchObject({
+      wake: `Next run clock:${WAKE}`,
+      title: 'Wake',
+    });
     vi.setSystemTime(Date.parse(WAKE));
     const props = propsFor(data);
-    expect(props.homeCopy?.detail).toBe('Awaiting update');
+    expect(props.homeCopy).toMatchObject({ wake: 'Awaiting update', wakeOverdue: true });
     expect(props.home?.primaryKind).toBe('scheduled');
     expect(props.home?.primaryCount).toBe(1);
   });
@@ -219,7 +220,7 @@ describe('shared Home presentation localization', () => {
   it('keeps unknown wake times absent while retaining the scheduled count', () => {
     const props = propsFor(dataFor([{ status: 'scheduled' }]));
     expect(props.home?.primaryKind).toBe('scheduled');
-    expect(props.homeCopy?.detail).toBe('Agent');
+    expect(props.homeCopy).toMatchObject({ wake: null, title: 'Agent' });
     expect(props.home?.scheduledAt).toBeNull();
     expect(props.home?.awaitingUpdate).toBe(false);
   });
@@ -233,12 +234,15 @@ describe('shared Home presentation localization', () => {
     ]);
   });
 
-  it('shows approve feedback ahead of a title without claiming that title was approved', () => {
+  it('carries approve feedback beside the title without claiming that title was approved', () => {
     setSurfaceExtras({ newestSessionTitle: 'not Home data', actionFeedback: 'approving' });
-    expect(propsFor(MIXED).homeCopy?.detail).toBe('Approving…');
+    expect(propsFor(MIXED).homeCopy).toMatchObject({
+      actionLine: 'Approving…',
+      title: 'Permission title',
+    });
     setSurfaceExtras({ newestSessionTitle: 'not Home data', actionFeedback: 'couldNotApprove' });
-    expect(propsFor(MIXED).homeCopy?.detail).toBe('Could not approve');
-    expect(propsFor(dataFor([], 'privacy')).homeCopy?.detail).toBeNull();
+    expect(propsFor(MIXED).homeCopy?.accessibilityLabel).toContain('Could not approve');
+    expect(propsFor(dataFor([], 'privacy')).homeCopy?.actionLine).toBeNull();
   });
 
   it('does not attach private titles to the generic no-account fallback', () => {
@@ -247,72 +251,5 @@ describe('shared Home presentation localization', () => {
     expect(props.countLines).toEqual([]);
     expect(props.actions.approve).toBe(false);
     expect(props.actions.newAgent).toBe(false);
-  });
-});
-
-describe('notification privacy and activity policy remain independent', () => {
-  it('lists ranked nonzero counts without Home titles or private identifiers', () => {
-    expect(buildOngoingNotificationText(MIXED.snapshot, {}, translate)).toBe(
-      `2 Needs input, 1 Working, 1 Scheduled wakes ${WAKE}, 1 Idle`
-    );
-    const notification = buildOngoingNotificationText(MIXED.snapshot, {}, translate);
-    expect(notification).not.toContain('Permission title');
-    expect(notification).not.toContain('Schedule title');
-    expect(notification).not.toContain('user-private-id');
-  });
-
-  it('keeps the stale warning and retry notice in the notification only', () => {
-    const stale = { ...MIXED.snapshot, status: 'stale' as const };
-    expect(buildOngoingNotificationText(stale, {}, translate, String, 'Could not approve')).toBe(
-      `Could not approve Updates delayed, 2 Needs input, 1 Working, 1 Scheduled wakes ${WAKE}, 1 Idle`
-    );
-  });
-
-  it.each(['signed_out', 'privacy', 'expired', 'waiting', 'empty'] as const)(
-    'does not leak retained Home counts on %s',
-    status => {
-      const snapshot = { ...MIXED.snapshot, status };
-      expect(buildOngoingNotificationText(snapshot, {}, translate)).toBe(
-        translate(
-          {
-            signed_out: 'glanceable.signedOut',
-            privacy: 'glanceable.privacy',
-            expired: 'glanceable.expired',
-            waiting: 'glanceable.waiting',
-            empty: 'glanceable.empty',
-          }[status]
-        )
-      );
-      expect(buildCompactNotificationText(snapshot, {})).toBeNull();
-    }
-  );
-
-  it('keeps notification relative wake formatting and literal placeholder insertion', () => {
-    const data = dataFor([{ status: 'scheduled', scheduledAt: WAKE }]);
-    expect(
-      buildOngoingNotificationText(
-        data.snapshot,
-        {},
-        translate,
-        String,
-        null,
-        () => '$& in 2 hours'
-      )
-    ).toBe('1 Scheduled wakes $& in 2 hours');
-  });
-
-  it('formats the promoted notification primary count without titles', () => {
-    expect(buildCompactNotificationText(MIXED.snapshot, {}, value => `digit:${value}`)).toBe(
-      'digit:2'
-    );
-    const scheduled = dataFor([{ status: 'scheduled' }, { status: 'idle' }]);
-    expect(buildCompactNotificationText(scheduled.snapshot, {})).toBe('1');
-  });
-
-  it('does not require Home details to render privacy-minimal activity text', () => {
-    const noDetails = { ...MIXED, details: EMPTY_HOME_WIDGET_DETAILS };
-    expect(buildOngoingNotificationText(noDetails.snapshot, {}, translate)).toBe(
-      buildOngoingNotificationText(MIXED.snapshot, {}, translate)
-    );
   });
 });

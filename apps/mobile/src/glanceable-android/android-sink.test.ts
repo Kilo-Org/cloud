@@ -30,17 +30,20 @@ vi.mock('expo-localization', () => ({
 }));
 
 const mocks = vi.hoisted(() => {
-  let notification: {
+  type Card = {
     title: string;
     text: string;
+    textIsError: boolean;
+    subText: string | null;
+    compactText: string | null;
     openLabel: string;
     openUrl: string;
     approveLabel: string | null;
-    compactText: string | null;
-    channelId: string;
-    alerting: boolean;
-    promotion: boolean;
-  } | null = null;
+    newAgentLabel: string | null;
+    newAgentUrl: string;
+  };
+  let notification: (Card & { channelId: string; alerting: boolean; promotion: boolean }) | null =
+    null;
 
   // Capture the requested bridge timeout, not Android's alarm cancellation behavior.
   let notificationDeadline: number | null = null;
@@ -52,58 +55,24 @@ const mocks = vi.hoisted(() => {
 
   // eslint-disable-next-line max-params -- the fake models the native bridge arguments
   function post(
-    title: string,
-    text: string,
-    openAction: { label: string; url: string },
-    approveLabel: string | null,
-    compactText: string | null,
+    card: Card,
     channelId: string,
     alerting: boolean,
     promotion: boolean,
     timeoutMs = 0
   ): void {
-    notification = {
-      title,
-      text,
-      openLabel: openAction.label,
-      openUrl: openAction.url,
-      approveLabel,
-      compactText,
-      channelId,
-      alerting,
-      promotion,
-    };
+    notification = { ...card, channelId, alerting, promotion };
     notificationDeadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
     postedChannel = channelId;
   }
 
   const isPromotionCapable = vi.fn(() => true);
 
-  // The native `update` spends its eighth bridge slot on the terminal timeout,
-  // so it applies the promotion gate from the capability check it re-runs
-  // instead of a JS flag.
+  // The native `update` carries the terminal timeout and applies the promotion
+  // gate from the capability check it re-runs instead of a JS flag.
   // eslint-disable-next-line max-params -- the fake models the native update bridge arguments
-  function postUpdate(
-    title: string,
-    text: string,
-    openAction: { label: string; url: string },
-    approveLabel: string | null,
-    compactText: string | null,
-    channelId: string,
-    alerting: boolean,
-    timeoutMs = 0
-  ): void {
-    post(
-      title,
-      text,
-      openAction,
-      approveLabel,
-      compactText,
-      channelId,
-      alerting,
-      isPromotionCapable(),
-      timeoutMs
-    );
+  function postUpdate(card: Card, channelId: string, alerting: boolean, timeoutMs = 0): void {
+    post(card, channelId, alerting, isPromotionCapable(), timeoutMs);
   }
 
   return {
@@ -160,6 +129,7 @@ vi.mock('react-native', () => ({
 // vitest; stub them so only the sink logic runs.
 vi.mock('react-native-android-widget', () => ({
   FlexWidget: () => null,
+  OverlapWidget: () => null,
   TextWidget: () => null,
   ImageWidget: () => null,
   requestWidgetUpdate: (...args: unknown[]) => mocks.requestWidgetUpdate(...args),
@@ -301,7 +271,7 @@ describe('androidSink start and update', () => {
 
     publisher.applySnapshot(snapshotFor([{ status: 'busy' }], 1), CTX);
     await flushAsync();
-    expect(mocks.getNotification()?.text).toBe('1 Working');
+    expect(mocks.getNotification()).toMatchObject({ title: '1 Working', text: '' });
 
     publisher.handleSessions([], CTX);
     await vi.advanceTimersByTimeAsync(8000);
@@ -313,9 +283,9 @@ describe('androidSink start and update', () => {
   it('forwards the ranked compact number and all counts on start and update', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
-    expect(mocks.getNotification()).toEqual({
-      title: 'Active agents',
-      text: '2 Needs input, 4 Working, 3 Idle',
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: '4 Working · 3 Idle',
       ...noAskActions(),
       compactText: '2',
       channelId: 'needs-input',
@@ -325,9 +295,9 @@ describe('androidSink start and update', () => {
 
     androidSink.startOrUpdate({ ...MIXED, revision: 2, needsInput: 0 }, CTX);
     await flushAsync();
-    expect(mocks.getNotification()).toEqual({
-      title: 'Active agents',
-      text: '4 Working, 3 Idle',
+    expect(mocks.getNotification()).toMatchObject({
+      title: '4 Working',
+      text: '3 Idle',
       ...noAskActions(),
       compactText: '4',
       channelId: 'agent-progress',
@@ -337,9 +307,9 @@ describe('androidSink start and update', () => {
 
     androidSink.startOrUpdate({ ...MIXED, revision: 3, needsInput: 0, idle: 0 }, CTX);
     await flushAsync();
-    expect(mocks.getNotification()).toEqual({
-      title: 'Active agents',
-      text: '4 Working',
+    expect(mocks.getNotification()).toMatchObject({
+      title: '4 Working',
+      text: '',
       ...noAskActions(),
       compactText: '4',
       channelId: 'agent-progress',
@@ -349,21 +319,27 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
     expect(mocks.native.update).toHaveBeenCalledTimes(2);
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      '2 Needs input, 4 Working, 3 Idle',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      '2',
+      expect.objectContaining({
+        title: '2 Needs input',
+        text: '4 Working · 3 Idle',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: '2',
+      }),
       'needs-input',
       true,
       true
     );
     expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      '4 Working',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      '4',
+      expect.objectContaining({
+        title: '4 Working',
+        text: '',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: '4',
+      }),
       'agent-progress',
       false,
       0
@@ -379,11 +355,12 @@ describe('androidSink start and update', () => {
     androidSink.startOrUpdate({ ...needsInput, revision: 2 }, CTX);
     await flushAsync();
     expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      expect.any(String),
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      expect.any(String),
+      expect.objectContaining({
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: expect.any(String),
+      }),
       'needs-input',
       false,
       0
@@ -396,11 +373,12 @@ describe('androidSink start and update', () => {
 
     expect(mocks.getNotification()).toMatchObject({ channelId: 'agent-progress', alerting: false });
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      expect.any(String),
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      expect.any(String),
+      expect.objectContaining({
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: expect.any(String),
+      }),
       'agent-progress',
       false,
       true
@@ -429,11 +407,12 @@ describe('androidSink start and update', () => {
     await flushAsync();
 
     expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      expect.any(String),
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      expect.any(String),
+      expect.objectContaining({
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: expect.any(String),
+      }),
       'needs-input',
       true,
       0
@@ -454,11 +433,12 @@ describe('androidSink start and update', () => {
     await flushAsync();
 
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      expect.any(String),
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      expect.any(String),
+      expect.objectContaining({
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: expect.any(String),
+      }),
       'needs-input',
       false,
       true
@@ -477,11 +457,12 @@ describe('androidSink start and update', () => {
     await flushAsync();
 
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      expect.any(String),
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      expect.any(String),
+      expect.objectContaining({
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: expect.any(String),
+      }),
       'needs-input',
       true,
       true
@@ -508,11 +489,12 @@ describe('androidSink start and update', () => {
     await handleAppStateActive();
 
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      expect.any(String),
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      expect.any(String),
+      expect.objectContaining({
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: expect.any(String),
+      }),
       'needs-input',
       true,
       true
@@ -534,11 +516,12 @@ describe('androidSink start and update', () => {
     await flushAsync();
 
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      expect.any(String),
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      expect.any(String),
+      expect.objectContaining({
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: expect.any(String),
+      }),
       'needs-input',
       true,
       true
@@ -574,7 +557,8 @@ describe('androidSink start and update', () => {
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
     expect(mocks.native.update).toHaveBeenCalledTimes(1);
     expect(mocks.getNotification()).toMatchObject({
-      text: '4 Working, 3 Idle',
+      title: '4 Working',
+      text: '3 Idle',
       channelId: 'agent-progress',
       alerting: false,
     });
@@ -585,9 +569,9 @@ describe('androidSink start and update', () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
 
-    expect(mocks.getNotification()).toEqual({
-      title: 'Active agents',
-      text: '2 Needs input, 4 Working, 3 Idle',
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: '4 Working · 3 Idle',
       ...noAskActions(),
       compactText: '2',
       channelId: 'needs-input',
@@ -605,9 +589,9 @@ describe('androidSink start and update', () => {
     deferred.resolve('granted');
     await flushAsync();
 
-    expect(mocks.getNotification()).toEqual({
-      title: 'Active agents',
-      text: '4 Working, 3 Idle',
+    expect(mocks.getNotification()).toMatchObject({
+      title: '4 Working',
+      text: '3 Idle',
       ...noAskActions(),
       compactText: '4',
       channelId: 'agent-progress',
@@ -717,11 +701,14 @@ describe('androidSink approve action', () => {
     await flushAsync();
     expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      '1 Needs input',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_approve' },
-      i18n.t('common.approve'),
-      '1',
+      expect.objectContaining({
+        title: '1 Needs input',
+        text: '',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions/ses_approve',
+        approveLabel: i18n.t('common.approve'),
+        compactText: '1',
+      }),
       'needs-input',
       true,
       true
@@ -733,11 +720,14 @@ describe('androidSink approve action', () => {
     await flushAsync();
     expect(mocks.getNotification()?.approveLabel).toBeNull();
     expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      '1 Working',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions' },
-      null,
-      '1',
+      expect.objectContaining({
+        title: '1 Working',
+        text: '',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions',
+        approveLabel: null,
+        compactText: '1',
+      }),
       'agent-progress',
       false,
       0
@@ -757,11 +747,14 @@ describe('androidSink approve action', () => {
     await handleAppStateActive();
 
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      '1 Needs input',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_retry' },
-      i18n.t('common.approve'),
-      '1',
+      expect.objectContaining({
+        title: '1 Needs input',
+        text: '',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions/ses_retry',
+        approveLabel: i18n.t('common.approve'),
+        compactText: '1',
+      }),
       'needs-input',
       true,
       true
@@ -774,11 +767,14 @@ describe('androidSink approve action', () => {
     await flushAsync();
     expect(mocks.getNotification()?.approveLabel).toBeNull();
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      '1 Needs input',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_question' },
-      null,
-      '1',
+      expect.objectContaining({
+        title: '1 Needs input',
+        text: '',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions/ses_question',
+        approveLabel: null,
+        compactText: '1',
+      }),
       'needs-input',
       true,
       true
@@ -799,11 +795,14 @@ describe('androidSink approve action', () => {
     androidSink.publish(snapshotFor([{ status: 'permission' }], 1));
     expect(mocks.getNotification()?.approveLabel).toBe(i18n.t('common.approve'));
     expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      '1 Needs input',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_late' },
-      i18n.t('common.approve'),
-      '1',
+      expect.objectContaining({
+        title: '1 Needs input',
+        text: '',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions/ses_late',
+        approveLabel: i18n.t('common.approve'),
+        compactText: '1',
+      }),
       'needs-input',
       true,
       0
@@ -824,11 +823,14 @@ describe('androidSink approve action', () => {
 
     expect(mocks.getNotification()?.approveLabel).toBeNull();
     expect(mocks.native.update).toHaveBeenLastCalledWith(
-      'Active agents',
-      'No agents waiting',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_done' },
-      null,
-      null,
+      expect.objectContaining({
+        title: 'No agents waiting',
+        text: '',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions/ses_done',
+        approveLabel: null,
+        compactText: null,
+      }),
       'agent-progress',
       false,
       expect.any(Number)
@@ -944,7 +946,10 @@ describe('androidSink action notice', () => {
     androidSink.startOrUpdate({ ...MIXED, revision: 2, running: 5 }, CTX);
     await flushAsync();
 
-    expect(mocks.getNotification()?.text).toBe('Approval failed 2 Needs input, 5 Working, 3 Idle');
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: 'Approval failed',
+    });
   });
 
   it('drops the notice once the counts reach zero', async () => {
@@ -954,10 +959,13 @@ describe('androidSink action notice', () => {
     setGlanceableActionNotice('Approval failed');
 
     androidSink.publish({ ...MIXED, revision: 2, needsInput: 0 });
-    expect(mocks.getNotification()?.text).toBe('4 Working, 3 Idle');
+    expect(mocks.getNotification()).toMatchObject({ title: '4 Working', text: '3 Idle' });
 
     androidSink.publish({ ...MIXED, revision: 3, needsInput: 3 });
-    expect(mocks.getNotification()?.text).toBe('3 Needs input, 4 Working, 3 Idle');
+    expect(mocks.getNotification()).toMatchObject({
+      title: '3 Needs input',
+      text: '4 Working · 3 Idle',
+    });
   });
 
   it('drops the notice when the recorded ask changes', async () => {
@@ -970,14 +978,20 @@ describe('androidSink action notice', () => {
     androidSink.startOrUpdate({ ...MIXED, revision: 2, running: 5 }, CTX);
     await flushAsync();
 
-    expect(mocks.getNotification()?.text).toBe('2 Needs input, 5 Working, 3 Idle');
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: '5 Working · 3 Idle',
+    });
   });
 
   it('prefixes the notice only after it is set', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
 
-    expect(mocks.getNotification()?.text).toBe('2 Needs input, 4 Working, 3 Idle');
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: '4 Working · 3 Idle',
+    });
   });
 });
 
@@ -996,11 +1010,14 @@ describe('renderStoredSnapshotWithNotice', () => {
     expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
     expect(mocks.native.start).toHaveBeenCalledWith(
-      'Active agents',
-      'Approval failed 2 Needs input, 4 Working, 3 Idle',
-      { label: i18n.t('glanceable.openSession'), url: 'kiloapp:///cloud/sessions/ses_retry' },
-      i18n.t('common.approve'),
-      '2',
+      expect.objectContaining({
+        title: '2 Needs input',
+        text: 'Approval failed',
+        openLabel: i18n.t('glanceable.openSession'),
+        openUrl: 'kiloapp:///cloud/sessions/ses_retry',
+        approveLabel: i18n.t('common.approve'),
+        compactText: '2',
+      }),
       'needs-input',
       true,
       true
@@ -1021,7 +1038,8 @@ describe('renderStoredSnapshotWithNotice', () => {
 
     expect(mocks.native.start).toHaveBeenCalledTimes(1);
     expect(mocks.getNotification()).toMatchObject({
-      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      title: '2 Needs input',
+      text: 'Approval failed',
       approveLabel: i18n.t('common.approve'),
     });
   });
@@ -1040,7 +1058,8 @@ describe('renderStoredSnapshotWithNotice', () => {
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).toHaveBeenCalledTimes(1);
     expect(mocks.getNotification()).toMatchObject({
-      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      title: '2 Needs input',
+      text: 'Approval failed',
       approveLabel: i18n.t('common.approve'),
     });
   });
@@ -1060,7 +1079,8 @@ describe('renderStoredSnapshotWithNotice', () => {
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).toHaveBeenCalledTimes(1);
     expect(mocks.getNotification()).toMatchObject({
-      text: 'Approval failed 2 Needs input, 4 Working, 3 Idle',
+      title: '2 Needs input',
+      text: 'Approval failed',
       approveLabel: i18n.t('common.approve'),
     });
   });
@@ -1088,14 +1108,14 @@ describe('androidSink widget publish and end', () => {
     expect(runningCount()).toBe('1');
   });
 
-  it('publishes the stale warning and retained counts through the native bridge', async () => {
+  it('publishes the last-known time and retained counts through the native bridge', async () => {
     androidSink.startOrUpdate(MIXED, CTX);
     await flushAsync();
     androidSink.publish({ ...MIXED, revision: 2, status: 'stale' });
 
     const notification = mocks.getNotification();
-    expect(notification?.text).toContain(i18n.t('glanceable.stale'));
-    expect(notification?.text).toContain('2 Needs input, 4 Working, 3 Idle');
+    expect(notification).toMatchObject({ title: '2 Needs input', text: '4 Working · 3 Idle' });
+    expect(notification?.subText).toMatch(new RegExp(`^${i18n.t('glanceable.lastKnown')} · `, 'u'));
     expect(notification?.compactText).toBe('2');
     expect(getCurrentWidgetProps()?.accessibilityLabel).toContain(
       '2 Needs input, 4 Working, 3 Idle, Open agents'
@@ -1151,7 +1171,8 @@ describe('androidSink widget publish and end', () => {
 
     androidSink.publish(snapshotFor([{ status: 'idle' }], MIXED.revision));
     expect(mocks.getNotification()).toMatchObject({
-      text: i18n.t('glanceable.empty'),
+      title: i18n.t('glanceable.empty'),
+      text: '',
       compactText: null,
     });
     expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
@@ -1240,7 +1261,8 @@ describe('androidSink widget publish and end', () => {
     _resetAndroidSinkForTests();
 
     expect(mocks.getNotification()).toMatchObject({
-      text: 'No agents waiting',
+      title: 'No agents waiting',
+      text: '',
       compactText: null,
     });
     expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
@@ -1271,13 +1293,17 @@ describe('androidSink widget publish and end', () => {
     expect(() => {
       androidSink.publish(empty);
     }).toThrow('Cannot persist the active agents notification timeout');
-    expect(mocks.getNotification()?.text).toBe('2 Needs input, 4 Working, 3 Idle');
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: '4 Working · 3 Idle',
+    });
     expect(mocks.getRequestedNotificationDeadline()).toBeNull();
 
     vi.setSystemTime(NOW + 3000);
     androidSink.publish(empty);
     expect(mocks.getNotification()).toMatchObject({
-      text: 'No agents waiting',
+      title: 'No agents waiting',
+      text: '',
       compactText: null,
     });
     expect(mocks.getRequestedNotificationDeadline()).toBe(NOW + 8000);
@@ -1305,7 +1331,8 @@ describe('androidSink widget publish and end', () => {
 
       expect(mocks.getRequestedNotificationDeadline()).toBeNull();
       expect(mocks.getNotification()).toMatchObject({
-        text: '2 Needs input, 4 Working, 3 Idle',
+        title: '2 Needs input',
+        text: '4 Working · 3 Idle',
         compactText: '2',
       });
       expect(mocks.getWidgetDeadline()).toBe(method === 'publish' ? NOW + 28_800_000 : 0);
@@ -1364,9 +1391,9 @@ describe('handleAppStateActive', () => {
     // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
     _setPermissionReaderForTests(() => Promise.resolve('granted'));
     await handleAppStateActive();
-    expect(mocks.getNotification()).toEqual({
-      title: 'Active agents',
-      text: '2 Needs input, 4 Working, 3 Idle',
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: '4 Working · 3 Idle',
       ...noAskActions(),
       compactText: '2',
       channelId: 'needs-input',

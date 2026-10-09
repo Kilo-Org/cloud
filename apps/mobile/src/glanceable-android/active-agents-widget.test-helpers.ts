@@ -1,5 +1,4 @@
 import { buildHomeWidgetData, type HomeWidgetSessionRow } from '@kilocode/app-shared/home-widget';
-import { expect } from 'vitest';
 
 import { renderActiveAgentsWidget } from './active-agents-widget';
 import { type AndroidWidgetProps, buildAndroidWidgetProps } from './widget-props';
@@ -14,8 +13,10 @@ const COPY: Record<string, string> = {
   'common.scheduled': 'Scheduled',
   'common.idle': 'Idle',
   'common.agent': 'Agent',
+  'common.recent': 'Recent',
   'glanceable.empty': 'No work in progress',
-  'glanceable.waiting': 'Waiting for agents',
+  'home.noLiveSessions': 'Nothing running right now',
+  'glanceable.waiting': 'Updating agents',
   'glanceable.signedOut': 'Sign in to see agents',
   'glanceable.privacy': 'Open Kilo to see agents',
   'glanceable.checked': 'Checked',
@@ -23,9 +24,12 @@ const COPY: Record<string, string> = {
   'glanceable.awaitingUpdate': 'Awaiting update',
   'glanceable.nextRun': 'Next run',
   'glanceable.newAgent': 'New agent',
+  'glanceable.waitingForYou': 'Waiting for you',
+  'glanceable.nextScheduled': 'Next scheduled',
   'common.approve': 'Approve',
   'glanceable.approving': 'Approving…',
   'glanceable.couldNotApprove': 'Could not approve',
+  'glanceable.approveFailed': "Couldn't approve. Tap Approve to try again.",
   'agentChat.permissionCard.title': 'Permission required',
   'glanceable.answerNeeded': 'Answer needed',
   'glanceable.waitingToRetry': 'Waiting to retry',
@@ -33,11 +37,20 @@ const COPY: Record<string, string> = {
 };
 export const translate = (key: string) => COPY[key] ?? key;
 
-// Launcher-reported dp frames, including the shallow landscape variants.
+/** The design frames, then launcher-reported dp cells including the landscape bands. */
+export const DESIGN = {
+  small: [170, 170],
+  medium: [364, 170],
+  large: [364, 382],
+  row: [360, 104],
+  narrow: [172, 104],
+  landscape: [627, 62],
+} as const;
 export const CELLS = [
   [172, 104],
   [266, 104],
   [360, 104],
+  [172, 135],
   [172, 224],
   [266, 224],
   [360, 224],
@@ -55,27 +68,34 @@ export const CELLS = [
   [467, 208],
   [627, 208],
   [627, 281],
+  ...Object.values(DESIGN),
 ] as const;
 
+type Style = {
+  height?: string | number;
+  width?: string | number;
+  marginLeft?: number;
+  marginTop?: number;
+  flex?: number;
+  flexDirection?: string;
+  flexGap?: number;
+  fontSize?: number;
+  fontWeight?: string;
+  backgroundColor?: string;
+  textAlign?: string;
+  rotation?: number;
+};
 export type Element = {
+  key?: string | null;
   props: {
     children?: unknown;
     text?: string;
     maxLines?: number;
+    truncate?: string;
     clickAction?: string;
-    clickActionData?: { uri?: string };
+    clickActionData?: { uri?: string; approvalKey?: string | null };
     accessibilityLabel?: string;
-    style?: {
-      height?: string | number;
-      width?: string | number;
-      flex?: number;
-      flexDirection?: string;
-      flexGap?: number;
-      padding?: number;
-      fontSize?: number;
-      backgroundColor?: string;
-      textAlign?: string;
-    };
+    style?: Style;
   };
 };
 export function nodes(root: unknown): Element[] {
@@ -87,6 +107,33 @@ export function nodes(root: unknown): Element[] {
   }
   const element = root as Element;
   return [element, ...nodes(element.props.children)];
+}
+/** The canvas's absolutely placed children. */
+export function placed(root: Element): Element[] {
+  return [root.props.children]
+    .flat(Infinity)
+    .filter((child): child is Element => child !== null && typeof child === 'object');
+}
+export type Rect = { x: number; y: number; width: number; height: number };
+export function rectOf(node: Element): Rect {
+  const { marginLeft = 0, marginTop = 0, width, height } = node.props.style ?? {};
+  return {
+    x: marginLeft,
+    y: marginTop,
+    width: typeof width === 'number' ? width : Number.NaN,
+    height: typeof height === 'number' ? height : Number.NaN,
+  };
+}
+export function hasKey(root: Element, key: string): boolean {
+  return placed(root).some(node => node.key === key);
+}
+/** The placed child with `key`; a missing one fails the test that asked for it. */
+export function byKey(root: Element, key: string): Element {
+  const found = placed(root).find(node => node.key === key);
+  if (found === undefined) {
+    throw new Error(`no placed ${key}`);
+  }
+  return found;
 }
 export function propsFor(
   sessions: HomeWidgetSessionRow[],
@@ -119,42 +166,4 @@ export function render(props: AndroidWidgetProps, size: readonly [number, number
 }
 export function texts(root: Element) {
   return nodes(root).flatMap(node => (node.props.text ? [node.props.text] : []));
-}
-
-/** Check emitted native slot budgets, including fallback-script font padding. Not pixel measurement. */
-export function minimumHeight(root: unknown): number {
-  if (root === null || typeof root !== 'object') {
-    return 0;
-  }
-  if (Array.isArray(root)) {
-    return root.reduce((sum: number, child) => sum + minimumHeight(child), 0);
-  }
-  const element = root as Element;
-  const { style = {}, text: value, maxLines = 1 } = element.props;
-  if (value !== undefined) {
-    if (value === '') {
-      return 0;
-    }
-    const tall = /[\u0600-\u08FF\u0900-\u0DFF]/u.test(value);
-    return Math.ceil((style.fontSize ?? 14) * (tall ? 1.62 : 1.32)) * maxLines;
-  }
-  const children = (
-    Array.isArray(element.props.children)
-      ? element.props.children.flat(Infinity)
-      : [element.props.children]
-  ).filter(child => child != null);
-  const heights = children.map(child => minimumHeight(child));
-  const content =
-    style.flexDirection === 'row'
-      ? Math.max(0, ...heights)
-      : heights.reduce((sum, height) => sum + height, 0) +
-        Math.max(0, heights.length - 1) * (style.flexGap ?? 0);
-  if (typeof style.height === 'number') {
-    expect(
-      content,
-      JSON.stringify({ style, text: nodes(element).map(node => node.props.text) })
-    ).toBeLessThanOrEqual(style.height - 2 * (style.padding ?? 0));
-    return style.height;
-  }
-  return content + 2 * (style.padding ?? 0);
 }

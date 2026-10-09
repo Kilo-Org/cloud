@@ -5,17 +5,33 @@ import { type GlanceableActionFeedback } from '@/lib/glanceable/surface-extras';
 
 export type AndroidWidgetCount = { label: string; kind: GlanceableCountKind; count: string };
 export type GlanceableCountFormat = (value: number) => string;
-export type GlanceableClockFormat = (at: string, options?: { includeDate: boolean }) => string;
+/** A clock time, with the date added when `at` is not today. */
+export type GlanceableClockFormat = (at: string) => string;
 
 /** Translated Home widget copy; the layout never translates or formats on its own. */
 export type AndroidWidgetHomeCopy = {
   /** The presented state: privacy/signed_out/unavailable centre a locked composition. */
   statusKind: HomeWidgetPresentation['status'];
+  /** Picks the status dot colour. */
+  primaryKind: GlanceableCountKind | null;
   primaryCount: string;
   primaryLabel: string | null;
+  /** Locked, empty ("Nothing running right now") and updating copy; null while content shows. */
   status: string | null;
-  detail: string | null;
-  checked: string | null;
+  /** The 2x1 cell's shorter empty wording. */
+  emptyShort: string;
+  /** The agent the count is about; an untitled agent reads `common.agent`. */
+  title: string | null;
+  /** "Next run <time>", or "Awaiting update" once the wake has passed. */
+  wake: string | null;
+  wakeOverdue: boolean;
+  /** "Checked <time>", or "Last known · <time>" when the data is stale. */
+  footer: string | null;
+  /** "Approving…" or "Could not approve" while an approve press is in flight or failed. */
+  actionLine: string | null;
+  /** The Medium/Large footer that replaces the checked time after a failed approve. */
+  approveFailed: string;
+  headings: { recent: string; waitingForYou: string; nextScheduled: string };
   secondaryCounts: AndroidWidgetCount[];
   waitingAgents: { title: string; reason: string }[];
   scheduledAgents: { title: string; time: string | null }[];
@@ -65,6 +81,20 @@ function scheduledAgentTime(
     : formatClock(scheduledAt);
 }
 
+function footerLine(
+  home: HomeWidgetPresentation,
+  translate: (key: string) => string,
+  formatClock: GlanceableClockFormat
+): string | null {
+  if (home.checkedAt === null) {
+    return null;
+  }
+  const at = formatClock(home.checkedAt);
+  return home.stale
+    ? `${translate('glanceable.lastKnown')} · ${at}`
+    : `${translate('glanceable.checked')} ${at}`;
+}
+
 // eslint-disable-next-line max-params -- shared policy, translator and injected number/clock formatters keep native/i18n imports out of this builder
 export function buildAndroidHomeCopy(
   home: HomeWidgetPresentation,
@@ -92,20 +122,16 @@ export function buildAndroidHomeCopy(
             privacy: 'glanceable.privacy',
           }[home.status]
         );
-  const checked =
-    home.checkedAt === null
-      ? null
-      : `${translate('glanceable.checked')} ${formatClock(home.checkedAt, { includeDate: true })}`;
-  const wake = wakeLine(home, translate, formatClock);
+  const content = home.status === 'content';
+  const footer =
+    home.status === 'content' || home.status === 'empty'
+      ? footerLine(home, translate, formatClock)
+      : null;
+  const wake =
+    content && home.primaryKind === 'scheduled' ? wakeLine(home, translate, formatClock) : null;
   const actionLine = feedback === null ? null : translate(ACTION_FEEDBACK_KEYS[feedback]);
-  const title = home.primaryTitle === null ? null : home.primaryTitle || translate('common.agent');
-  const knownTitle = home.stale
-    ? [translate('glanceable.lastKnown'), title].filter(Boolean).join(' · ')
-    : title;
-  const detail =
-    home.status !== 'content'
-      ? null
-      : (actionLine ?? (home.primaryKind === 'scheduled' ? (wake ?? knownTitle) : knownTitle));
+  const title =
+    !content || home.primaryTitle === null ? null : home.primaryTitle || translate('common.agent');
   const counts =
     home.primaryKind === null
       ? []
@@ -115,11 +141,22 @@ export function buildAndroidHomeCopy(
         ];
   return {
     statusKind: home.status,
+    primaryKind: home.primaryKind,
     primaryCount: formatCount(home.primaryCount),
     primaryLabel,
     status,
-    detail,
-    checked,
+    emptyShort: translate('glanceable.empty'),
+    title,
+    wake,
+    wakeOverdue: home.awaitingUpdate,
+    footer,
+    actionLine,
+    approveFailed: translate('glanceable.approveFailed'),
+    headings: {
+      recent: translate('common.recent'),
+      waitingForYou: translate('glanceable.waitingForYou'),
+      nextScheduled: translate('glanceable.nextScheduled'),
+    },
     secondaryCounts,
     waitingAgents: home.waitingAgents.map(agent => ({
       title: agent.title || translate('common.agent'),
@@ -132,9 +169,8 @@ export function buildAndroidHomeCopy(
     accessibilityLabel: [
       status,
       ...counts,
-      detail,
-      home.stale && home.status === 'content' ? translate('glanceable.lastKnown') : null,
-      checked,
+      actionLine ?? wake ?? title,
+      footer,
       translate('glanceable.openAgents'),
     ]
       .filter(Boolean)

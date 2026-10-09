@@ -12,6 +12,7 @@ import { dismissNeedsInputNotification } from '@/lib/needs-input-notification';
 import {
   androidSink,
   renderStoredSnapshotWithNotice,
+  setGlanceableActionApproving,
   setGlanceableActionNotice,
 } from './android-sink';
 
@@ -73,6 +74,22 @@ async function showApproveFailed(ask: WaitingAsk): Promise<void> {
 }
 
 /**
+ * Show the answer in flight: the card reads "Approving…" and drops Approve until
+ * the answer settles. Best-effort: the republish after the answer redraws it.
+ */
+async function showApproving(ask: WaitingAsk): Promise<void> {
+  setGlanceableActionApproving(true);
+  try {
+    await renderStoredSnapshotWithNotice({
+      userId: ask.userId,
+      organizationId: ask.organizationId,
+    });
+  } catch {
+    // The answer still runs; the republish below corrects the surface.
+  }
+}
+
+/**
  * Answer the recorded ask and update the notification in place. Never throws:
  * the worker completes from the headless task's finish, so a rejection would
  * only lose the failure state the user needs to see. A thrown error is a
@@ -108,6 +125,7 @@ export async function handleApproveTask(): Promise<void> {
       // Nothing is recorded, so there is no ask to answer and no action to drop.
       return;
     }
+    await showApproving(ask);
     const result = await runGlanceableApprove({ now: () => Date.now() });
     askEnded = result.kind === 'approved' || result.kind === 'gone';
     if (result.kind === 'gone') {
@@ -121,6 +139,8 @@ export async function handleApproveTask(): Promise<void> {
     // Keep the recorded ask and its Approve; only the failure line is needed.
     failed = ask !== null;
   }
+  // Settled either way: the next draw shows the answer, the failure, or Approve again.
+  setGlanceableActionApproving(false);
   if (ask === null) {
     return;
   }

@@ -6,6 +6,7 @@ import { type JSX } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  collectControls,
   collectText,
   NOW,
   runWidgetClickTask,
@@ -72,6 +73,7 @@ vi.mock('react-native-android-widget', () => ({
   requestWidgetUpdateById: mocks.requestById,
   getWidgetInfo: mocks.getWidgetInfo,
   FlexWidget: () => null,
+  OverlapWidget: () => null,
   TextWidget: () => null,
 }));
 
@@ -123,9 +125,8 @@ describe.each([172, 360])('headless Home widget at %d dp', width => {
     const { handleWidgetTask } = await registerAfterRestart(snapshotFor());
     const rendered = await runWidgetTask(handleWidgetTask, width);
     const text = collectText(rendered.light);
-    expect(text).toEqual(
-      expect.arrayContaining(['Kilo', '2', 'Needs input', '+', width >= 266 ? 'Approve' : '✓'])
-    );
+    expect(text).toEqual(expect.arrayContaining(['Kilo', '2', 'Needs input']));
+    expect(collectControls(rendered.light)).toEqual(['Approve', 'New agent']);
     expect(text).not.toContain('0');
     expect(text.some(line => line.startsWith('Checked'))).toBe(true);
     expect(rendered.light.props).toMatchObject({
@@ -139,7 +140,8 @@ describe.each([172, 360])('headless Home widget at %d dp', width => {
     const { handleWidgetTask } = await registerAfterRestart(stored);
     vi.setSystemTime(Date.parse(stored.expiresAt) + 1);
     const rendered = await runWidgetTask(handleWidgetTask, width);
-    expect(collectText(rendered.light)).toEqual(expect.arrayContaining(['2', 'Needs input', '+']));
+    expect(collectText(rendered.light)).toEqual(expect.arrayContaining(['2', 'Needs input']));
+    expect(collectControls(rendered.light)).toContain('New agent');
     expect(collectText(rendered.light)).not.toContain('Status expired');
     expect(mocks.getDeadline()).toBe(Date.parse(stored.expiresAt));
   });
@@ -155,7 +157,7 @@ describe.each([172, 360])('headless Home widget at %d dp', width => {
         status === 'privacy' ? 'Open Kilo to see agents' : 'Sign in to see agents'
       );
       expect(collectText(rendered.light)).not.toContain('2');
-      expect(collectText(rendered.light)).not.toContain('✓');
+      expect(collectControls(rendered.light)).toEqual([]);
     }
   );
 
@@ -190,9 +192,12 @@ describe.each([172, 360])('headless Home widget at %d dp', width => {
     const renders = await runWidgetClickTask(handleWidgetTask, width, 'approve');
     expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
     expect(renders).toHaveLength(2);
-    expect(collectText(renders[0]?.light)).toContain('Approving…');
-    expect(collectText(renders[0]?.light)).not.toContain(width >= 266 ? 'Approve' : '✓');
-    expect(collectText(renders[1]?.light)).toContain(width >= 266 ? 'Approve' : '✓');
+    // Small shows the in-flight dots in the Approve slot; Medium's pill reads "Approving…".
+    if (width >= 266) {
+      expect(collectText(renders[0]?.light)).toContain('Approving…');
+    }
+    expect(collectControls(renders[0]?.light)).not.toContain('Approve');
+    expect(collectControls(renders[1]?.light)).toContain('Approve');
     expect(mocks.linking.openURL).not.toHaveBeenCalled();
   });
 
@@ -200,9 +205,11 @@ describe.each([172, 360])('headless Home widget at %d dp', width => {
     mocks.runWidgetApprove.mockResolvedValue({ kind: 'failed' });
     const { handleWidgetTask } = await registerAfterRestart(snapshotFor());
     const renders = await runWidgetClickTask(handleWidgetTask, width, 'approve');
-    expect(collectText(renders.at(-1)?.light)).toEqual(
-      expect.arrayContaining(['Could not approve', width >= 266 ? 'Approve' : '✓', '+'])
+    const last = renders.at(-1)?.light;
+    expect(collectText(last)).toContain(
+      width >= 266 ? "Couldn't approve. Tap Approve to try again." : 'Could not approve'
     );
+    expect(collectControls(last)).toEqual(['Approve', 'New agent']);
     expect(mocks.linking.openURL).not.toHaveBeenCalled();
   });
 
@@ -301,7 +308,7 @@ describe('WorkManager Home-only refresh', () => {
     expect(mocks.applyResponse).toHaveBeenCalledWith({ terminal: 'privacy' }, CONTEXT);
     expect(rendered).toContain('Open Kilo to see agents');
     expect(rendered).not.toContain('2');
-    expect(rendered).not.toContain('+');
+    expect(rendered).not.toContain('New agent');
   });
 });
 
@@ -313,7 +320,8 @@ it('renders an authorized native/Home-only record even without any activity snap
     details: EMPTY_HOME_WIDGET_DETAILS,
   });
   const rendered = await runWidgetTask(handleWidgetTask, 172);
-  expect(collectText(rendered.light)).toEqual(expect.arrayContaining(['1', 'Working', '+']));
+  expect(collectText(rendered.light)).toEqual(expect.arrayContaining(['1', 'Working']));
+  expect(collectControls(rendered.light)).toEqual(['New agent']);
   expect(mocks.native.startOrUpdate).not.toHaveBeenCalled();
 });
 
@@ -357,5 +365,5 @@ it('rereads the newly published tray after approval instead of reusing the tappe
   const renders = await runWidgetClickTask(handleWidgetTask, 172, 'approve');
   expect(collectText(renders.at(-1)?.light)).toEqual(expect.arrayContaining(['1', 'Working']));
   expect(collectText(renders.at(-1)?.light)).not.toContain('Needs input');
-  expect(collectText(renders.at(-1)?.light)).not.toContain('✓');
+  expect(collectControls(renders.at(-1)?.light)).not.toContain('Approve');
 });

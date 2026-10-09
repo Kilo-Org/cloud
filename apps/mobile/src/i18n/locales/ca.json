@@ -3379,11 +3379,22 @@
         "deviceNotEligible": "Aquest dispositiu no és compatible amb Apple Intelligence.",
         "modelNotReady": "El model encara s'està baixant o preparant. Torna-ho a provar més tard.",
         "unsupportedOs": "Aquest model requereix iOS 26 o posterior.",
-        "unknown": "El sistema no ha indicat per què aquest model no està disponible."
+        "unknown": "El sistema no ha indicat per què aquest model no està disponible.",
+        "androidUnsupportedOs": "Gemini Nano no és compatible amb aquesta versió d'Android.",
+        "androidModelUnavailable": "Aquest dispositiu no és compatible amb Gemini Nano, o l'aplicació del sistema AICore encara s'està configurant. Torna-ho a provar més tard.",
+        "aicoreUpdateRequired": "Actualitza l'aplicació AICore i el programari del sistema per fer servir aquest model.",
+        "downloadable": "Cal baixar aquest model una sola vegada abans de poder-lo fer servir.",
+        "downloading": "El model s'està baixant. Estarà a punt quan acabi la baixada."
       },
       "unavailable": "El model al dispositiu no està disponible ara mateix. Comprova'n l'estat a $t(modelChat.backends.title).",
       "busy": "El model al dispositiu està ocupat amb una altra resposta. Torna-ho a provar quan acabi.",
-      "failed": "El model al dispositiu no ha pogut respondre aquest missatge. Torna-ho a provar o reformula'l."
+      "failed": "El model al dispositiu no ha pogut respondre aquest missatge. Torna-ho a provar o reformula'l.",
+      "android": "Gemini Nano (al dispositiu)",
+      "background": "El model al dispositiu s'ha aturat perquè Kilo ha sortit de la pantalla. Toca $t(common.retry) per tornar a preguntar.",
+      "download": "Baixa el model al dispositiu",
+      "downloading": "S'està baixant…",
+      "downloadProgress": "S'està baixant… {{percent}}%",
+      "downloadFailed": "La baixada no s'ha completat. Comprova la connexió i l'espai lliure i torna-ho a provar."
     }
   },
   "settingsTools": {

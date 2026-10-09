@@ -3465,11 +3465,22 @@
         "deviceNotEligible": "Dan l-apparat ma jappoġġjax Apple Intelligence.",
         "modelNotReady": "Il-mudell għadu qed jitniżżel jew jitħejja. Erġa' pprova aktar tard.",
         "unsupportedOs": "Dan il-mudell jeħtieġ iOS 26 jew aktar ġdid.",
-        "unknown": "Is-sistema ma qalitx għaliex dan il-mudell mhux disponibbli."
+        "unknown": "Is-sistema ma qalitx għaliex dan il-mudell mhux disponibbli.",
+        "androidUnsupportedOs": "Gemini Nano mhux appoġġjat f'din il-verżjoni ta' Android.",
+        "androidModelUnavailable": "Dan l-apparat ma jappoġġjax Gemini Nano, jew l-app tas-sistema AICore għadha qed titħejja. Erġa' pprova aktar tard.",
+        "aicoreUpdateRequired": "Aġġorna l-app AICore u s-software tas-sistema biex tuża dan il-mudell.",
+        "downloadable": "Dan il-mudell jeħtieġ jitniżżel darba qabel ma tkun tista' tużah.",
+        "downloading": "Il-mudell qed jitniżżel. Ikun lest meta jispiċċa t-tniżżil."
       },
       "unavailable": "Il-mudell fuq l-apparat mhux disponibbli bħalissa. Iċċekkja l-istatus tiegħu f'$t(modelChat.backends.title).",
       "busy": "Il-mudell fuq l-apparat għadu qed iwieġeb messaġġ ieħor. Erġa' pprova meta jispiċċa.",
-      "failed": "Il-mudell fuq l-apparat ma setax iwieġeb dan il-messaġġ. Erġa' pprova jew ikteb il-messaġġ b'mod ieħor."
+      "failed": "Il-mudell fuq l-apparat ma setax iwieġeb dan il-messaġġ. Erġa' pprova jew ikteb il-messaġġ b'mod ieħor.",
+      "android": "Gemini Nano (fuq l-apparat)",
+      "background": "Il-mudell fuq l-apparat waqaf għax Kilo ħareġ mill-iskrin. Agħfas \"$t(common.retry)\" biex terġa' tistaqsi.",
+      "download": "Niżżel il-mudell fuq l-apparat",
+      "downloading": "Qed jitniżżel…",
+      "downloadProgress": "Qed jitniżżel… {{percent}}%",
+      "downloadFailed": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni u l-ispazju ħieles, imbagħad erġa' pprova."
     }
   },
   "settingsTools": {

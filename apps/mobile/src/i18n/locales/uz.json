@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Bu qurilma Apple Intelligence’ni qo‘llab-quvvatlamaydi.",
         "modelNotReady": "Model hali yuklanmoqda yoki tayyorlanmoqda. Keyinroq qayta urining.",
         "unsupportedOs": "Bu model uchun iOS 26 yoki undan keyingi versiya kerak.",
-        "unknown": "Tizim bu model nima uchun mavjud emasligini bildirmadi."
+        "unknown": "Tizim bu model nima uchun mavjud emasligini bildirmadi.",
+        "androidUnsupportedOs": "Gemini Nano bu Android versiyasida qo‘llab-quvvatlanmaydi.",
+        "androidModelUnavailable": "Bu qurilma Gemini Nano’ni qo‘llab-quvvatlamaydi yoki AICore tizim ilovasi hali sozlanmoqda. Keyinroq qayta urining.",
+        "aicoreUpdateRequired": "Bu modeldan foydalanish uchun AICore ilovasi va tizim dasturini yangilang.",
+        "downloadable": "Bu modeldan foydalanishdan oldin uni bir marta yuklab olish kerak.",
+        "downloading": "Model yuklab olinmoqda. Yuklab olish tugagach, u tayyor bo‘ladi."
       },
       "unavailable": "Qurilmadagi model hozir mavjud emas. Uning holatini $t(modelChat.backends.title) bo‘limida tekshiring.",
       "busy": "Qurilmadagi model boshqa javob bilan band. U tugagach, qayta urining.",
-      "failed": "Qurilmadagi model bu xabarga javob bera olmadi. Qayta urining yoki boshqacha yozing."
+      "failed": "Qurilmadagi model bu xabarga javob bera olmadi. Qayta urining yoki boshqacha yozing.",
+      "android": "Gemini Nano (qurilmada)",
+      "background": "Kilo ekrandan chiqqani sababli qurilmadagi model to‘xtadi. Qayta so‘rash uchun $t(common.retry) tugmasini bosing.",
+      "download": "Qurilmadagi modelni yuklab olish",
+      "downloading": "Yuklab olinmoqda…",
+      "downloadProgress": "Yuklab olinmoqda… {{percent}}%",
+      "downloadFailed": "Yuklab olish tugallanmadi. Internet aloqasi va bo‘sh xotirani tekshirib, qayta urining."
     }
   },
   "settingsTools": {

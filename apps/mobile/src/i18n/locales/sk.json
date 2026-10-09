@@ -3422,11 +3422,22 @@
         "deviceNotEligible": "Toto zariadenie nepodporuje Apple Intelligence.",
         "modelNotReady": "Model sa ešte sťahuje alebo pripravuje. Skúste to neskôr.",
         "unsupportedOs": "Tento model vyžaduje iOS 26 alebo novší.",
-        "unknown": "Systém neuviedol, prečo je tento model nedostupný."
+        "unknown": "Systém neuviedol, prečo je tento model nedostupný.",
+        "androidUnsupportedOs": "Gemini Nano nie je v tejto verzii Androidu podporovaný.",
+        "androidModelUnavailable": "Toto zariadenie nepodporuje Gemini Nano alebo sa systémová aplikácia AICore ešte nastavuje. Skúste to neskôr.",
+        "aicoreUpdateRequired": "Ak chcete použiť tento model, aktualizujte aplikáciu AICore a systémový softvér.",
+        "downloadable": "Pred prvým použitím je potrebné tento model jednorazovo stiahnuť.",
+        "downloading": "Model sa sťahuje. Bude pripravený po dokončení sťahovania."
       },
       "unavailable": "Model v zariadení momentálne nie je dostupný. Skontrolujte jeho stav v sekcii $t(modelChat.backends.title).",
       "busy": "Model v zariadení práve generuje inú odpoveď. Skúste to znova, keď skončí.",
-      "failed": "Model v zariadení nedokázal odpovedať na túto správu. Skúste to znova alebo ju preformulujte."
+      "failed": "Model v zariadení nedokázal odpovedať na túto správu. Skúste to znova alebo ju preformulujte.",
+      "android": "Gemini Nano (v zariadení)",
+      "background": "Model v zariadení sa zastavil, pretože Kilo opustilo obrazovku. Ťuknite na $t(common.retry) a opýtajte sa znova.",
+      "download": "Stiahnuť model do zariadenia",
+      "downloading": "Sťahuje sa…",
+      "downloadProgress": "Sťahuje sa… {{percent}} %",
+      "downloadFailed": "Sťahovanie sa nedokončilo. Skontrolujte pripojenie a voľné miesto v úložisku a skúste to znova."
     }
   },
   "settingsTools": {

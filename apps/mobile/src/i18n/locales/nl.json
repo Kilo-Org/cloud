@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Dit apparaat ondersteunt Apple Intelligence niet.",
         "modelNotReady": "Het model wordt nog gedownload of voorbereid. Probeer het later opnieuw.",
         "unsupportedOs": "Voor dit model is iOS 26 of nieuwer vereist.",
-        "unknown": "Het systeem heeft niet aangegeven waarom dit model niet beschikbaar is."
+        "unknown": "Het systeem heeft niet aangegeven waarom dit model niet beschikbaar is.",
+        "androidUnsupportedOs": "Gemini Nano wordt niet ondersteund op deze Android-versie.",
+        "androidModelUnavailable": "Dit apparaat ondersteunt Gemini Nano niet, of de systeemapp AICore wordt nog ingesteld. Probeer het later opnieuw.",
+        "aicoreUpdateRequired": "Werk de AICore-app en je systeemsoftware bij om dit model te gebruiken.",
+        "downloadable": "Dit model moet eenmalig worden gedownload voordat je het kunt gebruiken.",
+        "downloading": "Het model wordt gedownload. Het is klaar voor gebruik zodra het downloaden is voltooid."
       },
       "unavailable": "Het model op het apparaat is nu niet beschikbaar. Controleer de status in $t(modelChat.backends.title).",
       "busy": "Het model op het apparaat is bezig met een ander antwoord. Probeer het opnieuw zodra het klaar is.",
-      "failed": "Het model op het apparaat kon dit bericht niet beantwoorden. Probeer het opnieuw of formuleer het anders."
+      "failed": "Het model op het apparaat kon dit bericht niet beantwoorden. Probeer het opnieuw of formuleer het anders.",
+      "android": "Gemini Nano (op het apparaat)",
+      "background": "Het model op het apparaat is gestopt omdat Kilo het scherm heeft verlaten. Tik op $t(common.retry) om het nog eens te vragen.",
+      "download": "Model op het apparaat downloaden",
+      "downloading": "Downloaden…",
+      "downloadProgress": "Downloaden… {{percent}}%",
+      "downloadFailed": "Het downloaden is niet voltooid. Controleer je verbinding en vrije opslagruimte en probeer het opnieuw."
     }
   },
   "settingsTools": {

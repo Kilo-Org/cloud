@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Perangkat ini tidak mendukung Apple Intelligence.",
         "modelNotReady": "Model masih diunduh atau sedang disiapkan. Coba lagi nanti.",
         "unsupportedOs": "Model ini memerlukan iOS 26 atau lebih baru.",
-        "unknown": "Sistem tidak menyebutkan alasan model ini tidak tersedia."
+        "unknown": "Sistem tidak menyebutkan alasan model ini tidak tersedia.",
+        "androidUnsupportedOs": "Gemini Nano tidak didukung di versi Android ini.",
+        "androidModelUnavailable": "Perangkat ini tidak mendukung Gemini Nano, atau aplikasi sistem AICore masih disiapkan. Coba lagi nanti.",
+        "aicoreUpdateRequired": "Perbarui aplikasi AICore dan perangkat lunak sistem untuk menggunakan model ini.",
+        "downloadable": "Model ini perlu diunduh satu kali sebelum dapat digunakan.",
+        "downloading": "Model sedang diunduh dan akan siap digunakan setelah unduhan selesai."
       },
       "unavailable": "Model di perangkat sedang tidak tersedia. Periksa statusnya di $t(modelChat.backends.title).",
       "busy": "Model di perangkat sedang menyusun balasan lain. Coba lagi setelah selesai.",
-      "failed": "Model di perangkat tidak dapat menjawab pesan ini. Coba lagi atau ubah susunan kalimatnya."
+      "failed": "Model di perangkat tidak dapat menjawab pesan ini. Coba lagi atau ubah susunan kalimatnya.",
+      "android": "Gemini Nano (di perangkat)",
+      "background": "Model di perangkat berhenti karena Kilo meninggalkan layar. Ketuk $t(common.retry) untuk bertanya lagi.",
+      "download": "Unduh model di perangkat",
+      "downloading": "Mengunduh…",
+      "downloadProgress": "Mengunduh… {{percent}}%",
+      "downloadFailed": "Unduhan tidak selesai. Periksa koneksi dan ruang penyimpanan Anda, lalu coba lagi."
     }
   },
   "settingsTools": {

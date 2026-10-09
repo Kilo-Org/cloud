@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Wannan na'urar ba ta goyon bayan Apple Intelligence.",
         "modelNotReady": "Samfurin yana ci gaba da saukewa ko shiryawa. Sake gwadawa daga baya.",
         "unsupportedOs": "Wannan samfurin yana buƙatar iOS 26 ko sama da haka.",
-        "unknown": "Tsarin bai faɗi dalilin da ya sa wannan samfurin ba ya samuwa ba."
+        "unknown": "Tsarin bai faɗi dalilin da ya sa wannan samfurin ba ya samuwa ba.",
+        "androidUnsupportedOs": "Wannan sigar Android ba ta goyon bayan Gemini Nano.",
+        "androidModelUnavailable": "Wannan na'urar ba ta goyon bayan Gemini Nano, ko kuma manhajar tsarin AICore tana ci gaba da shiryawa. Sake gwadawa daga baya.",
+        "aicoreUpdateRequired": "Sabunta manhajar AICore da manhajar tsarin na'urarka don amfani da wannan samfurin.",
+        "downloadable": "Wannan samfurin yana buƙatar saukewa sau ɗaya kafin ka iya amfani da shi.",
+        "downloading": "Ana sauke samfurin. Zai kasance a shirye idan saukewar ta kammala."
       },
       "unavailable": "Samfurin da ke kan na'ura ba ya samuwa a yanzu. Duba matsayinsa a $t(modelChat.backends.title).",
       "busy": "Samfurin da ke kan na'ura yana aiki da wata amsa. Sake gwadawa idan ya gama.",
-      "failed": "Samfurin da ke kan na'ura bai iya amsa wannan saƙon ba. Sake gwadawa ko ka sake rubuta shi."
+      "failed": "Samfurin da ke kan na'ura bai iya amsa wannan saƙon ba. Sake gwadawa ko ka sake rubuta shi.",
+      "android": "Gemini Nano (a kan na'ura)",
+      "background": "Samfurin da ke kan na'ura ya tsaya saboda Kilo ya bar allon. Taɓa $t(common.retry) don sake tambaya.",
+      "download": "Sauke samfurin da ke kan na'ura",
+      "downloading": "Ana saukewa…",
+      "downloadProgress": "Ana saukewa… {{percent}}%",
+      "downloadFailed": "Saukewar ba ta kammala ba. Duba haɗin intanet ɗinka da sararin ajiya, sannan ka sake gwadawa."
     }
   },
   "settingsTools": {

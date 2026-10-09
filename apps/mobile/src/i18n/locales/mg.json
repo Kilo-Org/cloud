@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Tsy manohana ny Apple Intelligence ity fitaovana ity.",
         "modelNotReady": "Mbola misintona na manomana ny modely. Andramo indray any aoriana.",
         "unsupportedOs": "Mila iOS 26 na vaovao kokoa ity modely ity.",
-        "unknown": "Tsy nolazain'ny rafitra ny antony tsy ahazoana mampiasa ity modely ity."
+        "unknown": "Tsy nolazain'ny rafitra ny antony tsy ahazoana mampiasa ity modely ity.",
+        "androidUnsupportedOs": "Tsy mandeha amin'ity dikan'ny Android ity ny Gemini Nano.",
+        "androidModelUnavailable": "Tsy mandeha amin'ity fitaovana ity ny Gemini Nano, na mbola eo am-panomanana ny rindranasa AICore. Andramo indray any aoriana.",
+        "aicoreUpdateRequired": "Havaozy ny rindranasa AICore sy ny rindrankajin'ny rafitra mba hampiasana ity modely ity.",
+        "downloadable": "Mila sintonina indray mandeha ity modely ity vao azo ampiasaina.",
+        "downloading": "Eo am-pisintonana ny modely. Ho vonona izy rehefa vita ny fisintonana."
       },
       "unavailable": "Tsy azo ampiasaina amin'izao fotoana izao ny modely ao amin'ny fitaovana. Jereo ny toetrany ao amin'ny $t(modelChat.backends.title).",
       "busy": "Mbola mamaly hafatra hafa ny modely ao amin'ny fitaovana. Andramo indray rehefa vita izany.",
-      "failed": "Tsy nahavaly ity hafatra ity ny modely ao amin'ny fitaovana. Andramo indray na ovay ny fanoratana azy."
+      "failed": "Tsy nahavaly ity hafatra ity ny modely ao amin'ny fitaovana. Andramo indray na ovay ny fanoratana azy.",
+      "android": "Gemini Nano (ao amin'ny fitaovana)",
+      "background": "Nijanona ny modely ao amin'ny fitaovana satria nandao ny efijery i Kilo. Tsindrio ny \"$t(common.retry)\" mba hanontaniana indray.",
+      "download": "Sintony ny modely ao amin'ny fitaovana",
+      "downloading": "Misintona…",
+      "downloadProgress": "Misintona… {{percent}}%",
+      "downloadFailed": "Tsy vita ny fisintonana. Hamarino ny fifandraisanao sy ny toerana malalaka amin'ny fitahirizana, dia andramo indray."
     }
   },
   "settingsTools": {

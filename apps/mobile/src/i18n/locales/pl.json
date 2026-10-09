@@ -3422,11 +3422,22 @@
         "deviceNotEligible": "To urządzenie nie obsługuje Apple Intelligence.",
         "modelNotReady": "Model jest nadal pobierany lub przygotowywany. Spróbuj ponownie później.",
         "unsupportedOs": "Ten model wymaga systemu iOS 26 lub nowszego.",
-        "unknown": "System nie podał, dlaczego ten model jest niedostępny."
+        "unknown": "System nie podał, dlaczego ten model jest niedostępny.",
+        "androidUnsupportedOs": "Gemini Nano nie jest obsługiwany w tej wersji Androida.",
+        "androidModelUnavailable": "To urządzenie nie obsługuje Gemini Nano albo aplikacja systemowa AICore jest jeszcze konfigurowana. Spróbuj ponownie później.",
+        "aicoreUpdateRequired": "Zaktualizuj aplikację AICore i oprogramowanie systemowe, aby korzystać z tego modelu.",
+        "downloadable": "Przed użyciem ten model trzeba jednorazowo pobrać.",
+        "downloading": "Model jest pobierany. Będzie gotowy po zakończeniu pobierania."
       },
       "unavailable": "Model na urządzeniu jest teraz niedostępny. Sprawdź jego stan w sekcji $t(modelChat.backends.title).",
       "busy": "Model na urządzeniu generuje inną odpowiedź. Spróbuj ponownie, gdy skończy.",
-      "failed": "Model na urządzeniu nie mógł odpowiedzieć na tę wiadomość. Spróbuj ponownie lub ją przeformułuj."
+      "failed": "Model na urządzeniu nie mógł odpowiedzieć na tę wiadomość. Spróbuj ponownie lub ją przeformułuj.",
+      "android": "Gemini Nano (na urządzeniu)",
+      "background": "Model na urządzeniu przerwał pracę, ponieważ Kilo opuściło ekran. Stuknij „$t(common.retry)”, aby zapytać jeszcze raz.",
+      "download": "Pobierz model na urządzenie",
+      "downloading": "Pobieranie…",
+      "downloadProgress": "Pobieranie… {{percent}}%",
+      "downloadFailed": "Pobieranie nie zostało ukończone. Sprawdź połączenie i wolne miejsce w pamięci, a potem spróbuj ponownie."
     }
   },
   "settingsTools": {

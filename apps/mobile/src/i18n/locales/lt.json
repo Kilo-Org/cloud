@@ -3422,11 +3422,22 @@
         "deviceNotEligible": "Šis įrenginys nepalaiko Apple Intelligence.",
         "modelNotReady": "Modelis vis dar atsisiunčiamas arba ruošiamas. Bandykite vėliau.",
         "unsupportedOs": "Šiam modeliui reikia iOS 26 ar naujesnės versijos.",
-        "unknown": "Sistema nenurodė, kodėl šis modelis nepasiekiamas."
+        "unknown": "Sistema nenurodė, kodėl šis modelis nepasiekiamas.",
+        "androidUnsupportedOs": "Gemini Nano nepalaikomas šioje Android versijoje.",
+        "androidModelUnavailable": "Šis įrenginys nepalaiko Gemini Nano arba AICore sistemos programa dar ruošiama. Bandykite vėliau.",
+        "aicoreUpdateRequired": "Norėdami naudoti šį modelį, atnaujinkite AICore programą ir sistemos programinę įrangą.",
+        "downloadable": "Prieš naudojant šį modelį, jį reikia vieną kartą atsisiųsti.",
+        "downloading": "Modelis atsisiunčiamas. Jis bus paruoštas, kai atsisiuntimas baigsis."
       },
       "unavailable": "Įrenginio modelis šiuo metu nepasiekiamas. Patikrinkite jo būseną skiltyje $t(modelChat.backends.title).",
       "busy": "Įrenginio modelis užimtas kitu atsakymu. Bandykite dar kartą, kai jis baigs.",
-      "failed": "Įrenginio modelis negalėjo atsakyti į šią žinutę. Bandykite dar kartą arba performuluokite."
+      "failed": "Įrenginio modelis negalėjo atsakyti į šią žinutę. Bandykite dar kartą arba performuluokite.",
+      "android": "Gemini Nano (įrenginyje)",
+      "background": "Įrenginio modelis sustojo, nes Kilo išėjo iš ekrano. Bakstelėkite „$t(common.retry)“, kad paklaustumėte iš naujo.",
+      "download": "Atsisiųsti įrenginio modelį",
+      "downloading": "Atsisiunčiama…",
+      "downloadProgress": "Atsisiunčiama… {{percent}}%",
+      "downloadFailed": "Atsisiuntimas nebaigtas. Patikrinkite ryšį ir laisvą vietą saugykloje, tada bandykite dar kartą."
     }
   },
   "settingsTools": {

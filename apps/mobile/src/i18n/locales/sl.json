@@ -3422,11 +3422,22 @@
         "deviceNotEligible": "Ta naprava ne podpira funkcije Apple Intelligence.",
         "modelNotReady": "Model se še prenaša ali pripravlja. Poskusite znova pozneje.",
         "unsupportedOs": "Ta model zahteva iOS 26 ali novejšo različico.",
-        "unknown": "Sistem ni navedel, zakaj ta model ni na voljo."
+        "unknown": "Sistem ni navedel, zakaj ta model ni na voljo.",
+        "androidUnsupportedOs": "Gemini Nano v tej različici Androida ni podprt.",
+        "androidModelUnavailable": "Ta naprava ne podpira modela Gemini Nano ali pa se sistemska aplikacija AICore še nastavlja. Poskusite znova pozneje.",
+        "aicoreUpdateRequired": "Za uporabo tega modela posodobite aplikacijo AICore in sistemsko programsko opremo.",
+        "downloadable": "Pred uporabo je treba ta model enkrat prenesti.",
+        "downloading": "Model se prenaša. Pripravljen bo, ko se prenos konča."
       },
       "unavailable": "Model v napravi trenutno ni na voljo. Njegovo stanje preverite v razdelku $t(modelChat.backends.title).",
       "busy": "Model v napravi je zaseden z drugim odgovorom. Poskusite znova, ko ga dokonča.",
-      "failed": "Model v napravi ni mogel odgovoriti na to sporočilo. Poskusite znova ali ga preoblikujte."
+      "failed": "Model v napravi ni mogel odgovoriti na to sporočilo. Poskusite znova ali ga preoblikujte.",
+      "android": "Gemini Nano (v napravi)",
+      "background": "Model v napravi se je ustavil, ker je Kilo zapustil zaslon. Tapnite $t(common.retry), da znova vprašate.",
+      "download": "Prenesi model v napravo",
+      "downloading": "Prenašanje …",
+      "downloadProgress": "Prenašanje … {{percent}} %",
+      "downloadFailed": "Prenos se ni dokončal. Preverite povezavo in prosti prostor za shranjevanje ter poskusite znova."
     }
   },
   "settingsTools": {

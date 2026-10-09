@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "이 기기는 Apple Intelligence를 지원하지 않습니다.",
         "modelNotReady": "모델을 아직 다운로드하거나 준비하는 중입니다. 나중에 다시 시도하세요.",
         "unsupportedOs": "이 모델을 사용하려면 iOS 26 이상이 필요합니다.",
-        "unknown": "시스템에서 이 모델을 사용할 수 없는 이유를 알려 주지 않았습니다."
+        "unknown": "시스템에서 이 모델을 사용할 수 없는 이유를 알려 주지 않았습니다.",
+        "androidUnsupportedOs": "이 Android 버전에서는 Gemini Nano를 지원하지 않습니다.",
+        "androidModelUnavailable": "이 기기에서 Gemini Nano를 지원하지 않거나 AICore 시스템 앱이 아직 설정 중입니다. 나중에 다시 시도하세요.",
+        "aicoreUpdateRequired": "이 모델을 사용하려면 AICore 앱과 시스템 소프트웨어를 업데이트하세요.",
+        "downloadable": "이 모델을 사용하려면 먼저 한 번 다운로드해야 합니다.",
+        "downloading": "모델을 다운로드하는 중입니다. 다운로드가 완료되면 사용할 수 있습니다."
       },
       "unavailable": "지금은 기기 내 모델을 사용할 수 없습니다. $t(modelChat.backends.title)에서 상태를 확인하세요.",
       "busy": "기기 내 모델이 다른 답변을 생성하는 중입니다. 완료된 후 다시 시도하세요.",
-      "failed": "기기 내 모델이 이 메시지에 답변하지 못했습니다. 다시 시도하거나 다른 표현으로 입력해 보세요."
+      "failed": "기기 내 모델이 이 메시지에 답변하지 못했습니다. 다시 시도하거나 다른 표현으로 입력해 보세요.",
+      "android": "Gemini Nano(기기 내)",
+      "background": "Kilo가 화면을 벗어나 기기 내 모델이 중지되었습니다. 다시 질문하려면 $t(common.retry)를 탭하세요.",
+      "download": "기기 내 모델 다운로드",
+      "downloading": "다운로드 중…",
+      "downloadProgress": "다운로드 중… {{percent}}%",
+      "downloadFailed": "다운로드를 완료하지 못했습니다. 네트워크 연결과 저장 공간을 확인한 후 다시 시도하세요."
     }
   },
   "settingsTools": {

@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Le divayisi ayiyisekeli i-Apple Intelligence.",
         "modelNotReady": "Imodeli isadawunilodwa noma isalungiswa. Zama futhi emuva kwesikhathi.",
         "unsupportedOs": "Le modeli idinga i-iOS 26 noma eyakamuva.",
-        "unknown": "Isistimu ayishongo ukuthi kungani le modeli ingatholakali."
+        "unknown": "Isistimu ayishongo ukuthi kungani le modeli ingatholakali.",
+        "androidUnsupportedOs": "I-Gemini Nano ayisekelwe kule nguqulo ye-Android.",
+        "androidModelUnavailable": "Le divayisi ayiyisekeli i-Gemini Nano, noma uhlelo lwesistimu lwe-AICore lusalungiswa. Zama futhi emuva kwesikhathi.",
+        "aicoreUpdateRequired": "Buyekeza uhlelo lwe-AICore nesofthiwe yesistimu yakho ukuze usebenzise le modeli.",
+        "downloadable": "Le modeli idinga ukudawunilodwa kanye kuphela ngaphambi kokuthi uyisebenzise.",
+        "downloading": "Imodeli iyadawunilodwa. Izolunga uma ukudawuniloda sekuqedile."
       },
       "unavailable": "Imodeli esedivayisini ayitholakali okwamanje. Hlola isimo sayo ku-$t(modelChat.backends.title).",
       "busy": "Imodeli esedivayisini isamatasa nenye impendulo. Zama futhi uma isiqedile.",
-      "failed": "Imodeli esedivayisini ayikwazanga ukuphendula lo mlayezo. Zama futhi noma uwubhale ngenye indlela."
+      "failed": "Imodeli esedivayisini ayikwazanga ukuphendula lo mlayezo. Zama futhi noma uwubhale ngenye indlela.",
+      "android": "Gemini Nano (edivayisini)",
+      "background": "Imodeli esedivayisini imisiwe ngoba i-Kilo iphume esikrinini. Thepha $t(common.retry) ukuze ubuze futhi.",
+      "download": "Dawuniloda imodeli esedivayisini",
+      "downloading": "Iyadawuniloda…",
+      "downloadProgress": "Iyadawuniloda… {{percent}}%",
+      "downloadFailed": "Ukudawuniloda akuqedanga. Hlola uxhumano lwakho nendawo yokugcina ekhululekile, bese uzama futhi."
     }
   },
   "settingsTools": {

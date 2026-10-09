@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Kjo pajisje nuk e mbështet Apple Intelligence.",
         "modelNotReady": "Modeli ende po shkarkohet ose po përgatitet. Provo përsëri më vonë.",
         "unsupportedOs": "Ky model kërkon iOS 26 ose më të ri.",
-        "unknown": "Sistemi nuk tregoi pse ky model nuk është i disponueshëm."
+        "unknown": "Sistemi nuk tregoi pse ky model nuk është i disponueshëm.",
+        "androidUnsupportedOs": "Gemini Nano nuk mbështetet në këtë version të Android.",
+        "androidModelUnavailable": "Kjo pajisje nuk e mbështet Gemini Nano, ose aplikacioni i sistemit AICore ende po konfigurohet. Provo përsëri më vonë.",
+        "aicoreUpdateRequired": "Përditëso aplikacionin AICore dhe softuerin e sistemit për të përdorur këtë model.",
+        "downloadable": "Ky model duhet shkarkuar një herë para se ta përdorësh.",
+        "downloading": "Modeli po shkarkohet. Do të jetë gati kur të përfundojë shkarkimi."
       },
       "unavailable": "Modeli në pajisje nuk është i disponueshëm tani. Kontrollo gjendjen e tij te $t(modelChat.backends.title).",
       "busy": "Modeli në pajisje është i zënë me një përgjigje tjetër. Provo përsëri kur të mbarojë.",
-      "failed": "Modeli në pajisje nuk mundi t'i përgjigjej këtij mesazhi. Provo përsëri ose riformuloje."
+      "failed": "Modeli në pajisje nuk mundi t'i përgjigjej këtij mesazhi. Provo përsëri ose riformuloje.",
+      "android": "Gemini Nano (në pajisje)",
+      "background": "Modeli në pajisje ndaloi sepse Kilo doli nga ekrani. Trokit te \"$t(common.retry)\" për ta pyetur përsëri.",
+      "download": "Shkarko modelin në pajisje",
+      "downloading": "Po shkarkohet…",
+      "downloadProgress": "Po shkarkohet… {{percent}}%",
+      "downloadFailed": "Shkarkimi nuk përfundoi. Kontrollo lidhjen dhe hapësirën e lirë, pastaj provo përsëri."
     }
   },
   "settingsTools": {

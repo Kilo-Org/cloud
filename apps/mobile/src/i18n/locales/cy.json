@@ -3508,11 +3508,22 @@
         "deviceNotEligible": "Nid yw'r ddyfais hon yn cefnogi Apple Intelligence.",
         "modelNotReady": "Mae'r model yn dal i lwytho i lawr neu'n paratoi. Rhowch gynnig arall arni nes ymlaen.",
         "unsupportedOs": "Mae angen iOS 26 neu'n hwyrach ar y model hwn.",
-        "unknown": "Ni ddywedodd y system pam nad yw'r model hwn ar gael."
+        "unknown": "Ni ddywedodd y system pam nad yw'r model hwn ar gael.",
+        "androidUnsupportedOs": "Nid yw Gemini Nano yn cael ei gefnogi ar y fersiwn hon o Android.",
+        "androidModelUnavailable": "Nid yw'r ddyfais hon yn cefnogi Gemini Nano, neu mae ap system AICore yn dal i baratoi. Rhowch gynnig arall arni nes ymlaen.",
+        "aicoreUpdateRequired": "Diweddarwch yr ap AICore a meddalwedd eich system i ddefnyddio'r model hwn.",
+        "downloadable": "Mae angen llwytho'r model hwn i lawr unwaith cyn y gallwch ei ddefnyddio.",
+        "downloading": "Mae'r model yn llwytho i lawr. Bydd yn barod pan fydd y llwytho i lawr wedi gorffen."
       },
       "unavailable": "Nid yw'r model ar y ddyfais ar gael ar hyn o bryd. Gwiriwch ei statws yn $t(modelChat.backends.title).",
       "busy": "Mae'r model ar y ddyfais yn brysur gydag ateb arall. Rhowch gynnig arall arni pan fydd wedi gorffen.",
-      "failed": "Methodd y model ar y ddyfais ag ateb y neges hon. Rhowch gynnig arall arni neu aralleiriwch hi."
+      "failed": "Methodd y model ar y ddyfais ag ateb y neges hon. Rhowch gynnig arall arni neu aralleiriwch hi.",
+      "android": "Gemini Nano (ar y ddyfais)",
+      "background": "Daeth y model ar y ddyfais i ben am fod Kilo wedi gadael y sgrin. Tapiwch $t(common.retry) i ofyn eto.",
+      "download": "Llwytho'r model ar y ddyfais i lawr",
+      "downloading": "Wrthi'n llwytho i lawr…",
+      "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",
+      "downloadFailed": "Ni orffennodd y llwytho i lawr. Gwiriwch eich cysylltiad a'ch lle storio, yna rhowch gynnig arall arni."
     }
   },
   "settingsTools": {

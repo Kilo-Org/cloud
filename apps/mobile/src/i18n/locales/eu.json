@@ -3336,11 +3336,22 @@
         "deviceNotEligible": "Gailu honek ez du Apple Intelligence onartzen.",
         "modelNotReady": "Modeloa deskargatzen edo prestatzen ari da oraindik. Saiatu berriro geroago.",
         "unsupportedOs": "Modelo honek iOS 26 edo berriagoa behar du.",
-        "unknown": "Sistemak ez du esan zergatik ez dagoen modelo hau erabilgarri."
+        "unknown": "Sistemak ez du esan zergatik ez dagoen modelo hau erabilgarri.",
+        "androidUnsupportedOs": "Android bertsio honek ez du Gemini Nano onartzen.",
+        "androidModelUnavailable": "Gailu honek ez du Gemini Nano onartzen, edo AICore sistema-aplikazioa prestatzen ari da oraindik. Saiatu berriro geroago.",
+        "aicoreUpdateRequired": "Modelo hau erabiltzeko, eguneratu AICore aplikazioa eta sistemaren softwarea.",
+        "downloadable": "Modelo hau erabili aurretik, behin deskargatu behar da.",
+        "downloading": "Modeloa deskargatzen ari da. Deskarga amaitzean prest egongo da."
       },
       "unavailable": "Gailuko modeloa ez dago erabilgarri une honetan. Egiaztatu haren egoera hemen: $t(modelChat.backends.title).",
       "busy": "Gailuko modeloa beste erantzun batekin lanpetuta dago. Saiatu berriro amaitzen duenean.",
-      "failed": "Gailuko modeloak ezin izan dio mezu honi erantzun. Saiatu berriro edo idatzi beste modu batera."
+      "failed": "Gailuko modeloak ezin izan dio mezu honi erantzun. Saiatu berriro edo idatzi beste modu batera.",
+      "android": "Gemini Nano (gailuan)",
+      "background": "Gailuko modeloa gelditu egin da Kilo pantailatik irten delako. Sakatu $t(common.retry) berriro galdetzeko.",
+      "download": "Deskargatu gailuko modeloa",
+      "downloading": "Deskargatzen…",
+      "downloadProgress": "Deskargatzen… %{{percent}}",
+      "downloadFailed": "Deskarga ez da amaitu. Egiaztatu konexioa eta biltegiratze-toki librea, eta saiatu berriro."
     }
   },
   "settingsTools": {

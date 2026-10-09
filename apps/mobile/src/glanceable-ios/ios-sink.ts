@@ -105,17 +105,30 @@ function pruneActionNotice(snapshot: GlanceableAgentsSnapshot): void {
 }
 
 /**
+ * Whether an Approve pressed on the card is in flight. The card swaps Approve
+ * for a muted Approving… pill until the press resolves; the interaction clears
+ * it on every outcome, so it can never stick.
+ */
+let approving = false;
+
+/** Mark (or clear) the in-flight Approve the next Live Activity update draws. */
+export function setGlanceableActionApproving(value: boolean): void {
+  approving = value;
+}
+
+/**
  * The content-state one update carries: the counts, the Approve gate, and the
  * pending notice when there is one. Every Live Activity update goes through
  * this, so the notice cannot be dropped by one path and kept by another.
  */
 function liveActivityContentState(snapshot: GlanceableAgentsSnapshot): GlanceableLiveActivityProps {
   pruneActionNotice(snapshot);
-  return buildGlanceableLiveActivityContentState(
+  const contentState = buildGlanceableLiveActivityContentState(
     snapshot,
     isApprovableAskRecorded(),
     actionNotice ?? undefined
   );
+  return approving ? { ...contentState, approving: true } : contentState;
 }
 
 /**
@@ -462,6 +475,7 @@ export function _resetIosSinkForTests(): void {
   pendingStartAt = 0;
   actionNotice = null;
   noticeAskKey = null;
+  approving = false;
 }
 
 export const iosSink: GlanceableSink = {

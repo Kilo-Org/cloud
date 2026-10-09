@@ -1,187 +1,219 @@
-/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- the buttons' targets and copy are stringified into the widget process, so their literals are observable only in the layout source, which this suite reads from disk */
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- the press handler loads native modules, so its target literal is read from disk */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { buildGlanceableSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { type LiveActivityEnvironment } from 'expo-widgets';
+
+import { activeAgentsLiveActivityLayout } from './active-agents-live-activity';
 import { buildGlanceableLiveActivityContentState } from './view-props';
 
-const LAYOUT_FILE = 'active-agents-live-activity.tsx';
-const INTERACTION_FILE = 'interaction.ts';
-
-const read = (file: string) => readFileSync(join(__dirname, file), 'utf8');
-
-/** The source between two markers, so a region can be asserted on its own. */
-function region(source: string, start: string, end: string): string {
-  const from = source.indexOf(start);
-  const to = source.indexOf(end, from + start.length);
-  expect(from).toBeGreaterThan(-1);
-  expect(to).toBeGreaterThan(from);
-  return source.slice(from, to);
+function mockComponent(kind: string) {
+  return Object.assign((props: Record<string, unknown>) => ({ kind, props }), { kind });
 }
 
-const targetsIn = (source: string): string[] =>
-  [...source.matchAll(/target="([^"]+)"/g)].map(match => match[1] ?? '').toSorted();
+function mockModifier(name: string) {
+  return (args?: unknown) => ({ $type: name, args });
+}
 
-/**
- * The `'widget'` layout is stringified by Babel and re-evaluated inside the
- * widget extension, where an imported binding is an undefined global and a
- * non-literal target could not be sent back by the native intent. Nothing here
- * runs the widget transform, so the source on disk is the only place these
- * literals can be checked.
- */
-describe('Active Agents Live Activity actions', () => {
-  const source = read(LAYOUT_FILE);
+vi.mock('expo-widgets', () => ({ createLiveActivity: () => ({}) }));
+vi.mock('@expo/ui/swift-ui', () => ({
+  Button: mockComponent('Button'),
+  Circle: mockComponent('Circle'),
+  HStack: mockComponent('HStack'),
+  RoundedRectangle: mockComponent('RoundedRectangle'),
+  Spacer: mockComponent('Spacer'),
+  Text: mockComponent('Text'),
+  VStack: mockComponent('VStack'),
+}));
+vi.mock('@expo/ui/swift-ui/modifiers', () => ({
+  accessibilityElement: mockModifier('accessibilityElement'),
+  accessibilityLabel: mockModifier('accessibilityLabel'),
+  activityBackgroundTint: mockModifier('activityBackgroundTint'),
+  background: (style: unknown) => ({ $type: 'background', args: style }),
+  buttonStyle: mockModifier('buttonStyle'),
+  environment: mockModifier('environment'),
+  fixedSize: mockModifier('fixedSize'),
+  font: mockModifier('font'),
+  foregroundStyle: mockModifier('foregroundStyle'),
+  frame: mockModifier('frame'),
+  lineLimit: mockModifier('lineLimit'),
+  monospacedDigit: mockModifier('monospacedDigit'),
+  padding: mockModifier('padding'),
+  shapes: { capsule: () => ({}), roundedRectangle: () => ({}) },
+}));
+vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 
-  it('declares the two stable targets', () => {
-    // Two surfaces draw Approve — the phone block's `actions` and the
-    // watch/CarPlay `bannerSmall` control beside it — so the literal repeats.
-    // The contract is the set of targets the handler routes, and no surface
-    // declares one outside it.
-    expect([...new Set(targetsIn(source))]).toEqual(['approve', 'open']);
+type Rendered = { kind: string; props: Record<string, unknown> };
+type State = Parameters<typeof activeAgentsLiveActivityLayout>[0];
+
+function element(node: unknown): Rendered | null {
+  // eslint-disable-next-line anti-slop/no-runtime-typeof -- walks the untyped JSX element tree
+  if (node === null || typeof node !== 'object' || !('type' in node) || !('props' in node)) {
+    return null;
+  }
+  const { type, props } = node;
+  // eslint-disable-next-line anti-slop/no-runtime-typeof -- walks the untyped JSX element tree
+  if (typeof type !== 'function' || !('kind' in type) || typeof type.kind !== 'string') {
+    return null;
+  }
+  // A JSX element's props object; every reader below narrows the field it uses.
+  const record = props as Record<string, unknown>;
+  return { kind: type.kind, props: record };
+}
+
+function collect(node: unknown): Rendered[] {
+  const root = element(node);
+  if (root === null) {
+    return Array.isArray(node) ? node.flatMap(item => collect(item)) : [];
+  }
+  const raw = root.props.children;
+  const kids = Array.isArray(raw) ? raw.flat(Infinity) : [raw];
+  return [root, ...kids.flatMap(child => collect(child))];
+}
+
+const texts = (node: unknown) =>
+  collect(node)
+    .filter(item => item.kind === 'Text' && typeof item.props.children === 'string')
+    .map(item => item.props.children as string);
+const buttons = (node: unknown) => collect(node).filter(item => item.kind === 'Button');
+
+const UPDATED_AT = new Date().toISOString();
+const ENVIRONMENT: LiveActivityEnvironment = { colorScheme: 'light' };
+
+function render(state: State, environment: LiveActivityEnvironment = ENVIRONMENT) {
+  return activeAgentsLiveActivityLayout(state, environment);
+}
+
+const PERMISSION: State = {
+  status: 'happy',
+  needsInput: 2,
+  needsApproval: 1,
+  running: 3,
+  scheduled: 1,
+  idle: 0,
+  updatedAt: UPDATED_AT,
+  canApprove: true,
+};
+
+describe('Live Activity Lock Screen card (round 7)', () => {
+  it('draws the header, the status row, Approve, and the other counts', () => {
+    const { banner } = render(PERMISSION);
+    expect(texts(banner)).toEqual([
+      'Kilo',
+      'Checked',
+      '2',
+      'Needs input',
+      'Approve',
+      '3 Working · 1 Scheduled',
+    ]);
+    expect(buttons(banner).map(button => button.props.target)).toEqual(['approve']);
+    expect(collect(banner).some(item => item.props.dateStyle === 'time')).toBe(true);
   });
 
-  it('reads both labels from the baked copy, never through an import', () => {
-    expect(source).toContain('COPY.approve');
-    expect(source).toContain('COPY.open');
-    // The layout cannot call i18n: the widget process would throw on the
-    // undefined global and blank the whole surface.
-    expect(source).not.toMatch(/\bi18n\./);
-  });
-
-  /**
-   * The gate expression as the widget process evaluates it. The layout is
-   * stringified, so no import runs it under vitest; the literal in the source is
-   * the shipped gate, and evaluating it here is the only way to run that gate
-   * against a content state.
-   */
-  const gate = (): ((props: Record<string, number | boolean | undefined>) => boolean) => {
-    const match = /const canApprove =([\s\S]*?);\n/.exec(source);
-    if (match === null) {
-      throw new Error('the layout declares no canApprove gate');
+  it('swaps Approve for Approving… while the press is in flight', () => {
+    const { banner, expandedBottom } = render({ ...PERMISSION, approving: true });
+    for (const surface of [banner, expandedBottom]) {
+      expect(buttons(surface)).toEqual([]);
+      expect(texts(surface)).toContain('Approving…');
     }
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func -- the shipped gate is a source literal, so it cannot be imported and called
-    return new Function('props', `return (${match[1] ?? ''});`) as (
-      props: Record<string, number | boolean | undefined>
-    ) => boolean;
-  };
+  });
+
+  it('keeps Approve and prints the failure line instead of the other counts', () => {
+    const notice = "Couldn't approve. Tap Approve to try again.";
+    const { banner } = render({ ...PERMISSION, notice });
+    expect(texts(banner)).toContain(notice);
+    expect(texts(banner)).not.toContain('3 Working · 1 Scheduled');
+    expect(buttons(banner)).toHaveLength(1);
+  });
 
   it('offers Approve only while an approvable ask waits', () => {
-    const canApprove = gate();
-    // The app's own state: the recorded-ask flag decides, and the wait count
-    // withholds the control from the expired frame `withStatus` leaves the
-    // approvable count on.
-    expect(canApprove({ needsInput: 1, needsApproval: 1, canApprove: true })).toBe(true);
-    expect(canApprove({ needsInput: 1, needsApproval: 1, canApprove: false })).toBe(false);
-    expect(canApprove({ needsInput: 0, needsApproval: 1, canApprove: true })).toBe(false);
-    expect(source).toMatch(/canApprove \? \([\s\S]*?target="approve"[\s\S]*?\) : null/);
+    const offered = (state: State) => buttons(render(state).banner).length > 0;
+    expect(offered(PERMISSION)).toBe(true);
+    expect(offered({ ...PERMISSION, canApprove: false })).toBe(false);
+    // A server-written question-only state carries no flag and no approvable count.
+    expect(offered({ ...PERMISSION, needsApproval: 0, canApprove: undefined })).toBe(false);
+    expect(offered({ ...PERMISSION, needsApproval: 1, canApprove: undefined })).toBe(true);
+    // The expired frame zeroes the wait but leaves the approvable count.
+    expect(offered({ ...PERMISSION, needsInput: 0 })).toBe(false);
   });
 
-  it('withholds Approve from a server-written question-only state', () => {
-    // A state that arrived over APNs carries no `canApprove`, and its
-    // `needsApproval` counts the `permission` rows alone. A question-only wait
-    // must not draw the control `runGlanceableApprove` answers with `none`,
-    // while a permission wait keeps the tap the app-closed press answers.
-    const canApprove = gate();
-    expect(canApprove({ needsInput: 1, needsApproval: 0 })).toBe(false);
-    expect(canApprove({ needsInput: 1, needsApproval: 0, canApprove: true })).toBe(false);
-    expect(canApprove({ needsInput: 1, needsApproval: 1 })).toBe(true);
-    expect(source).toContain('props.canApprove !== false');
-    expect(source).not.toMatch(/props\.canApprove === true/);
+  it('drops the bottom line for a lone question and prints Next run for scheduled only', () => {
+    const question = render({ status: 'happy', needsInput: 1, updatedAt: UPDATED_AT }).banner;
+    expect(texts(question)).toEqual(['Kilo', 'Checked', '1', 'Needs input']);
+    const scheduled = render({
+      status: 'happy',
+      scheduled: 2,
+      scheduledAt: new Date(Date.now() + 3_600_000).toISOString(),
+      updatedAt: UPDATED_AT,
+    }).banner;
+    expect(texts(scheduled)).toContain('Next run');
   });
 
-  it('always offers Open', () => {
-    const guardEnd = source.indexOf(') : null', source.indexOf('canApprove ? ('));
-    expect(guardEnd).toBeGreaterThan(-1);
-    // The Open button is outside the needs-input guard: it is the only way to
-    // the session the card names.
-    expect(source.indexOf('target="open"')).toBeGreaterThan(guardEnd);
-  });
-
-  it('draws the actions on the banner and in the expanded island', () => {
-    expect(region(source, 'banner: (', 'compactLeading:')).toContain('{actions}');
-    expect(region(source, 'expandedBottom: (', '\n  };\n};')).toContain('{actions}');
-  });
-
-  it('draws a failed Approve on the surfaces the button lives on', () => {
-    // The press can arrive with the app closed, so the failure line the app
-    // puts in the content state has to be drawn on the card itself.
-    expect(source).toContain('const notice = props.notice ?? null;');
-    expect(region(source, 'banner: (', 'bannerSmall:')).toContain('{noticeLine}');
-    expect(region(source, 'bannerSmall: (', 'compactLeading:')).toContain('{noticeLine}');
-    expect(region(source, 'expandedBottom: (', '\n  };\n};')).toContain('{noticeLine}');
-    // The compact presentations carry the count alone: the notice goes where
-    // the buttons and the labelled counts are.
-    expect(region(source, 'compactLeading:', 'expandedBottom:')).not.toContain('{noticeLine}');
-  });
-
-  it('reserves the small banner notice row even before an Approve failure', () => {
-    const small = region(source, 'bannerSmall: (', 'compactLeading:');
-    expect(small).toMatch(
-      /<VStack modifiers=\{\[frame\(\{ height: 18 \}\)\]\}>\s*\{noticeLine\}\s*<\/VStack>/
+  it('says Last known on a stale card and prints no time without updatedAt', () => {
+    expect(texts(render({ ...PERMISSION, status: 'stale' }).banner)).toContain('Last known ·');
+    expect(texts(render(PERMISSION, { colorScheme: 'dark', isStale: true }).banner)).toContain(
+      'Last known ·'
     );
+    const legacy = render({ ...PERMISSION, updatedAt: undefined }).banner;
+    expect(texts(legacy)).not.toContain('Checked');
   });
 
-  it('keeps every compact presentation free of buttons', () => {
-    const compact = region(source, 'compactLeading:', 'expandedBottom:');
-    expect(compact).not.toContain('<Button');
-    expect(compact).not.toContain('{actions}');
+  it('keeps the spoken count block apart from the Approve control', () => {
+    const combined = collect(render(PERMISSION).banner).filter(item =>
+      (Array.isArray(item.props.modifiers) ? item.props.modifiers : []).some(
+        (modifier: { $type?: string; args?: unknown }) =>
+          modifier.$type === 'accessibilityElement' && modifier.args === 'combine'
+      )
+    );
+    expect(combined).toHaveLength(1);
+    expect(buttons(combined[0])).toEqual([]);
   });
 
-  it('bakes both action slots from the reviewed keys', () => {
-    const copy = read('layout-copy.ts');
-    expect(copy).toContain("approve: i18n.t('common.approve')");
-    expect(copy).toContain("open: i18n.t('glanceable.openSession')");
-  });
-
-  it('routes exactly the targets the layout declares', () => {
-    // The layout cannot import the target constants — they would be undefined
-    // globals in the widget process — so the two files are compared instead.
-    const interactionTargets = [
-      ...read(INTERACTION_FILE).matchAll(/GLANCEABLE(?:_APPROVE|_OPEN)_TARGET = '([^']+)'/g),
-    ]
-      .map(match => match[1] ?? '')
-      .toSorted();
-    expect(interactionTargets).toEqual(['approve', 'open']);
-    expect([...new Set(targetsIn(source))]).toEqual(interactionTargets);
-  });
-
-  it('foregrounds the app for Open, and only for Open', () => {
-    // A Live Activity button performs in the app's process without bringing it
-    // forward, so Open asks for the foreground: the destination the press
-    // records is consumed by the app's own listener, which the user has to be
-    // looking at. Approve must not ask for it — an Approve that needed the app
-    // up would not answer the Lock Screen with the app closed.
-    expect(source).toContain('const openButtonProps = { openAppWhenRun: true };');
-    expect(source.match(/\.\.\.openButtonProps/g)).toHaveLength(1);
-    // The one spread is the Open button's: the prop travels beside its target.
-    expect(region(source, '{...openButtonProps}', 'modifiers=')).toContain('target="open"');
-  });
-
-  it('names the foregrounding prop the patched expo-widgets button view reads', () => {
-    // The prop name is the JS-to-native contract: the layout writes
-    // `openAppWhenRun` on the Open button, and expo-widgets' patched ButtonProps
-    // reads that name and presses through the intent that asks the system for
-    // the foreground. The two sides are literals in different languages, so the
-    // patch is read here to hold them equal — a rename on one side alone would
-    // put Open back in the background with no other test to catch it.
-    const patch = read('../../../../patches/expo-widgets@57.0.22.patch');
-    expect(patch).toContain('@Field var openAppWhenRun: Bool?');
-    expect(patch).toContain('static var openAppWhenRun: Bool = true');
-    expect(patch).toContain('intent: LiveActivityOpenInteraction(');
+  it('paints the card background from the colour scheme', () => {
+    const tint = (scheme: 'light' | 'dark') =>
+      collect(render(PERMISSION, { colorScheme: scheme }).banner)
+        .flatMap(item => (Array.isArray(item.props.modifiers) ? item.props.modifiers : []))
+        .find((modifier: { $type?: string }) => modifier.$type === 'activityBackgroundTint');
+    expect(tint('light')).toEqual({ $type: 'activityBackgroundTint', args: '#FBFAF5' });
+    expect(tint('dark')).toEqual({ $type: 'activityBackgroundTint', args: '#17171A' });
   });
 });
 
-/**
- * The scheduled row reaches the card over two paths: the app builds the content
- * state from a snapshot, and the notifications Worker pushes the same raw shape
- * for a card that was never woken by the app. Both carry the count and the ISO
- * wake, and the layout draws the wake as a clock time beside the row — never
- * when a scheduled row had no wake to report.
- */
-describe('Active Agents Live Activity scheduled row', () => {
-  it('carries the scheduled count and its ISO wake in the built content state', () => {
+describe('Live Activity Dynamic Island (round 7)', () => {
+  it('draws the dot and count in compact and minimal, capping minimal at 99+', () => {
+    const layout = render({ ...PERMISSION, needsInput: 120 });
+    expect(texts(layout.compactTrailing)).toEqual(['120']);
+    expect(texts(layout.minimal)).toEqual(['99+']);
+    for (const surface of [layout.compactLeading, layout.compactTrailing, layout.minimal]) {
+      expect(buttons(surface)).toEqual([]);
+    }
+  });
+
+  it('repeats the card with Approve in the expanded island', () => {
+    const { expandedBottom } = render(PERMISSION);
+    expect(texts(expandedBottom)).toContain('3 Working · 1 Scheduled');
+    expect(buttons(expandedBottom).map(button => button.props.target)).toEqual(['approve']);
+  });
+});
+
+describe('Live Activity press target', () => {
+  it('declares only the target interaction.ts routes', () => {
+    const declared = /export const GLANCEABLE_APPROVE_TARGET = '([^']+)'/.exec(
+      readFileSync(join(__dirname, 'interaction.ts'), 'utf8')
+    )?.[1];
+    const layout = render(PERMISSION);
+    const targets = Object.values(layout).flatMap(surface =>
+      buttons(surface).map(button => button.props.target)
+    );
+    expect(new Set(targets)).toEqual(new Set([declared]));
+  });
+});
+
+describe('Live Activity content state', () => {
+  it('carries the counts, the checked time, and the ISO wake', () => {
     const snapshot = buildGlanceableSnapshot({
       sessions: [{ status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' }],
       userId: 'u1',
@@ -191,5 +223,6 @@ describe('Active Agents Live Activity scheduled row', () => {
     const contentState = buildGlanceableLiveActivityContentState(snapshot);
     expect(contentState.scheduled).toBe(1);
     expect(contentState.scheduledAt).toBe('2026-09-24T09:00:00.000Z');
+    expect(contentState.updatedAt).toBe('2026-01-02T00:00:00.000Z');
   });
 });

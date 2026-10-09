@@ -1,13 +1,16 @@
 import {
+  buildGlanceableSnapshot,
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
+  buildHomeWidgetData,
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
   EMPTY_HOME_WIDGET_DETAILS,
   type HomeWidgetData,
   type HomeWidgetPresentation,
+  type HomeWidgetSessionRow,
 } from '@kilocode/app-shared/home-widget';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
@@ -22,7 +25,11 @@ import {
   primaryGlanceableCount,
   resolveGlanceableStatus,
 } from '@/lib/glanceable/presentation';
-import { getSurfaceExtras, type GlanceableSurfaceExtras } from '@/lib/glanceable/surface-extras';
+import {
+  getSurfaceExtras,
+  type GlanceableActionFeedback,
+  type GlanceableSurfaceExtras,
+} from '@/lib/glanceable/surface-extras';
 
 /** One translated count line. `kind` picks the glyph and the color. */
 type GlanceableCount = { label: string; kind: GlanceableCountKind; count: number };
@@ -50,12 +57,11 @@ export type GlanceableViewProps = {
    */
   newestTitle: string | null;
   /**
-   * The in-flight action's progress or failure line alone (the same copy
-   * `newestTitle` carries while an Approve is answered), or null. The large
-   * card has no reserved slot — its footer already names the newest result —
-   * so it draws only this line, under its header.
+   * The in-flight Approve's state on a content card, or null. The Home layout
+   * owns the copy and the placement: Approving… replaces the Approve control,
+   * and a failure keeps Approve and prints its line in the detail or footer.
    */
-  actionLine: string | null;
+  actionFeedback: GlanceableActionFeedback;
   /** The two in-place actions the state offers. Disabled actions draw no button. */
   actions: { approve: boolean; newAgent: boolean };
   /**
@@ -196,14 +202,7 @@ export function buildGlanceableViewProps(
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
     newestTitle,
-    actionLine:
-      home.status !== 'content' || extras.actionFeedback === null
-        ? null
-        : translate(
-            extras.actionFeedback === 'approving'
-              ? 'glanceable.approving'
-              : 'glanceable.couldNotApprove'
-          ),
+    actionFeedback: home.status === 'content' ? extras.actionFeedback : null,
     actions: {
       approve: home.canApprove,
       newAgent: home.canCreate,
@@ -262,6 +261,50 @@ function buildStaleWidgetProps(
 }
 
 /**
+ * The sample the widget gallery draws: the approved Needs input layout with
+ * two waiting agents and others working, scheduled and idle, checked at 9:41.
+ * The gallery is inside the unlocked app, so sample titles are allowed; no
+ * account data is read.
+ */
+const GALLERY_SESSIONS: HomeWidgetSessionRow[] = [
+  { status: 'permission', title: 'Review the release', approvalKey: '0'.repeat(64) },
+  { status: 'question', title: 'Pick a color for the badge' },
+  { status: 'busy' },
+  { status: 'busy' },
+  { status: 'busy' },
+  { status: 'scheduled' },
+  { status: 'idle' },
+  { status: 'idle' },
+];
+
+/** Props for the gallery preview kind the widget extension draws in the picker. */
+export function buildGalleryPreviewProps(
+  translate: (key: string) => string,
+  now = Date.now()
+): Partial<GlanceableViewProps> {
+  const checked = new Date(now);
+  checked.setHours(9, 41, 0, 0);
+  const input = {
+    sessions: GALLERY_SESSIONS,
+    userId: 'gallery',
+    organizationId: null,
+    now: checked.getTime(),
+  };
+  const snapshot = buildGlanceableSnapshot(input);
+  return toWidgetProps({
+    ...buildGlanceableViewProps(
+      snapshot,
+      {},
+      translate,
+      buildHomeWidgetData(input),
+      checked.getTime()
+    ),
+    // An Approve in flight belongs to the placed widget, never the sample.
+    actionFeedback: null,
+  });
+}
+
+/**
  * The delayed frame, when there is a claim worth retracting. Counts only: an
  * empty or waiting surface asserts nothing that can go out of date, and a
  * `stale` frame after `expiresAt` would only undo the expiry frame behind it.
@@ -315,6 +358,8 @@ export type GlanceableLiveActivityProps = GlanceableLiveActivityContentState & {
   canApprove?: boolean;
   /** Translated failure line for the next update; omitted when there is none. */
   notice?: string;
+  /** An Approve pressed on the card is in flight; omitted otherwise. */
+  approving?: boolean;
 };
 
 /** The status a later timeline frame draws: expired at expiry, stale once the window lapses. */
@@ -405,6 +450,7 @@ export function buildGlanceableLiveActivityContentState(
     needsInput: snapshot.needsInput,
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
+    updatedAt: snapshot.updatedAt,
     needsInputSince: snapshot.needsInputSince,
     scheduled: snapshot.scheduled,
     scheduledAt: snapshot.scheduledAt,

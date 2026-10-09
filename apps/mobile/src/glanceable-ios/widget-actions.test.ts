@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- one cohesive sweep + widget-layout suite sharing the expo-widgets/@expo/ui mock harness */
+/* eslint-disable max-lines -- one cohesive sweep suite sharing the expo-widgets mock harness */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -7,7 +7,6 @@ import {
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import {
-  buildHomeWidgetPresentation,
   EMPTY_HOME_WIDGET_DETAILS,
   type HomeWidgetDetails,
 } from '@kilocode/app-shared/home-widget';
@@ -16,9 +15,9 @@ import { setHomeWidgetDetails } from '@/lib/glanceable/home-widget-data';
 import { _setLastGlanceableSnapshotForTests } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
-import { type UserInteractionEvent, type WidgetFamily } from 'expo-widgets';
+import { type UserInteractionEvent } from 'expo-widgets';
 
-import { activeAgentsWidgetLayout, WIDGET_NAME } from './active-agents-widget';
+import { WIDGET_NAME } from './active-agents-widget';
 import {
   PENDING_ACTION_TTL_MS,
   pendingActionForEvent,
@@ -26,12 +25,12 @@ import {
   registerWidgetActionHandling,
   runPendingWidgetActions,
 } from './widget-actions';
-import { buildGlanceableViewProps, type GlanceableWidgetProps } from './view-props';
+import { buildGlanceableViewProps } from './view-props';
 
 // The widget surfaces are unreachable under vitest: the swift-ui primitives are
 // recording stubs, react-native is stubbed, and expo-widgets' factories are
-// stubs with a controllable timeline — so the sweep and the stringified layout
-// are the real logic under test.
+// stubs with a controllable timeline — so the sweep is the real logic under
+// test. The layout has its own suite in active-agents-widget.test.ts.
 const widgetState = vi.hoisted(() => ({
   timeline: [] as { date: Date; props: Record<string, unknown> }[],
   snapshots: [] as unknown[],
@@ -156,64 +155,6 @@ function snapshotFor(sessions: { status: string }[], now = NOW): GlanceableAgent
     userId: 'u1',
     organizationId: null,
     now,
-  });
-}
-
-const SCHEDULED_WAKE = '2026-09-24T09:00:00.000Z';
-
-// ── mock-element tree helpers, shared with the render suite ─────────────────
-
-type MockElement = { kind: string; props: Record<string, unknown> };
-
-function collect(node: unknown): MockElement[] {
-  if (node == null || typeof node !== 'object' || Array.isArray(node)) {
-    return Array.isArray(node) ? node.flatMap(item => collect(item)) : [];
-  }
-  const kind = (node as { type?: { kind?: string } }).type?.kind;
-  const props = (node as { props?: Record<string, unknown> }).props;
-  if (kind === undefined || props === undefined) {
-    return [];
-  }
-  return [{ kind, props }, ...collect(props.children)];
-}
-
-function collectText(node: unknown): string[] {
-  return collect(node)
-    .filter(element => element.kind === 'Text' && typeof element.props.children === 'string')
-    .map(element => element.props.children as string);
-}
-
-function collectOfKind(node: unknown, kind: string): MockElement[] {
-  return collect(node).filter(element => element.kind === kind);
-}
-
-/** Every `widgetURL` modifier argument anywhere in the tree. */
-function widgetURLs(node: unknown): unknown[] {
-  return collect(node).flatMap(element => {
-    const modifiers = element.props.modifiers;
-    if (!Array.isArray(modifiers)) {
-      return [];
-    }
-    return modifiers
-      .filter((modifier: { $type?: string }) => modifier.$type === 'widgetURL')
-      .map((modifier: { args?: unknown }) => modifier.args);
-  });
-}
-
-function pressButton(
-  tree: unknown,
-  patch: { pendingAction: string; pendingApprovalKey?: string }
-): MockElement | undefined {
-  return collect(tree).find(element => {
-    if (element.kind !== 'Button' || typeof element.props.onPress !== 'function') {
-      return false;
-    }
-    const pressed = (element.props.onPress as () => Record<string, unknown>)();
-    return (
-      pressed.pendingAction === patch.pendingAction &&
-      (patch.pendingApprovalKey === undefined ||
-        pressed.pendingApprovalKey === patch.pendingApprovalKey)
-    );
   });
 }
 
@@ -762,312 +703,5 @@ describe('registerWidgetActionHandling', () => {
     unsubscribeFirst();
     expect(widgetState.removals).toBe(0);
     expect(widgetState.listeners).toHaveLength(1);
-  });
-});
-
-// ── the stringified layout ──────────────────────────────────────────────────
-
-function renderWidget(props: GlanceableWidgetProps, family: WidgetFamily): MockElement {
-  return activeAgentsWidgetLayout(props, {
-    widgetFamily: family,
-    date: new Date(0),
-    configuration: undefined,
-  }) as unknown as MockElement;
-}
-
-const HOME_FAMILIES: WidgetFamily[] = ['systemSmall', 'systemMedium', 'systemLarge'];
-const ACCESSORY_FAMILIES: WidgetFamily[] = [
-  'accessoryCircular',
-  'accessoryInline',
-  'accessoryRectangular',
-];
-
-function homeProps(
-  sessions: Parameters<typeof buildGlanceableSnapshot>[0]['sessions'],
-  details: HomeWidgetDetails = EMPTY_HOME_WIDGET_DETAILS,
-  now = NOW
-): GlanceableWidgetProps {
-  const snapshot = buildGlanceableSnapshot({
-    sessions,
-    userId: 'u1',
-    organizationId: null,
-    now: NOW,
-  });
-  return buildGlanceableViewProps(snapshot, {}, key => key, { snapshot, details }, now);
-}
-
-describe('activeAgentsWidgetLayout', () => {
-  it('keeps accessory families privacy-minimal despite Home titles and actions', () => {
-    const props = homeProps([{ status: 'permission' }], {
-      approvalKey: APPROVAL_KEY,
-      primaryTitle: 'Private title',
-      waitingAgents: [{ title: 'Private title', kind: 'permission' }],
-      scheduledAgents: [],
-    });
-    for (const family of ACCESSORY_FAMILIES) {
-      const tree = renderWidget(props, family);
-      expect(collectOfKind(tree, 'Button')).toEqual([]);
-      expect(collectText(tree)).not.toContain('Private title');
-      expect(widgetURLs(tree)).toEqual(['kiloapp:///cloud/sessions']);
-    }
-  });
-
-  it('draws a state glyph, never a placeholder dash, in the count-less circular', () => {
-    const expected = {
-      waiting: 'arrow.triangle.2.circlepath',
-      empty: 'checkmark.circle.fill',
-      privacy: 'lock.fill',
-      signed_out: 'person.fill',
-    } as const;
-    for (const status of Object.keys(expected) as (keyof typeof expected)[]) {
-      const snapshot = { ...snapshotFor([]), status };
-      const home = buildHomeWidgetPresentation(
-        { snapshot, details: EMPTY_HOME_WIDGET_DETAILS },
-        NOW
-      );
-      const tree = renderWidget({ home }, 'accessoryCircular');
-      const images = collectOfKind(tree, 'Image').map(image => image.props.systemName);
-      expect(images).toEqual([expected[status]]);
-      expect(collectText(tree)).not.toContain('—');
-    }
-  });
-
-  it('names up to two waiting agents in the medium column and falls back to counts', () => {
-    const waiting = renderWidget(
-      homeProps([{ status: 'permission' }], {
-        approvalKey: null,
-        primaryTitle: 'First wait',
-        waitingAgents: [
-          { title: 'First wait', kind: 'permission' },
-          { title: 'Second wait', kind: 'question' },
-          { title: 'Third wait', kind: 'retry' },
-        ],
-        scheduledAgents: [],
-      }),
-      'systemMedium'
-    );
-    const texts = collectText(waiting);
-    expect(texts).toContain('First wait');
-    expect(texts).toContain('Second wait');
-    expect(texts).not.toContain('Third wait');
-    expect(texts).toContain('Permission required');
-    // No entry rows: the column falls back to the support counts.
-    const counts = renderWidget(
-      homeProps([{ status: 'busy' }, { status: 'idle' }]),
-      'systemMedium'
-    );
-    expect(collectText(counts)).toContain('Working');
-    expect(collectText(counts)).toContain('Idle');
-  });
-
-  it.each(HOME_FAMILIES)(
-    'keeps New agent navigation available alongside approval in %s',
-    family => {
-      const tree = renderWidget(homeProps([{ status: 'permission' }], APPROVABLE), family);
-      const newAgent = pressButton(tree, { pendingAction: 'new-agent' });
-      if (newAgent === undefined) {
-        throw new Error(`New agent button missing in ${family}`);
-      }
-      expect(newAgent.props.openAppWhenRun).toBe(true);
-      // The press records its own time, so the extension carries the marker only
-      // while the press is younger than the TTL and a fresh press always resets it.
-      const patch = (newAgent.props.onPress as () => { pendingActionAt: number })();
-      expect(Math.abs(patch.pendingActionAt - Date.now())).toBeLessThan(1000);
-      const approve = pressButton(tree, {
-        pendingAction: 'approve',
-        pendingApprovalKey: APPROVAL_KEY,
-      });
-      expect(approve).toBeDefined();
-      expect(approve?.props.openAppWhenRun).toBeUndefined();
-      expect(widgetURLs(tree)).toEqual(['kiloapp:///cloud/sessions']);
-    }
-  );
-
-  it.each(HOME_FAMILIES)(
-    'offers no blind Approve without a displayed request key in %s',
-    family => {
-      expect(
-        pressButton(renderWidget(homeProps([{ status: 'permission' }]), family), {
-          pendingAction: 'approve',
-        })
-      ).toBeUndefined();
-    }
-  );
-
-  it.each(HOME_FAMILIES)(
-    'holds both action hit slots in the same header across states in %s',
-    family => {
-      const states = [
-        homeProps([{ status: 'permission' }], APPROVABLE),
-        homeProps([]),
-        homeProps([{ status: 'busy' }]),
-      ];
-      for (const props of states) {
-        const root = renderWidget(props, family);
-        const header = (root.props.children as { props: Record<string, unknown> }[])[0];
-        const slots = (
-          header?.props.children as { props: Record<string, unknown> }[] | undefined
-        )?.slice(-2);
-        expect(slots?.map(slot => slot.props.modifiers)).toEqual([
-          [{ $type: 'frame', args: { width: 24, height: 24 } }],
-          [{ $type: 'frame', args: { width: 24, height: 24 } }],
-        ]);
-      }
-    }
-  );
-
-  it.each(HOME_FAMILIES)(
-    'shows only nonzero Home counts and an honest checked footer in %s',
-    family => {
-      const props = homeProps([{ status: 'busy' }, { status: 'idle' }]);
-      const texts = collectText(renderWidget(props, family));
-      expect(texts).toContain('Working');
-      expect(texts).not.toContain('Needs input');
-      expect(texts).not.toContain('Scheduled');
-      expect(texts).toContain('Checked');
-      // The square card has no room for a relative phrase, so it prints the
-      // clock time; the wide and large cards keep the relative form.
-      const footer = collectOfKind(renderWidget(props, family), 'Text').find(
-        text => text.props.dateStyle === (family === 'systemSmall' ? 'time' : 'ago')
-      );
-      expect(footer?.props.date).toEqual(new Date(NOW));
-    }
-  );
-
-  it.each(HOME_FAMILIES)('retains old counts without asserting current work in %s', family => {
-    const texts = collectText(
-      renderWidget(
-        homeProps([{ status: 'busy' }], EMPTY_HOME_WIDGET_DETAILS, NOW + 24 * 60 * 60 * 1000),
-        family
-      )
-    );
-    expect(texts).toContain('1');
-    expect(texts).toContain('Last known');
-    expect(texts).toContain('Checked');
-    expect(texts).not.toContain('Status expired');
-  });
-
-  it.each(HOME_FAMILIES)('renders the scheduled wake even in the small family: %s', family => {
-    const props = homeProps([{ status: 'scheduled', scheduledAt: SCHEDULED_WAKE }]);
-    const tree = renderWidget(props, family);
-    expect(
-      collectOfKind(tree, 'Text').some(
-        text => text.props.dateStyle === 'time' && text.props.date instanceof Date
-      )
-    ).toBe(true);
-    expect(collectText(tree)).not.toContain('Idle');
-  });
-
-  it.each(HOME_FAMILIES)('does not invent running after a missed wake in %s', family => {
-    const props = homeProps([
-      { status: 'scheduled', scheduledAt: new Date(NOW - 1).toISOString() },
-    ]);
-    const texts = collectText(renderWidget(props, family));
-    expect(texts).toContain('Awaiting update');
-    expect(texts).toContain('Scheduled');
-    expect(texts).not.toContain('Working');
-  });
-
-  it('shows bounded waiting and scheduled details in the large family', () => {
-    const waiting = renderWidget(
-      homeProps([{ status: 'question' }], {
-        approvalKey: null,
-        primaryTitle: 'First wait',
-        waitingAgents: [
-          { title: 'First wait', kind: 'question' },
-          { title: 'Second wait', kind: 'retry' },
-        ],
-        scheduledAgents: [],
-      }),
-      'systemLarge'
-    );
-    expect(collectText(waiting)).toContain('Second wait');
-    const scheduled = renderWidget(
-      homeProps([{ status: 'scheduled', scheduledAt: SCHEDULED_WAKE }], {
-        approvalKey: null,
-        primaryTitle: 'Later job',
-        waitingAgents: [],
-        scheduledAgents: [
-          { title: 'Later job', scheduledAt: SCHEDULED_WAKE },
-          { title: '', scheduledAt: null },
-        ],
-      }),
-      'systemLarge'
-    );
-    expect(collectText(scheduled)).toContain('Agent');
-    expect(collectText(scheduled)).toContain('Awaiting update');
-  });
-
-  it.each(HOME_FAMILIES)(
-    'keeps failure feedback visible with retained Home content in %s',
-    family => {
-      const tree = renderWidget(
-        { ...homeProps([{ status: 'permission' }], APPROVABLE), actionLine: 'Could not approve' },
-        family
-      );
-      expect(collectText(tree)).toContain('Could not approve');
-      expect(
-        pressButton(tree, { pendingAction: 'approve', pendingApprovalKey: APPROVAL_KEY })
-      ).toBeDefined();
-    }
-  );
-
-  it.each(HOME_FAMILIES)('renders empty, waiting, auth and privacy deliberately in %s', family => {
-    for (const status of ['empty', 'waiting', 'signed_out', 'privacy'] as const) {
-      const snapshot = { ...snapshotFor([]), status };
-      const home = buildHomeWidgetPresentation(
-        { snapshot, details: EMPTY_HOME_WIDGET_DETAILS },
-        NOW
-      );
-      const tree = renderWidget({ home }, family);
-      expect(collectText(tree)).toContain('Kilo');
-      expect(collectText(tree).includes('Checked')).toBe(status === 'empty');
-      expect(pressButton(tree, { pendingAction: 'approve' })).toBeUndefined();
-      expect(pressButton(tree, { pendingAction: 'new-agent' }) !== undefined).toBe(
-        status === 'empty'
-      );
-    }
-  });
-
-  it('contains malformed persisted props without throwing in any family', () => {
-    const corrupt = {
-      countLines: [null, { kind: 'unknown', count: 'bad', label: {} }],
-      primaryKind: 'unknown',
-      primaryLabel: {},
-      primaryCount: Number.NaN,
-      home: {
-        status: 'unknown',
-        secondaryCounts: [null, { kind: 'unknown' }],
-        waitingAgents: [null],
-        scheduledAgents: {},
-        checkedAt: 'bad',
-        scheduledAt: 'bad',
-      },
-    } as unknown as GlanceableWidgetProps;
-    for (const family of [...HOME_FAMILIES, ...ACCESSORY_FAMILIES]) {
-      expect(() => renderWidget(corrupt, family)).not.toThrow();
-    }
-  });
-
-  it('does not use broken minimum scaling for long labels and large counts', () => {
-    const props = homeProps([{ status: 'busy' }], {
-      ...EMPTY_HOME_WIDGET_DETAILS,
-      primaryTitle: 'A very long title '.repeat(20),
-    });
-    expect(props.home).toBeDefined();
-    props.home = props.home && { ...props.home, primaryCount: 1_234_567_890 };
-    for (const family of HOME_FAMILIES) {
-      const tree = renderWidget(props, family);
-      expect(collectText(tree)).toContain('1234567890');
-      expect(
-        collect(tree)
-          .flatMap(element =>
-            Array.isArray(element.props.modifiers)
-              ? (element.props.modifiers as { $type?: string }[])
-              : []
-          )
-          .some(modifier => modifier.$type === 'minimumScaleFactor')
-      ).toBe(false);
-    }
   });
 });

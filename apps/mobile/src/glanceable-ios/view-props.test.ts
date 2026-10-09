@@ -260,7 +260,7 @@ describe('Home-only presentation and timeline', () => {
       canCreate: true,
       canApprove: true,
     });
-    expect(props.actionLine).toBe('Could not approve');
+    expect(props.actionFeedback).toBe('couldNotApprove');
   });
 
   it.each([{ signedOut: true }, { orgInvalid: true }])(

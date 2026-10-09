@@ -1,504 +1,500 @@
-import { Button, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+/* eslint-disable max-lines -- the 'widget' layout function is stringified whole, so its helpers cannot be extracted to module scope; the surface stays in one function */
+import { Button, Circle, HStack, RoundedRectangle, Spacer, Text, VStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
-  controlSize,
-  cornerRadius,
+  activityBackgroundTint,
+  background,
+  buttonStyle,
   environment,
   fixedSize,
   font,
   foregroundStyle,
   frame,
-  layoutPriority,
   lineLimit,
-  minimumScaleFactor,
   monospacedDigit,
   padding,
-  resizable,
-  tint,
+  shapes,
 } from '@expo/ui/swift-ui/modifiers';
 import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
-import { PlatformColor } from 'react-native';
 
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import { withGlanceableCopy } from './layout-copy';
-import { withWidgetLogo } from './widget-logo';
-
-/* eslint-disable new-cap -- PlatformColor is a React Native factory function, not a constructor */
-/* eslint-disable max-lines -- the 'widget' layout function is stringified whole, so its helpers cannot be extracted to module scope; the surface stays in one function */
 
 // The layout function below is marked with the `'widget'` directive, so Babel
-// stringifies it and the watcher extension re-evaluates the source. Everything
-// it references must be a watcher global (`Text`, `VStack`, `Button`, the
-// modifiers, `PlatformColor`) or a built-in. Do not call `@/` helpers or i18n
-// from here.
+// stringifies it and the widget extension re-evaluates the source. Everything
+// it references must be a widget global (`Text`, `VStack`, `Button`, the
+// modifiers) or a built-in. Do not call `@/` helpers or i18n from here.
 //
-// Two values are resolved after stringification, both from literals below:
-// `withWidgetLogo` swaps `__KILO_WIDGET_LOGO_URI__` for the app-group path of
-// the mark, and `withGlanceableCopy` swaps `__KILO_GLANCEABLE_COPY__` for the
-// translated copy. The copy is baked in rather than passed through the content
-// state because the notifications Worker pushes the same raw shape and knows
-// no locale.
+// `withGlanceableCopy` swaps `__KILO_GLANCEABLE_COPY__` for the translated copy
+// after stringification. The copy is baked in rather than passed through the
+// content state because the notifications Worker pushes the same raw shape and
+// knows no locale.
 
-// The pushed content state plus the two facts the widget extension cannot
-// derive: whether the recorded ask is one Approve can answer, and the failure
-// line a retryable Approve left on the card. They stay local fields rather than
-// imports from `./view-props`, because Babel stringifies this function's source
-// and every imported binding would be an undefined global in the widget
-// process.
+// The pushed content state plus the facts only the app can add: whether the
+// recorded ask is one Approve can answer, the failure line a retryable Approve
+// left on the card, and whether an Approve press is in flight. They stay local
+// fields rather than imports from `./view-props`, because Babel stringifies
+// this function's source and every imported binding would be an undefined
+// global in the widget process. `updatedAt` is optional: a card started by an
+// older server build carries no checked time and draws none.
 type ContentState = Partial<GlanceableLiveActivityContentState> & {
   canApprove?: boolean;
   notice?: string;
+  approving?: boolean;
 };
 
+/**
+ * The approved Live Activity design (round 7). The Lock Screen card is 364pt
+ * wide: the header at 16pt (tile, Kilo, and the checked time trailing), the
+ * status row centred at 74pt (count 36, dot, label 16, Approve pill 96x32), and
+ * an optional muted line at 118pt — the card is 140pt tall with it and 108pt
+ * without. The expanded Dynamic Island repeats it on black at count 32 and
+ * label 15; the compact and minimal presentations carry the dot and the count.
+ */
 // Babel replaces the annotated arrow with its source string, so `layout` is a
 // string at runtime while TypeScript still checks it as a component — the same
 // shape `expo-widgets` casts internally.
-const layout: LiveActivityComponent<ContentState> = props => {
+const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment) => {
   'widget';
 
-  // The literal, not the imported constant: the widget transform stringifies
+  // The literal, not an imported constant: the widget transform stringifies
   // this function's source, so an imported binding would be an undefined
   // global in the widget process. `withGlanceableCopy` replaces the token,
   // quotes included, with the translated copy as a JSON source literal.
   // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
   const copySource: string = '__KILO_GLANCEABLE_COPY__';
-  const COPY = JSON.parse(copySource) as Record<string, string>;
-  // The tag SwiftUI formats the relative wait with; English when the bake is
-  // somehow missing it, which is what the widget process would have used anyway.
+  const COPY = JSON.parse(copySource.startsWith('{') ? copySource : '{}') as Record<string, string>;
   const locale = COPY.locale ?? 'en';
 
   // The counts are stringified here, not formatted: a pushed content state
   // carries raw numbers and this process has no formatter. `COPY.digits` is the
-  // language's own ten, empty when it writes them the way `String` already
-  // does, so an Arabic count reads "١" beside the "٢٦ د" SwiftUI formats.
+  // language's own ten (empty when `String` already writes them) and
+  // `COPY.group` its thousands separator.
   const digits = COPY.digits ?? '';
-  const count = (value: number) =>
-    digits.length === 10
+  const groupSeparator = COPY.group ?? ',';
+  const count = (value: number) => {
+    const plain = String(value);
+    let grouped = '';
+    for (let index = 0; index < plain.length; index += 1) {
+      if (index > 0 && (plain.length - index) % 3 === 0) {
+        grouped += groupSeparator;
+      }
+      grouped += plain[index] ?? '';
+    }
+    return digits.length === 10
       ? // eslint-disable-next-line unicorn/prefer-spread -- `replaceAll` and a spread both failed in the widget process; this form is the one verified on device
-        String(value)
+        grouped
           .split('')
-          .map(character => digits[Number(character)] ?? character)
+          .map(character => (/[0-9]/.test(character) ? digits[Number(character)] : character))
           .join('')
-      : String(value);
+      : grouped;
+  };
 
   const status = props.status ?? 'empty';
-  const statusLine = status === 'happy' ? null : COPY[status];
+  const statusLine = status === 'happy' ? null : (COPY[status] ?? null);
+  const dark = activityEnvironment.colorScheme === 'dark';
+  const palette = dark
+    ? {
+        bg: '#17171A',
+        fg: '#F2F0EB',
+        muted: '#8A8680',
+        warn: '#F2B05F',
+        good: '#5FCB8E',
+        info: '#60A5FA',
+        idle: '#56544F',
+        primary: '#E8F27A',
+        primaryFg: '#1A1A10',
+        secondary: '#26262B',
+      }
+    : {
+        bg: '#FBFAF5',
+        fg: '#14130F',
+        muted: '#6F6A61',
+        warn: '#956011',
+        good: '#24784A',
+        info: '#2260EB',
+        idle: '#A9A39A',
+        primary: '#4F5A10',
+        primaryFg: '#FFFFFF',
+        secondary: '#F0EEE6',
+      };
 
   // Rank order: what the user must act on, then what is making progress, then
-  // what is only connected. The Dynamic Island shows one number, so this
-  // ranking decides what a glance says. The glyphs differ in shape as well as
-  // color (exclamation / filled / hollow) so the state reads without color.
+  // what will wake, then what is only connected. One number leads every
+  // presentation, so this ranking decides what a glance says.
   const countLines = [
-    {
-      kind: 'needsInput',
-      label: COPY.needsInput,
-      count: props.needsInput ?? 0,
-      icon: 'exclamationmark.circle.fill',
-      color: PlatformColor('systemOrange'),
-    },
-    {
-      kind: 'running',
-      label: COPY.running,
-      count: props.running ?? 0,
-      icon: 'circle.fill',
-      color: PlatformColor('systemGreen'),
-    },
-    {
-      kind: 'scheduled',
-      label: COPY.scheduled,
-      count: props.scheduled ?? 0,
-      icon: 'clock',
-      color: PlatformColor('label'),
-    },
-    {
-      kind: 'idle',
-      label: COPY.idle,
-      count: props.idle ?? 0,
-      icon: 'circle',
-      color: PlatformColor('label'),
-    },
-    // `as const` keeps each `icon` an SF Symbol literal, which the Image prop
-    // type requires.
+    { kind: 'needsInput', label: COPY.needsInput ?? 'Needs input', count: props.needsInput ?? 0 },
+    { kind: 'running', label: COPY.running ?? 'Working', count: props.running ?? 0 },
+    { kind: 'scheduled', label: COPY.scheduled ?? 'Scheduled', count: props.scheduled ?? 0 },
+    { kind: 'idle', label: COPY.idle ?? 'Idle', count: props.idle ?? 0 },
   ] as const;
-  // A zero row still draws, so the rows never reflow as work changes state.
-  // `primary` skips the zeros: one number on the Dynamic Island must be a
-  // number worth showing.
   const primary = countLines.find(line => line.count > 0) ?? null;
-  const hasCounts = primary !== null;
-  const primaryCount = count(primary === null ? 0 : primary.count);
-  // Only the needs-input row carries a duration, and only the oldest wait: a
-  // blocked agent is the one interval the user can act on. Working and idle
-  // durations tell the user nothing they can use.
-  const needsInputSince = (props.needsInput ?? 0) > 0 ? (props.needsInputSince ?? null) : null;
-  // The soonest wake, drawn only beside a non-zero scheduled row: a scheduled
-  // count with no wake time is representable, and the row then carries no time.
-  const scheduledAt = (props.scheduled ?? 0) > 0 ? (props.scheduledAt ?? null) : null;
+  const others = countLines
+    .filter(line => line.count > 0 && line !== primary)
+    .map(line => `${count(line.count)} ${line.label}`)
+    .join(' · ');
+  type Scheme = {
+    fg: string;
+    muted: string;
+    warn: string;
+    tile: string;
+    inner: string;
+    primary: string;
+    primaryFg: string;
+    secondary: string;
+    dots: Record<(typeof countLines)[number]['kind'], string>;
+    countSize: number;
+    labelSize: number;
+  };
+  const card: Scheme = {
+    ...palette,
+    tile: palette.fg,
+    inner: palette.bg,
+    dots: {
+      needsInput: palette.warn,
+      running: palette.good,
+      scheduled: palette.info,
+      idle: palette.idle,
+    },
+    countSize: 36,
+    labelSize: 16,
+  };
+  // The Dynamic Island is always black: the dark palette with white text.
+  const island: Scheme = {
+    fg: '#FFFFFF',
+    muted: '#8A8680',
+    warn: '#F2B05F',
+    tile: '#F2F0EB',
+    inner: '#17171A',
+    primary: '#E8F27A',
+    primaryFg: '#1A1A10',
+    secondary: '#26262B',
+    dots: { needsInput: '#F2B05F', running: '#5FCB8E', scheduled: '#60A5FA', idle: '#56544F' },
+    countSize: 32,
+    labelSize: 15,
+  };
   // Approval is offered only while an ask actually waits and the app recorded
-  // one Approve can answer: an Approve that cannot answer anything is a dead
-  // control, and a card whose ask was just answered elsewhere would keep
-  // offering the tap that answered it. `needsInput` counts questions and
-  // retried asks too, so the wait count alone must not offer a control that
-  // cannot act; the pushed `needsApproval` — the `permission` rows, the one
-  // wait the user can clear without choosing an option — narrows it. That
-  // narrower count is also what stands in when the app wrote no flag, which is
-  // every state that arrived over APNs: a question-only server state then
-  // offers Open alone instead of a tap the press answers with `none`, while a
-  // `permission` server state still offers the tap the app-closed press
-  // answers. `withStatus` zeroes the wait count on expiry but leaves
-  // `needsApproval` standing, so the wait term is what keeps the retained
-  // expired frame gateless. The phone `actions` and the watch `bannerSmall`
-  // control share this one gate, so each offers exactly the tap its own press
-  // can answer.
+  // one Approve can answer. `needsInput` counts questions and retried asks too,
+  // so the wait count alone must not offer a control that cannot act; the
+  // pushed `needsApproval` — the `permission` rows — narrows it. That narrower
+  // count is also what stands in when the app wrote no flag, which is every
+  // state that arrived over APNs: a question-only server state then offers no
+  // tap, while a `permission` server state still offers the tap the app-closed
+  // press answers. `withStatus` zeroes the wait count on expiry but leaves
+  // `needsApproval` standing, so the wait term keeps the expired frame gateless.
   const canApprove =
     (props.needsInput ?? 0) > 0 && (props.needsApproval ?? 0) > 0 && props.canApprove !== false;
-
-  // The failure line a retryable Approve left on the card. The app sets it in
-  // the content state, because this process cannot translate; a server-written
-  // state and a card whose ask changed carry none, and the line then draws
-  // nothing at all.
-  const notice = props.notice ?? null;
+  // The press in flight replaces Approve with a muted Approving… pill; a
+  // failure brings Approve back with its line under the counts.
+  const approving = props.approving === true && (props.needsInput ?? 0) > 0;
+  // A retry in flight hides the failure line it answers.
+  const notice = approving ? null : (props.notice ?? null);
+  const scheduledAt =
+    primary?.kind === 'scheduled' && others.length === 0 && props.scheduledAt != null
+      ? new Date(props.scheduledAt)
+      : null;
+  const updatedAt = props.updatedAt == null ? null : new Date(props.updatedAt);
+  const checkedAt = updatedAt !== null && Number.isFinite(updatedAt.getTime()) ? updatedAt : null;
+  const lastKnown =
+    status === 'stale' || status === 'expired' || activityEnvironment.isStale === true;
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
   // spoken label even though no line draws it.
-  const spokenParts = [
-    ...(statusLine !== null ? [statusLine] : []),
+  const accessibility = [
+    ...(statusLine === null ? [] : [statusLine]),
     ...countLines.map(line => `${line.count} ${line.label}`),
-    COPY.openAgents,
-  ];
-  const accessibility = spokenParts.join(', ');
+    COPY.openAgents ?? 'Open agents',
+  ].join(', ');
 
-  const primaryForeground = foregroundStyle(PlatformColor('label'));
-  // `secondaryLabel` in both appearances: `tertiaryLabel` on the light widget
-  // background left the ranked-down rows too faint to read.
-  const mutedForeground = foregroundStyle(PlatformColor('secondaryLabel'));
-
-  // The failure line, drawn on its own full-width row under the counts so the
-  // whole banner width carries it: inside the count block it would have to fit
-  // between the mark and the buttons, which shrinks a reviewed sentence past
-  // reading. Orange, the color of the Approve button the notice asks the user
-  // to tap again. Nothing to draw when no press failed.
-  const noticeLine =
-    notice === null ? null : (
-      <Text
-        modifiers={[
-          font({ textStyle: 'footnote', weight: 'semibold' }),
-          // The line stays one row: the banner grows once for the notice and
-          // never reflows again as the copy changes language. In the widget
-          // renderer a scaling line always draws at its minimum, so 0.85 is
-          // the size it draws at: one step below footnote, still readable.
-          lineLimit(1),
-          minimumScaleFactor(0.85),
-          foregroundStyle(PlatformColor('systemOrange')),
-        ]}
-      >
-        {notice}
-      </Text>
-    );
-
-  // The literal, not the imported constant: the widget transform stringifies
-  // this function's source, so an imported binding would be an undefined global
-  // in the widget process. It must stay equal to `WIDGET_LOGO_PLACEHOLDER`, which
-  // `withWidgetLogo` replaces with the app-group path.
-  // The annotation widens the literal: the token is replaced after this file is
-  // stringified, so the empty-path branch below is reachable at runtime.
-  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
-  const logoUri: string = '__KILO_WIDGET_LOGO_URI__';
-  const logo = (size: number) =>
-    logoUri.length === 0 ? null : (
-      <Image
-        uiImage={logoUri}
-        modifiers={[resizable(), frame({ width: size, height: size }), cornerRadius(size * 0.24)]}
-      />
-    );
-
-  // One row per state: a colored glyph carries the state (readable without
-  // color), a fixed-width count, then the label. Every row shares one type
-  // size so the counts line up on a grid; only the label dims to rank them.
-  // `showTimes` draws the needs-input wait and the scheduled wake beside
-  // their rows. A time that cannot fit is dropped whole, never truncated: the
-  // expanded island and the watch row never draw one, and the banner drops a
-  // row's time when its label is longer than the 13 characters that leave the
-  // time room beside the buttons (a character count is the measure this
-  // process has).
-  const TIME_LABEL_BUDGET = 13;
-  // Past 16 characters a label no longer fits beside the mark and the buttons
-  // even with its time dropped (German "Eingabe erforderlich"), so the mark
-  // gives its width up next: the last thing a narrow surface drops before a
-  // label truncates.
-  const markFits = countLines.every(line => (line.label ?? '').length <= 16);
-  // `elapsed` is the repo-local @expo/ui style (patches/@expo+ui): the wait in
-  // its one largest unit, seconds only under a minute ("31 minutes", "20
-  // seconds"); before iOS 18 it is the relative style.
-  const waitStyle = 'elapsed';
-  const timeModifiers = [
-    font({ textStyle: 'footnote' }),
-    monospacedDigit(),
-    lineLimit(1),
-    mutedForeground,
-  ];
-  // A zero row keeps its place in the grid but sinks below every non-zero one
-  // and draws fully muted: glyph, number and label in the secondary colour,
-  // the number without its emphasis. A stable sort keeps the kind order.
-  const ledgerRows = [
-    ...countLines.filter(line => line.count > 0),
-    ...countLines.filter(line => line.count === 0),
-  ];
-  const mutedColor = PlatformColor('secondaryLabel');
-  const countRow = (line: (typeof countLines)[number], isPrimary: boolean, showTimes: boolean) => {
-    const zero = line.count === 0;
-    const timeFits = showTimes && (line.label ?? '').length <= TIME_LABEL_BUDGET;
-    return (
-      <HStack key={line.label} alignment="center" spacing={7}>
-        <Image systemName={line.icon} color={zero ? mutedColor : line.color} size={13} />
+  // eslint-disable-next-line max-params -- a text run is its copy, size, colour and weight, named as the design names them
+  const text = (
+    value: string,
+    size: number,
+    color: string,
+    weight: 'regular' | 'semibold' = 'regular'
+  ) => (
+    <Text modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>{value}</Text>
+  );
+  const dot = (diameter: number, color: string) => (
+    <Circle modifiers={[frame({ width: diameter, height: diameter }), foregroundStyle(color)]} />
+  );
+  // The Kilo tile: a filled square with a smaller square of the background in it.
+  const tile = (size: number, fill: string, inner: string) => (
+    <RoundedRectangle
+      cornerRadius={1}
+      modifiers={[
+        foregroundStyle(inner),
+        frame({ width: size * 0.44, height: size * 0.44 }),
+        frame({ width: size, height: size }),
+        background(fill, shapes.roundedRectangle({ cornerRadius: size * 0.22 })),
+      ]}
+    />
+  );
+  // The clock time alone today; another day adds its weekday.
+  const clock = (date: Date, color: string) => {
+    if (date.toDateString() === new Date().toDateString()) {
+      return (
         <Text
-          modifiers={[
-            font({ textStyle: 'subheadline', weight: zero ? 'regular' : 'semibold' }),
-            monospacedDigit(),
-            // The number is the whole point of the row, so it takes its space
-            // first: a long label truncates before the count does.
-            layoutPriority(1),
-            zero ? mutedForeground : primaryForeground,
-          ]}
-        >
-          {count(line.count)}
-        </Text>
+          date={date}
+          dateStyle="time"
+          modifiers={[font({ size: 11 }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
+        />
+      );
+    }
+    try {
+      // eslint-disable-next-line no-restricted-globals -- the widget process cannot import @/lib/intl-cache; failure falls back to SwiftUI's date text
+      const formatted = new Intl.DateTimeFormat(locale.split('_').join('-'), {
+        weekday: 'short',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(date);
+      return text(formatted, 11, color);
+    } catch {
+      return (
         <Text
-          modifiers={[
-            font({ textStyle: 'subheadline' }),
-            // One line at the row's own size. Do not add `minimumScaleFactor`:
-            // in the widget renderer it always drew the label at its minimum
-            // scale, room or not, far smaller than the count beside it.
-            lineLimit(1),
-            // A live time reserves more width than it draws, so without the
-            // priority it took the label's room and the label truncated
-            // beside a time that fit.
-            layoutPriority(1),
-            isPrimary && !zero ? primaryForeground : mutedForeground,
-          ]}
-        >
-          {line.label}
-        </Text>
-        {timeFits && line.kind === 'needsInput' && needsInputSince !== null ? (
-          <Text date={new Date(needsInputSince)} dateStyle={waitStyle} modifiers={timeModifiers} />
-        ) : null}
-        {timeFits && line.kind === 'scheduled' && scheduledAt !== null ? (
-          // A wait counts a duration ("31 minutes"); a wake is the moment the
-          // user asked for, so it reads as a clock time ("9:00 AM"), the way
-          // the session list shows it.
-          <Text date={new Date(scheduledAt)} dateStyle="time" modifiers={timeModifiers} />
-        ) : null}
-      </HStack>
-    );
+          date={date}
+          dateStyle="time"
+          modifiers={[font({ size: 11 }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
+        />
+      );
+    }
   };
 
-  // The mark, then the rows. The Lock Screen banner and the expanded Dynamic
-  // Island draw the same block, so one glance teaches both surfaces. The spoken
-  // label is combined onto this block rather than the whole surface, because
-  // the action buttons after it are their own elements: a combined container
-  // would swallow the two taps into the count label. The Apple Watch and CarPlay
-  // draw the `bannerSmall` section instead: their activity family is `.small`,
-  // so they get one compact row plus the watch control rather than this block.
-  const markAndRows = (markSize: number, showTimes: boolean) => (
-    <HStack
-      alignment="center"
-      spacing={12}
-      modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
-    >
-      {markFits ? logo(markSize) : null}
-      {/* The combined label sits on the counts/status block alone, the way the
-          watch `bannerSmall` scopes it to its count row, so the action buttons
-          after this block stay separate, focusable elements. `combine` on the
-          whole row merged the control into one element whose spoken label named
-          only the counts and "Open agents", which is how the Lock Screen banner
-          lost the action for VoiceOver. */}
-      <HStack
-        alignment="center"
-        spacing={7}
-        modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
-      >
-        {hasCounts ? (
-          // The emphasised row is the ranked primary, not the first row: with
-          // zeros drawn the first row is often a 0.
-          <VStack alignment="leading" spacing={5}>
-            {ledgerRows.map(line => countRow(line, line === primary, showTimes))}
-          </VStack>
-        ) : (
-          <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
-            {statusLine}
-          </Text>
-        )}
-      </HStack>
-      <Spacer />
+  // Header: the tile, Kilo, and the checked time at the trailing edge.
+  const header = (scheme: Scheme) => (
+    <HStack alignment="center" spacing={6} modifiers={[frame({ height: 18 })]}>
+      {tile(18, scheme.tile, scheme.inner)}
+      {text('Kilo', 13, scheme.fg, 'semibold')}
+      <Spacer minLength={8} />
+      {checkedAt === null ? null : (
+        <HStack spacing={3}>
+          {text(
+            lastKnown ? `${COPY.lastKnown ?? 'Last known'} ·` : (COPY.checked ?? 'Checked'),
+            11,
+            scheme.muted
+          )}
+          {clock(checkedAt, scheme.muted)}
+        </HStack>
+      )}
     </HStack>
   );
 
-  // The two action buttons, on the surfaces with room: the Lock Screen banner
-  // and the expanded Dynamic Island. The compact presentations keep the count
-  // alone — two tappable controls in the leading/trailing slots would crowd
-  // the one number a glance reads — so the buttons sit exactly where the counts
-  // are drawn in full.
-  //
-  // `target` is the stable id the press reports back; the app's listener routes
-  // it. The literals must stay equal to the targets in `interaction.ts`, which
-  // `active-agents-live-activity.test.ts` holds them to.
-  //
-  // A text `Button`, not an icon child: this process has no React context and
-  // no SVG renderer, so the theme tokens reach it as `PlatformColor` — the
-  // same values the count rows use. Approve carries the needs-input orange of
-  // the row it answers; Open takes the label color. The two stack in one
-  // trailing column at the small control size and their natural width
-  // (`fixedSize`): side by side, or with icons, they squeezed the rows until
-  // the labels and the wait truncated and the button titles wrapped.
-  //
-  // The Open tap has to show the user the session, and a Live Activity button's
-  // intent performs in the app's process without foregrounding it: unattended,
-  // the tap records a destination on a surface nobody is looking at.
-  // `openAppWhenRun` selects the foregrounding intent in the patched
-  // expo-widgets button view, so the app is up to consume that destination. It
-  // is a prop of that view, not of `@expo/ui`'s `Button`, so it travels as the
-  // plain extra prop the widget process serialises with the rest.
-  const openButtonProps = { openAppWhenRun: true };
-  const actions = (
-    <VStack alignment="trailing" spacing={8}>
-      {canApprove ? (
-        <Button
-          target="approve"
-          label={COPY.approve}
-          modifiers={[fixedSize(), controlSize('small'), tint(PlatformColor('systemOrange'))]}
-        />
-      ) : null}
+  // The Approve pill, or the muted Approving… pill while the press is in
+  // flight. The target literal must stay equal to `GLANCEABLE_APPROVE_TARGET`
+  // in `interaction.ts`, which `active-agents-live-activity.test.ts` holds it to.
+  const pill = (label: string, width: number, tone: { fill: string; color: string }) => (
+    <Text
+      modifiers={[
+        font({ size: 13, weight: 'semibold' }),
+        lineLimit(1),
+        foregroundStyle(tone.color),
+        fixedSize({ horizontal: true, vertical: false }),
+        padding({ horizontal: 14 }),
+        frame({ minWidth: width, height: 32 }),
+        background(tone.fill, shapes.capsule()),
+      ]}
+    >
+      {label}
+    </Text>
+  );
+  const approveControl = (scheme: Scheme) => {
+    if (approving) {
+      return pill(COPY.approving ?? 'Approving…', 104, {
+        fill: scheme.secondary,
+        color: scheme.muted,
+      });
+    }
+    if (!canApprove) {
+      return null;
+    }
+    return (
       <Button
-        {...openButtonProps}
-        target="open"
-        label={COPY.open}
-        modifiers={[fixedSize(), controlSize('small'), tint(PlatformColor('label'))]}
-      />
-    </VStack>
+        target="approve"
+        modifiers={[buttonStyle('plain'), accessibilityLabel(COPY.approve ?? 'Approve')]}
+      >
+        {pill(COPY.approve ?? 'Approve', 96, { fill: scheme.primary, color: scheme.primaryFg })}
+      </Button>
+    );
+  };
+
+  // The status row: count, dot, label; or the status line when nothing counts.
+  // The spoken label sits on this block alone, so the Approve control after it
+  // stays its own focusable element.
+  const statusBlock = (scheme: Scheme) => (
+    <HStack
+      alignment="center"
+      spacing={6}
+      modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
+    >
+      {primary === null ? (
+        text(
+          statusLine ?? COPY.openAgents ?? 'Open agents',
+          scheme.labelSize,
+          scheme.fg,
+          'semibold'
+        )
+      ) : (
+        <Text
+          modifiers={[
+            font({ size: scheme.countSize, weight: 'bold' }),
+            monospacedDigit(),
+            lineLimit(1),
+            fixedSize({ horizontal: true, vertical: false }),
+            foregroundStyle(scheme.fg),
+          ]}
+        >
+          {count(primary.count)}
+        </Text>
+      )}
+      {primary === null ? null : dot(scheme.countSize > 32 ? 9 : 8, scheme.dots[primary.kind])}
+      {primary === null ? null : text(primary.label, scheme.labelSize, scheme.fg, 'semibold')}
+    </HStack>
   );
 
+  // The line under the counts: a failed Approve's retry line, else the other
+  // counts, else the next run of a scheduled-only card. Nothing shortens the card.
+  const bottomLine = (scheme: Scheme) => {
+    if (notice !== null) {
+      return text(notice, 13, scheme.warn, 'semibold');
+    }
+    if (others.length > 0) {
+      return text(others, 13, scheme.muted);
+    }
+    if (scheduledAt !== null && Number.isFinite(scheduledAt.getTime())) {
+      return (
+        <HStack spacing={3}>
+          {text(COPY.nextRun ?? 'Next run', 13, scheme.muted)}
+          <Text
+            date={scheduledAt}
+            dateStyle="time"
+            modifiers={[
+              font({ size: 13 }),
+              lineLimit(1),
+              monospacedDigit(),
+              foregroundStyle(scheme.muted),
+            ]}
+          />
+        </HStack>
+      );
+    }
+    return null;
+  };
+  const cardLine = bottomLine(card);
+  const islandLine = bottomLine(island);
+
   return {
+    // Lock Screen: header @16, status row centred @74, line @118 (13pt).
     banner: (
       <VStack
-        spacing={6}
+        alignment="leading"
+        spacing={0}
         modifiers={[
-          // The banner draws to its own rounded edge, so without an inset the
-          // top-left corner clips the leading content.
-          padding({ all: 'default' }),
+          padding({ top: 16, leading: 16, trailing: 16, bottom: cardLine === null ? 12.4 : 18.9 }),
+          activityBackgroundTint(palette.bg),
           // The widget process takes its locale from the device language, so
-          // without this the relative wait would be formatted in a different
-          // language than the baked labels.
+          // without this the times would be formatted in a different language
+          // than the baked labels.
           environment({ key: 'locale', value: locale }),
         ]}
       >
-        <HStack>
-          {markAndRows(26, true)}
-          {actions}
+        {header(card)}
+        <HStack alignment="center" spacing={0} modifiers={[padding({ top: 18.7 })]}>
+          {statusBlock(card)}
+          <Spacer minLength={10} />
+          {approveControl(card)}
         </HStack>
-        {noticeLine}
+        {cardLine === null ? null : (
+          <VStack alignment="leading" spacing={0} modifiers={[padding({ top: 9.9 })]}>
+            {cardLine}
+          </VStack>
+        )}
       </VStack>
     ),
     // The Apple Watch and CarPlay small family draws this section, not the
-    // phone `banner`: expo-widgets' banner view prefers the `bannerSmall` node
-    // whenever the activity family is `.small`, falling back to `banner`
-    // otherwise, so the phone Lock Screen and Dynamic Island never read it. One
-    // compact row plus the Approve control, so the wait count and the wrist
-    // control fit the small region instead of the phone's stacked block. The
-    // ranked primary row only — the small family draws one line — and no
-    // relative wait: the medium banner and the accessory rectangle carry it. The
-    // trailing Spacer pins the row to the leading edge, so the count keeps its
-    // place when the control appears and disappears, the way the phone block is
-    // spaced; the row draws unconditionally, and only the control is gated, by
-    // the same `canApprove` the phone block uses. The notice has a reserved row
-    // below, so a failed press cannot move the count or its retry control.
+    // phone `banner`: one compact status row plus the Approve control, and the
+    // failure line in a reserved row below so a failed press cannot move the
+    // count or its retry control.
     bannerSmall: (
       <VStack alignment="leading" spacing={6}>
         <HStack alignment="center" spacing={10}>
-          <HStack
-            alignment="center"
-            spacing={7}
-            modifiers={[
-              // The combined label sits on the count row alone, so VoiceOver on
-              // the watch can still focus and activate the Approve button
-              // separately.
-              accessibilityElement('combine'),
-              accessibilityLabel(accessibility),
-            ]}
-          >
-            {hasCounts ? (
-              countRow(primary, true, false)
-            ) : (
-              <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>
-                {statusLine}
-              </Text>
-            )}
-          </HStack>
-          {canApprove ? (
-            // The target is the literal, not the imported `APPROVE_TARGET`: this
-            // function's source is stringified and re-evaluated in the widget
-            // process, where an imported binding is an undefined global.
-            // `layout-copy.test.ts` keeps it equal to the constant the interaction
-            // handler matches.
-            <Button label={COPY.approve} target="approve" />
-          ) : null}
+          {statusBlock({ ...island, countSize: 20 })}
+          {canApprove && !approving ? <Button label={COPY.approve} target="approve" /> : null}
           <Spacer />
         </HStack>
-        <VStack modifiers={[frame({ height: 18 })]}>{noticeLine}</VStack>
+        <VStack modifiers={[frame({ height: 18 })]}>
+          {notice === null ? null : text(notice, 13, island.warn, 'semibold')}
+        </VStack>
       </VStack>
     ),
-    // The Dynamic Island's leading slot is the app-identity slot, so it holds
-    // the Kilo mark; the trailing slot carries the ranked count.
-    compactLeading: <HStack modifiers={[accessibilityLabel(accessibility)]}>{logo(18)}</HStack>,
-    // One number, colored by the state it counts: orange needs input, green
-    // working, white idle.
-    compactTrailing: (
-      <Text
-        modifiers={[
-          font({ textStyle: 'title3', weight: 'bold' }),
-          monospacedDigit(),
-          primary === null ? mutedForeground : foregroundStyle(primary.color),
-          accessibilityLabel(accessibility),
-        ]}
-      >
-        {hasCounts ? primaryCount : ''}
-      </Text>
-    ),
-    minimal: (
-      <Text
-        modifiers={[
-          font({ textStyle: 'headline', weight: 'bold' }),
-          monospacedDigit(),
-          primary === null ? mutedForeground : foregroundStyle(primary.color),
-          accessibilityLabel(accessibility),
-        ]}
-      >
-        {hasCounts ? primaryCount : ''}
-      </Text>
-    ),
-    // The whole expanded island is the bottom region: it is the only one wide
-    // enough for a labelled row, and it clears the rounded corners that clip
-    // the flanking regions. The leading and trailing regions stay empty and
-    // take no height. The row carries its own combined label on the count block
-    // and none sits here, so the Approve control inside it stays focusable
-    // instead of being merged into the island's spoken label.
+    // Compact: the tile leading, the dot and count trailing.
+    compactLeading: tile(18, island.tile, island.inner),
+    compactTrailing:
+      primary === null ? null : (
+        <HStack
+          alignment="center"
+          spacing={6}
+          modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
+        >
+          {dot(8, island.dots[primary.kind])}
+          <Text
+            modifiers={[
+              font({ size: 15, weight: 'bold' }),
+              monospacedDigit(),
+              lineLimit(1),
+              foregroundStyle(island.fg),
+            ]}
+          >
+            {count(primary.count)}
+          </Text>
+        </HStack>
+      ),
+    // Minimal: the dot and the count, capped at 99+.
+    minimal:
+      primary === null ? null : (
+        <HStack
+          alignment="center"
+          spacing={7}
+          modifiers={[accessibilityElement('combine'), accessibilityLabel(accessibility)]}
+        >
+          {dot(7, island.dots[primary.kind])}
+          <Text
+            modifiers={[
+              font({ size: 14, weight: 'bold' }),
+              monospacedDigit(),
+              lineLimit(1),
+              foregroundStyle(island.fg),
+            ]}
+          >
+            {primary.count > 99 ? `${count(99)}+` : count(primary.count)}
+          </Text>
+        </HStack>
+      ),
+    // Expanded: the Lock Screen card on black at count 32 and label 15. The
+    // island's rounded corner cuts into the leading edge, so the content keeps
+    // an inset on both sides.
     expandedBottom: (
       <VStack
-        spacing={6}
+        alignment="leading"
+        spacing={0}
         modifiers={[
-          // The island's rounded corner cuts into the leading edge, so the
-          // mark needs an inset the banner gets from its own padding. The
-          // trailing edge needs the same inset now that the buttons end there.
-          padding({ vertical: 2, leading: 14, trailing: 14 }),
+          padding({ leading: 14, trailing: 14, bottom: islandLine === null ? 4 : 10 }),
           environment({ key: 'locale', value: locale }),
         ]}
       >
-        <HStack>
-          {markAndRows(24, false)}
-          {actions}
+        {header(island)}
+        <HStack alignment="center" spacing={0} modifiers={[padding({ top: 15.5 })]}>
+          {statusBlock(island)}
+          <Spacer minLength={10} />
+          {approveControl(island)}
         </HStack>
-        {noticeLine}
+        {islandLine === null ? null : (
+          <VStack alignment="leading" spacing={0} modifiers={[padding({ top: 13.9 })]}>
+            {islandLine}
+          </VStack>
+        )}
       </VStack>
     ),
   };
@@ -519,12 +515,9 @@ export const LIVE_ACTIVITY_NAME = 'ActiveAgentsLiveActivity';
  */
 export const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
 
+export const activeAgentsLiveActivityLayout = layout;
 const registerLayout = () =>
-  createLiveActivity<ContentState>(
-    LIVE_ACTIVITY_NAME,
-    withGlanceableCopy(withWidgetLogo(layout)),
-    OPEN_AGENTS_URL
-  );
+  createLiveActivity<ContentState>(LIVE_ACTIVITY_NAME, withGlanceableCopy(layout), OPEN_AGENTS_URL);
 
 export const ActiveAgentsLiveActivity = registerLayout();
 

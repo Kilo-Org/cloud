@@ -294,15 +294,19 @@ describe('the saved list', () => {
   });
 });
 
-it('leaves a list it cannot fully read alone, so the next launch still protects the file', () => {
+it.each([
+  ['{"fileId":"other"}', 'an entry this build cannot read'],
+  ['{ not json', 'a list that does not parse at all'],
+])('leaves %s alone, so the next launch still protects the file', text => {
   const h = harness();
-  h.index.text = JSON.stringify([{ fileId: 'other', name: 'Other' }]);
+  h.index.text = text;
   h.files.set(ggufModelName('other'), 20);
 
+  // Two loads stand in for two launches.
   h.store.load();
   h.store.load();
 
-  expect(h.index.text).toContain('other');
+  expect(h.index.text).toBe(text);
   expect(h.files.has(ggufModelName('other'))).toBe(true);
 });
 

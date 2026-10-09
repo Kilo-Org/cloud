@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ggufModelName,
+  modelIndexFullyParsed,
   modelIndexIsReadable,
   modelIndexMentionedNames,
   orphanedModelFiles,
@@ -51,6 +52,13 @@ describe('the saved model list', () => {
     });
 
     expect(orphans).toEqual(['orphan.gguf']);
+  });
+
+  it('reports a list as fully parsed only when every entry parsed', () => {
+    expect(modelIndexFullyParsed(JSON.stringify([saved]))).toBe(true);
+    expect(modelIndexFullyParsed('{ not json')).toBe(false);
+    expect(modelIndexFullyParsed('{"fileId":"one"}')).toBe(false);
+    expect(modelIndexFullyParsed(JSON.stringify([saved, { fileId: 'other' }]))).toBe(false);
   });
 
   it('deletes nothing when the list cannot be read', () => {

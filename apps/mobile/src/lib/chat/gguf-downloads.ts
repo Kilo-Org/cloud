@@ -9,7 +9,7 @@ import {
   type GgufModelRecord,
   ggufPartialName,
   type GgufStorage,
-  modelIndexHasUnreadableEntries,
+  modelIndexFullyParsed,
   orphanedModelFiles,
   readModelIndex,
   settled,
@@ -219,9 +219,9 @@ export function ggufDownloads({
         storage.remove(name);
       }
       models = kept;
-      // Rewriting a list with an entry this build cannot read would drop that
-      // entry, and the next launch would then delete the file it names.
-      if (!modelIndexHasUnreadableEntries(index)) {
+      // Only a list that parsed in full is written back: anything else would lose
+      // an entry, and the next launch would then delete the file it names.
+      if (modelIndexFullyParsed(index)) {
         save(kept);
       }
       publish();

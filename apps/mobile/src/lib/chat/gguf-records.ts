@@ -180,12 +180,13 @@ export function modelIndexMentionedNames(text: string | null): ReadonlySet<strin
 }
 
 /**
- * Whether the saved list holds an entry this build cannot read.
+ * Whether the saved list parsed in full, entry by entry.
  *
- * Such a list is not rewritten: writing it back would drop the entry, and the
- * next launch would then treat its file as unlisted and delete it.
+ * Only then is writing it back lossless. A list that does not parse, or that
+ * holds an entry this build cannot read, is left as it is: rewriting it would
+ * drop that entry, and the next launch would then delete the file it names.
  */
-export function modelIndexHasUnreadableEntries(text: string | null): boolean {
+export function modelIndexFullyParsed(text: string | null): boolean {
   let parsed: unknown = undefined;
   try {
     parsed = JSON.parse(text ?? '[]');
@@ -195,7 +196,7 @@ export function modelIndexHasUnreadableEntries(text: string | null): boolean {
   if (!Array.isArray(parsed)) {
     return false;
   }
-  return parsed.some(entry => !modelRecord.safeParse(entry).success);
+  return parsed.every(entry => modelRecord.safeParse(entry).success);
 }
 
 /**

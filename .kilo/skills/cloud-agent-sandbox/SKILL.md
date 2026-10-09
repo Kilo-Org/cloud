@@ -76,8 +76,14 @@ pnpm dev:stop
   GitHub App credentials, which the sandbox does not have.
 - `--no-attach` returns once services are up: about 50 s for `app`. The first
   page load compiles with Turbopack and takes about 30 s more.
-- The first agents start after a restart builds the Cloud Agent sandbox images.
-  This can take 10 to 15 minutes. Later starts reuse them.
+- The first agents start after a restart builds eight Cloud Agent sandbox
+  images, about 12 minutes. `cloud-agent-next` reports `up` before they are
+  ready, and sessions created meanwhile fail (`fetch failed` in the harness).
+  Wait for the build to finish:
+
+  ```bash
+  until grep -q 'Container image(s) ready' dev/logs/cloud-agent-next.log; do sleep 15; done
+  ```
 - `--reuse-running` currently refuses to reuse a session because the Stripe
   forwarder is always skipped. Check `pnpm dev:status` instead.
 
@@ -177,5 +183,6 @@ docker exec <sandbox container> git ls-remote https://github.com/octocat/Hello-W
 - `pkill -f next-server` also matches the shell that runs it. Use
   `pkill -f '[n]ext-server'`.
 - Do not prune Docker images, volumes, or the BuildKit builder. Rebuilding the
-  Cloud Agent images costs 10 to 15 minutes.
+  Cloud Agent images costs about 12 minutes.
 - Lint setup changes with `shellcheck -S warning -e SC1090 .kilo/cloud-agent-setup.sh`.
+  Setup does not install ShellCheck; use `apt-get install -y shellcheck`.

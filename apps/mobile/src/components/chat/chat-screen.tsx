@@ -32,7 +32,7 @@ import { useOrganization } from '@/lib/organization-context';
 import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
-import { useChatBackends } from '@/lib/chat/backend-store';
+import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
 import { backendModelOptions, requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
 import { decodeBackendTarget, resolveChatTarget } from '@/lib/chat/backend-target';
 
@@ -189,8 +189,12 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
 
   const handleSend = useCallback(
     (text: string, options?: ChatComposerSendOptions) => {
+      // Before the stored profiles load, every custom target looks deleted. The
+      // registry waits for the load and validates the target itself.
       try {
-        resolveChatTarget(model, backends);
+        if (getChatBackendsHasLoaded()) {
+          resolveChatTarget(model, backends);
+        }
       } catch (error) {
         Alert.alert(
           t('modelChat.backends.title'),

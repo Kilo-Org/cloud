@@ -58,6 +58,8 @@ vi.mock('@/lib/chat/sign-out', () => ({
   clearChatsForSignOut: vi.fn(),
   releaseChatsForAccountSwitch: vi.fn(),
 }));
+// Session-scoped cleanup clears backend profiles; the store reaches native crypto.
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: vi.fn() }));
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({ setTrpcUnauthorizedHandler: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({ clearAgentModelPreference: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({

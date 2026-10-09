@@ -70,6 +70,7 @@ const fakeFs = vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   clearClipboardImages: vi.fn(),
+  clearChatBackends: vi.fn(),
   clearFilePartCache: vi.fn(),
   clearMarkdownImageConfirmMemory: vi.fn(),
   clearSessionAutoApprove: vi.fn(),
@@ -121,7 +122,7 @@ vi.mock('@/lib/chat/remote-mcp-store', () => ({
 }));
 // The backend store reaches native crypto and SecureStore. Its own tests cover
 // credential removal across account changes.
-vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: vi.fn() }));
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: mocks.clearChatBackends }));
 vi.mock('@/lib/chat/settings-tools-switch', () => ({
   clearSettingsToolsEnabled: mocks.clearSettingsToolsEnabled,
 }));
@@ -146,6 +147,7 @@ const SESSION_MEMBERS = [
   mocks.clearSessionAutoApprove,
   mocks.forgetRemoteMcp,
   mocks.clearRemoteMcpServers,
+  mocks.clearChatBackends,
   mocks.clearSettingsToolsEnabled,
 ];
 

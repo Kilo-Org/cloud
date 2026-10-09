@@ -11,7 +11,7 @@
  * Protected by internal API secret
  */
 
-import { timingSafeEqual } from '@kilocode/encryption';
+import { authorizeInternalApiRequest } from '@/lib/internal-api-auth';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { updateTriageTicketStatus, getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
@@ -19,7 +19,6 @@ import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-p
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { TriageStatus, TriageClassification, TriageAction } from '@/lib/auto-triage/db/types';
 
 interface StatusUpdatePayload {
@@ -44,10 +43,8 @@ export async function POST(
 ) {
   try {
     // Validate internal API secret
-    const secret = req.headers.get('X-Internal-Secret');
-    if (!INTERNAL_API_SECRET || !secret || !timingSafeEqual(secret, INTERNAL_API_SECRET)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const unauthorized = authorizeInternalApiRequest(req);
+    if (unauthorized) return unauthorized;
 
     const { ticketId } = await params;
     const payload: StatusUpdatePayload = await req.json();

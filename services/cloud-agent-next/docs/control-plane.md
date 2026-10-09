@@ -304,8 +304,10 @@ The wrapper heartbeat (every 5 s) carries `active`. Each Kilo process owns a nat
 session supervisor that observes every session before Cloud route filtering, including
 unrouted sessions, subagents and autonomous continuations. Its running or stopping
 executions keep compute active independently of accepted Cloud messages and UI selection.
-Preparation, pending prompt delivery (bounded to 2 minutes), finalization and recent terminal
-input also contribute. An accepted UI turn alone is not activity.
+Preparation, bounded prompt delivery, finalization and recent terminal input also contribute.
+The 2-minute delivery budget excludes legitimate serialized command/summarization waits
+described below. A follow-up blocked only behind a user-waiting command adds no compute
+activity. An accepted UI turn alone is not activity.
 
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable
@@ -544,11 +546,11 @@ has no key, so it restores and captures nothing: setup output is never published
 - Commands and summarization keep sequential wrapper submission: later messages may wait for the
   current command/summary HTTP response before reaching Kilo. This wait is accepted and is not a
   remediation blocker or a requirement for a Kilo/SDK change. A later message waiting behind a
-  command/summary Kilo has already observed and still supervises does not consume its 2-minute
-  prompt-delivery budget; that budget stays current while the wait holds, so it does not expire the
-  instant the response clears. The native no-progress clock pauses during user waits, and the
-  120-minute wall-clock cap still bounds the wait. A command that is not currently observed, or a
-  plain prompt, still expires as a stuck intake.
+  dispatched command/summary Kilo has already observed and still supervises does not consume its
+  2-minute prompt-delivery budget; that budget stays current while the wait holds, so it does not
+  expire the instant the response clears. The native 20-minute no-progress bound applies while
+  executing; its clock pauses during user waits, and the 120-minute wall-clock cap still bounds
+  the wait. A command that is not currently observed, or a plain prompt, still expires as a stuck intake.
   Ordinary prompts still reach Kilo during model execution through `prompt_async`. Kilo owns its
   native queue and execution; the wrapper must not add a shadow native queue or concurrent HTTP to
   bypass command ordering.

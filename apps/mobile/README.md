@@ -64,6 +64,16 @@ Apple's Foundation Models system model for inference only; the SDK still owns
 the conversation. Building the module requires Xcode with the iOS 26.4 SDK or
 newer. The minimum iOS version does not change.
 
+On Android devices whose AICore system app supports Gemini Nano, the picker
+offers **Gemini Nano (on device)**. The `kilo-android-model` local module uses
+the ML Kit GenAI Prompt API (`genai-prompt` 1.0.0-beta2, the newest release the
+app's Kotlin 2.1 compiler can read). The library declares minSdk 26; the module
+overrides that in its manifest and returns `unsupported_os` below API 26, so the
+app's minSdk does not change.
+
+- When the system reports the model as downloadable, **Manage backends** shows **Download on-device model**. Only that button starts the system download; the row shows progress and failures, then checks the status again.
+- Gemini Nano runs only while Kilo is in the foreground. Leaving the app stops the reply with fixed copy; **Retry** works after returning.
+
 - **Manage backends** shows its status and why it is unavailable: Apple Intelligence off, device not eligible, model not ready, or iOS older than 26.
 - On-device models are text-only. They never receive tool definitions.
 - An unavailable or busy model fails the send with fixed copy. It never falls back to Kilo or another backend.

@@ -1,11 +1,12 @@
 import { i18n } from '@/i18n';
 
-export type LocalModelProblem = 'unavailable' | 'busy' | 'failed';
+export type LocalModelProblem = 'unavailable' | 'busy' | 'failed' | 'background';
 
 const LOCAL_ERROR_KEYS = {
   unavailable: 'modelChat.localModels.unavailable',
   busy: 'modelChat.localModels.busy',
   failed: 'modelChat.localModels.failed',
+  background: 'modelChat.localModels.background',
 } as const satisfies Record<LocalModelProblem, string>;
 
 /** An on-device model refused or failed a request. It is never a reason to route elsewhere. */

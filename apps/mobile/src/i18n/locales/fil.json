@@ -3363,11 +3363,22 @@
         "deviceNotEligible": "Hindi sinusuportahan ng device na ito ang Apple Intelligence.",
         "modelNotReady": "Nagda-download o inihahanda pa ang modelo. Subukang muli mamaya.",
         "unsupportedOs": "Kailangan ng modelong ito ang iOS 26 o mas bago.",
-        "unknown": "Hindi sinabi ng system kung bakit hindi available ang modelong ito."
+        "unknown": "Hindi sinabi ng system kung bakit hindi available ang modelong ito.",
+        "androidUnsupportedOs": "Hindi suportado ang Gemini Nano sa bersyong ito ng Android.",
+        "androidModelUnavailable": "Hindi suportado ng device na ito ang Gemini Nano, o inihahanda pa ang system app na AICore. Subukang muli mamaya.",
+        "aicoreUpdateRequired": "I-update ang AICore app at ang system software mo para magamit ang modelong ito.",
+        "downloadable": "Kailangang i-download nang isang beses ang modelong ito bago mo ito magamit.",
+        "downloading": "Nagda-download ang modelo. Magiging handa ito kapag natapos ang pag-download."
       },
       "unavailable": "Hindi available ngayon ang modelong nasa device. Tingnan ang status nito sa $t(modelChat.backends.title).",
       "busy": "Abala pa ang modelong nasa device sa ibang sagot. Subukang muli kapag tapos na ito.",
-      "failed": "Hindi nasagot ng modelong nasa device ang mensaheng ito. Subukang muli o baguhin ang pagkakasabi."
+      "failed": "Hindi nasagot ng modelong nasa device ang mensaheng ito. Subukang muli o baguhin ang pagkakasabi.",
+      "android": "Gemini Nano (sa device)",
+      "background": "Huminto ang modelong nasa device dahil umalis ang Kilo sa screen. I-tap ang $t(common.retry) para magtanong ulit.",
+      "download": "I-download ang modelong nasa device",
+      "downloading": "Nagda-download…",
+      "downloadProgress": "Nagda-download… {{percent}}%",
+      "downloadFailed": "Hindi natapos ang pag-download. Tingnan ang iyong koneksyon at bakanteng storage, pagkatapos ay subukang muli."
     }
   },
   "settingsTools": {

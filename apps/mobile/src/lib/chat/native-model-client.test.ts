@@ -195,6 +195,46 @@ describe('native on-device model client', () => {
     expect(await failureKey(bridge)).toBe('modelChat.localModels.busy');
   });
 
+  // Android rejects or errors with these stable codes; none of them routes elsewhere.
+  it.each([
+    ['model_download_required', 'modelChat.localModels.unavailable'],
+    ['model_downloading', 'modelChat.localModels.unavailable'],
+    ['model_unavailable', 'modelChat.localModels.unavailable'],
+    ['unsupported_os', 'modelChat.localModels.unavailable'],
+    ['aicore_incompatible', 'modelChat.localModels.unavailable'],
+    ['system_update_required', 'modelChat.localModels.unavailable'],
+    ['battery_quota_exceeded', 'modelChat.localModels.unavailable'],
+    ['background_use_blocked', 'modelChat.localModels.background'],
+    ['busy', 'modelChat.localModels.busy'],
+    ['context_exceeded', 'modelChat.localModels.failed'],
+    ['generation_failed', 'modelChat.localModels.failed'],
+    ['released', 'modelChat.localModels.failed'],
+  ])('maps the Android rejection %s to %s', async (code, key) => {
+    const { bridge } = fakeBridge(() => {
+      throw Object.assign(new Error(code), { code });
+    });
+    expect(await failureKey(bridge)).toBe(key);
+    expect(bridge.generate).toHaveBeenCalledOnce();
+  });
+
+  it('shows the background copy when Android stops an answer, and Retry answers after returning', async () => {
+    let inFront = false;
+    const { bridge } = fakeBridge((native, emit) => {
+      emit({ id: native.id, kind: 'delta', text: 'Partial' });
+      emit(
+        inFront
+          ? { id: native.id, kind: 'done', stop: 'end', usageSource: 'counted', inputTokens: 9 }
+          : { id: native.id, kind: 'error', reason: 'background_use_blocked' }
+      );
+    });
+    expect(await failureKey(bridge)).toBe('modelChat.localModels.background');
+
+    inFront = true;
+    const retried = await events(bridge);
+    expect(retried.at(-1)).toMatchObject({ kind: 'done', stop: 'end' });
+    expect(bridge.generate).toHaveBeenCalledTimes(2);
+  });
+
   it('turns a failure after streaming began into a stream error with fixed copy', async () => {
     const { bridge } = fakeBridge((native, emit) => {
       emit({ id: native.id, kind: 'delta', text: 'Partial' });

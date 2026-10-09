@@ -3363,11 +3363,22 @@
         "deviceNotEligible": "Ngwaọrụ a anaghị akwado Apple Intelligence.",
         "modelNotReady": "Ụdị nlereanya ahụ ka na-ebudata ma ọ bụ na-akwado onwe ya. Nwaa ọzọ ma emechaa.",
         "unsupportedOs": "Ụdị nlereanya a chọrọ iOS 26 ma ọ bụ nke ọhụrụ karịa.",
-        "unknown": "Sistemụ ekwughị ihe kpatara na ụdị nlereanya a adịghị."
+        "unknown": "Sistemụ ekwughị ihe kpatara na ụdị nlereanya a adịghị.",
+        "androidUnsupportedOs": "Ụdị Android a anaghị akwado Gemini Nano.",
+        "androidModelUnavailable": "Ngwaọrụ a anaghị akwado Gemini Nano, ma ọ bụ ngwa sistemụ AICore ka na-akwado onwe ya. Nwaa ọzọ ma emechaa.",
+        "aicoreUpdateRequired": "Melite ngwa AICore na sọftụwia sistemụ gị iji jiri ụdị nlereanya a.",
+        "downloadable": "Ụdị nlereanya a chọrọ nbudata otu ugboro tupu i nwee ike iji ya.",
+        "downloading": "Ụdị nlereanya ahụ na-ebudata. Ọ ga-adị njikere mgbe nbudata ahụ gwụchara."
       },
       "unavailable": "Ụdị nlereanya na ngwaọrụ adịghị ugbu a. Lelee ọnọdụ ya na $t(modelChat.backends.title).",
       "busy": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na nzaghachi ọzọ. Nwaa ọzọ mgbe ọ gwụchara.",
-      "failed": "Ụdị nlereanya na ngwaọrụ enweghị ike ịza ozi a. Nwaa ọzọ ma ọ bụ dee ya n'ụzọ ọzọ."
+      "failed": "Ụdị nlereanya na ngwaọrụ enweghị ike ịza ozi a. Nwaa ọzọ ma ọ bụ dee ya n'ụzọ ọzọ.",
+      "android": "Gemini Nano (na ngwaọrụ)",
+      "background": "Ụdị nlereanya na ngwaọrụ kwụsịrị n'ihi na Kilo hapụrụ ihuenyo ahụ. Pịa $t(common.retry) ka ị jụọ ọzọ.",
+      "download": "Budata ụdị nlereanya na ngwaọrụ",
+      "downloading": "Na-ebudata…",
+      "downloadProgress": "Na-ebudata… {{percent}}%",
+      "downloadFailed": "Nbudata ahụ emezughị. Lelee njikọ gị na ebe nchekwa tọgbọrọ chakoo, wee nwaa ọzọ."
     }
   },
   "settingsTools": {

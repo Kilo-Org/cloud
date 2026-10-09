@@ -3320,11 +3320,22 @@
         "deviceNotEligible": "This device doesn't support Apple Intelligence.",
         "modelNotReady": "The model is still downloading or getting ready. Try again later.",
         "unsupportedOs": "This model requires iOS 26 or later.",
-        "unknown": "The system didn't say why this model is unavailable."
+        "unknown": "The system didn't say why this model is unavailable.",
+        "androidUnsupportedOs": "Gemini Nano isn't supported on this Android version.",
+        "androidModelUnavailable": "This device doesn't support Gemini Nano, or the AICore system app is still setting up. Try again later.",
+        "aicoreUpdateRequired": "Update the AICore app and your system software to use this model.",
+        "downloadable": "This model needs a one-time download before you can use it.",
+        "downloading": "The model is downloading. It'll be ready when the download finishes."
       },
       "unavailable": "The on-device model isn't available right now. Check its status in $t(modelChat.backends.title).",
       "busy": "The on-device model is busy with another reply. Try again when it finishes.",
-      "failed": "The on-device model couldn't answer this message. Try again or rephrase it."
+      "failed": "The on-device model couldn't answer this message. Try again or rephrase it.",
+      "android": "Gemini Nano (on device)",
+      "background": "The on-device model stopped because Kilo left the screen. Tap $t(common.retry) to ask again.",
+      "download": "Download on-device model",
+      "downloading": "Downloading…",
+      "downloadProgress": "Downloading… {{percent}}%",
+      "downloadFailed": "The download didn't finish. Check your connection and free storage, then try again."
     },
     "mcp": {
       "title": "Kilo tools",

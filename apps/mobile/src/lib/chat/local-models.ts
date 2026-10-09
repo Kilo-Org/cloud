@@ -112,20 +112,36 @@ function systemModelProvider(
 const apple =
   Platform.OS === 'ios' ? requireOptionalNativeModule<SystemModelModule>('KiloAppleModel') : null;
 
+// Android-only module. Devices without AICore or Gemini Nano report it unavailable.
+const android =
+  Platform.OS === 'android'
+    ? requireOptionalNativeModule<SystemModelModule>('KiloAndroidModel')
+    : null;
+
 const system: readonly {
   readonly provider: SystemProvider;
   readonly nameKey: string;
   readonly model: LocalModelProvider;
-}[] =
-  apple === null
+}[] = [
+  ...(apple === null
     ? []
     : [
         {
-          provider: 'apple',
+          provider: 'apple' as const,
           nameKey: 'modelChat.localModels.apple',
           model: systemModelProvider('apple', apple),
         },
-      ];
+      ]),
+  ...(android === null
+    ? []
+    : [
+        {
+          provider: 'android' as const,
+          nameKey: 'modelChat.localModels.android',
+          model: systemModelProvider('android', android),
+        },
+      ]),
+];
 
 function statusesOf(): readonly LocalModelStatus[] {
   return system.map(({ provider, nameKey }) => ({

@@ -3363,11 +3363,22 @@
         "deviceNotEligible": "此设备不支持 Apple 智能。",
         "modelNotReady": "模型仍在下载或准备中，请稍后再试。",
         "unsupportedOs": "此模型需要 iOS 26 或更高版本。",
-        "unknown": "系统未说明此模型不可用的原因。"
+        "unknown": "系统未说明此模型不可用的原因。",
+        "androidUnsupportedOs": "此 Android 版本不支持 Gemini Nano。",
+        "androidModelUnavailable": "此设备不支持 Gemini Nano，或 AICore 系统应用仍在设置中。请稍后再试。",
+        "aicoreUpdateRequired": "请更新 AICore 应用和系统软件后再使用此模型。",
+        "downloadable": "此模型需要先下载一次才能使用。",
+        "downloading": "模型正在下载，下载完成后即可使用。"
       },
       "unavailable": "本机模型目前不可用。请在“$t(modelChat.backends.title)”中查看其状态。",
       "busy": "本机模型正忙于生成另一条回复，请在其完成后再试。",
-      "failed": "本机模型无法回答此消息。请重试或换种说法。"
+      "failed": "本机模型无法回答此消息。请重试或换种说法。",
+      "android": "Gemini Nano（本机）",
+      "background": "Kilo 已离开屏幕，本机模型已停止。请点按“$t(common.retry)”重新提问。",
+      "download": "下载本机模型",
+      "downloading": "正在下载…",
+      "downloadProgress": "正在下载… {{percent}}%",
+      "downloadFailed": "下载未完成。请检查网络连接和可用存储空间，然后重试。"
     }
   },
   "settingsTools": {

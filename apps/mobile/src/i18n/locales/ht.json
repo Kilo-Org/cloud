@@ -3363,11 +3363,22 @@
         "deviceNotEligible": "Aparèy sa a pa sipòte Apple Intelligence.",
         "modelNotReady": "Modèl la toujou ap telechaje oswa l ap prepare. Eseye ankò pita.",
         "unsupportedOs": "Modèl sa a bezwen iOS 26 oswa yon vèsyon ki pi resan.",
-        "unknown": "Sistèm nan pa di poukisa modèl sa a pa disponib."
+        "unknown": "Sistèm nan pa di poukisa modèl sa a pa disponib.",
+        "androidUnsupportedOs": "Gemini Nano pa mache sou vèsyon Android sa a.",
+        "androidModelUnavailable": "Aparèy sa a pa sipòte Gemini Nano, oswa aplikasyon sistèm AICore a toujou ap prepare. Eseye ankò pita.",
+        "aicoreUpdateRequired": "Mete aplikasyon AICore a ak lojisyèl sistèm ou a ajou pou w ka sèvi ak modèl sa a.",
+        "downloadable": "Fòk ou telechaje modèl sa a yon sèl fwa anvan ou ka sèvi avè l.",
+        "downloading": "Modèl la ap telechaje. L ap pare lè telechajman an fini."
       },
       "unavailable": "Modèl sou aparèy la pa disponib kounye a. Verifye estati li nan $t(modelChat.backends.title).",
       "busy": "Modèl sou aparèy la okipe ak yon lòt repons. Eseye ankò lè li fini.",
-      "failed": "Modèl sou aparèy la pa t ka reponn mesaj sa a. Eseye ankò oswa ekri l yon lòt jan."
+      "failed": "Modèl sou aparèy la pa t ka reponn mesaj sa a. Eseye ankò oswa ekri l yon lòt jan.",
+      "android": "Gemini Nano (sou aparèy la)",
+      "background": "Modèl sou aparèy la sispann paske Kilo kite ekran an. Peze $t(common.retry) pou mande ankò.",
+      "download": "Telechaje modèl sou aparèy la",
+      "downloading": "Ap telechaje…",
+      "downloadProgress": "Ap telechaje… {{percent}}%",
+      "downloadFailed": "Telechajman an pa t fini. Verifye koneksyon w ak espas ki lib sou aparèy la, epi eseye ankò."
     }
   },
   "settingsTools": {

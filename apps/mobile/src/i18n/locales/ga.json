@@ -3492,11 +3492,22 @@
         "deviceNotEligible": "Ní thacaíonn an gléas seo le Apple Intelligence.",
         "modelNotReady": "Tá an tsamhail fós á híoslódáil nó á hullmhú. Bain triail eile as ar ball.",
         "unsupportedOs": "Tá iOS 26 nó níos déanaí ag teastáil don tsamhail seo.",
-        "unknown": "Níor thug an córas cúis nach bhfuil an tsamhail seo ar fáil."
+        "unknown": "Níor thug an córas cúis nach bhfuil an tsamhail seo ar fáil.",
+        "androidUnsupportedOs": "Ní thacaítear le Gemini Nano ar an leagan seo de Android.",
+        "androidModelUnavailable": "Ní thacaíonn an gléas seo le Gemini Nano, nó tá aip chórais AICore fós á socrú. Bain triail eile as ar ball.",
+        "aicoreUpdateRequired": "Nuashonraigh an aip AICore agus bogearraí do chórais chun an tsamhail seo a úsáid.",
+        "downloadable": "Ní mór an tsamhail seo a íoslódáil uair amháin sula féidir leat í a úsáid.",
+        "downloading": "Tá an tsamhail á híoslódáil. Beidh sí réidh nuair a bheidh an íoslódáil críochnaithe."
       },
       "unavailable": "Níl an tsamhail ar an ngléas ar fáil faoi láthair. Seiceáil a stádas in $t(modelChat.backends.title).",
       "busy": "Tá an tsamhail ar an ngléas gnóthach le freagra eile. Bain triail eile as nuair a bheidh sé críochnaithe.",
-      "failed": "Níorbh fhéidir leis an tsamhail ar an ngléas an teachtaireacht seo a fhreagairt. Bain triail eile as nó athfhoclaigh í."
+      "failed": "Níorbh fhéidir leis an tsamhail ar an ngléas an teachtaireacht seo a fhreagairt. Bain triail eile as nó athfhoclaigh í.",
+      "android": "Gemini Nano (ar an ngléas)",
+      "background": "Stop an tsamhail ar an ngléas mar gur fhág Kilo an scáileán. Tapáil \"$t(common.retry)\" chun an cheist a chur arís.",
+      "download": "Íoslódáil an tsamhail ar an ngléas",
+      "downloading": "Á híoslódáil…",
+      "downloadProgress": "Á híoslódáil… {{percent}}%",
+      "downloadFailed": "Níor críochnaíodh an íoslódáil. Seiceáil do nasc agus an spás stórála atá saor, agus bain triail eile as."
     }
   },
   "settingsTools": {

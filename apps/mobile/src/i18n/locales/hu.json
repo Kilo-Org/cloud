@@ -3363,11 +3363,22 @@
         "deviceNotEligible": "Ez az eszköz nem támogatja az Apple Intelligence funkciót.",
         "modelNotReady": "A modell letöltése vagy előkészítése még folyamatban van. Próbálja újra később.",
         "unsupportedOs": "Ehhez a modellhez iOS 26 vagy újabb szükséges.",
-        "unknown": "A rendszer nem adta meg, miért nem érhető el ez a modell."
+        "unknown": "A rendszer nem adta meg, miért nem érhető el ez a modell.",
+        "androidUnsupportedOs": "Ez az Android-verzió nem támogatja a Gemini Nano modellt.",
+        "androidModelUnavailable": "Ez az eszköz nem támogatja a Gemini Nano modellt, vagy az AICore rendszeralkalmazás beállítása még folyamatban van. Próbálja újra később.",
+        "aicoreUpdateRequired": "A modell használatához frissítse az AICore alkalmazást és a rendszerszoftvert.",
+        "downloadable": "A modell használata előtt egyszeri letöltés szükséges.",
+        "downloading": "A modell letöltése folyamatban van. A letöltés befejeztével használatra kész lesz."
       },
       "unavailable": "Az eszközön futó modell jelenleg nem érhető el. Ellenőrizze az állapotát itt: $t(modelChat.backends.title).",
       "busy": "Az eszközön futó modell épp egy másik válaszon dolgozik. Próbálja újra, ha végzett.",
-      "failed": "Az eszközön futó modell nem tudott válaszolni erre az üzenetre. Próbálja újra, vagy fogalmazza át."
+      "failed": "Az eszközön futó modell nem tudott válaszolni erre az üzenetre. Próbálja újra, vagy fogalmazza át.",
+      "android": "Gemini Nano (az eszközön)",
+      "background": "Az eszközön futó modell leállt, mert a Kilo elhagyta a képernyőt. Koppintson az $t(common.retry) gombra az újbóli kérdezéshez.",
+      "download": "Eszközön futó modell letöltése",
+      "downloading": "Letöltés…",
+      "downloadProgress": "Letöltés… {{percent}}%",
+      "downloadFailed": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot és a szabad tárhelyet, majd próbálja újra."
     }
   },
   "settingsTools": {

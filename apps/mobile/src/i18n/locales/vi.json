@@ -3363,11 +3363,22 @@
         "deviceNotEligible": "Thiết bị này không hỗ trợ Apple Intelligence.",
         "modelNotReady": "Mô hình vẫn đang tải xuống hoặc đang chuẩn bị. Hãy thử lại sau.",
         "unsupportedOs": "Mô hình này yêu cầu iOS 26 trở lên.",
-        "unknown": "Hệ thống không cho biết lý do mô hình này không khả dụng."
+        "unknown": "Hệ thống không cho biết lý do mô hình này không khả dụng.",
+        "androidUnsupportedOs": "Phiên bản Android này không hỗ trợ Gemini Nano.",
+        "androidModelUnavailable": "Thiết bị này không hỗ trợ Gemini Nano hoặc ứng dụng hệ thống AICore vẫn đang thiết lập. Hãy thử lại sau.",
+        "aicoreUpdateRequired": "Hãy cập nhật ứng dụng AICore và phần mềm hệ thống để sử dụng mô hình này.",
+        "downloadable": "Mô hình này cần được tải xuống một lần trước khi sử dụng.",
+        "downloading": "Mô hình đang tải xuống và sẽ sẵn sàng khi tải xong."
       },
       "unavailable": "Mô hình trên thiết bị hiện không khả dụng. Hãy kiểm tra trạng thái trong $t(modelChat.backends.title).",
       "busy": "Mô hình trên thiết bị đang bận trả lời tin nhắn khác. Hãy thử lại khi hoàn tất.",
-      "failed": "Mô hình trên thiết bị không thể trả lời tin nhắn này. Hãy thử lại hoặc diễn đạt theo cách khác."
+      "failed": "Mô hình trên thiết bị không thể trả lời tin nhắn này. Hãy thử lại hoặc diễn đạt theo cách khác.",
+      "android": "Gemini Nano (trên thiết bị)",
+      "background": "Mô hình trên thiết bị đã dừng vì Kilo rời khỏi màn hình. Nhấn $t(common.retry) để hỏi lại.",
+      "download": "Tải xuống mô hình trên thiết bị",
+      "downloading": "Đang tải xuống…",
+      "downloadProgress": "Đang tải xuống… {{percent}}%",
+      "downloadFailed": "Quá trình tải xuống chưa hoàn tất. Hãy kiểm tra kết nối và dung lượng trống, sau đó thử lại."
     }
   },
   "settingsTools": {

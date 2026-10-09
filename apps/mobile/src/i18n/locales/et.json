@@ -3363,11 +3363,22 @@
         "deviceNotEligible": "See seade ei toeta Apple Intelligence'it.",
         "modelNotReady": "Mudelit alles laaditakse alla või valmistatakse ette. Proovi hiljem uuesti.",
         "unsupportedOs": "See mudel nõuab iOS 26 või uuemat versiooni.",
-        "unknown": "Süsteem ei teatanud, miks see mudel pole saadaval."
+        "unknown": "Süsteem ei teatanud, miks see mudel pole saadaval.",
+        "androidUnsupportedOs": "Gemini Nano ei toeta seda Androidi versiooni.",
+        "androidModelUnavailable": "See seade ei toeta Gemini Nanot või AICore'i süsteemirakendust alles seadistatakse. Proovi hiljem uuesti.",
+        "aicoreUpdateRequired": "Selle mudeli kasutamiseks värskenda AICore'i rakendust ja süsteemitarkvara.",
+        "downloadable": "Enne kasutamist tuleb see mudel ühekordselt alla laadida.",
+        "downloading": "Mudelit laaditakse alla. See on kasutusvalmis, kui allalaadimine lõpeb."
       },
       "unavailable": "Seadmesisene mudel pole praegu saadaval. Kontrolli selle olekut jaotises $t(modelChat.backends.title).",
       "busy": "Seadmesisene mudel koostab praegu teist vastust. Proovi uuesti, kui see on lõpetanud.",
-      "failed": "Seadmesisene mudel ei suutnud sellele sõnumile vastata. Proovi uuesti või sõnasta see ümber."
+      "failed": "Seadmesisene mudel ei suutnud sellele sõnumile vastata. Proovi uuesti või sõnasta see ümber.",
+      "android": "Gemini Nano (seadmes)",
+      "background": "Seadmesisene mudel peatus, sest Kilo lahkus ekraanilt. Uuesti küsimiseks puuduta nuppu „$t(common.retry)“.",
+      "download": "Laadi seadmesisene mudel alla",
+      "downloading": "Allalaadimine…",
+      "downloadProgress": "Allalaadimine… {{percent}}%",
+      "downloadFailed": "Allalaadimine ei lõppenud. Kontrolli ühendust ja vaba salvestusruumi ning proovi uuesti."
     }
   },
   "settingsTools": {

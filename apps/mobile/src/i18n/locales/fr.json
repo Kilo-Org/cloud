@@ -3406,11 +3406,22 @@
         "deviceNotEligible": "Cet appareil n'est pas compatible avec Apple Intelligence.",
         "modelNotReady": "Le modèle est encore en cours de téléchargement ou de préparation. Réessayez plus tard.",
         "unsupportedOs": "Ce modèle nécessite iOS 26 ou une version ultérieure.",
-        "unknown": "Le système n'a pas indiqué pourquoi ce modèle est indisponible."
+        "unknown": "Le système n'a pas indiqué pourquoi ce modèle est indisponible.",
+        "androidUnsupportedOs": "Gemini Nano n'est pas pris en charge sur cette version d'Android.",
+        "androidModelUnavailable": "Cet appareil ne prend pas en charge Gemini Nano, ou l'application système AICore est encore en cours de configuration. Réessayez plus tard.",
+        "aicoreUpdateRequired": "Mettez à jour l'application AICore et le logiciel système pour utiliser ce modèle.",
+        "downloadable": "Ce modèle doit être téléchargé une seule fois avant de pouvoir être utilisé.",
+        "downloading": "Le modèle est en cours de téléchargement. Il sera prêt une fois le téléchargement terminé."
       },
       "unavailable": "Le modèle sur l'appareil n'est pas disponible pour le moment. Vérifiez son état dans $t(modelChat.backends.title).",
       "busy": "Le modèle sur l'appareil est occupé à générer une autre réponse. Réessayez une fois qu'il aura terminé.",
-      "failed": "Le modèle sur l'appareil n'a pas pu répondre à ce message. Réessayez ou reformulez-le."
+      "failed": "Le modèle sur l'appareil n'a pas pu répondre à ce message. Réessayez ou reformulez-le.",
+      "android": "Gemini Nano (sur l'appareil)",
+      "background": "Le modèle sur l'appareil s'est arrêté, car Kilo a quitté l'écran. Touchez $t(common.retry) pour reposer la question.",
+      "download": "Télécharger le modèle sur l'appareil",
+      "downloading": "Téléchargement…",
+      "downloadProgress": "Téléchargement… {{percent}} %",
+      "downloadFailed": "Le téléchargement n'a pas abouti. Vérifiez votre connexion et l'espace de stockage disponible, puis réessayez."
     }
   },
   "settingsTools": {

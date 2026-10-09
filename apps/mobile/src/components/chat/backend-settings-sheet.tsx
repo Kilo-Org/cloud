@@ -25,16 +25,44 @@ import { type LocalModelStatus, useLocalModels } from '@/lib/chat/local-models';
 
 import { BackendForm } from './backend-form';
 import { GgufModelSection } from './gguf-model-section';
+import { ModelDownloadControl } from './model-download-control';
 
 type FormTarget = { kind: 'add' } | { kind: 'edit'; backend: StoredChatBackend };
 
-/** Fixed copy for the stable reason codes the native providers report. */
-const UNAVAILABLE_REASON_KEYS = new Map([
-  ['apple_intelligence_disabled', 'modelChat.localModels.reasons.appleIntelligenceDisabled'],
-  ['device_not_eligible', 'modelChat.localModels.reasons.deviceNotEligible'],
-  ['model_not_ready', 'modelChat.localModels.reasons.modelNotReady'],
-  ['unsupported_os', 'modelChat.localModels.reasons.unsupportedOs'],
-]);
+/** Fixed copy for the stable reason codes each native provider reports. */
+const UNAVAILABLE_REASON_KEYS = {
+  apple: new Map([
+    ['apple_intelligence_disabled', 'modelChat.localModels.reasons.appleIntelligenceDisabled'],
+    ['device_not_eligible', 'modelChat.localModels.reasons.deviceNotEligible'],
+    ['model_not_ready', 'modelChat.localModels.reasons.modelNotReady'],
+    ['unsupported_os', 'modelChat.localModels.reasons.unsupportedOs'],
+  ]),
+  android: new Map([
+    ['unsupported_os', 'modelChat.localModels.reasons.androidUnsupportedOs'],
+    ['model_unavailable', 'modelChat.localModels.reasons.androidModelUnavailable'],
+    ['aicore_incompatible', 'modelChat.localModels.reasons.aicoreUpdateRequired'],
+    ['system_update_required', 'modelChat.localModels.reasons.aicoreUpdateRequired'],
+  ]),
+} satisfies Record<LocalModelStatus['provider'], ReadonlyMap<string, string>>;
+
+/** A model the system can still fetch is explained by its status, whatever reason rides along. */
+const PENDING_STATUS_KEYS = {
+  downloadable: 'modelChat.localModels.reasons.downloadable',
+  downloading: 'modelChat.localModels.reasons.downloading',
+} as const;
+
+function reasonKeyOf({ provider, availability }: LocalModelStatus): string | undefined {
+  if (availability === undefined || availability.status === 'available') {
+    return undefined;
+  }
+  if (availability.status !== 'unavailable') {
+    return PENDING_STATUS_KEYS[availability.status];
+  }
+  return (
+    UNAVAILABLE_REASON_KEYS[provider].get(availability.reason ?? '') ??
+    'modelChat.localModels.reasons.unknown'
+  );
+}
 
 function LocalModelRow({ status }: Readonly<{ status: LocalModelStatus }>) {
   const { t } = useTranslation();
@@ -45,11 +73,7 @@ function LocalModelRow({ status }: Readonly<{ status: LocalModelStatus }>) {
   } else if (availability.status === 'available') {
     statusKey = 'modelChat.localModels.ready';
   }
-  const reasonKey =
-    availability === undefined || availability.status === 'available'
-      ? undefined
-      : (UNAVAILABLE_REASON_KEYS.get(availability.reason ?? '') ??
-        'modelChat.localModels.reasons.unknown');
+  const reasonKey = reasonKeyOf(status);
   return (
     <View className="gap-1 rounded-xl border border-border p-4">
       <Text className="font-semibold">{t(status.nameKey)}</Text>
@@ -57,6 +81,7 @@ function LocalModelRow({ status }: Readonly<{ status: LocalModelStatus }>) {
       {reasonKey !== undefined && (
         <Text className="text-sm text-muted-foreground">{t(reasonKey)}</Text>
       )}
+      <ModelDownloadControl status={status} />
     </View>
   );
 }

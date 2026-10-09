@@ -24,6 +24,7 @@ import {
 import { type LocalModelStatus, useLocalModels } from '@/lib/chat/local-models';
 
 import { BackendForm } from './backend-form';
+import { GgufModelSection } from './gguf-model-section';
 import { ModelDownloadControl } from './model-download-control';
 
 type FormTarget = { kind: 'add' } | { kind: 'edit'; backend: StoredChatBackend };
@@ -211,6 +212,7 @@ function BackendSettingsContent({ onClose }: Readonly<{ onClose: () => void }>) 
         <Text>{t('modelChat.backends.defaultKilo')}</Text>
         <Text className="text-sm text-muted-foreground">{t('modelChat.backends.kiloHelp')}</Text>
         <LocalModelSection />
+        <GgufModelSection />
         {!loaded ? (
           <Text>{t('common.loading')}</Text>
         ) : (

@@ -22,8 +22,8 @@ import { rememberModelFacts } from '@/lib/chat/layers';
 import { type ChatSummary } from '@/lib/chat/store';
 import { chatPlaceOf, newChat, useChatList } from '@/lib/chat/use-chat';
 import { useChatBackends } from '@/lib/chat/backend-store';
-import { backendModelOptions, localModelOptions } from '@/lib/chat/backend-model-options';
 import { useLocalModels } from '@/lib/chat/local-models';
+import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -76,14 +76,11 @@ function ScopedChatListScreen() {
   const backends = useChatBackends();
   const localModels = useLocalModels();
   const [picked, setPicked] = useState<string | null>(null);
-  const options = useMemo(
-    () => [
-      ...models.map(model => ({ ...model, displayId: model.id, showGatewayMetadata: true })),
-      ...backendModelOptions(backends),
-      ...localModelOptions(localModels, t),
-    ],
-    [backends, localModels, models, t]
+  const gatewayOptions = useMemo(
+    () => models.map(model => ({ ...model, displayId: model.id, showGatewayMetadata: true })),
+    [models]
   );
+  const options = useChatModelOptions(gatewayOptions, backends, localModels);
   const selectedModel = picked ?? models.find(one => one.isPreferred)?.id ?? models[0]?.id;
   const selectionValid = options.some(option => option.id === selectedModel);
 

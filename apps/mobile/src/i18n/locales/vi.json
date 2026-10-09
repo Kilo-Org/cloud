@@ -3324,6 +3324,33 @@
       "deleteMessage": "Xóa {{name}} và thông tin xác thực đã lưu của máy chủ này? Các cuộc trò chuyện dùng máy chủ này sẽ cần một máy chủ mới để tiếp tục.",
       "completionTokenFieldHelp": "Trường token đầu ra: dùng max_completion_tokens cho các API hiện đại, hoặc max_tokens nếu điểm cuối của bạn yêu cầu trường cũ."
     },
+    "gguf": {
+      "title": "Mô hình có thể tải xuống",
+      "help": "Tải xuống một mô hình mở và chạy nó ngay trên điện thoại này bằng llama.cpp. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị. Mô hình có kích thước lớn, nên hãy dùng Wi-Fi.",
+      "details": "{{size}} · Giấy phép: {{license}}",
+      "download": "Tải mô hình xuống",
+      "pause": "Tạm dừng tải xuống",
+      "resume": "Tiếp tục tải xuống",
+      "downloading": "Đang tải xuống: {{written}} / {{total}}",
+      "downloadingUnknown": "Đang tải xuống: {{written}}",
+      "paused": "Đã tạm dừng: {{written}} / {{total}}",
+      "verifying": "Đang kiểm tra tệp đã tải xuống…",
+      "downloaded": "Đã tải xuống · {{size}}",
+      "url": "Liên kết tải xuống trực tiếp",
+      "urlHelp": "Dán liên kết HTTPS đến tệp .gguf, chẳng hạn như liên kết resolve của Hugging Face. Chỉ tải mô hình từ những nguồn bạn tin cậy.",
+      "downloadUrl": "Tải xuống từ liên kết",
+      "deleteTitle": "Xóa mô hình này?",
+      "deleteMessage": "Xóa {{name}} khỏi thiết bị này? Các cuộc trò chuyện sử dụng mô hình này cần một mô hình khác trước khi có thể tiếp tục.",
+      "errors": {
+        "invalidUrl": "Nhập một liên kết hợp lệ.",
+        "insecureUrl": "Dùng liên kết HTTPS. Không thể tải mô hình xuống qua HTTP.",
+        "credentialsUrl": "Xóa tên người dùng và mật khẩu khỏi liên kết.",
+        "notGguf": "Liên kết phải trỏ đến tệp .gguf.",
+        "space": "Không đủ dung lượng trống cho mô hình này. Hãy giải phóng dung lượng và thử lại.",
+        "network": "Tải xuống chưa hoàn tất. Kiểm tra kết nối của bạn và thử lại.",
+        "invalidFile": "Tệp đã tải xuống không phải là mô hình mà ứng dụng này có thể chạy, nên tệp đã bị xóa."
+      }
+    },
     "localModels": {
       "title": "Mô hình trên thiết bị",
       "help": "Mô hình trên thiết bị chạy ngay trên điện thoại này. Lời nhắc và câu trả lời của bạn được giữ trên thiết bị, và các mô hình này không thể dùng công cụ.",

@@ -3496,6 +3496,33 @@
       "deleteMessage": "Dileu {{name}} a'i fanylion adnabod sydd wedi'u storio? Bydd angen ôl-ben newydd ar sgyrsiau sy'n defnyddio'r ôl-ben hwn cyn y gallant barhau.",
       "completionTokenFieldHelp": "Maes tocynnau cwblhau: defnyddiwch max_completion_tokens ar gyfer rhyngwynebau API modern, neu max_tokens os yw eich pwynt terfyn yn gofyn am y maes etifeddol."
     },
+    "gguf": {
+      "title": "Modelau y gellir eu lawrlwytho",
+      "help": "Lawrlwythwch fodel agored a'i redeg ar y ffôn hwn gyda llama.cpp. Mae eich anogwyr a'ch atebion yn aros ar y ddyfais. Mae modelau'n fawr, felly defnyddiwch Wi-Fi.",
+      "details": "{{size}} · Trwydded: {{license}}",
+      "download": "Lawrlwytho model",
+      "pause": "Seibio'r lawrlwythiad",
+      "resume": "Ailddechrau'r lawrlwythiad",
+      "downloading": "Yn lawrlwytho: {{written}} o {{total}}",
+      "downloadingUnknown": "Yn lawrlwytho: {{written}}",
+      "paused": "Wedi'i seibio: {{written}} o {{total}}",
+      "verifying": "Wrthi'n gwirio'r ffeil a lawrlwythwyd…",
+      "downloaded": "Wedi'i lawrlwytho · {{size}}",
+      "url": "Dolen lawrlwytho uniongyrchol",
+      "urlHelp": "Gludwch ddolen HTTPS i ffeil .gguf, fel dolen resolve Hugging Face. Dim ond o ffynonellau rydych yn ymddiried ynddynt y dylech lawrlwytho modelau.",
+      "downloadUrl": "Lawrlwytho o ddolen",
+      "deleteTitle": "Dileu'r model hwn?",
+      "deleteMessage": "Dileu {{name}} o'r ddyfais hon? Mae sgyrsiau sy'n ei ddefnyddio angen model arall cyn y gallant barhau.",
+      "errors": {
+        "invalidUrl": "Rhowch ddolen ddilys.",
+        "insecureUrl": "Defnyddiwch ddolen HTTPS. Ni ellir lawrlwytho modelau dros HTTP.",
+        "credentialsUrl": "Tynnwch yr enw defnyddiwr a'r cyfrinair o'r ddolen.",
+        "notGguf": "Rhaid i'r ddolen bwyntio at ffeil .gguf.",
+        "space": "Nid oes digon o storfa rydd ar gyfer y model hwn. Rhyddhewch le a rhowch gynnig arall arni.",
+        "network": "Ni orffennodd y lawrlwythiad. Gwiriwch eich cysylltiad a rhowch gynnig arall arni.",
+        "invalidFile": "Nid yw'r ffeil a lawrlwythwyd yn fodel y gall yr ap hwn ei redeg, felly cafodd ei dileu."
+      }
+    },
     "localModels": {
       "title": "Modelau ar y ddyfais",
       "help": "Mae modelau ar y ddyfais yn rhedeg ar y ffôn hwn. Mae eich anogwyr a'r atebion yn aros ar y ddyfais, ac ni all y modelau hyn ddefnyddio offer.",

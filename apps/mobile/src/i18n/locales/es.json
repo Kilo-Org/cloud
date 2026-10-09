@@ -3367,6 +3367,33 @@
       "deleteMessage": "¿Eliminar {{name}} y sus credenciales almacenadas? Los chats que usen este servicio necesitarán otro servicio para poder continuar.",
       "completionTokenFieldHelp": "Campo de tokens de salida: usa max_completion_tokens para las API modernas, o max_tokens si tu punto de conexión requiere el campo heredado."
     },
+    "gguf": {
+      "title": "Modelos descargables",
+      "help": "Descarga un modelo abierto y ejecútalo en este teléfono con llama.cpp. Tus peticiones y respuestas se quedan en el dispositivo. Los modelos son grandes, así que usa Wi-Fi.",
+      "details": "{{size}} · Licencia: {{license}}",
+      "download": "Descargar modelo",
+      "pause": "Pausar descarga",
+      "resume": "Reanudar descarga",
+      "downloading": "Descargando: {{written}} de {{total}}",
+      "downloadingUnknown": "Descargando: {{written}}",
+      "paused": "En pausa: {{written}} de {{total}}",
+      "verifying": "Comprobando el archivo descargado…",
+      "downloaded": "Descargado · {{size}}",
+      "url": "Enlace de descarga directa",
+      "urlHelp": "Pega un enlace HTTPS a un archivo .gguf, como un enlace resolve de Hugging Face. Descarga modelos solo de fuentes en las que confíes.",
+      "downloadUrl": "Descargar desde enlace",
+      "deleteTitle": "¿Eliminar este modelo?",
+      "deleteMessage": "¿Eliminar {{name}} de este dispositivo? Los chats que lo usan necesitan otro modelo antes de poder continuar.",
+      "errors": {
+        "invalidUrl": "Introduce un enlace válido.",
+        "insecureUrl": "Usa un enlace HTTPS. Los modelos no se pueden descargar por HTTP.",
+        "credentialsUrl": "Elimina el nombre de usuario y la contraseña del enlace.",
+        "notGguf": "El enlace debe apuntar a un archivo .gguf.",
+        "space": "No hay suficiente espacio libre para este modelo. Libera espacio e inténtalo de nuevo.",
+        "network": "La descarga no se completó. Comprueba tu conexión e inténtalo de nuevo.",
+        "invalidFile": "El archivo descargado no es un modelo que esta aplicación pueda ejecutar, así que se eliminó."
+      }
+    },
     "localModels": {
       "title": "Modelos en el dispositivo",
       "help": "Los modelos en el dispositivo se ejecutan en este teléfono. Tus peticiones y respuestas no salen del dispositivo, y estos modelos no pueden usar herramientas.",

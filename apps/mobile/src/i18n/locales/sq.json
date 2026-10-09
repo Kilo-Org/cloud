@@ -3324,6 +3324,33 @@
       "deleteMessage": "Të fshihet {{name}} bashkë me të dhënat e ruajtura të hyrjes? Bisedat që përdorin këtë shërbim mbështetës do të kenë nevojë për një shërbim të ri mbështetës përpara se të mund të vazhdojnë.",
       "completionTokenFieldHelp": "Fusha e tokenëve në dalje: përdorni max_completion_tokens për API-të moderne, ose max_tokens nëse pika juaj fundore kërkon fushën e vjetër."
     },
+    "gguf": {
+      "title": "Modelet e shkarkueshme",
+      "help": "Shkarko një model të hapur dhe ekzekutoje në këtë telefon me llama.cpp. Kërkesat dhe përgjigjet e tua mbeten në pajisje. Modelet janë të mëdha, prandaj përdor Wi-Fi.",
+      "details": "{{size}} · Licenca: {{license}}",
+      "download": "Shkarko modelin",
+      "pause": "Pauzo shkarkimin",
+      "resume": "Rifillo shkarkimin",
+      "downloading": "Duke shkarkuar: {{written}} nga {{total}}",
+      "downloadingUnknown": "Duke shkarkuar: {{written}}",
+      "paused": "Pauzuar: {{written}} nga {{total}}",
+      "verifying": "Duke kontrolluar skedarin e shkarkuar…",
+      "downloaded": "Shkarkuar · {{size}}",
+      "url": "Lidhje e drejtpërdrejtë shkarkimi",
+      "urlHelp": "Ngjit një lidhje HTTPS për një skedar .gguf, si një lidhje resolve nga Hugging Face. Shkarko modele vetëm nga burime që i beson.",
+      "downloadUrl": "Shkarko nga lidhja",
+      "deleteTitle": "Të fshihet ky model?",
+      "deleteMessage": "Të fshihet {{name}} nga kjo pajisje? Bisedat që e përdorin kanë nevojë për një model tjetër përpara se të vazhdojnë.",
+      "errors": {
+        "invalidUrl": "Fut një lidhje të vlefshme.",
+        "insecureUrl": "Përdor një lidhje HTTPS. Modelet nuk mund të shkarkohen përmes HTTP.",
+        "credentialsUrl": "Hiq emrin e përdoruesit dhe fjalëkalimin nga lidhja.",
+        "notGguf": "Lidhja duhet të tregojë një skedar .gguf.",
+        "space": "Nuk ka hapësirë të lirë të mjaftueshme për këtë model. Liro hapësirë dhe provo përsëri.",
+        "network": "Shkarkimi nuk përfundoi. Kontrollo lidhjen e internetit dhe provo përsëri.",
+        "invalidFile": "Skedari i shkarkuar nuk është një model që ky aplikacion mund ta ekzekutojë, prandaj u hoq."
+      }
+    },
     "localModels": {
       "title": "Modelet në pajisje",
       "help": "Modelet në pajisje funksionojnë në këtë telefon. Kërkesat dhe përgjigjet e tua mbeten në pajisje dhe këto modele nuk mund të përdorin mjete.",

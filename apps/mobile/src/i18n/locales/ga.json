@@ -3453,6 +3453,33 @@
       "deleteMessage": "Scrios {{name}} agus na dintiúir atá stóráilte dó? Beidh cúlchóras nua de dhíth ar chomhráití a úsáideann an cúlchóras seo sular féidir leo leanúint ar aghaidh.",
       "completionTokenFieldHelp": "Réimse comharthaí comhlánaithe: úsáid max_completion_tokens le haghaidh APIanna nua-aimseartha, nó max_tokens má éilíonn do chríochphointe an réimse oidhreachta."
     },
+    "gguf": {
+      "title": "Samhlacha is féidir a íoslódáil",
+      "help": "Íoslódáil samhail oscailte agus rith í ar an bhfón seo le llama.cpp. Fanann do leideanna agus na freagraí ar an ngléas. Tá na samhlacha móra, mar sin bain úsáid as Wi-Fi.",
+      "details": "{{size}} · Ceadúnas: {{license}}",
+      "download": "Íoslódáil an tsamhail",
+      "pause": "Cuir an íoslódáil ar sos",
+      "resume": "Atosaigh an íoslódáil",
+      "downloading": "Á íoslódáil: {{written}} as {{total}}",
+      "downloadingUnknown": "Á íoslódáil: {{written}}",
+      "paused": "Ar sos: {{written}} as {{total}}",
+      "verifying": "Ag seiceáil an chomhaid íoslódáilte…",
+      "downloaded": "Íoslódáilte · {{size}}",
+      "url": "Nasc íoslódála díreach",
+      "urlHelp": "Greamaigh nasc HTTPS le comhad .gguf, mar nasc resolve ó Hugging Face. Ná híoslódáil samhlacha ach ó fhoinsí a bhfuil muinín agat astu.",
+      "downloadUrl": "Íoslódáil ón nasc",
+      "deleteTitle": "Scrios an tsamhail seo?",
+      "deleteMessage": "Scrios {{name}} ón ngléas seo? Teastaíonn samhail eile ó na comhráite a úsáideann í sular féidir leo leanúint ar aghaidh.",
+      "errors": {
+        "invalidUrl": "Cuir isteach nasc bailí.",
+        "insecureUrl": "Bain úsáid as nasc HTTPS. Ní féidir samhlacha a íoslódáil thar HTTP.",
+        "credentialsUrl": "Bain an t-ainm úsáideora agus an focal faire den nasc.",
+        "notGguf": "Caithfidh an nasc díriú ar chomhad .gguf.",
+        "space": "Níl go leor stórála saor don tsamhail seo. Saor roinnt spáis agus triail arís.",
+        "network": "Níor críochnaíodh an íoslódáil. Seiceáil do cheangal agus triail arís.",
+        "invalidFile": "Ní samhail é an comhad íoslódáilte ar féidir leis an aip seo a rith, mar sin baineadh é."
+      }
+    },
     "localModels": {
       "title": "Samhlacha ar an ngléas",
       "help": "Ritheann samhlacha ar an ngléas ar an bhfón seo. Fanann do leideanna agus na freagraí ar an ngléas, agus ní féidir leis na samhlacha seo uirlisí a úsáid.",

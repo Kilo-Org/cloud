@@ -12,6 +12,8 @@ import { type NativeAvailability, type NativeModelEvent } from './native-model-c
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('./backend-store', () => ({ listChatBackends: () => [] }));
+// The registry loads the GGUF provider, whose module scope reaches native code.
+vi.mock('./gguf-models', () => ({ ggufModelProvider: undefined }));
 vi.mock('react-native', () => ({ Platform: { OS: 'android' } }));
 
 type DownloadEvent = {

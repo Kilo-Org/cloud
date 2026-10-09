@@ -3324,6 +3324,33 @@
       "deleteMessage": "Poistetaanko {{name}} ja sen tallennetut tunnistetiedot? Tätä taustapalvelua käyttävät keskustelut tarvitsevat uuden taustapalvelun ennen kuin niitä voi jatkaa.",
       "completionTokenFieldHelp": "Vastauksen tokenien kenttä: käytä max_completion_tokens nykyaikaisissa API-rajapinnoissa tai max_tokens, jos päätepisteesi edellyttää vanhaa kenttää."
     },
+    "gguf": {
+      "title": "Ladattavat mallit",
+      "help": "Lataa avoin malli ja aja se tässä puhelimessa llama.cpp:n avulla. Kehotteesi ja vastaukset pysyvät laitteessa. Mallit ovat suuria, joten käytä Wi-Fi-yhteyttä.",
+      "details": "{{size}} · Lisenssi: {{license}}",
+      "download": "Lataa malli",
+      "pause": "Keskeytä lataus",
+      "resume": "Jatka latausta",
+      "downloading": "Ladataan: {{written}} / {{total}}",
+      "downloadingUnknown": "Ladataan: {{written}}",
+      "paused": "Keskeytetty: {{written}} / {{total}}",
+      "verifying": "Tarkistetaan ladattua tiedostoa…",
+      "downloaded": "Ladattu · {{size}}",
+      "url": "Suora latauslinkki",
+      "urlHelp": "Liitä HTTPS-linkki .gguf-tiedostoon, esimerkiksi Hugging Face -resolve-linkki. Lataa malleja vain lähteistä, joihin luotat.",
+      "downloadUrl": "Lataa linkistä",
+      "deleteTitle": "Poistetaanko tämä malli?",
+      "deleteMessage": "Poistetaanko {{name}} tältä laitteelta? Keskustelut, jotka käyttävät sitä, tarvitsevat toisen mallin ennen kuin ne voivat jatkaa.",
+      "errors": {
+        "invalidUrl": "Anna kelvollinen linkki.",
+        "insecureUrl": "Käytä HTTPS-linkkiä. Malleja ei voi ladata HTTP-yhteyden yli.",
+        "credentialsUrl": "Poista käyttäjätunnus ja salasana linkistä.",
+        "notGguf": "Linkin täytyy osoittaa .gguf-tiedostoon.",
+        "space": "Laitteessa ei ole tarpeeksi vapaata tallennustilaa tälle mallille. Vapauta tilaa ja yritä uudelleen.",
+        "network": "Lataus ei valmistunut. Tarkista yhteytesi ja yritä uudelleen.",
+        "invalidFile": "Ladattu tiedosto ei ole malli, jota tämä sovellus voi ajaa, joten se poistettiin."
+      }
+    },
     "localModels": {
       "title": "Laitteessa toimivat mallit",
       "help": "Laitteessa toimivat mallit toimivat tässä puhelimessa. Kehotteesi ja vastaukset pysyvät laitteessa, eivätkä nämä mallit voi käyttää työkaluja.",

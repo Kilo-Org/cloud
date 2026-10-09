@@ -3324,6 +3324,33 @@
       "deleteMessage": "Pa {{name}} àti àwọn ẹ̀rí ìwọlé rẹ̀ tí a fi pamọ́ rẹ́? Àwọn ìjíròrò tí ń lo ètò ẹ̀yìn yìí yóò nílò ètò ẹ̀yìn tuntun kí wọ́n tó lè tẹ̀síwájú.",
       "completionTokenFieldHelp": "Ààyè àwọn àmì àbájáde: lo max_completion_tokens fún àwọn API òde òní, tàbí max_tokens bí ojú òpin rẹ bá nílò ààyè àtijọ́."
     },
+    "gguf": {
+      "title": "Àwọn awoṣe tí a lè gbà sílẹ̀",
+      "help": "Gbà awoṣe ṣíṣí kan sílẹ̀ kí o sì máa ṣiṣẹ́ rẹ̀ lórí fóònù yìí pẹ̀lú llama.cpp. Àwọn ìbéèrè àti èsì rẹ máa wà lórí ẹ̀rọ náà. Àwọn awoṣe tóbi, nítorí náà lo Wi-Fi.",
+      "details": "{{size}} · Ìwé àṣẹ: {{license}}",
+      "download": "Gbà awoṣe sílẹ̀",
+      "pause": "Dádúró gbígbà sílẹ̀",
+      "resume": "Tẹ̀síwájú gbígbà sílẹ̀",
+      "downloading": "Ń gbà sílẹ̀: {{written}} nínú {{total}}",
+      "downloadingUnknown": "Ń gbà sílẹ̀: {{written}}",
+      "paused": "Dúró: {{written}} nínú {{total}}",
+      "verifying": "Ń yẹ fáìlì tí a gbà sílẹ̀ wò…",
+      "downloaded": "Ti gbà sílẹ̀ · {{size}}",
+      "url": "Ìjápọ̀ ìgbà sílẹ̀ tààrà",
+      "urlHelp": "Lẹ̀ ìjápọ̀ HTTPS kan sí fáìlì .gguf, gẹ́gẹ́ bí ìjápọ̀ resolve Hugging Face. Gbà àwọn awoṣe nínú àwọn orísun tí o gbẹ́kẹ̀lé nìkan sílẹ̀.",
+      "downloadUrl": "Gbà sílẹ̀ láti ìjápọ̀",
+      "deleteTitle": "Pa awoṣe yìí ré?",
+      "deleteMessage": "Pa {{name}} ré kúrò lórí ẹ̀rọ yìí? Àwọn ìjíròrò tí ń lò ó nílò awoṣe mìíràn kí wọ́n tó lè tẹ̀síwájú.",
+      "errors": {
+        "invalidUrl": "Tẹ ìjápọ̀ tí ó tọ́ sínú.",
+        "insecureUrl": "Lo ìjápọ̀ HTTPS kan. A kò lè gbà àwọn awoṣe sílẹ̀ nípasẹ̀ HTTP.",
+        "credentialsUrl": "Yọ orúkọ olùlò àti ọ̀rọ̀ ìpamọ́ kúrò nínú ìjápọ̀.",
+        "notGguf": "Ìjápọ̀ náà gbọ́dọ̀ tọ́ka sí fáìlì .gguf.",
+        "space": "Kò sí ààyè tó pọ̀ tó fún awoṣe yìí. Ṣí ààyè kúrò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+        "network": "Gbígbà sílẹ̀ kò parí. Yẹ ìsopọ̀ rẹ wò kí o sì gbìyànjú lẹ́ẹ̀kan sí i.",
+        "invalidFile": "Fáìlì tí a gbà sílẹ̀ kì í ṣe awoṣe tí app yìí lè ṣiṣẹ́, nítorí náà a yọ ọ́ kúrò."
+      }
+    },
     "localModels": {
       "title": "Àwọn awoṣe lórí ẹ̀rọ",
       "help": "Àwọn awoṣe lórí ẹ̀rọ ń ṣiṣẹ́ lórí fóònù yìí. Àwọn ìbéèrè àti èsì rẹ máa wà lórí ẹ̀rọ náà, àwọn awoṣe yìí kò sì lè lo irinṣẹ́.",

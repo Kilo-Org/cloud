@@ -115,6 +115,10 @@ vi.mock('@/lib/chat/backend-store', () => ({
   getChatBackendsHasLoaded: () => backendUi.loaded,
 }));
 vi.mock('@/lib/chat/local-models', () => ({ useLocalModels: () => [] }));
+vi.mock('@/lib/chat/gguf-models', () => ({
+  useGgufModels: () => ({ models: [], download: null, failure: null }),
+  ggufModelOptions: () => [],
+}));
 vi.mock('@/components/chat/backend-settings-sheet', () => ({
   BackendSettingsControl: 'BackendSettingsControl',
 }));

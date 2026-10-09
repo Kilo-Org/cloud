@@ -3367,6 +3367,33 @@
       "deleteMessage": "Excluir {{name}} e suas credenciais armazenadas? Os chats que usam este servidor precisarão de um novo servidor para continuar.",
       "completionTokenFieldHelp": "Campo de tokens de saída: use max_completion_tokens para APIs modernas ou max_tokens se o seu endpoint exigir o campo legado."
     },
+    "gguf": {
+      "title": "Modelos para baixar",
+      "help": "Baixe um modelo aberto e execute-o neste celular com llama.cpp. Seus prompts e respostas ficam no dispositivo. Os modelos são grandes, então use Wi-Fi.",
+      "details": "{{size}} · Licença: {{license}}",
+      "download": "Baixar modelo",
+      "pause": "Pausar download",
+      "resume": "Retomar download",
+      "downloading": "Baixando: {{written}} de {{total}}",
+      "downloadingUnknown": "Baixando: {{written}}",
+      "paused": "Pausado: {{written}} de {{total}}",
+      "verifying": "Verificando o arquivo baixado…",
+      "downloaded": "Baixado · {{size}}",
+      "url": "Link de download direto",
+      "urlHelp": "Cole um link HTTPS para um arquivo .gguf, como um link resolve do Hugging Face. Baixe modelos apenas de fontes confiáveis.",
+      "downloadUrl": "Baixar do link",
+      "deleteTitle": "Excluir este modelo?",
+      "deleteMessage": "Excluir {{name}} deste dispositivo? As conversas que o usam precisam de outro modelo antes de continuar.",
+      "errors": {
+        "invalidUrl": "Insira um link válido.",
+        "insecureUrl": "Use um link HTTPS. Modelos não podem ser baixados por HTTP.",
+        "credentialsUrl": "Remova o nome de usuário e a senha do link.",
+        "notGguf": "O link deve apontar para um arquivo .gguf.",
+        "space": "Não há espaço livre suficiente para este modelo. Libere espaço e tente novamente.",
+        "network": "O download não foi concluído. Verifique sua conexão e tente novamente.",
+        "invalidFile": "O arquivo baixado não é um modelo que este app pode executar, então ele foi removido."
+      }
+    },
     "localModels": {
       "title": "Modelos no dispositivo",
       "help": "Os modelos no dispositivo são executados neste celular. Seus prompts e respostas ficam no dispositivo, e esses modelos não podem usar ferramentas.",

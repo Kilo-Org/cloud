@@ -3367,6 +3367,33 @@
       "deleteMessage": "Obrisati {{name}} i njegove pohranjene pristupne podatke? Razgovorima koji koriste ovaj pozadinski servis bit će potreban novi pozadinski servis prije nego što se mogu nastaviti.",
       "completionTokenFieldHelp": "Polje za izlazne tokene: koristite max_completion_tokens za moderne API-je ili max_tokens ako vaša krajnja tačka zahtijeva staro polje."
     },
+    "gguf": {
+      "title": "Modeli za preuzimanje",
+      "help": "Preuzmite otvoreni model i pokrenite ga na ovom telefonu pomoću llama.cpp. Vaši upiti i odgovori ostaju na uređaju. Modeli su veliki, pa koristite Wi-Fi.",
+      "details": "{{size}} · Licenca: {{license}}",
+      "download": "Preuzmi model",
+      "pause": "Pauziraj preuzimanje",
+      "resume": "Nastavi preuzimanje",
+      "downloading": "Preuzimanje: {{written}} od {{total}}",
+      "downloadingUnknown": "Preuzimanje: {{written}}",
+      "paused": "Pauzirano: {{written}} od {{total}}",
+      "verifying": "Provjera preuzete datoteke…",
+      "downloaded": "Preuzeto · {{size}}",
+      "url": "Direktan link za preuzimanje",
+      "urlHelp": "Nalijepite HTTPS link do .gguf datoteke, kao što je Hugging Face resolve link. Preuzimajte modele samo iz izvora kojima vjerujete.",
+      "downloadUrl": "Preuzmi s linka",
+      "deleteTitle": "Izbrisati ovaj model?",
+      "deleteMessage": "Izbrisati {{name}} s ovog uređaja? Razgovori koji ga koriste trebaju drugi model prije nego što mogu nastaviti.",
+      "errors": {
+        "invalidUrl": "Unesite važeći link.",
+        "insecureUrl": "Koristite HTTPS link. Modeli se ne mogu preuzeti preko HTTP-a.",
+        "credentialsUrl": "Uklonite korisničko ime i lozinku iz linka.",
+        "notGguf": "Link mora pokazivati na .gguf datoteku.",
+        "space": "Nema dovoljno slobodnog prostora za ovaj model. Oslobodite prostor i pokušajte ponovo.",
+        "network": "Preuzimanje nije završeno. Provjerite vezu i pokušajte ponovo.",
+        "invalidFile": "Preuzeta datoteka nije model koji ova aplikacija može pokrenuti, pa je uklonjena."
+      }
+    },
     "localModels": {
       "title": "Modeli na uređaju",
       "help": "Modeli na uređaju rade na ovom telefonu. Vaši upiti i odgovori ostaju na uređaju, a ovi modeli ne mogu koristiti alate.",

@@ -3324,6 +3324,33 @@
       "deleteMessage": "Ufute {{name}} na taarifa zake za uthibitishaji zilizohifadhiwa? Gumzo zinazotumia huduma hii zitahitaji huduma mpya kabla ya kuendelea.",
       "completionTokenFieldHelp": "Sehemu ya tokeni za matokeo: tumia max_completion_tokens kwa API za kisasa, au max_tokens ikiwa kiishio chako kinahitaji sehemu ya zamani."
     },
+    "gguf": {
+      "title": "Modeli zinazoweza kupakuliwa",
+      "help": "Pakua modeli huria na uiendeshe kwenye simu hii kwa llama.cpp. Maombi na majibu yako hubaki kwenye kifaa. Modeli ni kubwa, kwa hivyo tumia Wi-Fi.",
+      "details": "{{size}} · Leseni: {{license}}",
+      "download": "Pakua modeli",
+      "pause": "Simamisha upakuaji",
+      "resume": "Endeleza upakuaji",
+      "downloading": "Inapakuliwa: {{written}} kati ya {{total}}",
+      "downloadingUnknown": "Inapakuliwa: {{written}}",
+      "paused": "Imesimamishwa: {{written}} kati ya {{total}}",
+      "verifying": "Inakagua faili iliyopakuliwa…",
+      "downloaded": "Imepakuliwa · {{size}}",
+      "url": "Kiungo cha kupakua moja kwa moja",
+      "urlHelp": "Bandika kiungo cha HTTPS kwa faili ya .gguf, kama vile kiungo cha resolve cha Hugging Face. Pakua modeli kutoka vyanzo unavyoamini pekee.",
+      "downloadUrl": "Pakua kutoka kwenye kiungo",
+      "deleteTitle": "Ungependa kufuta modeli hii?",
+      "deleteMessage": "Ungependa kufuta {{name}} kwenye kifaa hiki? Gumzo zinazotumia modeli hii zinahitaji modeli nyingine kabla ya kuendelea.",
+      "errors": {
+        "invalidUrl": "Weka kiungo sahihi.",
+        "insecureUrl": "Tumia kiungo cha HTTPS. Modeli haziwezi kupakuliwa kwa HTTP.",
+        "credentialsUrl": "Ondoa jina la mtumiaji na nenosiri kwenye kiungo.",
+        "notGguf": "Kiungo lazima kielekee faili ya .gguf.",
+        "space": "Hakuna nafasi ya kutosha ya kuhifadhi kwa modeli hii. Toa nafasi na ujaribu tena.",
+        "network": "Upakuaji haukukamilika. Angalia muunganisho wako na ujaribu tena.",
+        "invalidFile": "Faili iliyopakuliwa si modeli ambayo programu hii inaweza kuendesha, kwa hivyo iliondolewa."
+      }
+    },
     "localModels": {
       "title": "Modeli za kwenye kifaa",
       "help": "Modeli za kwenye kifaa hufanya kazi kwenye simu hii. Maombi na majibu yako hubaki kwenye kifaa, na modeli hizi haziwezi kutumia zana.",

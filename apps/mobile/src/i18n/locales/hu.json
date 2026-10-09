@@ -3324,6 +3324,33 @@
       "deleteMessage": "Törlöd a(z) {{name}} háttérrendszert és a tárolt hitelesítési adatait? Az ezt használó csevegések folytatásához új háttérrendszert kell választani.",
       "completionTokenFieldHelp": "Kimeneti tokenek mezője: modern API-k esetén a max_completion_tokens mezőt használja, vagy a max_tokens mezőt, ha a végpont a régi mezőt igényli."
     },
+    "gguf": {
+      "title": "Letölthető modellek",
+      "help": "Töltsön le egy nyílt modellt, és futtassa ezen a telefonon a llama.cpp segítségével. A kérései és a válaszai az eszközön maradnak. A modellek nagyok, ezért használjon Wi-Fi-t.",
+      "details": "{{size}} · Licenc: {{license}}",
+      "download": "Modell letöltése",
+      "pause": "Letöltés szüneteltetése",
+      "resume": "Letöltés folytatása",
+      "downloading": "Letöltés: {{written}} / {{total}}",
+      "downloadingUnknown": "Letöltés: {{written}}",
+      "paused": "Szüneteltetve: {{written}} / {{total}}",
+      "verifying": "A letöltött fájl ellenőrzése…",
+      "downloaded": "Letöltve · {{size}}",
+      "url": "Közvetlen letöltési hivatkozás",
+      "urlHelp": "Illesszen be egy HTTPS-hivatkozást egy .gguf fájlra, például egy Hugging Face resolve-hivatkozást. Csak megbízható forrásból töltsön le modelleket.",
+      "downloadUrl": "Letöltés hivatkozásról",
+      "deleteTitle": "Törli ezt a modellt?",
+      "deleteMessage": "Törli a(z) {{name}} modellt erről az eszközről? A beszélgetéseknek, amelyek használják, másik modellre van szükségük a folytatáshoz.",
+      "errors": {
+        "invalidUrl": "Adjon meg érvényes hivatkozást.",
+        "insecureUrl": "Használjon HTTPS-hivatkozást. A modellek nem tölthetők le HTTP-n keresztül.",
+        "credentialsUrl": "Távolítsa el a felhasználónevet és a jelszót a hivatkozásból.",
+        "notGguf": "A hivatkozásnak .gguf fájlra kell mutatnia.",
+        "space": "Nincs elég szabad tárhely ehhez a modellhez. Szabadítson fel tárhelyet, és próbálja újra.",
+        "network": "A letöltés nem fejeződött be. Ellenőrizze a kapcsolatot, és próbálja újra.",
+        "invalidFile": "A letöltött fájl nem olyan modell, amelyet ez az alkalmazás futtatni tud, ezért eltávolítottuk."
+      }
+    },
     "localModels": {
       "title": "Eszközön futó modellek",
       "help": "Az eszközön futó modellek ezen a telefonon működnek. A kérései és a válaszok az eszközön maradnak, és ezek a modellek nem használhatnak eszközöket.",

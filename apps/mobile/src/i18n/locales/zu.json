@@ -3324,6 +3324,33 @@
       "deleteMessage": "Susa i-{{name}} kanye nemininingwane yayo yokungena egciniwe? Izingxoxo ezisebenzisa lolu hlelo olungemuva zizodinga uhlelo olungemuva olusha ngaphambi kokuba ziqhubeke.",
       "completionTokenFieldHelp": "Inkambu yamathokheni empendulo: sebenzisa max_completion_tokens kuma-API esimanje, noma max_tokens uma indawo yakho yokugcina idinga inkambu yakudala."
     },
+    "gguf": {
+      "title": "Amamodeli angalandwa",
+      "help": "Landa imodeli evulekile bese uyisebenzisa kule foni nge-llama.cpp. Imiyalo yakho nezimpendulo kuhlala kudivayisi. Amamodeli makhulu, ngakho sebenzisa i-Wi-Fi.",
+      "details": "{{size}} · Ilayisensi: {{license}}",
+      "download": "Landa imodeli",
+      "pause": "Misa ukulanda",
+      "resume": "Qhubeka nokulanda",
+      "downloading": "Iyalandwa: {{written}} kwe-{{total}}",
+      "downloadingUnknown": "Iyalandwa: {{written}}",
+      "paused": "Kumisiwe: {{written}} kwe-{{total}}",
+      "verifying": "Kuhlolwa ifayela elilandiwe…",
+      "downloaded": "Kulandiwe · {{size}}",
+      "url": "Isixhumanisi sokulanda ngqo",
+      "urlHelp": "Namathisela isixhumanisi se-HTTPS efayeleni le-.gguf, njengesixhumanisi se-Hugging Face. Landa amamodeli kuphela emithonjeni oyithembayo.",
+      "downloadUrl": "Landa ngesixhumanisi",
+      "deleteTitle": "Susa leli modeli?",
+      "deleteMessage": "Susa {{name}} kule divayisi? Izingxoxo ezilisebenzisayo zidinga elinye imodeli ukuze ziqhubeke.",
+      "errors": {
+        "invalidUrl": "Faka isixhumanisi esivumelekile.",
+        "insecureUrl": "Sebenzisa isixhumanisi se-HTTPS. Amamodeli awakwazi ukulandwa nge-HTTP.",
+        "credentialsUrl": "Susa igama lomsebenzisi nephasiwedi esixhumanisini.",
+        "notGguf": "Isixhumanisi kufanele sikhombe efayeleni le-.gguf.",
+        "space": "Asikho isikhala esanele saleli modeli. Khulula isikhala bese uzama futhi.",
+        "network": "Ukulanda akuphelanga. Hlola ukuxhumana kwakho bese uzama futhi.",
+        "invalidFile": "Ifayela elilandiwe akusiyo imodeli le app engayisebenzisa, ngakho isusiwe."
+      }
+    },
     "localModels": {
       "title": "Amamodeli asedivayisini",
       "help": "Amamodeli asedivayisini asebenza kule foni. Imiyalo yakho nezimpendulo kuhlala kudivayisi, futhi lawa mamodeli awakwazi ukusebenzisa amathuluzi.",

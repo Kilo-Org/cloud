@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} en de bijbehorende opgeslagen aanmeldgegevens verwijderen? Chats die deze chatserver gebruiken, hebben een nieuwe chatserver nodig voordat ze verder kunnen gaan.",
       "completionTokenFieldHelp": "Veld voor uitvoertokens: gebruik max_completion_tokens voor moderne API's, of max_tokens als je eindpunt het verouderde veld vereist."
     },
+    "gguf": {
+      "title": "Downloadbare modellen",
+      "help": "Download een open model en draai het op deze telefoon met llama.cpp. Je prompts en antwoorden blijven op het apparaat. Modellen zijn groot, dus gebruik Wi-Fi.",
+      "details": "{{size}} · Licentie: {{license}}",
+      "download": "Model downloaden",
+      "pause": "Download pauzeren",
+      "resume": "Download hervatten",
+      "downloading": "Downloaden: {{written}} van {{total}}",
+      "downloadingUnknown": "Downloaden: {{written}}",
+      "paused": "Gepauzeerd: {{written}} van {{total}}",
+      "verifying": "Het gedownloade bestand wordt gecontroleerd…",
+      "downloaded": "Gedownload · {{size}}",
+      "url": "Directe downloadlink",
+      "urlHelp": "Plak een HTTPS-link naar een .gguf-bestand, zoals een Hugging Face resolve-link. Download alleen modellen van bronnen die je vertrouwt.",
+      "downloadUrl": "Downloaden via link",
+      "deleteTitle": "Dit model verwijderen?",
+      "deleteMessage": "{{name}} van dit apparaat verwijderen? Chats die het gebruiken hebben een ander model nodig voordat ze verder kunnen.",
+      "errors": {
+        "invalidUrl": "Voer een geldige link in.",
+        "insecureUrl": "Gebruik een HTTPS-link. Modellen kunnen niet via HTTP worden gedownload.",
+        "credentialsUrl": "Verwijder de gebruikersnaam en het wachtwoord uit de link.",
+        "notGguf": "De link moet naar een .gguf-bestand verwijzen.",
+        "space": "Er is niet genoeg vrije opslagruimte voor dit model. Maak ruimte vrij en probeer het opnieuw.",
+        "network": "De download is niet voltooid. Controleer je verbinding en probeer het opnieuw.",
+        "invalidFile": "Het gedownloade bestand is geen model dat deze app kan uitvoeren, dus het is verwijderd."
+      }
+    },
     "localModels": {
       "title": "Modellen op het apparaat",
       "help": "Modellen op het apparaat draaien op deze telefoon. Je prompts en antwoorden blijven op het apparaat, en deze modellen kunnen geen tools gebruiken.",

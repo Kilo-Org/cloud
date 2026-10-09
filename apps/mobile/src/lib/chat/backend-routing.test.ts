@@ -56,6 +56,15 @@ vi.mock('expo', () => ({
   requireOptionalNativeModule: (name: string) => (name === 'KiloAppleModel' ? apple : null),
 }));
 
+vi.mock('./gguf-models', () => ({
+  ggufModelProvider: {
+    availability: apple.availability,
+    client: { stream: () => undefined },
+    facts: () => ({ apiKinds: [] }),
+    supportsTools: () => false,
+  },
+}));
+
 beforeEach(() => {
   apple.availability.mockReset().mockResolvedValue(apple.available);
   apple.generate.mockClear();

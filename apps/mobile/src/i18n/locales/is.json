@@ -3324,6 +3324,33 @@
       "deleteMessage": "Eyða {{name}} og vistuðum auðkenningarupplýsingum hans? Spjöll sem nota þennan bakenda þurfa nýjan bakenda áður en hægt er að halda áfram.",
       "completionTokenFieldHelp": "Reitur fyrir úttakstákn: notaðu max_completion_tokens fyrir nýrri forritaskil eða max_tokens ef endapunkturinn þinn krefst eldri reitsins."
     },
+    "gguf": {
+      "title": "Líkön til niðurhals",
+      "help": "Sæktu opið líkan og keyrðu það í þessum síma með llama.cpp. Fyrirmæli þín og svör verða eftir í tækinu. Líkönin eru stór, svo notaðu Wi-Fi.",
+      "details": "{{size}} · Leyfi: {{license}}",
+      "download": "Sækja líkan",
+      "pause": "Gera hlé á niðurhali",
+      "resume": "Halda niðurhali áfram",
+      "downloading": "Hleður niður: {{written}} af {{total}}",
+      "downloadingUnknown": "Hleður niður: {{written}}",
+      "paused": "Í hléi: {{written}} af {{total}}",
+      "verifying": "Athuga niðurhalaða skrána…",
+      "downloaded": "Niðurhalað · {{size}}",
+      "url": "Beinn niðurhalstengill",
+      "urlHelp": "Límdu HTTPS-tengil á .gguf-skrá, til dæmis Hugging Face resolve-tengil. Sæktu aðeins líkön frá heimildum sem þú treystir.",
+      "downloadUrl": "Sækja af tengli",
+      "deleteTitle": "Eyða þessu líkani?",
+      "deleteMessage": "Eyða {{name}} af þessu tæki? Spjöll sem nota það þurfa annað líkan áður en þau geta haldið áfram.",
+      "errors": {
+        "invalidUrl": "Sláðu inn gildan tengil.",
+        "insecureUrl": "Notaðu HTTPS-tengil. Ekki er hægt að sækja líkön yfir HTTP.",
+        "credentialsUrl": "Fjarlægðu notandanafn og lykilorð úr tenglinum.",
+        "notGguf": "Tengillinn verður að vísa á .gguf-skrá.",
+        "space": "Það er ekki nóg laust geymslupláss fyrir þetta líkan. Losaðu pláss og reyndu aftur.",
+        "network": "Niðurhalið kláraðist ekki. Athugaðu tenginguna þína og reyndu aftur.",
+        "invalidFile": "Niðurhalaða skráin er ekki líkan sem þetta forrit getur keyrt, svo henni var eytt."
+      }
+    },
     "localModels": {
       "title": "Líkön í tækinu",
       "help": "Líkön í tækinu keyra á þessum síma. Fyrirmæli þín og svör verða eftir í tækinu og þessi líkön geta ekki notað verkfæri.",

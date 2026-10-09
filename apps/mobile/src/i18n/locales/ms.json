@@ -3324,6 +3324,33 @@
       "deleteMessage": "Padam {{name}} dan bukti kelayakannya yang disimpan? Sembang yang menggunakan sistem pelayan ini memerlukan sistem pelayan baharu sebelum boleh diteruskan.",
       "completionTokenFieldHelp": "Medan token output: gunakan max_completion_tokens untuk API moden, atau max_tokens jika titik akhir anda memerlukan medan legasi."
     },
+    "gguf": {
+      "title": "Model yang boleh dimuat turun",
+      "help": "Muat turun model terbuka dan jalankannya pada telefon ini dengan llama.cpp. Gesaan dan balasan anda kekal pada peranti. Model bersaiz besar, jadi gunakan Wi-Fi.",
+      "details": "{{size}} · Lesen: {{license}}",
+      "download": "Muat turun model",
+      "pause": "Jeda muat turun",
+      "resume": "Sambung muat turun",
+      "downloading": "Memuat turun: {{written}} daripada {{total}}",
+      "downloadingUnknown": "Memuat turun: {{written}}",
+      "paused": "Dijeda: {{written}} daripada {{total}}",
+      "verifying": "Menyemak fail yang dimuat turun…",
+      "downloaded": "Dimuat turun · {{size}}",
+      "url": "Pautan muat turun terus",
+      "urlHelp": "Tampal pautan HTTPS ke fail .gguf, seperti pautan resolve Hugging Face. Muat turun model hanya daripada sumber yang anda percaya.",
+      "downloadUrl": "Muat turun daripada pautan",
+      "deleteTitle": "Padam model ini?",
+      "deleteMessage": "Padam {{name}} daripada peranti ini? Sembang yang menggunakannya memerlukan model lain sebelum boleh diteruskan.",
+      "errors": {
+        "invalidUrl": "Masukkan pautan yang sah.",
+        "insecureUrl": "Gunakan pautan HTTPS. Model tidak boleh dimuat turun melalui HTTP.",
+        "credentialsUrl": "Buang nama pengguna dan kata laluan daripada pautan.",
+        "notGguf": "Pautan mesti menunjuk ke fail .gguf.",
+        "space": "Ruang storan kosong tidak mencukupi untuk model ini. Kosongkan ruang dan cuba lagi.",
+        "network": "Muat turun tidak selesai. Semak sambungan anda dan cuba lagi.",
+        "invalidFile": "Fail yang dimuat turun bukan model yang boleh dijalankan oleh aplikasi ini, jadi ia telah dibuang."
+      }
+    },
     "localModels": {
       "title": "Model pada peranti",
       "help": "Model pada peranti berjalan pada telefon ini. Gesaan dan balasan anda kekal pada peranti, dan model ini tidak boleh menggunakan alat.",

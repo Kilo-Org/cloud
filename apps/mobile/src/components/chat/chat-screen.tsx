@@ -1,6 +1,6 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -33,13 +33,10 @@ import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
-import {
-  backendModelOptions,
-  localModelOptions,
-  requiresBackendDisclosure,
-} from '@/lib/chat/backend-model-options';
+import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
 import { resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
+import { useChatModelOptions } from '@/lib/chat/use-chat-model-options';
 
 import { BetaPill } from './beta-pill';
 import { ChatFailureRow } from './chat-failure-row';
@@ -110,14 +107,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     organizationId: organizationId ?? undefined,
     remoteModelState: NO_REMOTE,
   });
-  const availableOptions = useMemo(
-    () => [
-      ...modelOptions.options,
-      ...backendModelOptions(backends),
-      ...localModelOptions(localModels, t),
-    ],
-    [backends, localModels, modelOptions.options, t]
-  );
+  const availableOptions = useChatModelOptions(modelOptions.options, backends, localModels);
 
   // The model the next message goes to. It starts as the one the conversation
   // is on and changes the moment the person picks another, which is what makes

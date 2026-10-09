@@ -3367,6 +3367,33 @@
       "deleteMessage": "Eliminare {{name}} e le credenziali archiviate? Le chat che usano questo servizio avranno bisogno di un nuovo servizio per poter continuare.",
       "completionTokenFieldHelp": "Campo dei token in uscita: usa max_completion_tokens per le API moderne oppure max_tokens se il tuo endpoint richiede il campo precedente."
     },
+    "gguf": {
+      "title": "Modelli scaricabili",
+      "help": "Scarica un modello aperto e eseguilo su questo telefono con llama.cpp. I tuoi prompt e le risposte restano sul dispositivo. I modelli sono di grandi dimensioni, quindi usa il Wi-Fi.",
+      "details": "{{size}} · Licenza: {{license}}",
+      "download": "Scarica modello",
+      "pause": "Metti in pausa il download",
+      "resume": "Riprendi il download",
+      "downloading": "Download in corso: {{written}} di {{total}}",
+      "downloadingUnknown": "Download in corso: {{written}}",
+      "paused": "In pausa: {{written}} di {{total}}",
+      "verifying": "Verifica del file scaricato…",
+      "downloaded": "Scaricato · {{size}}",
+      "url": "Link di download diretto",
+      "urlHelp": "Incolla un link HTTPS a un file .gguf, ad esempio un link resolve di Hugging Face. Scarica i modelli solo da fonti affidabili.",
+      "downloadUrl": "Scarica dal link",
+      "deleteTitle": "Eliminare questo modello?",
+      "deleteMessage": "Eliminare {{name}} da questo dispositivo? Le chat che lo usano necessitano di un altro modello prima di poter continuare.",
+      "errors": {
+        "invalidUrl": "Inserisci un link valido.",
+        "insecureUrl": "Usa un link HTTPS. I modelli non possono essere scaricati tramite HTTP.",
+        "credentialsUrl": "Rimuovi nome utente e password dal link.",
+        "notGguf": "Il link deve puntare a un file .gguf.",
+        "space": "Non c'è abbastanza spazio di archiviazione libero per questo modello. Libera spazio e riprova.",
+        "network": "Il download non è terminato. Controlla la connessione e riprova.",
+        "invalidFile": "Il file scaricato non è un modello che questa app può eseguire, quindi è stato rimosso."
+      }
+    },
     "localModels": {
       "title": "Modelli sul dispositivo",
       "help": "I modelli sul dispositivo vengono eseguiti su questo telefono. I tuoi prompt e le risposte restano sul dispositivo e questi modelli non possono usare strumenti.",

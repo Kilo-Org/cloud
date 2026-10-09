@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} fi odeeffannoo mirkaneessa eenyummaa isaa kuufame haquu? Chaatonni sirna duubaa kana fayyadaman itti fufuu isaanii dura sirna duubaa haaraa barbaadu.",
       "completionTokenFieldHelp": "Dirree tokanoota bu'aa: APIwwan ammayyaatiif max_completion_tokens fayyadami, yookaan qabxiin xumuraa kee dirree durii yoo barbaadu max_tokens fayyadami."
     },
+    "gguf": {
+      "title": "Moodeelota buufamuu danda'an",
+      "help": "Moodeela banaa buufiitii bilbila kana irratti llama.cpp waliin hojjedhu. Gaaffiin keessanii fi deebiin meeshaa kana irra turu. Moodeelonni gurguddoo waan ta'aniif, Wi-Fi fayyadamaa.",
+      "details": "{{size}} · Hayyama: {{license}}",
+      "download": "Moodeela buufi",
+      "pause": "Buufinsa dhaabi",
+      "resume": "Buufinsa itti fufi",
+      "downloading": "Buufamaa jira: {{total}} keessaa {{written}}",
+      "downloadingUnknown": "Buufamaa jira: {{written}}",
+      "paused": "Dhaabbate: {{total}} keessaa {{written}}",
+      "verifying": "Faayilii buufame sakatta'amaa jira…",
+      "downloaded": "Buufameera · {{size}}",
+      "url": "Liinkii buufinsa kallattii",
+      "urlHelp": "Liinkii HTTPS faayilii .gguf tiif maxxansi, akka liinkii resolve Hugging Face. Moodeelota maddawwan amantaa qabdan irraa qofa buufadhaa.",
+      "downloadUrl": "Liinkii irraa buufi",
+      "deleteTitle": "Moodeela kana haqi?",
+      "deleteMessage": "{{name}} meeshaa kana irraa haqi? Haasawaawwan isa fayyadaman itti fufuuf moodeela biraa barbaadu.",
+      "errors": {
+        "invalidUrl": "Liinkii sirrii galchi.",
+        "insecureUrl": "Liinkii HTTPS fayyadami. Moodeelonni HTTP irraan buufamuu hin danda'an.",
+        "credentialsUrl": "Maqaa fayyadamaa fi jecha darbii liinkii irraa haqi.",
+        "notGguf": "Liinkiin faayilii .gguf agarsiisuu qaba.",
+        "space": "Moodeela kanaaf bakka duwwaa gahaan hin jiru. Bakka duwwaa uumiitii irra deebi'ii yaali.",
+        "network": "Buufinsi hin xumuramne. Walqunnamtii keessan sakatta'ii irra deebi'ii yaali.",
+        "invalidFile": "Faayiliin buufame moodeela app kanaan hojjetamuu danda'u miti, kanaaf haqame."
+      }
+    },
     "localModels": {
       "title": "Moodeelota meeshaa irratti",
       "help": "Moodeelonni meeshaa irratti bilbila kana irratti hojjetu. Gaaffiin keessanii fi deebiin meeshaa kana irra turu, moodeelonni kunis meeshaalee fayyadamuu hin danda'an.",

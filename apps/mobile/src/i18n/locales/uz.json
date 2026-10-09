@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} va uning saqlangan kirish maʼlumotlari oʻchirilsinmi? Bu serverdan foydalanayotgan suhbatlarni davom ettirish uchun yangi server tanlash kerak boʻladi.",
       "completionTokenFieldHelp": "Javob tokenlari maydoni: zamonaviy APIlar uchun max_completion_tokens dan, yoki endpointingiz eski maydonni talab qilsa, max_tokens dan foydalaning."
     },
+    "gguf": {
+      "title": "Yuklab olinadigan modellar",
+      "help": "Ochiq modelni yuklab oling va uni shu telefonda llama.cpp bilan ishga tushiring. So‘rovlaringiz va javoblaringiz qurilmada qoladi. Modellar katta, shuning uchun Wi-Fi’dan foydalaning.",
+      "details": "{{size}} · Litsenziya: {{license}}",
+      "download": "Modelni yuklab olish",
+      "pause": "Yuklab olishni to‘xtatib turish",
+      "resume": "Yuklab olishni davom ettirish",
+      "downloading": "Yuklanmoqda: {{total}} dan {{written}}",
+      "downloadingUnknown": "Yuklanmoqda: {{written}}",
+      "paused": "To‘xtatib turildi: {{total}} dan {{written}}",
+      "verifying": "Yuklab olingan fayl tekshirilmoqda…",
+      "downloaded": "Yuklab olindi · {{size}}",
+      "url": "To‘g‘ridan-to‘g‘ri yuklab olish havolasi",
+      "urlHelp": "HTTPS havolani .gguf faylga joylashtiring, masalan, Hugging Face resolve havolasi. Modellarni faqat o‘zingiz ishonadigan manbalardan yuklab oling.",
+      "downloadUrl": "Havola orqali yuklab olish",
+      "deleteTitle": "Bu model o‘chirilsinmi?",
+      "deleteMessage": "{{name}} shu qurilmadan o‘chirilsinmi? Undan foydalanadigan chatlar davom ettirishi uchun boshqa model kerak bo‘ladi.",
+      "errors": {
+        "invalidUrl": "To‘g‘ri havola kiriting.",
+        "insecureUrl": "HTTPS havoladan foydalaning. Modellarni HTTP orqali yuklab bo‘lmaydi.",
+        "credentialsUrl": "Havoladan foydalanuvchi nomi va parolni olib tashlang.",
+        "notGguf": "Havola .gguf faylga ishora qilishi kerak.",
+        "space": "Bu model uchun yetarli bo‘sh joy yo‘q. Joy bo‘shatib, qayta urinib ko‘ring.",
+        "network": "Yuklab olish tugallanmadi. Ulanishni tekshirib, qayta urinib ko‘ring.",
+        "invalidFile": "Yuklab olingan fayl bu ilova ishga tushira oladigan model emas, shuning uchun u o‘chirildi."
+      }
+    },
     "localModels": {
       "title": "Qurilmadagi modellar",
       "help": "Qurilmadagi modellar shu telefonda ishlaydi. So‘rovlaringiz va javoblar qurilmada qoladi, bu modellar esa vositalardan foydalana olmaydi.",

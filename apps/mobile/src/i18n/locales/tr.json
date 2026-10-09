@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} ve kayıtlı kimlik bilgileri silinsin mi? Bu arka ucu kullanan sohbetlerin devam edebilmesi için yeni bir arka uç seçilmesi gerekir.",
       "completionTokenFieldHelp": "Tamamlama belirteci alanı: Modern API'ler için max_completion_tokens kullanın; uç noktanız eski alanı gerektiriyorsa max_tokens kullanın."
     },
+    "gguf": {
+      "title": "İndirilebilir modeller",
+      "help": "Açık bir model indirin ve llama.cpp ile bu telefonda çalıştırın. İstemleriniz ve yanıtlarınız cihazda kalır. Modeller büyüktür, bu yüzden Wi-Fi kullanın.",
+      "details": "{{size}} · Lisans: {{license}}",
+      "download": "Modeli indir",
+      "pause": "İndirmeyi duraklat",
+      "resume": "İndirmeyi sürdür",
+      "downloading": "İndiriliyor: {{written}} / {{total}}",
+      "downloadingUnknown": "İndiriliyor: {{written}}",
+      "paused": "Duraklatıldı: {{written}} / {{total}}",
+      "verifying": "İndirilen dosya denetleniyor…",
+      "downloaded": "İndirildi · {{size}}",
+      "url": "Doğrudan indirme bağlantısı",
+      "urlHelp": "Bir .gguf dosyasına ait HTTPS bağlantısını (örneğin bir Hugging Face resolve bağlantısı) yapıştırın. Modelleri yalnızca güvendiğiniz kaynaklardan indirin.",
+      "downloadUrl": "Bağlantıdan indir",
+      "deleteTitle": "Bu model silinsin mi?",
+      "deleteMessage": "{{name}} bu cihazdan silinsin mi? Bu modeli kullanan sohbetlerin devam edebilmesi için başka bir modele ihtiyacı olur.",
+      "errors": {
+        "invalidUrl": "Geçerli bir bağlantı girin.",
+        "insecureUrl": "Bir HTTPS bağlantısı kullanın. Modeller HTTP üzerinden indirilemez.",
+        "credentialsUrl": "Bağlantıdan kullanıcı adını ve parolayı kaldırın.",
+        "notGguf": "Bağlantı bir .gguf dosyasını göstermelidir.",
+        "space": "Bu model için yeterli boş depolama alanı yok. Yer açıp yeniden deneyin.",
+        "network": "İndirme tamamlanamadı. Bağlantınızı denetleyip yeniden deneyin.",
+        "invalidFile": "İndirilen dosya bu uygulamanın çalıştırabileceği bir model değil, bu yüzden kaldırıldı."
+      }
+    },
     "localModels": {
       "title": "Cihazdaki modeller",
       "help": "Cihazdaki modeller bu telefonda çalışır. İstemleriniz ve yanıtlarınız cihazda kalır ve bu modeller araç kullanamaz.",

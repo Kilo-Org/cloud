@@ -3453,6 +3453,33 @@
       "deleteMessage": "Tħassar {{name}} u l-kredenzjali maħżuna tiegħu? Iċ-chats li jużaw dan is-servizz se jkollhom bżonn servizz ġdid qabel ma jkunu jistgħu jkomplu.",
       "completionTokenFieldHelp": "Qasam għall-unitajiet tat-test tat-tlestija: uża max_completion_tokens għall-APIs moderni, jew max_tokens jekk il-punt finali tiegħek jeħtieġ il-qasam l-antik."
     },
+    "gguf": {
+      "title": "Mudelli li jistgħu jitniżżlu",
+      "help": "Niżżel mudell miftuħ u ħaddmu fuq dan it-telefon permezz ta' llama.cpp. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat. Il-mudelli huma kbar, għalhekk uża l-Wi-Fi.",
+      "details": "{{size}} · Liċenzja: {{license}}",
+      "download": "Niżżel il-mudell",
+      "pause": "Ippawża t-tniżżil",
+      "resume": "Kompli t-tniżżil",
+      "downloading": "Qed jitniżżel: {{written}} minn {{total}}",
+      "downloadingUnknown": "Qed jitniżżel: {{written}}",
+      "paused": "Ippawżat: {{written}} minn {{total}}",
+      "verifying": "Qed jiġi vverifikat il-fajl imniżżel…",
+      "downloaded": "Imniżżel · {{size}}",
+      "url": "Link dirett għat-tniżżil",
+      "urlHelp": "Ippejstja link HTTPS għal fajl .gguf, bħal link resolve ta' Hugging Face. Niżżel mudelli biss minn sorsi li tafda.",
+      "downloadUrl": "Niżżel mil-link",
+      "deleteTitle": "Ħassar dan il-mudell?",
+      "deleteMessage": "Ħassar {{name}} minn dan l-apparat? Il-chats li jużawh għandhom bżonn mudell ieħor qabel ma jkunu jistgħu jkomplu.",
+      "errors": {
+        "invalidUrl": "Daħħal link validu.",
+        "insecureUrl": "Uża link HTTPS. Il-mudelli ma jistgħux jitniżżlu fuq HTTP.",
+        "credentialsUrl": "Neħħi l-isem tal-utent u l-password mil-link.",
+        "notGguf": "Il-link irid jindika lejn fajl .gguf.",
+        "space": "M'hemmx biżżejjed spazju ħieles għal dan il-mudell. Illibera spazju u erġa' pprova.",
+        "network": "It-tniżżil ma tlestiex. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+        "invalidFile": "Il-fajl imniżżel mhuwiex mudell li din l-app tista' tmexxi, għalhekk tneħħa."
+      }
+    },
     "localModels": {
       "title": "Mudelli fuq l-apparat",
       "help": "Il-mudelli fuq l-apparat jaħdmu fuq dan il-mowbajl. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat, u dawn il-mudelli ma jistgħux jużaw għodod.",

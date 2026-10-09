@@ -3367,6 +3367,33 @@
       "deleteMessage": "Eliminar {{name}} e as credenciais guardadas? As conversas que usam este serviço vão precisar de um novo serviço para poderem continuar.",
       "completionTokenFieldHelp": "Campo de tokens de conclusão: utilize max_completion_tokens para APIs modernas ou max_tokens se o seu endpoint exigir o campo antigo."
     },
+    "gguf": {
+      "title": "Modelos para transferir",
+      "help": "Transfira um modelo aberto e execute-o neste telemóvel com llama.cpp. Os seus pedidos e respostas ficam no dispositivo. Os modelos são grandes, por isso use Wi-Fi.",
+      "details": "{{size}} · Licença: {{license}}",
+      "download": "Transferir modelo",
+      "pause": "Pausar transferência",
+      "resume": "Retomar transferência",
+      "downloading": "A transferir: {{written}} de {{total}}",
+      "downloadingUnknown": "A transferir: {{written}}",
+      "paused": "Em pausa: {{written}} de {{total}}",
+      "verifying": "A verificar o ficheiro transferido…",
+      "downloaded": "Transferido · {{size}}",
+      "url": "Ligação de transferência direta",
+      "urlHelp": "Cole uma ligação HTTPS para um ficheiro .gguf, como uma ligação resolve do Hugging Face. Transfira modelos apenas de fontes em que confia.",
+      "downloadUrl": "Transferir a partir da ligação",
+      "deleteTitle": "Eliminar este modelo?",
+      "deleteMessage": "Eliminar {{name}} deste dispositivo? As conversas que o utilizam precisam de outro modelo antes de poderem continuar.",
+      "errors": {
+        "invalidUrl": "Introduza uma ligação válida.",
+        "insecureUrl": "Use uma ligação HTTPS. Os modelos não podem ser transferidos por HTTP.",
+        "credentialsUrl": "Remova o nome de utilizador e a palavra-passe da ligação.",
+        "notGguf": "A ligação tem de apontar para um ficheiro .gguf.",
+        "space": "Não há espaço de armazenamento livre suficiente para este modelo. Liberte espaço e tente novamente.",
+        "network": "A transferência não terminou. Verifique a sua ligação e tente novamente.",
+        "invalidFile": "O ficheiro transferido não é um modelo que esta aplicação possa executar, por isso foi removido."
+      }
+    },
     "localModels": {
       "title": "Modelos no dispositivo",
       "help": "Os modelos no dispositivo são executados neste telemóvel. Os seus pedidos e respostas ficam no dispositivo, e estes modelos não podem usar ferramentas.",

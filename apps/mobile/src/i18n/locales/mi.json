@@ -3324,6 +3324,33 @@
       "deleteMessage": "Mukua a {{name}} me ōna taipitopito motuhēhēnga kua tiakina? Me whai pūnaha tuarā hou ngā kōrerorero e whakamahi ana i tēnei pūnaha tuarā i mua i te haere tonu.",
       "completionTokenFieldHelp": "Āpure waeine kupu whakaoti: whakamahia max_completion_tokens mō ngā API hou, max_tokens rānei mēnā e hiahiatia ana te āpure tawhito e tō pito mutunga."
     },
+    "gguf": {
+      "title": "Ngā tauira ka taea te tikiake",
+      "help": "Tikiake he tauira tuwhera, ka whakahaere ki runga i tēnei waea mā llama.cpp. Ka noho ō tono me ō whakautu ki te pūrere. He nui ngā tauira, nō reira whakamahia te Wi-Fi.",
+      "details": "{{size}} · Raihana: {{license}}",
+      "download": "Tikiake tauira",
+      "pause": "Whakamōwai i te tikiake",
+      "resume": "Haere tonu te tikiake",
+      "downloading": "E tikiake ana: {{written}} o {{total}}",
+      "downloadingUnknown": "E tikiake ana: {{written}}",
+      "paused": "Kua mōwai: {{written}} o {{total}}",
+      "verifying": "E tirotiro ana i te kōnae kua tikiake…",
+      "downloaded": "Kua tikiake · {{size}}",
+      "url": "Hononga tikiake tōtika",
+      "urlHelp": "Whakapirihia he hononga HTTPS ki tētahi kōnae .gguf, pēnei i te hononga whakatau o Hugging Face. Me tikiake noa ngā tauira mai i ngā puna e whakawhirinaki ana koe.",
+      "downloadUrl": "Tikiake mai i te hononga",
+      "deleteTitle": "Muku tēnei tauira?",
+      "deleteMessage": "Mukua {{name}} i tēnei pūrere? Ka hiahia ngā kōrerorero e whakamahi ana i a ia ki tētahi atu tauira kia taea ai te haere tonu.",
+      "errors": {
+        "invalidUrl": "Whakaurua he hononga tika.",
+        "insecureUrl": "Whakamahia he hononga HTTPS. Kāore e taea ngā tauira te tikiake mā HTTP.",
+        "credentialsUrl": "Tangohia te ingoa kaiwhakamahi me te kupuhipa i te hononga.",
+        "notGguf": "Me tohu te hononga ki tētahi kōnae .gguf.",
+        "space": "Kāore e ranea te wāhi rokiroki mō tēnei tauira. Whakawāteahia he wāhi, ka ngana anō.",
+        "network": "Kāore i oti te tikiake. Tirohia tō hononga, ka ngana anō.",
+        "invalidFile": "Ehara te kōnae kua tikiake i tētahi tauira ka taea e tēnei taupānga te whakahaere, nō reira kua tangohia."
+      }
+    },
     "localModels": {
       "title": "Ngā tauira i te pūrere",
       "help": "Ka rere ngā tauira i te pūrere ki runga i tēnei waea. Ka noho ō tono me ngā whakautu ki te pūrere, ā, kāore e taea e ēnei tauira te whakamahi taputapu.",

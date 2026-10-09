@@ -3324,6 +3324,33 @@
       "deleteMessage": "Ma tirtiraa {{name}} iyo xogtiisa aqoonsiga ee kaydsan? Wada sheekaysiyada isticmaala adeeggan gadaale waxay u baahan doonaan adeeg gadaale oo cusub ka hor inta aysan sii socon.",
       "completionTokenFieldHelp": "Goobta unugyada qoraalka jawaabta: u isticmaal max_completion_tokens API-yada casriga ah, ama max_tokens haddii bartaada dhammaadku u baahan tahay goobtii hore."
     },
+    "gguf": {
+      "title": "Moodeelada la soo dejin karo",
+      "help": "Soo deji moodeel furan oo ku shaqeeya taleefankan adigoo isticmaalaya llama.cpp. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda. Moodeeladu way waaweyn yihiin, markaa isticmaal Wi-Fi.",
+      "details": "{{size}} · Ruqsad: {{license}}",
+      "download": "Soo deji moodeelka",
+      "pause": "Jooji soo dejinta",
+      "resume": "Sii wad soo dejinta",
+      "downloading": "Soo dejinaya: {{written}} ka mid ah {{total}}",
+      "downloadingUnknown": "Soo dejinaya: {{written}}",
+      "paused": "La joojiyay: {{written}} ka mid ah {{total}}",
+      "verifying": "Waxaa la hubinayaa faylka la soo dejiyay…",
+      "downloaded": "La soo dejiyay · {{size}}",
+      "url": "Xiriirka soo dejinta ee tooska ah",
+      "urlHelp": "Ku dheji xiriir HTTPS ah oo fayl .gguf ah, sida xiriirka resolve ee Hugging Face. Kaliya soo deji moodeelada ilo aad isku halleysid.",
+      "downloadUrl": "Ka soo deji xiriirka",
+      "deleteTitle": "Ma tirtirtaa moodeelkan?",
+      "deleteMessage": "Ma tirtirtaa {{name}} aaladdan? Wadahadallada isticmaala waxay u baahan yihiin moodeel kale ka hor inta aysan sii socon karin.",
+      "errors": {
+        "invalidUrl": "Geli xiriir sax ah.",
+        "insecureUrl": "Isticmaal xiriir HTTPS ah. Moodeelada lama soo dejin karo HTTP.",
+        "credentialsUrl": "Ka saar magaca isticmaalaha iyo erayga sirta ah xiriirka.",
+        "notGguf": "Xiriirku waa inuu tilmaamaa fayl .gguf ah.",
+        "space": "Ma jiro kayd bannaan oo ku filan moodeelkan. Meel bannaan samee oo mar kale isku day.",
+        "network": "Soo dejintu ma dhammaanin. Hubi xiriirkaaga oo mar kale isku day.",
+        "invalidFile": "Faylka la soo dejiyay ma aha moodeel uu abkani ku shaqeyn karo, sidaas darteed waa la tirtiray."
+      }
+    },
     "localModels": {
       "title": "Moodeelada aaladda gudaheeda",
       "help": "Moodeelada aaladda gudaheeda waxay ku shaqeeyaan taleefankan. Codsiyadaada iyo jawaabaha waxay ku jiraan aaladda, moodeeladanina ma isticmaali karaan qalab.",

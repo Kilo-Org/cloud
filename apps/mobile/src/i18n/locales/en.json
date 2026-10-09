@@ -3281,6 +3281,33 @@
       "deleteTitle": "Delete this chat backend?",
       "deleteMessage": "Delete {{name}} and its stored credentials? Chats using this backend will need a new backend before they can continue."
     },
+    "gguf": {
+      "title": "Downloadable models",
+      "help": "Download an open model and run it on this phone with llama.cpp. Your prompts and replies stay on the device. Models are large, so use Wi-Fi.",
+      "details": "{{size}} · License: {{license}}",
+      "download": "Download model",
+      "pause": "Pause download",
+      "resume": "Resume download",
+      "downloading": "Downloading: {{written}} of {{total}}",
+      "downloadingUnknown": "Downloading: {{written}}",
+      "paused": "Paused: {{written}} of {{total}}",
+      "verifying": "Checking the downloaded file…",
+      "downloaded": "Downloaded · {{size}}",
+      "url": "Direct download link",
+      "urlHelp": "Paste an HTTPS link to a .gguf file, such as a Hugging Face resolve link. Only download models from sources you trust.",
+      "downloadUrl": "Download from link",
+      "deleteTitle": "Delete this model?",
+      "deleteMessage": "Delete {{name}} from this device? Chats that use it need another model before they can continue.",
+      "errors": {
+        "invalidUrl": "Enter a valid link.",
+        "insecureUrl": "Use an HTTPS link. Models can't be downloaded over HTTP.",
+        "credentialsUrl": "Remove the user name and password from the link.",
+        "notGguf": "The link must point to a .gguf file.",
+        "space": "There isn't enough free storage for this model. Free up space and try again.",
+        "network": "The download didn't finish. Check your connection and try again.",
+        "invalidFile": "The downloaded file isn't a model this app can run, so it was removed."
+      }
+    },
     "localModels": {
       "title": "On-device models",
       "help": "On-device models run on this phone. Your prompts and replies stay on the device, and these models can't use tools.",

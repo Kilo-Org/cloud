@@ -3324,6 +3324,33 @@
       "deleteMessage": "Ta bort {{name}} och dess sparade inloggningsuppgifter? Chattar som använder den här backenden behöver en ny backend innan de kan fortsätta.",
       "completionTokenFieldHelp": "Fält för utdatatokens: använd max_completion_tokens för moderna API:er, eller max_tokens om din slutpunkt kräver det äldre fältet."
     },
+    "gguf": {
+      "title": "Nedladdningsbara modeller",
+      "help": "Ladda ner en öppen modell och kör den på den här telefonen med llama.cpp. Dina frågor och svar stannar på enheten. Modellerna är stora, så använd Wi-Fi.",
+      "details": "{{size}} · Licens: {{license}}",
+      "download": "Ladda ner modell",
+      "pause": "Pausa nedladdningen",
+      "resume": "Återuppta nedladdningen",
+      "downloading": "Laddar ner: {{written}} av {{total}}",
+      "downloadingUnknown": "Laddar ner: {{written}}",
+      "paused": "Pausad: {{written}} av {{total}}",
+      "verifying": "Kontrollerar den nedladdade filen…",
+      "downloaded": "Nedladdad · {{size}}",
+      "url": "Direkt nedladdningslänk",
+      "urlHelp": "Klistra in en HTTPS-länk till en .gguf-fil, till exempel en resolve-länk från Hugging Face. Ladda bara ner modeller från källor du litar på.",
+      "downloadUrl": "Ladda ner från länk",
+      "deleteTitle": "Ta bort den här modellen?",
+      "deleteMessage": "Ta bort {{name}} från den här enheten? Chattar som använder den behöver en annan modell innan de kan fortsätta.",
+      "errors": {
+        "invalidUrl": "Ange en giltig länk.",
+        "insecureUrl": "Använd en HTTPS-länk. Modeller kan inte laddas ner via HTTP.",
+        "credentialsUrl": "Ta bort användarnamnet och lösenordet från länken.",
+        "notGguf": "Länken måste peka på en .gguf-fil.",
+        "space": "Det finns inte tillräckligt med ledigt utrymme för den här modellen. Frigör utrymme och försök igen.",
+        "network": "Nedladdningen slutfördes inte. Kontrollera anslutningen och försök igen.",
+        "invalidFile": "Den nedladdade filen är inte en modell som den här appen kan köra, så den har tagits bort."
+      }
+    },
     "localModels": {
       "title": "Modeller på enheten",
       "help": "Modeller på enheten körs på den här telefonen. Dina frågor och svar stannar på enheten, och de här modellerna kan inte använda verktyg.",

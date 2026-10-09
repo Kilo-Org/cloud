@@ -3324,6 +3324,33 @@
       "deleteMessage": "Burahin ang {{name}} at ang mga nakaimbak nitong kredensyal? Kakailanganin ng mga chat na gumagamit ng sistemang ito ng bagong sistema bago makapagpatuloy.",
       "completionTokenFieldHelp": "Patlang para sa token ng sagot: gamitin ang max_completion_tokens para sa mga makabagong API, o ang max_tokens kung kailangan ng iyong dulo ng koneksyon ang lumang patlang."
     },
+    "gguf": {
+      "title": "Mga modelong maaaring i-download",
+      "help": "Mag-download ng open na modelo at patakbuhin ito sa teleponong ito gamit ang llama.cpp. Mananatili sa device ang iyong mga prompt at sagot. Malalaki ang mga modelo, kaya gumamit ng Wi-Fi.",
+      "details": "{{size}} · Lisensya: {{license}}",
+      "download": "I-download ang modelo",
+      "pause": "I-pause ang pag-download",
+      "resume": "Ituloy ang pag-download",
+      "downloading": "Nagda-download: {{written}} ng {{total}}",
+      "downloadingUnknown": "Nagda-download: {{written}}",
+      "paused": "Naka-pause: {{written}} ng {{total}}",
+      "verifying": "Sinusuri ang na-download na file…",
+      "downloaded": "Na-download · {{size}}",
+      "url": "Direktang link ng pag-download",
+      "urlHelp": "I-paste ang HTTPS link sa isang .gguf file, tulad ng Hugging Face resolve link. Mag-download lamang ng mga modelo mula sa mga source na pinagkakatiwalaan mo.",
+      "downloadUrl": "Mag-download mula sa link",
+      "deleteTitle": "Burahin ang modelong ito?",
+      "deleteMessage": "Burahin ang {{name}} sa device na ito? Ang mga chat na gumagamit nito ay mangangailangan ng ibang modelo bago makapagpatuloy.",
+      "errors": {
+        "invalidUrl": "Maglagay ng valid na link.",
+        "insecureUrl": "Gumamit ng HTTPS link. Hindi maaaring i-download ang mga modelo gamit ang HTTP.",
+        "credentialsUrl": "Alisin ang user name at password sa link.",
+        "notGguf": "Dapat nakaturo ang link sa isang .gguf file.",
+        "space": "Walang sapat na libreng storage para sa modelong ito. Magbakante ng espasyo at subukan muli.",
+        "network": "Hindi natapos ang pag-download. Suriin ang iyong koneksyon at subukan muli.",
+        "invalidFile": "Ang na-download na file ay hindi modelong kayang patakbuhin ng app na ito, kaya inalis ito."
+      }
+    },
     "localModels": {
       "title": "Mga modelong nasa device",
       "help": "Tumatakbo sa teleponong ito ang mga modelong nasa device. Mananatili sa device ang iyong mga prompt at sagot, at hindi makakagamit ng mga tool ang mga modelong ito.",

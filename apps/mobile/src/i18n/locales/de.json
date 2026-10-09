@@ -3324,6 +3324,33 @@
       "deleteMessage": "{{name}} und die gespeicherten Zugangsdaten löschen? Chats, die dieses Backend verwenden, benötigen ein neues Backend, bevor sie fortgesetzt werden können.",
       "completionTokenFieldHelp": "Feld für Ausgabetokens: Verwenden Sie max_completion_tokens für moderne APIs oder max_tokens, wenn Ihr Endpunkt das ältere Feld erfordert."
     },
+    "gguf": {
+      "title": "Herunterladbare Modelle",
+      "help": "Lade ein offenes Modell herunter und führe es mit llama.cpp auf diesem Telefon aus. Deine Eingaben und Antworten bleiben auf dem Gerät. Modelle sind groß, verwende daher WLAN.",
+      "details": "{{size}} · Lizenz: {{license}}",
+      "download": "Modell herunterladen",
+      "pause": "Download pausieren",
+      "resume": "Download fortsetzen",
+      "downloading": "Wird heruntergeladen: {{written}} von {{total}}",
+      "downloadingUnknown": "Wird heruntergeladen: {{written}}",
+      "paused": "Pausiert: {{written}} von {{total}}",
+      "verifying": "Die heruntergeladene Datei wird überprüft…",
+      "downloaded": "Heruntergeladen · {{size}}",
+      "url": "Direkter Download-Link",
+      "urlHelp": "Füge einen HTTPS-Link zu einer .gguf-Datei ein, z. B. einen Resolve-Link von Hugging Face. Lade Modelle nur aus Quellen herunter, denen du vertraust.",
+      "downloadUrl": "Über Link herunterladen",
+      "deleteTitle": "Dieses Modell löschen?",
+      "deleteMessage": "{{name}} von diesem Gerät löschen? Chats, die es verwenden, benötigen ein anderes Modell, bevor sie fortgesetzt werden können.",
+      "errors": {
+        "invalidUrl": "Gib einen gültigen Link ein.",
+        "insecureUrl": "Verwende einen HTTPS-Link. Modelle können nicht über HTTP heruntergeladen werden.",
+        "credentialsUrl": "Entferne den Benutzernamen und das Passwort aus dem Link.",
+        "notGguf": "Der Link muss auf eine .gguf-Datei verweisen.",
+        "space": "Es ist nicht genügend freier Speicherplatz für dieses Modell vorhanden. Gib Speicherplatz frei und versuche es erneut.",
+        "network": "Der Download wurde nicht abgeschlossen. Prüfe deine Verbindung und versuche es erneut.",
+        "invalidFile": "Die heruntergeladene Datei ist kein Modell, das diese App ausführen kann, und wurde daher entfernt."
+      }
+    },
     "localModels": {
       "title": "Modelle auf dem Gerät",
       "help": "Modelle auf dem Gerät laufen auf diesem Telefon. Deine Eingaben und Antworten bleiben auf dem Gerät, und diese Modelle können keine Tools verwenden.",

@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
   CONTROL_PLANE_SETUP_EVENTS,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
@@ -44,6 +45,7 @@ import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
+import { restoreWorktreeRecovery } from './worktree-recovery.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
 import {
   emptyWorkspaceDirectory,
@@ -150,6 +152,7 @@ export type PrepareDeps = {
   /** Starts the default setup command, e.g. inside the setup cgroup. */
   spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
+  recoverWorktree?: typeof restoreWorktreeRecovery;
   seedRegistration?: typeof seedSessionIngestRegistration;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
   sessionExists?: (
@@ -321,7 +324,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       type: 'session.progress',
       sessionId,
       step,
-      ...(detail === undefined ? {} : { detail }),
+      ...(detail === undefined
+        ? {}
+        : {
+            detail:
+              detail.length > CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH
+                ? `${detail.slice(0, CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH - 1)}…`
+                : detail,
+          }),
     });
   }
 
@@ -738,7 +748,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     env: Record<string, string>,
     redact: (text: string) => string,
     home: string,
-    setStep: (step: ControlPlanePreparationStep) => void
+    setStep: (step: ControlPlanePreparationStep) => void,
+    onReplacementWorkspace?: () => Promise<void>
   ): Promise<ControlPlaneWorkspaceOutcome> {
     const { inspection, stamp: previous } = await inspectWorkspace(directory);
     if (inspection === 'same') return 'same';
@@ -762,6 +773,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     setStep('setup');
     await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
+    if (cloning || adopted) await onReplacementWorkspace?.();
     const commit = await headCommit(directory, env);
     // The stamp goes down before the snapshot, so a container restored from it
     // sees another allocation's stamp and adopts rather than trusting the files.
@@ -849,12 +861,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     directory: string,
     env: Record<string, string>,
     client: WrapperKiloClient,
-    signal: AbortSignal
+    signal: AbortSignal,
+    restoreFiles: boolean
   ): Promise<void> {
     await seedRegistration(spec.kiloSessionId, env, signal);
     if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
     emitProgress(spec.sessionId, 'kilo_session', 'Loading session history');
-    const restored = await restore(spec.kiloSessionId, directory, undefined, { env, signal });
+    const restored = await restore(spec.kiloSessionId, directory, undefined, {
+      env,
+      signal,
+      restoreFiles,
+    });
     if (restored.ok) {
       if (restored.diffs.skipped > 0) {
         await reportRestoreIncomplete({
@@ -961,13 +978,57 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // directory and inspect the stamp inside the lock, so a waiting session
       // sees the finished workspace and skips the work.
       let workspace: ControlPlaneWorkspaceOutcome | undefined;
+      let replacementWorkspace = false;
+      let localRecoveryApplied = false;
+      const recovery = spec.worktreeRecovery;
       await withWorkspaceLock(directory, async () => {
         if (!needsWorkspace) return;
-        workspace = await prepareWorkspace(spec, directory, env, redact, home, step => {
-          currentStep = step;
-        });
+        workspace = await prepareWorkspace(
+          spec,
+          directory,
+          env,
+          redact,
+          home,
+          step => {
+            currentStep = step;
+          },
+          async () => {
+            replacementWorkspace = true;
+            if (!recovery || owner.released) return;
+            currentStep = 'restore';
+            try {
+              emitProgress(sessionId, 'restore', 'Restoring saved worktree changes');
+              const diffs = await (deps.recoverWorktree ?? restoreWorktreeRecovery)(
+                directory,
+                recovery,
+                env,
+                AbortSignal.timeout(30_000)
+              );
+              log(
+                `local worktree recovery session=${sessionId} applied=${diffs.applied} skipped=${diffs.skipped} total=${diffs.total}`
+              );
+              localRecoveryApplied = diffs.applied > 0 || diffs.total === 0;
+              const incomplete = await reportRestoreIncomplete({
+                diffs,
+                identity: `kiloSessionId=${spec.kiloSessionId}`,
+                log,
+              });
+              if (incomplete) emitProgress(sessionId, 'restore', incomplete.message);
+            } catch {
+              log(`local worktree recovery session=${sessionId} failed; continuing`);
+              emitProgress(
+                sessionId,
+                'restore',
+                'Saved worktree changes could not be restored; continuing'
+              );
+            }
+          }
+        );
       });
       if (owner.released) return;
+      if (recovery && !replacementWorkspace) {
+        log(`local worktree recovery session=${sessionId} skipped reason=surviving_workspace`);
+      }
       currentStep = 'kilo_runtime';
       emitProgress(sessionId, 'kilo_runtime');
       if (spec.runtimeIsolation === 'per-session') await materializeRuntimeProfile(home, spec);
@@ -988,7 +1049,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       await withOneRetry(
         () =>
           withinStep('kilo_session', timers.kiloSessionMs, signal =>
-            resolveKiloSession(spec, directory, env, client, signal)
+            resolveKiloSession(
+              spec,
+              directory,
+              env,
+              client,
+              signal,
+              !(replacementWorkspace && localRecoveryApplied)
+            )
           ),
         () => !owner.released
       );

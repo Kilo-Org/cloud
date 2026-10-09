@@ -19,6 +19,11 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
 import type { AgentSandboxProvider } from '../types.js';
 import { WORKTREE_CHANGED_EVENT } from '../shared/worktree-changes-wire.js';
+import {
+  MAX_WORKTREE_CHANGES_BYTES,
+  worktreeRecoverySchema,
+  type WorktreeRecovery,
+} from '../shared/worktree-changes-wire.js';
 
 export const WORKTREE_CHANGES_KEY = 'worktree_changes';
 export const WORKTREE_FILE_PREFIX = 'worktree_file:';
@@ -279,6 +284,28 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
   }
 
   return {
+    recovery(): WorktreeRecovery | undefined {
+      const snapshot = readSnapshot();
+      if (!snapshot || snapshot.files.length === 0 || suppressed) return undefined;
+      const files: WorktreeRecovery['files'] = snapshot.files.map(file => ({
+        path: file.path,
+        status: file.status,
+      }));
+      const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+      let remaining = MAX_WORKTREE_CHANGES_BYTES - bytes({ files });
+      for (const file of files) {
+        const record = readRecordAgainstManifest(snapshot, file.path)?.record;
+        if (record?.diff.status === 'available') {
+          const extra = bytes({ ...file, patch: record.diff.patch }) - bytes(file);
+          if (extra <= remaining) {
+            file.patch = record.diff.patch;
+            remaining -= extra;
+          }
+        }
+      }
+      const parsed = worktreeRecoverySchema.safeParse({ files });
+      return parsed.success ? parsed.data : undefined;
+    },
     async get(): Promise<GetWorktreeChangesOutput> {
       return { snapshot: readSnapshot() };
     },

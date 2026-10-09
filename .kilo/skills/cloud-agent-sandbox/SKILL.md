@@ -30,9 +30,10 @@ If this does not print `ready`, run setup from the repository root:
 bash .kilo/cloud-agent-setup.sh
 ```
 
-A restarted machine takes about 90 s, since `node_modules` survives. A machine
-without dependencies takes about 4 minutes: apt packages, `pnpm install`,
-Compose image pulls, and migrations. Setup stops at the first failure and prints
+A restarted machine takes about 6 minutes, mostly building the Cloud Agent
+sandbox images; `node_modules` survives the restart. A rerun on a running
+machine takes under 2 minutes, because images come from the build cache. A
+machine without dependencies adds about 3 minutes for `pnpm install`. Setup stops at the first failure and prints
 the line number.
 
 ## What setup does
@@ -49,6 +50,10 @@ the line number.
   `/usr/local/lib/kilo-cloud-agent/real-pnpm`, unchanged.
 - Installs dependencies, creates `.env.local`, runs `pnpm test:db`, and seeds a
   fake-login user with credits.
+- Builds the eight Cloud Agent sandbox images by running `wrangler dev` for
+  `cloud-agent-next` on spare ports until `Container image(s) ready`. The log is
+  `.wrangler/kilo-startup/sandbox-images.log`. Skip this with
+  `KILO_STARTUP_SANDBOX_IMAGES=0`.
 - It does not start the dev stack.
 
 `.wrangler/kilo-startup/env` only sets defaults. Override a value by exporting
@@ -76,8 +81,10 @@ pnpm dev:stop
   GitHub App credentials, which the sandbox does not have.
 - `--no-attach` returns once services are up: about 50 s for `app`. The first
   page load compiles with Turbopack and takes about 30 s more.
-- The first agents start after a restart builds eight Cloud Agent sandbox
-  images, about 12 minutes. `cloud-agent-next` reports `up` before they are
+- Wrangler rebuilds every sandbox image each time `cloud-agent-next` starts.
+  Images build in dockerd's own BuildKit, so unchanged images come from the
+  layer cache. Setup prebuilds them; without that, or after a Dockerfile change,
+  the build takes minutes. `cloud-agent-next` reports `up` before images are
   ready, and sessions created meanwhile fail (`fetch failed` in the harness).
   Wait for the build to finish:
 
@@ -153,10 +160,22 @@ echo "$(( $(cat $cg/memory.current) / 1048576 )) MiB of $(( $(cat $cg/memory.max
 grep -E '^(high|max|oom_kill) ' $cg/memory.events
 ```
 
-If the `max` count keeps rising, you are near the cap. Stop work you do not
-need, remove idle sandbox containers, or start fewer services. Dev tooling is
+If the `high` or `max` count keeps rising, you are near the cap. Stop work you do
+not need, remove idle sandbox containers, or start fewer services. Dev tooling is
 heavy: wrangler and workerd use about 3 GB, and the pnpm parents and log filters
-about 2 GB. Redis is not the problem; it idles under 1% CPU.
+about 2 GB.
+
+- Next.js dev (Turbopack) grows by 1 to 3 GB while compiling a route and gives
+  most of it back after about two minutes idle: 4.2 GB after login fell to
+  2.8 GB, and 4.4 GB after `/cloud` fell to 2.0 GB. Opening many routes back to
+  back fills the cap before that happens. Pause between heavy routes. Next 16.3
+  already defaults `experimental.turbopackMemoryEviction` to `auto`.
+- High Redis, redis-http, or Postgres CPU means memory pressure, not load. Under
+  pressure, Redis used 6 s of user CPU and 1590 s of system CPU in 90 minutes:
+  the kernel kept evicting and re-reading its code pages. Compare with
+  `cat $cg/containers/*/cpu.stat`. Idle Redis without pressure uses under 1%.
+- If Next.js is stuck above the cap, `pkill -9 -f '^[n]ext-server'`, then
+  `pnpm dev:restart nextjs`.
 
 Run heavy commands such as builds, tests, and typechecks from inside the
 repository, so that the wrapper caps them. pnpm outside the repository and
@@ -182,7 +201,7 @@ docker exec <sandbox container> git ls-remote https://github.com/octocat/Hello-W
 
 - `pkill -f next-server` also matches the shell that runs it. Use
   `pkill -f '[n]ext-server'`.
-- Do not prune Docker images, volumes, or the BuildKit builder. Rebuilding the
-  Cloud Agent images costs about 12 minutes.
+- Do not prune Docker images or build cache. Rebuilding the Cloud Agent images
+  costs about 12 minutes.
 - Lint setup changes with `shellcheck -S warning -e SC1090 .kilo/cloud-agent-setup.sh`.
   Setup does not install ShellCheck; use `apt-get install -y shellcheck`.

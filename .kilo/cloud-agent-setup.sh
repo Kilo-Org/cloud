@@ -160,7 +160,6 @@ fi
 mkdir -p "$startup_bin"
 rm -f "$startup_bin/pnpm" "$state_dir/browser.env" "$state_dir/selection"
 real_docker=$(readlink -f "$(command -v docker)")
-KILO_STARTUP_BUILDER="kilo-lowmem-$(basename "$repo")"
 cat > "$state_dir/compose.memory.yml" <<YAML
 services:
   postgres:
@@ -202,11 +201,10 @@ function run(input) {
     const source = args.findIndex((arg, i) => arg === '-f' && path.resolve(args[i + 1]) === path.resolve(__dirname, '../../dev/docker-compose.yml'));
     if (source !== -1) args.splice(source + 2, 0, '-f', path.join(__dirname, 'compose.memory.yml'));
   }
-  if (build) args.splice(0, 1, 'buildx', 'build', '--builder', process.env.KILO_STARTUP_BUILDER, '--allow=network.host');
-  // Stop the builder after each build so its 2 GiB does not stay inside the dev workload budget; buildx restarts it on demand.
-  const buildScript = '"$KILO_STARTUP_REAL_DOCKER" "$@"; status=$?; "$KILO_STARTUP_REAL_DOCKER" stop "buildx_buildkit_${KILO_STARTUP_BUILDER}0" >/dev/null 2>&1; exit $status';
+  // dockerd's own BuildKit keeps images in the daemon store, so unchanged images rebuild from cache in seconds.
+  if (build) args.splice(1, 0, `--cgroup-parent=${process.env.KILO_STARTUP_CGROUP.replace('/sys/fs/cgroup', '')}/containers/builds`);
   const command = build ? 'flock' : process.env.KILO_STARTUP_REAL_DOCKER;
-  const commandArgs = build ? [path.join(__dirname, 'image-build.lock'), 'sh', '-c', buildScript, 'sandbox-docker-build', ...args] : args;
+  const commandArgs = build ? [path.join(__dirname, 'image-build.lock'), process.env.KILO_STARTUP_REAL_DOCKER, ...args] : args;
   const child = spawn(command, commandArgs, { stdio: [input === undefined ? 'inherit' : 'pipe', 'inherit', 'inherit'] });
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
   child.on('error', error => { console.error(error.message); process.exitCode = 1; });
@@ -241,7 +239,7 @@ env_default() {
 {
   printf 'case ":$PATH:" in *:%q:*) ;; *) export PATH=%q:"$PATH" ;; esac\n' "$startup_bin" "$startup_bin"
   printf 'export SHELL=%q\n' "$startup_bin/kilo-shell"
-  for name in NEXT_TELEMETRY_DISABLED SKIP_STRIPE_API KILO_PORT_OFFSET KILO_ENV_SYNC_CONCURRENCY KILO_STARTUP_CGROUP KILO_STARTUP_BUILDER; do
+  for name in NEXT_TELEMETRY_DISABLED SKIP_STRIPE_API KILO_PORT_OFFSET KILO_ENV_SYNC_CONCURRENCY KILO_STARTUP_CGROUP; do
     env_default "$name" "${!name}"
   done
   env_default KILO_STARTUP_REAL_DOCKER "$real_docker"
@@ -302,7 +300,7 @@ if ! docker info >/dev/null 2>&1; then
   fi
   # Own the socket by the invoking user's group so a non-root sandbox can use the daemon it starts.
   "${root[@]}" tmux new-session -d -s kilo-startup-docker \
-    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
+    "env DOCKER_ALLOW_IPV6_ON_IPV4_INTERFACE=1 dockerd --group=$(id -gn) --storage-driver=$storage_driver --ip-forward=false --bip=$bridge_gateway/16 --registry-mirror=https://mirror.gcr.io --cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers"
   for (( attempt=0; attempt<30; attempt++ )); do
     docker info >/dev/null 2>&1 && break
     sleep 1
@@ -331,37 +329,19 @@ fi
 if tmux list-sessions >/dev/null 2>&1; then
   while IFS= read -r line; do
     tmux set-environment -g "${line%%=*}" "${line#*=}"
-  done < <(bash -c 'source "$1"; for name in PATH SHELL KILO_PORT_OFFSET KILO_STARTUP_CGROUP KILO_STARTUP_BUILDER KILO_STARTUP_REAL_DOCKER WRANGLER_DOCKER_BIN WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST NODE_EXTRA_CA_CERTS; do [[ -n ${!name:-} ]] && printf "%s=%s\n" "$name" "${!name}"; done' _ "$env_file")
+  done < <(bash -c 'source "$1"; for name in PATH SHELL KILO_PORT_OFFSET KILO_STARTUP_CGROUP KILO_STARTUP_REAL_DOCKER WRANGLER_DOCKER_BIN WRANGLER_CI_OVERRIDE_NETWORK_MODE_HOST NODE_EXTRA_CA_CERTS; do [[ -n ${!name:-} ]] && printf "%s=%s\n" "$name" "${!name}"; done' _ "$env_file")
 fi
 
-cat > "$state_dir/buildkitd.toml" <<'TOML'
-[worker.oci]
-  max-parallelism = 1
-  networkMode = "host"
-[registry."docker.io"]
-  mirrors = ["mirror.gcr.io"]
-TOML
-if [[ -n ${NODE_EXTRA_CA_CERTS:-} && -f $NODE_EXTRA_CA_CERTS ]]; then
-  ca_path=$(node -p 'JSON.stringify(process.env.NODE_EXTRA_CA_CERTS)')
-  printf '  ca = [%s]\n[registry."mirror.gcr.io"]\n  ca = [%s]\n' "$ca_path" "$ca_path" >> "$state_dir/buildkitd.toml"
+legacy_builder="kilo-lowmem-$(basename "$repo")"
+if docker buildx inspect "$legacy_builder" >/dev/null 2>&1; then
+  docker buildx rm --force "$legacy_builder" >/dev/null
 fi
-if ! docker buildx inspect "$KILO_STARTUP_BUILDER" >/dev/null 2>&1; then
-  docker buildx create --name "$KILO_STARTUP_BUILDER" --driver docker-container \
-    --driver-opt "image=mirror.gcr.io/moby/buildkit:v0.16.0,memory=2g,memory-swap=2g,network=host,cgroup-parent=${KILO_STARTUP_CGROUP#/sys/fs/cgroup}/containers" \
-    --buildkitd-config "$state_dir/buildkitd.toml" \
-    --buildkitd-flags '--allow-insecure-entitlement network.host'
-fi
-timeout 3m docker buildx inspect --bootstrap "$KILO_STARTUP_BUILDER" >/dev/null
-docker inspect "buildx_buildkit_${KILO_STARTUP_BUILDER}0" --format '{{json .HostConfig}}' | node -e '
-  let input = "";
-  process.stdin.on("data", chunk => { input += chunk; });
-  process.stdin.on("end", () => {
-    const config = JSON.parse(input);
-    const parent = process.env.KILO_STARTUP_CGROUP.replace("/sys/fs/cgroup", "") + "/containers";
-    if (config.Memory !== 2147483648 || config.CgroupParent !== parent) throw new Error("BuildKit is not inside its required memory budget");
-  });
-'
-docker stop "buildx_buildkit_${KILO_STARTUP_BUILDER}0" >/dev/null
+# Image build steps run in their own 2 GiB slice of the dev workload budget.
+builds_cgroup="$KILO_STARTUP_CGROUP/containers/builds"
+printf '+memory +cpu\n' | "${root[@]}" tee "$KILO_STARTUP_CGROUP/containers/cgroup.subtree_control" >/dev/null
+"${root[@]}" mkdir -p "$builds_cgroup"
+printf '%s\n' "$(( 2048 * 1048576 ))" | "${root[@]}" tee "$builds_cgroup/memory.max" >/dev/null
+printf '0\n' | "${root[@]}" tee "$builds_cgroup/memory.swap.max" >/dev/null
 
 timeout 15m pnpm install --frozen-lockfile --child-concurrency=1 --network-concurrency=4
 if [[ ! -s .env.local ]]; then
@@ -413,6 +393,27 @@ SQL
 )
 pnpm dev:seed app:add-credits "$test_user_id" 100 --free
 env_default KILO_TEST_USER_EMAIL "$test_email" >> "$env_file"
+
+# wrangler dev builds every Cloud Agent sandbox image on start. Build them now so dev:start only hits the cache.
+if [[ ${KILO_STARTUP_SANDBOX_IMAGES:-1} != 0 ]]; then
+  printf 'Building Cloud Agent sandbox images (about 10 minutes on a new machine, under a minute when cached).\n'
+  images_log="$state_dir/sandbox-images.log"
+  setsid bash -c 'source "$1"; cd services/cloud-agent-next; exec pnpm run dev --port 28794 --inspector-port 38794 --ip 127.0.0.1' \
+    _ "$env_file" > "$images_log" 2>&1 < /dev/null &
+  images_pid=$!
+  images_deadline=$(( SECONDS + 2400 ))
+  until grep -qF 'Container image(s) ready' "$images_log"; do
+    if ! kill -0 "$images_pid" 2>/dev/null || (( SECONDS > images_deadline )); then
+      kill -KILL -- "-$images_pid" 2>/dev/null || true
+      tail -20 "$images_log" >&2
+      printf 'Building Cloud Agent sandbox images failed; see %s. Rerun setup, or set KILO_STARTUP_SANDBOX_IMAGES=0 to skip.\n' "$images_log" >&2
+      exit 1
+    fi
+    sleep 5
+  done
+  kill -TERM -- "-$images_pid"
+  wait "$images_pid" 2>/dev/null || true
+fi
 
 printf '\nSetup complete. Dev workload memory peak so far: %s MiB / %s MiB.\n' \
   "$(( $(< "$KILO_STARTUP_CGROUP/memory.peak") / 1048576 ))" "$KILO_STARTUP_MEMORY_MB"

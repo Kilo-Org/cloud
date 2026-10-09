@@ -176,6 +176,12 @@ function answer(
     const run = async () => {
       try {
         await bridge.generate(native);
+        // A bridge resolves only after it emitted its terminal event. A resolve
+        // with none is a bridge defect: failing is what releases the caller
+        // instead of leaving the answer streaming forever.
+        if (state === 'running') {
+          fail('missing_terminal_event');
+        }
       } catch (error) {
         // A rejection with no terminal event (Android reports busy this way).
         if (state === 'running') {

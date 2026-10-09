@@ -263,4 +263,16 @@ describe('native on-device model client', () => {
     expect(await usageOf(noCounter.bridge)).toMatchObject(estimate);
     expect(countTokens).toHaveBeenCalledOnce();
   });
+
+  it('fails the answer when a bridge resolves without a terminal event', async () => {
+    const { bridge } = fakeBridge((native, emit) => {
+      emit({ id: native.id, kind: 'delta', text: 'Half' });
+      // No done and no error: the promise resolves anyway.
+    });
+    const result = await collect(bridge);
+    expect(Either.isLeft(result) && result.left.reason).toBe('stream');
+    expect(Either.isLeft(result) && backendFailureKey(result.left)).toBe(
+      'modelChat.localModels.failed'
+    );
+  });
 });

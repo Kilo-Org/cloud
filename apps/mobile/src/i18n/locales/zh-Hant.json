@@ -3347,7 +3347,7 @@
       "busy": "裝置端模型正在產生另一則回覆，請在完成後再試一次。",
       "failed": "裝置端模型無法回答此訊息。請再試一次或換個說法。",
       "android": "Gemini Nano（裝置端）",
-      "background": "由於 Kilo 已離開畫面，裝置端模型已停止。請點選「再試一次」重新提問。",
+      "background": "由於 Kilo 已離開畫面，裝置端模型已停止。請點選「$t(common.retry)」重新提問。",
       "download": "下載裝置端模型",
       "downloading": "下載中…",
       "downloadProgress": "下載中… {{percent}}%",

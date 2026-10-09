@@ -3347,7 +3347,7 @@
       "busy": "Ụdị nlereanya na ngwaọrụ na-arụ ọrụ na nzaghachi ọzọ. Nwaa ọzọ mgbe ọ gwụchara.",
       "failed": "Ụdị nlereanya na ngwaọrụ enweghị ike ịza ozi a. Nwaa ọzọ ma ọ bụ dee ya n'ụzọ ọzọ.",
       "android": "Gemini Nano (na ngwaọrụ)",
-      "background": "Ụdị nlereanya na ngwaọrụ kwụsịrị n'ihi na Kilo hapụrụ ihuenyo ahụ. Pịa Nwaa ọzọ ka ị jụọ ọzọ.",
+      "background": "Ụdị nlereanya na ngwaọrụ kwụsịrị n'ihi na Kilo hapụrụ ihuenyo ahụ. Pịa $t(common.retry) ka ị jụọ ọzọ.",
       "download": "Budata ụdị nlereanya na ngwaọrụ",
       "downloading": "Na-ebudata…",
       "downloadProgress": "Na-ebudata… {{percent}}%",

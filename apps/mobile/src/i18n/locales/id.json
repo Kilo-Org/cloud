@@ -3347,7 +3347,7 @@
       "busy": "Model di perangkat sedang menyusun balasan lain. Coba lagi setelah selesai.",
       "failed": "Model di perangkat tidak dapat menjawab pesan ini. Coba lagi atau ubah susunan kalimatnya.",
       "android": "Gemini Nano (di perangkat)",
-      "background": "Model di perangkat berhenti karena Kilo meninggalkan layar. Ketuk Coba lagi untuk bertanya lagi.",
+      "background": "Model di perangkat berhenti karena Kilo meninggalkan layar. Ketuk $t(common.retry) untuk bertanya lagi.",
       "download": "Unduh model di perangkat",
       "downloading": "Mengunduh…",
       "downloadProgress": "Mengunduh… {{percent}}%",

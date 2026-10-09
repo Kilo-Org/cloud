@@ -3347,7 +3347,7 @@
       "busy": "Het model op het apparaat is bezig met een ander antwoord. Probeer het opnieuw zodra het klaar is.",
       "failed": "Het model op het apparaat kon dit bericht niet beantwoorden. Probeer het opnieuw of formuleer het anders.",
       "android": "Gemini Nano (op het apparaat)",
-      "background": "Het model op het apparaat is gestopt omdat Kilo het scherm heeft verlaten. Tik op Opnieuw proberen om het nog eens te vragen.",
+      "background": "Het model op het apparaat is gestopt omdat Kilo het scherm heeft verlaten. Tik op $t(common.retry) om het nog eens te vragen.",
       "download": "Model op het apparaat downloaden",
       "downloading": "Downloaden…",
       "downloadProgress": "Downloaden… {{percent}}%",

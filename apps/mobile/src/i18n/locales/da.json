@@ -3347,7 +3347,7 @@
       "busy": "Modellen på enheden er optaget af et andet svar. Prøv igen, når den er færdig.",
       "failed": "Modellen på enheden kunne ikke besvare denne besked. Prøv igen, eller omformuler den.",
       "android": "Gemini Nano (på enheden)",
-      "background": "Modellen på enheden stoppede, fordi Kilo forlod skærmen. Tryk på Prøv igen for at spørge igen.",
+      "background": "Modellen på enheden stoppede, fordi Kilo forlod skærmen. Tryk på $t(common.retry) for at spørge igen.",
       "download": "Download model til enheden",
       "downloading": "Downloader…",
       "downloadProgress": "Downloader… {{percent}}%",

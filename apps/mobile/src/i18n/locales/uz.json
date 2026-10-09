@@ -3347,7 +3347,7 @@
       "busy": "Qurilmadagi model boshqa javob bilan band. U tugagach, qayta urining.",
       "failed": "Qurilmadagi model bu xabarga javob bera olmadi. Qayta urining yoki boshqacha yozing.",
       "android": "Gemini Nano (qurilmada)",
-      "background": "Kilo ekrandan chiqqani sababli qurilmadagi model to‘xtadi. Qayta so‘rash uchun “Qayta urinish” tugmasini bosing.",
+      "background": "Kilo ekrandan chiqqani sababli qurilmadagi model to‘xtadi. Qayta so‘rash uchun $t(common.retry) tugmasini bosing.",
       "download": "Qurilmadagi modelni yuklab olish",
       "downloading": "Yuklab olinmoqda…",
       "downloadProgress": "Yuklab olinmoqda… {{percent}}%",

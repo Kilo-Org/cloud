@@ -3390,7 +3390,7 @@
       "busy": "El model al dispositiu està ocupat amb una altra resposta. Torna-ho a provar quan acabi.",
       "failed": "El model al dispositiu no ha pogut respondre aquest missatge. Torna-ho a provar o reformula'l.",
       "android": "Gemini Nano (al dispositiu)",
-      "background": "El model al dispositiu s'ha aturat perquè Kilo ha sortit de la pantalla. Toca «Torna-ho a provar» per tornar a preguntar.",
+      "background": "El model al dispositiu s'ha aturat perquè Kilo ha sortit de la pantalla. Toca $t(common.retry) per tornar a preguntar.",
       "download": "Baixa el model al dispositiu",
       "downloading": "S'està baixant…",
       "downloadProgress": "S'està baixant… {{percent}}%",

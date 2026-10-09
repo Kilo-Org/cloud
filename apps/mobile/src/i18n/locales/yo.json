@@ -3347,7 +3347,7 @@
       "busy": "Awoṣe lórí ẹ̀rọ ń dá èsì míì lọ́wọ́. Gbìyànjú lẹ́ẹ̀kan sí i tí ó bá parí.",
       "failed": "Awoṣe lórí ẹ̀rọ kò lè dáhùn ọ̀rọ̀ yìí. Gbìyànjú lẹ́ẹ̀kan sí i tàbí kọ ọ́ lọ́nà míì.",
       "android": "Gemini Nano (lórí ẹ̀rọ)",
-      "background": "Awoṣe lórí ẹ̀rọ dúró nítorí pé Kilo kúrò lójú ìbòjú. Tẹ Tún gbìyànjú láti béèrè lẹ́ẹ̀kan sí i.",
+      "background": "Awoṣe lórí ẹ̀rọ dúró nítorí pé Kilo kúrò lójú ìbòjú. Tẹ $t(common.retry) láti béèrè lẹ́ẹ̀kan sí i.",
       "download": "Gba awoṣe lórí ẹ̀rọ sílẹ̀",
       "downloading": "Ó ń gbà sílẹ̀…",
       "downloadProgress": "Ó ń gbà sílẹ̀… {{percent}}%",

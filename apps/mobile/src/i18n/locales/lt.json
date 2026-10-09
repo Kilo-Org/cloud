@@ -3433,7 +3433,7 @@
       "busy": "Įrenginio modelis užimtas kitu atsakymu. Bandykite dar kartą, kai jis baigs.",
       "failed": "Įrenginio modelis negalėjo atsakyti į šią žinutę. Bandykite dar kartą arba performuluokite.",
       "android": "Gemini Nano (įrenginyje)",
-      "background": "Įrenginio modelis sustojo, nes Kilo išėjo iš ekrano. Bakstelėkite „Bandyti dar kartą“, kad paklaustumėte iš naujo.",
+      "background": "Įrenginio modelis sustojo, nes Kilo išėjo iš ekrano. Bakstelėkite „$t(common.retry)“, kad paklaustumėte iš naujo.",
       "download": "Atsisiųsti įrenginio modelį",
       "downloading": "Atsisiunčiama…",
       "downloadProgress": "Atsisiunčiama… {{percent}}%",

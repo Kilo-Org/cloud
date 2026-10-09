@@ -3347,7 +3347,7 @@
       "busy": "Mô hình trên thiết bị đang bận trả lời tin nhắn khác. Hãy thử lại khi hoàn tất.",
       "failed": "Mô hình trên thiết bị không thể trả lời tin nhắn này. Hãy thử lại hoặc diễn đạt theo cách khác.",
       "android": "Gemini Nano (trên thiết bị)",
-      "background": "Mô hình trên thiết bị đã dừng vì Kilo rời khỏi màn hình. Nhấn Thử lại để hỏi lại.",
+      "background": "Mô hình trên thiết bị đã dừng vì Kilo rời khỏi màn hình. Nhấn $t(common.retry) để hỏi lại.",
       "download": "Tải xuống mô hình trên thiết bị",
       "downloading": "Đang tải xuống…",
       "downloadProgress": "Đang tải xuống… {{percent}}%",

@@ -3347,7 +3347,7 @@
       "busy": "기기 내 모델이 다른 답변을 생성하는 중입니다. 완료된 후 다시 시도하세요.",
       "failed": "기기 내 모델이 이 메시지에 답변하지 못했습니다. 다시 시도하거나 다른 표현으로 입력해 보세요.",
       "android": "Gemini Nano(기기 내)",
-      "background": "Kilo가 화면을 벗어나 기기 내 모델이 중지되었습니다. 다시 질문하려면 '다시 시도'를 탭하세요.",
+      "background": "Kilo가 화면을 벗어나 기기 내 모델이 중지되었습니다. 다시 질문하려면 $t(common.retry)를 탭하세요.",
       "download": "기기 내 모델 다운로드",
       "downloading": "다운로드 중…",
       "downloadProgress": "다운로드 중… {{percent}}%",

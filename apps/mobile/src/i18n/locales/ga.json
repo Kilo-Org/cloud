@@ -3476,7 +3476,7 @@
       "busy": "Tá an tsamhail ar an ngléas gnóthach le freagra eile. Bain triail eile as nuair a bheidh sé críochnaithe.",
       "failed": "Níorbh fhéidir leis an tsamhail ar an ngléas an teachtaireacht seo a fhreagairt. Bain triail eile as nó athfhoclaigh í.",
       "android": "Gemini Nano (ar an ngléas)",
-      "background": "Stop an tsamhail ar an ngléas mar gur fhág Kilo an scáileán. Tapáil \"Bain triail eile as\" chun an cheist a chur arís.",
+      "background": "Stop an tsamhail ar an ngléas mar gur fhág Kilo an scáileán. Tapáil \"$t(common.retry)\" chun an cheist a chur arís.",
       "download": "Íoslódáil an tsamhail ar an ngléas",
       "downloading": "Á híoslódáil…",
       "downloadProgress": "Á híoslódáil… {{percent}}%",

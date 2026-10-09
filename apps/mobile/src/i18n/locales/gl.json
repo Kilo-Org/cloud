@@ -3347,7 +3347,7 @@
       "busy": "O modelo no dispositivo está ocupado con outra resposta. Téntao de novo cando remate.",
       "failed": "O modelo no dispositivo non puido responder a esta mensaxe. Téntao de novo ou reformúlaa.",
       "android": "Gemini Nano (no dispositivo)",
-      "background": "O modelo no dispositivo detívose porque Kilo saíu da pantalla. Toca Tentar de novo para preguntar outra vez.",
+      "background": "O modelo no dispositivo detívose porque Kilo saíu da pantalla. Toca $t(common.retry) para preguntar outra vez.",
       "download": "Descargar o modelo no dispositivo",
       "downloading": "Descargando…",
       "downloadProgress": "Descargando… {{percent}}%",

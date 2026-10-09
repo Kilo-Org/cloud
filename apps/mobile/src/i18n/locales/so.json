@@ -3347,7 +3347,7 @@
       "busy": "Moodeelka aaladda gudaheeda wuxuu ku mashquulsan yahay jawaab kale. Isku day marka uu dhammeeyo.",
       "failed": "Moodeelka aaladda gudaheeda wuu ka jawaabi waayay fariintan. Isku day mar kale ama si kale u qor.",
       "android": "Gemini Nano (aaladda gudaheeda)",
-      "background": "Moodeelka aaladda gudaheeda wuu istaagay sababtoo ah Kilo shaashadda ayuu ka baxay. Taabo \"Mar kale isku day\" si aad mar kale u weydiiso.",
+      "background": "Moodeelka aaladda gudaheeda wuu istaagay sababtoo ah Kilo shaashadda ayuu ka baxay. Taabo $t(common.retry) si aad mar kale u weydiiso.",
       "download": "Soo deji moodeelka aaladda gudaheeda",
       "downloading": "Waa la soo dejinayaa…",
       "downloadProgress": "Waa la soo dejinayaa… {{percent}}%",

@@ -3304,7 +3304,7 @@
       "busy": "The on-device model is busy with another reply. Try again when it finishes.",
       "failed": "The on-device model couldn't answer this message. Try again or rephrase it.",
       "android": "Gemini Nano (on device)",
-      "background": "The on-device model stopped because Kilo left the screen. Tap Retry to ask again.",
+      "background": "The on-device model stopped because Kilo left the screen. Tap $t(common.retry) to ask again.",
       "download": "Download on-device model",
       "downloading": "Downloading…",
       "downloadProgress": "Downloading… {{percent}}%",

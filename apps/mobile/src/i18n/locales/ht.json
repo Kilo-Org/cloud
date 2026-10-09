@@ -3347,7 +3347,7 @@
       "busy": "Modèl sou aparèy la okipe ak yon lòt repons. Eseye ankò lè li fini.",
       "failed": "Modèl sou aparèy la pa t ka reponn mesaj sa a. Eseye ankò oswa ekri l yon lòt jan.",
       "android": "Gemini Nano (sou aparèy la)",
-      "background": "Modèl sou aparèy la sispann paske Kilo kite ekran an. Peze Eseye ankò pou mande ankò.",
+      "background": "Modèl sou aparèy la sispann paske Kilo kite ekran an. Peze $t(common.retry) pou mande ankò.",
       "download": "Telechaje modèl sou aparèy la",
       "downloading": "Ap telechaje…",
       "downloadProgress": "Ap telechaje… {{percent}}%",

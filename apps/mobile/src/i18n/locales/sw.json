@@ -3347,7 +3347,7 @@
       "busy": "Modeli ya kwenye kifaa inashughulikia jibu jingine. Jaribu tena itakapomaliza.",
       "failed": "Modeli ya kwenye kifaa haikuweza kujibu ujumbe huu. Jaribu tena au uuandike kwa njia nyingine.",
       "android": "Gemini Nano (kwenye kifaa)",
-      "background": "Modeli ya kwenye kifaa ilisimama kwa sababu Kilo iliondoka kwenye skrini. Gusa Jaribu tena ili uulize tena.",
+      "background": "Modeli ya kwenye kifaa ilisimama kwa sababu Kilo iliondoka kwenye skrini. Gusa $t(common.retry) ili uulize tena.",
       "download": "Pakua modeli ya kwenye kifaa",
       "downloading": "Inapakua…",
       "downloadProgress": "Inapakua… {{percent}}%",

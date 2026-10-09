@@ -3433,7 +3433,7 @@
       "busy": "Model v zariadení práve generuje inú odpoveď. Skúste to znova, keď skončí.",
       "failed": "Model v zariadení nedokázal odpovedať na túto správu. Skúste to znova alebo ju preformulujte.",
       "android": "Gemini Nano (v zariadení)",
-      "background": "Model v zariadení sa zastavil, pretože Kilo opustilo obrazovku. Ťuknite na Skúsiť znova a opýtajte sa znova.",
+      "background": "Model v zariadení sa zastavil, pretože Kilo opustilo obrazovku. Ťuknite na $t(common.retry) a opýtajte sa znova.",
       "download": "Stiahnuť model do zariadenia",
       "downloading": "Sťahuje sa…",
       "downloadProgress": "Sťahuje sa… {{percent}} %",

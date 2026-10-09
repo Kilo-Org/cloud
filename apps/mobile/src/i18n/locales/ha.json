@@ -3347,7 +3347,7 @@
       "busy": "Samfurin da ke kan na'ura yana aiki da wata amsa. Sake gwadawa idan ya gama.",
       "failed": "Samfurin da ke kan na'ura bai iya amsa wannan saƙon ba. Sake gwadawa ko ka sake rubuta shi.",
       "android": "Gemini Nano (a kan na'ura)",
-      "background": "Samfurin da ke kan na'ura ya tsaya saboda Kilo ya bar allon. Taɓa Sake gwadawa don sake tambaya.",
+      "background": "Samfurin da ke kan na'ura ya tsaya saboda Kilo ya bar allon. Taɓa $t(common.retry) don sake tambaya.",
       "download": "Sauke samfurin da ke kan na'ura",
       "downloading": "Ana saukewa…",
       "downloadProgress": "Ana saukewa… {{percent}}%",

@@ -3347,7 +3347,7 @@
       "busy": "Líkanið í tækinu er upptekið við annað svar. Reyndu aftur þegar því lýkur.",
       "failed": "Líkanið í tækinu gat ekki svarað þessum skilaboðum. Reyndu aftur eða orðaðu þau öðruvísi.",
       "android": "Gemini Nano (í tækinu)",
-      "background": "Líkanið í tækinu stöðvaðist vegna þess að Kilo fór af skjánum. Ýttu á Reyna aftur til að spyrja aftur.",
+      "background": "Líkanið í tækinu stöðvaðist vegna þess að Kilo fór af skjánum. Ýttu á $t(common.retry) til að spyrja aftur.",
       "download": "Sækja líkan í tækið",
       "downloading": "Sæki…",
       "downloadProgress": "Sæki… {{percent}}%",

@@ -3390,7 +3390,7 @@
       "busy": "Ierīces modelis ir aizņemts ar citu atbildi. Mēģiniet vēlreiz, kad tas būs pabeidzis.",
       "failed": "Ierīces modelis nevarēja atbildēt uz šo ziņojumu. Mēģiniet vēlreiz vai pārformulējiet to.",
       "android": "Gemini Nano (ierīcē)",
-      "background": "Ierīces modelis apturēja darbu, jo Kilo aizvēra ekrānu. Pieskarieties “Mēģināt vēlreiz”, lai jautātu vēlreiz.",
+      "background": "Ierīces modelis apturēja darbu, jo Kilo aizvēra ekrānu. Pieskarieties “$t(common.retry)”, lai jautātu vēlreiz.",
       "download": "Lejupielādēt ierīces modeli",
       "downloading": "Notiek lejupielāde…",
       "downloadProgress": "Notiek lejupielāde… {{percent}}%",

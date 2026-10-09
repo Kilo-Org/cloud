@@ -3347,7 +3347,7 @@
       "busy": "Laitteessa toimiva malli kirjoittaa toista vastausta. Yritä uudelleen, kun se on valmis.",
       "failed": "Laitteessa toimiva malli ei pystynyt vastaamaan tähän viestiin. Yritä uudelleen tai muotoile viesti toisin.",
       "android": "Gemini Nano (laitteessa)",
-      "background": "Laitteessa toimiva malli pysähtyi, koska Kilo poistui näytöltä. Kysy uudelleen napauttamalla Yritä uudelleen.",
+      "background": "Laitteessa toimiva malli pysähtyi, koska Kilo poistui näytöltä. Kysy uudelleen napauttamalla $t(common.retry).",
       "download": "Lataa laitteessa toimiva malli",
       "downloading": "Ladataan…",
       "downloadProgress": "Ladataan… {{percent}} %",

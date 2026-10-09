@@ -3433,7 +3433,7 @@
       "busy": "Model v napravi je zaseden z drugim odgovorom. Poskusite znova, ko ga dokonča.",
       "failed": "Model v napravi ni mogel odgovoriti na to sporočilo. Poskusite znova ali ga preoblikujte.",
       "android": "Gemini Nano (v napravi)",
-      "background": "Model v napravi se je ustavil, ker je Kilo zapustil zaslon. Tapnite »Poskusi znova«, da znova vprašate.",
+      "background": "Model v napravi se je ustavil, ker je Kilo zapustil zaslon. Tapnite $t(common.retry), da znova vprašate.",
       "download": "Prenesi model v napravo",
       "downloading": "Prenašanje …",
       "downloadProgress": "Prenašanje … {{percent}} %",

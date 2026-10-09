@@ -3347,7 +3347,7 @@
       "busy": "Kei te pukumahi te tauira i te pūrere ki tētahi atu whakautu. Ngana anō ina oti.",
       "failed": "Kāore i taea e te tauira i te pūrere te whakautu i tēnei karere. Ngana anō, kōrerotia anō rānei mā tētahi atu huarahi.",
       "android": "Gemini Nano (i te pūrere)",
-      "background": "I mutu te tauira i te pūrere nā te mea i wehe atu a Kilo i te mata. Pātōhia te Whakamātau anō kia pātai anō.",
+      "background": "I mutu te tauira i te pūrere nā te mea i wehe atu a Kilo i te mata. Pātōhia te $t(common.retry) kia pātai anō.",
       "download": "Tikiake i te tauira i te pūrere",
       "downloading": "Kei te tikiake…",
       "downloadProgress": "Kei te tikiake… {{percent}}%",

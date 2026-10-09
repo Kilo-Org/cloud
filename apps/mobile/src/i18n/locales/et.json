@@ -3347,7 +3347,7 @@
       "busy": "Seadmesisene mudel koostab praegu teist vastust. Proovi uuesti, kui see on lõpetanud.",
       "failed": "Seadmesisene mudel ei suutnud sellele sõnumile vastata. Proovi uuesti või sõnasta see ümber.",
       "android": "Gemini Nano (seadmes)",
-      "background": "Seadmesisene mudel peatus, sest Kilo lahkus ekraanilt. Uuesti küsimiseks puuduta nuppu „Proovi uuesti“.",
+      "background": "Seadmesisene mudel peatus, sest Kilo lahkus ekraanilt. Uuesti küsimiseks puuduta nuppu „$t(common.retry)“.",
       "download": "Laadi seadmesisene mudel alla",
       "downloading": "Allalaadimine…",
       "downloadProgress": "Allalaadimine… {{percent}}%",

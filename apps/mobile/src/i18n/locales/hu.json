@@ -3347,7 +3347,7 @@
       "busy": "Az eszközön futó modell épp egy másik válaszon dolgozik. Próbálja újra, ha végzett.",
       "failed": "Az eszközön futó modell nem tudott válaszolni erre az üzenetre. Próbálja újra, vagy fogalmazza át.",
       "android": "Gemini Nano (az eszközön)",
-      "background": "Az eszközön futó modell leállt, mert a Kilo elhagyta a képernyőt. Koppintson az Újrapróbálkozás gombra az újbóli kérdezéshez.",
+      "background": "Az eszközön futó modell leállt, mert a Kilo elhagyta a képernyőt. Koppintson az $t(common.retry) gombra az újbóli kérdezéshez.",
       "download": "Eszközön futó modell letöltése",
       "downloading": "Letöltés…",
       "downloadProgress": "Letöltés… {{percent}}%",

@@ -3347,7 +3347,7 @@
       "busy": "Das Modell auf dem Gerät erstellt gerade eine andere Antwort. Versuche es erneut, wenn es fertig ist.",
       "failed": "Das Modell auf dem Gerät konnte diese Nachricht nicht beantworten. Versuche es erneut oder formuliere sie um.",
       "android": "Gemini Nano (auf dem Gerät)",
-      "background": "Das Modell auf dem Gerät wurde gestoppt, weil Kilo den Bildschirm verlassen hat. Tippe auf „Erneut versuchen“, um die Frage noch einmal zu stellen.",
+      "background": "Das Modell auf dem Gerät wurde gestoppt, weil Kilo den Bildschirm verlassen hat. Tippe auf $t(common.retry), um die Frage noch einmal zu stellen.",
       "download": "Modell auf dem Gerät herunterladen",
       "downloading": "Wird heruntergeladen…",
       "downloadProgress": "Wird heruntergeladen… {{percent}} %",

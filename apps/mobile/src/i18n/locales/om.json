@@ -3347,7 +3347,7 @@
       "busy": "Moodeelli meeshaa irratti deebii biraatiin qabameera. Yeroo xumuru irra deebi'ii yaali.",
       "failed": "Moodeelli meeshaa irratti ergaa kanaaf deebisuu hin dandeenye. Irra deebi'ii yaali ykn haala biraan barreessi.",
       "android": "Gemini Nano (meeshaa irratti)",
-      "background": "Kilo'n iskiriinii irraa waan baheef moodeelli meeshaa irratti dhaabbateera. Ammas gaafachuuf \"Irra deebi'ii yaali\" tuqi.",
+      "background": "Kilo'n iskiriinii irraa waan baheef moodeelli meeshaa irratti dhaabbateera. Ammas gaafachuuf \"$t(common.retry)\" tuqi.",
       "download": "Moodeela meeshaa irratti buufadhu",
       "downloading": "Buufamaa jira…",
       "downloadProgress": "Buufamaa jira… {{percent}}%",

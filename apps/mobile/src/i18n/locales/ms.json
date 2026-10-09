@@ -3347,7 +3347,7 @@
       "busy": "Model pada peranti sedang sibuk dengan balasan lain. Cuba lagi apabila ia selesai.",
       "failed": "Model pada peranti tidak dapat menjawab mesej ini. Cuba lagi atau tulis semula mesej itu.",
       "android": "Gemini Nano (pada peranti)",
-      "background": "Model pada peranti berhenti kerana Kilo meninggalkan skrin. Ketik Cuba lagi untuk bertanya semula.",
+      "background": "Model pada peranti berhenti kerana Kilo meninggalkan skrin. Ketik $t(common.retry) untuk bertanya semula.",
       "download": "Muat turun model pada peranti",
       "downloading": "Memuat turun…",
       "downloadProgress": "Memuat turun… {{percent}}%",

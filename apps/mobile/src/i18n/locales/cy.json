@@ -3519,7 +3519,7 @@
       "busy": "Mae'r model ar y ddyfais yn brysur gydag ateb arall. Rhowch gynnig arall arni pan fydd wedi gorffen.",
       "failed": "Methodd y model ar y ddyfais ag ateb y neges hon. Rhowch gynnig arall arni neu aralleiriwch hi.",
       "android": "Gemini Nano (ar y ddyfais)",
-      "background": "Daeth y model ar y ddyfais i ben am fod Kilo wedi gadael y sgrin. Tapiwch Rhoi cynnig eto i ofyn eto.",
+      "background": "Daeth y model ar y ddyfais i ben am fod Kilo wedi gadael y sgrin. Tapiwch $t(common.retry) i ofyn eto.",
       "download": "Llwytho'r model ar y ddyfais i lawr",
       "downloading": "Wrthi'n llwytho i lawr…",
       "downloadProgress": "Wrthi'n llwytho i lawr… {{percent}}%",

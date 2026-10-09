@@ -3347,7 +3347,7 @@
       "busy": "Cihazdaki model başka bir yanıtla meşgul. Tamamlandığında yeniden deneyin.",
       "failed": "Cihazdaki model bu mesajı yanıtlayamadı. Yeniden deneyin veya mesajı farklı şekilde yazın.",
       "android": "Gemini Nano (cihazda)",
-      "background": "Kilo ekrandan ayrıldığı için cihazdaki model durdu. Yeniden sormak için Tekrar dene'ye dokunun.",
+      "background": "Kilo ekrandan ayrıldığı için cihazdaki model durdu. Yeniden sormak için $t(common.retry)'ye dokunun.",
       "download": "Cihazdaki modeli indir",
       "downloading": "İndiriliyor…",
       "downloadProgress": "İndiriliyor… %{{percent}}",

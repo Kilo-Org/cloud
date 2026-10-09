@@ -3347,7 +3347,7 @@
       "busy": "Gailuko modeloa beste erantzun batekin lanpetuta dago. Saiatu berriro amaitzen duenean.",
       "failed": "Gailuko modeloak ezin izan dio mezu honi erantzun. Saiatu berriro edo idatzi beste modu batera.",
       "android": "Gemini Nano (gailuan)",
-      "background": "Gailuko modeloa gelditu egin da Kilo pantailatik irten delako. Sakatu \"Saiatu berriro\" berriro galdetzeko.",
+      "background": "Gailuko modeloa gelditu egin da Kilo pantailatik irten delako. Sakatu $t(common.retry) berriro galdetzeko.",
       "download": "Deskargatu gailuko modeloa",
       "downloading": "Deskargatzen…",
       "downloadProgress": "Deskargatzen… %{{percent}}",

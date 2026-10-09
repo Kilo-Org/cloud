@@ -3347,7 +3347,7 @@
       "busy": "Imodeli esedivayisini isamatasa nenye impendulo. Zama futhi uma isiqedile.",
       "failed": "Imodeli esedivayisini ayikwazanga ukuphendula lo mlayezo. Zama futhi noma uwubhale ngenye indlela.",
       "android": "Gemini Nano (edivayisini)",
-      "background": "Imodeli esedivayisini imisiwe ngoba i-Kilo iphume esikrinini. Thepha u-Zama futhi ukuze ubuze futhi.",
+      "background": "Imodeli esedivayisini imisiwe ngoba i-Kilo iphume esikrinini. Thepha $t(common.retry) ukuze ubuze futhi.",
       "download": "Dawuniloda imodeli esedivayisini",
       "downloading": "Iyadawuniloda…",
       "downloadProgress": "Iyadawuniloda… {{percent}}%",

@@ -3347,7 +3347,7 @@
       "busy": "Abala pa ang modelong nasa device sa ibang sagot. Subukang muli kapag tapos na ito.",
       "failed": "Hindi nasagot ng modelong nasa device ang mensaheng ito. Subukang muli o baguhin ang pagkakasabi.",
       "android": "Gemini Nano (sa device)",
-      "background": "Huminto ang modelong nasa device dahil umalis ang Kilo sa screen. I-tap ang Subukan muli para magtanong ulit.",
+      "background": "Huminto ang modelong nasa device dahil umalis ang Kilo sa screen. I-tap ang $t(common.retry) para magtanong ulit.",
       "download": "I-download ang modelong nasa device",
       "downloading": "Nagda-download…",
       "downloadProgress": "Nagda-download… {{percent}}%",

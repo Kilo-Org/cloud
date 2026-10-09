@@ -3347,7 +3347,7 @@
       "busy": "Mbola mamaly hafatra hafa ny modely ao amin'ny fitaovana. Andramo indray rehefa vita izany.",
       "failed": "Tsy nahavaly ity hafatra ity ny modely ao amin'ny fitaovana. Andramo indray na ovay ny fanoratana azy.",
       "android": "Gemini Nano (ao amin'ny fitaovana)",
-      "background": "Nijanona ny modely ao amin'ny fitaovana satria nandao ny efijery i Kilo. Tsindrio ny \"Andramo indray\" mba hanontaniana indray.",
+      "background": "Nijanona ny modely ao amin'ny fitaovana satria nandao ny efijery i Kilo. Tsindrio ny \"$t(common.retry)\" mba hanontaniana indray.",
       "download": "Sintony ny modely ao amin'ny fitaovana",
       "downloading": "Misintona…",
       "downloadProgress": "Misintona… {{percent}}%",

@@ -3390,7 +3390,7 @@
       "busy": "Model na uređaju zauzet je drugim odgovorom. Pokušajte ponovno kad završi.",
       "failed": "Model na uređaju nije mogao odgovoriti na ovu poruku. Pokušajte ponovno ili je preformulirajte.",
       "android": "Gemini Nano (na uređaju)",
-      "background": "Model na uređaju zaustavio se jer je Kilo napustio zaslon. Dodirnite Pokušaj ponovno da biste ponovno postavili upit.",
+      "background": "Model na uređaju se zaustavio jer je Kilo napustio zaslon. Dodirnite $t(common.retry) za ponovni upit.",
       "download": "Preuzmi model na uređaju",
       "downloading": "Preuzimanje…",
       "downloadProgress": "Preuzimanje… {{percent}} %",

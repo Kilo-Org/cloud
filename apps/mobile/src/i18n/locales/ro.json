@@ -3390,7 +3390,7 @@
       "busy": "Modelul pe dispozitiv este ocupat cu un alt răspuns. Încearcă din nou după ce termină.",
       "failed": "Modelul pe dispozitiv nu a putut răspunde la acest mesaj. Încearcă din nou sau reformulează-l.",
       "android": "Gemini Nano (pe dispozitiv)",
-      "background": "Modelul pe dispozitiv s-a oprit deoarece Kilo a părăsit ecranul. Atinge Reîncearcă pentru a întreba din nou.",
+      "background": "Modelul pe dispozitiv s-a oprit deoarece Kilo a părăsit ecranul. Atinge $t(common.retry) pentru a întreba din nou.",
       "download": "Descarcă modelul pe dispozitiv",
       "downloading": "Se descarcă…",
       "downloadProgress": "Se descarcă… {{percent}}%",

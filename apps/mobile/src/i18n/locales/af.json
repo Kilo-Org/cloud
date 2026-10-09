@@ -3347,7 +3347,7 @@
       "busy": "Die model op die toestel is besig met 'n ander antwoord. Probeer weer wanneer dit klaar is.",
       "failed": "Die model op die toestel kon nie hierdie boodskap beantwoord nie. Probeer weer of herformuleer dit.",
       "android": "Gemini Nano (op die toestel)",
-      "background": "Die model op die toestel het gestop omdat Kilo die skerm verlaat het. Tik op Probeer weer om weer te vra.",
+      "background": "Die model op die toestel het gestop omdat Kilo die skerm verlaat het. Tik op $t(common.retry) om weer te vra.",
       "download": "Laai model op die toestel af",
       "downloading": "Laai tans af…",
       "downloadProgress": "Laai tans af… {{percent}}%",

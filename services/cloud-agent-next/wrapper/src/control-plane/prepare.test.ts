@@ -164,15 +164,20 @@ describe('replacement workspace local recovery', () => {
     );
     expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     expect(harness.logs.some(line => line.includes('failed; continuing'))).toBe(true);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
   });
 
   it('reports skipped files without failing session readiness', async () => {
+    const skippedDiffs = Array.from({ length: 20 }, (_, index) => ({
+      file: `src/some/deeply/nested/lost-${index}.txt`,
+      reason: 'patch_apply_failed' as const,
+    }));
     const harness = createHarness(FAST_TIMERS, {
       recoverWorktree: async () => ({
         applied: 0,
-        skipped: 1,
-        total: 1,
-        skippedDiffs: [{ file: 'lost.txt', reason: 'patch_apply_failed' }],
+        skipped: skippedDiffs.length,
+        total: skippedDiffs.length,
+        skippedDiffs,
       }),
     });
     harness.setSessionExists(false);
@@ -180,13 +185,14 @@ describe('replacement workspace local recovery', () => {
       routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
     );
     expect(
-      harness.logs.some(line => line.includes('restore incomplete') && line.includes('lost.txt'))
+      harness.logs.some(line => line.includes('restore incomplete') && line.includes('lost-0.txt'))
     ).toBe(true);
-    expect(
-      harness.frames.some(
-        frame => frame.type === 'session.progress' && frame.detail?.includes('incomplete')
-      )
-    ).toBe(true);
+    const detail = harness.frames.find(
+      frame => frame.type === 'session.progress' && frame.detail?.includes('incomplete')
+    );
+    expect(detail).toBeDefined();
+    expect(controlPlaneWrapperFrameSchema.safeParse(detail).success).toBe(true);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
     expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
   });

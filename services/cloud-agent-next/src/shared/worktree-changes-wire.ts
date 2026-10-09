@@ -19,13 +19,24 @@ export const MAX_WORKTREE_PATCH_LINES = 10_000;
 export const MAX_WORKTREE_CONTENT_BYTES = 100 * 1024;
 export const MAX_WORKTREE_CONTENT_LINES = 10_000;
 
+const repositoryRelativePathSchema = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine(
+    path =>
+      !path.includes('\0') &&
+      path.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
+    'Expected a repository-relative path'
+  );
+
 export const worktreeRecoverySchema = z
   .object({
     files: z
       .array(
         z
           .object({
-            path: z.string().min(1).max(4096),
+            path: repositoryRelativePathSchema,
             status: z.enum(['added', 'modified', 'deleted']),
             patch: z.string().optional(),
           })
@@ -60,16 +71,7 @@ const baseRefSchema = z
 
 export const worktreeChangesFileSchema = z
   .object({
-    path: z
-      .string()
-      .min(1)
-      .max(4096)
-      .refine(
-        path =>
-          !path.includes('\0') &&
-          path.split('/').every(part => part !== '' && part !== '.' && part !== '..'),
-        'Expected a repository-relative path'
-      ),
+    path: repositoryRelativePathSchema,
     status: z.enum(['added', 'modified', 'deleted']),
     additions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     deletions: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),

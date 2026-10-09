@@ -14,7 +14,7 @@ export async function restoreWorktreeRecovery(
   env: NodeJS.ProcessEnv,
   signal: AbortSignal
 ) {
-  const root = path.resolve(directory);
+  const root = await fs.realpath(path.resolve(directory));
   const skippedDiffs: RestoreDiffSkip[] = [];
   let applied = 0;
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'kilo-worktree-recovery-'));
@@ -45,7 +45,6 @@ export async function restoreWorktreeRecovery(
           throw new Error('Unsafe recovery path');
         }
         let parent = root;
-        if ((await fs.realpath(root)) !== root) throw new Error('Symlink workspace');
         for (const part of parts) {
           parent = path.join(parent, part);
           const stat = await fs.lstat(parent).catch((error: unknown) => {

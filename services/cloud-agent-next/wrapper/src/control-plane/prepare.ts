@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
   CONTROL_PLANE_SETUP_EVENTS,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
@@ -323,7 +324,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       type: 'session.progress',
       sessionId,
       step,
-      ...(detail === undefined ? {} : { detail }),
+      ...(detail === undefined
+        ? {}
+        : {
+            detail:
+              detail.length > CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH
+                ? `${detail.slice(0, CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH - 1)}…`
+                : detail,
+          }),
     });
   }
 
@@ -971,6 +979,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // sees the finished workspace and skips the work.
       let workspace: ControlPlaneWorkspaceOutcome | undefined;
       let replacementWorkspace = false;
+      let localRecoveryApplied = false;
       const recovery = spec.worktreeRecovery;
       await withWorkspaceLock(directory, async () => {
         if (!needsWorkspace) return;
@@ -998,6 +1007,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               log(
                 `local worktree recovery session=${sessionId} applied=${diffs.applied} skipped=${diffs.skipped} total=${diffs.total}`
               );
+              localRecoveryApplied = diffs.applied > 0 || diffs.total === 0;
               const incomplete = await reportRestoreIncomplete({
                 diffs,
                 identity: `kiloSessionId=${spec.kiloSessionId}`,
@@ -1045,7 +1055,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               env,
               client,
               signal,
-              !(replacementWorkspace && spec.worktreeRecovery)
+              !(replacementWorkspace && localRecoveryApplied)
             )
           ),
         () => !owner.released

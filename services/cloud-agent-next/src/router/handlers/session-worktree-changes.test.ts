@@ -78,7 +78,6 @@ function setup(userId = 'user_owner') {
     request: new Request('https://worker.test/trpc'),
     env: {
       HYPERDRIVE: { connectionString: 'postgresql://test' },
-      CONTROL_PLANE_IDS: '',
       SANDBOX_SESSION: session,
       CLOUD_AGENT_SESSION: legacy,
       SANDBOX_CONTROL: control,

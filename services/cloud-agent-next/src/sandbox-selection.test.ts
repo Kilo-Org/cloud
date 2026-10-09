@@ -14,7 +14,6 @@ import type { Env } from './types.js';
 
 const configured = {
   SANDBOX_SELECTION_IDS: 'org-id',
-  CONTROL_PLANE_IDS: 'org-id',
   VERCEL_TOKEN: 'test-token',
   VERCEL_TEAM_ID: 'team-id',
   VERCEL_PROJECT_ID: 'project-id',
@@ -44,20 +43,11 @@ describe('sandbox selection policy', () => {
       expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
     },
     {
-      name: 'Vercel with user-level control-plane enrollment',
+      name: 'Vercel with personal Vercel enrollment',
       overrides: {
-        CONTROL_PLANE_IDS: owner.userId,
         VERCEL_SANDBOX_ORG_IDS: '*',
       },
       expected: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
-    },
-    {
-      name: 'legacy isolation despite Vercel enrollment',
-      overrides: {
-        CONTROL_PLANE_IDS: '',
-        VERCEL_SANDBOX_ORG_IDS: owner.orgId,
-      },
-      expected: getSandboxAllocationRequest('cloudflare-single'),
     },
     {
       name: 'isolated Cloudflare outside the former allowlist',
@@ -163,7 +153,7 @@ describe('sandbox selection policy', () => {
   });
 
   it('enables personal selection for wildcard rollouts', () => {
-    const env = { ...configured, SANDBOX_SELECTION_IDS: '*', CONTROL_PLANE_IDS: '*' } as Env;
+    const env = { ...configured, SANDBOX_SELECTION_IDS: '*' } as Env;
     expect(getSandboxSelectionCapabilities(env, { userId: owner.userId }).enabled).toBe(true);
   });
 
@@ -179,18 +169,9 @@ describe('sandbox selection policy', () => {
     expect(getSandboxSelectionCapabilities(env, owner).enabled).toBe(true);
   });
 
-  it.each([
-    { CONTROL_PLANE_IDS: 'org-id' },
-    { CONTROL_PLANE_IDS: owner.userId },
-    // Plane enrollment is not an availability condition: a legacy owner may still
-    // choose, and a Vercel choice plane-forces that one session.
-    { CONTROL_PLANE_IDS: '' },
-    { CONTROL_PLANE_IDS: undefined },
-    { CONTROL_PLANE_IDS: 'other-owner' },
-  ])('enables selection regardless of plane enrollment: %j', overrides => {
+  it('enables selection for an enrolled owner', () => {
     const env = {
       ...configured,
-      ...overrides,
       VERCEL_SANDBOX_ORG_IDS: '',
       CLOUDFLARE_CONTAINERS_ORG_IDS: owner.orgId,
     } as Env;

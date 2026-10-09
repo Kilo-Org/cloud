@@ -41,15 +41,9 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session Cloudflare sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
-# Control-plane and worktree enrollment (optional)
+# Code Reviewer sessions run on the control plane for these owners.
 # Comma-separated user or org IDs, or `*` for all including personal accounts.
-# Local wrangler `dev` also defaults these to `*` in wrangler.jsonc.
-CONTROL_PLANE_IDS=*
-WORKTREE_CREATION_ENABLED_IDS=*
-# Code Reviewer sessions for these owners run on the control plane instead of
-# the legacy plane. Comma-separated user or org IDs. Off by default; set the
-# enrolled org in the Cloudflare dashboard.
-# CODE_REVIEW_CONTROL_PLANE_IDS=
+CODE_REVIEW_CONTROL_PLANE_IDS=*
 # Comma-separated user or org IDs allowed to pick a sandbox destination, or `*` for all
 SANDBOX_SELECTION_IDS=*
 

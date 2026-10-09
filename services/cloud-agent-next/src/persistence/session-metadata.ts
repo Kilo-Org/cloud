@@ -407,13 +407,6 @@ export const CurrentSessionMetadataSchema = z
   )
   .refine(
     metadata =>
-      // `isolated-standard` remains legacy-plane only; Vercel is control-plane only.
-      metadata.workspace?.sandboxAllocation !== 'isolated-standard' ||
-      sessionPlaneFromId(metadata.identity.sessionId) === 'legacy',
-    'Isolated Standard allocation is not supported for control-plane sessions'
-  )
-  .refine(
-    metadata =>
       !sandboxAllocationRequiresControlPlane(metadata.workspace?.sandboxAllocation) ||
       sessionPlaneFromId(metadata.identity.sessionId) === 'control',
     'Sandbox allocations for this provider require a control-plane session'

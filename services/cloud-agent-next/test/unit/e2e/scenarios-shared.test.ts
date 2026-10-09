@@ -1977,7 +1977,6 @@ describe('converted load and fault scenarios', () => {
   it('large-stream and concurrent-chats require only sessionSandbox', () => {
     for (const name of ['large-stream', 'concurrent-chats']) {
       expect(SHARED_SCENARIOS[name]?.requires).toEqual(['sessionSandbox']);
-      expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
     }
   });
 
@@ -2004,7 +2003,6 @@ describe('converted load and fault scenarios', () => {
         'controlPlaneRuntime',
         'controlPlaneV2',
       ]);
-      expect(SHARED_SCENARIOS[name]?.requiresWorktreeCreation).toBe(true);
     }
   });
 

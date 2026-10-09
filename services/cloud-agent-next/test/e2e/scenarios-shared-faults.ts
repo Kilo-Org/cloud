@@ -1029,7 +1029,6 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runExternalKill,
   },
   'kill-mid-flight': {
@@ -1038,7 +1037,6 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runKillMidFlight,
   },
   'wrapper-freeze-settled-reap': {
@@ -1047,7 +1045,6 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runWrapperFreezeSettledReap,
   },
   'wrapper-freeze-inflight-reap': {
@@ -1056,7 +1053,6 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runWrapperFreezeInflightReap,
   },
   'control-socket-recycle-boot': {
@@ -1065,7 +1061,6 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runControlSocketRecycleBoot,
   },
 };

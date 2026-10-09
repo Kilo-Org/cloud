@@ -9,8 +9,7 @@ import {
   type GgufModelRecord,
   ggufPartialName,
   type GgufStorage,
-  modelIndexIsReadable,
-  modelIndexMentionedNames,
+  orphanedModelFiles,
   readModelIndex,
   settled,
   STORAGE_HEADROOM_BYTES,
@@ -214,25 +213,13 @@ export function ggufDownloads({
       const kept = readModelIndex(index).filter(model =>
         names.includes(ggufModelName(model.fileId))
       );
-      const held = new Set(kept.map(model => ggufModelName(model.fileId)));
-      const partial = active === undefined ? undefined : ggufPartialName(active.fileId);
-      // Cleanup against everything the list names, not only what parsed: a file
-      // belonging to an entry this build cannot read is still a download.
-      const mentioned = modelIndexMentionedNames(index);
-      // A list that did not parse is not a list of nothing: deleting the files
-      // it does not name would destroy every download, so cleanup waits for a
-      // readable index.
-      if (modelIndexIsReadable(index)) {
-        for (const name of names) {
-          if (
-            name.includes('.gguf') &&
-            name !== partial &&
-            !held.has(name) &&
-            !mentioned.has(name)
-          ) {
-            storage.remove(name);
-          }
-        }
+      const keep = new Set(kept.map(model => ggufModelName(model.fileId)));
+      if (active !== undefined) {
+        // A partial transfer is not a model and survives the cleanup.
+        keep.add(ggufPartialName(active.fileId));
+      }
+      for (const name of orphanedModelFiles(names, index, keep)) {
+        storage.remove(name);
       }
       save(kept);
       publish();

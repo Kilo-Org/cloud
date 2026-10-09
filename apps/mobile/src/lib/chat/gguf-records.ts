@@ -117,7 +117,7 @@ const modelRecord = z.object({
  * downloaded model on the next cleanup, which no user action can undo.
  */
 export function readModelIndex(text: string | null): readonly GgufModelRecord[] {
-  let parsed: unknown;
+  let parsed: unknown = undefined;
   try {
     parsed = JSON.parse(text ?? '[]');
   } catch {
@@ -148,6 +148,9 @@ export function modelIndexIsReadable(text: string | null): boolean {
   }
 }
 
+/** Reads only the field that names a file, so an entry of another shape still protects it. */
+const mentionedRecord = z.object({ fileId: z.string().min(1) }).loose();
+
 /**
  * Every model file the saved list names, read without trusting its shape.
  *
@@ -158,7 +161,7 @@ export function modelIndexIsReadable(text: string | null): boolean {
  */
 export function modelIndexMentionedNames(text: string | null): ReadonlySet<string> {
   const names = new Set<string>();
-  let parsed: unknown;
+  let parsed: unknown = undefined;
   try {
     parsed = JSON.parse(text ?? '[]');
   } catch {
@@ -168,12 +171,29 @@ export function modelIndexMentionedNames(text: string | null): ReadonlySet<strin
     return names;
   }
   for (const entry of parsed) {
-    if (typeof entry === 'object' && entry !== null && 'fileId' in entry) {
-      const { fileId } = entry;
-      if (typeof fileId === 'string' && fileId.length > 0) {
-        names.add(ggufModelName(fileId));
-      }
+    const record = mentionedRecord.safeParse(entry);
+    if (record.success) {
+      names.add(ggufModelName(record.data.fileId));
     }
   }
   return names;
+}
+
+/**
+ * The model files cleanup may delete: the ones the saved list never names.
+ *
+ * A list that could not be read is not a list of nothing, so it deletes
+ * nothing. Neither does an entry this build cannot parse delete its own file,
+ * because a shape change would otherwise destroy every download at once.
+ */
+export function orphanedModelFiles(
+  names: readonly string[],
+  index: string | null,
+  keep: ReadonlySet<string>
+): readonly string[] {
+  if (!modelIndexIsReadable(index)) {
+    return [];
+  }
+  const mentioned = modelIndexMentionedNames(index);
+  return names.filter(name => name.includes('.gguf') && !keep.has(name) && !mentioned.has(name));
 }

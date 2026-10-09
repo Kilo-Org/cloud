@@ -156,9 +156,19 @@ function checkRawText(relative, text) {
  */
 const DIRECT_INTL = /new Intl\.\w+|\.toLocale(?:Date|Time|)String\s*\(/g;
 const DIRECT_INTL_DIR = join(ROOT, 'apps/mobile/src');
+// These layouts are stringified and run in the iOS widget extension, which
+// cannot import @/lib/intl-cache; they normalise the locale tag themselves.
+const WIDGET_PROCESS_LAYOUTS = new Set([
+  'apps/mobile/src/glanceable-ios/active-agents-widget.tsx',
+  'apps/mobile/src/glanceable-ios/active-agents-live-activity.tsx',
+]);
 
 function checkDirectIntl(relative, absolute, text) {
-  if (!absolute.startsWith(DIRECT_INTL_DIR) || relative.endsWith('lib/intl-cache.ts')) {
+  if (
+    !absolute.startsWith(DIRECT_INTL_DIR) ||
+    relative.endsWith('lib/intl-cache.ts') ||
+    WIDGET_PROCESS_LAYOUTS.has(relative.replace(/^\//, ''))
+  ) {
     return;
   }
   for (const [index, line] of text.split('\n').entries()) {

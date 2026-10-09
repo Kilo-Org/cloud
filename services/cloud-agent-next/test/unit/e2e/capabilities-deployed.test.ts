@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDeployedScenarioEnvironment } from '../../e2e/capabilities-deployed.js';
+import { createLocalHttpScenarioEnvironment } from '../../e2e/e2e-surface-client.js';
+import {
+  getSandboxAllocationInstance,
+  getSandboxAllocationProvider,
+  getSandboxAllocationResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 
 const SECRET = 'e2e-internal-secret-0123456789';
 
@@ -161,7 +167,7 @@ describe('createDeployedScenarioEnvironment', () => {
       surfaceUrl: 'https://worker.test/',
       bearerToken: 'token-1',
       internalApiSecret: SECRET,
-      expectedProvider: 'vercel',
+      expectedAllocation: 'vercel-small',
     });
 
     await expect(
@@ -179,6 +185,7 @@ describe('createDeployedScenarioEnvironment', () => {
         logicalSandboxId: 'usr-123456789abc',
         physicalProviderRef: 'provider-ref-9',
         provider: 'vercel',
+        configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
         physicalState: 'running',
       })
     );
@@ -188,7 +195,7 @@ describe('createDeployedScenarioEnvironment', () => {
       surfaceUrl: 'https://worker.test/',
       bearerToken: 'token-1',
       internalApiSecret: SECRET,
-      expectedProvider: 'vercel',
+      expectedAllocation: 'vercel-small',
     });
 
     await expect(
@@ -223,6 +230,141 @@ describe('createDeployedScenarioEnvironment', () => {
         kiloSessionId: 'ses_1',
       })
     ).rejects.toThrow(/unknown provider/);
+  });
+
+  it.each([
+    ['vercel-small', 'vercel-large'],
+    ['vercel-large', 'vercel-small'],
+    ['cloudflare-containers-standard-3', 'cloudflare-containers-standard-4'],
+    ['cloudflare-containers-standard-4', 'cloudflare-containers-standard-3'],
+  ] as const)('rejects requested %s when the pin selects %s', async (requested, observed) => {
+    const provider = getSandboxAllocationProvider(observed);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          logicalSandboxId: 'usr-123456789abc',
+          physicalProviderRef: 'provider-ref-9',
+          provider,
+          configuration:
+            provider === 'vercel'
+              ? { provider, resources: getSandboxAllocationResources(observed) }
+              : { provider, instance: getSandboxAllocationInstance(observed) },
+          physicalState: 'running',
+        })
+      )
+    );
+
+    for (const createEnvironment of [
+      createDeployedScenarioEnvironment,
+      createLocalHttpScenarioEnvironment,
+    ]) {
+      const env = createEnvironment({
+        surfaceUrl: 'https://worker.test',
+        internalApiSecret: SECRET,
+        expectedAllocation: requested,
+      });
+      await expect(
+        env.sessionSandbox!.waitForContainer({
+          cloudAgentSessionId: 'workspace_1',
+          kiloSessionId: 'ses_1',
+          timeoutMs: 5_000,
+        })
+      ).rejects.toThrow(`did not match the requested "${requested}"`);
+      await expect(
+        env.sessionSandbox!.currentContainer({
+          cloudAgentSessionId: 'workspace_1',
+          kiloSessionId: 'ses_1',
+        })
+      ).rejects.toThrow(`did not match the requested "${requested}"`);
+    }
+  });
+
+  it.each([
+    'vercel-small',
+    'vercel-large',
+    'cloudflare-containers-standard-3',
+    'cloudflare-containers-standard-4',
+  ] as const)('accepts matching persisted configuration for %s', async requested => {
+    const provider = getSandboxAllocationProvider(requested);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          logicalSandboxId: 'usr-123456789abc',
+          physicalProviderRef: 'provider-ref-9',
+          provider,
+          configuration:
+            provider === 'vercel'
+              ? { provider, resources: getSandboxAllocationResources(requested) }
+              : { provider, instance: getSandboxAllocationInstance(requested) },
+          physicalState: 'running',
+        })
+      )
+    );
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test',
+      internalApiSecret: SECRET,
+      expectedAllocation: requested,
+    });
+    await expect(
+      env.sessionSandbox!.waitForContainer({
+        cloudAgentSessionId: 'workspace_1',
+        kiloSessionId: 'ses_1',
+        timeoutMs: 5_000,
+      })
+    ).resolves.toBe('provider-ref-9');
+  });
+
+  it.each([undefined, null])('fails closed on a missing configuration: %s', async configuration => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          logicalSandboxId: 'usr-123456789abc',
+          physicalProviderRef: 'provider-ref-9',
+          provider: 'vercel',
+          configuration,
+          physicalState: 'running',
+        })
+      )
+    );
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test',
+      internalApiSecret: SECRET,
+      expectedAllocation: 'vercel-small',
+    });
+    await expect(
+      env.sessionSandbox!.currentContainer({
+        cloudAgentSessionId: 'workspace_1',
+        kiloSessionId: 'ses_1',
+      })
+    ).rejects.toThrow(/did not report a configuration; redeploy/);
+  });
+
+  it('rejects an invalid configuration even without an explicit allocation', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          logicalSandboxId: 'usr-123456789abc',
+          physicalProviderRef: 'provider-ref-9',
+          provider: 'vercel',
+          configuration: { provider: 'vercel', resources: { vcpus: 99, memory: 1 } },
+          physicalState: 'running',
+        })
+      )
+    );
+    const env = createDeployedScenarioEnvironment({
+      surfaceUrl: 'https://worker.test',
+      internalApiSecret: SECRET,
+    });
+    await expect(
+      env.sessionSandbox!.currentContainer({
+        cloudAgentSessionId: 'workspace_1',
+        kiloSessionId: 'ses_1',
+      })
+    ).rejects.toThrow(/invalid configuration/);
   });
 
   it('accepts an older surface that omits the provider when no allocation was requested', async () => {
@@ -263,7 +405,7 @@ describe('createDeployedScenarioEnvironment', () => {
       surfaceUrl: 'https://worker.test/',
       bearerToken: 'token-1',
       internalApiSecret: SECRET,
-      expectedProvider: 'vercel',
+      expectedAllocation: 'vercel-small',
     });
 
     await expect(
@@ -294,6 +436,7 @@ describe('createDeployedScenarioEnvironment', () => {
         logicalSandboxId: 'usr-123456789abc',
         physicalProviderRef: 'provider-ref-9',
         provider: 'vercel',
+        configuration: { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
         physicalState: 'running',
       });
     });
@@ -303,7 +446,7 @@ describe('createDeployedScenarioEnvironment', () => {
       surfaceUrl: 'https://worker.test/',
       bearerToken: 'token-1',
       internalApiSecret: SECRET,
-      expectedProvider: 'vercel',
+      expectedAllocation: 'vercel-small',
     });
     const pending = env.sessionSandbox!.waitForContainer({
       cloudAgentSessionId: 'agent_1',

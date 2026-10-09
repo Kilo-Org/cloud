@@ -3,7 +3,7 @@
  * session. It reuses the production access check and the production sandbox-id
  * derivation so the e2e surface cannot widen who may read a session, and it
  * returns only the observable allocation fields: the logical sandbox id, the
- * physical provider reference, the persisted provider and the persisted
+ * physical provider reference, the persisted provider configuration and the persisted
  * physical control-plane state.
  *
  * It deliberately never calls freshness probes, never serializes raw session
@@ -20,6 +20,7 @@ import { resolveSessionStub, type SessionStub } from '../sandbox-session/session
 import type { CloudAgentSessionState } from '../persistence/types.js';
 import type { HonoContext } from '../hono-context.js';
 import type { AllocationView } from '../control-plane/sandbox/allocation.js';
+import type { SandboxProviderConfiguration } from '../sandbox-control/provider.js';
 import type { AgentSandboxProvider, SandboxId, SessionId } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 
@@ -34,6 +35,7 @@ export type AllocationInspection = {
    * of treating any present reference as a successful boot.
    */
   provider: AgentSandboxProvider;
+  configuration: SandboxProviderConfiguration | null;
   /**
    * Persisted control-plane physical state, or `null` when the control plane
    * owns no allocation for this session. This is stored state, not a fresh
@@ -55,12 +57,19 @@ export function projectAllocationInspection(
       logicalSandboxId,
       physicalProviderRef: ownsAllocation ? physicalProviderRef : null,
       provider: state.provider,
+      configuration: state.configuration,
       physicalState: !ownsAllocation ? null : physicalProviderRef !== null ? 'unknown' : 'stopped',
     };
   }
   const physicalState =
     state.kind === 'starting' ? 'creating' : state.kind === 'stopping' ? 'stopping' : 'running';
-  return { logicalSandboxId, physicalProviderRef, provider: state.provider, physicalState };
+  return {
+    logicalSandboxId,
+    physicalProviderRef,
+    provider: state.provider,
+    configuration: state.configuration,
+    physicalState,
+  };
 }
 
 export async function handleAllocationInspect(c: Context<HonoContext>): Promise<Response> {

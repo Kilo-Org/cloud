@@ -1,6 +1,7 @@
 import type { ControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { ControlPlaneFailureReason } from '../../shared/control-plane-protocol.js';
 import type { AgentSandboxProvider } from '../../types.js';
+import type { SandboxProviderConfiguration } from '../../sandbox-control/provider.js';
 
 export type SandboxTimers = ControlPlaneTimers['sandbox'];
 
@@ -50,8 +51,11 @@ export type AllocationState = {
   unconfirmedProviderRef: string | null;
 };
 
-/** Allocation state plus the provider kind owned by the persisted pin. */
-export type AllocationView = AllocationState & { provider: AgentSandboxProvider };
+/** Allocation state plus the provider selection owned by the persisted pin. */
+export type AllocationView = AllocationState & {
+  provider: AgentSandboxProvider;
+  configuration: SandboxProviderConfiguration | null;
+};
 
 export function initialAllocationState(): AllocationState {
   return {

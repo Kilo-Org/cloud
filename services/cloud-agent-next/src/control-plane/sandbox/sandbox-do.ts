@@ -557,7 +557,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /** Passive read for tests and B3's `status`/B10's badge. */
   async getAllocationState(): Promise<AllocationView> {
     await this.initialized;
-    return { ...(await this.readAllocation()), provider: this.currentProvider() };
+    return {
+      ...(await this.readAllocation()),
+      provider: this.currentProvider(),
+      configuration: this.providerPin?.configuration ?? null,
+    };
   }
 
   /**
@@ -3733,7 +3737,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private sendStatusSnapshot(socket: WebSocket, sessionId: string, state: AllocationState): void {
     const snapshot = projectAllocationStatusSnapshot({
-      allocation: { ...state, provider: this.currentProvider() },
+      allocation: {
+        ...state,
+        provider: this.currentProvider(),
+        configuration: this.providerPin?.configuration ?? null,
+      },
       observedAt: Date.now(),
       inactivityTimeoutMs: this.sandboxTimers().idleMs,
     });

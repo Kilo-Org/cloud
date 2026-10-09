@@ -17,6 +17,16 @@ import type {
   SessionSandboxWaitInput,
 } from './scenario-capabilities.js';
 import { agentSandboxProviderSchema, type AgentSandboxProvider } from '../../src/types.js';
+import {
+  getSandboxAllocationInstance,
+  getSandboxAllocationProvider,
+  getSandboxAllocationResources,
+  type SandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  sandboxProviderConfigurationSchema,
+  type SandboxProviderConfiguration,
+} from '../../src/sandbox-control/provider.js';
 
 export type AllocationInspection = {
   logicalSandboxId: string;
@@ -24,9 +34,10 @@ export type AllocationInspection = {
   /**
    * The persisted provider. Optional for compatibility with a deployed Worker
    * built before this field existed: an omitted value is accepted when no
-   * expected provider is asserted. When present it must be a known provider.
+   * expected allocation is asserted. When present it must be a known provider.
    */
   provider?: AgentSandboxProvider;
+  configuration?: SandboxProviderConfiguration | null;
   physicalState: string | null;
 };
 
@@ -41,12 +52,10 @@ export type SurfaceRequestOptions = {
    */
   internalApiSecret: string;
   /**
-   * The provider the requested allocation must start on. When set, an
-   * allocation read whose persisted provider does not match fails closed before
-   * a reference is returned, so a wrong-provider session can never be reported
-   * as a successful boot.
+   * Requires the persisted provider and instance/resources to match before
+   * returning a physical reference.
    */
-  expectedProvider?: AgentSandboxProvider;
+  expectedAllocation?: SandboxAllocation;
   signal?: AbortSignal;
 };
 
@@ -97,7 +106,7 @@ function parseAllocation(value: unknown): AllocationInspection {
     throw new Error('allocation inspection response had an invalid physicalProviderRef');
   }
   // An older deployed surface omits `provider`. It is only required when an
-  // explicit expected provider is asserted, so accept an omitted field; a
+  // explicit allocation is asserted, so accept an omitted field; a
   // present, unknown value is always rejected.
   let provider: AgentSandboxProvider | undefined;
   if (record.provider !== undefined) {
@@ -110,16 +119,25 @@ function parseAllocation(value: unknown): AllocationInspection {
   if (physicalState !== null && typeof physicalState !== 'string') {
     throw new Error('allocation inspection response had an invalid physicalState');
   }
+  let configuration: SandboxProviderConfiguration | null | undefined;
+  if (record.configuration !== undefined) {
+    const parsed = sandboxProviderConfigurationSchema.nullable().safeParse(record.configuration);
+    if (!parsed.success) {
+      throw new Error('allocation inspection response had an invalid configuration');
+    }
+    configuration = parsed.data;
+  }
   return {
     logicalSandboxId,
     physicalProviderRef,
     ...(provider === undefined ? {} : { provider }),
+    ...(configuration === undefined ? {} : { configuration }),
     physicalState,
   };
 }
 
 /**
- * Fail closed when the persisted provider does not match the requested
+ * Fail closed when the persisted provider configuration does not match the requested
  * allocation. `physicalState` is the authority signal: before the pin is
  * written it is `null` and `getAllocationState()` reports the default provider,
  * so a mismatch is deferred and the wait keeps polling rather than failing once.
@@ -127,11 +145,12 @@ function parseAllocation(value: unknown): AllocationInspection {
  * a missing field on an old deployed surface or a genuine mismatch throws
  * before a reference is returned.
  */
-export function requireExpectedProvider(
+export function requireExpectedAllocation(
   allocation: AllocationInspection,
-  expectedProvider: AgentSandboxProvider | undefined
+  expectedAllocation: SandboxAllocation | undefined
 ): string | null {
-  if (expectedProvider !== undefined && allocation.physicalState !== null) {
+  if (expectedAllocation !== undefined && allocation.physicalState !== null) {
+    const expectedProvider = getSandboxAllocationProvider(expectedAllocation);
     if (allocation.provider === undefined) {
       throw new Error(
         'surface did not report a provider; redeploy the E2E Worker to assert an explicit allocation'
@@ -140,6 +159,27 @@ export function requireExpectedProvider(
     if (allocation.provider !== expectedProvider) {
       throw new Error(
         `allocation provider "${allocation.provider}" did not match the requested "${expectedProvider}"`
+      );
+    }
+    const configuration = allocation.configuration;
+    if (configuration == null) {
+      throw new Error(
+        'surface did not report a configuration; redeploy the E2E Worker to assert an explicit allocation'
+      );
+    }
+    const resources = getSandboxAllocationResources(expectedAllocation);
+    const instance = getSandboxAllocationInstance(expectedAllocation);
+    if (
+      configuration.provider !== expectedProvider ||
+      (resources !== undefined &&
+        (configuration.provider !== 'vercel' ||
+          configuration.resources?.vcpus !== resources.vcpus ||
+          configuration.resources?.memory !== resources.memory)) ||
+      (instance !== undefined &&
+        (configuration.provider !== 'cloudflare-containers' || configuration.instance !== instance))
+    ) {
+      throw new Error(
+        `allocation configuration ${JSON.stringify(configuration)} did not match the requested "${expectedAllocation}"`
       );
     }
   }
@@ -184,7 +224,7 @@ export function createHttpSessionSandbox(
       while (Date.now() < deadline) {
         if (signal?.aborted) return null;
         const allocation = await fetchAllocation({ ...options, signal }, input.cloudAgentSessionId);
-        const ref = requireExpectedProvider(allocation, options.expectedProvider);
+        const ref = requireExpectedAllocation(allocation, options.expectedAllocation);
         if (ref !== null) return ref;
         await abortableDelay(500, signal);
       }
@@ -195,7 +235,7 @@ export function createHttpSessionSandbox(
         { ...options, signal: input.signal ?? options.signal },
         input.cloudAgentSessionId
       );
-      return requireExpectedProvider(allocation, options.expectedProvider);
+      return requireExpectedAllocation(allocation, options.expectedAllocation);
     },
   };
 }
@@ -293,8 +333,7 @@ export function createLocalHttpScenarioEnvironment(options: {
   internalApiSecret: string;
   /** Read from the Worker `.dev.vars` by the driver, not a second flag. */
   credentialContainmentEnabled?: boolean;
-  /** Required provider when a run selects an explicit allocation. */
-  expectedProvider?: AgentSandboxProvider;
+  expectedAllocation?: SandboxAllocation;
 }): ScenarioEnvironment {
   return {
     profile: 'local-http',

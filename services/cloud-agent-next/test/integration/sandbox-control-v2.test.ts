@@ -1654,6 +1654,27 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     }
   );
 
+  it.each([
+    { provider: 'vercel', resources: { vcpus: 2, memory: 4096 } },
+    { provider: 'vercel', resources: { vcpus: 4, memory: 8192 } },
+    { provider: 'cloudflare-containers', instance: 'standard-3' },
+    { provider: 'cloudflare-containers', instance: 'standard-4' },
+  ] as const)('reads the persisted $provider configuration after eviction', async configuration => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      provider: configuration.provider,
+      configuration,
+    });
+    if (configuration.provider === 'cloudflare-containers') {
+      await awaitStarting(provider, stub);
+    } else {
+      await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
+    }
+    expect((await stub.getAllocationState()).configuration).toEqual(configuration);
+    await evictAllDurableObjects();
+    expect((await stub.getAllocationState()).configuration).toEqual(configuration);
+  });
+
   it('rebuilds its provider adapter from the stored pin after eviction', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider, { allocationName: CUSTOM_ALLOCATION_NAME });
@@ -2308,12 +2329,9 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
     };
 
-    await runInDurableObject(stub, async (instance, state) => {
+    await runInDurableObject(stub, async instance => {
       await instance.getAllocationState();
       Object.assign(instance, { env: { ...instance.env, ...vercelEnv } });
-      const db = drizzle(state.storage, { logger: false });
-      writeScopeGrant(db, active);
-      writeScopeGrant(db, expired);
       vi.stubGlobal('fetch', fetchStub);
     });
 
@@ -2329,6 +2347,9 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     await runInDurableObject(stub, async (_instance, state) => {
       await state.storage.put('control_plane_owner', 'owner-1');
+      const db = drizzle(state.storage, { logger: false });
+      writeScopeGrant(db, active);
+      writeScopeGrant(db, expired);
     });
 
     await evictDurableObject(stub);
@@ -2344,11 +2365,12 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       ).createProviderAdapter.bind(instance);
       Object.assign(instance, {
         createProviderAdapter(pin: StoredProviderPin) {
+          expect(listScopeGrants(db)).toEqual(expect.arrayContaining([active, expired]));
           const adapter = realFactory(pin);
           for (const grant of listScopeGrants(db)) {
             writeScopeGrant(db, {
               ...grant,
-              preparedAt: grant.expiresAt - MINUTE,
+              preparedAt: now - 2 * MINUTE,
               expiresAt: now - 1,
             });
           }

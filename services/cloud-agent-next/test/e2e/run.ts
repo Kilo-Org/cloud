@@ -33,7 +33,6 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  getSandboxAllocationProvider,
   sandboxAllocationSchema,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -501,9 +500,7 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
       bearerToken: auth.token,
       internalApiSecret: config.internalApiSecret,
       credentialContainmentEnabled: credentialContainmentEnabled(loadDevVars(SERVICE_PACKAGE_DIR)),
-      ...(allocation === undefined
-        ? {}
-        : { expectedProvider: getSandboxAllocationProvider(allocation) }),
+      ...(allocation === undefined ? {} : { expectedAllocation: allocation }),
     }),
     ...timeoutRequestArgs(definition, timeoutMs),
   });
@@ -587,9 +584,7 @@ async function runDeployed(parsed: ParsedArgs): Promise<void> {
       surfaceUrl: config.workerUrl,
       bearerToken: auth.token,
       internalApiSecret: config.internalApiSecret,
-      ...(allocation === undefined
-        ? {}
-        : { expectedProvider: getSandboxAllocationProvider(allocation) }),
+      ...(allocation === undefined ? {} : { expectedAllocation: allocation }),
     }),
     ...timeoutRequestArgs(definition, timeoutMs),
   });

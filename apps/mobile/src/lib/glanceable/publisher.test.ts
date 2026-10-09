@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one cohesive publisher state-machine suite sharing the fake-sink harness */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
@@ -11,6 +11,11 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
+import {
+  _resetHomeWidgetDataForTests,
+  getHomeWidgetDataForSnapshot,
+  rememberHomeWidgetData,
+} from './home-widget-data';
 import {
   GLANCEABLE_RENEW_MARGIN_MS,
   GLANCEABLE_RENEW_RETRY_MAX_MS,
@@ -960,6 +965,68 @@ describe('GlanceablePublisher waiting ask', () => {
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
     publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
     expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+});
+
+describe('Home widget approval key retention', () => {
+  const KEY = 'b'.repeat(64);
+
+  beforeEach(() => {
+    _resetHomeWidgetDataForTests();
+  });
+
+  it('keeps a server-minted approval key while the visible ask is unchanged', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'permission', title: 'Migrate billing' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
+    publisher.dispose();
+  });
+
+  it('drops the key when a different ask becomes the visible one', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'permission', title: 'Rotate the signing key' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBeNull();
+    publisher.dispose();
+  });
+
+  it('drops the key once no permission is waiting', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'busy', title: 'Migrate billing' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBeNull();
     publisher.dispose();
   });
 });

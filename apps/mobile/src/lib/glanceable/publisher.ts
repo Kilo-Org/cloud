@@ -16,7 +16,11 @@ import {
 } from '@kilocode/app-shared/home-widget';
 
 import { isGlanceableFixtureHeld } from './fixture-hold';
-import { hasSameHomeWidgetDetails, setHomeWidgetDetails } from './home-widget-data';
+import {
+  getLastHomeWidgetData,
+  hasSameHomeWidgetDetails,
+  setHomeWidgetDetails,
+} from './home-widget-data';
 import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import { hasSameGlanceableContent, withStatus } from './snapshot-transforms';
 import {
@@ -195,7 +199,19 @@ export class GlanceablePublisher {
     }
     const previousTitle = getSurfaceExtras().newestSessionTitle;
     const nextTitle = newestSessionTitle(sessions);
-    const nextHomeDetails = buildHomeWidgetDetails(sessions);
+    const derivedHomeDetails = buildHomeWidgetDetails(sessions);
+    // The approval key is minted server-side from the session and permission ids
+    // and cannot be recomputed here. Keep the key already held while the ask it
+    // was minted for is still the visible one; a press re-checks the digest, so a
+    // stale key can never approve a different request.
+    const heldHomeDetails = getLastHomeWidgetData()?.details ?? this.homeDetails;
+    const nextHomeDetails =
+      derivedHomeDetails.approvalKey === null &&
+      heldHomeDetails !== null &&
+      heldHomeDetails.approvalKey !== null &&
+      hasSameHomeWidgetDetails(heldHomeDetails, derivedHomeDetails)
+        ? { ...derivedHomeDetails, approvalKey: heldHomeDetails.approvalKey }
+        : derivedHomeDetails;
     const sameHomeDetails =
       this.homeDetails !== null && hasSameHomeWidgetDetails(this.homeDetails, nextHomeDetails);
     this.homeDetails = nextHomeDetails;

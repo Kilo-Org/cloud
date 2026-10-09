@@ -104,8 +104,12 @@ beforeEach(() => {
 // expose it) so the test exercises the actual fetch call, not a stub.
 const realCloudAgentClientModule =
   jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
-const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAgentNextClient } =
-  realCloudAgentClientModule;
+const {
+  closeCloudAgentOrgStreams,
+  CloudAgentNextClient,
+  createAppBuilderCloudAgentNextClient,
+  readCloudAgentWidgetApprovalKey,
+} = realCloudAgentClientModule;
 
 describe('CloudAgentNextClient review message results', () => {
   const input = {
@@ -1243,6 +1247,55 @@ describe('closeCloudAgentOrgStreams', () => {
 
     await expect(closeCloudAgentOrgStreams('usr_1', 'org_1')).rejects.toThrow(
       'Cloud Agent stream close failed: 500 Internal Server Error - boom'
+    );
+  });
+});
+
+describe('readCloudAgentWidgetApprovalKey', () => {
+  const originalFetch = global.fetch;
+  const input = {
+    userId: 'usr_1',
+    organizationId: null,
+    kiloSessionId: 'ses_0123456789abcdefghijklmnop',
+    cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+  };
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  function respond(response: Response) {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(response);
+    global.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
+  it('POSTs the exact owned scope with the internal key and returns only the binding', async () => {
+    const key = 'b'.repeat(64);
+    const fetchMock = respond(new Response(JSON.stringify({ approvalKey: key })));
+
+    await expect(readCloudAgentWidgetApprovalKey(input)).resolves.toBe(key);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://cloud-agent-next/internal/widgets/approval-key',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-internal-api-key': 'test-secret' },
+        body: JSON.stringify(input),
+      })
+    );
+  });
+
+  it('rejects a response that is not a lowercase SHA-256 binding', async () => {
+    respond(new Response(JSON.stringify({ approvalKey: 'per_raw_permission' })));
+    await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow();
+  });
+
+  it('throws on a refused read without echoing the body', async () => {
+    respond(new Response('Session access denied ses_private', { status: 403 }));
+    await expect(readCloudAgentWidgetApprovalKey(input)).rejects.toThrow(
+      /^Cloud Agent widget approval key failed: 403$/
     );
   });
 });

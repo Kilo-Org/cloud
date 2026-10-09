@@ -186,3 +186,53 @@ Gastown/Wasteland control issuers are deferred with their delegation adapters: c
 This PR does not retire legacy native exchange, shorten user credentials, change global pepper/session semantics, or remove ordinary legacy resource access.
 
 Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
+
+## Dedicated Home widget credential
+
+`activeSessions.widgetCredential({ organizationId })` issues a 30-day,
+HS256-signed `kilo-home-widget` audience credential and returns
+`{ token, expiresAt }`, where `expiresAt` is epoch milliseconds. Issuance uses
+`getResourceDelegationAuthority` and requires a verified native device session.
+Browser sessions and human API credentials cannot mint it. Every read rechecks
+that device session, its live refresh credential, the account pepper, and exact
+organization membership.
+
+This credential is not a general mobile access or refresh token. It cannot
+authenticate ordinary tRPC or mutate agent/session state. Only
+`GET /api/mobile/widgets` reads Home widget data, and
+`POST /api/mobile/widgets/push-token` accepts `{ token, enabled }` to register or
+remove an `ios_widget` APNs reload-hint token. A device token moves to the account
+that currently holds that device's widget credential; Live Activity rows are never
+changed by this route. Both dedicated routes authenticate
+the widget audience and derive the exact user/organization scope from signed
+claims, rather than client body/query values. Responses use `Cache-Control:
+no-store, private`; auth, reads, and registration have a ten-second request bound.
+
+Home widget data may carry `approvalKey`: SHA-256 (lowercase hex) of
+`JSON.stringify([kiloSessionId, permissionId])` for the one oldest approvable
+cloud permission. The web backend obtains it from the Cloud Agent Worker's
+`POST /internal/widgets/approval-key`, gated by `x-internal-api-key` and never
+reachable with the widget credential. The Worker re-checks user, exact
+organization scope with live membership, and the Kilo/cloud session pairing,
+then reads only the control-plane Session DO's stored pending set (no sandbox
+wake) and returns the binding, never the raw permission. The key grants no
+authority: the app approves only after re-reading the live pending permission
+through its ordinary authenticated routes and matching the same key.
+
+Every dedicated request verifies signature, algorithm, audience, environment,
+purpose, issuance/expiry/lifetime, the current user and pepper, account blocking,
+and actual organization membership (including organization deletion). A
+device-bound credential additionally requires its owned unrevoked device session
+and a live unconsumed refresh credential. Device sessions have no independent
+expiry column, so the refresh credential's expiry defines their usable lifetime.
+Widget code never reads, consumes, or rotates the app refresh token itself.
+Pepper rotation, account blocking/deletion, organization access loss, session
+revocation, or refresh expiry immediately invalidates subsequent reads.
+
+Native storage must protect the credential and clear it with account/scope
+changes. Unregister the widget push token before clearing a still-valid
+credential where possible. Reload pushes contain no private Home data and are
+not authority to restore a cleared account. The native renderer retains its
+last-confirmed Home data on transient failures, ages using shared/server-derived
+presentation timeline boundaries, and clears private data on explicit auth or
+privacy failure.

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { homeWidgetDetailsSchema } from '@kilocode/app-shared/home-widget';
 
 import { instanceLifecycleEventSchema, scheduledActionEventSchema } from './notification-events';
 
@@ -92,12 +93,9 @@ export const pushDataSchema = z.discriminatedUnion('type', [
     remediationId: nonEmptyStringSchema.optional(),
     prUrl: nonEmptyStringSchema.optional(),
   }),
-  // Aggregate glanceable snapshot for the Active Agents Live Activity / widget
-  // / Android ongoing. Carries generic status, counts, safe timestamps, and an
-  // opaque scope key only — no titles, ids, or accountEpoch (the client sets
-  // its local epoch). `status` mirrors the shared glanceable status enum.
-  // Old clients omit this type; remove the send gate when every client is past
-  // this release.
+  // Aggregate snapshot remains privacy-minimal. Optional Home-only details
+  // travel beside it for background Home widget updates and are never copied
+  // into Live Activity/ongoing content-state. Older producers omit them.
   z.object({
     type: z.literal('active_agents_glanceable'),
     schemaVersion: z.literal(1),
@@ -140,6 +138,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
       .nullable()
       .default(null),
     newestResultAt: z.string().nullable().default(null),
+    homeWidgetDetails: homeWidgetDetailsSchema.optional(),
   }),
 ]);
 

@@ -196,6 +196,19 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         }
         return { rows: [] };
       }
+      if (sql.includes('from "user_activity_tokens"') && params.includes('ios_widget')) {
+        // The widget hint read selects id, token, updated_at for ios_widget rows only.
+        return {
+          rows: [...activityRows]
+            .filter(
+              ([, row]) =>
+                row.kind === 'ios_widget' &&
+                matches('user_id', row.userId ?? 'usr_1') &&
+                matches('organization_id', row.organizationId ?? null)
+            )
+            .map(([token, row]) => [row.id, token, row.updated_at]),
+        };
+      }
       if (sql.includes('from "user_activity_tokens"')) {
         if (params.includes('android_ongoing')) return { rows: [['subscription']] };
         await options.beforeIosTokens?.();
@@ -2109,6 +2122,14 @@ describe('buildGlanceableExpoMessages', () => {
 });
 
 describe('deliverGlanceableSnapshot', () => {
+  it('sends independent WidgetKit hints even with no Live Activity targets', async () => {
+    const sendIosWidgetHints = vi.fn(async () => undefined);
+    const { deps, calls } = fakeDeps({ sendIosWidgetHints });
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: 'org-1' }, deps);
+    expect(sendIosWidgetHints).toHaveBeenCalledExactlyOnceWith('u1', 'org-1', undefined);
+    expect(calls.iosSends).toHaveLength(0);
+  });
+
   it('skips all delivery when the snapshot cannot be built', async () => {
     const { deps, calls } = fakeDeps({ buildSnapshot: vi.fn(async () => null) });
 

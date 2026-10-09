@@ -5,6 +5,7 @@ import { pushDataSchema } from '@kilocode/notifications';
 import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity';
+import { sendWidgetApns } from './apns-widget';
 import { sendPushNotifications } from './expo-push';
 import type { GlanceableDeliveryDeps, IosActivityToken } from './glanceable-delivery';
 
@@ -150,6 +151,46 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
           failed: result.failed,
         });
       }
+    },
+    sendIosWidgetHints: async (userId, organizationId, isCurrent) => {
+      const orgPredicate =
+        organizationId === null
+          ? isNull(user_activity_tokens.organization_id)
+          : eq(user_activity_tokens.organization_id, organizationId);
+      const rows = await getDbForCall()
+        .select({
+          id: user_activity_tokens.id,
+          token: user_activity_tokens.token,
+          updated_at: user_activity_tokens.updated_at,
+        })
+        .from(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, userId),
+            orgPredicate,
+            eq(user_activity_tokens.kind, 'ios_widget')
+          )
+        );
+      const credentials = await readApnsCredentials(env);
+      if (!credentials || (isCurrent && !(await isCurrent()))) return;
+      await sendWidgetApns({
+        credentials,
+        tokens: rows.map(row => row.token),
+        isCurrent,
+        onGone: async token => {
+          const row = rows.find(candidate => candidate.token === token);
+          if (!row) return;
+          await getDbForCall()
+            .delete(user_activity_tokens)
+            .where(
+              and(
+                eq(user_activity_tokens.id, row.id),
+                eq(user_activity_tokens.updated_at, row.updated_at),
+                eq(user_activity_tokens.kind, 'ios_widget')
+              )
+            );
+        },
+      });
     },
     listIosExpoTokens: async userId => {
       const rows = await getDbForCall()

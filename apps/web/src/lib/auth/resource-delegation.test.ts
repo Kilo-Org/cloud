@@ -294,6 +294,30 @@ describe('resource delegation authority', () => {
     });
   });
 
+  test('preserves verified legacy device sid for separately scoped widget issuance', async () => {
+    const current = await user();
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: current.id, user_agent: 'widget-delegation-test' })
+      .returning({ id: device_sessions.id });
+    const token = jwt.sign(
+      {
+        version: 3,
+        kiloUserId: current.id,
+        apiTokenPepper: current.api_token_pepper,
+        env: process.env.NODE_ENV,
+        deviceSessionId: session.id,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 60 * 60 }
+    );
+    const authority = await getResourceDelegationAuthority(current, { headers: bearer(token) });
+    expect(authority).toMatchObject({
+      credentialKind: 'device-access',
+      deviceSessionId: session.id,
+    });
+  });
+
   test('requires an active owned device session for a modern device credential', async () => {
     const current = await user();
     const [session] = await db

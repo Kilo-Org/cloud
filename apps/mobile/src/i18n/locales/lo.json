@@ -135,7 +135,8 @@
     "updated": "ອັບເດດແລ້ວ",
     "working": "ກຳລັງເຮັດວຽກ",
     "yourOwnRepositories": "ຄັງໂຄ້ດຂອງທ່ານເອງ",
-    "dismissed": "ລະເວັ້ນແລ້ວ"
+    "dismissed": "ລະເວັ້ນແລ້ວ",
+    "agent": "ຕົວແທນ"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
-    "newestResult": "ຜົນຫຼ້າສຸດ",
-    "scheduledWakes": "ຕື່ນ {{time}}"
+    "scheduledWakes": "ຕື່ນ {{time}}",
+    "checked": "ກວດສອບແລ້ວ",
+    "lastKnown": "ສະຖານະຫຼ້າສຸດທີ່ຮູ້",
+    "awaitingUpdate": "ລໍການອັບເດດ",
+    "nextRun": "ເຮັດວຽກຄັ້ງຕໍ່ໄປ",
+    "waitingForYou": "ລໍທ່ານ",
+    "nextScheduled": "ກຳນົດເວລາຖັດໄປ",
+    "answerNeeded": "ລໍຄຳຕອບ",
+    "waitingToRetry": "ລໍລອງໃໝ່"
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
@@ -3357,7 +3365,6 @@
       "template": "ແມ່ແບບ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "ອະທິບາຍ $ARGUMENTS",
-      "agent": "ຕົວແທນ",
       "subtask": "ດໍາເນີນການເປັນວຽກຍ່ອຍ",
       "edit": "ແກ້ໄຂຄໍາສັ່ງ slash",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງໄດ້",

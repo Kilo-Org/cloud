@@ -4,6 +4,11 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
+import {
+  _resetHomeWidgetDataForTests,
+  _setHomeWidgetStoreForTests,
+  restoreHomeWidgetData,
+} from './home-widget-data';
 
 import { type GlanceableSink } from './sink-registry';
 
@@ -190,6 +195,7 @@ export async function restorePersistedGlanceable(): Promise<void> {
     if (rawScope !== null && localScopeKey === null) {
       localScopeKey = rawScope;
     }
+    await restoreHomeWidgetData(localScopeKey);
   } catch (error) {
     // A malformed mirror is treated as absent; the publisher repopulates it.
     // A read failure is different: the record may be there and own a card, so
@@ -230,6 +236,7 @@ export const persistGlanceableSink: GlanceableSink = {
 
 export function _setSecureStoreForTests(store: SecureStoreLike | null): void {
   secureStoreForTests = store;
+  _setHomeWidgetStoreForTests(store);
 }
 
 export function _setLastGlanceableSnapshotForTests(
@@ -255,4 +262,5 @@ export function _resetGlanceablePersistForTests(): void {
   restoresInFlight = 0;
   settleWaiters = [];
   secureStoreForTests = null;
+  _resetHomeWidgetDataForTests();
 }

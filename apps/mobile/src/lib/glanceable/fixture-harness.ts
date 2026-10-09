@@ -3,8 +3,10 @@ import {
   GLANCEABLE_TERMINAL_MS,
   isEligibleGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
 
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
+import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 
 import {
   GLANCEABLE_FIXTURES,
@@ -12,7 +14,18 @@ import {
   type GlanceableFixtureName,
   isGlanceableFixtureName,
 } from './fixture-catalog';
-import { holdGlanceableFixture, releaseGlanceableFixtureHold } from './fixture-hold';
+import { getTerminalBlankEpoch } from './cleanup';
+import {
+  holdGlanceableFixture,
+  isGlanceableFixtureHeld,
+  releaseGlanceableFixtureHold,
+} from './fixture-hold';
+import {
+  clearHomeWidgetData,
+  rememberHomeWidgetData,
+  setHomeWidgetDetails,
+} from './home-widget-data';
+import { clearHomeWidgetRefresh, HomeWidgetRefresh } from './home-widget-refresh';
 import { newestSessionTitle } from './newest-session';
 import { getLastGlanceableSnapshot } from './persist';
 import { type GlanceablePublisherContext } from './publisher';
@@ -37,6 +50,7 @@ let scope: GlanceablePublisherContext | null = null;
 /** A fixture requested before a scope existed (cold launch, restore in flight). */
 let pendingName: GlanceableFixtureName | null = null;
 let terminalTimer: ReturnType<typeof setTimeout> | null = null;
+let fixtureGeneration = 0;
 
 function log(message: string): void {
   // eslint-disable-next-line no-console -- dev-only harness feedback in the Metro log
@@ -50,9 +64,29 @@ function cancelTerminal(): void {
   }
 }
 
-function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContext): void {
+async function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContext): Promise<void> {
+  fixtureGeneration += 1;
+  const generation = fixtureGeneration;
+  const authEpoch = currentAuthEpoch();
+  const blankEpoch = getTerminalBlankEpoch();
+  await HomeWidgetRefresh?.setFixtureMode(true);
+  const superseded = () =>
+    generation !== fixtureGeneration ||
+    !isGlanceableFixtureHeld() ||
+    currentAuthEpoch() !== authEpoch ||
+    getTerminalBlankEpoch() !== blankEpoch ||
+    scope?.userId !== ctx.userId ||
+    scope.organizationId !== ctx.organizationId;
+  if (superseded()) {
+    return;
+  }
   const fixture: GlanceableFixture = GLANCEABLE_FIXTURES[name];
   cancelTerminal();
+  clearHomeWidgetData();
+  await clearHomeWidgetRefresh();
+  if (superseded()) {
+    return;
+  }
   const now = Date.now();
   // Ids and the cloud connection let the waiting-ask selection name a session,
   // so the Live Activity and the ongoing card offer Approve like a real ask.
@@ -66,14 +100,27 @@ function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContext): vo
   }));
   // Seeded from the persisted revision, which is never below what any sink
   // accepted, so the native surfaces take the frame instead of discarding it.
-  const snapshot = buildGlanceableSnapshot({
+  const homeSnapshot = buildGlanceableSnapshot({
     sessions: rows,
     userId: ctx.userId,
     organizationId: ctx.organizationId,
-    now,
+    now: now - (fixture.checkedAgo ?? 0) * 60_000,
     previousRevision: getLastGlanceableSnapshot()?.revision ?? 0,
-    status: fixture.status,
   });
+  const details = buildHomeWidgetDetails(rows);
+  setHomeWidgetDetails(details);
+  rememberHomeWidgetData({ snapshot: homeSnapshot, details });
+  const snapshot =
+    fixture.status === 'expired'
+      ? buildGlanceableSnapshot({
+          sessions: [],
+          userId: ctx.userId,
+          organizationId: ctx.organizationId,
+          now,
+          previousRevision: homeSnapshot.revision,
+          status: 'expired',
+        })
+      : { ...homeSnapshot, status: fixture.status ?? homeSnapshot.status };
   const eligible = isEligibleGlanceableWork(snapshot);
   setSurfaceExtras({
     newestSessionTitle: newestSessionTitle(rows),
@@ -96,9 +143,20 @@ function apply(name: GlanceableFixtureName, ctx: GlanceablePublisherContext): vo
   log(`applied ${name} (revision ${snapshot.revision})`);
 }
 
-function release(): void {
+async function release(): Promise<void> {
+  fixtureGeneration += 1;
+  const generation = fixtureGeneration;
   pendingName = null;
   cancelTerminal();
+  clearHomeWidgetData();
+  await clearHomeWidgetRefresh();
+  if (generation !== fixtureGeneration) {
+    return;
+  }
+  await HomeWidgetRefresh?.setFixtureMode(false);
+  if (generation !== fixtureGeneration) {
+    return;
+  }
   // The rebuilt publisher spreads the current extras, so the fixture's action
   // feedback must not survive into the live surface.
   setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
@@ -117,7 +175,7 @@ export function handleGlanceableFixturePath(path: string): boolean {
     return false;
   }
   if (name === RELEASE) {
-    release();
+    void release();
     return true;
   }
   if (!isGlanceableFixtureName(name)) {
@@ -132,7 +190,7 @@ export function handleGlanceableFixturePath(path: string): boolean {
     log(`queued ${name} until a signed-in scope publishes`);
     return true;
   }
-  apply(name, scope);
+  void apply(name, scope);
   return true;
 }
 
@@ -142,6 +200,6 @@ export function setGlanceableFixtureScope(next: GlanceablePublisherContext | nul
   if (next !== null && pendingName !== null) {
     const name = pendingName;
     pendingName = null;
-    apply(name, next);
+    void apply(name, next);
   }
 }

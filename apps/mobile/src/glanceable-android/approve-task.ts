@@ -19,24 +19,21 @@ import {
  * The JS bodies the ongoing notification's Approve action runs headless.
  *
  * Two registrations share this module. `handleApproveTask` answers the ask the
- * app recorded, and the entry registers it under `APPROVE_HEADLESS_TASK_KEY`
- * via the Kotlin worker; `runApproveTask` runs the front-approval service and
- * is registered under `APPROVE_AGENT_TASK_KEY` by `registerApproveTask`, the
- * key the `ActiveAgentsApproveTaskService` chain starts. Only the strings cross
- * the native boundary, so they are asserted equal in `approve-task.test.ts`.
+ * app recorded, and the entry registers it under `KiloActiveAgentsApprove`,
+ * the Kotlin worker's `TASK_NAME`; `runApproveTask` runs the front-approval
+ * service and is registered under `APPROVE_AGENT_TASK_KEY` by
+ * `registerApproveTask`, the key the `ActiveAgentsApproveTaskService` chain
+ * starts. Only the strings cross the native boundary.
  *
  * The recorded waiting ask is the only thing `handleApproveTask` answers —
  * never the snapshot's counts — and it also names the ids the republish below
  * needs.
- */
-export const APPROVE_HEADLESS_TASK_KEY = 'KiloActiveAgentsApprove';
-
-/**
+ *
  * The key the `ActiveAgentsApproveTaskService` chain starts. One literal,
  * shared by the Kotlin service and this registration: a mismatch would leave
  * that notification action with no task.
  */
-export const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
+const APPROVE_AGENT_TASK_KEY = 'ActiveAgentsApprove';
 
 /** The approval the task runs. Injected so the flow is unit-testable. */
 export type ApproveRunner = () => Promise<void>;

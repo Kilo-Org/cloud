@@ -135,7 +135,8 @@
     "updated": "Zaktualizowano",
     "working": "W toku",
     "yourOwnRepositories": "Twoje repozytoria",
-    "dismissed": "Odrzucone"
+    "dismissed": "Odrzucone",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -3237,8 +3238,15 @@
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
     "openSession": "Otwórz",
     "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
-    "newestResult": "Najnowszy wynik",
-    "scheduledWakes": "budzi się {{time}}"
+    "scheduledWakes": "budzi się {{time}}",
+    "checked": "Sprawdzono",
+    "lastKnown": "Ostatni znany stan",
+    "awaitingUpdate": "Czeka na aktualizację",
+    "nextRun": "Następne uruchomienie",
+    "waitingForYou": "Czeka na ciebie",
+    "nextScheduled": "Najbliższe zaplanowane",
+    "answerNeeded": "Czeka na odpowiedź",
+    "waitingToRetry": "Czeka na ponowną próbę"
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",
@@ -3439,7 +3447,6 @@
       "template": "Szablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Wyjaśnij $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Uruchom jako podzadanie",
       "edit": "Edytuj polecenie ukośnika",
       "saveFailed": "Nie udało się zapisać polecenia",

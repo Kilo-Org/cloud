@@ -56,7 +56,7 @@ async function runTask(
       widgetName: 'ActiveAgentsWidget',
       widgetId: 1,
       width,
-      height: 200,
+      height: 224,
       screenInfo: {
         screenWidthDp: 400,
         screenHeightDp: 800,

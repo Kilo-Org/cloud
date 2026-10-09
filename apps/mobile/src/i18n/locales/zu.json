@@ -135,7 +135,8 @@
     "updated": "Kubuyekezwe",
     "working": "Kuyasebenza",
     "yourOwnRepositories": "Izinqolobane zakho zekhodi",
-    "dismissed": "Kuchithiwe"
+    "dismissed": "Kuchithiwe",
+    "agent": "Umenzeli"
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
     "openSession": "Vula",
     "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi.",
-    "newestResult": "Umphumela wakamuva",
-    "scheduledWakes": "ivuka {{time}}"
+    "scheduledWakes": "ivuka {{time}}",
+    "checked": "Kuhloliwe",
+    "lastKnown": "Okwagcina kwaziwa",
+    "awaitingUpdate": "Kulinde isibuyekezo",
+    "nextRun": "Ukuqalisa okulandelayo",
+    "waitingForYou": "Kulinde wena",
+    "nextScheduled": "Okulandelayo okuhleliwe",
+    "answerNeeded": "Kudinga impendulo",
+    "waitingToRetry": "Kulinde ukuzama futhi"
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",
@@ -3357,7 +3365,6 @@
       "template": "Isifanekiso",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Chaza $ARGUMENTS",
-      "agent": "Umenzeli",
       "subtask": "Qalisa njengomsebenzi ongaphansi",
       "edit": "Hlela umyalo we-slash",
       "saveFailed": "Ayikwazanga ukulondoloza umyalo",

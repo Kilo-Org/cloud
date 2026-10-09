@@ -135,7 +135,8 @@
     "updated": "Đã cập nhật",
     "working": "Đang xử lý",
     "yourOwnRepositories": "Kho mã nguồn của riêng bạn",
-    "dismissed": "Đã bỏ qua"
+    "dismissed": "Đã bỏ qua",
+    "agent": "Đại lý"
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
-    "newestResult": "Kết quả mới nhất",
-    "scheduledWakes": "thức dậy {{time}}"
+    "scheduledWakes": "thức dậy {{time}}",
+    "checked": "Đã kiểm tra",
+    "lastKnown": "Ghi nhận gần nhất",
+    "awaitingUpdate": "Đang chờ cập nhật",
+    "nextRun": "Lần chạy tiếp theo",
+    "waitingForYou": "Đang chờ bạn",
+    "nextScheduled": "Lịch tiếp theo",
+    "answerNeeded": "Cần trả lời",
+    "waitingToRetry": "Đang chờ thử lại"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -3357,7 +3365,6 @@
       "template": "Bản mẫu",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
-      "agent": "Đại lý",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
       "edit": "Chỉnh sửa lệnh gạch chéo",
       "saveFailed": "Không thể lưu lệnh",

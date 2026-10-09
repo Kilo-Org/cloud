@@ -135,7 +135,8 @@
     "updated": "Թարմացված",
     "working": "Աշխատում է",
     "yourOwnRepositories": "Քո սեփական պահոցները",
-    "dismissed": "Անտեսված"
+    "dismissed": "Անտեսված",
+    "agent": "Գործակալ"
   },
   "language": {
     "restarting": "Վերագործարկվում է՝ լեզվի փոփոխությունը կիրառելու համար",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։",
     "openSession": "Բացիր",
     "approveFailed": "Չհաջողվեց հաստատել։ Կրկին փորձելու համար հպեք $t(common.approve)-ին։",
-    "newestResult": "Նորագույն արդյունքը",
-    "scheduledWakes": "արթնանում է {{time}}"
+    "scheduledWakes": "արթնանում է {{time}}",
+    "checked": "Ստուգված",
+    "lastKnown": "Վերջին հայտնի",
+    "awaitingUpdate": "Սպասում է թարմացման",
+    "nextRun": "Հաջորդ գործարկումը",
+    "waitingForYou": "Սպասում է ձեզ",
+    "nextScheduled": "Հաջորդ պլանավորվածները",
+    "answerNeeded": "Սպասում է պատասխանի",
+    "waitingToRetry": "Սպասում է կրկնափորձի"
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",
@@ -3357,7 +3365,6 @@
       "template": "Կաղապար",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Բացատրեք $ARGUMENTS",
-      "agent": "Գործակալ",
       "subtask": "Գործարկել որպես ենթաառաջադրանք",
       "edit": "Խմբագրել շեղ հրամանը",
       "saveFailed": "Չհաջողվեց պահել հրամանը",

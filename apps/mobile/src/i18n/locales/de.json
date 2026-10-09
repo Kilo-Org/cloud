@@ -135,7 +135,8 @@
     "updated": "Aktualisiert",
     "working": "In Bearbeitung",
     "yourOwnRepositories": "Deine eigenen Code-Repositories",
-    "dismissed": "Verworfen"
+    "dismissed": "Verworfen",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
     "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
-    "newestResult": "Neuestes Ergebnis",
-    "scheduledWakes": "wacht {{time}} auf"
+    "scheduledWakes": "wacht {{time}} auf",
+    "checked": "Geprüft",
+    "lastKnown": "Zuletzt bekannt",
+    "awaitingUpdate": "Aktualisierung ausstehend",
+    "nextRun": "Nächste Ausführung",
+    "waitingForYou": "Wartet auf dich",
+    "nextScheduled": "Als Nächstes geplant",
+    "answerNeeded": "Antwort erforderlich",
+    "waitingToRetry": "Wartet auf erneuten Versuch"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
@@ -3357,7 +3365,6 @@
       "template": "Vorlage",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Erklären Sie $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Als Unteraufgabe ausführen",
       "edit": "Slash-Befehl bearbeiten",
       "saveFailed": "Der Befehl konnte nicht gespeichert werden",

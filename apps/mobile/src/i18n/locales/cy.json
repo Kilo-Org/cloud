@@ -135,7 +135,8 @@
     "updated": "Diweddarwyd",
     "working": "Yn gweithio",
     "yourOwnRepositories": "Dy ystorfeydd dy hun",
-    "dismissed": "Wedi'i ddiystyru"
+    "dismissed": "Wedi'i ddiystyru",
+    "agent": "Asiant"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -3319,8 +3320,15 @@
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
-    "newestResult": "Canlyniad diweddaraf",
-    "scheduledWakes": "yn deffro {{time}}"
+    "scheduledWakes": "yn deffro {{time}}",
+    "checked": "Gwiriwyd",
+    "lastKnown": "Hysbys diwethaf",
+    "awaitingUpdate": "Yn aros am ddiweddariad",
+    "nextRun": "Rhediad nesaf",
+    "waitingForYou": "Yn aros amdanoch",
+    "nextScheduled": "Nesaf ar yr amserlen",
+    "answerNeeded": "Angen ateb",
+    "waitingToRetry": "Yn aros i ailgeisio"
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",
@@ -3521,7 +3529,6 @@
       "template": "Templed",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Eglurwch $ARGUMENTS",
-      "agent": "Asiant",
       "subtask": "Rhedeg fel is-dasg",
       "edit": "Golygu gorchymyn slaes",
       "saveFailed": "Ni fu modd cadw'r gorchymyn",

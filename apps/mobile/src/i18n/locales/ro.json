@@ -135,7 +135,8 @@
     "updated": "Actualizat",
     "working": "În lucru",
     "yourOwnRepositories": "Depozitele tale de cod",
-    "dismissed": "Ignorată"
+    "dismissed": "Ignorată",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -3196,8 +3197,15 @@
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
     "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
-    "newestResult": "Cel mai recent rezultat",
-    "scheduledWakes": "se trezește {{time}}"
+    "scheduledWakes": "se trezește {{time}}",
+    "checked": "Verificat",
+    "lastKnown": "Ultima stare cunoscută",
+    "awaitingUpdate": "Așteaptă actualizarea",
+    "nextRun": "Următoarea rulare",
+    "waitingForYou": "Te așteaptă",
+    "nextScheduled": "Următoarele programate",
+    "answerNeeded": "Așteaptă un răspuns",
+    "waitingToRetry": "Așteaptă reîncercarea"
   },
   "transcriptionModel": {
     "title": "Model de transcriere",
@@ -3398,7 +3406,6 @@
       "template": "Șablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Explicați $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Rulați ca subsarcină",
       "edit": "Comanda Editați slash",
       "saveFailed": "Comanda nu a putut fi salvată",

@@ -6,6 +6,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
+import { _resetHomeWidgetDataForTests } from '@/lib/glanceable/home-widget-data';
 import { setGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import {
   _resetWaitingAskForTests,
@@ -23,6 +24,10 @@ import {
   setGlanceableActionNotice,
 } from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US' }],
+  getCalendars: () => [{ uses24hourClock: false }],
+}));
 
 const mocks = vi.hoisted(() => {
   let notification: {
@@ -260,6 +265,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   mocks.native.setWidgetSnapshot('', 0);
   _resetAndroidSinkForTests();
+  _resetHomeWidgetDataForTests();
   _resetWaitingAskForTests();
   // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
   _setPermissionReaderForTests(() => Promise.resolve('granted'));
@@ -1190,6 +1196,13 @@ describe('androidSink widget publish and end', () => {
       vi.setSystemTime(NOW + 28_800_000);
       expect(getCurrentWidgetProps()?.statusLine).toBe('Status expired');
       expect(getCurrentWidgetProps()?.countLines).toEqual([]);
+      expect(getCurrentWidgetProps()?.home).toMatchObject({
+        primaryKind: 'running',
+        primaryCount: 1,
+        stale: true,
+        checkedAt: snapshot.updatedAt,
+        canCreate: true,
+      });
     }
   );
 

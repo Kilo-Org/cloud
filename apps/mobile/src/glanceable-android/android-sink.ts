@@ -12,6 +12,10 @@ import {
 import { requestWidgetUpdate } from 'react-native-android-widget';
 
 import { i18n } from '@/i18n';
+import {
+  getHomeWidgetDataForSnapshot,
+  getLastHomeWidgetData,
+} from '@/lib/glanceable/home-widget-data';
 import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 import {
   getGlanceableDelivery,
@@ -153,13 +157,15 @@ function widgetPropsFor(snapshot: GlanceableAgentsSnapshot): AndroidWidgetProps 
     translate,
     formatGlanceableCount,
     formatGlanceableAgo,
-    formatGlanceableClock
+    formatGlanceableClock,
+    getHomeWidgetDataForSnapshot(snapshot)
   );
 }
 
 /** A delayed render must check the current snapshot and its deadline, not cached props. */
 export function getCurrentWidgetProps(): AndroidWidgetProps | null {
-  return lastWidgetSnapshot === null ? null : widgetPropsFor(lastWidgetSnapshot);
+  const snapshot = lastWidgetSnapshot ?? getLastHomeWidgetData()?.snapshot ?? null;
+  return snapshot === null ? null : widgetPropsFor(snapshot);
 }
 
 function renderWidgetNow(props: AndroidWidgetProps): void {

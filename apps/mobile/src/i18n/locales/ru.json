@@ -135,7 +135,8 @@
     "updated": "Обновлено",
     "working": "В работе",
     "yourOwnRepositories": "Личные репозитории",
-    "dismissed": "Отклонено"
+    "dismissed": "Отклонено",
+    "agent": "Агент"
   },
   "language": {
     "restarting": "Перезапуск для смены языка",
@@ -3237,8 +3238,15 @@
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
     "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
-    "newestResult": "Последний результат",
-    "scheduledWakes": "просыпается {{time}}"
+    "scheduledWakes": "просыпается {{time}}",
+    "checked": "Проверено",
+    "lastKnown": "Последний известный статус",
+    "awaitingUpdate": "Ожидание обновления",
+    "nextRun": "Следующий запуск",
+    "waitingForYou": "Ожидание ваших действий",
+    "nextScheduled": "Далее по расписанию",
+    "answerNeeded": "Требуется ответ",
+    "waitingToRetry": "Ожидание повтора"
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",
@@ -3439,7 +3447,6 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Объясните $ARGUMENTS",
-      "agent": "Агент",
       "subtask": "Запустить как подзадачу",
       "edit": "Команда редактирования косой черты",
       "saveFailed": "Не удалось сохранить команду",

@@ -91,6 +91,7 @@
     "couldnTLoadMore": "Couldn't load more",
     "deviceSessions": "Device sessions",
     "disabled": "Disabled",
+    "agent": "Agent",
     "email": "Email",
     "ends": "Ends {{date}}",
     "failed": "Failed",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
-    "newestResult": "Newest result",
-    "scheduledWakes": "wakes {{time}}"
+    "scheduledWakes": "wakes {{time}}",
+    "checked": "Checked",
+    "lastKnown": "Last known",
+    "awaitingUpdate": "Awaiting update",
+    "nextRun": "Next run",
+    "waitingForYou": "Waiting for you",
+    "nextScheduled": "Next scheduled",
+    "answerNeeded": "Answer needed",
+    "waitingToRetry": "Waiting to retry"
   },
   "transcriptionModel": {
     "title": "Transcription model",
@@ -3357,7 +3365,6 @@
       "template": "Template",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Explain $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Run as subtask",
       "edit": "Edit slash command",
       "saveFailed": "Couldn't save command",

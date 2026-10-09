@@ -135,7 +135,8 @@
     "updated": "Ажурирано",
     "working": "Во тек",
     "yourOwnRepositories": "Твоите репозиториуми",
-    "dismissed": "Отфрлено"
+    "dismissed": "Отфрлено",
+    "agent": "Агент"
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "openSession": "Отвори",
     "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно.",
-    "newestResult": "Најнов резултат",
-    "scheduledWakes": "се буди {{time}}"
+    "scheduledWakes": "се буди {{time}}",
+    "checked": "Проверено",
+    "lastKnown": "Последно познато",
+    "awaitingUpdate": "Чека ажурирање",
+    "nextRun": "Следно извршување",
+    "waitingForYou": "Чека на вас",
+    "nextScheduled": "Следни закажани",
+    "answerNeeded": "Потребен е одговор",
+    "waitingToRetry": "Чека повторен обид"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",
@@ -3357,7 +3365,6 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Објасни $ARGUMENTS",
-      "agent": "Агент",
       "subtask": "Стартувај како подзадача",
       "edit": "Уреди команда коса црта",
       "saveFailed": "Не може да се зачува командата",

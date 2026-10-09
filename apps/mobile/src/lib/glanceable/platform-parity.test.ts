@@ -11,18 +11,11 @@ import { buildGlanceableViewProps } from '@/glanceable-ios/view-props';
 import { type GlanceableActionFeedback, setSurfaceExtras } from './surface-extras';
 
 /**
- * The request builds the widget actions on iOS and on Android with each
- * platform's own mechanism (App Intents on iOS, a headless task on Android),
- * so the two props builders must agree on everything the user sees: the status
- * line, the counts, the reserved newest/feedback line, which action is
- * offered, and the spoken label. This pins that parity from one input matrix,
- * so a change to either builder that forks the *visible* behaviour — as opposed
- * to the drawing mechanism — fails here instead of on a device.
- *
- * The builders differ where the platform's surface does: iOS carries a numeric
- * count and a compact primary for the Lock Screen accessory families, Android
- * carries a formatted string. The comparison below normalizes those and ignores
- * the mechanism-only fields.
+ * Both platforms draw widget actions with their own mechanism (App Intents on
+ * iOS, a headless task on Android), so the two props builders must agree on
+ * what the user sees: status, counts, the action feedback line, offered
+ * actions, and the spoken label. Numeric/string count formatting differs by
+ * platform and is normalized below.
  */
 
 const NOW = 1_750_000_000_000;
@@ -77,7 +70,7 @@ function visible(snapshot: GlanceableAgentsSnapshot) {
       android.countLines,
     ],
     primaryLabel: [ios.primaryLabel, android.primaryLabel],
-    newestLine: [ios.newestTitle, android.newestLine],
+    feedbackLine: [ios.actionLine, android.homeCopy?.detail ?? null],
     actions: [
       { approve: ios.actions.approve, newAgent: ios.actions.newAgent },
       { approve: android.actions.approve, newAgent: android.actions.newAgent },
@@ -115,36 +108,14 @@ describe('iOS and Android widget props parity', () => {
     expect(seen.primaryLabel[1]).toBe(seen.primaryLabel[0]);
   });
 
-  const EXTRAS: {
-    label: string;
-    feedback: GlanceableActionFeedback | null;
-    title: string | null;
-    expected: string;
-  }[] = [
-    {
-      label: 'newest title',
-      feedback: null,
-      title: 'Fix the flaky test',
-      expected: 'Newest: Fix the flaky test',
-    },
-    {
-      label: 'approving',
-      feedback: 'approving',
-      title: 'Fix the flaky test',
-      expected: 'Approving…',
-    },
-    {
-      label: 'could not approve',
-      feedback: 'couldNotApprove',
-      title: 'Fix the flaky test',
-      expected: 'Could not approve',
-    },
+  const FEEDBACK: { label: string; feedback: GlanceableActionFeedback; expected: string }[] = [
+    { label: 'approving', feedback: 'approving', expected: 'Approving…' },
+    { label: 'could not approve', feedback: 'couldNotApprove', expected: 'Could not approve' },
   ];
 
-  it.each(EXTRAS)('draws the same reserved line for $label', ({ feedback, title, expected }) => {
-    setSurfaceExtras({ newestSessionTitle: title, actionFeedback: feedback });
+  it.each(FEEDBACK)('draws the same action feedback for $label', ({ feedback, expected }) => {
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: feedback });
     const seen = visible(snapshotFor([{ status: 'busy' }, { status: 'idle' }]));
-    expect(seen.newestLine[0]).toBe(expected);
-    expect(seen.newestLine[1]).toBe(expected);
+    expect(seen.feedbackLine).toEqual([expected, expected]);
   });
 });

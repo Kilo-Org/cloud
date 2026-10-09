@@ -1,3 +1,4 @@
+import { getCalendars } from 'expo-localization';
 import { i18n } from '@/i18n';
 import { RTL_LANGUAGES, type SupportedLanguage } from '@/i18n/languages';
 import { dateTimeFormat, numberFormat } from '@/lib/intl-cache';
@@ -41,11 +42,21 @@ export function formatGlanceableAgo(at: string): string {
   return timeAgo(parseTimestamp(at));
 }
 
-/**
- * The clock time a scheduled count row draws beside its count ("8:00 PM", or
- * "20:00" where the language reads a 24-hour clock): the row says when the
- * agent wakes, the way the iOS widget's scheduled row does.
- */
-export function formatGlanceableClock(at: string): string {
-  return dateTimeFormat(i18n.language, { timeStyle: 'short' }).format(parseTimestamp(at));
+/** Checked dates stay absolute because a widget bitmap cannot advance a relative age offline. */
+export function formatGlanceableClock(at: string, options?: { includeDate: boolean }): string {
+  const date = parseTimestamp(at);
+  const now = new Date();
+  const today =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  const uses24hourClock = getCalendars().at(0)?.uses24hourClock ?? null;
+  return dateTimeFormat(i18n.language, {
+    ...(today && !options?.includeDate
+      ? { timeStyle: 'short' as const }
+      : { dateStyle: 'short' as const, timeStyle: 'short' as const }),
+    ...(uses24hourClock === null
+      ? {}
+      : { hourCycle: uses24hourClock ? ('h23' as const) : ('h12' as const) }),
+  }).format(date);
 }

@@ -135,7 +135,8 @@
     "updated": "Güncellendi",
     "working": "Çalışıyor",
     "yourOwnRepositories": "Kendi depoların",
-    "dismissed": "Yok sayıldı"
+    "dismissed": "Yok sayıldı",
+    "agent": "Ajan"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
     "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
-    "newestResult": "En yeni sonuç",
-    "scheduledWakes": "{{time}} uyanır"
+    "scheduledWakes": "{{time}} uyanır",
+    "checked": "Kontrol edildi",
+    "lastKnown": "Son bilinen",
+    "awaitingUpdate": "Güncelleme bekleniyor",
+    "nextRun": "Sonraki çalışma",
+    "waitingForYou": "Sizi bekliyor",
+    "nextScheduled": "Sıradaki zamanlananlar",
+    "answerNeeded": "Yanıt bekliyor",
+    "waitingToRetry": "Yeniden deneme bekleniyor"
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",
@@ -3357,7 +3365,6 @@
       "template": "Şablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS'ı açıklayın",
-      "agent": "Ajan",
       "subtask": "Alt görev olarak çalıştır",
       "edit": "Eğik çizgi komutunu düzenle",
       "saveFailed": "Komut kaydedilemedi",

@@ -135,7 +135,8 @@
     "updated": "Aktualizované",
     "working": "Pracuje sa",
     "yourOwnRepositories": "Tvoje vlastné repozitáre",
-    "dismissed": "Ignorované"
+    "dismissed": "Ignorované",
+    "agent": "agent"
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -3237,8 +3238,15 @@
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
     "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova.",
-    "newestResult": "Najnovší výsledok",
-    "scheduledWakes": "prebudí sa {{time}}"
+    "scheduledWakes": "prebudí sa {{time}}",
+    "checked": "Overené",
+    "lastKnown": "Posledný známy stav",
+    "awaitingUpdate": "Čaká na aktualizáciu",
+    "nextRun": "Ďalšie spustenie",
+    "waitingForYou": "Čaká na vás",
+    "nextScheduled": "Ďalšie naplánované",
+    "answerNeeded": "Čaká na odpoveď",
+    "waitingToRetry": "Čaká na opakovanie"
   },
   "transcriptionModel": {
     "title": "Model prepisu",
@@ -3439,7 +3447,6 @@
       "template": "Šablóna",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Vysvetlite $ARGUMENTS",
-      "agent": "agent",
       "subtask": "Spustiť ako podúlohu",
       "edit": "Príkaz na úpravu lomky",
       "saveFailed": "Príkaz sa nepodarilo uložiť",

@@ -178,26 +178,17 @@ describe('withGlanceableCopy', () => {
     expect(glanceableLayoutCopy().locale).not.toContain('-');
   });
 
-  it('covers every status the layouts render, the action labels, and the language tag', () => {
-    expect(Object.keys(glanceableLayoutCopy()).toSorted()).toEqual([
-      'approve',
-      'digits',
-      'empty',
-      'expired',
-      'idle',
-      'locale',
-      'needsInput',
-      'newAgent',
-      'newestResult',
-      'open',
-      'openAgents',
-      'privacy',
-      'running',
-      'scheduled',
-      'signed_out',
-      'stale',
-      'waiting',
-    ]);
+  it('bakes Home freshness and fallback copy alongside privacy-minimal accessory copy', () => {
+    const copy = glanceableLayoutCopy();
+    expect(copy).toMatchObject({
+      checked: i18n.t('glanceable.checked'),
+      lastKnown: i18n.t('glanceable.lastKnown'),
+      awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
+      agent: i18n.t('common.agent'),
+      noneWaiting: i18n.t('glanceable.noneWaiting'),
+    });
+    expect(copy.checked).not.toBe('glanceable.checked');
+    expect(copy.awaitingUpdate).not.toBe('glanceable.awaitingUpdate');
   });
 
   it('bakes both Live Activity action labels from the reviewed keys', () => {

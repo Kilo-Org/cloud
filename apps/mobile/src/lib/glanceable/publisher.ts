@@ -9,8 +9,14 @@ import {
   isStartableGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildHomeWidgetDetails,
+  EMPTY_HOME_WIDGET_DETAILS,
+  type HomeWidgetDetails,
+} from '@kilocode/app-shared/home-widget';
 
 import { isGlanceableFixtureHeld } from './fixture-hold';
+import { hasSameHomeWidgetDetails, setHomeWidgetDetails } from './home-widget-data';
 import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import { hasSameGlanceableContent, withStatus } from './snapshot-transforms';
 import {
@@ -122,6 +128,8 @@ export class GlanceablePublisher {
   private readonly skipWaitingAskSessionId?: string;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
+  /** Home-only details from this publisher's previous tray read. */
+  private homeDetails: HomeWidgetDetails | null = null;
   /**
    * `updatedAt` of the frame the native surface accepted, i.e. the one its stale
    * deadline keys off. A heartbeat whose visible content did not change leaves
@@ -171,7 +179,8 @@ export class GlanceablePublisher {
    */
   handleSessions(
     sessions: readonly (NewestSessionRow & WaitingAskRow)[],
-    ctx: GlanceablePublisherContext
+    ctx: GlanceablePublisherContext,
+    checkedAt: number = this.now()
   ): void {
     // A dev fixture owns the surfaces and the ask it recorded: stay silent
     // without clearing that ask.
@@ -184,10 +193,13 @@ export class GlanceablePublisher {
       this.noteWaitingAsk(null);
       return;
     }
-    // The newest session's title never enters the snapshot (privacy contract):
-    // it rides in the surface extras every widget reads on redraw.
     const previousTitle = getSurfaceExtras().newestSessionTitle;
     const nextTitle = newestSessionTitle(sessions);
+    const nextHomeDetails = buildHomeWidgetDetails(sessions);
+    const sameHomeDetails =
+      this.homeDetails !== null && hasSameHomeWidgetDetails(this.homeDetails, nextHomeDetails);
+    this.homeDetails = nextHomeDetails;
+    setHomeWidgetDetails(nextHomeDetails, checkedAt);
     setSurfaceExtras({ ...getSurfaceExtras(), newestSessionTitle: nextTitle });
     getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
@@ -241,6 +253,7 @@ export class GlanceablePublisher {
     if (
       this.lastWriteAttemptAt !== null &&
       this.current !== null &&
+      sameHomeDetails &&
       hasSameGlanceableContent(
         { snapshot: this.current, newestSessionTitle: previousTitle },
         { snapshot, newestSessionTitle: nextTitle }
@@ -364,6 +377,7 @@ export class GlanceablePublisher {
     if (incoming.status !== 'signed_out' && incoming.status !== 'privacy') {
       getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     }
+    setHomeWidgetDetails(EMPTY_HOME_WIDGET_DETAILS);
     // A late background delivery supersedes a pending coalesced emit and any
     // pending 8 s terminal, so neither can fire after the newer snapshot.
     this.cancelCoalesce();

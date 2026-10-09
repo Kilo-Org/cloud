@@ -135,7 +135,8 @@
     "updated": "Actualitzat",
     "working": "En curs",
     "yourOwnRepositories": "Els teus repositoris",
-    "dismissed": "Descartat"
+    "dismissed": "Descartat",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -3196,8 +3197,15 @@
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
     "openSession": "Obre",
     "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar.",
-    "newestResult": "Resultat més recent",
-    "scheduledWakes": "es desperta {{time}}"
+    "scheduledWakes": "es desperta {{time}}",
+    "checked": "Comprovat",
+    "lastKnown": "Últim estat conegut",
+    "awaitingUpdate": "Pendent d’actualització",
+    "nextRun": "Propera execució",
+    "waitingForYou": "Esperant-te",
+    "nextScheduled": "Properes programades",
+    "answerNeeded": "Pendent de resposta",
+    "waitingToRetry": "Pendent de reintent"
   },
   "transcriptionModel": {
     "title": "Model de transcripció",
@@ -3398,7 +3406,6 @@
       "template": "Plantilla",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Explica $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Executar com a subtasca",
       "edit": "Edita l'ordre de barra inclinada",
       "saveFailed": "No s'ha pogut desar l'ordre",

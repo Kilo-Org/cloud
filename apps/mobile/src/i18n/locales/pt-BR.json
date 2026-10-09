@@ -135,7 +135,8 @@
     "updated": "Atualizado",
     "working": "Em execução",
     "yourOwnRepositories": "Seus próprios repositórios",
-    "dismissed": "Ignorado"
+    "dismissed": "Ignorado",
+    "agent": "Agente"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -3196,8 +3197,15 @@
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
     "openSession": "Abrir",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
-    "newestResult": "Resultado mais recente",
-    "scheduledWakes": "acorda {{time}}"
+    "scheduledWakes": "acorda {{time}}",
+    "checked": "Verificado",
+    "lastKnown": "Último status conhecido",
+    "awaitingUpdate": "Aguardando atualização",
+    "nextRun": "Próxima execução",
+    "waitingForYou": "Aguardando você",
+    "nextScheduled": "Próximas agendadas",
+    "answerNeeded": "Aguardando resposta",
+    "waitingToRetry": "Aguardando nova tentativa"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3398,7 +3406,6 @@
       "template": "Modelo",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Explique $ARGUMENTS",
-      "agent": "Agente",
       "subtask": "Executar como subtarefa",
       "edit": "Editar comando de barra",
       "saveFailed": "Não foi possível salvar o comando",

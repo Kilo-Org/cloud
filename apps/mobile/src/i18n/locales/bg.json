@@ -135,7 +135,8 @@
     "updated": "Актуализирано",
     "working": "В процес",
     "yourOwnRepositories": "Личните ти хранилища",
-    "dismissed": "Отхвърлено"
+    "dismissed": "Отхвърлено",
+    "agent": "агент"
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
     "openSession": "Отвори",
     "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
-    "newestResult": "Най-нов резултат",
-    "scheduledWakes": "се събужда {{time}}"
+    "scheduledWakes": "се събужда {{time}}",
+    "checked": "Проверено",
+    "lastKnown": "Последно известно",
+    "awaitingUpdate": "Изчаква актуализация",
+    "nextRun": "Следващо изпълнение",
+    "waitingForYou": "Очаква ви",
+    "nextScheduled": "Следващи планирани",
+    "answerNeeded": "Нужен е отговор",
+    "waitingToRetry": "Изчаква повторен опит"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипция",
@@ -3357,7 +3365,6 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Обяснете $ARGUMENTS",
-      "agent": "агент",
       "subtask": "Изпълнение като подзадача",
       "edit": "Команда за редактиране на наклонена черта",
       "saveFailed": "Командата не можа да бъде запазена",

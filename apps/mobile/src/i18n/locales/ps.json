@@ -135,7 +135,8 @@
     "updated": "تازه شوی",
     "working": "په کار بوخت",
     "yourOwnRepositories": "ستاسو خپل زېرمتونونه",
-    "dismissed": "له پامه غورځول شوی"
+    "dismissed": "له پامه غورځول شوی",
+    "agent": "اجنټ"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
-    "newestResult": "تر ټولو نوې پایله",
-    "scheduledWakes": "{{time}} بیداریږي"
+    "scheduledWakes": "{{time}} بیداریږي",
+    "checked": "تایید شوی",
+    "lastKnown": "وروستی معلوم حالت",
+    "awaitingUpdate": "د تازه کېدو په تمه",
+    "nextRun": "راتلونکی چلول",
+    "waitingForYou": "ستاسو په تمه",
+    "nextScheduled": "راتلونکی مهال ویش",
+    "answerNeeded": "ځواب ته اړتیا لري",
+    "waitingToRetry": "د بیا هڅې په تمه"
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",
@@ -3357,7 +3365,6 @@
       "template": "کينډۍ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS تشریح کړئ",
-      "agent": "اجنټ",
       "subtask": "د فرعي دندې په توګه چلول",
       "edit": "د سلیش کمانډ ایډیټ کړئ",
       "saveFailed": "کمانډ خوندي نشو کړای",

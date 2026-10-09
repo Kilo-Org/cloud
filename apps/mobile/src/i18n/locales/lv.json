@@ -135,7 +135,8 @@
     "updated": "Atjaunināts",
     "working": "Strādā",
     "yourOwnRepositories": "Tavi repozitoriji",
-    "dismissed": "Noraidīts"
+    "dismissed": "Noraidīts",
+    "agent": "Aģents"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -3196,8 +3197,15 @@
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",
     "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz.",
-    "newestResult": "Jaunākais rezultāts",
-    "scheduledWakes": "pamostas {{time}}"
+    "scheduledWakes": "pamostas {{time}}",
+    "checked": "Pārbaudīts",
+    "lastKnown": "Pēdējais zināmais",
+    "awaitingUpdate": "Gaida atjauninājumu",
+    "nextRun": "Nākamā palaišana",
+    "waitingForYou": "Gaida jūs",
+    "nextScheduled": "Nākamie ieplānotie",
+    "answerNeeded": "Nepieciešama atbilde",
+    "waitingToRetry": "Gaida atkārtotu mēģinājumu"
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",
@@ -3398,7 +3406,6 @@
       "template": "Veidne",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
-      "agent": "Aģents",
       "subtask": "Palaist kā apakšuzdevumu",
       "edit": "Rediģēt slīpsvītras komandu",
       "saveFailed": "Nevarēja saglabāt komandu",

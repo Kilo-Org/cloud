@@ -135,7 +135,8 @@
     "updated": "Päivitetty",
     "working": "Työn alla",
     "yourOwnRepositories": "Omat koodivarastosi",
-    "dismissed": "Sivuutettu"
+    "dismissed": "Sivuutettu",
+    "agent": "Agentti"
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
     "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
-    "newestResult": "Uusin tulos",
-    "scheduledWakes": "herää {{time}}"
+    "scheduledWakes": "herää {{time}}",
+    "checked": "Tarkistettu",
+    "lastKnown": "Viimeisin tiedossa oleva",
+    "awaitingUpdate": "Odottaa päivitystä",
+    "nextRun": "Seuraava ajo",
+    "waitingForYou": "Odottaa sinua",
+    "nextScheduled": "Seuraavaksi ajastetut",
+    "answerNeeded": "Odottaa vastausta",
+    "waitingToRetry": "Odottaa uutta yritystä"
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
@@ -3357,7 +3365,6 @@
       "template": "Malli",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Selitä $ARGUMENTS",
-      "agent": "Agentti",
       "subtask": "Suorita alitehtävänä",
       "edit": "Muokkaa vinoviivakomentoa",
       "saveFailed": "Komentoa ei voitu tallentaa",

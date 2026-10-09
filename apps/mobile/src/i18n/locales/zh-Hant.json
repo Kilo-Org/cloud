@@ -135,7 +135,8 @@
     "updated": "已更新",
     "working": "處理中",
     "yourOwnRepositories": "你自己的存放庫",
-    "dismissed": "已忽略"
+    "dismissed": "已忽略",
+    "agent": "代理人"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
     "openSession": "開啟",
     "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
-    "newestResult": "最新結果",
-    "scheduledWakes": "{{time}}喚醒"
+    "scheduledWakes": "{{time}}喚醒",
+    "checked": "上次確認",
+    "lastKnown": "最後已知",
+    "awaitingUpdate": "等待更新",
+    "nextRun": "下次執行",
+    "waitingForYou": "等待你回應",
+    "nextScheduled": "下次排程",
+    "answerNeeded": "等待回答",
+    "waitingToRetry": "等待重試"
   },
   "transcriptionModel": {
     "title": "轉錄模型",
@@ -3357,7 +3365,6 @@
       "template": "範本",
       "namePlaceholder": "explain",
       "templatePlaceholder": "解釋$ARGUMENTS",
-      "agent": "代理人",
       "subtask": "作為子任務運行",
       "edit": "編輯斜槓命令",
       "saveFailed": "無法保存命令",

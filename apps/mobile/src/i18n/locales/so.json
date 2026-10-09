@@ -135,7 +135,8 @@
     "updated": "La cusboonaysiiyay",
     "working": "Shaqaynaya",
     "yourOwnRepositories": "Kaydadkaaga shakhsiga ah",
-    "dismissed": "La iska dhaafay"
+    "dismissed": "La iska dhaafay",
+    "agent": "Wakiil"
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
     "openSession": "Fur",
     "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo.",
-    "newestResult": "Natiijada ugu cusub",
-    "scheduledWakes": "wuxuu soo toosaa {{time}}"
+    "scheduledWakes": "wuxuu soo toosaa {{time}}",
+    "checked": "La hubiyay",
+    "lastKnown": "Ugu dambayn la ogaa",
+    "awaitingUpdate": "Cusboonaysiin sugaya",
+    "nextRun": "Hawlgalka xiga",
+    "waitingForYou": "Adiga ku sugaya",
+    "nextScheduled": "Qorshaha xiga",
+    "answerNeeded": "Jawaab loo baahan yahay",
+    "waitingToRetry": "Dib-u-tijaabin sugaya"
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",
@@ -3357,7 +3365,6 @@
       "template": "Tusaale",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Sharax $ARGUMENTS",
-      "agent": "Wakiil",
       "subtask": "U orda sidii shaqo-hoosaad",
       "edit": "Tafatir amarka slash",
       "saveFailed": "Way kaydsan kari wayday amarka",

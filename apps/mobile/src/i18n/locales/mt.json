@@ -135,7 +135,8 @@
     "updated": "Aġġornat",
     "working": "Fix-xogħol",
     "yourOwnRepositories": "Ir-repożitorji tiegħek stess",
-    "dismissed": "Imwarrba"
+    "dismissed": "Imwarrba",
+    "agent": "Aġent"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -3278,8 +3279,15 @@
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
-    "newestResult": "L-aħħar riżultat",
-    "scheduledWakes": "iqum {{time}}"
+    "scheduledWakes": "iqum {{time}}",
+    "checked": "Iċċekkjat",
+    "lastKnown": "L-aħħar magħruf",
+    "awaitingUpdate": "Jistenna aġġornament",
+    "nextRun": "Tħaddim li jmiss",
+    "waitingForYou": "Jistenna lilek",
+    "nextScheduled": "Ipprogrammati li jmiss",
+    "answerNeeded": "Tweġiba meħtieġa",
+    "waitingToRetry": "Jistenna biex jerġa’ jipprova"
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
@@ -3480,7 +3488,6 @@
       "template": "Mudell",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Spjega $ARGUMENTS",
-      "agent": "Aġent",
       "subtask": "Mexxi bħala subtask",
       "edit": "Editja kmand slash",
       "saveFailed": "Ma setax isalva l-kmand",

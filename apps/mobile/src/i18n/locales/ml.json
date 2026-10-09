@@ -135,7 +135,8 @@
     "updated": "പുതുക്കി",
     "working": "പ്രവർത്തിക്കുന്നു",
     "yourOwnRepositories": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ",
-    "dismissed": "ഒഴിവാക്കി"
+    "dismissed": "ഒഴിവാക്കി",
+    "agent": "ഏജൻ്റ്"
   },
   "language": {
     "restarting": "ഭാഷ മാറ്റാൻ പുനരാരംഭിക്കുന്നു",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക.",
     "openSession": "തുറക്കുക",
     "approveFailed": "അംഗീകരിക്കാനായില്ല. വീണ്ടും ശ്രമിക്കാൻ $t(common.approve) ടാപ്പ് ചെയ്യുക.",
-    "newestResult": "ഏറ്റവും പുതിയ ഫലം",
-    "scheduledWakes": "{{time}} ഉണരും"
+    "scheduledWakes": "{{time}} ഉണരും",
+    "checked": "പരിശോധിച്ചത്",
+    "lastKnown": "അവസാനം അറിയപ്പെട്ടത്",
+    "awaitingUpdate": "അപ്‌ഡേറ്റിനായി കാത്തിരിക്കുന്നു",
+    "nextRun": "അടുത്ത പ്രവർത്തനം",
+    "waitingForYou": "നിങ്ങൾക്കായി കാത്തിരിക്കുന്നു",
+    "nextScheduled": "അടുത്ത ഷെഡ്യൂൾ",
+    "answerNeeded": "മറുപടി വേണം",
+    "waitingToRetry": "വീണ്ടും ശ്രമിക്കാൻ കാത്തിരിക്കുന്നു"
   },
   "transcriptionModel": {
     "title": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ",
@@ -3357,7 +3365,6 @@
       "template": "ടെംപ്ലേറ്റ്",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS വിശദീകരിക്കുക",
-      "agent": "ഏജൻ്റ്",
       "subtask": "ഉപടാസ്‌കായി പ്രവർത്തിപ്പിക്കുക",
       "edit": "സ്ലാഷ് കമാൻഡ് എഡിറ്റ് ചെയ്യുക",
       "saveFailed": "കമാൻഡ് സംരക്ഷിക്കാനായില്ല",

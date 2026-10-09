@@ -1,8 +1,14 @@
 import {
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
-  isIdleOnlyGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildHomeWidgetPresentation,
+  buildHomeWidgetPresentationTimeline,
+  EMPTY_HOME_WIDGET_DETAILS,
+  type HomeWidgetData,
+  type HomeWidgetPresentation,
+} from '@kilocode/app-shared/home-widget';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import {
@@ -21,12 +27,10 @@ import { getSurfaceExtras, type GlanceableSurfaceExtras } from '@/lib/glanceable
 /** One translated count line. `kind` picks the glyph and the color. */
 type GlanceableCount = { label: string; kind: GlanceableCountKind; count: number };
 
-/**
- * The props every iOS surface renders. The builder below is the only producer,
- * so a title, organization name, account id, or raw session id can never reach
- * the widget extension.
- */
+/** Generic accessory props and a separate Home-only presentation. */
 export type GlanceableViewProps = {
+  /** Home-only titles and retained counts never enter accessory rendering. */
+  home?: HomeWidgetPresentation;
   /** Translated locked copy; null while counts show (happy). Stale carries both. */
   statusLine: string | null;
   /** Non-zero count lines in rank order (needs-input, running, scheduled, idle). */
@@ -96,6 +100,8 @@ export type GlanceableWidgetAction = 'approve' | 'new-agent';
 
 export type GlanceableWidgetProps = Partial<GlanceableViewProps> & {
   pendingAction?: GlanceableWidgetAction;
+  /** The exact request the pressed Approve displayed. */
+  pendingApprovalKey?: string;
 };
 
 /**
@@ -131,10 +137,13 @@ function newestTitleFor(
 }
 
 /** Build the surface props from a snapshot, surface flags, and a translator. */
+// eslint-disable-next-line max-params -- snapshot, flags, the translator, separately scoped Home-only data, and the frame time
 export function buildGlanceableViewProps(
   snapshot: GlanceableAgentsSnapshot,
   flags: GlanceableSurfaceFlags,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  homeData?: HomeWidgetData,
+  now = Date.now()
 ): GlanceableViewProps {
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
   const primary = primaryGlanceableCount(snapshot);
@@ -160,25 +169,36 @@ export function buildGlanceableViewProps(
   const copy = (key: string): string =>
     key === 'glanceable.empty' ? translate('glanceable.noneWaiting') : translate(key);
 
-  const newestTitle = newestTitleFor(getSurfaceExtras(), status, translate);
+  const extras = getSurfaceExtras();
+  const newestTitle = newestTitleFor(extras, status, translate);
+  const home = buildHomeWidgetPresentation(
+    flags.signedOut || flags.orgInvalid
+      ? {
+          snapshot: { ...snapshot, status: flags.signedOut ? 'signed_out' : 'privacy' },
+          details: EMPTY_HOME_WIDGET_DETAILS,
+        }
+      : (homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS }),
+    now
+  );
   return {
+    home,
     statusLine: statusKey === null ? null : copy(statusKey),
     countLines,
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
     newestTitle,
-    actionLine: getSurfaceExtras().actionFeedback === null ? null : newestTitle,
+    actionLine:
+      home.status !== 'content' || extras.actionFeedback === null
+        ? null
+        : translate(
+            extras.actionFeedback === 'approving'
+              ? 'glanceable.approving'
+              : 'glanceable.couldNotApprove'
+          ),
     actions: {
-      // Only a permission wait can be answered from the widget, so the button
-      // gates on `needsApproval` (the count the Live Activity's own Approve
-      // control uses). A `question` needs an answer and a `retry` needs the
-      // provider back: neither is approvable, so neither may offer a button the
-      // action can only answer by opening the app.
-      approve: showCounts && (snapshot.needsApproval ?? 0) > 0,
-      // Nothing waiting to act on: the empty state, or an idle-only tray that
-      // keeps a card alive. A locked or expired surface offers neither.
-      newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
+      approve: home.canApprove,
+      newAgent: home.canCreate,
     },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
     // The shared helper decides the wake, so a scheduled count with no usable
@@ -191,6 +211,11 @@ export function buildGlanceableViewProps(
   };
 }
 
+/** One record with its null fields dropped; the caller owns the resulting shape. */
+function withoutNulls<T extends object>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== null)) as T;
+}
+
 /**
  * Drop the null fields before a widget write.
  *
@@ -200,8 +225,19 @@ export function buildGlanceableViewProps(
  * defaults, so omitting the field is the lossless form.
  */
 export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableViewProps> {
-  const entries = Object.entries(props).filter(([, value]) => value !== null);
-  return Object.fromEntries(entries) as Partial<GlanceableViewProps>;
+  const widgetProps = withoutNulls(props);
+  const { home } = props;
+  if (home === undefined) {
+    return widgetProps;
+  }
+  // UserDefaults rejects null even inside the nested Home-only payload: its
+  // own nullable fields and each scheduled row's wake.
+  return Object.assign(widgetProps, {
+    home: {
+      ...withoutNulls(home),
+      scheduledAgents: home.scheduledAgents.map(row => withoutNulls(row)),
+    },
+  });
 }
 
 /**
@@ -235,10 +271,7 @@ export function staleTimelineFrame(
     : [{ date: new Date(staleAt), props: buildStaleWidgetProps(snapshot, translate) }];
 }
 
-/**
- * The widget's expiry frame: the same snapshot with its counts zeroed and the
- * expired copy, for the timeline entry that lands at `expiresAt`.
- */
+/** Accessory expiry retracts its counts; Home retains the same confirmed work. */
 export function buildExpiredWidgetProps(
   snapshot: GlanceableAgentsSnapshot,
   translate: (key: string) => string
@@ -256,7 +289,9 @@ export function buildExpiredWidgetProps(
         scheduledAt: null,
       },
       {},
-      translate
+      translate,
+      { snapshot, details: EMPTY_HOME_WIDGET_DETAILS },
+      Date.parse(snapshot.expiresAt)
     )
   );
 }
@@ -274,38 +309,66 @@ export type GlanceableLiveActivityProps = GlanceableLiveActivityContentState & {
   notice?: string;
 };
 
+/** The status a later timeline frame draws: expired at expiry, stale once the window lapses. */
+function frameStatus(
+  snapshot: GlanceableAgentsSnapshot,
+  time: number
+): GlanceableAgentsSnapshot['status'] {
+  if (time >= Date.parse(snapshot.expiresAt)) {
+    return 'expired';
+  }
+  if (time >= Date.parse(snapshot.updatedAt) + GLANCEABLE_STALE_MS) {
+    return 'stale';
+  }
+  return snapshot.status;
+}
+
 /**
- * The widget timeline for one snapshot running from `now`: the current frame,
- * then the delayed frame that stops asserting the counts as current and the
- * expiry frame that zeroes them.
- *
- * WidgetKit is the only clock the widget has while the app is not running, so
- * every writer that replaces the timeline must hand it the whole set — the
- * publisher's sink (`ios-sink.publish`) and the failure republish after a press
- * (`glanceable-ios/widget-actions`). A single-frame write drops the two
- * fallbacks and the widget keeps claiming the line it was last given.
- *
- * `null` for a terminal blank: `updateSnapshot` already wrote its single
- * current frame, and the delayed copy must never replace signed-out or privacy
- * copy.
+ * Every writer supplies the same current/stale/expiry/wake frames. Home counts
+ * remain last-known at activity expiry; accessories still expire privately.
+ * Terminal auth/privacy writes replace the entire timeline with one blank.
  */
+// eslint-disable-next-line max-params -- snapshot, the current props, the translator, and separately scoped Home-only data
 export function widgetTimelineFrames(
   snapshot: GlanceableAgentsSnapshot,
   props: Partial<GlanceableViewProps>,
-  translate: (key: string) => string
+  translate: (key: string) => string,
+  homeData?: HomeWidgetData
 ): { date: Date; props: Partial<GlanceableViewProps> }[] | null {
   if (snapshot.status === 'signed_out' || snapshot.status === 'privacy') {
     return null;
   }
+  const data = homeData ?? { snapshot, details: EMPTY_HOME_WIDGET_DETAILS };
   const now = Date.now();
   // WidgetKit renders the newest entry at or before `now` and never rewinds, so
   // a frame whose date has already passed sits behind the current one and only
   // leaves the timeline unsorted. A press on a widget whose last snapshot
   // lapsed while the app was away therefore keeps the single current frame.
-  const later = [
-    ...staleTimelineFrame(snapshot, translate),
-    { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
-  ].filter(frame => frame.date.getTime() > now);
+  const boundaries = [
+    ...staleTimelineFrame(snapshot, translate).map(entry => entry.date.getTime()),
+    ...buildHomeWidgetPresentationTimeline(data, now).map(entry => entry.at),
+    Date.parse(snapshot.expiresAt),
+  ];
+  const later = [...new Set(boundaries)]
+    .filter(time => Number.isFinite(time) && time > now)
+    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; filter already copies so nothing shared is mutated
+    .sort((left, right) => left - right)
+    .map(time => ({
+      date: new Date(time),
+      props: toWidgetProps({
+        ...buildGlanceableViewProps(
+          { ...snapshot, status: frameStatus(snapshot, time) },
+          {},
+          translate,
+          data,
+          time
+        ),
+        ...(time >= Date.parse(snapshot.expiresAt)
+          ? { countLines: [], primaryCount: 0, primaryKind: null, primaryLabel: null }
+          : {}),
+        home: buildHomeWidgetPresentation(data, time),
+      }),
+    }));
   return [{ date: new Date(now), props }, ...later];
 }
 

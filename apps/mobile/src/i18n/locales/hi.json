@@ -135,7 +135,8 @@
     "updated": "अपडेट किया गया",
     "working": "काम जारी",
     "yourOwnRepositories": "आपकी अपनी रिपॉज़िटरी",
-    "dismissed": "खारिज"
+    "dismissed": "खारिज",
+    "agent": "प्रतिनिधि"
   },
   "language": {
     "restarting": "भाषा बदलने के लिए ऐप फिर से शुरू हो रहा है",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।",
     "openSession": "खोलें",
     "approveFailed": "स्वीकार नहीं किया जा सका। फिर से कोशिश करने के लिए $t(common.approve) पर टैप करें।",
-    "newestResult": "नवीनतम परिणाम",
-    "scheduledWakes": "{{time}} जागेगा"
+    "scheduledWakes": "{{time}} जागेगा",
+    "checked": "जाँच की गई",
+    "lastKnown": "अंतिम ज्ञात",
+    "awaitingUpdate": "अपडेट का इंतज़ार",
+    "nextRun": "अगला रन",
+    "waitingForYou": "आपका इंतज़ार",
+    "nextScheduled": "अगले निर्धारित",
+    "answerNeeded": "जवाब चाहिए",
+    "waitingToRetry": "फिर कोशिश का इंतज़ार"
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
@@ -3357,7 +3365,6 @@
       "template": "खाका",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करें",
-      "agent": "प्रतिनिधि",
       "subtask": "उपकार्य के रूप में चलाएँ",
       "edit": "स्लैश कमांड संपादित करें",
       "saveFailed": "आदेश सहेजा नहीं जा सका",

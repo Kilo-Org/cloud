@@ -135,7 +135,8 @@
     "updated": "Frissítve",
     "working": "Dolgozik",
     "yourOwnRepositories": "Saját adattáraid",
-    "dismissed": "Elvetve"
+    "dismissed": "Elvetve",
+    "agent": "Ügynök"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
     "openSession": "Megnyitás",
     "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre.",
-    "newestResult": "Legújabb eredmény",
-    "scheduledWakes": "{{time}} felébred"
+    "scheduledWakes": "{{time}} felébred",
+    "checked": "Ellenőrizve",
+    "lastKnown": "Utolsó ismert",
+    "awaitingUpdate": "Frissítésre vár",
+    "nextRun": "Következő futás",
+    "waitingForYou": "Rád vár",
+    "nextScheduled": "Következő ütemezések",
+    "answerNeeded": "Válaszra vár",
+    "waitingToRetry": "Újrapróbálkozásra vár"
   },
   "transcriptionModel": {
     "title": "Átírási modell",
@@ -3357,7 +3365,6 @@
       "template": "Sablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Magyarázza el $ARGUMENTS",
-      "agent": "Ügynök",
       "subtask": "Futtassa részfeladatként",
       "edit": "Szerkessze a perjel parancsot",
       "saveFailed": "Nem sikerült menteni a parancsot",

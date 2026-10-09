@@ -135,7 +135,8 @@
     "updated": "อัปเดตแล้ว",
     "working": "กำลังทำงาน",
     "yourOwnRepositories": "คลังโค้ดของคุณเอง",
-    "dismissed": "ละเว้นแล้ว"
+    "dismissed": "ละเว้นแล้ว",
+    "agent": "ตัวแทน"
   },
   "language": {
     "restarting": "กำลังเริ่มแอปใหม่เพื่อเปลี่ยนภาษา",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
     "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
-    "newestResult": "ผลลัพธ์ล่าสุด",
-    "scheduledWakes": "ตื่น {{time}}"
+    "scheduledWakes": "ตื่น {{time}}",
+    "checked": "ตรวจสอบล่าสุด",
+    "lastKnown": "สถานะล่าสุดที่ทราบ",
+    "awaitingUpdate": "รออัปเดต",
+    "nextRun": "ทำงานครั้งถัดไป",
+    "waitingForYou": "รอคุณ",
+    "nextScheduled": "กำหนดการถัดไป",
+    "answerNeeded": "รอคำตอบ",
+    "waitingToRetry": "รอลองใหม่"
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",
@@ -3357,7 +3365,6 @@
       "template": "แม่แบบ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "อธิบาย $ARGUMENTS",
-      "agent": "ตัวแทน",
       "subtask": "ทำงานเป็นงานย่อย",
       "edit": "แก้ไขคำสั่งสแลช",
       "saveFailed": "ไม่สามารถบันทึกคำสั่งได้",

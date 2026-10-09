@@ -135,7 +135,8 @@
     "updated": "Жаңартылды",
     "working": "Орындалуда",
     "yourOwnRepositories": "Өзіңіздің репозиторийлеріңіз",
-    "dismissed": "Еленбейді"
+    "dismissed": "Еленбейді",
+    "agent": "Агент"
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз.",
     "openSession": "Ашыңыз",
     "approveFailed": "Мақұлдау мүмкін болмады. Қайталап көру үшін $t(common.approve) түртіңіз.",
-    "newestResult": "Ең жаңа нәтиже",
-    "scheduledWakes": "{{time}} оянады"
+    "scheduledWakes": "{{time}} оянады",
+    "checked": "Тексерілді",
+    "lastKnown": "Соңғы белгілі күй",
+    "awaitingUpdate": "Жаңарту күтілуде",
+    "nextRun": "Келесі іске қосылу",
+    "waitingForYou": "Сізді күтуде",
+    "nextScheduled": "Келесі жоспарланғандар",
+    "answerNeeded": "Жауап қажет",
+    "waitingToRetry": "Қайта әрекет күтілуде"
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",
@@ -3357,7 +3365,6 @@
       "template": "Үлгі",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS түсіндіріңіз",
-      "agent": "Агент",
       "subtask": "Қосымша тапсырма ретінде іске қосыңыз",
       "edit": "Қиғаш сызықты өңдеу пәрмені",
       "saveFailed": "Пәрменді сақтау мүмкін болмады",

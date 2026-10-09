@@ -1,4 +1,6 @@
 /* eslint-disable max-lines -- one cohesive headless-action suite sharing the trpcClient harness */
+// eslint-disable-next-line import/no-nodejs-modules -- test-only SHA-256 reference for the native digest
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -12,12 +14,7 @@ import {
   unregisterGlanceableSink,
 } from './sink-registry';
 import { setSurfaceExtras } from './surface-extras';
-import {
-  oldestPendingPermissionId,
-  resolveWaitingSession,
-  runWidgetApprove,
-  type WaitingSessionRow,
-} from './widget-actions';
+import { resolveWaitingSession, runWidgetApprove, type WaitingSessionRow } from './widget-actions';
 
 const ORGANIZATION_KEY = 'selected-organization';
 const USER_KEY = 'active-user-id';
@@ -54,6 +51,21 @@ vi.mock('@/lib/auth/secure-store-value', () => ({
 }));
 
 vi.mock('@/lib/trpc', () => ({ trpcClient: mocks.trpc }));
+
+vi.mock('expo-crypto', () => ({
+  CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
+  digestStringAsync: vi.fn(async (_algorithm: string, value: string) => {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+  }),
+}));
+
+/** The key a widget carries for the request it displayed. */
+function keyFor(sessionId: string, permissionId: string): string {
+  return createHash('sha256')
+    .update(JSON.stringify([sessionId, permissionId]))
+    .digest('hex');
+}
 
 vi.mock('./persist', () => ({
   getLastGlanceableSnapshot: () => null,
@@ -185,28 +197,6 @@ describe('resolveWaitingSession', () => {
   });
 });
 
-describe('oldestPendingPermissionId', () => {
-  it('returns the first permission carrying a usable id', () => {
-    expect(
-      oldestPendingPermissionId([
-        { id: 'perm-1', tool: 'bash' },
-        { id: 'perm-2', tool: 'edit' },
-      ])
-    ).toBe('perm-1');
-  });
-
-  it('skips entries the wire schema cannot describe', () => {
-    expect(oldestPendingPermissionId([null, 'nope', { id: '' }, { id: 4 }, { id: 'perm-9' }])).toBe(
-      'perm-9'
-    );
-  });
-
-  it('returns null when nothing carries an id', () => {
-    expect(oldestPendingPermissionId([])).toBeNull();
-    expect(oldestPendingPermissionId([{ tool: 'bash' }])).toBeNull();
-  });
-});
-
 describe('runWidgetApprove', () => {
   beforeEach(() => {
     mocks.secure.clear();
@@ -228,7 +218,7 @@ describe('runWidgetApprove', () => {
   it('reports none when the tray holds no waiting session', async () => {
     wireTrpc({ sessions: [{ id: 'busy', status: 'busy' }] });
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'none' });
+    await expect(runWidgetApprove(null)).resolves.toEqual({ kind: 'none' });
   });
 
   it('reports failed, not a rejection, when the stored scope cannot be read', async () => {
@@ -237,7 +227,9 @@ describe('runWidgetApprove', () => {
 
     // A rejected read used to escape the container and leave the widget on its
     // progress line, because nothing settled the action's own line.
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'failed' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'failed',
+    });
   });
 
   it('does not republish when a terminal blank lands while the action runs', async () => {
@@ -256,7 +248,9 @@ describe('runWidgetApprove', () => {
     });
     const { snapshots, release } = collectSink();
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
     expect(snapshots).toEqual([]);
     release();
   });
@@ -270,7 +264,9 @@ describe('runWidgetApprove', () => {
     mocks.orgLost = true;
     const { snapshots, release } = collectSink();
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
     expect(snapshots).toEqual([]);
     release();
   });
@@ -286,20 +282,22 @@ describe('runWidgetApprove', () => {
       .mockResolvedValueOnce({ sessions: [{ id: 'waiting', status: 'permission' }] })
       .mockRejectedValueOnce(new Error('tray down'));
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
   });
 
-  it('reports none when the waiting session is not a cloud-agent session', async () => {
+  it('answers nothing when the displayed session is not a cloud-agent session', async () => {
     const rpc = wireTrpc({
       sessions: [{ id: 'waiting', status: 'permission' }],
       cloudAgentSessionId: null,
     });
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'none' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({ kind: 'stale' });
     expect(rpc.getPendingInteractions.query).not.toHaveBeenCalled();
   });
 
-  it('approves the oldest pending permission once and republishes the tray', async () => {
+  it('approves the displayed permission once and republishes the tray', async () => {
     const rpc = wireTrpc({
       sessions: [
         { id: 'busy', status: 'busy' },
@@ -310,7 +308,9 @@ describe('runWidgetApprove', () => {
     });
     const { snapshots, started, release } = collectSink();
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
 
     expect(rpc.getPendingInteractions.query).toHaveBeenCalledWith({
       cloudAgentSessionId: 'workspace_agent_1',
@@ -339,6 +339,35 @@ describe('runWidgetApprove', () => {
     release();
   });
 
+  it('answers the displayed request, not merely the oldest one', async () => {
+    const rpc = wireTrpc({
+      sessions: [{ id: 'waiting', status: 'permission' }],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }, { id: 'perm-2' }],
+    });
+
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-2'))).resolves.toEqual({
+      kind: 'approved',
+    });
+    expect(rpc.answerPermission.mutate).toHaveBeenCalledExactlyOnceWith({
+      sessionId: 'workspace_agent_1',
+      permissionId: 'perm-2',
+      response: 'once',
+    });
+  });
+
+  it('answers nothing for a stale press after the request was replaced', async () => {
+    const rpc = wireTrpc({
+      sessions: [{ id: 'waiting', status: 'permission' }],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-2' }],
+    });
+
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({ kind: 'stale' });
+    expect(rpc.answerPermission.mutate).not.toHaveBeenCalled();
+    expect(mocks.dismissNeedsInputNotification).not.toHaveBeenCalled();
+  });
+
   it('leaves the raise notification alone when the approve never landed', async () => {
     const rpc = wireTrpc({
       sessions: [{ id: 'waiting', status: 'permission' }],
@@ -347,7 +376,9 @@ describe('runWidgetApprove', () => {
     });
     rpc.answerPermission.mutate.mockRejectedValueOnce(new Error('network'));
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'failed' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'failed',
+    });
     expect(mocks.dismissNeedsInputNotification).not.toHaveBeenCalled();
   });
 
@@ -358,7 +389,7 @@ describe('runWidgetApprove', () => {
       permissions: [],
     });
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'no-permission' });
+    await expect(runWidgetApprove(null)).resolves.toEqual({ kind: 'no-permission' });
   });
 
   // The chip is offered on `needsApproval`, which counts `permission` rows, so
@@ -377,7 +408,9 @@ describe('runWidgetApprove', () => {
         permissions: [{ id: 'perm-1' }],
       });
 
-      await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
+      await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+        kind: 'approved',
+      });
 
       expect(rpc.cliSessionsV2.get.query).toHaveBeenCalledWith({ session_id: 'waiting' });
       expect(rpc.answerPermission.mutate).toHaveBeenCalledWith({
@@ -397,7 +430,9 @@ describe('runWidgetApprove', () => {
     rpc.answerPermission.mutate.mockRejectedValueOnce(new Error('network'));
     const { snapshots, release } = collectSink();
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'failed' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'failed',
+    });
     expect(snapshots).toEqual([]);
     release();
   });
@@ -410,7 +445,9 @@ describe('runWidgetApprove', () => {
       permissions: [{ id: 'perm-1' }],
     });
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
 
     expect(rpc.activeSessions.list.query).toHaveBeenCalledWith({
       organizationId: 'org-1',
@@ -439,7 +476,9 @@ describe('runWidgetApprove', () => {
       permissions: [{ id: 'perm-1' }],
     });
 
-    await expect(runWidgetApprove()).resolves.toEqual({ kind: 'approved' });
+    await expect(runWidgetApprove(keyFor('waiting', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
 
     expect(rpc.getPendingInteractions.query).toHaveBeenCalledWith({
       cloudAgentSessionId: 'workspace_agent_1',

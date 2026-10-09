@@ -2,6 +2,7 @@ import { addUserInteractionListener, type UserInteractionEvent } from 'expo-widg
 import { Linking } from 'react-native';
 
 import { i18n } from '@/i18n';
+import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import { getLastGlanceableSnapshot } from '@/lib/glanceable/persist';
 import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
@@ -48,17 +49,20 @@ export function pendingActionOf(
 
 /** The pressed entry's props without the marker, in the form the timeline stores. */
 function stripPendingAction(props: WidgetProps | null | undefined): WidgetProps {
-  const { pendingAction: _pendingAction, ...rest } = props ?? {};
+  const {
+    pendingAction: _pendingAction,
+    pendingApprovalKey: _pendingApprovalKey,
+    ...rest
+  } = props ?? {};
   return rest;
 }
 
 /**
- * One press: the action its entry carries and the entry's date, which is what
- * identifies the entry — the App Intent merges the press marker into the
- * pressed entry's props and never touches its date, so a press read at one
- * moment can be matched against the timeline read at another.
+ * One press: the action its entry carries, the approval it displayed, and the
+ * entry's date, which identifies the entry — the App Intent merges the press
+ * marker into the pressed entry's props and never touches its date.
  */
-type PressedEntry = { date: number; action: GlanceableWidgetAction };
+type PressedEntry = { date: number; action: GlanceableWidgetAction; approvalKey: string | null };
 
 /**
  * The pressed entry a user-interaction event maps to, or null when the event
@@ -79,7 +83,11 @@ function pressedEntryForEvent(
       // A timeline read always carries the entry's date; the fallback keeps a
       // hand-built entry from a caller out of the key, and no production read
       // reaches it.
-      return { date: entry.date?.getTime() ?? 0, action };
+      return {
+        date: entry.date?.getTime() ?? 0,
+        action,
+        approvalKey: entry.props?.pendingApprovalKey ?? null,
+      };
     }
   }
   return null;
@@ -109,9 +117,10 @@ function republishWidgetProps(): void {
     return;
   }
   const translate = (key: string): string => i18n.t(key);
-  const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
+  const homeData = getHomeWidgetDataForSnapshot(snapshot);
+  const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, homeData));
   ActiveAgentsWidget.updateSnapshot(props);
-  const frames = widgetTimelineFrames(snapshot, props, translate);
+  const frames = widgetTimelineFrames(snapshot, props, translate, homeData);
   if (frames !== null) {
     ActiveAgentsWidget.updateTimeline(frames);
   }
@@ -144,7 +153,8 @@ async function openFromPress(uri: string): Promise<void> {
  * question the widget must never invent an answer to) opens the agents list —
  * the same destination the Android twin opens (`glanceable-android/register.ts`).
  */
-async function performWidgetAction(action: GlanceableWidgetAction): Promise<void> {
+async function performWidgetAction(press: PressedEntry): Promise<void> {
+  const { action } = press;
   if (action === 'new-agent') {
     await openFromPress(LAUNCHER_NEW_AGENT_URL);
     return;
@@ -157,7 +167,7 @@ async function performWidgetAction(action: GlanceableWidgetAction): Promise<void
   // The sweep runs its presses sequentially, so no sibling press can observe
   // the gap.
   setSurfaceExtras({ ...getSurfaceExtras(), actionFeedback: null });
-  const result = await runWidgetApprove();
+  const result = await runWidgetApprove(press.approvalKey);
   if (result.kind === 'approved') {
     return;
   }
@@ -168,7 +178,7 @@ async function performWidgetAction(action: GlanceableWidgetAction): Promise<void
     actionFeedback: result.kind === 'failed' ? 'couldNotApprove' : null,
   });
   republishWidgetProps();
-  if (result.kind === 'none' || result.kind === 'no-permission') {
+  if (result.kind === 'none' || result.kind === 'no-permission' || result.kind === 'stale') {
     await openFromPress(OPEN_AGENTS_URI);
   }
 }
@@ -236,7 +246,10 @@ async function carryPendingPress(
     if (
       press !== null &&
       !carriedPresses.some(
-        carried => carried.date === press.date && carried.action === press.action
+        carried =>
+          carried.date === press.date &&
+          carried.action === press.action &&
+          carried.approvalKey === press.approvalKey
       )
     ) {
       carriedPresses.push(press);
@@ -267,13 +280,17 @@ function takeResweepRequest(): boolean {
  */
 async function sweepPendingActions(): Promise<void> {
   const timeline = await ActiveAgentsWidget.getTimeline();
-  const pending = new Map<number, GlanceableWidgetAction>();
+  const pending = new Set<number>();
   const pressed: PressedEntry[] = [];
   for (const [index, entry] of timeline.entries()) {
     const action = pendingActionOf(entry.props);
     if (action !== null) {
-      pending.set(index, action);
-      pressed.push({ date: entry.date.getTime(), action });
+      pending.add(index);
+      pressed.push({
+        date: entry.date.getTime(),
+        action,
+        approvalKey: entry.props.pendingApprovalKey ?? null,
+      });
     }
   }
   const carried = takeCarriedPresses().filter(
@@ -286,11 +303,11 @@ async function sweepPendingActions(): Promise<void> {
       )
     );
   }
-  for (const action of [...pending.values(), ...carried.map(press => press.action)]) {
+  for (const press of [...pressed, ...carried]) {
     // Sequential by design: each action can republish the surface, and two
     // overlapping republishes could push the props out of order.
     // eslint-disable-next-line no-await-in-loop -- one answer on screen at a time
-    await performWidgetAction(action);
+    await performWidgetAction(press);
   }
 }
 

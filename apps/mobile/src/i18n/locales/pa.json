@@ -135,7 +135,8 @@
     "updated": "ਅੱਪਡੇਟ ਕੀਤਾ ਗਿਆ",
     "working": "ਕੰਮ ਜਾਰੀ",
     "yourOwnRepositories": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ",
-    "dismissed": "ਖਾਰਜ"
+    "dismissed": "ਖਾਰਜ",
+    "agent": "ਏਜੰਟ"
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।",
     "openSession": "ਖੋਲ੍ਹੋ",
     "approveFailed": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ $t(common.approve) 'ਤੇ ਟੈਪ ਕਰੋ।",
-    "newestResult": "ਸਭ ਤੋਂ ਨਵਾਂ ਨਤੀਜਾ",
-    "scheduledWakes": "{{time}} ਜਾਗੇਗਾ"
+    "scheduledWakes": "{{time}} ਜਾਗੇਗਾ",
+    "checked": "ਜਾਂਚ ਕੀਤੀ",
+    "lastKnown": "ਆਖਰੀ ਜਾਣੀ ਸਥਿਤੀ",
+    "awaitingUpdate": "ਅੱਪਡੇਟ ਦੀ ਉਡੀਕ",
+    "nextRun": "ਅਗਲੀ ਵਾਰ ਚੱਲੇਗਾ",
+    "waitingForYou": "ਤੁਹਾਡੀ ਉਡੀਕ",
+    "nextScheduled": "ਅਗਲਾ ਨਿਰਧਾਰਿਤ",
+    "answerNeeded": "ਜਵਾਬ ਚਾਹੀਦਾ ਹੈ",
+    "waitingToRetry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਦੀ ਉਡੀਕ"
   },
   "transcriptionModel": {
     "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",
@@ -3357,7 +3365,6 @@
       "template": "ਟੈਂਪਲੇਟ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ਦੀ ਵਿਆਖਿਆ ਕਰੋ",
-      "agent": "ਏਜੰਟ",
       "subtask": "ਸਬਟਾਸਕ ਵਜੋਂ ਚਲਾਓ",
       "edit": "ਸਲੈਸ਼ ਕਮਾਂਡ ਨੂੰ ਸੋਧੋ",
       "saveFailed": "ਕਮਾਂਡ ਨੂੰ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",

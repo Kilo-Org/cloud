@@ -135,7 +135,8 @@
     "updated": "Atnaujinta",
     "working": "Vykdoma",
     "yourOwnRepositories": "Tavo saugyklos",
-    "dismissed": "Atmesta"
+    "dismissed": "Atmesta",
+    "agent": "Agentas"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -3237,8 +3238,15 @@
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
-    "newestResult": "Naujausias rezultatas",
-    "scheduledWakes": "prabunda {{time}}"
+    "scheduledWakes": "prabunda {{time}}",
+    "checked": "Patikrinta",
+    "lastKnown": "Paskutinė žinoma",
+    "awaitingUpdate": "Laukiama atnaujinimo",
+    "nextRun": "Kitas vykdymas",
+    "waitingForYou": "Laukia jūsų",
+    "nextScheduled": "Artimiausi suplanuoti",
+    "answerNeeded": "Laukia atsakymo",
+    "waitingToRetry": "Laukiama pakartojimo"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3439,7 +3447,6 @@
       "template": "Šablonas",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
-      "agent": "Agentas",
       "subtask": "Vykdyti kaip papildomą užduotį",
       "edit": "Redaguoti pasvirojo brūkšnio komandą",
       "saveFailed": "Nepavyko išsaugoti komandos",

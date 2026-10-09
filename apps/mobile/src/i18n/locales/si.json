@@ -135,7 +135,8 @@
     "updated": "යාවත්කාලීන කර ඇත",
     "working": "ක්‍රියාත්මකයි",
     "yourOwnRepositories": "ඔබේම කේත ගබඩා",
-    "dismissed": "ඉවතලා ඇත"
+    "dismissed": "ඉවතලා ඇත",
+    "agent": "නියෝජිතයා"
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "අගුළු තිරයේ සක්‍රීය නියෝජිතයන් බැලීමට සැකසුම් තුළ සජීවී ක්‍රියාකාරකම් සක්‍රීය කරන්න.",
     "openSession": "විවෘත කරන්න",
     "approveFailed": "අනුමත කිරීමට නොහැකි විය. නැවත උත්සාහ කිරීමට $t(common.approve) තට්ටු කරන්න.",
-    "newestResult": "නවතම ප්‍රතිඵලය",
-    "scheduledWakes": "{{time}} අවදි වේ"
+    "scheduledWakes": "{{time}} අවදි වේ",
+    "checked": "තහවුරු කළේ",
+    "lastKnown": "අවසන් වරට දන්නා තත්ත්වය",
+    "awaitingUpdate": "යාවත්කාලීනයක් එනතුරු",
+    "nextRun": "ඊළඟ ක්‍රියාත්මක වීම",
+    "waitingForYou": "ඔබේ ප්‍රතිචාරය එනතුරු",
+    "nextScheduled": "ඊළඟ නියමිත කාර්යයන්",
+    "answerNeeded": "පිළිතුරක් අවශ්‍යයි",
+    "waitingToRetry": "නැවත උත්සාහ කිරීමට රැඳී සිටී"
   },
   "transcriptionModel": {
     "title": "හඬ පෙළට හරවන ආකෘතිය",
@@ -3357,7 +3365,6 @@
       "template": "සැකිල්ල",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS පැහැදිලි කරන්න",
-      "agent": "නියෝජිතයා",
       "subtask": "උප කාර්යයක් ලෙස ධාවනය කරන්න",
       "edit": "slash විධානය සංස්කරණය කරන්න",
       "saveFailed": "විධානය සුරැකීමට නොහැකි විය",

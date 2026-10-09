@@ -135,7 +135,8 @@
     "updated": "已更新",
     "working": "处理中",
     "yourOwnRepositories": "你自己的仓库",
-    "dismissed": "已忽略"
+    "dismissed": "已忽略",
+    "agent": "代理人"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
     "approveFailed": "无法批准。点按$t(common.approve)重试。",
-    "newestResult": "最新结果",
-    "scheduledWakes": "{{time}}唤醒"
+    "scheduledWakes": "{{time}}唤醒",
+    "checked": "上次确认",
+    "lastKnown": "上次已知状态",
+    "awaitingUpdate": "等待更新",
+    "nextRun": "下次运行",
+    "waitingForYou": "等待你处理",
+    "nextScheduled": "后续计划",
+    "answerNeeded": "等待回答",
+    "waitingToRetry": "等待重试"
   },
   "transcriptionModel": {
     "title": "转写模型",
@@ -3357,7 +3365,6 @@
       "template": "模板",
       "namePlaceholder": "explain",
       "templatePlaceholder": "解释$ARGUMENTS",
-      "agent": "代理人",
       "subtask": "作为子任务运行",
       "edit": "编辑斜杠命令",
       "saveFailed": "无法保存命令",

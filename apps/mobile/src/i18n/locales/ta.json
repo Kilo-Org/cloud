@@ -135,7 +135,8 @@
     "updated": "புதுப்பிக்கப்பட்டது",
     "working": "பணியில்",
     "yourOwnRepositories": "உங்கள் சொந்தக் களஞ்சியங்கள்",
-    "dismissed": "புறக்கணிக்கப்பட்டது"
+    "dismissed": "புறக்கணிக்கப்பட்டது",
+    "agent": "முகவர்"
   },
   "language": {
     "restarting": "மொழி மாற்றத்தைப் பயன்படுத்த மறுதொடக்கம் செய்கிறது",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்.",
     "openSession": "திற",
     "approveFailed": "ஒப்புதல் அளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க $t(common.approve) தட்டவும்.",
-    "newestResult": "சமீபத்திய முடிவு",
-    "scheduledWakes": "{{time}} விழிக்கும்"
+    "scheduledWakes": "{{time}} விழிக்கும்",
+    "checked": "சரிபார்க்கப்பட்டது",
+    "lastKnown": "கடைசியாக அறியப்பட்ட நிலை",
+    "awaitingUpdate": "புதுப்பிப்புக்குக் காத்திருக்கிறது",
+    "nextRun": "அடுத்த இயக்கம்",
+    "waitingForYou": "உங்களுக்காகக் காத்திருக்கிறது",
+    "nextScheduled": "அடுத்து திட்டமிடப்பட்டவை",
+    "answerNeeded": "பதில் தேவை",
+    "waitingToRetry": "மீண்டும் முயலக் காத்திருக்கிறது"
   },
   "transcriptionModel": {
     "title": "உரையாக்க மாதிரி",
@@ -3357,7 +3365,6 @@
       "template": "டெம்ப்ளேட்",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTSஐ விளக்கவும்",
-      "agent": "முகவர்",
       "subtask": "துணைப் பணியாக இயக்கவும்",
       "edit": "ஸ்லாஷ் கட்டளையைத் திருத்தவும்",
       "saveFailed": "கட்டளையைச் சேமிக்க முடியவில்லை",

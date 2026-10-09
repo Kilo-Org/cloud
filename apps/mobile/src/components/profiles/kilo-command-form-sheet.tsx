@@ -154,7 +154,7 @@ export function KiloCommandFormSheet({
           }}
         />
         <FormField
-          label={t('profiles.slashCommands.agent')}
+          label={t('common.agent')}
           defaultValue={initial.agent}
           disabled={isSaving}
           autoCapitalize="none"

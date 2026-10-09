@@ -135,7 +135,8 @@
     "updated": "Aktualizováno",
     "working": "Pracuje",
     "yourOwnRepositories": "Tvoje vlastní repozitáře",
-    "dismissed": "Zamítnuto"
+    "dismissed": "Zamítnuto",
+    "agent": "Činidlo"
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -3237,8 +3238,15 @@
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
     "openSession": "Otevřít",
     "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
-    "newestResult": "Nejnovější výsledek",
-    "scheduledWakes": "probudí se {{time}}"
+    "scheduledWakes": "probudí se {{time}}",
+    "checked": "Ověřeno",
+    "lastKnown": "Poslední známý stav",
+    "awaitingUpdate": "Čeká na aktualizaci",
+    "nextRun": "Příští spuštění",
+    "waitingForYou": "Čeká na vás",
+    "nextScheduled": "Další naplánované",
+    "answerNeeded": "Čeká na odpověď",
+    "waitingToRetry": "Čeká na další pokus"
   },
   "transcriptionModel": {
     "title": "Model přepisu",
@@ -3439,7 +3447,6 @@
       "template": "Šablona",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Vysvětlete $ARGUMENTS",
-      "agent": "Činidlo",
       "subtask": "Spustit jako dílčí úkol",
       "edit": "Příkaz upravit lomítko",
       "saveFailed": "Příkaz se nepodařilo uložit",

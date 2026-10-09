@@ -135,7 +135,8 @@
     "updated": "اپ ڈیٹ کیا گیا",
     "working": "کام جاری ہے",
     "yourOwnRepositories": "آپ کی اپنی ریپوزٹریز",
-    "dismissed": "نظر انداز کردہ"
+    "dismissed": "نظر انداز کردہ",
+    "agent": "ایجنٹ"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
-    "newestResult": "تازہ ترین نتیجہ",
-    "scheduledWakes": "{{time}} بیدار ہوگا"
+    "scheduledWakes": "{{time}} بیدار ہوگا",
+    "checked": "آخری تصدیق",
+    "lastKnown": "آخری معلوم حالت",
+    "awaitingUpdate": "اپ ڈیٹ کا انتظار",
+    "nextRun": "اگلا اجرا",
+    "waitingForYou": "آپ کا انتظار",
+    "nextScheduled": "آئندہ شیڈول",
+    "answerNeeded": "جواب درکار",
+    "waitingToRetry": "دوبارہ کوشش کا انتظار"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3357,7 +3365,6 @@
       "template": "سانچہ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS کی وضاحت کریں۔",
-      "agent": "ایجنٹ",
       "subtask": "ذیلی کام کے طور پر چلائیں۔",
       "edit": "سلیش کمانڈ میں ترمیم کریں۔",
       "saveFailed": "کمانڈ کو محفوظ نہیں کیا جا سکا",

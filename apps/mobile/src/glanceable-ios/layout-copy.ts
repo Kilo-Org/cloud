@@ -58,7 +58,6 @@ export function glanceableLayoutCopy() {
     scheduled: i18n.t('common.scheduled'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
-    newestResult: i18n.t('glanceable.newestResult'),
     // The Live Activity's two buttons and the widget's in-place actions all read
     // `common.approve`: the permission card, the wrist control, and the widget
     // button name the same action, and `check:i18n` forbids a second key with the
@@ -69,6 +68,16 @@ export function glanceableLayoutCopy() {
     approve: i18n.t('common.approve'),
     open: i18n.t('glanceable.openSession'),
     newAgent: i18n.t('glanceable.newAgent'),
+    checked: i18n.t('glanceable.checked'),
+    lastKnown: i18n.t('glanceable.lastKnown'),
+    awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
+    nextRun: i18n.t('glanceable.nextRun'),
+    agent: i18n.t('common.agent'),
+    noneWaiting: i18n.t('glanceable.noneWaiting'),
+    waitingForYou: i18n.t('glanceable.waitingForYou'),
+    permissionRequired: i18n.t('agentChat.permissionCard.title'),
+    answerNeeded: i18n.t('glanceable.answerNeeded'),
+    waitingToRetry: i18n.t('glanceable.waitingToRetry'),
     locale: resolveGlanceableLocale(i18n.language),
     digits: glanceableDigits(),
   };

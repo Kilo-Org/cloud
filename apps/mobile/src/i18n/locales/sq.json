@@ -135,7 +135,8 @@
     "updated": "Përditësuar",
     "working": "Duke punuar",
     "yourOwnRepositories": "Depot e tua",
-    "dismissed": "E hedhur poshtë"
+    "dismissed": "E hedhur poshtë",
+    "agent": "Agjenti"
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
-    "newestResult": "Rezultati më i ri",
-    "scheduledWakes": "zgjohet {{time}}"
+    "scheduledWakes": "zgjohet {{time}}",
+    "checked": "Kontrolluar",
+    "lastKnown": "Gjendja e fundit e njohur",
+    "awaitingUpdate": "Në pritje të përditësimit",
+    "nextRun": "Ekzekutimi i radhës",
+    "waitingForYou": "Pret ty",
+    "nextScheduled": "Të planifikuara në vijim",
+    "answerNeeded": "Pret përgjigje",
+    "waitingToRetry": "Në pritje për të riprovuar"
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3357,7 +3365,6 @@
       "template": "shabllon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Shpjegoni $ARGUMENTS",
-      "agent": "Agjenti",
       "subtask": "Ekzekuto si nëndetyrë",
       "edit": "Redakto komandën e pjerrët",
       "saveFailed": "Komanda nuk mund të ruhej",

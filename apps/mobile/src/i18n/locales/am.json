@@ -135,7 +135,8 @@
     "updated": "ተዘምኗል",
     "working": "በመሥራት ላይ",
     "yourOwnRepositories": "የራስህ ማከማቻዎች",
-    "dismissed": "ተወግዷል"
+    "dismissed": "ተወግዷል",
+    "agent": "ወኪል"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
     "openSession": "ክፈት",
     "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።",
-    "newestResult": "አዲሱ ውጤት",
-    "scheduledWakes": "{{time}} ይነቃል"
+    "scheduledWakes": "{{time}} ይነቃል",
+    "checked": "የተረጋገጠ",
+    "lastKnown": "ለመጨረሻ ጊዜ የታወቀ",
+    "awaitingUpdate": "ዝማኔ በመጠበቅ ላይ",
+    "nextRun": "ቀጣይ አፈጻጸም",
+    "waitingForYou": "እርስዎን በመጠበቅ ላይ",
+    "nextScheduled": "ቀጣይ የተያዙ",
+    "answerNeeded": "ምላሽ ይፈልጋል",
+    "waitingToRetry": "ዳግም ለመሞከር በመጠበቅ ላይ"
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",
@@ -3357,7 +3365,6 @@
       "template": "አብነት",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ያብራሩ",
-      "agent": "ወኪል",
       "subtask": "እንደ ንዑስ ተግባር ያሂዱ",
       "edit": "የጭረት ትእዛዝን ያርትዑ",
       "saveFailed": "ትዕዛዝ ማስቀመጥ አልተቻለም",

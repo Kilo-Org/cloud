@@ -135,7 +135,8 @@
     "updated": "Yenilənib",
     "working": "İşləyir",
     "yourOwnRepositories": "Öz repozitoriyaların",
-    "dismissed": "Rədd edilib"
+    "dismissed": "Rədd edilib",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
     "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
-    "newestResult": "Ən yeni nəticə",
-    "scheduledWakes": "{{time}} oyanır"
+    "scheduledWakes": "{{time}} oyanır",
+    "checked": "Yoxlanılıb",
+    "lastKnown": "Son məlum vəziyyət",
+    "awaitingUpdate": "Yenilənmə gözlənilir",
+    "nextRun": "Növbəti işə düşmə",
+    "waitingForYou": "Sizi gözləyir",
+    "nextScheduled": "Növbəti planlaşdırılanlar",
+    "answerNeeded": "Cavab gözləyir",
+    "waitingToRetry": "Təkrar cəhd gözlənilir"
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",
@@ -3357,7 +3365,6 @@
       "template": "Şablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS-i izah edin",
-      "agent": "Agent",
       "subtask": "Alt tapşırıq kimi işləyin",
       "edit": "Slash əmrini redaktə edin",
       "saveFailed": "Komandanı saxlamaq mümkün olmadı",

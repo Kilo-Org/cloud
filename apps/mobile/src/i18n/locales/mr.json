@@ -135,7 +135,8 @@
     "updated": "अद्ययावत केले",
     "working": "काम सुरू आहे",
     "yourOwnRepositories": "तुमच्या स्वतःच्या रिपॉझिटरी",
-    "dismissed": "दुर्लक्षित"
+    "dismissed": "दुर्लक्षित",
+    "agent": "एजंट"
   },
   "language": {
     "restarting": "निवडलेली भाषा लागू करण्यासाठी पुन्हा सुरू होत आहे",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
     "openSession": "उघडा",
     "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा.",
-    "newestResult": "नवीनतम निकाल",
-    "scheduledWakes": "{{time}} जागेल"
+    "scheduledWakes": "{{time}} जागेल",
+    "checked": "तपासले",
+    "lastKnown": "शेवटची ज्ञात स्थिती",
+    "awaitingUpdate": "अपडेटची प्रतीक्षा",
+    "nextRun": "पुढील कार्यारंभ",
+    "waitingForYou": "तुमची प्रतीक्षा",
+    "nextScheduled": "पुढील नियोजित",
+    "answerNeeded": "उत्तर आवश्यक",
+    "waitingToRetry": "पुन्हा प्रयत्नाची प्रतीक्षा"
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",
@@ -3357,7 +3365,6 @@
       "template": "साचा",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS स्पष्ट करा",
-      "agent": "एजंट",
       "subtask": "सबटास्क म्हणून चालवा",
       "edit": "स्लॅश कमांड संपादित करा",
       "saveFailed": "कमांड सेव्ह करू शकलो नाही",

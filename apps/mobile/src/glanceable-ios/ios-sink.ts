@@ -8,6 +8,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { i18n } from '@/i18n';
+import { getHomeWidgetDataForSnapshot } from '@/lib/glanceable/home-widget-data';
 import {
   getLastGlanceableSnapshot,
   isGlanceableRestoreSettled,
@@ -473,13 +474,14 @@ export const iosSink: GlanceableSink = {
   },
 
   publish(snapshot) {
-    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate));
+    const homeData = getHomeWidgetDataForSnapshot(snapshot);
+    const props = toWidgetProps(buildGlanceableViewProps(snapshot, {}, translate, homeData));
     ActiveAgentsWidget.updateSnapshot(props);
     // updateSnapshot leaves a single frame behind, so the shared builder adds
     // the delayed and expiry frames every timeline writer owes WidgetKit (see
     // `widgetTimelineFrames`). Null means a terminal blank, whose copy needs no
     // further frame.
-    const frames = widgetTimelineFrames(snapshot, props, translate);
+    const frames = widgetTimelineFrames(snapshot, props, translate, homeData);
     if (frames !== null) {
       ActiveAgentsWidget.updateTimeline(frames);
     }

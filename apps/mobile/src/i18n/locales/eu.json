@@ -135,7 +135,8 @@
     "updated": "Eguneratuta",
     "working": "Lanean",
     "yourOwnRepositories": "Zure biltegiak",
-    "dismissed": "Baztertuta"
+    "dismissed": "Baztertuta",
+    "agent": "Agentea"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
     "openSession": "Ireki",
     "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
-    "newestResult": "Emaitza berriena",
-    "scheduledWakes": "{{time}} esnatuko da"
+    "scheduledWakes": "{{time}} esnatuko da",
+    "checked": "Egiaztatuta",
+    "lastKnown": "Azken egoera ezaguna",
+    "awaitingUpdate": "Eguneratzearen zain",
+    "nextRun": "Hurrengo exekuzioa",
+    "waitingForYou": "Zure zain",
+    "nextScheduled": "Hurrengo programatuak",
+    "answerNeeded": "Zure erantzunaren zain",
+    "waitingToRetry": "Berriro saiatzeko zain"
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
@@ -3357,7 +3365,6 @@
       "template": "Txantiloia",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Azaldu $ARGUMENTS",
-      "agent": "Agentea",
       "subtask": "Exekutatu azpizeregin gisa",
       "edit": "Editatu barra komandoa",
       "saveFailed": "Ezin izan da gorde komandoa",

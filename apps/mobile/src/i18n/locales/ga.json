@@ -135,7 +135,8 @@
     "updated": "Nuashonraithe",
     "working": "Ag obair",
     "yourOwnRepositories": "Do stóir féin",
-    "dismissed": "Curtha as an áireamh"
+    "dismissed": "Curtha as an áireamh",
+    "agent": "Gníomhaire"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -3278,8 +3279,15 @@
     "activityKitDisabledBody": "Cumasaigh gníomhaíochtaí beo sna socruithe chun gníomhairí gníomhacha a fheiceáil ar an scáileán glasála.",
     "openSession": "Oscail",
     "approveFailed": "Níorbh fhéidir ceadú. Tapáil $t(common.approve) chun triail eile a bhaint as.",
-    "newestResult": "An toradh is nuaí",
-    "scheduledWakes": "dúisíonn {{time}}"
+    "scheduledWakes": "dúisíonn {{time}}",
+    "checked": "Seiceáilte",
+    "lastKnown": "Stádas deireanach ar eolas",
+    "awaitingUpdate": "Ag fanacht le nuashonrú",
+    "nextRun": "An chéad rith eile",
+    "waitingForYou": "Ag fanacht leat",
+    "nextScheduled": "Sceidealaithe amach romhainn",
+    "answerNeeded": "Freagra de dhíth",
+    "waitingToRetry": "Ag fanacht le hatriail"
   },
   "transcriptionModel": {
     "title": "Samhail tras-scríobh",
@@ -3480,7 +3488,6 @@
       "template": "Teimpléad",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Mínigh $ARGUMENTS",
-      "agent": "Gníomhaire",
       "subtask": "Rith mar fhothasc",
       "edit": "Cuir ordú slais in eagar",
       "saveFailed": "Níorbh fhéidir an t-ordú a shábháil",

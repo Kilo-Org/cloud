@@ -135,7 +135,8 @@
     "updated": "Mete ajou",
     "working": "Ap travay",
     "yourOwnRepositories": "Pwòp depo ou yo",
-    "dismissed": "Rejte"
+    "dismissed": "Rejte",
+    "agent": "Ajan"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
     "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
-    "newestResult": "Dènye rezilta",
-    "scheduledWakes": "leve {{time}}"
+    "scheduledWakes": "leve {{time}}",
+    "checked": "Verifye",
+    "lastKnown": "Dènye eta koni",
+    "awaitingUpdate": "Ap tann mizajou",
+    "nextRun": "Pwochen ekzekisyon",
+    "waitingForYou": "Ap tann ou",
+    "nextScheduled": "Pwochen ki pwograme",
+    "answerNeeded": "Bezwen repons",
+    "waitingToRetry": "Ap tann pou reeseye"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3357,7 +3365,6 @@
       "template": "Modèl",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Eksplike $ARGUMENTS",
-      "agent": "Ajan",
       "subtask": "Kouri kòm subtach",
       "edit": "Edit lòd koupe",
       "saveFailed": "Pa t 'kapab sove lòd",

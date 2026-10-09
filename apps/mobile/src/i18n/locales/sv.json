@@ -135,7 +135,8 @@
     "updated": "Uppdaterad",
     "working": "Arbetar",
     "yourOwnRepositories": "Dina egna kodarkiv",
-    "dismissed": "Avskriven"
+    "dismissed": "Avskriven",
+    "agent": "Ombud"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -3155,8 +3156,15 @@
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
-    "newestResult": "Nyaste resultatet",
-    "scheduledWakes": "vaknar {{time}}"
+    "scheduledWakes": "vaknar {{time}}",
+    "checked": "Kontrollerad",
+    "lastKnown": "Senast kända",
+    "awaitingUpdate": "Väntar på uppdatering",
+    "nextRun": "Nästa körning",
+    "waitingForYou": "Väntar på dig",
+    "nextScheduled": "Nästa schemalagda",
+    "answerNeeded": "Väntar på svar",
+    "waitingToRetry": "Väntar på nytt försök"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
@@ -3357,7 +3365,6 @@
       "template": "Mall",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Förklara $ARGUMENTS",
-      "agent": "Ombud",
       "subtask": "Kör som deluppgift",
       "edit": "Redigera snedstreck kommando",
       "saveFailed": "Det gick inte att spara kommandot",

@@ -382,7 +382,9 @@ export async function fetchForgejoBranches(
   return branches;
 }
 
-export function calculateTokenExpiry(createdAt: number, expiresIn: number): string {
-  const expiresAtMs = (createdAt + expiresIn) * 1000;
-  return new Date(expiresAtMs).toISOString();
+export { DEFAULT_FORGEJO_INSTANCE_URL, normalizeForgejoInstanceUrl };
+export { validateForgejoInstance, type ForgejoInstanceValidationResult };
+export { calculateTokenExpiry };
+export function fetchForgejoProjects(...args: Parameters<typeof fetchForgejoRepos>) {
+  return fetchForgejoRepos(...args);
 }

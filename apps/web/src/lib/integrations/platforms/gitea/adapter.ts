@@ -391,7 +391,9 @@ export async function fetchGiteaBranches(
   return branches;
 }
 
-export function calculateTokenExpiry(createdAt: number, expiresIn: number): string {
-  const expiresAtMs = (createdAt + expiresIn) * 1000;
-  return new Date(expiresAtMs).toISOString();
+export { DEFAULT_GITEA_INSTANCE_URL, normalizeGiteaInstanceUrl };
+export { validateGiteaInstance, type GiteaInstanceValidationResult };
+export { calculateTokenExpiry };
+export function fetchGiteaProjects(...args: Parameters<typeof fetchGiteaRepos>) {
+  return fetchGiteaRepos(...args);
 }

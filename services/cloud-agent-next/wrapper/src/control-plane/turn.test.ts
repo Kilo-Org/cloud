@@ -246,6 +246,7 @@ function createHarness(
   const states = new Map<string, ReturnType<TurnKiloRuntime['sessionState']>>();
   let clock = 0;
   let materializeCalls = 0;
+  let observeDispatches = true;
 
   const scheduler: TurnScheduler = {
     setInterval: () => 0 as unknown as ReturnType<typeof setInterval>,
@@ -283,12 +284,16 @@ function createHarness(
     runAutoCommit: options.runAutoCommit ?? ((async () => ({ success: true })) as never),
   });
 
+  function observeDispatch(id: string): void {
+    if (observeDispatches) {
+      manager.observeKiloEvent(kiloEvent('session.turn.open', { sessionID: id }));
+    }
+  }
+
   function ensureRuntime(spec: ControlPlaneRouteSpec): void {
     const key = runtimeKey(spec);
     if (clients.has(key)) return;
-    const fake = createFakeClient(id =>
-      manager.observeKiloEvent(kiloEvent('session.turn.open', { sessionID: id }))
-    );
+    const fake = createFakeClient(observeDispatch);
     clients.set(key, fake);
     flags.set(key, {});
     envs.set(key, {});
@@ -341,12 +346,10 @@ function createHarness(
     retireClient(spec: ControlPlaneRouteSpec): void {
       const key = runtimeKey(spec);
       retiredClients.add(clients.get(key)!.client);
-      clients.set(
-        key,
-        createFakeClient(id =>
-          manager.observeKiloEvent(kiloEvent('session.turn.open', { sessionID: id }))
-        )
-      );
+      clients.set(key, createFakeClient(observeDispatch));
+    },
+    setDispatchObservation(enabled: boolean): void {
+      observeDispatches = enabled;
     },
     setEnv(spec: ControlPlaneRouteSpec, env: Record<string, string>): void {
       envs.set(runtimeKey(spec), env);
@@ -536,6 +539,356 @@ describe('turn manager submission', () => {
     expect(available?.properties.commands).toEqual([
       { name: 'compact', description: 'Compact the conversation' },
     ]);
+  });
+});
+
+describe('serialized command delivery wait', () => {
+  function pendingCompact(h: ReturnType<typeof createHarness>) {
+    const client = h.client(routeSpec());
+    const summary = Promise.withResolvers<boolean>();
+    client.setSummaryImpl(() => summary.promise);
+    return { client, summary };
+  }
+
+  function blockedCompact(h: ReturnType<typeof createHarness>) {
+    h.setState(KILO_SESSION, runningState);
+    return pendingCompact(h);
+  }
+
+  it('does not expire a follow-up waiting behind a live observed compact response', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    expect(client.summaries).toHaveLength(1);
+
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(client.prompts).toEqual([]);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.manager.hasPendingWork()).toBe(true);
+
+    summary.resolve(true);
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+    h.manager.observeKiloEvent(completedKiloTurn());
+    // The close defers while the native execution is still live; clearing it
+    // reconciles the deferred completion.
+    h.setState(KILO_SESSION, undefined);
+    h.manager.refreshActivity(DIRECTORY);
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([
+      { type: 'session.outcome', sessionId: SESSION_ID, status: 'completed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('keeps arrival order for multiple follow-ups behind the serialized command', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    summary.resolve(true);
+    await settle();
+    expect(client.summaries).toHaveLength(1);
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
+  });
+
+  it('excludes waiting behind a live observed non-compact command too', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, runningState);
+    const client = h.client(routeSpec());
+    const command = Promise.withResolvers<unknown>();
+    client.setCommandImpl(() => command.promise);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'init'));
+    await settle();
+    expect(client.commands).toHaveLength(1);
+
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    command.resolve({});
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+  });
+
+  it('does not exempt a follow-up while the compact is dispatched but unobserved', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, runningState);
+    h.setDispatchObservation(false);
+    pendingCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('does not credit an accepted wait to a follower the command never exempted', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    const client = h.client(spec);
+    const summary = Promise.withResolvers<boolean>();
+    client.setSummaryImpl(() => summary.promise);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(30_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // No live execution ever covered m1. The command clearing must not extend its
+    // window: it still expires 120s after receipt, not 120s after the ack.
+    h.setFlags(spec, { restarting: true, suspected: true });
+    summary.resolve(true);
+    await settle();
+    h.advance(90_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('bounds a follow-up when the native execution ends while the response is pending', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The execution is gone but the serialized HTTP response is still pending: no
+    // native bound covers the follower, so its own delivery window applies.
+    h.setState(KILO_SESSION, undefined);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+    summary.resolve(true);
+  });
+
+  it('expires a follow-up a normal deadline after a longer-than-deadline serialized wait', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    const { summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    // A legitimate wait well past the 120s delivery deadline.
+    for (let index = 0; index < 5; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
+    }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The command clears while the runtime is restarting, so the follower stays in
+    // the inbox undispatched: it must not expire on the spot after that long wait,
+    // but its own deadline must still run out a normal window later.
+    h.setFlags(spec, { restarting: true, suspected: true });
+    summary.resolve(true);
+    await settle();
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+  });
+
+  it('keeps the deadline honest across a memory hold and a serialized wait', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    const key = runtimeKey(spec);
+    h.registerRoute(spec);
+    const { summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(60_000);
+    h.manager.tick();
+
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: true, key });
+    h.advance(10 * 60_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The hold ends but the serialized wait continues for several more minutes.
+    h.manager.onRuntimeMemoryHold({ directory: DIRECTORY, held: false, key });
+    for (let index = 0; index < 5; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
+    }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    // The execution clears while the response is still pending: the follower must
+    // not expire immediately, and must expire a normal deadline later.
+    h.setState(KILO_SESSION, undefined);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(120_000 - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+    summary.resolve(true);
+  });
+
+  it('settles a long serialized wait on the native bound without later delivery', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    for (let index = 0; index < 30; index += 1) {
+      h.advance(60_000);
+      h.manager.tick();
+    }
+    expect(outcomeFrames(h.frames)).toEqual([]);
+
+    h.manager.onNativeDeadline(
+      { sessionId: KILO_SESSION, directory: DIRECTORY, nativeRuntimeId: 'rt', execution: 1 },
+      'no_progress',
+      runtimeKey(spec)
+    );
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'failed', reason: 'no_progress' }]);
+    summary.resolve(true);
+    await settle();
+    expect(client.prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+  });
+
+  it('does not hold compute for a follower behind a command waiting on the user', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setState(KILO_SESSION, { ...runningState, activity: 'waiting' });
+    const { client } = pendingCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    expect(h.manager.hasPendingWork()).toBe(false);
+    expect(client.prompts).toEqual([]);
+  });
+
+  it('still expires a follow-up waiting behind an ordinary prompt response', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const client = h.client(routeSpec());
+    const first = Promise.withResolvers<void>();
+    client.setPromptImpl(opts => (opts.messageId === 'm1' ? first.promise : Promise.resolve()));
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m1']);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm2' },
+    ]);
+  });
+
+  it('still expires a first command blocked without native observation', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.setFlags(routeSpec(), { restarting: true, suspected: true });
+    const client = h.client(routeSpec());
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    expect(client.summaries).toEqual([]);
+
+    h.advance(120_000);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'c1' },
+    ]);
+  });
+
+  it('settles the batch when the serialized command fails without hanging the queue', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const client = h.client(routeSpec());
+    client.setSummaryImpl(async () => false);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    expect(outcomeFrames(h.frames)).toMatchObject([
+      { status: 'failed', reason: 'prompt_failed', lastMessageId: 'm1' },
+    ]);
+    expect(client.prompts).toEqual([]);
+
+    h.manager.submit(SESSION_ID, promptPayload('m2'));
+    await settle();
+    expect(client.prompts.map(call => call.messageId)).toEqual(['m2']);
+  });
+
+  it('cancels a command batch on Stop and never delivers the waiting prompt', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const { client, summary } = blockedCompact(h);
+    h.manager.submit(SESSION_ID, commandPayload('c1', 'compact'));
+    await settle();
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+
+    h.manager.abort(SESSION_ID);
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([
+      { type: 'session.outcome', sessionId: SESSION_ID, status: 'cancelled', lastMessageId: 'm1' },
+    ]);
+    summary.resolve(true);
+    await settle();
+    expect(client.prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
   });
 });
 

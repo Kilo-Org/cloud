@@ -185,7 +185,7 @@ describe('withGlanceableCopy', () => {
       lastKnown: i18n.t('glanceable.lastKnown'),
       awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
       agent: i18n.t('common.agent'),
-      noneWaiting: i18n.t('glanceable.noneWaiting'),
+      homeEmpty: i18n.t('home.noLiveSessions'),
     });
     expect(copy.checked).not.toBe('glanceable.checked');
     expect(copy.awaitingUpdate).not.toBe('glanceable.awaitingUpdate');

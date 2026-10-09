@@ -73,7 +73,9 @@ export function glanceableLayoutCopy() {
     awaitingUpdate: i18n.t('glanceable.awaitingUpdate'),
     nextRun: i18n.t('glanceable.nextRun'),
     agent: i18n.t('common.agent'),
-    noneWaiting: i18n.t('glanceable.noneWaiting'),
+    // The Home tile's empty state reads the key the Android Home widget and the
+    // in-app Home card read, so an empty account is worded the same everywhere.
+    homeEmpty: i18n.t('home.noLiveSessions'),
     waitingForYou: i18n.t('glanceable.waitingForYou'),
     permissionRequired: i18n.t('agentChat.permissionCard.title'),
     answerNeeded: i18n.t('glanceable.answerNeeded'),

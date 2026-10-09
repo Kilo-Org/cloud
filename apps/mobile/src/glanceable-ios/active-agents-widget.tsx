@@ -186,7 +186,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const primaryLabel = primaryKind === null ? '' : labels[primaryKind];
   let statusLabel = COPY.signed_out ?? genericStatus;
   if (status === 'empty') {
-    statusLabel = COPY.homeEmpty ?? COPY.noneWaiting ?? 'No agents waiting';
+    statusLabel = COPY.homeEmpty ?? 'Nothing running right now';
   } else if (status === 'waiting') {
     statusLabel = COPY.waiting ?? 'Checking agents';
   } else if (status === 'privacy' || status === 'unavailable') {

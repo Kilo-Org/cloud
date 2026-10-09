@@ -25,6 +25,7 @@ import { askedIn, forgetAsked, migrateAsked, moveAsked, rememberAsked } from './
 import { chatToolNames, chatToolNamesStarting } from './tools';
 import { waitForChatBackends } from './backend-store';
 import { targetSupportsTools } from './backend-capabilities';
+import { backendFailureKey } from './backend-target';
 import {
   forgetSession,
   modelOfSession,
@@ -240,7 +241,11 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
          not left saying it is opening with the rejection swallowing it: it
          settles idle with the reason, so entering it again is possible rather
          than a screen that spins forever. */
-      change(sessionId, { status: 'idle', failed: openReason(error) });
+      change(sessionId, {
+        status: 'idle',
+        failed: openReason(error),
+        failureKey: backendFailureKey(error),
+      });
     } finally {
       opening.delete(sessionId);
     }
@@ -402,6 +407,7 @@ export async function say(sessionId: string, text: string, model: string): Promi
       asked: text,
       askedModel: model,
       failed: null,
+      failureKey: null,
     });
     chat.answering = runtime.runFork(reading(current, text, runtime));
   } catch (error) {
@@ -416,6 +422,7 @@ export async function say(sessionId: string, text: string, model: string): Promi
       asked: text,
       askedModel: model,
       failed: reason(error),
+      failureKey: backendFailureKey(error),
     });
   }
 }
@@ -433,6 +440,11 @@ export async function retryChat(sessionId: string): Promise<void> {
   const { sessionId: current, asked, askedModel } = snapshotOf(sessionId);
   if (asked !== null && askedModel !== null) {
     await say(current, asked, askedModel);
+  } else {
+    const chat = chats.get(current);
+    if (chat !== undefined && chat.answering === undefined) {
+      await drain(current, chat, false);
+    }
   }
 }
 
@@ -513,6 +525,7 @@ async function settle(
     asked: failed === null ? null : snapshotOf(sessionId).asked,
     askedModel: failed === null ? null : snapshotOf(sessionId).askedModel,
     failed,
+    failureKey: failed === null ? null : 'common.somethingWentWrong',
   });
   /* The line moves only when the answer landed. A question that failed keeps
      its Retry, and asking the next one would take the place that Retry hangs
@@ -538,7 +551,22 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
     /* The names are computed from the switches as they stand now, so a choice
        made while the answer was arriving — the Kilo switch, a Retry, or the
        settings group switch — all land on the same recomputation. */
-    current = await ontoTools(current, chat);
+    try {
+      current = await ontoTools(current, chat);
+      if (!failed) {
+        change(current, { failed: null, failureKey: null });
+      }
+    } catch (error) {
+      /* A backend can change while its answer arrives. Keep the tool change
+         and the whole line for an explicit retry or a new, valid target. */
+      current = snapshotOf(current).sessionId;
+      const held = chats.get(current);
+      if (held !== undefined) {
+        held.pendingTools = true;
+      }
+      change(current, { failed: reason(error), failureKey: backendFailureKey(error) });
+      return;
+    }
   }
   if (failed) {
     return;

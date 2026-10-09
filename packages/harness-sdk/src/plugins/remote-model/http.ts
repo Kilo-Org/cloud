@@ -35,9 +35,6 @@ const bodyFor = (config: RemoteModelConfig, wire: Wire, request: ModelRequest) =
       ) {
         throw new Error('Invalid remote API root');
       }
-      if (config.apiKind === 'chat_completions' && request.effort === 'max') {
-        throw new Error('Unsupported reasoning effort');
-      }
       return JSON.stringify(wire.toBody(request));
     },
     catch: () => new ModelError({ reason: 'unsupported', cause: 'Unsupported remote request' }),

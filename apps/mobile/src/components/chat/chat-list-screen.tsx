@@ -82,6 +82,7 @@ function ScopedChatListScreen() {
     [backends, models]
   );
   const selectedModel = picked ?? models.find(one => one.isPreferred)?.id ?? models[0]?.id;
+  const selectionValid = options.some(option => option.id === selectedModel);
 
   // The catalog is what tells a session its context window, and a session with
   // no window never compacts. It is handed over as it arrives.
@@ -110,7 +111,7 @@ function ScopedChatListScreen() {
       return;
     }
     const model = selectedModel;
-    if (place === null || model === undefined) {
+    if (place === null || model === undefined || !selectionValid) {
       return;
     }
     startingRef.current = true;
@@ -137,7 +138,7 @@ function ScopedChatListScreen() {
         setStarting(false);
       }
     })();
-  }, [selectedModel, place, router, t]);
+  }, [selectedModel, selectionValid, place, router, t]);
 
   const open = useCallback(
     (sessionId: string) => {
@@ -235,7 +236,7 @@ function ScopedChatListScreen() {
             <Button
               onPress={start}
               loading={starting}
-              disabled={selectedModel === undefined}
+              disabled={!selectionValid}
               accessibilityLabel={t('modelChat.list.new')}
             >
               <Text>{t('modelChat.list.new')}</Text>
@@ -291,14 +292,19 @@ function ScopedChatListScreen() {
             />
           </View>
         )}
+        {picked !== null && !selectionValid && (
+          <Text className="px-[22px] pb-2 text-destructive">
+            {t('modelChat.backends.invalidTarget')}
+          </Text>
+        )}
         <View className="flex-1">{renderBody()}</View>
         {showFab && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('modelChat.list.new')}
-            accessibilityState={{ disabled: starting, busy: starting }}
+            accessibilityState={{ disabled: starting || !selectionValid, busy: starting }}
             testID="chat-new-fab"
-            disabled={starting}
+            disabled={starting || !selectionValid}
             onPress={start}
             className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
             style={fabStyle}

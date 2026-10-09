@@ -1,7 +1,7 @@
 import { SUPPORTED_LANGUAGES, type SupportedLanguage } from './languages.ts';
 
 /**
- * The five Info.plist usage descriptions iOS can draw for this app. Expo's
+ * The six Info.plist usage descriptions iOS can draw for this app. Expo's
  * `withLocales` plugin writes one `<tag>.lproj/InfoPlist.strings` per language
  * from the config's top-level `locales` field; these are the keys it must hold.
  */
@@ -11,6 +11,7 @@ export const PERMISSION_PROMPT_PLIST_KEYS = [
   'NSFaceIDUsageDescription',
   'NSLocationWhenInUseUsageDescription',
   'NSUserTrackingUsageDescription',
+  'NSLocalNetworkUsageDescription',
 ] as const;
 
 type PermissionPlistKey = (typeof PERMISSION_PROMPT_PLIST_KEYS)[number];
@@ -42,7 +43,7 @@ function readPrompt(
  * and without it an Android prebuild would emit `values-b+<tag>/strings.xml`
  * holding `NS*` keys.
  *
- * Throws when a supported language or any of the five keys is missing or
+ * Throws when a supported language or any of the six keys is missing or
  * empty, so a prebuild fails loudly instead of shipping an English prompt.
  */
 export function buildPermissionPromptLocales(copy: PermissionPromptCopy): PermissionPromptLocales {
@@ -69,6 +70,7 @@ export function buildPermissionPromptLocales(copy: PermissionPromptCopy): Permis
             'NSLocationWhenInUseUsageDescription'
           ),
           NSUserTrackingUsageDescription: readPrompt(entry, tag, 'NSUserTrackingUsageDescription'),
+          NSLocalNetworkUsageDescription: readPrompt(entry, tag, 'NSLocalNetworkUsageDescription'),
         },
       },
     ]);

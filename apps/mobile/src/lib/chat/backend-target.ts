@@ -22,6 +22,13 @@ class BackendTargetError extends Error {
   }
 }
 
+/** Fixed UI copy only: provider failures may contain credentials or response bodies. */
+export function backendFailureKey(error: unknown): string {
+  return error instanceof BackendTargetError
+    ? TARGET_ERROR_KEYS[error.problem]
+    : 'common.somethingWentWrong';
+}
+
 type BackendTarget = {
   readonly backendId: string;
   readonly revision: number;

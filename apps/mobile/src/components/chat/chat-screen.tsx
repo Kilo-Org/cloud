@@ -37,6 +37,7 @@ import { backendModelOptions, requiresBackendDisclosure } from '@/lib/chat/backe
 import { decodeBackendTarget, resolveChatTarget } from '@/lib/chat/backend-target';
 
 import { BetaPill } from './beta-pill';
+import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
 
@@ -268,6 +269,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
               {t('common.working')}
             </Text>
           </View>
+        ) : null}
+
+        {state.status === 'idle' && unanswered === undefined && state.failureKey !== null ? (
+          <ChatFailureRow failureKey={state.failureKey} onRetry={() => void retry()} />
         ) : null}
 
         <View style={composerPadding}>

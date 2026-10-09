@@ -207,7 +207,7 @@ const remoteWireFor = (
     toParts: protocol.parts,
     toStop: event => {
       if (
-        (kind === 'responses' && isResponseRefusal(event)) ||
+        (kind === 'responses' && isResponseRefusal(event) && event.delta.length > 0) ||
         (kind === 'chat_completions' &&
           isChatRefusal(event) &&
           (event.choices[0]?.delta.refusal.length ?? 0) > 0)

@@ -153,7 +153,10 @@ const effortFields = (
   if (!remote) {
     return { reasoning: { effort } };
   }
-  return { reasoning_effort: effort === 'max' ? 'xhigh' : effort };
+  if (effort === 'max') {
+    throw new Error('Unsupported reasoning effort');
+  }
+  return { reasoning_effort: effort };
 };
 
 const toBody = (

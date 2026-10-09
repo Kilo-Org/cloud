@@ -1,11 +1,14 @@
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
-import { createElement, type ElementType } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { createElement, type ElementType, isValidElement } from 'react';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { ChatListScreen } from '@/components/chat/chat-list-screen';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { type StoredChatBackend } from '@/lib/chat/backend-store';
+import { backendTargetId } from '@/lib/chat/backend-target';
 
 /**
  * Starting a chat from the list.
@@ -21,6 +24,7 @@ const state = vi.hoisted(() => ({
   toastError: vi.fn<(message: string, options?: unknown) => void>(),
   toastDismiss: vi.fn<(id?: string | number) => void>(),
   chats: [] as { sessionId: string; model: string; title: string; updatedAt: number }[],
+  backends: [] as StoredChatBackend[],
 }));
 
 vi.mock('@/lib/chat/use-chat', () => ({
@@ -87,7 +91,7 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/chat/chat-row', () => ({ ChatRow: 'ChatRow' }));
 vi.mock('@/components/chat/beta-pill', () => ({ BetaPill: 'BetaPill' }));
-vi.mock('@/lib/chat/backend-store', () => ({ useChatBackends: () => [] }));
+vi.mock('@/lib/chat/backend-store', () => ({ useChatBackends: () => state.backends }));
 vi.mock('@/components/chat/backend-settings-sheet', () => ({
   BackendSettingsControl: 'BackendSettingsControl',
 }));
@@ -98,6 +102,7 @@ let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefine
 beforeEach(() => {
   vi.clearAllMocks();
   state.chats = [];
+  state.backends = [];
   state.newChat.mockResolvedValue('session-1');
 });
 afterEach(() => {
@@ -129,6 +134,40 @@ async function pressFab(tree: ReactTestRenderer): Promise<void> {
     (fab.props as { onPress: () => void }).onPress();
     await Promise.resolve();
   });
+}
+
+function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
+  return typeof value === 'function';
+}
+
+/** Pick a model in the selector, as the user does. */
+async function selectModel(tree: ReactTestRenderer, model: string): Promise<void> {
+  const { onSelect } = tree.root.findByType('ModelSelector' as ElementType).props;
+  if (!isHandler(onSelect)) {
+    throw new TypeError('ModelSelector has no select handler');
+  }
+  await act(() => {
+    onSelect(model);
+  });
+}
+
+function offersModel(tree: ReactTestRenderer, model: string): boolean {
+  const options: unknown = tree.root.findByType('ModelSelector' as ElementType).props.options;
+  if (!Array.isArray(options)) {
+    throw new TypeError('ModelSelector has no options');
+  }
+  return options.some(
+    (option: unknown) =>
+      typeof option === 'object' && option !== null && 'id' in option && option.id === model
+  );
+}
+
+function startDisabled(tree: ReactTestRenderer): unknown {
+  const action: unknown = tree.root.findByType('EmptyState' as ElementType).props.action;
+  if (!isValidElement<{ disabled?: boolean }>(action)) {
+    throw new TypeError('EmptyState has no action');
+  }
+  return action.props.disabled;
 }
 
 describe('starting a chat from the list', () => {
@@ -194,4 +233,77 @@ describe('starting a chat from the list', () => {
       busy: false,
     });
   });
+
+  it.each([
+    ['edited', false],
+    ['deleted', false],
+    ['edited', true],
+    ['deleted', true],
+  ] as const)(
+    'keeps an explicitly picked backend invalid after it is %s (existing chats: %s)',
+    async (mutation, hasChats) => {
+      const backend: StoredChatBackend = {
+        id: 'custom-server',
+        revision: 1,
+        name: 'Custom',
+        baseUrl: 'https://custom.example/v1',
+        apiKind: 'chat_completions',
+        apiKey: '',
+        headers: {},
+        models: [{ id: 'custom-model', name: 'Custom model', tools: false }],
+        allowLocalHttp: false,
+      };
+      state.backends = [backend];
+      if (hasChats) {
+        state.chats = [{ sessionId: 'older', model: 'm1', title: 'Older', updatedAt: 1 }];
+      }
+      const target = backendTargetId(backend, 'custom-model');
+      const tree = await mount();
+      await selectModel(tree, target);
+      expect(tree.root.findByType('ModelSelector' as ElementType).props.value).toBe(target);
+
+      const edited = { ...backend, revision: 2 };
+      state.backends = mutation === 'deleted' ? [] : [edited];
+      const client = view?.queryClient;
+      if (client === undefined) {
+        throw new Error('not mounted');
+      }
+      await act(() => {
+        tree.update(createElement(QueryClientProvider, { client }, createElement(ChatListScreen)));
+      });
+
+      const selector = tree.root.findByType('ModelSelector' as ElementType);
+      expect(selector.props.value).toBe(target);
+      expect(offersModel(tree, target)).toBe(false);
+      expect(
+        tree.root
+          .findAllByType('Text' as ElementType)
+          .some(node => node.props.children === i18n.t('modelChat.backends.invalidTarget'))
+      ).toBe(true);
+      if (hasChats) {
+        const fab = tree.root.findByProps({ testID: 'chat-new-fab' });
+        expect(fab.props.disabled).toBe(true);
+        expect(fab.props.accessibilityState).toEqual({ disabled: true, busy: false });
+        await pressFab(tree);
+      } else {
+        expect(startDisabled(tree)).toBe(true);
+        await pressStart(tree);
+      }
+      expect(state.newChat).not.toHaveBeenCalled();
+      expect(state.push).not.toHaveBeenCalled();
+
+      // Selecting a current revision (or explicitly choosing Kilo) recovers.
+      const current = mutation === 'edited' ? backendTargetId(edited, 'custom-model') : 'm1';
+      await selectModel(tree, current);
+      if (hasChats) {
+        expect(tree.root.findByProps({ testID: 'chat-new-fab' }).props.disabled).toBe(false);
+        await pressFab(tree);
+      } else {
+        expect(startDisabled(tree)).toBe(false);
+        await pressStart(tree);
+      }
+      expect(state.newChat).toHaveBeenCalledExactlyOnceWith(expect.anything(), current);
+      expect(state.push).toHaveBeenCalledWith('/(app)/(tabs)/(4_chat)/session-1');
+    }
+  );
 });

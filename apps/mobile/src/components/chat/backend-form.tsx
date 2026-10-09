@@ -26,6 +26,7 @@ import {
   type BackendFormFields,
   modelFields,
 } from './backend-form-state';
+import { BackendHeadersField } from './backend-headers-field';
 import { BackendModelRow } from './backend-model-row';
 
 const FAILURE_KEYS = {
@@ -222,14 +223,9 @@ export function BackendForm({
           setDiscovered([]);
         }}
       />
-      <FormField
-        label={t('profiles.mcp.headers')}
+      <BackendHeadersField
         defaultValue={fields.current.headers}
-        multiline
-        className="min-h-28 leading-5"
-        autoCapitalize="none"
-        autoCorrect={false}
-        disabled={busy}
+        busy={busy}
         onChangeText={headers => {
           fields.current.headers = headers;
           setStatus(null);

@@ -792,6 +792,7 @@ describe('custom backend question targets', () => {
         askedModel: target,
         waiting: [],
         failed: i18n.t(errorKey),
+        failureKey: errorKey,
       });
       expect(await askedIn(opened)).toEqual({ text: 'custom question', model: target });
 
@@ -804,6 +805,7 @@ describe('custom backend question targets', () => {
         asked: 'custom question',
         askedModel: target,
         failed: i18n.t(errorKey),
+        failureKey: errorKey,
       });
 
       // Closing and restoring must not replace the remembered target with Kilo.
@@ -822,6 +824,128 @@ describe('custom backend question targets', () => {
     }
   );
 
+  it.each([
+    ['deleted', 'modelChat.backends.deletedBackend'],
+    ['edited', 'modelChat.backends.staleBackend'],
+  ] as const)(
+    'reports a pending tool change after an answering backend is %s and retains the queue',
+    async (mutation, errorKey) => {
+      backendState.profiles = [backend];
+      const target = backendTargetId(backend, 'same-model');
+      await releaseChat(opened);
+      opened = await startChat(place, target);
+      await say(opened, 'first', target);
+      await settled();
+      await say(opened, 'queued custom question', target);
+      await say(opened, 'queued Kilo question', 'kilo/one');
+      await refreshChatTools();
+
+      backendState.profiles = mutation === 'deleted' ? [] : [{ ...backend, revision: 2 }];
+      finish?.();
+      await settled();
+
+      expect(asked).toEqual([{ sessionId: 's1', text: 'first' }]);
+      expect(clonedWith).toBeUndefined();
+      expect(snapshotOf(opened)).toMatchObject({
+        model: target,
+        turns: [TURN],
+        status: 'idle',
+        asked: null,
+        askedModel: null,
+        waiting: ['queued custom question', 'queued Kilo question'],
+        failed: i18n.t(errorKey),
+        failureKey: errorKey,
+      });
+
+      // Retry reattempts the tool move without losing either queued target.
+      await retryChat(opened);
+      expect(snapshotOf(opened).failed).toBe(i18n.t(errorKey));
+      expect(snapshotOf(opened).waiting).toEqual([
+        'queued custom question',
+        'queued Kilo question',
+      ]);
+      expect(asked).toHaveLength(1);
+
+      // Only an explicit valid choice can move off the invalid backend.
+      await say(opened, 'explicit Kilo recovery', 'kilo/one');
+      await settled();
+      expect(snapshotOf(opened)).toMatchObject({
+        model: 'kilo/one',
+        failed: null,
+        failureKey: null,
+      });
+      finish?.();
+      await settled();
+
+      expect(asked.map(one => one.text)).toEqual(['first', 'explicit Kilo recovery']);
+      expect(snapshotOf(opened)).toMatchObject({
+        asked: 'queued custom question',
+        askedModel: target,
+        waiting: ['queued Kilo question'],
+        failed: i18n.t(errorKey),
+        failureKey: errorKey,
+      });
+      expect(await askedIn(snapshotOf(opened).sessionId)).toEqual({
+        text: 'queued custom question',
+        model: target,
+      });
+      await retryChat(opened);
+      expect(asked).toHaveLength(2);
+      expect(snapshotOf(opened).askedModel).toBe(target);
+
+      await say(opened, 'explicit replacement question', 'kilo/one');
+      await settled();
+      finish?.();
+      await settled();
+      expect(asked.map(one => one.text)).toEqual([
+        'first',
+        'explicit Kilo recovery',
+        'explicit replacement question',
+        'queued Kilo question',
+      ]);
+      expect(snapshotOf(opened)).toMatchObject({
+        model: 'kilo/one',
+        asked: 'queued Kilo question',
+        askedModel: 'kilo/one',
+        waiting: [],
+        failed: null,
+        failureKey: null,
+      });
+    }
+  );
+
+  it('retries a retained tool change explicitly when its original target is available again', async () => {
+    backendState.profiles = [backend];
+    const target = backendTargetId(backend, 'same-model');
+    await releaseChat(opened);
+    opened = await startChat(place, target);
+    await say(opened, 'first', target);
+    await settled();
+    await say(opened, 'second', target);
+    await refreshChatTools();
+    backendState.profiles = [];
+    finish?.();
+    await settled();
+    expect(snapshotOf(opened).failed).toBe(i18n.t('modelChat.backends.deletedBackend'));
+    expect(snapshotOf(opened).waiting).toEqual(['second']);
+
+    backendState.profiles = [backend];
+    // Becoming valid does not automatically send anything or select Kilo.
+    expect(asked.map(one => one.text)).toEqual(['first']);
+    await retryChat(opened);
+    await settled();
+
+    expect(asked.map(one => one.text)).toEqual(['first', 'second']);
+    expect(snapshotOf(opened)).toMatchObject({
+      model: target,
+      asked: 'second',
+      askedModel: target,
+      waiting: [],
+      failed: null,
+      failureKey: null,
+    });
+  });
+
   it('reports a failure after a move on the resulting session and retries there', async () => {
     backendState.profiles = [backend];
     const target = backendTargetId(backend, 'same-model');
@@ -836,6 +960,7 @@ describe('custom backend question targets', () => {
       asked: 'custom question',
       askedModel: target,
       failed: 'session cleanup failed after move',
+      failureKey: 'common.somethingWentWrong',
     });
     expect(await askedIn('s1')).toBeNull();
     expect(await askedIn('s2')).toEqual({ text: 'custom question', model: target });
@@ -847,7 +972,12 @@ describe('custom backend question targets', () => {
     expect(asked).toEqual([{ sessionId: 's2', text: 'custom question' }]);
     finish?.();
     await settled();
-    expect(snapshotOf(opened)).toMatchObject({ asked: null, askedModel: null, failed: null });
+    expect(snapshotOf(opened)).toMatchObject({
+      asked: null,
+      askedModel: null,
+      failed: null,
+      failureKey: null,
+    });
     expect(await askedIn('s2')).toBeNull();
   });
 

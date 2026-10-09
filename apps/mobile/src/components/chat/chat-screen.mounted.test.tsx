@@ -21,6 +21,9 @@ import { backendTargetId } from '@/lib/chat/backend-target';
 const state = vi.hoisted(() => ({
   status: 'opening' as 'opening' | 'idle' | 'working',
   messages: [] as { info: { id: string } }[],
+  failed: null as string | null,
+  failureKey: null as string | null,
+  retry: vi.fn(),
 }));
 
 type AlertAction = { onPress?: () => void };
@@ -80,11 +83,12 @@ vi.mock('@/lib/chat/use-chat', () => ({
       status: state.status,
       asked: null,
       waiting: [],
-      failed: null,
+      failed: state.failed,
+      failureKey: state.failureKey,
     },
     send: vi.fn(),
     stop: vi.fn(),
-    retry: vi.fn(),
+    retry: state.retry,
   }),
 }));
 vi.mock('@/lib/chat/turns', () => ({ asMessages: () => state.messages }));
@@ -126,6 +130,8 @@ vi.mock('@/components/ui/icons', () => ({
   Server: 'Server',
 }));
 vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
@@ -153,6 +159,9 @@ let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefine
 beforeEach(() => {
   state.status = 'opening';
   state.messages = [];
+  state.failed = null;
+  state.failureKey = null;
+  state.retry.mockClear();
   backendUi.profiles = [];
   backendUi.alert.mockClear();
 });
@@ -168,6 +177,10 @@ async function mount(): Promise<ReactTestRenderer> {
 
 const count = (tree: ReactTestRenderer, type: string): number =>
   tree.root.findAll(node => (node.type as string) === type).length;
+
+function isHandler(value: unknown): value is (...args: unknown[]) => unknown {
+  return typeof value === 'function';
+}
 
 describe('the chat transcript while it opens', () => {
   it('shows a loading transcript instead of the empty state', async () => {
@@ -235,5 +248,33 @@ describe('backend context-transfer approval', () => {
     });
     expect(backendUi.alert).toHaveBeenCalledTimes(2);
     expect(composer().model).toBe(target);
+  });
+});
+
+describe('a retained chat failure', () => {
+  it('shows only fixed copy and retries the retained work', async () => {
+    state.status = 'idle';
+    state.failed = 'Bearer provider-secret from a raw provider body';
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    const tree = await mount();
+    const status = tree.root.find(node => (node.type as string) === 'AccessibleStatus');
+    expect(status.props.message).toBe(
+      'This chat backend was deleted. Choose another backend to continue.'
+    );
+    expect(
+      tree.root.findAll(node =>
+        Object.values(node.props).some(
+          value => typeof value === 'string' && value.includes('provider-secret')
+        )
+      )
+    ).toHaveLength(0);
+    const { onPress } = tree.root.find(node => (node.type as string) === 'Button').props;
+    if (!isHandler(onPress)) {
+      throw new TypeError('Retry button has no press handler');
+    }
+    act(() => {
+      onPress();
+    });
+    expect(state.retry).toHaveBeenCalledOnce();
   });
 });

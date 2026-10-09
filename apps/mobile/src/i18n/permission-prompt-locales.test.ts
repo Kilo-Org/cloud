@@ -10,7 +10,8 @@ import {
 
 const locales = buildPermissionPromptLocales(copy);
 
-// Mirrors the five plugin options in app.config.ts. The en override must match
+// Mirrors the five plugin options and local-network Info.plist value in app.config.ts.
+// The en override must match
 // the value the system resolves — including `$(PRODUCT_NAME)` expanded to the
 // product name — so the base Info.plist value and the .lproj string never
 // drift. `.lproj/InfoPlist.strings` is not build-expanded, so the location copy
@@ -23,6 +24,8 @@ const ENGLISH_PROMPTS = {
   NSLocationWhenInUseUsageDescription: 'Allow Kilo to use your location to set up local weather.',
   NSUserTrackingUsageDescription:
     'This identifier is used to measure the effectiveness of advertising campaigns.',
+  NSLocalNetworkUsageDescription:
+    'Allow Kilo to connect to the local model server you configure for Chat.',
 };
 
 describe('buildPermissionPromptLocales', () => {
@@ -30,7 +33,7 @@ describe('buildPermissionPromptLocales', () => {
     expect(Object.keys(locales).toSorted()).toEqual(SUPPORTED_LANGUAGES.toSorted());
   });
 
-  it.each(SUPPORTED_LANGUAGES)('fills all five keys in %s', tag => {
+  it.each(SUPPORTED_LANGUAGES)('fills all six keys in %s', tag => {
     for (const key of PERMISSION_PROMPT_PLIST_KEYS) {
       expect(locales[tag].ios[key].trim().length, `${tag}.${key}`).toBeGreaterThan(0);
     }
@@ -61,6 +64,22 @@ describe('buildPermissionPromptLocales', () => {
     const incomplete: PermissionPromptCopy = rest;
     expect(() => buildPermissionPromptLocales(incomplete)).toThrow(
       'Missing permission prompt copy for language: de'
+    );
+  });
+
+  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
+    'provides translated local-network copy in %s',
+    tag => {
+      expect(locales[tag].ios.NSLocalNetworkUsageDescription).not.toBe(
+        ENGLISH_PROMPTS.NSLocalNetworkUsageDescription
+      );
+    }
+  );
+
+  it('throws when local-network copy is missing', () => {
+    const { NSLocalNetworkUsageDescription: _localNetwork, ...de } = copy.de;
+    expect(() => buildPermissionPromptLocales({ ...copy, de })).toThrow(
+      'Missing or empty permission prompt copy for de.NSLocalNetworkUsageDescription'
     );
   });
 

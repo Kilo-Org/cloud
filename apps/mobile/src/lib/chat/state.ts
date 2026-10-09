@@ -34,6 +34,8 @@ export type ChatState = {
   readonly waiting: readonly string[];
   /** Why the last question ended with no answer, for the log rather than the screen. */
   readonly failed: string | null;
+  /** A fixed localization key safe to display, never a provider's raw error. */
+  readonly failureKey: string | null;
 };
 
 /**
@@ -101,6 +103,7 @@ export const NOTHING = {
   askedModel: null,
   waiting: [] as readonly string[],
   failed: null,
+  failureKey: null,
 } satisfies Omit<ChatState, 'sessionId' | 'model' | 'status'>;
 
 function publish(sessionId: string): void {

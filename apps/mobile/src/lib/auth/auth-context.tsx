@@ -537,6 +537,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               await deleteStoredValue(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
+            deleteAccountMetadata(CHAT_BACKENDS_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
             // The Personal-choice marker is account-scoped selection state
             // beside the organization key. Clearing it here (and never on the

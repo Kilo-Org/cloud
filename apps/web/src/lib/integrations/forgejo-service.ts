@@ -314,7 +314,7 @@ export async function disconnectForgejoIntegration(owner: Owner) {
       .update(platform_integrations)
       .set({
         integration_status: INTEGRATION_STATUS.SUSPENDED,
-        disconnected_at: new Date().toISOString(),
+        suspended_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, integration.id));

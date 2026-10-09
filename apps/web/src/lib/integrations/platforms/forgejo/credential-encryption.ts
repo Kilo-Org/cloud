@@ -2,8 +2,8 @@ import 'server-only';
 
 import { createHash, createPublicKey } from 'node:crypto';
 import {
-  BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
-  BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY,
+  FORGEJO_OAUTH_CREDENTIAL_ACTIVE_KEY_ID,
+  FORGEJO_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY,
 } from '@kilocode/web-shared/lib/config.server';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 
@@ -21,8 +21,8 @@ export class ForgejoCredentialEncryptionError extends Error {
 }
 
 function requireCredentialEncryptionKey(): CredentialEncryptionKey {
-  const keyId = BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID;
-  const encodedPublicKey = BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY;
+  const keyId = FORGEJO_OAUTH_CREDENTIAL_ACTIVE_KEY_ID;
+  const encodedPublicKey = FORGEJO_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY;
   if (!keyId || keyId.trim() !== keyId || !encodedPublicKey) {
     throw new ForgejoCredentialEncryptionError();
   }
@@ -75,8 +75,8 @@ export type EncryptedForgejoOAuthCredentials = {
 function buildForgejoOAuthCredentialAad(
   input: EncryptForgejoOAuthCredentialsInput,
   kind: 'access' | 'refresh' | 'oauth-client-secret'
-): Record<string, unknown> {
-  return {
+): string {
+  return JSON.stringify({
     kind,
     credential_id: input.credentialId,
     integration_id: input.integrationId,
@@ -84,7 +84,7 @@ function buildForgejoOAuthCredentialAad(
     authorized_by_user_id: input.authorizedByUserId,
     credential_version: input.credentialVersion,
     platform: 'forgejo',
-  };
+  });
 }
 
 const FORGEJO_OAUTH_CREDENTIAL_ENVELOPE_SCHEME = 'forgejo-oauth-credential-v1';

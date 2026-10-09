@@ -76,7 +76,6 @@ export async function storeGiteaOAuthIntegration(
     credentialId,
     integrationId,
     providerBaseUrl: input.providerBaseUrl,
-    owner: input.owner,
     authorizedByUserId: input.authorizedByUserId,
     credentialVersion,
     accessToken: input.accessToken,

@@ -3,6 +3,8 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import * as http from 'http';
+import * as https from 'https';
 import {
   buildGiteaUrl,
   DEFAULT_GITEA_INSTANCE_URL,
@@ -22,7 +24,7 @@ const MAX_GITEA_REDIRECTS = 5;
 const MAX_GITEA_RESPONSE_BYTES = 10 * 1024 * 1024;
 const GITEA_REQUEST_TIMEOUT_MS = 30_000;
 
-const GITEA_OAUTH_SCOPES = ['read:user', 'repo', 'openid', 'profile', 'email'] as const;
+const GITEA_OAUTH_SCOPES = ['read:user', 'read:repository', 'read:organization', 'openid', 'profile', 'email'] as const;
 
 export type GiteaOAuthCredentials = {
   clientId: string;
@@ -64,6 +66,7 @@ export type GiteaBranch = {
     url: string;
   };
   protected: boolean;
+  default?: boolean;
 };
 
 async function fetchGitea(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
@@ -147,20 +150,94 @@ function buildRedirectRequestInit(
 type ResolvedGiteaUrl = GiteaResolvedUrl & { address: string };
 
 function fetchGiteaBoundToAddress(
-  { url, address, family }: ResolvedGiteaUrl,
+  resolvedUrl: GiteaResolvedUrl & { address: string },
   init?: RequestInit
 ): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    headers: {
-      ...init?.headers,
-    },
-    next: {
-      // Use the bound address for connection
-    },
-  }).catch(() => {
-    // Fallback to standard fetch if the bound address approach fails
-    return fetch(url, init);
+  const reqUrl = resolvedUrl.url;
+  const request = reqUrl.protocol === 'https:' ? https.request : http.request;
+  const headers = headersInitToRecord(init?.headers);
+  const body = bodyInitToBuffer(init?.body);
+
+  if (body && !hasHeader(headers, 'content-length')) {
+    headers['content-length'] = String(Buffer.byteLength(body));
+  }
+
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        protocol: reqUrl.protocol,
+        hostname: reqUrl.hostname,
+        port: reqUrl.port || undefined,
+        path: `${reqUrl.pathname}${reqUrl.search}`,
+        method: init?.method ?? 'GET',
+        headers,
+        family: resolvedUrl.family,
+        lookup: (_hostname, _options, callback) =>
+          callback(null, resolvedUrl.address, resolvedUrl.family ?? 0),
+        ...(reqUrl.protocol === 'https:' ? { servername: reqUrl.hostname } : {}),
+      },
+      response => {
+        const chunks: Buffer[] = [];
+        let responseBytes = 0;
+        response.on('data', chunk => {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          responseBytes += buffer.byteLength;
+          if (responseBytes > MAX_GITEA_RESPONSE_BYTES) {
+            const error = new Error('Gitea response exceeded size limit');
+            response.destroy(error);
+            req.destroy(error);
+            reject(error);
+            return;
+          }
+
+          chunks.push(buffer);
+        });
+        response.on('error', reject);
+        response.on('end', () => {
+          try {
+            const status = response.statusCode ?? 500;
+            const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
+            resolve(
+              new Response(body, {
+                status,
+                statusText: response.statusMessage,
+                headers: responseHeadersToHeaders(response.headers),
+              })
+            );
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.setTimeout(GITEA_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error('Gitea request timed out'));
+    });
+
+    const signal = init?.signal;
+    if (signal) {
+      if (signal.aborted) {
+        req.destroy(signal.reason);
+        reject(signal.reason);
+        return;
+      }
+
+      signal.addEventListener(
+        'abort',
+        () => {
+          req.destroy(signal.reason);
+          reject(signal.reason);
+        },
+        { once: true }
+      );
+    }
+
+    if (body) {
+      req.write(body);
+    }
+    req.end();
   });
 }
 
@@ -169,17 +246,14 @@ function isGiteaRedirectStatus(status: number): boolean {
 }
 
 function headersInitToRecord(headers: HeadersInit | undefined): Record<string, string> {
-  if (!headers) return {};
-  if (headers instanceof Headers) {
-    return Object.fromEntries(headers.entries());
-  }
-  if (Array.isArray(headers)) {
-    return Object.fromEntries(headers);
-  }
-  return headers;
+  const record: Record<string, string> = {};
+  new Headers(headers).forEach((value, key) => {
+    record[key] = value;
+  });
+  return record;
 }
 
-function bodyInitToBuffer(body: BodyInit | undefined): Buffer | undefined {
+function bodyInitToBuffer(body: BodyInit | null | undefined): Buffer | undefined {
   if (body == null) return undefined;
   if (typeof body === 'string') return Buffer.from(body);
   if (Buffer.isBuffer(body)) return body;
@@ -198,6 +272,20 @@ function hasHeader(headers: Record<string, string>, name: string): boolean {
 
 function responseStatusForbidsBody(status: number): boolean {
   return status === 204 || status === 304;
+}
+
+function responseHeadersToHeaders(headers: http.IncomingHttpHeaders): Headers {
+  const responseHeaders = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        responseHeaders.append(key, item);
+      }
+    } else if (value !== undefined && value !== null && typeof value === 'string') {
+      responseHeaders.set(key, value);
+    }
+  }
+  return responseHeaders;
 }
 
 export function buildGiteaOAuthUrl(
@@ -391,9 +479,94 @@ export async function fetchGiteaBranches(
   return branches;
 }
 
+export function calculateTokenExpiry(createdAt: number, expiresIn: number): string {
+  const expiresAtMs = (createdAt + expiresIn) * 1000;
+  return new Date(expiresAtMs).toISOString();
+}
+
 export { DEFAULT_GITEA_INSTANCE_URL, normalizeGiteaInstanceUrl };
-export { validateGiteaInstance, type GiteaInstanceValidationResult };
-export { calculateTokenExpiry };
+
+export type GiteaInstanceValidationResult = {
+  valid: boolean;
+  version?: string;
+  error?: string;
+};
+
+/**
+ * Uses the public /api/v1/version endpoint which doesn't require authentication.
+ * This allows users to verify their self-hosted Gitea URL before attempting OAuth.
+ */
+export async function validateGiteaInstance(
+  instanceUrl: string
+): Promise<GiteaInstanceValidationResult> {
+  let normalizedUrl: string;
+  try {
+    normalizedUrl = normalizeGiteaInstanceUrl(instanceUrl);
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof GiteaInstanceUrlError ? error.message : 'Invalid URL format.',
+    };
+  }
+
+  try {
+    const response = await fetchGitea(buildGiteaUrl(normalizedUrl, '/api/v1/version'), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      logExceptInTest('[validateGiteaInstance] Invalid response from instance', {
+        instanceUrl: normalizedUrl,
+        status: response.status,
+      });
+
+      return {
+        valid: false,
+        error: `Gitea instance returned status ${response.status}. Please verify the URL.`,
+      };
+    }
+
+    const data = (await response.json()) as { version: string };
+
+    if (!data.version || typeof data.version !== 'string') {
+      return {
+        valid: false,
+        error: 'Response does not appear to be from a Gitea instance.',
+      };
+    }
+
+    logExceptInTest('[validateGiteaInstance] Valid Gitea instance found', {
+      instanceUrl: normalizedUrl,
+      version: data.version,
+    });
+
+    return {
+      valid: true,
+      version: data.version,
+    };
+  } catch (error) {
+    if (error instanceof GiteaInstanceUrlError) {
+      return {
+        valid: false,
+        error: error.message,
+      };
+    }
+
+    logExceptInTest('[validateGiteaInstance] Error validating instance', {
+      instanceUrl: normalizedUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      valid: false,
+      error: 'Failed to validate Gitea instance. Please verify the URL is correct and accessible.',
+    };
+  }
+}
+
 export function fetchGiteaProjects(...args: Parameters<typeof fetchGiteaRepos>) {
   return fetchGiteaRepos(...args);
 }

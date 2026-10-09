@@ -90,8 +90,12 @@ export async function fetchGiteaCredential(
   selector: GiteaCredentialSelector
 ): Promise<GiteaCredentialBrokerResult> {
   const token = await generateBoundedInternalServiceToken(
-    GITEA_CREDENTIAL_BROKER_AUDIENCE,
-    TOKEN_EXPIRY.SECONDS(30)
+    actor.userId,
+    {
+      audience: GITEA_CREDENTIAL_BROKER_AUDIENCE,
+      expiresIn: TOKEN_EXPIRY.oneHour,
+      organizationId: actor.organizationId,
+    }
   );
 
   const apiUrl = new URL(`${GIT_TOKEN_SERVICE_API_URL}/gitea-credential`);

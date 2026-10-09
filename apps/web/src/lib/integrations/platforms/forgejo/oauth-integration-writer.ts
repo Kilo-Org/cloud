@@ -78,7 +78,6 @@ export async function storeForgejoOAuthIntegration(
     credentialId,
     integrationId,
     providerBaseUrl: input.providerBaseUrl,
-    owner: input.owner,
     authorizedByUserId: input.authorizedByUserId,
     credentialVersion,
     accessToken: input.accessToken,

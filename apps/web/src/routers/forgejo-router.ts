@@ -16,7 +16,11 @@ import {
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
-import { getForgejoIntegration, getValidForgejoProjectAccessToken } from '@/lib/integrations/forgejo-service';
+import {
+  getForgejoIntegration,
+  getValidForgejoProjectAccessToken,
+} from '@/lib/integrations/forgejo-service';
+import { validateForgejoInstance } from '@/lib/integrations/platforms/forgejo/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 export const forgejoRouter = createTRPCRouter({
@@ -154,4 +158,18 @@ export const forgejoRouter = createTRPCRouter({
         input.repoPath
       );
     }),
-});
+
+    /**
+     * Validates that a URL points to a valid Forgejo instance.
+     * Used to verify self-hosted Forgejo URLs before OAuth setup.
+     */
+    validateInstance: baseProcedure
+      .input(
+        z.object({
+          instanceUrl: z.string().url(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return validateForgejoInstance(input.instanceUrl);
+      }),
+  });

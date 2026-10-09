@@ -16,7 +16,11 @@ import {
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
-import { getGiteaIntegration, getValidGiteaProjectAccessToken } from '@/lib/integrations/gitea-service';
+import {
+  getGiteaIntegration,
+  getValidGiteaProjectAccessToken,
+} from '@/lib/integrations/gitea-service';
+import { validateGiteaInstance } from '@/lib/integrations/platforms/gitea/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 export const giteaRouter = createTRPCRouter({
@@ -154,4 +158,18 @@ export const giteaRouter = createTRPCRouter({
         input.repoPath
       );
     }),
-});
+
+    /**
+     * Validates that a URL points to a valid Gitea instance.
+     * Used to verify self-hosted Gitea URLs before OAuth setup.
+     */
+    validateInstance: baseProcedure
+      .input(
+        z.object({
+          instanceUrl: z.string().url(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return validateGiteaInstance(input.instanceUrl);
+      }),
+  });

@@ -90,8 +90,12 @@ export async function fetchForgejoCredential(
   selector: ForgejoCredentialSelector
 ): Promise<ForgejoCredentialBrokerResult> {
   const token = await generateBoundedInternalServiceToken(
-    FORGEJO_CREDENTIAL_BROKER_AUDIENCE,
-    TOKEN_EXPIRY.SECONDS(30)
+    actor.userId,
+    {
+      audience: FORGEJO_CREDENTIAL_BROKER_AUDIENCE,
+      expiresIn: TOKEN_EXPIRY.oneHour,
+      organizationId: actor.organizationId,
+    }
   );
 
   const apiUrl = new URL(`${GIT_TOKEN_SERVICE_API_URL}/forgejo-credential`);

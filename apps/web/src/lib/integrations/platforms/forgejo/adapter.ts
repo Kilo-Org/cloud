@@ -3,6 +3,8 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import * as http from 'http';
+import * as https from 'https';
 import {
   buildForgejoUrl,
   DEFAULT_FORGEJO_INSTANCE_URL,
@@ -22,7 +24,7 @@ const MAX_FORGEJO_REDIRECTS = 5;
 const MAX_FORGEJO_RESPONSE_BYTES = 10 * 1024 * 1024;
 const FORGEJO_REQUEST_TIMEOUT_MS = 30_000;
 
-const FORGEJO_OAUTH_SCOPES = ['read:user', 'repo', 'openid', 'profile', 'email'] as const;
+const FORGEJO_OAUTH_SCOPES = ['read:user', 'read:repository', 'read:organization', 'openid', 'profile', 'email'] as const;
 
 export type ForgejoOAuthCredentials = {
   clientId: string;
@@ -64,6 +66,7 @@ export type ForgejoBranch = {
     url: string;
   };
   protected: boolean;
+  default?: boolean;
 };
 
 async function fetchForgejo(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
@@ -144,24 +147,138 @@ function buildRedirectRequestInit(
   return { ...init, headers };
 }
 
-type ResolvedForgejoUrl = ForgejoResolvedUrl & { address: string };
-
 function fetchForgejoBoundToAddress(
-  { url, address, family }: ResolvedForgejoUrl,
+  resolvedUrl: ForgejoResolvedUrl & { address: string },
   init?: RequestInit
 ): Promise<Response> {
-  return fetch(url, {
-    ...init,
-    headers: {
-      ...init?.headers,
-    },
-    next: {
-      // Use the bound address for connection
-    },
-  }).catch(() => {
-    // Fallback to standard fetch if the bound address approach fails
-    return fetch(url, init);
+  const reqUrl = resolvedUrl.url;
+  const request = reqUrl.protocol === 'https:' ? https.request : http.request;
+  const headers = headersInitToRecord(init?.headers);
+  const body = bodyInitToBuffer(init?.body);
+
+  if (body && !hasHeader(headers, 'content-length')) {
+    headers['content-length'] = String(Buffer.byteLength(body));
+  }
+
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        protocol: reqUrl.protocol,
+        hostname: reqUrl.hostname,
+        port: reqUrl.port || undefined,
+        path: `${reqUrl.pathname}${reqUrl.search}`,
+        method: init?.method ?? 'GET',
+        headers,
+        family: resolvedUrl.family,
+        lookup: (_hostname, _options, callback) =>
+          callback(null, resolvedUrl.address, resolvedUrl.family ?? 0),
+        ...(reqUrl.protocol === 'https:' ? { servername: reqUrl.hostname } : {}),
+      },
+      response => {
+        const chunks: Buffer[] = [];
+        let responseBytes = 0;
+        response.on('data', chunk => {
+          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          responseBytes += buffer.byteLength;
+          if (responseBytes > MAX_FORGEJO_RESPONSE_BYTES) {
+            const error = new Error('Forgejo response exceeded size limit');
+            response.destroy(error);
+            req.destroy(error);
+            reject(error);
+            return;
+          }
+
+          chunks.push(buffer);
+        });
+        response.on('error', reject);
+        response.on('end', () => {
+          try {
+            const status = response.statusCode ?? 500;
+            const body = responseStatusForbidsBody(status) ? null : Buffer.concat(chunks);
+            resolve(
+              new Response(body, {
+                status,
+                statusText: response.statusMessage,
+                headers: responseHeadersToHeaders(response.headers),
+              })
+            );
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.setTimeout(FORGEJO_REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error('Forgejo request timed out'));
+    });
+
+    const signal = init?.signal;
+    if (signal) {
+      if (signal.aborted) {
+        req.destroy(signal.reason);
+        reject(signal.reason);
+        return;
+      }
+
+      signal.addEventListener(
+        'abort',
+        () => {
+          req.destroy(signal.reason);
+          reject(signal.reason);
+        },
+        { once: true }
+      );
+    }
+
+    if (body) {
+      req.write(body);
+    }
+    req.end();
   });
+}
+
+function headersInitToRecord(headers: HeadersInit | undefined): Record<string, string> {
+  const record: Record<string, string> = {};
+  new Headers(headers).forEach((value, key) => {
+    record[key] = value;
+  });
+  return record;
+}
+
+function bodyInitToBuffer(body: BodyInit | null | undefined): Buffer | undefined {
+  if (body == null) return undefined;
+  if (typeof body === 'string') return Buffer.from(body);
+  if (Buffer.isBuffer(body)) return body;
+  if (body instanceof Uint8Array) return Buffer.from(body);
+  if (body instanceof ArrayBuffer) return Buffer.from(body);
+  if (body instanceof FormData) {
+    return undefined;
+  }
+  return undefined;
+}
+
+function hasHeader(headers: Record<string, string>, name: string): boolean {
+  return Object.prototype.hasOwnProperty.call(headers, name);
+}
+
+function responseStatusForbidsBody(status: number): boolean {
+  return status === 204 || status === 304;
+}
+
+function responseHeadersToHeaders(headers: http.IncomingHttpHeaders): Headers {
+  const responseHeaders = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        responseHeaders.append(key, item);
+      }
+    } else if (value !== undefined && value !== null && typeof value === 'string') {
+      responseHeaders.set(key, value);
+    }
+  }
+  return responseHeaders;
 }
 
 export function buildForgejoOAuthUrl(
@@ -382,9 +499,94 @@ export async function fetchForgejoBranches(
   return branches;
 }
 
+export function calculateTokenExpiry(createdAt: number, expiresIn: number): string {
+  const expiresAtMs = (createdAt + expiresIn) * 1000;
+  return new Date(expiresAtMs).toISOString();
+}
+
 export { DEFAULT_FORGEJO_INSTANCE_URL, normalizeForgejoInstanceUrl };
-export { validateForgejoInstance, type ForgejoInstanceValidationResult };
-export { calculateTokenExpiry };
+
+export type ForgejoInstanceValidationResult = {
+  valid: boolean;
+  version?: string;
+  error?: string;
+};
+
+/**
+ * Uses the public /api/v1/version endpoint which doesn't require authentication.
+ * This allows users to verify their self-hosted Forgejo URL before attempting OAuth.
+ */
+export async function validateForgejoInstance(
+  instanceUrl: string
+): Promise<ForgejoInstanceValidationResult> {
+  let normalizedUrl: string;
+  try {
+    normalizedUrl = normalizeForgejoInstanceUrl(instanceUrl);
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof ForgejoInstanceUrlError ? error.message : 'Invalid URL format.',
+    };
+  }
+
+  try {
+    const response = await fetchForgejo(buildForgejoUrl(normalizedUrl, '/api/v1/version'), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      logExceptInTest('[validateForgejoInstance] Invalid response from instance', {
+        instanceUrl: normalizedUrl,
+        status: response.status,
+      });
+
+      return {
+        valid: false,
+        error: `Forgejo instance returned status ${response.status}. Please verify the URL.`,
+      };
+    }
+
+    const data = (await response.json()) as { version: string };
+
+    if (!data.version || typeof data.version !== 'string') {
+      return {
+        valid: false,
+        error: 'Response does not appear to be from a Forgejo instance.',
+      };
+    }
+
+    logExceptInTest('[validateForgejoInstance] Valid Forgejo instance found', {
+      instanceUrl: normalizedUrl,
+      version: data.version,
+    });
+
+    return {
+      valid: true,
+      version: data.version,
+    };
+  } catch (error) {
+    if (error instanceof ForgejoInstanceUrlError) {
+      return {
+        valid: false,
+        error: error.message,
+      };
+    }
+
+    logExceptInTest('[validateForgejoInstance] Error validating instance', {
+      instanceUrl: normalizedUrl,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return {
+      valid: false,
+      error: 'Failed to validate Forgejo instance. Please verify the URL is correct and accessible.',
+    };
+  }
+}
+
 export function fetchForgejoProjects(...args: Parameters<typeof fetchForgejoRepos>) {
   return fetchForgejoRepos(...args);
 }

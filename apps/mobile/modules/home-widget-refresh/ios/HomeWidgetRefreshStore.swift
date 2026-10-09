@@ -9,7 +9,10 @@ enum HomeWidgetRefreshStore {
   static let widgetName = "ActiveAgentsWidget"
   static let service = "com.kilocode.home-widget-refresh"
   static let group = Bundle.main.object(forInfoDictionaryKey: "ExpoWidgetsAppGroupIdentifier") as? String ?? "group.com.kilocode.kiloapp"
-  static let defaults = UserDefaults(suiteName: group)!
+  /// Nil when the app group is unusable; `locked` then skips the work instead of trapping.
+  static let defaults = UserDefaults(suiteName: group)
+  static let lockURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)?
+    .appendingPathComponent("home-widget-refresh.lock")
   static let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HomeWidgetKeychainAccessGroup") as? String
   static let session: URLSession = {
     let config = URLSessionConfiguration.ephemeral
@@ -18,7 +21,7 @@ enum HomeWidgetRefreshStore {
     return URLSession(configuration: config, delegate: HomeWidgetNetworkDelegate(), delegateQueue: nil)
   }()
   static var layoutDirection: LayoutDirection {
-    let locale = defaults.string(forKey: "homeWidgetLocale") ?? Locale.current.identifier
+    let locale = defaults?.string(forKey: "homeWidgetLocale") ?? Locale.current.identifier
     let language = locale.replacingOccurrences(of: "_", with: "-").split(separator: "-").first.map(String.init) ?? "en"
     return Locale.characterDirection(forLanguage: language) == .rightToLeft ? .rightToLeft : .leftToRight
   }
@@ -28,11 +31,11 @@ enum HomeWidgetRefreshStore {
     return query
   }
 
-  static func saveJSON(_ value: Any?, key: String) {
+  static func saveJSON(_ defaults: UserDefaults, _ value: Any?, key: String) {
     guard let value, let data = try? JSONSerialization.data(withJSONObject: value) else { return }
     defaults.set(data, forKey: key)
   }
-  static func readJSON(_ key: String) -> [String: Any]? {
+  static func readJSON(_ defaults: UserDefaults, _ key: String) -> [String: Any]? {
     guard let bytes = defaults.data(forKey: key) else { return nil }
     return (try? JSONSerialization.jsonObject(with: bytes)) as? [String: Any]
   }
@@ -44,16 +47,18 @@ enum HomeWidgetRefreshStore {
     return value
   }
 
-  static func locked<T>(_ body: () throws -> T) rethrows -> T {
-    let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)!
-      .appendingPathComponent("home-widget-refresh.lock")
-    let fd = open(url.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
-    precondition(fd >= 0, "Cannot lock widget state")
+  /// Runs `body` under the cross-process lock, or returns nil without running it when the
+  /// app group's defaults, container or lock file are unavailable (a misprovisioned build).
+  @discardableResult
+  static func locked<T>(_ body: (UserDefaults) throws -> T) rethrows -> T? {
+    guard let defaults, let lockURL else { return nil }
+    let fd = open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+    guard fd >= 0 else { return nil }
     flock(fd, LOCK_EX)
     defer { flock(fd, LOCK_UN); close(fd) }
     // UserDefaults caches across processes; refresh under the cross-process lock.
     defaults.synchronize()
-    return try body()
+    return try body(defaults)
   }
 
   static func context() -> [String: Any]? {
@@ -67,10 +72,10 @@ enum HomeWidgetRefreshStore {
   }
 
   static func configure(_ config: [String: Any]) throws {
-    try locked {
+    let stored: Void? = try locked { defaults in
       let previous = context()
       if previous?["scopeKey"] as? String != config["scopeKey"] as? String ||
-         previous?["accountEpoch"] as? Int != config["accountEpoch"] as? Int { clearLocked() }
+         previous?["accountEpoch"] as? Int != config["accountEpoch"] as? Int { clearLocked(defaults) }
       let data = try JSONSerialization.data(withJSONObject: config)
       var query = keyQuery
       query[kSecValueData as String] = data
@@ -81,17 +86,20 @@ enum HomeWidgetRefreshStore {
       }
       defaults.set(UUID().uuidString, forKey: "homeWidgetGeneration")
       defaults.removeObject(forKey: "homeWidgetTerminalFence")
-      saveJSON(config["data"], key: "homeWidgetData")
-      saveJSON(config["home"], key: "homeWidgetPresentation")
+      saveJSON(defaults, config["data"], key: "homeWidgetData")
+      saveJSON(defaults, config["home"], key: "homeWidgetPresentation")
       defaults.set(config["refreshAt"], forKey: "homeWidgetRefreshAt")
       defaults.set(config["locale"], forKey: "homeWidgetLocale")
       defaults.set(max(900, (config["refreshAt"] as? Double ?? 0) / 1000 - Date().timeIntervalSince1970), forKey: "homeWidgetRefreshDelay")
       defaults.synchronize()
     }
+    guard stored != nil else {
+      throw NSError(domain: service, code: 3, userInfo: [NSLocalizedDescriptionKey: "Widget storage unavailable"])
+    }
     WidgetCenter.shared.reloadTimelines(ofKind: widgetName)
   }
 
-  static func clearLocked() {
+  static func clearLocked(_ defaults: UserDefaults) {
     SecItemDelete(keyQuery as CFDictionary)
     defaults.set(UUID().uuidString, forKey: "homeWidgetGeneration")
     for key in ["homeWidgetData", "homeWidgetPresentation", "homeWidgetRefreshAt", "homeWidgetRefreshDelay", "homeWidgetTerminalFence", "__expo_widgets_\(widgetName)_timeline"] {
@@ -99,15 +107,19 @@ enum HomeWidgetRefreshStore {
     }
     defaults.synchronize()
   }
-  static func clear() { locked { clearLocked() }; WidgetCenter.shared.reloadTimelines(ofKind: widgetName) }
+  static func clear() {
+    // Without the group container there is nothing else to clear, but the credential still goes.
+    if locked({ clearLocked($0) }) == nil { SecItemDelete(keyQuery as CFDictionary) }
+    WidgetCenter.shared.reloadTimelines(ofKind: widgetName)
+  }
   static func fixture(_ enabled: Bool) {
-    locked {
+    locked { defaults in
       defaults.set(enabled, forKey: "homeWidgetFixture")
       defaults.set(UUID().uuidString, forKey: "homeWidgetGeneration")
       defaults.synchronize()
     }
   }
-  static func current(_ config: [String: Any], _ generation: String) -> Bool {
+  static func current(_ defaults: UserDefaults, _ config: [String: Any], _ generation: String) -> Bool {
     guard !defaults.bool(forKey: "homeWidgetFixture"),
           defaults.string(forKey: "homeWidgetGeneration") == generation,
           let latest = context() ?? defaults.dictionary(forKey: "homeWidgetTerminalFence") else { return false }
@@ -132,11 +144,11 @@ enum HomeWidgetRefreshStore {
   }
 
   static func refresh() async {
-    let captured: ([String: Any], String)? = locked {
+    let captured = locked { defaults -> ([String: Any], String)? in
       guard !defaults.bool(forKey: "homeWidgetFixture"), let config = context(),
             let generation = defaults.string(forKey: "homeWidgetGeneration") else { return nil }
       return (config, generation)
-    }
+    } ?? nil
     guard let (config, generation) = captured,
           let request = request(config) else { return }
     do {
@@ -144,9 +156,9 @@ enum HomeWidgetRefreshStore {
       guard let http = response as? HTTPURLResponse else { return }
       // Only an authentication refusal is terminal; 403 and every other failure keep retained content.
       if http.statusCode == 401 {
-        locked {
-          if current(config, generation) {
-            clearLocked()
+        locked { defaults in
+          if current(defaults, config, generation) {
+            clearLocked(defaults)
             defaults.set(["scopeKey": config["scopeKey"]!, "accountEpoch": config["accountEpoch"]!], forKey: "homeWidgetTerminalFence")
             let copy = config["copy"] as? [String: String] ?? [:]
             defaults.set([["timestamp": Int(Date().timeIntervalSince1970 * 1000),
@@ -164,12 +176,12 @@ enum HomeWidgetRefreshStore {
             let details = payload["details"] as? [String: Any],
             let home = payload["home"] as? [String: Any],
             let refreshAt = payload["refreshAt"] as? Double else { return }
-      locked {
-        guard current(config, generation) else { return }
-        let oldSnapshot = readJSON("homeWidgetData")?["snapshot"] as? [String: Any]
+      locked { defaults in
+        guard current(defaults, config, generation) else { return }
+        let oldSnapshot = readJSON(defaults, "homeWidgetData")?["snapshot"] as? [String: Any]
         if let oldAt = oldSnapshot?["updatedAt"] as? String, let newAt = snapshot["updatedAt"] as? String, newAt < oldAt { return }
-        saveJSON(["snapshot": snapshot, "details": details], key: "homeWidgetData")
-        saveJSON(home, key: "homeWidgetPresentation")
+        saveJSON(defaults, ["snapshot": snapshot, "details": details], key: "homeWidgetData")
+        saveJSON(defaults, home, key: "homeWidgetPresentation")
         defaults.set(refreshAt, forKey: "homeWidgetRefreshAt")
         defaults.set(max(900, refreshAt / 1000 - Date().timeIntervalSince1970), forKey: "homeWidgetRefreshDelay")
         let copy = config["copy"] as? [String: String] ?? [:]
@@ -226,7 +238,7 @@ enum HomeWidgetRefreshStore {
   }
 
   static func registerStoredPushToken() async {
-    guard let token = locked({ defaults.string(forKey: "homeWidgetPushToken") }) else { return }
+    guard let token = locked({ $0.string(forKey: "homeWidgetPushToken") }) ?? nil else { return }
     let widgets: [WidgetInfo]? = await withCheckedContinuation { continuation in
       WidgetCenter.shared.getCurrentConfigurations { result in
         continuation.resume(returning: try? result.get())
@@ -238,21 +250,21 @@ enum HomeWidgetRefreshStore {
 
   static func pushToken(_ token: Data, widgets: [WidgetInfo]) async {
     let hex = token.map { String(format: "%02x", $0) }.joined()
-    locked { defaults.set(hex, forKey: "homeWidgetPushToken"); defaults.synchronize() }
+    locked { defaults in defaults.set(hex, forKey: "homeWidgetPushToken"); defaults.synchronize() }
     await uploadPushToken(hex, enabled: widgets.contains(where: { $0.kind == widgetName }))
   }
 
   static func uploadPushToken(_ token: String, enabled: Bool) async {
-    let captured: ([String: Any], String)? = locked {
+    let captured = locked { defaults -> ([String: Any], String)? in
       guard !defaults.bool(forKey: "homeWidgetFixture"), let config = context(),
             let generation = defaults.string(forKey: "homeWidgetGeneration") else { return nil }
       return (config, generation)
-    }
+    } ?? nil
     guard let (config, generation) = captured,
-          locked({ current(config, generation) }),
+          locked({ current($0, config, generation) }) == true,
           let request = request(config, input: ["token": token, "enabled": enabled]) else { return }
     _ = try? await session.data(for: request)
-    if !locked({ current(config, generation) }) {
+    if locked({ current($0, config, generation) }) != true {
       // A completed older upload cannot leave the current installation bound to its former scope.
       await registerStoredPushToken()
     }

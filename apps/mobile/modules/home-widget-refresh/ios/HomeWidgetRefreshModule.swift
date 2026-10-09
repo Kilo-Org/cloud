@@ -32,9 +32,10 @@ public class HomeWidgetRefreshModule: Module {
     guard !destroyed, epoch > operationEpoch else { return nil }
     operationEpoch = epoch
     pendingClearEpoch = epoch
+    // Without the app group there is no stored credential to unregister; the clear still completes.
     return HomeWidgetRefreshStore.locked {
-      (HomeWidgetRefreshStore.context(), HomeWidgetRefreshStore.defaults.string(forKey: "homeWidgetPushToken"))
-    }
+      (HomeWidgetRefreshStore.context(), $0.string(forKey: "homeWidgetPushToken"))
+    } ?? (nil, nil)
   }
 
   private func finishClear(_ epoch: Int) {
@@ -65,15 +66,15 @@ public class HomeWidgetRefreshModule: Module {
     }
     AsyncFunction("setFixtureMode") { (enabled: Bool) in HomeWidgetRefreshStore.fixture(enabled) }
     AsyncFunction("getData") { () -> [String: Any]? in
-      HomeWidgetRefreshStore.locked { HomeWidgetRefreshStore.readJSON("homeWidgetData") }
+      HomeWidgetRefreshStore.locked { HomeWidgetRefreshStore.readJSON($0, "homeWidgetData") } ?? nil
     }
     AsyncFunction("getWidgetPushToken") { () -> String? in
-      HomeWidgetRefreshStore.defaults.string(forKey: "homeWidgetPushToken")
+      HomeWidgetRefreshStore.defaults?.string(forKey: "homeWidgetPushToken")
     }
     AsyncFunction("isCurrent") { (scope: String, epoch: Int, generation: String) -> Bool in
       HomeWidgetRefreshStore.locked {
-        HomeWidgetRefreshStore.current(["scopeKey": scope, "accountEpoch": epoch], generation)
-      }
+        HomeWidgetRefreshStore.current($0, ["scopeKey": scope, "accountEpoch": epoch], generation)
+      } ?? false
     }
     AsyncFunction("widgetsChanged") { WidgetCenter.shared.reloadTimelines(ofKind: HomeWidgetRefreshStore.widgetName) }
     OnDestroy {

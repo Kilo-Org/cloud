@@ -13,18 +13,18 @@ struct HomeWidgetTimelineProvider: TimelineProvider {
     Task {
       await HomeWidgetRefreshStore.refresh()
       base.getTimeline(in: context) { timeline in
-        let next: Double? = HomeWidgetRefreshStore.locked {
-          guard !HomeWidgetRefreshStore.defaults.bool(forKey: "homeWidgetFixture"),
+        let next = HomeWidgetRefreshStore.locked { defaults -> Double? in
+          guard !defaults.bool(forKey: "homeWidgetFixture"),
                 HomeWidgetRefreshStore.context() != nil else { return nil }
-          return HomeWidgetRefreshStore.defaults.double(forKey: "homeWidgetRefreshAt")
-        }
+          return defaults.double(forKey: "homeWidgetRefreshAt")
+        } ?? nil
         guard let next else {
           completion(Timeline(entries: timeline.entries, policy: .never))
           return
         }
         // WidgetKit budgets requests; the requested wake is not an exact alarm.
         let now = Date().timeIntervalSince1970
-        let retryDelay = HomeWidgetRefreshStore.locked { HomeWidgetRefreshStore.defaults.double(forKey: "homeWidgetRefreshDelay") }
+        let retryDelay = HomeWidgetRefreshStore.locked { $0.double(forKey: "homeWidgetRefreshDelay") } ?? 0
         let wake = Date(timeIntervalSince1970: next / 1000 > now ? max(now + 900, next / 1000) : now + max(900, retryDelay))
         completion(Timeline(entries: timeline.entries, policy: .after(wake)))
       }

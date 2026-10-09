@@ -1,5 +1,4 @@
 /* eslint-disable sort-keys */
-import { createStore } from 'jotai';
 import { describe, expect, it } from 'vitest';
 import type { AgentWorkflow } from '@/src/shared/agent-workflows';
 import {
@@ -7,7 +6,6 @@ import {
   deriveWorkflowSettingsView,
   formatWorkflowListDate,
   toWorkflowSettingsListItem,
-  workflowRunRequestAtom,
 } from './workflow-settings-state';
 
 const workflow = (overrides: Partial<AgentWorkflow> = {}): AgentWorkflow => ({
@@ -229,25 +227,5 @@ describe('workflow run disabled reason', () => {
       isDangerousMode: true,
     });
     expect(reason?.reason).toBe('conversationRunning');
-  });
-});
-
-describe('workflow run request atom', () => {
-  it('defaults to undefined', () => {
-    const store = createStore();
-    expect(store.get(workflowRunRequestAtom)).toBeUndefined();
-  });
-
-  it('sets and reads a run request', () => {
-    const store = createStore();
-    store.set(workflowRunRequestAtom, { workflowId: 'wf-test' });
-    expect(store.get(workflowRunRequestAtom)).toStrictEqual({ workflowId: 'wf-test' });
-  });
-
-  it('can be cleared back to undefined', () => {
-    const store = createStore();
-    store.set(workflowRunRequestAtom, { workflowId: 'wf-test' });
-    store.set(workflowRunRequestAtom, undefined);
-    expect(store.get(workflowRunRequestAtom)).toBeUndefined();
   });
 });

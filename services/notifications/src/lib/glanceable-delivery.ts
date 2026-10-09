@@ -94,6 +94,7 @@ export function toGlanceableContentState(
     needsInput: snapshot.needsInput,
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
+    updatedAt: snapshot.updatedAt,
     needsInputSince: snapshot.needsInputSince,
     scheduled: snapshot.scheduled,
     scheduledAt: snapshot.scheduledAt,

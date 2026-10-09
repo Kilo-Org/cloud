@@ -146,10 +146,11 @@ export type PushData = z.infer<typeof pushDataSchema>;
 
 /**
  * The raw content-state the Active Agents Live Activity renders. The server
- * pushes exactly this shape (counts + status + the safe needs-input wait
- * timestamp) and the widget extension renders it directly with inlined English
- * copy. It must never carry a title, session id, repository name, organization
- * name, generated text, or a raw account id.
+ * pushes exactly this shape (counts + status + the safe timestamps: when the
+ * counts were confirmed, the needs-input wait and the next wake) and the widget
+ * extension renders it directly with baked copy. It must never carry a title,
+ * session id, repository name, organization name, generated text, or a raw
+ * account id.
  */
 export type GlanceableLiveActivityContentState = Pick<
   Extract<PushData, { type: 'active_agents_glanceable' }>,
@@ -158,6 +159,7 @@ export type GlanceableLiveActivityContentState = Pick<
   | 'needsInput'
   | 'needsApproval'
   | 'idle'
+  | 'updatedAt'
   | 'needsInputSince'
   | 'scheduled'
   | 'scheduledAt'

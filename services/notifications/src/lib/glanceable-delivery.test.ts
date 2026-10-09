@@ -663,6 +663,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       needsInput: 0,
       needsApproval: 0,
       idle: 0,
+      updatedAt: expect.any(String),
       needsInputSince: null,
       scheduled: 0,
       scheduledAt: null,
@@ -1037,6 +1038,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           needsInput: 1,
           needsApproval: 0,
           idle: 0,
+          updatedAt: expect.any(String),
           needsInputSince: '2026-08-27T10:00:01.000Z',
           scheduled: 0,
           scheduledAt: null,
@@ -1591,6 +1593,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 needsInput: 0,
                 needsApproval: 0,
                 idle: 0,
+                updatedAt: expect.any(String),
                 needsInputSince: null,
                 scheduled: 0,
                 scheduledAt: null,
@@ -1987,6 +1990,7 @@ describe('toGlanceableContentState', () => {
       needsInput: 1,
       needsApproval: 1,
       idle: 0,
+      updatedAt: snapshot.updatedAt,
       needsInputSince: '2026-08-27T09:00:00.000Z',
       scheduled: 0,
       scheduledAt: null,
@@ -2025,6 +2029,14 @@ describe('toGlanceableContentState', () => {
     ).toBe(0);
   });
 
+  it('carries the confirmed time the card prints as "Checked <time>"', () => {
+    // A timestamp, like the wait and the wake: the card's header prints when
+    // the counts were confirmed, and an older card without it prints no time.
+    expect(
+      (JSON.parse(toGlanceableContentState(snapshot).props) as Record<string, unknown>).updatedAt
+    ).toBe(snapshot.updatedAt);
+  });
+
   it('never leaks snapshot bookkeeping, ids, or titles into the pushed content-state', () => {
     const contentState = toGlanceableContentState(snapshot);
     const raw = JSON.stringify(contentState);
@@ -2033,7 +2045,6 @@ describe('toGlanceableContentState', () => {
     expect(raw).not.toContain('scopeKey');
     expect(raw).not.toContain('deadbeef');
     expect(raw).not.toContain('organizationBound');
-    expect(raw).not.toContain('updatedAt');
     expect(raw).not.toContain('expiresAt');
     expect(raw).not.toContain('accountEpoch');
     expect(raw).not.toContain('title');

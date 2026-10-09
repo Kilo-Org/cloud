@@ -154,6 +154,8 @@ export const controlDiagnosticFieldsSchema = z
       'kilo_restarting',
       'kilo_restarted',
       'kilo_restart_failed',
+      'kilo_memory_hold_started',
+      'kilo_memory_hold_ended',
       'prepare_failed',
       'session_ready',
       'session_outcome',
@@ -239,6 +241,9 @@ export const controlDiagnosticFieldsSchema = z
     preparationStep: controlPlanePreparationStepSchema.optional(),
     subtype: controlPlaneWorkspaceFailureSubtypeSchema.optional(),
     kiloRestartReason: kiloRestartFaultReasonSchema.optional(),
+    memoryHoldOutcome: z
+      .enum(['recovered', 'cleared', 'expired', 'restarted', 'stopped'])
+      .optional(),
     interceptTrustFailure: z
       .enum(['cert_unavailable', 'cert_unreadable', 'cert_append_failed'])
       .optional(),
@@ -365,7 +370,7 @@ export const controlDiagnosticFieldsSchema = z
     questionQueryPending: z.boolean().optional(),
     permissionQueryPending: z.boolean().optional(),
     workloadPhase: z
-      .enum(['probe', 'applied', 'migration', 'oom', 'stats', 'rollback', 'failed'])
+      .enum(['probe', 'applied', 'protection', 'migration', 'oom', 'stats', 'rollback', 'failed'])
       .optional(),
     workloadFailure: z
       .enum([
@@ -388,6 +393,7 @@ export const controlDiagnosticFieldsSchema = z
     reserveBytes: count.optional(),
     appliedMaxBytes: count.optional(),
     readbackMaxBytes: count.optional(),
+    serverMinBytes: count.optional(),
     currentBytes: count.optional(),
     peakBytes: count.optional(),
     anonBytes: count.optional(),
@@ -418,6 +424,12 @@ export const controlDiagnosticFieldsSchema = z
     serverCpuUsageUsec: count.optional(),
     toolIoReadBytes: count.optional(),
     toolIoWriteBytes: count.optional(),
+    toolAnonBytes: count.optional(),
+    toolFileBytes: count.optional(),
+    toolShmemBytes: count.optional(),
+    serverAnonBytes: count.optional(),
+    serverFileBytes: count.optional(),
+    serverShmemBytes: count.optional(),
     cpuController: z.boolean().optional(),
     siblingProtection: z.boolean().optional(),
     workloadLimitSource: z.enum(['cgroup', 'explicit', 'meminfo']).optional(),
@@ -459,6 +471,8 @@ const PROJECTABLE_LIFECYCLE_PHASES = new Set([
   'kilo_restarting',
   'kilo_restarted',
   'kilo_restart_failed',
+  'kilo_memory_hold_started',
+  'kilo_memory_hold_ended',
   'prepare_failed',
   'session_ready',
   'session_outcome',

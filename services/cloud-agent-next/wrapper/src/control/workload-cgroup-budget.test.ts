@@ -6,6 +6,7 @@ import {
   applyManagedWorkloadLimits,
   computeWorkloadBudget,
   DEFAULT_CONTROL_RESERVE_BYTES,
+  KILO_SERVER_MIN_BYTES,
 } from './workload-cgroup.js';
 
 const MiB = 1024 * 1024;
@@ -89,5 +90,39 @@ describe('applyManagedWorkloadLimits', () => {
     expect(readFileSync(path.join(tools, 'memory.oom.group'), 'utf8')).toBe('0');
     expect(readFileSync(path.join(tools, 'memory.swap.max'), 'utf8')).toBe('0');
     expect(readFileSync(path.join(server, 'memory.oom.group'), 'utf8')).toBe('0');
+  });
+
+  it('protects Kilo from reclaim at the shared cap through the scope group and the server', () => {
+    const { parent, server, tools } = scope();
+
+    const applied = applyManagedWorkloadLimits({
+      parentReference: parent,
+      serverReference: server,
+      toolsReference: tools,
+      toolsMaxBytes: 5632 * MiB,
+    });
+
+    expect(applied.serverProtection).toEqual({ ok: true, bytes: KILO_SERVER_MIN_BYTES });
+    expect(readFileSync(path.join(parent, 'memory.min'), 'utf8')).toBe(
+      String(KILO_SERVER_MIN_BYTES)
+    );
+    expect(readFileSync(path.join(server, 'memory.min'), 'utf8')).toBe(
+      String(KILO_SERVER_MIN_BYTES)
+    );
+  });
+
+  it('keeps the hard caps and reports the failure when memory.min cannot be written', () => {
+    const { parent, server, tools } = scope();
+    mkdirSync(path.join(server, 'memory.min'));
+
+    const applied = applyManagedWorkloadLimits({
+      parentReference: parent,
+      serverReference: server,
+      toolsReference: tools,
+      toolsMaxBytes: 5632 * MiB,
+    });
+
+    expect(applied.serverProtection).toEqual({ ok: false, failure: 'write_failed' });
+    expect(readFileSync(path.join(tools, 'memory.max'), 'utf8')).toBe(String(5632 * MiB));
   });
 });

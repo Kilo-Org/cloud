@@ -172,7 +172,7 @@ describe('production session host composition', () => {
       );
       expect(errors).toEqual([
         { sessionId: 'workspace_a', reason: 'no_progress' },
-        { sessionId: 'workspace_b', reason: 'agent_restarted' },
+        { sessionId: 'workspace_b', reason: 'agent_unresponsive' },
       ]);
       expect(f.frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
       expect(f.host.getHeartbeat().active).toBe(false);

@@ -108,6 +108,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'sandbox_lost',
   'agent_restarted',
   'sandbox_out_of_memory',
+  'agent_unresponsive',
   'no_progress',
   'no_outcome',
   'prompt_failed',

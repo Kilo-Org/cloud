@@ -5,6 +5,8 @@ export type PlatformType =
   | 'github'
   | 'gitlab'
   | 'bitbucket'
+  | 'gitea'
+  | 'forgejo'
   | 'slack'
   | 'discord'
   | 'linear'
@@ -57,6 +59,24 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     enabled: true,
     personalRoute: '/integrations/gitlab',
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/gitlab`,
+  },
+  {
+    id: PLATFORM.GITEA,
+    name: 'Gitea',
+    description:
+      'Connect Gitea repositories to enable AI code reviews and automated workflows. Supports both gitea.com and self-hosted instances.',
+    enabled: true,
+    personalRoute: '/integrations/gitea',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/gitea`,
+  },
+  {
+    id: PLATFORM.FORGEJO,
+    name: 'Forgejo',
+    description:
+      'Connect Forgejo repositories to enable AI code reviews and automated workflows. Supports both codeberg.org and self-hosted instances.',
+    enabled: true,
+    personalRoute: '/integrations/forgejo',
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/forgejo`,
   },
   {
     id: 'discord',

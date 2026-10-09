@@ -84,6 +84,18 @@ export async function handlePlatformOAuthConnect(
     ).handleGitLabOAuthConnect(request);
   }
 
+  if (platform === PLATFORM.GITEA) {
+    return (
+      await import('@/lib/integrations/oauth/platforms/gitea-connect')
+    ).handleGiteaOAuthConnect(request);
+  }
+
+  if (platform === PLATFORM.FORGEJO) {
+    return (
+      await import('@/lib/integrations/oauth/platforms/forgejo-connect')
+    ).handleForgejoOAuthConnect(request);
+  }
+
   if (!isStatefulOAuthConnectPlatform(platform)) {
     return unsupportedOAuthRoute(platform, 'connect');
   }
@@ -111,6 +123,14 @@ export async function handlePlatformOAuthConnectPost(
       return (
         await import('@/lib/integrations/oauth/platforms/gitlab-connect')
       ).handleGitLabOAuthConnectPost(request);
+    case PLATFORM.GITEA:
+      return (
+        await import('@/lib/integrations/oauth/platforms/gitea-connect')
+      ).handleGiteaOAuthConnectPost(request);
+    case PLATFORM.FORGEJO:
+      return (
+        await import('@/lib/integrations/oauth/platforms/forgejo-connect')
+      ).handleForgejoOAuthConnectPost(request);
     default:
       return unsupportedOAuthRoute(platform, 'connect');
   }
@@ -137,6 +157,14 @@ export async function handlePlatformOAuthCallback(
       return (
         await import('@/lib/integrations/oauth/platforms/gitlab-callback')
       ).handleGitLabOAuthCallback(request);
+    case PLATFORM.GITEA:
+      return (
+        await import('@/lib/integrations/oauth/platforms/gitea-callback')
+      ).handleGiteaOAuthCallback(request);
+    case PLATFORM.FORGEJO:
+      return (
+        await import('@/lib/integrations/oauth/platforms/forgejo-callback')
+      ).handleForgejoOAuthCallback(request);
     case PLATFORM.LINEAR:
       return (
         await import('@/lib/integrations/oauth/platforms/linear-callback')

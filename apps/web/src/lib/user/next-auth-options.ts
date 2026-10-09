@@ -84,6 +84,10 @@ import {
   NEXTAUTH_URL,
   GITLAB_CLIENT_ID,
   GITLAB_CLIENT_SECRET,
+  GITEA_CLIENT_ID,
+  GITEA_CLIENT_SECRET,
+  FORGEJO_CLIENT_ID,
+  FORGEJO_CLIENT_SECRET,
   DISCORD_OAUTH_CLIENT_ID,
   DISCORD_OAUTH_CLIENT_SECRET,
   APPLE_CLIENT_ID,
@@ -412,6 +416,44 @@ function createGitlabAccountInfo(
   };
 }
 
+function createGiteaAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== PLATFORM.GITEA) return null;
+  assert(user.email, 'User email is required for Gitea auth');
+  assert(user.name, 'User name is required for Gitea auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || '',
+    hosted_domain: hosted_domain_specials.gitea,
+    google_user_image_url: user.image || '',
+    provider: account.provider as AuthProviderId,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
+  };
+}
+
+function createForgejoAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== PLATFORM.FORGEJO) return null;
+  assert(user.email, 'User email is required for Forgejo auth');
+  assert(user.name, 'User name is required for Forgejo auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || '',
+    hosted_domain: hosted_domain_specials.forgejo,
+    google_user_image_url: user.image || '',
+    provider: account.provider as AuthProviderId,
+    provider_account_id: account.providerAccountId,
+    display_name: null,
+  };
+}
+
 function createLinkedInAccountInfo(
   account: Account,
   user: NextUser | AdapterUser
@@ -583,6 +625,8 @@ function createAccountInfo(
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
+    createGiteaAccountInfo(account, user) ??
+    createForgejoAccountInfo(account, user) ??
     createLinkedInAccountInfo(account, user) ??
     createDiscordAccountInfo(account, user) ??
     createEmailAccountInfo(account, user) ??
@@ -826,10 +870,52 @@ export const authOptions: NextAuthOptions = {
       clientId: GITHUB_CLIENT_ID,
       clientSecret: GITHUB_CLIENT_SECRET,
     }),
-    GitlabProvider({
+     GitlabProvider({
       clientId: GITLAB_CLIENT_ID,
       clientSecret: GITLAB_CLIENT_SECRET,
     }),
+    {
+      id: PLATFORM.GITEA,
+      name: 'Gitea',
+      type: 'oauth',
+      wellKnown: 'https://gitea.com/.well-known/openid-configuration',
+      authorization: {
+        params: { scope: 'openid profile email' },
+      },
+      idToken: true,
+      checks: ['pkce', 'state', 'nonce'],
+      clientId: GITEA_CLIENT_ID,
+      clientSecret: GITEA_CLIENT_SECRET,
+      profile(profile) {
+        return {
+          id: profile.sub,
+          email: profile.email,
+          name: profile.name || profile.preferred_username || profile.nickname,
+          image: profile.picture,
+        };
+      },
+    },
+    {
+      id: PLATFORM.FORGEJO,
+      name: 'Forgejo',
+      type: 'oauth',
+      wellKnown: 'https://codeberg.org/.well-known/openid-configuration',
+      authorization: {
+        params: { scope: 'openid profile email' },
+      },
+      idToken: true,
+      checks: ['pkce', 'state', 'nonce'],
+      clientId: FORGEJO_CLIENT_ID,
+      clientSecret: FORGEJO_CLIENT_SECRET,
+      profile(profile) {
+        return {
+          id: profile.sub,
+          email: profile.email,
+          name: profile.name || profile.preferred_username || profile.nickname,
+          image: profile.picture,
+        };
+      },
+    },
     DiscordProvider({
       clientId: DISCORD_OAUTH_CLIENT_ID ?? '',
       clientSecret: DISCORD_OAUTH_CLIENT_SECRET ?? '',

@@ -1,0 +1,229 @@
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { captureException } from '@sentry/nextjs';
+import { buildForgejoOAuthUrl } from '@/lib/integrations/platforms/forgejo/adapter';
+import { createForgejoOAuthState } from '@/lib/integrations/platforms/forgejo/oauth-state';
+import {
+  isDefaultForgejoInstanceUrl,
+  normalizeForgejoInstanceUrl,
+} from '@/lib/integrations/platforms/forgejo/instance-url';
+import { storeForgejoOAuthCredentials } from '@/lib/integrations/platforms/forgejo/oauth-credentials';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
+import {
+  buildIntegrationOAuthConnectErrorPath,
+  organizationAccessDenialErrorCode,
+  redirectToSignInForOAuthConnect,
+} from '@/lib/integrations/oauth/common';
+import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import type { Owner } from '@/lib/integrations/core/types';
+
+type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
+
+const ForgejoOAuthConnectPostBodySchema = z.object({
+  organizationId: z.string().optional(),
+  instanceUrl: z.string().optional(),
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+  returnTo: z.string().optional(),
+});
+
+type ForgejoOAuthConnectOptions = {
+  organizationId: string | null;
+  instanceUrl?: string;
+  clientId?: string;
+  clientSecret?: string;
+  returnTo?: string | null;
+};
+
+/**
+ * Forgejo OAuth Connect
+ *
+ * Initiates the Forgejo OAuth authorization flow.
+ * Redirects the user to Forgejo's authorization page.
+ *
+ * Query parameters:
+ * - organizationId: (optional) Organization ID for org-owned integrations
+ * - instanceUrl: (optional) Self-hosted Forgejo instance URL
+ * - returnTo: (optional) Relative path to return to after OAuth
+ */
+export async function handleForgejoOAuthConnect(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const organizationId = searchParams.get('organizationId');
+
+  try {
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    if (authFailedResponse) {
+      const hasLegacyQueryCredentials =
+        searchParams.has('clientId') || searchParams.has('clientSecret');
+
+      return redirectToSignInForOAuthConnect(
+        request,
+        hasLegacyQueryCredentials ? buildForgejoDetailCallbackPath(organizationId) : undefined
+      );
+    }
+
+    const instanceUrl = searchParams.get('instanceUrl') || undefined;
+    const returnToParam = searchParams.get('returnTo') || undefined;
+    const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
+
+    const oauthUrl = await buildForgejoConnectOAuthUrl(user, {
+      organizationId,
+      instanceUrl,
+      returnTo,
+    });
+
+    return NextResponse.redirect(oauthUrl);
+  } catch (error) {
+    console.error('Error initiating Forgejo OAuth:', error);
+
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: 'forgejo/connect',
+          source: 'forgejo_oauth',
+        },
+      });
+    }
+
+    return NextResponse.redirect(
+      new URL(
+        buildIntegrationOAuthConnectErrorPath(
+          PLATFORM.FORGEJO,
+          organizationId,
+          denialCode ?? 'oauth_init_failed'
+        ),
+        request.url
+      )
+    );
+  }
+}
+
+export async function handleForgejoOAuthConnectPost(
+  request: NextRequest
+): Promise<Response> {
+  const rawBody = await request.json().catch(() => null);
+  const parsedBody = ForgejoOAuthConnectPostBodySchema.safeParse(rawBody);
+
+  if (!parsedBody.success) {
+    return NextResponse.json({ error: 'Invalid Forgejo OAuth request' }, { status: 400 });
+  }
+
+  const {
+    organizationId,
+    instanceUrl,
+    clientId,
+    clientSecret,
+    returnTo: rawReturnTo,
+  } = parsedBody.data;
+  const returnTo = rawReturnTo ? validateReturnPath(rawReturnTo) : null;
+
+  try {
+    const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
+    if (authFailedResponse) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const oauthUrl = await buildForgejoConnectOAuthUrl(user, {
+      organizationId: organizationId ?? null,
+      instanceUrl,
+      clientId,
+      clientSecret,
+      returnTo,
+    });
+
+    return NextResponse.json({ url: oauthUrl });
+  } catch (error) {
+    console.error('Error initiating Forgejo OAuth:', error);
+
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: 'forgejo/connect',
+          source: 'forgejo_oauth',
+        },
+        extra: {
+          organizationId,
+          hasCustomCredentials: Boolean(clientId && clientSecret),
+        },
+      });
+    }
+
+    if (denialCode) {
+      return NextResponse.json({ error: denialCode }, { status: 403 });
+    }
+
+    return NextResponse.json({ error: 'oauth_init_failed' }, { status: 500 });
+  }
+}
+
+function buildForgejoDetailCallbackPath(organizationId: string | null): string {
+  if (organizationId) {
+    return `/organizations/${organizationId}/integrations/forgejo`;
+  }
+
+  return '/integrations/forgejo';
+}
+
+async function buildForgejoConnectOAuthUrl(
+  user: AuthenticatedOAuthUser,
+  { organizationId, instanceUrl, clientId, clientSecret, returnTo }: ForgejoOAuthConnectOptions
+): Promise<string> {
+  const owner = await resolveForgejoOAuthOwner(user, organizationId);
+  const customCredentials = clientId && clientSecret ? { clientId, clientSecret } : undefined;
+  const normalizedInstanceUrl = instanceUrl ? normalizeForgejoInstanceUrl(instanceUrl) : undefined;
+  const usesCustomInstance =
+    !!normalizedInstanceUrl && !isDefaultForgejoInstanceUrl(normalizedInstanceUrl);
+
+  if (usesCustomInstance && !customCredentials) {
+    throw new Error('Custom Forgejo OAuth credentials are required for self-hosted instances');
+  }
+
+  const customCredentialsRef = customCredentials
+    ? await storeForgejoOAuthCredentials(customCredentials)
+    : undefined;
+
+  if (customCredentials && !customCredentialsRef) {
+    throw new Error('Forgejo OAuth credentials cache is unavailable');
+  }
+
+  const state = createForgejoOAuthState(
+    {
+      owner,
+      ...(usesCustomInstance ? { instanceUrl: normalizedInstanceUrl } : {}),
+      ...(customCredentialsRef ? { customCredentialsRef } : {}),
+      ...(returnTo ? { returnTo } : {}),
+    },
+    user.id
+  );
+
+  return buildForgejoOAuthUrl(state, normalizedInstanceUrl, customCredentials);
+}
+
+async function resolveForgejoOAuthOwner(
+  user: AuthenticatedOAuthUser,
+  organizationId: string | null
+): Promise<Owner> {
+  if (!organizationId) {
+    return { type: 'user', id: user.id };
+  }
+
+  // Replacing an existing org Forgejo integration is a billing-scoped action;
+  // a first-time connect keeps member-level access.
+  const existingIntegration = await getIntegrationForOrganization(
+    organizationId,
+    PLATFORM.FORGEJO
+  );
+  await ensureOrganizationAccess(
+    { user },
+    organizationId,
+    existingIntegration ? ORGANIZATION_BILLING_ROLES : undefined
+  );
+  return { type: 'org', id: organizationId };
+}

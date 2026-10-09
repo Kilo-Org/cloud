@@ -40,6 +40,10 @@ export const CONTRIBUTOR_CHAMPION_TEAM_EMAILS =
   getEnvVariable('CONTRIBUTOR_CHAMPION_TEAM_EMAILS') || '';
 export const GITLAB_CLIENT_ID = getEnvVariable('GITLAB_CLIENT_ID');
 export const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
+export const GITEA_CLIENT_ID = getEnvVariable('GITEA_CLIENT_ID');
+export const GITEA_CLIENT_SECRET = getEnvVariable('GITEA_CLIENT_SECRET');
+export const FORGEJO_CLIENT_ID = getEnvVariable('FORGEJO_CLIENT_ID');
+export const FORGEJO_CLIENT_SECRET = getEnvVariable('FORGEJO_CLIENT_SECRET');
 export const BITBUCKET_CLIENT_ID = getEnvVariable('BITBUCKET_CLIENT_ID');
 export const BITBUCKET_CLIENT_SECRET = getEnvVariable('BITBUCKET_CLIENT_SECRET');
 export const BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID = getEnvVariable(

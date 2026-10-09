@@ -38,16 +38,24 @@ export const CATALOG_JSON_DISPLAY_PATH = relative(REPO_ROOT, CATALOG_JSON_PATH);
 export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-router.ts');
 
 /**
- * Whether a procedure path is internal-only. A path is internal when any
- * segment is `test` or starts with `admin` or `dev` — the routers name admin
- * and dev-only procedures `adminX` and `devX` (for example
- * `organizations.admin.grantCredit` and `slack.devRemoveDbRowOnly`). `test`
- * stays exact-only so user-facing calls such as `slack.testConnection` remain
- * published, and `debug` stays published too: its rows carry a `debug: true`
- * marker and are guarded wherever they are offered or called. Subscriptions
- * are never exported regardless of this check.
+ * Exact procedure paths withheld from MCP even though no segment is internal.
+ * `activeSessions.widgetCredential` mints a 30-day Home widget bearer and only
+ * native device sessions may call it, so no MCP credential can use it.
+ */
+const NATIVE_ONLY_PATHS: Record<string, true> = { 'activeSessions.widgetCredential': true };
+
+/**
+ * Whether a procedure path is internal-only. A path is internal when it is in
+ * {@link NATIVE_ONLY_PATHS} or any segment is `test` or starts with `admin` or
+ * `dev` — the routers name admin and dev-only procedures `adminX` and `devX`
+ * (for example `organizations.admin.grantCredit` and `slack.devRemoveDbRowOnly`).
+ * `test` stays exact-only so user-facing calls such as `slack.testConnection`
+ * remain published, and `debug` stays published too: its rows carry a
+ * `debug: true` marker and are guarded wherever they are offered or called.
+ * Subscriptions are never exported regardless of this check.
  */
 export function isDenylistedPath(path: string): boolean {
+  if (Object.hasOwn(NATIVE_ONLY_PATHS, path)) return true;
   return path.split('.').some(segment => {
     const lower = segment.toLowerCase();
     return lower === 'test' || lower.startsWith('admin') || lower.startsWith('dev');

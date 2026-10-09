@@ -135,9 +135,9 @@ function createLifecycle(
 }
 
 describe('controlPlaneExitPolicy', () => {
-  it('exits 0 on shutdown and SIGTERM, 1 on an uncaught exception, and never on a rejection', () => {
+  it('exits 0 on shutdown, 1 on SIGTERM/uncaught exception, and never on a rejection', () => {
     expect(controlPlaneExitPolicy('shutdown')).toBe(0);
-    expect(controlPlaneExitPolicy('sigterm')).toBe(0);
+    expect(controlPlaneExitPolicy('sigterm')).toBe(1);
     expect(controlPlaneExitPolicy('uncaught_exception')).toBe(1);
     expect(controlPlaneExitPolicy('unhandled_rejection')).toBeNull();
   });
@@ -152,12 +152,12 @@ describe('createControlPlaneLifecycle', () => {
     expect(connectionState.recycled()).toBe(1);
   });
 
-  it('exits 0 on SIGTERM after flushing diagnostics and logs', async () => {
+  it('exits 1 on SIGTERM so the supervisor restarts, after flushing diagnostics and logs', async () => {
     const state = createLifecycle();
     state.process.emit('SIGTERM');
     await Bun.sleep(0);
-    expect(state.exits).toEqual([0]);
-    expect(state.phases).toContain('stopping');
+    expect(state.exits).toEqual([1]);
+    expect(state.phases).toContain('failed');
     expect(state.finalizes()).toEqual({ diagnostics: 1, fileLogs: 1 });
     expect(state.connectionState.closed()).toBe(1);
   });

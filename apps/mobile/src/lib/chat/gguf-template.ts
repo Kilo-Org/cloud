@@ -149,34 +149,90 @@ export function paramsOf(request: ModelRequest, file: GgufModelFile): Completion
  */
 const completionResult = z
   .object({
-    text: z.string().default(''),
-    content: z.string().optional(),
-    accumulated_text: z.string().optional(),
+    text: z
+      .string()
+      .nullish()
+      .transform(value => value ?? ''),
+    // The native object carries null rather than omitting a field, and the
+    // parsed content is absent unless the template's output parser ran.
+    content: z.string().nullish(),
+    accumulated_text: z.string().nullish(),
     tool_calls: z
       .array(
         z.object({
-          id: z.string().optional(),
-          function: z.object({ name: z.string(), arguments: z.string() }),
+          id: z.string().nullish(),
+          function: z.object({
+            name: z.string(),
+            // A model that stops mid-call leaves the arguments absent.
+            arguments: z.string().nullish(),
+          }),
         })
       )
-      .default([]),
-    tokens_evaluated: z.number().default(0),
-    tokens_predicted: z.number().default(0),
+      .nullish()
+      .transform(calls => calls ?? []),
+    tokens_evaluated: z
+      .number()
+      .nullish()
+      .transform(value => value ?? 0),
+    tokens_predicted: z
+      .number()
+      .nullish()
+      .transform(value => value ?? 0),
     // llama.cpp reports these as booleans, and older builds omit them entirely.
-    interrupted: z.boolean().optional(),
-    context_full: z.boolean().optional(),
-    stopped_eos: z.boolean().optional(),
-    stopped_word: z.boolean().optional(),
-    stopped_limit: z.boolean().optional(),
+    interrupted: z.boolean().nullish(),
+    context_full: z.boolean().nullish(),
+    stopped_eos: z.boolean().nullish(),
+    stopped_word: z.boolean().nullish(),
+    stopped_limit: z.boolean().nullish(),
   })
   .transform(flags => ({
     ...flags,
+    tool_calls: flags.tool_calls.map(call => ({
+      id: call.id ?? undefined,
+      function: { name: call.function.name, arguments: call.function.arguments ?? '' },
+    })),
     interrupted: flags.interrupted ?? false,
     context_full: flags.context_full ?? false,
     stopped_eos: flags.stopped_eos ?? false,
     stopped_word: flags.stopped_word ?? false,
     stopped_limit: flags.stopped_limit ?? false,
-  }));
+  }))
+  // A result with no words and no calls is not an answer, whatever else it holds.
+  .refine(
+    value =>
+      value.text.length > 0 || value.accumulated_text !== undefined || value.tool_calls.length > 0
+  );
+
+/**
+ * The least this build needs to answer: the text the model produced.
+ *
+ * A result that fails the full read still holds an answer, and failing the turn
+ * would throw away words the person waited for. Its counts and stop reason are
+ * reported as nothing reported them.
+ */
+const degradedCompletion = z
+  .object({
+    text: z.string().nullish(),
+    content: z.string().nullish(),
+    accumulated_text: z.string().nullish(),
+  })
+  .transform(flags => {
+    const answer = flags.accumulated_text ?? flags.content ?? flags.text ?? '';
+    return {
+      text: flags.text ?? answer,
+      content: flags.accumulated_text === undefined ? (flags.content ?? undefined) : answer,
+      accumulated_text: flags.accumulated_text ?? undefined,
+      tool_calls: [],
+      tokens_evaluated: 0,
+      tokens_predicted: 0,
+      interrupted: false,
+      context_full: false,
+      stopped_eos: false,
+      stopped_word: false,
+      stopped_limit: false,
+    };
+  })
+  .refine(parsed => parsed.text.length > 0 || parsed.accumulated_text !== undefined);
 
 export type CompletionResult = z.infer<typeof completionResult>;
 
@@ -184,10 +240,17 @@ export type CompletionOutcome =
   | { readonly ok: true; readonly value: CompletionResult }
   | { readonly ok: false };
 
-/** Reads the native result, turning any shape this build cannot read into a failure. */
+/**
+ * Reads the native result. A shape the full read refuses still answers when it
+ * carries text, because the alternative is failing a turn the model finished.
+ */
 export function readCompletion(result: unknown): CompletionOutcome {
   const parsed = completionResult.safeParse(result);
-  return parsed.success ? { ok: true, value: parsed.data } : { ok: false };
+  if (parsed.success) {
+    return { ok: true, value: parsed.data };
+  }
+  const degraded = degradedCompletion.safeParse(result);
+  return degraded.success ? { ok: true, value: degraded.data } : { ok: false };
 }
 
 /** The answer text, which is the parsed content once the template's parser has run. */

@@ -158,3 +158,53 @@ describe('the native result', () => {
     expect(readCompletion('not a result').ok).toBe(false);
   });
 });
+
+describe('reading what llama.rn resolves with', () => {
+  const full = {
+    text: 'Hello',
+    tokens_evaluated: 12,
+    tokens_predicted: 3,
+    stopped_eos: true,
+  };
+
+  it('reads null where the native object uses null', () => {
+    const read = readCompletion({
+      ...full,
+      content: null,
+      accumulated_text: null,
+      tool_calls: null,
+      stopped_word: null,
+      stopped_limit: null,
+      context_full: null,
+      interrupted: null,
+    });
+
+    expect(read.ok && read.value.text).toBe('Hello');
+    expect(read.ok && read.value.tool_calls).toEqual([]);
+  });
+
+  it('reads a tool call the model left unfinished', () => {
+    const read = readCompletion({
+      ...full,
+      tool_calls: [{ id: null, function: { name: 'weather', arguments: null } }],
+    });
+
+    expect(read.ok && read.value.tool_calls).toEqual([
+      { id: undefined, function: { name: 'weather', arguments: '' } },
+    ]);
+  });
+
+  it('answers from a shape the full read refuses, without inventing counts', () => {
+    // The unknown key is what the full read rejects; the text is real.
+    const read = readCompletion({ ...full, tokens_evaluated: 'twelve', timing: {} });
+
+    expect(read.ok && read.value.text).toBe('Hello');
+    expect(read.ok && read.value.tokens_evaluated).toBe(0);
+    expect(read.ok && read.value.tokens_predicted).toBe(0);
+  });
+
+  it('refuses a result that carries no text at all', () => {
+    expect(readCompletion({ timing: {} }).ok).toBe(false);
+    expect(readCompletion(null).ok).toBe(false);
+  });
+});

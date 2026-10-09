@@ -158,9 +158,12 @@ it('keeps streamed fragments visible but emits no done after a provider error an
 
 it('rejects credential-bearing roots and Kilo-specific headers without sending a request', async () => {
   const { fetch, calls } = fakeFetch([{ ok: true, status: 200, body: '', chunks: [] }]);
+  const credentialRoot = new URL('https://provider.example/v1');
+  credentialRoot.username = 'test-user';
+  credentialRoot.password = 'test-password';
   await Promise.all(
     [
-      { ...configFor(fetch), baseUrl: 'https://user:private-key@provider.example/v1' },
+      { ...configFor(fetch), baseUrl: credentialRoot.href },
       {
         ...configFor(fetch),
         headers: () => Effect.succeed({ 'X-KILOCODE-FEATURE': 'private-key' }),
@@ -173,6 +176,7 @@ it('rejects credential-bearing roots and Kilo-specific headers without sending a
       );
       expect(Either.isLeft(result)).toBe(true);
       expect(JSON.stringify(result)).not.toContain('private-key');
+      expect(JSON.stringify(result)).not.toContain('test-password');
     })
   );
   expect(calls).toHaveLength(0);

@@ -245,7 +245,13 @@ const signupRequestSchema = z.strictObject({
 export type SignupDecideRequest = z.input<typeof signupRequestSchema>;
 
 const signupFlagSchema = z.strictObject({
-  name: z.enum(['signup:burst', 'signup:sustained', 'signup:ja4', 'signup:saturated']),
+  name: z.enum([
+    'signup:burst',
+    'signup:sustained',
+    'signup:ja4',
+    'signup:saturated',
+    'signup:banned',
+  ]),
   decision: z.enum(['review', 'throttle', 'block']),
   enforced: z.boolean(),
   until: z.number().nonnegative().nullable(),

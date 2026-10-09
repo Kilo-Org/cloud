@@ -1949,7 +1949,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         () => this.sandboxPeer() ?? peer,
         stub =>
           stub.prepare({
-            spec: registration.spec,
+            spec: { ...registration.spec, worktreeRecovery: this.worktreeChanges.recovery() },
             credentials: registration.credentials,
             ...(registration.sandboxSelection
               ? { sandboxSelection: registration.sandboxSelection }

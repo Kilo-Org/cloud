@@ -356,6 +356,34 @@ describe('runWidgetApprove', () => {
     });
   });
 
+  it('reaches the request the server displayed past rows without a status time', async () => {
+    // The server binds the key to the permission row with the earliest
+    // `statusUpdatedAt`, rows without one last. Ranking these rows by their
+    // older `createdAt` instead filled the bounded scan before the displayed
+    // row and reported a live request as stale.
+    const rpc = wireTrpc({
+      sessions: [
+        { id: 'untimed-1', status: 'permission', createdAt: '2025-01-01T00:00:00.000Z' },
+        { id: 'untimed-2', status: 'permission', createdAt: '2025-01-02T00:00:00.000Z' },
+        { id: 'untimed-3', status: 'permission', createdAt: '2025-01-03T00:00:00.000Z' },
+        { id: 'newer', status: 'permission', statusUpdatedAt: '2026-01-03T00:00:00.000Z' },
+        { id: 'front', status: 'permission', statusUpdatedAt: '2026-01-02T00:00:00.000Z' },
+      ],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+
+    await expect(runWidgetApprove(keyFor('front', 'perm-1'))).resolves.toEqual({
+      kind: 'approved',
+    });
+    expect(rpc.cliSessionsV2.get.query).toHaveBeenCalledExactlyOnceWith({ session_id: 'front' });
+    expect(rpc.answerPermission.mutate).toHaveBeenCalledExactlyOnceWith({
+      sessionId: 'workspace_agent_1',
+      permissionId: 'perm-1',
+      response: 'once',
+    });
+  });
+
   it('answers nothing for a stale press after the request was replaced', async () => {
     const rpc = wireTrpc({
       sessions: [{ id: 'waiting', status: 'permission' }],

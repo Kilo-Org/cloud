@@ -15,6 +15,7 @@ import { trpcClient } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
 import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
+import { rankApprovableSessions } from './front-approval';
 import { setHomeWidgetDetails } from './home-widget-data';
 import { resolveAnsweredRaises } from './attention-rows';
 import { newestSessionTitle } from './newest-session';
@@ -212,11 +213,9 @@ async function approveVisiblePermission(
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(organizationId)
   );
-  const candidates = sessions
-    .filter(row => row.status === 'permission')
-    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; filter already copies so nothing shared is mutated
-    .sort((a, b) => (waitingSince(a) ?? Infinity) - (waitingSince(b) ?? Infinity))
-    .slice(0, MAX_APPROVAL_CANDIDATES);
+  // The server binds the displayed key to the front of this same ranking, so
+  // the bounded scan always reaches the displayed request first.
+  const candidates = rankApprovableSessions(sessions).slice(0, MAX_APPROVAL_CANDIDATES);
   if (candidates.length === 0) {
     return {
       kind: resolveWaitingSession(sessions) === null ? 'none' : 'no-permission',

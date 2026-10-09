@@ -1028,7 +1028,18 @@ describe('Home widget approval key retention', () => {
         approvalKey: KEY,
       },
     });
-    publisher.handleSessions([{ status: 'permission', title: 'Migrate billing' }], PUB_CTX);
+    publisher.handleSessions(
+      [{ id: 'ses_first', status: 'permission', title: 'Migrate billing' }],
+      PUB_CTX
+    );
+    expect(
+      getHomeWidgetDataForSnapshot(lastSnapshot(calls, 'startOrUpdate')).details.approvalKey
+    ).toBe(KEY);
+    // A different session with the same visible title replaces the first one.
+    publisher.handleSessions(
+      [{ id: 'ses_second', status: 'permission', title: 'Migrate billing' }],
+      PUB_CTX
+    );
     const published = lastSnapshot(calls, 'startOrUpdate');
     expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
     publisher.dispose();

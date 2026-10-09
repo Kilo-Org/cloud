@@ -119,6 +119,16 @@ enum HomeWidgetRefreshStore {
       defaults.synchronize()
     }
   }
+  /// Fixture capture only: the fixture path never runs `configure`, so the app
+  /// mirrors its active language into the same key the widget chrome reads for
+  /// its layout direction. Without this the extension would draw a localized
+  /// surface inside stale chrome.
+  static func fixtureLocale(_ locale: String) {
+    locked { defaults in
+      defaults.set(locale, forKey: "homeWidgetLocale")
+      defaults.synchronize()
+    }
+  }
   static func current(_ defaults: UserDefaults, _ config: [String: Any], _ generation: String) -> Bool {
     guard !defaults.bool(forKey: "homeWidgetFixture"),
           defaults.string(forKey: "homeWidgetGeneration") == generation,

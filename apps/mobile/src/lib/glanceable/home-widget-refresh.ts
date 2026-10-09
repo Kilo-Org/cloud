@@ -7,12 +7,9 @@ import {
   buildHomeWidgetPresentation,
   buildHomeWidgetPresentationTimeline,
   EMPTY_HOME_WIDGET_DETAILS,
-  type HomeWidgetData,
   homeWidgetDataSchema,
-  type HomeWidgetPresentation,
   homeWidgetRefreshAt,
   homeWidgetResponseSchema,
-  type HomeWidgetTimelineEntry,
 } from '@kilocode/app-shared/home-widget';
 import { requireOptionalNativeModule } from 'expo';
 import { z } from 'zod';
@@ -40,23 +37,21 @@ type NativeRefreshContext = {
 };
 
 type HomeWidgetRefreshModule = {
-  configure(config: {
-    endpoint: string;
-    token: string;
-    organizationId: string | null;
-    scopeKey: string;
-    accountEpoch: number;
-    operationEpoch: number;
-    copy: Record<string, string>;
-    locale: string;
-    data: HomeWidgetData;
-    home: HomeWidgetPresentation;
-    refreshAt: number;
-    presentationTimeline: HomeWidgetTimelineEntry[];
-  }): Promise<void>;
+  /**
+   * The same fields `syncHomeWidgetRefresh` builds, as JSON text. Native parses
+   * it, so null fields survive the bridge: Expo's Kotlin and Swift argument
+   * converters reject a null inside an object argument.
+   */
+  configure(payload: string): Promise<void>;
   clear(operationEpoch: number): Promise<void>;
   getOperationEpoch(): number;
   setFixtureMode(enabled: boolean): Promise<void>;
+  /**
+   * iOS only: mirror the active app language into the app-group locale key the
+   * widget chrome reads for its direction. The fixture path never runs
+   * `configure`, so it is the one writer that can keep the chrome in step.
+   */
+  setFixtureLocale?(locale: string): Promise<void>;
   // oxlint-disable-next-line anti-slop/no-unknown-returns -- raw native payload, parsed by homeWidgetDataSchema in restoreNativeHomeWidgetData
   getData(): Promise<unknown>;
   getWidgetPushToken(): Promise<string | null>;
@@ -101,6 +96,21 @@ export async function clearHomeWidgetRefresh(): Promise<void> {
   credential = null;
   clearPromise ??= clearNativeRefresh();
   await clearPromise;
+}
+
+/**
+ * Fixture capture only: mirror the active app language into the app-group locale
+ * key the widget extension reads for its layout direction. `configure` is the
+ * production writer, but fixture mode holds `syncHomeWidgetRefresh` back and
+ * clears native state, so nothing else keeps the chrome in step with the copy.
+ * The Android module has no such key; the optional call is a no-op there.
+ */
+export async function syncFixtureWidgetLocale(): Promise<void> {
+  try {
+    await HomeWidgetRefresh?.setFixtureLocale?.(getHomeWidgetCopy().locale);
+  } catch (error) {
+    report(error, 'set_fixture_locale');
+  }
 }
 
 /** The foreground app renews a dedicated read-only credential, never shares its refresh token. */
@@ -163,20 +173,27 @@ export async function syncHomeWidgetRefresh(context: {
     }
     const now = Date.now();
     const copy = getHomeWidgetCopy();
-    await HomeWidgetRefresh.configure({
-      endpoint: `${API_BASE_URL}/api/mobile/widgets`,
-      token: configuredCredential.token,
-      organizationId: context.organizationId,
-      scopeKey,
-      accountEpoch: authEpoch,
-      operationEpoch: epoch,
-      copy,
-      locale: copy.locale,
-      data,
-      home: buildHomeWidgetPresentation(data, now),
-      refreshAt: homeWidgetRefreshAt(data, now),
-      presentationTimeline: buildHomeWidgetPresentationTimeline(data, now),
-    });
+    // The payload crosses the bridge as JSON text and the native side parses it.
+    // A null field — a Personal scope's `organizationId`, a row without an
+    // approval key — otherwise fails Expo's Kotlin/Swift argument conversion
+    // with "Cannot convert '[object Object]' to a Kotlin type", which rejects
+    // every `configure` and leaves the widget with no credential to refresh.
+    await HomeWidgetRefresh.configure(
+      JSON.stringify({
+        endpoint: `${API_BASE_URL}/api/mobile/widgets`,
+        token: configuredCredential.token,
+        organizationId: context.organizationId,
+        scopeKey,
+        accountEpoch: authEpoch,
+        operationEpoch: epoch,
+        copy,
+        locale: copy.locale,
+        data,
+        home: buildHomeWidgetPresentation(data, now),
+        refreshAt: homeWidgetRefreshAt(data, now),
+        presentationTimeline: buildHomeWidgetPresentationTimeline(data, now),
+      })
+    );
   } catch (error) {
     if (!superseded()) {
       report(error, 'configure_native_refresh');

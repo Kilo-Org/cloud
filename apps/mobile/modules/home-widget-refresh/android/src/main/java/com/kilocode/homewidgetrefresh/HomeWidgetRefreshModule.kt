@@ -13,8 +13,8 @@ class HomeWidgetRefreshModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("HomeWidgetRefresh")
     Function("getOperationEpoch") { synchronized(operationLock) { operationEpoch.toDouble() } }
-    AsyncFunction("configure") { config: Map<String, Any?> ->
-      val json = JSONObject(config)
+    AsyncFunction("configure") { payload: String ->
+      val json = JSONObject(payload)
       val epoch = json.getLong("operationEpoch")
       synchronized(operationLock) {
         if (!destroyed && epoch > operationEpoch) {

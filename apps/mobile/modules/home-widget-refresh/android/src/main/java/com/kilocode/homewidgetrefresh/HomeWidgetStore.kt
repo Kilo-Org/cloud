@@ -22,6 +22,10 @@ internal object HomeWidgetStore {
   private const val ALIAS = "kilo-home-widget-context"
   private const val WORK = "kilo-home-widget-refresh"
   private fun prefs(context: Context) = context.getSharedPreferences("home-widget-refresh", Context.MODE_PRIVATE)
+  /** A missing key and a JSON null are both "no value"; `optString` would return the literal "null". */
+  private fun JSONObject.text(key: String): String? = if (isNull(key)) null else optString(key, null)
+  private fun JSONObject.integer(key: String): Int? = if (isNull(key)) null else getInt(key)
+  private fun JSONObject.number(key: String): Long? = if (isNull(key)) null else getLong(key)
   private fun key(): SecretKey {
     val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     (store.getKey(ALIAS, null) as? SecretKey)?.let { return it }
@@ -41,14 +45,15 @@ internal object HomeWidgetStore {
   }
   @Synchronized fun configure(context: Context, config: JSONObject) {
     val previous = HomeWidgetStore.config(context)
-    if (previous != null && (previous.optString("scopeKey") != config.optString("scopeKey") || previous.optInt("accountEpoch") != config.optInt("accountEpoch"))) clear(context)
+    if (previous != null && (previous.text("scopeKey") != config.text("scopeKey") || previous.integer("accountEpoch") != config.integer("accountEpoch"))) clear(context)
+    val refreshAt = config.number("refreshAt") ?: (System.currentTimeMillis() + 1_800_000)
     val cipher = Cipher.getInstance("AES/GCM/NoPadding")
     cipher.init(Cipher.ENCRYPT_MODE, key())
     val encrypted = cipher.iv + cipher.doFinal(config.toString().toByteArray(Charsets.UTF_8))
     check(prefs(context).edit().putString("protectedContext", Base64.encodeToString(encrypted, Base64.NO_WRAP))
       .putString("generation", UUID.randomUUID().toString()).putString("data", config.getJSONObject("data").toString())
-      .remove("terminalFence").putLong("refreshAt", config.getLong("refreshAt"))
-      .putLong("refreshDelay", (config.getLong("refreshAt") - System.currentTimeMillis()).coerceAtLeast(900_000)).commit())
+      .remove("terminalFence").putLong("refreshAt", refreshAt)
+      .putLong("refreshDelay", (refreshAt - System.currentTimeMillis()).coerceAtLeast(900_000)).commit())
     schedule(context, replace = true)
   }
   @Synchronized fun clear(context: Context, cancel: Boolean = true) {
@@ -66,7 +71,7 @@ internal object HomeWidgetStore {
   @Synchronized fun current(context: Context, scope: String, epoch: Int, generation: String): Boolean {
     if (!hasWidgets(context) || prefs(context).getBoolean("fixture", false) || generation(context) != generation) return false
     val config = config(context) ?: prefs(context).getString("terminalFence", null)?.let { JSONObject(it) } ?: return false
-    return config.optString("scopeKey") == scope && config.optInt("accountEpoch") == epoch
+    return config.text("scopeKey") == scope && config.integer("accountEpoch") == epoch
   }
   @Synchronized fun data(context: Context): JSONObject? = prefs(context).getString("data", null)?.let { JSONObject(it) }
   @Synchronized fun schedule(context: Context, replace: Boolean = false) {
@@ -92,23 +97,26 @@ internal object HomeWidgetStore {
       config = config(context) ?: return null
       generation = generation(context)
     }
-    val endpoint = URL(config.getString("endpoint"))
+    val endpoint = config.text("endpoint")?.let { URL(it) } ?: return null
     require(endpoint.protocol == "https" || endpoint.host == "localhost" || endpoint.host == "127.0.0.1" || endpoint.host == "10.0.2.2")
+    val token = config.text("token") ?: return null
+    val scopeKey = config.text("scopeKey") ?: return null
+    val accountEpoch = config.integer("accountEpoch") ?: return null
     val connection = endpoint.openConnection() as HttpURLConnection
     connection.connectTimeout = 15_000
     connection.readTimeout = 15_000
     connection.instanceFollowRedirects = false
-    connection.setRequestProperty("Authorization", "Bearer ${config.getString("token")}")
+    connection.setRequestProperty("Authorization", "Bearer $token")
     connection.setRequestProperty("Accept", "application/json")
     try {
       val status = connection.responseCode
       // Only an authentication refusal is terminal; 403 and every other failure keep retained content.
       if (status == 401) {
         synchronized(this) {
-          if (!current(context, config.getString("scopeKey"), config.getInt("accountEpoch"), generation)) return null
+          if (!current(context, scopeKey, accountEpoch, generation)) return null
           clear(context, cancel = false)
-          val fence = JSONObject().put("scopeKey", config.getString("scopeKey"))
-            .put("accountEpoch", config.getInt("accountEpoch")).put("generation", generation(context))
+          val fence = JSONObject().put("scopeKey", scopeKey)
+            .put("accountEpoch", accountEpoch).put("generation", generation(context))
           prefs(context).edit().putString("terminalFence", fence.toString()).commit()
           return fence.put("terminal", "privacy")
         }
@@ -131,15 +139,15 @@ internal object HomeWidgetStore {
       response.getJSONObject("home")
       val data = JSONObject().put("snapshot", snapshot).put("details", response.getJSONObject("details"))
       synchronized(this) {
-        if (!current(context, config.getString("scopeKey"), config.getInt("accountEpoch"), generation)) return null
+        if (!current(context, scopeKey, accountEpoch, generation)) return null
         val oldAt = HomeWidgetStore.data(context)?.getJSONObject("snapshot")?.optString("updatedAt")
         if (oldAt != null && snapshot.getString("updatedAt") < oldAt) return null
         prefs(context).edit().putString("data", data.toString()).putLong("refreshAt", response.getLong("refreshAt"))
           .putLong("refreshDelay", (response.getLong("refreshAt") - System.currentTimeMillis()).coerceAtLeast(900_000)).commit()
       }
-      return JSONObject().put("response", response).put("scopeKey", config.getString("scopeKey"))
-        .put("accountEpoch", config.getInt("accountEpoch")).put("generation", generation)
-        .put("copy", config.getJSONObject("copy")).put("locale", config.getString("locale"))
+      return JSONObject().put("response", response).put("scopeKey", scopeKey)
+        .put("accountEpoch", accountEpoch).put("generation", generation)
+        .put("copy", config.optJSONObject("copy") ?: JSONObject()).put("locale", config.text("locale") ?: "")
     } finally { connection.disconnect() }
   }
 }

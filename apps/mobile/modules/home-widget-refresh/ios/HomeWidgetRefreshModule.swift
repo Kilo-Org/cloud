@@ -50,7 +50,13 @@ public class HomeWidgetRefreshModule: Module {
   public func definition() -> ModuleDefinition {
     Name("HomeWidgetRefresh")
     Function("getOperationEpoch") { self.currentOperationEpoch() }
-    AsyncFunction("configure") { (config: [String: Any]) in
+    AsyncFunction("configure") { (payload: String) in
+      // The payload crosses the bridge as JSON text: a null field (a Personal
+      // scope's `organizationId`, a row without an approval key) makes Expo's
+      // Swift argument conversion fail before this body runs.
+      guard let config = (try? JSONSerialization.jsonObject(with: Data(payload.utf8))) as? [String: Any] else {
+        throw NSError(domain: HomeWidgetRefreshStore.service, code: 2, userInfo: [NSLocalizedDescriptionKey: "Widget configuration is not JSON"])
+      }
       guard let epoch = config["operationEpoch"] as? Int else {
         throw NSError(domain: HomeWidgetRefreshStore.service, code: 2, userInfo: [NSLocalizedDescriptionKey: "Missing widget operation epoch"])
       }
@@ -65,6 +71,7 @@ public class HomeWidgetRefreshModule: Module {
       self.finishClear(epoch)
     }
     AsyncFunction("setFixtureMode") { (enabled: Bool) in HomeWidgetRefreshStore.fixture(enabled) }
+    AsyncFunction("setFixtureLocale") { (locale: String) in HomeWidgetRefreshStore.fixtureLocale(locale) }
     AsyncFunction("getData") { () -> [String: Any]? in
       HomeWidgetRefreshStore.locked { HomeWidgetRefreshStore.readJSON($0, "homeWidgetData") } ?? nil
     }

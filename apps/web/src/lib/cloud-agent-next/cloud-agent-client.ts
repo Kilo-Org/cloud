@@ -1308,12 +1308,16 @@ const widgetApprovalKeyResponseSchema = z.object({
  * Kilo/cloud session pairing; the key grants no authority. Bounded, and throws
  * on any non-OK answer so the caller can drop the key while keeping counts.
  */
-export async function readCloudAgentWidgetApprovalKey(input: {
-  userId: string;
-  organizationId: string | null;
-  kiloSessionId: string;
-  cloudAgentSessionId: string;
-}): Promise<string | null> {
+export async function readCloudAgentWidgetApprovalKey(
+  input: {
+    userId: string;
+    organizationId: string | null;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+  },
+  signal?: AbortSignal
+): Promise<string | null> {
+  const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
   const response = await fetchWithinBudget(
     `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
     {
@@ -1324,7 +1328,7 @@ export async function readCloudAgentWidgetApprovalKey(input: {
       },
       body: JSON.stringify(input),
       cache: 'no-store',
-      signal: AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS),
+      signal: signal ? AbortSignal.any([budget, signal]) : budget,
     }
   );
   if (!response.ok) {

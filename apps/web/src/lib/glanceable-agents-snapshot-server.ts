@@ -46,7 +46,8 @@ function pickFrontPermissionRow(sessions: readonly ActiveSession[]): ActiveSessi
  */
 async function readApprovalKey(
   scope: HomeWidgetScope,
-  front: ActiveSession
+  front: ActiveSession,
+  signal: AbortSignal | undefined
 ): Promise<string | null> {
   try {
     const [row] = await db
@@ -64,11 +65,14 @@ async function readApprovalKey(
       .limit(1);
     // A remote CLI session has no cloud pending set; the app owns its approval.
     if (!row?.cloudAgentSessionId) return null;
-    return await readCloudAgentWidgetApprovalKey({
-      ...scope,
-      kiloSessionId: front.id,
-      cloudAgentSessionId: row.cloudAgentSessionId,
-    });
+    return await readCloudAgentWidgetApprovalKey(
+      {
+        ...scope,
+        kiloSessionId: front.id,
+        cloudAgentSessionId: row.cloudAgentSessionId,
+      },
+      signal
+    );
   } catch (error) {
     console.warn(
       '[home-widget] approval identity unavailable:',
@@ -78,20 +82,24 @@ async function readApprovalKey(
   }
 }
 
-/** Authorized callers only. Home details and counts use one complete read. */
-export async function buildHomeWidgetResponseForUser({
-  userId,
-  organizationId,
-}: HomeWidgetScope): Promise<HomeWidgetResponse> {
+/**
+ * Authorized callers only. Home details and counts use one complete read.
+ * `signal` stops the upstream fetches when the caller's deadline expires.
+ */
+export async function buildHomeWidgetResponseForUser(
+  { userId, organizationId }: HomeWidgetScope,
+  signal?: AbortSignal
+): Promise<HomeWidgetResponse> {
   const { sessions } = await listActiveSessions({
     userId,
     organizationId,
     includeCloudAgentSessions: true,
     requireCompleteSnapshot: true,
+    signal,
   });
   const front = pickFrontPermissionRow(sessions);
   const approvalKey =
-    front === null ? null : await readApprovalKey({ userId, organizationId }, front);
+    front === null ? null : await readApprovalKey({ userId, organizationId }, front, signal);
   const rows: HomeWidgetSessionRow[] =
     approvalKey === null
       ? sessions

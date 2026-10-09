@@ -168,12 +168,15 @@ describe('buildHomeWidgetResponseForUser', () => {
       });
 
       expect(mockedReadApprovalKey).toHaveBeenCalledTimes(1);
-      expect(mockedReadApprovalKey).toHaveBeenCalledWith({
-        userId: 'oauth/user-1',
-        organizationId: 'org-9',
-        kiloSessionId: 'ses_oldest_permission',
-        cloudAgentSessionId: CLOUD_SESSION,
-      });
+      expect(mockedReadApprovalKey).toHaveBeenCalledWith(
+        {
+          userId: 'oauth/user-1',
+          organizationId: 'org-9',
+          kiloSessionId: 'ses_oldest_permission',
+          cloudAgentSessionId: CLOUD_SESSION,
+        },
+        undefined
+      );
       expect(response.details.approvalKey).toBe(KEY);
       expect(response.home).toMatchObject({
         approvalKey: KEY,

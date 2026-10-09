@@ -5,9 +5,9 @@ import { homeWidgetJson, homeWidgetRequest } from '@/lib/home-widget-http';
 
 /** The read-only widget audience is accepted here, never by ordinary tRPC authentication. */
 export async function GET(request: NextRequest) {
-  return homeWidgetRequest(async () => {
+  return homeWidgetRequest(async signal => {
     const principal = await authenticateHomeWidget(request.headers);
-    const response = await buildHomeWidgetResponseForUser(principal);
+    const response = await buildHomeWidgetResponseForUser(principal, signal);
     return homeWidgetJson(response);
   });
 }

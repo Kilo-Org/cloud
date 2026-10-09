@@ -356,6 +356,8 @@ export type ListActiveSessionsInput = {
   includeCloudAgentSessions: boolean;
   /** Snapshot refreshes must fail rather than confirm partial/empty work on an upstream outage. */
   requireCompleteSnapshot?: boolean;
+  /** Caller deadline; aborts the session-ingest fetch. Postgres reads cannot be cancelled. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -369,6 +371,7 @@ export async function listActiveSessions({
   organizationId,
   includeCloudAgentSessions,
   requireCompleteSnapshot = false,
+  signal,
 }: ListActiveSessionsInput): Promise<{ sessions: ActiveSession[] }> {
   // Normal list callers retain best-effort behavior. Background snapshots
   // require an authoritative read so outages never erase last-known work.
@@ -398,6 +401,7 @@ export async function listActiveSessions({
       // exactly as any other upstream failure does.
       const response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
 
       if (!response.ok) {

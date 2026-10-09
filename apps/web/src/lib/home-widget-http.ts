@@ -10,8 +10,16 @@ export function homeWidgetJson(body: unknown, status = 200): NextResponse {
   });
 }
 
-/** Bound auth, source reads, and registration even without foreground-app headers. */
-export async function homeWidgetRequest(work: () => Promise<NextResponse>): Promise<NextResponse> {
+/**
+ * Bound auth, source reads, and registration even without foreground-app headers.
+ * `work` receives the deadline signal: forward it to upstream fetches so they stop
+ * on expiry. Drizzle over node-postgres takes no AbortSignal, so an in-flight DB
+ * query still finishes after a 504; check the signal before any write so a timed
+ * out request never starts a side effect.
+ */
+export async function homeWidgetRequest(
+  work: (signal: AbortSignal) => Promise<NextResponse>
+): Promise<NextResponse> {
   try {
     return await withDeadline(10_000, work);
   } catch (error) {

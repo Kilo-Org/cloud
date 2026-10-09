@@ -69,7 +69,7 @@ describe('dedicated native widget routes', () => {
     );
     const response = await GET(request);
     expect(auth).toHaveBeenCalledWith(request.headers);
-    expect(source).toHaveBeenCalledWith(principal);
+    expect(source).toHaveBeenCalledWith(principal, expect.any(AbortSignal));
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toContain('no-store');
     expect(await response.json()).toMatchObject({

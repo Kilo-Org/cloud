@@ -17,7 +17,7 @@ const bodySchema = z
 
 /** Bounded, widget-only registration. Account and organization come solely from the verified credential. */
 export async function POST(request: NextRequest) {
-  return homeWidgetRequest(async () => {
+  return homeWidgetRequest(async signal => {
     const principal = await authenticateHomeWidget(request.headers);
     const text = await request.text();
     if (text.length > 2048) throw new TRPCError({ code: 'BAD_REQUEST' });
@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
       principal.organizationId === null
         ? isNull(user_activity_tokens.organization_id)
         : eq(user_activity_tokens.organization_id, principal.organizationId);
+    // The DB write cannot be cancelled once sent; never start it after a 504.
+    signal.throwIfAborted();
     if (!enabled) {
       await db
         .delete(user_activity_tokens)

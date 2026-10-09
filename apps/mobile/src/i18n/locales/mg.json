@@ -3323,6 +3323,24 @@
       "deleteTitle": "Hamafa ity rafitra mpizara ho an'ny resaka ity?",
       "deleteMessage": "Hamafa an'i {{name}} sy ny mombamomba ny fidirana voatahiry ao aminy? Mila rafitra mpizara vaovao ny resaka mampiasa ity rafitra mpizara ity vao afaka mitohy.",
       "completionTokenFieldHelp": "Saha ho an'ny singa lahatsoratra amin'ny valiny: ampiasao max_completion_tokens ho an'ny API maoderina, na max_tokens raha mitaky ilay saha taloha ny teboka fiafaran'ny fifandraisanao."
+    },
+    "localModels": {
+      "title": "Modely ao amin'ny fitaovana",
+      "help": "Mandeha ao amin'ity finday ity ny modely ao amin'ny fitaovana. Mijanona ao amin'ny fitaovana ny fangatahanao sy ny valiny, ary tsy afaka mampiasa fitaovana ireo modely ireo.",
+      "apple": "Apple Intelligence (ao amin'ny fitaovana)",
+      "checking": "Manamarina raha misy…",
+      "ready": "Vonona hampiasaina",
+      "notAvailable": "Tsy azo ampiasaina",
+      "reasons": {
+        "appleIntelligenceDisabled": "Alefaso ny Apple Intelligence ao amin'ny app Settings mba hampiasana ity modely ity.",
+        "deviceNotEligible": "Tsy manohana ny Apple Intelligence ity fitaovana ity.",
+        "modelNotReady": "Mbola misintona na manomana ny modely. Andramo indray any aoriana.",
+        "unsupportedOs": "Mila iOS 26 na vaovao kokoa ity modely ity.",
+        "unknown": "Tsy nolazain'ny rafitra ny antony tsy ahazoana mampiasa ity modely ity."
+      },
+      "unavailable": "Tsy azo ampiasaina amin'izao fotoana izao ny modely ao amin'ny fitaovana. Jereo ny toetrany ao amin'ny $t(modelChat.backends.title).",
+      "busy": "Mbola mamaly hafatra hafa ny modely ao amin'ny fitaovana. Andramo indray rehefa vita izany.",
+      "failed": "Tsy nahavaly ity hafatra ity ny modely ao amin'ny fitaovana. Andramo indray na ovay ny fanoratana azy."
     }
   },
   "settingsTools": {

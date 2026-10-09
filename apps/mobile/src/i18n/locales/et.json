@@ -3323,6 +3323,24 @@
       "deleteTitle": "Kas kustutada see vestluse taustsüsteem?",
       "deleteMessage": "Kas kustutada {{name}} ja selle salvestatud autentimisandmed? Seda taustsüsteemi kasutavad vestlused vajavad jätkamiseks uut taustsüsteemi.",
       "completionTokenFieldHelp": "Väljundtokenite väli: kasuta tänapäevaste API-de puhul max_completion_tokens või max_tokens, kui sinu lõpp-punkt nõuab vanemat välja."
+    },
+    "localModels": {
+      "title": "Seadmesisesed mudelid",
+      "help": "Seadmesisesed mudelid töötavad selles telefonis. Sinu päringud ja vastused jäävad seadmesse ning need mudelid ei saa tööriistu kasutada.",
+      "apple": "Apple Intelligence (seadmes)",
+      "checking": "Saadavuse kontrollimine…",
+      "ready": "Kasutusvalmis",
+      "notAvailable": "Pole saadaval",
+      "reasons": {
+        "appleIntelligenceDisabled": "Selle mudeli kasutamiseks lülita rakenduses Seaded sisse Apple Intelligence.",
+        "deviceNotEligible": "See seade ei toeta Apple Intelligence'it.",
+        "modelNotReady": "Mudelit alles laaditakse alla või valmistatakse ette. Proovi hiljem uuesti.",
+        "unsupportedOs": "See mudel nõuab iOS 26 või uuemat versiooni.",
+        "unknown": "Süsteem ei teatanud, miks see mudel pole saadaval."
+      },
+      "unavailable": "Seadmesisene mudel pole praegu saadaval. Kontrolli selle olekut jaotises $t(modelChat.backends.title).",
+      "busy": "Seadmesisene mudel koostab praegu teist vastust. Proovi uuesti, kui see on lõpetanud.",
+      "failed": "Seadmesisene mudel ei suutnud sellele sõnumile vastata. Proovi uuesti või sõnasta see ümber."
     }
   },
   "settingsTools": {

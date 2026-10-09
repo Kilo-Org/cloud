@@ -3366,6 +3366,24 @@
       "deleteTitle": "Ștergi acest backend de chat?",
       "deleteMessage": "Ștergi {{name}} și credențialele stocate ale acestuia? Chaturile care folosesc acest backend vor avea nevoie de un backend nou înainte de a putea continua.",
       "completionTokenFieldHelp": "Câmpul pentru tokenuri de ieșire: folosește max_completion_tokens pentru API-urile moderne sau max_tokens dacă punctul tău de acces necesită câmpul vechi."
+    },
+    "localModels": {
+      "title": "Modele pe dispozitiv",
+      "help": "Modelele pe dispozitiv rulează pe acest telefon. Solicitările și răspunsurile tale rămân pe dispozitiv, iar aceste modele nu pot folosi instrumente.",
+      "apple": "Apple Intelligence (pe dispozitiv)",
+      "checking": "Se verifică disponibilitatea…",
+      "ready": "Gata de utilizare",
+      "notAvailable": "Indisponibil",
+      "reasons": {
+        "appleIntelligenceDisabled": "Activează Apple Intelligence în aplicația Configurări pentru a folosi acest model.",
+        "deviceNotEligible": "Acest dispozitiv nu acceptă Apple Intelligence.",
+        "modelNotReady": "Modelul încă se descarcă sau se pregătește. Încearcă din nou mai târziu.",
+        "unsupportedOs": "Acest model necesită iOS 26 sau o versiune ulterioară.",
+        "unknown": "Sistemul nu a indicat de ce acest model este indisponibil."
+      },
+      "unavailable": "Modelul pe dispozitiv nu este disponibil momentan. Verifică-i starea în $t(modelChat.backends.title).",
+      "busy": "Modelul pe dispozitiv este ocupat cu un alt răspuns. Încearcă din nou după ce termină.",
+      "failed": "Modelul pe dispozitiv nu a putut răspunde la acest mesaj. Încearcă din nou sau reformulează-l."
     }
   },
   "settingsTools": {

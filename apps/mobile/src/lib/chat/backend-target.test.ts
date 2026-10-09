@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import { type StoredChatBackend } from './backend-store';
-import { backendTargetId, decodeBackendTarget, resolveChatTarget } from './backend-target';
-import { requiresBackendDisclosure } from './backend-model-options';
+import {
+  backendTargetId,
+  decodeBackendTarget,
+  localTargetId,
+  resolveChatTarget,
+} from './backend-target';
+import { localModelOptions, requiresBackendDisclosure } from './backend-model-options';
 
 const first: StoredChatBackend = {
   id: 'server-one',
@@ -70,5 +77,75 @@ describe('persisted chat backend targets', () => {
     ).toBe(true);
     expect(requiresBackendDisclosure(target, backendTargetId(first, 'another-model'))).toBe(false);
     expect(requiresBackendDisclosure('kilo/one', 'kilo/two')).toBe(false);
+  });
+
+  it.each([
+    ['local:apple', { provider: 'apple', modelId: 'system' }],
+    ['local:android', { provider: 'android', modelId: 'system' }],
+    [
+      localTargetId('gguf', 'models/Qwen 3:4b.gguf'),
+      { provider: 'gguf', modelId: 'models/Qwen 3:4b.gguf' },
+    ],
+  ])('resolves on-device target %s without consulting backends', (id, expected) => {
+    expect(resolveChatTarget(id, [])).toEqual({ kind: 'local', ...expected });
+  });
+
+  it.each([
+    'local:',
+    'local:ios',
+    'local:apple:extra',
+    'local:gguf:',
+    'local:gguf:%XX',
+    'local:gguf:a b',
+  ])('refuses malformed on-device target %s', target => {
+    expect(() => resolveChatTarget(target, [first])).toThrow(
+      expect.objectContaining({ problem: 'invalidTarget' })
+    );
+  });
+
+  it('requires context disclosure between remote and each on-device model', () => {
+    const custom = backendTargetId(first, modelId);
+    const firstFile = localTargetId('gguf', 'one.gguf');
+    expect(requiresBackendDisclosure('kilo/default', 'local:apple')).toBe(true);
+    expect(requiresBackendDisclosure('local:apple', 'kilo/default')).toBe(true);
+    expect(requiresBackendDisclosure(custom, 'local:apple')).toBe(true);
+    expect(requiresBackendDisclosure('local:apple', 'local:android')).toBe(true);
+    expect(requiresBackendDisclosure(firstFile, localTargetId('gguf', 'two.gguf'))).toBe(true);
+    expect(requiresBackendDisclosure('local:apple', 'local:apple')).toBe(false);
+    expect(requiresBackendDisclosure(firstFile, firstFile)).toBe(false);
+  });
+
+  it('offers an on-device model only while its provider reports it available', () => {
+    const availability = {
+      modelId: 'apple-system-language-model',
+      contextWindow: 4096,
+      maxOutputTokens: 4096,
+      systemInstructions: true,
+    };
+    const status = {
+      provider: 'apple',
+      targetId: 'local:apple',
+      nameKey: 'modelChat.localModels.apple',
+    } as const;
+    expect(localModelOptions([{ ...status, availability: undefined }], i18n.t)).toEqual([]);
+    expect(
+      localModelOptions(
+        [
+          {
+            ...status,
+            availability: { ...availability, status: 'unavailable', reason: 'model_not_ready' },
+          },
+        ],
+        i18n.t
+      )
+    ).toEqual([]);
+    expect(
+      localModelOptions(
+        [{ ...status, availability: { ...availability, status: 'available' } }],
+        i18n.t
+      )
+    ).toMatchObject([
+      { id: 'local:apple', name: 'Apple Intelligence (on device)', contextWindow: 4096 },
+    ]);
   });
 });

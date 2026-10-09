@@ -114,6 +114,7 @@ vi.mock('@/lib/chat/backend-store', () => ({
   useChatBackends: () => backendUi.profiles,
   getChatBackendsHasLoaded: () => backendUi.loaded,
 }));
+vi.mock('@/lib/chat/local-models', () => ({ useLocalModels: () => [] }));
 vi.mock('@/components/chat/backend-settings-sheet', () => ({
   BackendSettingsControl: 'BackendSettingsControl',
 }));

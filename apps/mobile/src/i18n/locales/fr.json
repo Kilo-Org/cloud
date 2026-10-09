@@ -3366,6 +3366,24 @@
       "deleteTitle": "Supprimer ce service de discussion ?",
       "deleteMessage": "Supprimer {{name}} et ses identifiants d'authentification enregistrés ? Les discussions utilisant ce service devront utiliser un nouveau service pour pouvoir continuer.",
       "completionTokenFieldHelp": "Champ des jetons de sortie : utilisez max_completion_tokens pour les API modernes, ou max_tokens si votre point de terminaison nécessite le champ hérité."
+    },
+    "localModels": {
+      "title": "Modèles sur l'appareil",
+      "help": "Les modèles sur l'appareil s'exécutent sur ce téléphone. Vos requêtes et les réponses restent sur l'appareil, et ces modèles ne peuvent pas utiliser d'outils.",
+      "apple": "Apple Intelligence (sur l'appareil)",
+      "checking": "Vérification de la disponibilité…",
+      "ready": "Prêt à l'emploi",
+      "notAvailable": "Non disponible",
+      "reasons": {
+        "appleIntelligenceDisabled": "Activez Apple Intelligence dans l'app Réglages pour utiliser ce modèle.",
+        "deviceNotEligible": "Cet appareil n'est pas compatible avec Apple Intelligence.",
+        "modelNotReady": "Le modèle est encore en cours de téléchargement ou de préparation. Réessayez plus tard.",
+        "unsupportedOs": "Ce modèle nécessite iOS 26 ou une version ultérieure.",
+        "unknown": "Le système n'a pas indiqué pourquoi ce modèle est indisponible."
+      },
+      "unavailable": "Le modèle sur l'appareil n'est pas disponible pour le moment. Vérifiez son état dans $t(modelChat.backends.title).",
+      "busy": "Le modèle sur l'appareil est occupé à générer une autre réponse. Réessayez une fois qu'il aura terminé.",
+      "failed": "Le modèle sur l'appareil n'a pas pu répondre à ce message. Réessayez ou reformulez-le."
     }
   },
   "settingsTools": {

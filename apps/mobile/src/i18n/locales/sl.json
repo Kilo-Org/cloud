@@ -3409,6 +3409,24 @@
       "deleteTitle": "Izbrišem to zaledje za klepet?",
       "deleteMessage": "Izbrišem {{name}} in shranjene poverilnice? Klepeti, ki uporabljajo to zaledje, bodo za nadaljevanje potrebovali novo zaledje.",
       "completionTokenFieldHelp": "Polje za izhodne žetone: uporabite max_completion_tokens za sodobne API-je ali max_tokens, če vaša končna točka zahteva starejše polje."
+    },
+    "localModels": {
+      "title": "Modeli v napravi",
+      "help": "Modeli v napravi se izvajajo v tem telefonu. Vaši pozivi in odgovori ostanejo v napravi, ti modeli pa ne morejo uporabljati orodij.",
+      "apple": "Apple Intelligence (v napravi)",
+      "checking": "Preverjanje razpoložljivosti …",
+      "ready": "Pripravljeno za uporabo",
+      "notAvailable": "Ni na voljo",
+      "reasons": {
+        "appleIntelligenceDisabled": "Za uporabo tega modela vklopite Apple Intelligence v aplikaciji Nastavitve.",
+        "deviceNotEligible": "Ta naprava ne podpira funkcije Apple Intelligence.",
+        "modelNotReady": "Model se še prenaša ali pripravlja. Poskusite znova pozneje.",
+        "unsupportedOs": "Ta model zahteva iOS 26 ali novejšo različico.",
+        "unknown": "Sistem ni navedel, zakaj ta model ni na voljo."
+      },
+      "unavailable": "Model v napravi trenutno ni na voljo. Njegovo stanje preverite v razdelku $t(modelChat.backends.title).",
+      "busy": "Model v napravi je zaseden z drugim odgovorom. Poskusite znova, ko ga dokonča.",
+      "failed": "Model v napravi ni mogel odgovoriti na to sporočilo. Poskusite znova ali ga preoblikujte."
     }
   },
   "settingsTools": {

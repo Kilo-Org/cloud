@@ -3366,6 +3366,24 @@
       "deleteTitle": "Dzēst šo tērzēšanas aizmugursistēmu?",
       "deleteMessage": "Dzēst {{name}} un tās saglabātos piekļuves datus? Lai turpinātu tērzēšanas, kas izmanto šo aizmugursistēmu, būs jāizvēlas jauna aizmugursistēma.",
       "completionTokenFieldHelp": "Izvades tokenu lauks: jaunākajām API izmantojiet max_completion_tokens vai max_tokens, ja jūsu galapunktam nepieciešams mantotais lauks."
+    },
+    "localModels": {
+      "title": "Ierīces modeļi",
+      "help": "Ierīces modeļi darbojas šajā tālrunī. Jūsu uzvednes un atbildes paliek ierīcē, un šie modeļi nevar izmantot rīkus.",
+      "apple": "Apple Intelligence (ierīcē)",
+      "checking": "Pārbauda pieejamību…",
+      "ready": "Gatavs lietošanai",
+      "notAvailable": "Nav pieejams",
+      "reasons": {
+        "appleIntelligenceDisabled": "Lai izmantotu šo modeli, ieslēdziet Apple Intelligence lietotnē Iestatījumi.",
+        "deviceNotEligible": "Šī ierīce neatbalsta Apple Intelligence.",
+        "modelNotReady": "Modelis joprojām tiek lejupielādēts vai sagatavots. Mēģiniet vēlāk vēlreiz.",
+        "unsupportedOs": "Šim modelim nepieciešama iOS 26 vai jaunāka versija.",
+        "unknown": "Sistēma nenorādīja, kāpēc šis modelis nav pieejams."
+      },
+      "unavailable": "Ierīces modelis pašlaik nav pieejams. Pārbaudiet tā statusu sadaļā $t(modelChat.backends.title).",
+      "busy": "Ierīces modelis ir aizņemts ar citu atbildi. Mēģiniet vēlreiz, kad tas būs pabeidzis.",
+      "failed": "Ierīces modelis nevarēja atbildēt uz šo ziņojumu. Mēģiniet vēlreiz vai pārformulējiet to."
     }
   },
   "settingsTools": {

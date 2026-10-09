@@ -3323,6 +3323,24 @@
       "deleteTitle": "Deze chatserver verwijderen?",
       "deleteMessage": "{{name}} en de bijbehorende opgeslagen aanmeldgegevens verwijderen? Chats die deze chatserver gebruiken, hebben een nieuwe chatserver nodig voordat ze verder kunnen gaan.",
       "completionTokenFieldHelp": "Veld voor uitvoertokens: gebruik max_completion_tokens voor moderne API's, of max_tokens als je eindpunt het verouderde veld vereist."
+    },
+    "localModels": {
+      "title": "Modellen op het apparaat",
+      "help": "Modellen op het apparaat draaien op deze telefoon. Je prompts en antwoorden blijven op het apparaat, en deze modellen kunnen geen tools gebruiken.",
+      "apple": "Apple Intelligence (op het apparaat)",
+      "checking": "Beschikbaarheid controleren…",
+      "ready": "Klaar voor gebruik",
+      "notAvailable": "Niet beschikbaar",
+      "reasons": {
+        "appleIntelligenceDisabled": "Schakel Apple Intelligence in via de app Instellingen om dit model te gebruiken.",
+        "deviceNotEligible": "Dit apparaat ondersteunt Apple Intelligence niet.",
+        "modelNotReady": "Het model wordt nog gedownload of voorbereid. Probeer het later opnieuw.",
+        "unsupportedOs": "Voor dit model is iOS 26 of nieuwer vereist.",
+        "unknown": "Het systeem heeft niet aangegeven waarom dit model niet beschikbaar is."
+      },
+      "unavailable": "Het model op het apparaat is nu niet beschikbaar. Controleer de status in $t(modelChat.backends.title).",
+      "busy": "Het model op het apparaat is bezig met een ander antwoord. Probeer het opnieuw zodra het klaar is.",
+      "failed": "Het model op het apparaat kon dit bericht niet beantwoorden. Probeer het opnieuw of formuleer het anders."
     }
   },
   "settingsTools": {

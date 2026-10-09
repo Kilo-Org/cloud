@@ -3452,6 +3452,24 @@
       "deleteTitle": "Scrios an cúlchóras comhrá seo?",
       "deleteMessage": "Scrios {{name}} agus na dintiúir atá stóráilte dó? Beidh cúlchóras nua de dhíth ar chomhráití a úsáideann an cúlchóras seo sular féidir leo leanúint ar aghaidh.",
       "completionTokenFieldHelp": "Réimse comharthaí comhlánaithe: úsáid max_completion_tokens le haghaidh APIanna nua-aimseartha, nó max_tokens má éilíonn do chríochphointe an réimse oidhreachta."
+    },
+    "localModels": {
+      "title": "Samhlacha ar an ngléas",
+      "help": "Ritheann samhlacha ar an ngléas ar an bhfón seo. Fanann do leideanna agus na freagraí ar an ngléas, agus ní féidir leis na samhlacha seo uirlisí a úsáid.",
+      "apple": "Apple Intelligence (ar an ngléas)",
+      "checking": "Infhaighteacht á seiceáil…",
+      "ready": "Réidh le húsáid",
+      "notAvailable": "Níl sí ar fáil",
+      "reasons": {
+        "appleIntelligenceDisabled": "Cas air Apple Intelligence san aip Settings chun an tsamhail seo a úsáid.",
+        "deviceNotEligible": "Ní thacaíonn an gléas seo le Apple Intelligence.",
+        "modelNotReady": "Tá an tsamhail fós á híoslódáil nó á hullmhú. Bain triail eile as ar ball.",
+        "unsupportedOs": "Tá iOS 26 nó níos déanaí ag teastáil don tsamhail seo.",
+        "unknown": "Níor thug an córas cúis nach bhfuil an tsamhail seo ar fáil."
+      },
+      "unavailable": "Níl an tsamhail ar an ngléas ar fáil faoi láthair. Seiceáil a stádas in $t(modelChat.backends.title).",
+      "busy": "Tá an tsamhail ar an ngléas gnóthach le freagra eile. Bain triail eile as nuair a bheidh sé críochnaithe.",
+      "failed": "Níorbh fhéidir leis an tsamhail ar an ngléas an teachtaireacht seo a fhreagairt. Bain triail eile as nó athfhoclaigh í."
     }
   },
   "settingsTools": {

@@ -3323,6 +3323,24 @@
       "deleteTitle": "Hapus layanan obrolan ini?",
       "deleteMessage": "Hapus {{name}} beserta kredensial yang tersimpan? Obrolan yang menggunakan layanan ini akan memerlukan layanan baru sebelum dapat dilanjutkan.",
       "completionTokenFieldHelp": "Kolom token keluaran: gunakan max_completion_tokens untuk API modern, atau max_tokens jika endpoint Anda memerlukan kolom lama."
+    },
+    "localModels": {
+      "title": "Model di perangkat",
+      "help": "Model di perangkat berjalan di ponsel ini. Perintah dan balasan Anda tetap ada di perangkat, dan model ini tidak dapat menggunakan alat.",
+      "apple": "Apple Intelligence (di perangkat)",
+      "checking": "Memeriksa ketersediaan…",
+      "ready": "Siap digunakan",
+      "notAvailable": "Tidak tersedia",
+      "reasons": {
+        "appleIntelligenceDisabled": "Nyalakan Apple Intelligence di app Pengaturan untuk menggunakan model ini.",
+        "deviceNotEligible": "Perangkat ini tidak mendukung Apple Intelligence.",
+        "modelNotReady": "Model masih diunduh atau sedang disiapkan. Coba lagi nanti.",
+        "unsupportedOs": "Model ini memerlukan iOS 26 atau lebih baru.",
+        "unknown": "Sistem tidak menyebutkan alasan model ini tidak tersedia."
+      },
+      "unavailable": "Model di perangkat sedang tidak tersedia. Periksa statusnya di $t(modelChat.backends.title).",
+      "busy": "Model di perangkat sedang menyusun balasan lain. Coba lagi setelah selesai.",
+      "failed": "Model di perangkat tidak dapat menjawab pesan ini. Coba lagi atau ubah susunan kalimatnya."
     }
   },
   "settingsTools": {

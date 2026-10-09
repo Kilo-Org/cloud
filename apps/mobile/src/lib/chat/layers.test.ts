@@ -14,6 +14,7 @@ vi.mock('./fetch', () => ({ chatFetch: () => undefined }));
 vi.mock('./backend-store', () => ({ listChatBackends: () => [] }));
 vi.mock('./backend-request', () => ({ backendHeaders: () => ({}) }));
 vi.mock('./backend-transport', () => ({ assertBackendTransport: () => undefined }));
+vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
 vi.mock('@/lib/intl-cache', () => ({
   dateTimeFormat: () => ({ resolvedOptions: () => ({ timeZone: 'Europe/Amsterdam' }) }),
 }));

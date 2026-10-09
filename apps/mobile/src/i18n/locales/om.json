@@ -3323,6 +3323,24 @@
       "deleteTitle": "Sirna duubaa chaat kana haquu?",
       "deleteMessage": "{{name}} fi odeeffannoo mirkaneessa eenyummaa isaa kuufame haquu? Chaatonni sirna duubaa kana fayyadaman itti fufuu isaanii dura sirna duubaa haaraa barbaadu.",
       "completionTokenFieldHelp": "Dirree tokanoota bu'aa: APIwwan ammayyaatiif max_completion_tokens fayyadami, yookaan qabxiin xumuraa kee dirree durii yoo barbaadu max_tokens fayyadami."
+    },
+    "localModels": {
+      "title": "Moodeelota meeshaa irratti",
+      "help": "Moodeelonni meeshaa irratti bilbila kana irratti hojjetu. Gaaffiin keessanii fi deebiin meeshaa kana irra turu, moodeelonni kunis meeshaalee fayyadamuu hin danda'an.",
+      "apple": "Apple Intelligence (meeshaa irratti)",
+      "checking": "Argamuu isaa mirkaneessaa jira…",
+      "ready": "Fayyadamuuf qophaa'eera",
+      "notAvailable": "Hin argamu",
+      "reasons": {
+        "appleIntelligenceDisabled": "Moodeela kana fayyadamuuf appii Settings keessatti Apple Intelligence banaa.",
+        "deviceNotEligible": "Meeshaan kun Apple Intelligence hin deeggaru.",
+        "modelNotReady": "Moodeelli ammallee buufamaa ykn qophaa'aa jira. Booda irra deebi'ii yaali.",
+        "unsupportedOs": "Moodeelli kun iOS 26 ykn isaa booda barbaada.",
+        "unknown": "Sirnichi moodeelli kun maaliif akka hin argamne hin ibsine."
+      },
+      "unavailable": "Moodeelli meeshaa irratti amma hin argamu. Haala isaa $t(modelChat.backends.title) keessatti ilaali.",
+      "busy": "Moodeelli meeshaa irratti deebii biraatiin qabameera. Yeroo xumuru irra deebi'ii yaali.",
+      "failed": "Moodeelli meeshaa irratti ergaa kanaaf deebisuu hin dandeenye. Irra deebi'ii yaali ykn haala biraan barreessi."
     }
   },
   "settingsTools": {

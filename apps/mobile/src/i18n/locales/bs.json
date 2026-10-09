@@ -3366,6 +3366,24 @@
       "deleteTitle": "Obrisati ovaj pozadinski servis za razgovor?",
       "deleteMessage": "Obrisati {{name}} i njegove pohranjene pristupne podatke? Razgovorima koji koriste ovaj pozadinski servis bit će potreban novi pozadinski servis prije nego što se mogu nastaviti.",
       "completionTokenFieldHelp": "Polje za izlazne tokene: koristite max_completion_tokens za moderne API-je ili max_tokens ako vaša krajnja tačka zahtijeva staro polje."
+    },
+    "localModels": {
+      "title": "Modeli na uređaju",
+      "help": "Modeli na uređaju rade na ovom telefonu. Vaši upiti i odgovori ostaju na uređaju, a ovi modeli ne mogu koristiti alate.",
+      "apple": "Apple Intelligence (na uređaju)",
+      "checking": "Provjera dostupnosti…",
+      "ready": "Spremno za korištenje",
+      "notAvailable": "Nije dostupno",
+      "reasons": {
+        "appleIntelligenceDisabled": "Uključite Apple Intelligence u aplikaciji Postavke da biste koristili ovaj model.",
+        "deviceNotEligible": "Ovaj uređaj ne podržava Apple Intelligence.",
+        "modelNotReady": "Model se još preuzima ili priprema. Pokušajte ponovo kasnije.",
+        "unsupportedOs": "Ovaj model zahtijeva iOS 26 ili noviji.",
+        "unknown": "Sistem nije naveo zašto ovaj model nije dostupan."
+      },
+      "unavailable": "Model na uređaju trenutno nije dostupan. Provjerite njegov status u odjeljku $t(modelChat.backends.title).",
+      "busy": "Model na uređaju je zauzet drugim odgovorom. Pokušajte ponovo kada završi.",
+      "failed": "Model na uređaju nije mogao odgovoriti na ovu poruku. Pokušajte ponovo ili je preformulišite."
     }
   },
   "settingsTools": {

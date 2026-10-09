@@ -3323,6 +3323,24 @@
       "deleteTitle": "刪除此聊天後端？",
       "deleteMessage": "要刪除 {{name}} 及其儲存的驗證憑證嗎？使用此後端的聊天必須選擇新的後端才能繼續。",
       "completionTokenFieldHelp": "輸出詞元欄位：新版應用程式介面請使用 max_completion_tokens；若您的端點要求使用舊版欄位，則使用 max_tokens。"
+    },
+    "localModels": {
+      "title": "裝置端模型",
+      "help": "裝置端模型會在這支手機上執行。你的提示和回覆都會保留在裝置上，且這些模型無法使用工具。",
+      "apple": "Apple Intelligence（裝置端）",
+      "checking": "正在檢查可用性⋯",
+      "ready": "可以使用",
+      "notAvailable": "無法使用",
+      "reasons": {
+        "appleIntelligenceDisabled": "請在「設定」App 中開啟 Apple Intelligence 以使用此模型。",
+        "deviceNotEligible": "此裝置不支援 Apple Intelligence。",
+        "modelNotReady": "模型仍在下載或準備中，請稍後再試。",
+        "unsupportedOs": "此模型需要 iOS 26 或以上版本。",
+        "unknown": "系統未說明此模型無法使用的原因。"
+      },
+      "unavailable": "裝置端模型目前無法使用。請在「$t(modelChat.backends.title)」中查看其狀態。",
+      "busy": "裝置端模型正在產生另一則回覆，請在完成後再試一次。",
+      "failed": "裝置端模型無法回答此訊息。請再試一次或換個說法。"
     }
   },
   "settingsTools": {

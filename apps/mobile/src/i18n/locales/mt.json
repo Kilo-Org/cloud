@@ -3452,6 +3452,24 @@
       "deleteTitle": "Tħassar dan is-servizz taċ-chat?",
       "deleteMessage": "Tħassar {{name}} u l-kredenzjali maħżuna tiegħu? Iċ-chats li jużaw dan is-servizz se jkollhom bżonn servizz ġdid qabel ma jkunu jistgħu jkomplu.",
       "completionTokenFieldHelp": "Qasam għall-unitajiet tat-test tat-tlestija: uża max_completion_tokens għall-APIs moderni, jew max_tokens jekk il-punt finali tiegħek jeħtieġ il-qasam l-antik."
+    },
+    "localModels": {
+      "title": "Mudelli fuq l-apparat",
+      "help": "Il-mudelli fuq l-apparat jaħdmu fuq dan il-mowbajl. Il-messaġġi u t-tweġibiet tiegħek jibqgħu fuq l-apparat, u dawn il-mudelli ma jistgħux jużaw għodod.",
+      "apple": "Apple Intelligence (fuq l-apparat)",
+      "checking": "Qed tiġi ċċekkjata d-disponibbiltà…",
+      "ready": "Lest għall-użu",
+      "notAvailable": "Mhux disponibbli",
+      "reasons": {
+        "appleIntelligenceDisabled": "Ixgħel Apple Intelligence fl-app Settings biex tuża dan il-mudell.",
+        "deviceNotEligible": "Dan l-apparat ma jappoġġjax Apple Intelligence.",
+        "modelNotReady": "Il-mudell għadu qed jitniżżel jew jitħejja. Erġa' pprova aktar tard.",
+        "unsupportedOs": "Dan il-mudell jeħtieġ iOS 26 jew aktar ġdid.",
+        "unknown": "Is-sistema ma qalitx għaliex dan il-mudell mhux disponibbli."
+      },
+      "unavailable": "Il-mudell fuq l-apparat mhux disponibbli bħalissa. Iċċekkja l-istatus tiegħu f'$t(modelChat.backends.title).",
+      "busy": "Il-mudell fuq l-apparat għadu qed iwieġeb messaġġ ieħor. Erġa' pprova meta jispiċċa.",
+      "failed": "Il-mudell fuq l-apparat ma setax iwieġeb dan il-messaġġ. Erġa' pprova jew ikteb il-messaġġ b'mod ieħor."
     }
   },
   "settingsTools": {

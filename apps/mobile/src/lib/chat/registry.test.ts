@@ -65,6 +65,7 @@ const mcp = vi.hoisted(() => ({
   }),
 }));
 
+vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
 const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[] }));
 vi.mock('./backend-store', () => ({
   listChatBackends: () => backendState.profiles,
@@ -121,6 +122,8 @@ vi.mock('@kilocode/harness-sdk', () => {
   }
   return {
     ToolMissingError: FakeToolMissingError,
+    // Failure copy is read from the error itself before any model error cause.
+    ModelError: Error,
     openSession: (options: { readonly tools?: readonly string[] }) => {
       openedWith = options;
       return Effect.succeed(handleFor('s1'));

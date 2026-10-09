@@ -3323,6 +3323,24 @@
       "deleteTitle": "이 채팅 백엔드를 삭제할까요?",
       "deleteMessage": "{{name}} 및 저장된 인증 정보를 삭제할까요? 이 백엔드를 사용하는 채팅을 계속하려면 새 백엔드를 선택해야 합니다.",
       "completionTokenFieldHelp": "출력 토큰 필드: 최신 API에는 max_completion_tokens를 사용하고, 엔드포인트에서 기존 필드를 요구하는 경우 max_tokens를 사용하세요."
+    },
+    "localModels": {
+      "title": "기기 내 모델",
+      "help": "기기 내 모델은 이 휴대폰에서 실행됩니다. 프롬프트와 답변은 기기에만 저장되며, 이 모델은 도구를 사용할 수 없습니다.",
+      "apple": "Apple Intelligence(기기 내)",
+      "checking": "사용 가능 여부 확인 중…",
+      "ready": "사용 가능",
+      "notAvailable": "사용할 수 없음",
+      "reasons": {
+        "appleIntelligenceDisabled": "이 모델을 사용하려면 설정 앱에서 Apple Intelligence를 켜세요.",
+        "deviceNotEligible": "이 기기는 Apple Intelligence를 지원하지 않습니다.",
+        "modelNotReady": "모델을 아직 다운로드하거나 준비하는 중입니다. 나중에 다시 시도하세요.",
+        "unsupportedOs": "이 모델을 사용하려면 iOS 26 이상이 필요합니다.",
+        "unknown": "시스템에서 이 모델을 사용할 수 없는 이유를 알려 주지 않았습니다."
+      },
+      "unavailable": "지금은 기기 내 모델을 사용할 수 없습니다. $t(modelChat.backends.title)에서 상태를 확인하세요.",
+      "busy": "기기 내 모델이 다른 답변을 생성하는 중입니다. 완료된 후 다시 시도하세요.",
+      "failed": "기기 내 모델이 이 메시지에 답변하지 못했습니다. 다시 시도하거나 다른 표현으로 입력해 보세요."
     }
   },
   "settingsTools": {

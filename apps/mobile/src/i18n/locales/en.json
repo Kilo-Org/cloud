@@ -3281,6 +3281,24 @@
       "deleteTitle": "Delete this chat backend?",
       "deleteMessage": "Delete {{name}} and its stored credentials? Chats using this backend will need a new backend before they can continue."
     },
+    "localModels": {
+      "title": "On-device models",
+      "help": "On-device models run on this phone. Your prompts and replies stay on the device, and these models can't use tools.",
+      "apple": "Apple Intelligence (on device)",
+      "checking": "Checking availability…",
+      "ready": "Ready to use",
+      "notAvailable": "Not available",
+      "reasons": {
+        "appleIntelligenceDisabled": "Turn on Apple Intelligence in the Settings app to use this model.",
+        "deviceNotEligible": "This device doesn't support Apple Intelligence.",
+        "modelNotReady": "The model is still downloading or getting ready. Try again later.",
+        "unsupportedOs": "This model requires iOS 26 or later.",
+        "unknown": "The system didn't say why this model is unavailable."
+      },
+      "unavailable": "The on-device model isn't available right now. Check its status in $t(modelChat.backends.title).",
+      "busy": "The on-device model is busy with another reply. Try again when it finishes.",
+      "failed": "The on-device model couldn't answer this message. Try again or rephrase it."
+    },
     "mcp": {
       "title": "Kilo tools",
       "use": "Use Kilo tools",

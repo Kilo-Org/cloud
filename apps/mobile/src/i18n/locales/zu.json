@@ -3323,6 +3323,24 @@
       "deleteTitle": "Susa lolu hlelo olungemuva lwengxoxo?",
       "deleteMessage": "Susa i-{{name}} kanye nemininingwane yayo yokungena egciniwe? Izingxoxo ezisebenzisa lolu hlelo olungemuva zizodinga uhlelo olungemuva olusha ngaphambi kokuba ziqhubeke.",
       "completionTokenFieldHelp": "Inkambu yamathokheni empendulo: sebenzisa max_completion_tokens kuma-API esimanje, noma max_tokens uma indawo yakho yokugcina idinga inkambu yakudala."
+    },
+    "localModels": {
+      "title": "Amamodeli asedivayisini",
+      "help": "Amamodeli asedivayisini asebenza kule foni. Imiyalo yakho nezimpendulo kuhlala kudivayisi, futhi lawa mamodeli awakwazi ukusebenzisa amathuluzi.",
+      "apple": "Apple Intelligence (edivayisini)",
+      "checking": "Kuhlolwa ukutholakala…",
+      "ready": "Ilungele ukusetshenziswa",
+      "notAvailable": "Ayitholakali",
+      "reasons": {
+        "appleIntelligenceDisabled": "Vula i-Apple Intelligence ku-app ye-Izilungiselelo ukuze usebenzise le modeli.",
+        "deviceNotEligible": "Le divayisi ayiyisekeli i-Apple Intelligence.",
+        "modelNotReady": "Imodeli isadawunilodwa noma isalungiswa. Zama futhi emuva kwesikhathi.",
+        "unsupportedOs": "Le modeli idinga i-iOS 26 noma eyakamuva.",
+        "unknown": "Isistimu ayishongo ukuthi kungani le modeli ingatholakali."
+      },
+      "unavailable": "Imodeli esedivayisini ayitholakali okwamanje. Hlola isimo sayo ku-$t(modelChat.backends.title).",
+      "busy": "Imodeli esedivayisini isamatasa nenye impendulo. Zama futhi uma isiqedile.",
+      "failed": "Imodeli esedivayisini ayikwazanga ukuphendula lo mlayezo. Zama futhi noma uwubhale ngenye indlela."
     }
   },
   "settingsTools": {

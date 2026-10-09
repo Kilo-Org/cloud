@@ -33,13 +33,19 @@ import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
-import { backendModelOptions, requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
-import { decodeBackendTarget, resolveChatTarget } from '@/lib/chat/backend-target';
+import {
+  backendModelOptions,
+  localModelOptions,
+  requiresBackendDisclosure,
+} from '@/lib/chat/backend-model-options';
+import { resolveChatTarget } from '@/lib/chat/backend-target';
+import { useLocalModels } from '@/lib/chat/local-models';
 
 import { BetaPill } from './beta-pill';
 import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
+import { ModelToolsHint } from './model-tools-hint';
 
 /**
  * One conversation.
@@ -85,6 +91,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   // Kilo view, so the control and the sheet cannot disagree.
   const [mcpOpen, setMcpOpen] = useState(false);
   const backends = useChatBackends();
+  const localModels = useLocalModels();
   const mcp = useMcpSettings(place, state.sessionId);
   const colors = useThemeColors();
 
@@ -104,8 +111,12 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     remoteModelState: NO_REMOTE,
   });
   const availableOptions = useMemo(
-    () => [...modelOptions.options, ...backendModelOptions(backends)],
-    [backends, modelOptions.options]
+    () => [
+      ...modelOptions.options,
+      ...backendModelOptions(backends),
+      ...localModelOptions(localModels, t),
+    ],
+    [backends, localModels, modelOptions.options, t]
   );
 
   // The model the next message goes to. It starts as the one the conversation
@@ -114,10 +125,6 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const [picked, setPicked] = useState<string | null>(null);
   const [variant, setVariant] = useState('');
   const model = picked ?? state.model;
-  const customTarget = decodeBackendTarget(model);
-  const customModel = backends
-    .find(backend => backend.id === customTarget?.backendId)
-    ?.models.find(one => one.id === customTarget?.modelId);
 
   const selectModel = (modelId: string, variantId: string) => {
     const accept = () => {
@@ -280,13 +287,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         ) : null}
 
         <View style={composerPadding}>
-          {customModel !== undefined && (
-            <Text className="px-4 pt-2 text-xs text-muted-foreground">
-              {t(
-                customModel.tools ? 'modelChat.backends.modelTools' : 'modelChat.backends.textOnly'
-              )}
-            </Text>
-          )}
+          <ModelToolsHint model={model} backends={backends} localModels={localModels} />
           <ChatComposer
             onSend={handleSend}
             onSendCommand={noSessionCommand}

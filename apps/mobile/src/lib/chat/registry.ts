@@ -468,7 +468,10 @@ function reading(sessionId: string, text: string, runtime: ChatRuntime): Effect.
     Effect.matchCauseEffect({
       onFailure: (cause: Cause.Cause<unknown>) =>
         Effect.promise(async () => {
-          await settle(sessionId, runtime, why(cause));
+          await settle(sessionId, runtime, {
+            reason: why(cause),
+            key: backendFailureKey(Option.getOrUndefined(Cause.failureOption(cause))),
+          });
         }),
       onSuccess: () =>
         Effect.promise(async () => {
@@ -479,7 +482,7 @@ function reading(sessionId: string, text: string, runtime: ChatRuntime): Effect.
 }
 
 /**
- * A short reason for the log. The screen says the same thing whatever it is.
+ * A short reason for the log. The screen shows fixed copy for the failure instead.
  *
  * The failure itself is read rather than the cause's own text: every error this
  * package raises is a tagged value whose fields — the status, the body, the
@@ -500,7 +503,8 @@ function why(cause: Cause.Cause<unknown>): string {
 }
 
 /**
- * What is true once an answer has ended.
+ * What is true once an answer has ended. A failure carries a reason for the log
+ * and the key of the fixed copy the screen shows.
  *
  * The turns come from the session rather than from what was streamed: the store
  * holds what was written, and a question that failed was never written. That
@@ -509,13 +513,14 @@ function why(cause: Cause.Cause<unknown>): string {
 async function settle(
   sessionId: string,
   runtime: ChatRuntime,
-  failed: string | null
+  failure: { readonly reason: string; readonly key: string } | null
 ): Promise<void> {
   const chat = chats.get(sessionId);
   if (chat === undefined) {
     return;
   }
   const turns = await runtime.runPromise(chat.handle.history);
+  const failed = failure?.reason ?? null;
   if (failed === null) {
     await forgetAsked(sessionId);
   }
@@ -527,7 +532,7 @@ async function settle(
     asked: failed === null ? null : snapshotOf(sessionId).asked,
     askedModel: failed === null ? null : snapshotOf(sessionId).askedModel,
     failed,
-    failureKey: failed === null ? null : 'common.somethingWentWrong',
+    failureKey: failure?.key ?? null,
   });
   /* The line moves only when the answer landed. A question that failed keeps
      its Retry, and asking the next one would take the place that Retry hangs

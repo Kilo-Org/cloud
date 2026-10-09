@@ -3323,6 +3323,24 @@
       "deleteTitle": "Ta bort den här chattbackenden?",
       "deleteMessage": "Ta bort {{name}} och dess sparade inloggningsuppgifter? Chattar som använder den här backenden behöver en ny backend innan de kan fortsätta.",
       "completionTokenFieldHelp": "Fält för utdatatokens: använd max_completion_tokens för moderna API:er, eller max_tokens om din slutpunkt kräver det äldre fältet."
+    },
+    "localModels": {
+      "title": "Modeller på enheten",
+      "help": "Modeller på enheten körs på den här telefonen. Dina frågor och svar stannar på enheten, och de här modellerna kan inte använda verktyg.",
+      "apple": "Apple Intelligence (på enheten)",
+      "checking": "Kontrollerar tillgänglighet …",
+      "ready": "Redo att använda",
+      "notAvailable": "Inte tillgänglig",
+      "reasons": {
+        "appleIntelligenceDisabled": "Slå på Apple Intelligence i appen Inställningar för att använda den här modellen.",
+        "deviceNotEligible": "Den här enheten har inte stöd för Apple Intelligence.",
+        "modelNotReady": "Modellen laddas fortfarande ned eller förbereds. Försök igen senare.",
+        "unsupportedOs": "Den här modellen kräver iOS 26 eller senare.",
+        "unknown": "Systemet angav inte varför modellen inte är tillgänglig."
+      },
+      "unavailable": "Modellen på enheten är inte tillgänglig just nu. Kontrollera dess status i $t(modelChat.backends.title).",
+      "busy": "Modellen på enheten är upptagen med ett annat svar. Försök igen när den är klar.",
+      "failed": "Modellen på enheten kunde inte svara på meddelandet. Försök igen eller formulera om det."
     }
   },
   "settingsTools": {

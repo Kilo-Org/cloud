@@ -3323,6 +3323,24 @@
       "deleteTitle": "删除此聊天后端？",
       "deleteMessage": "删除 {{name}} 及其存储的凭据？使用此后端的聊天需要选择新的后端才能继续。",
       "completionTokenFieldHelp": "输出词元字段：现代接口使用 max_completion_tokens；如果您的端点要求使用旧版字段，则使用 max_tokens。"
+    },
+    "localModels": {
+      "title": "本机模型",
+      "help": "本机模型在这部手机上运行。你的提示和回复都会保留在设备上，且这些模型无法使用工具。",
+      "apple": "Apple 智能（本机）",
+      "checking": "正在检查可用性…",
+      "ready": "可以使用",
+      "notAvailable": "不可用",
+      "reasons": {
+        "appleIntelligenceDisabled": "请在“设置”App 中打开 Apple 智能以使用此模型。",
+        "deviceNotEligible": "此设备不支持 Apple 智能。",
+        "modelNotReady": "模型仍在下载或准备中，请稍后再试。",
+        "unsupportedOs": "此模型需要 iOS 26 或更高版本。",
+        "unknown": "系统未说明此模型不可用的原因。"
+      },
+      "unavailable": "本机模型目前不可用。请在“$t(modelChat.backends.title)”中查看其状态。",
+      "busy": "本机模型正忙于生成另一条回复，请在其完成后再试。",
+      "failed": "本机模型无法回答此消息。请重试或换种说法。"
     }
   },
   "settingsTools": {

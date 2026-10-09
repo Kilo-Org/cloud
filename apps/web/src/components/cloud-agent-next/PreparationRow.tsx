@@ -1,6 +1,7 @@
 import { AlertCircle, Check } from 'lucide-react';
 import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
+import { cn } from '@/lib/utils';
 import {
   extractTickerLines,
   findRunningSetupCommand,
@@ -31,7 +32,10 @@ export function PreparationRow({ attempt, onOpenDetails }: PreparationRowProps) 
       className="group flex w-full cursor-pointer flex-col rounded-md text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span
-        className="text-muted-foreground group-hover:text-foreground flex w-full min-w-0 items-center gap-2 py-2 transition-colors"
+        className={cn(
+          'group-hover:text-foreground flex w-full min-w-0 items-center gap-2 py-2 transition-colors',
+          attempt.status === 'running' ? 'text-foreground font-medium' : 'text-muted-foreground'
+        )}
         aria-live="polite"
       >
         <AttemptIcon status={attempt.status} summary={summary} />
@@ -117,7 +121,7 @@ function AttemptIcon({
   if (summary.kind === 'incomplete') {
     return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;
   }
-  if (status === 'running') return <StatusSpinner className="h-3 w-3 shrink-0" />;
+  if (status === 'running') return <StatusSpinner className="text-primary h-4 w-4 shrink-0" />;
   if (status === 'completed') return <Check className="h-3 w-3 shrink-0" />;
   return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;
 }

@@ -28,8 +28,8 @@ function IndicatorContent({ indicator }: { indicator: SessionStatusIndicatorType
       );
     case 'progress':
       return (
-        <span className="text-muted-foreground flex items-center gap-2">
-          <StatusSpinner className="h-3 w-3 shrink-0" />
+        <span role="status" className="text-foreground flex items-center gap-2 text-sm font-medium">
+          <StatusSpinner className="text-primary h-5 w-5 shrink-0" />
           <span>{indicator.message}</span>
         </span>
       );

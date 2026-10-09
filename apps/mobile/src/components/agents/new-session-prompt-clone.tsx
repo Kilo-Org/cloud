@@ -60,15 +60,13 @@ export function NewSessionPromptClone({
   }
   return (
     <ChatToolbar
-      mode={mode}
-      onModeChange={onModeChange}
+      modeControl={{ mode, onModeChange, customOptions }}
       model={model}
       variant={variant}
       modelOptions={modelOptions}
       onModelSelect={onModelSelect}
       disabled={isCreating}
       isLoadingModels={isLoadingModels}
-      customOptions={customOptions}
       modelLocked={modelLocked}
       modelLockLabel={modelLockLabel}
       wrap

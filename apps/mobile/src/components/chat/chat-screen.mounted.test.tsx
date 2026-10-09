@@ -220,6 +220,12 @@ describe('the chat transcript while it opens', () => {
     expect(sheet?.props.settings).toBe(mcpModel);
     expect(sheet?.props.visible).toBe(false);
   });
+  it('gives the composer no mode control, because a chat is not an agent session', async () => {
+    const tree = await mount();
+    const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+
+    expect(composer.props.modeControl).toBeUndefined();
+  });
   it('shows the stored transcript once the open has finished with messages', async () => {
     state.status = 'idle';
     state.messages = [{ info: { id: 'm-1' } }];

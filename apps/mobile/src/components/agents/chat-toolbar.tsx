@@ -11,9 +11,21 @@ import { cn } from '@/lib/utils';
 
 type ChatToolbarOrder = 'mode-first' | 'model-first';
 
-type ChatToolbarProps = {
+/**
+ * The mode chip's value, its change handler, and the custom options its picker
+ * lists. A caller passes all of it or none of it: Quick Chat is not an agent
+ * session, so it passes none and the toolbar draws no mode chip.
+ */
+export type ChatToolbarModeControl = {
   mode: AgentMode;
   onModeChange: (mode: AgentMode) => void;
+  /** Custom mode options shown under the built-ins in the mode picker. */
+  customOptions?: ModeOption[];
+};
+
+type ChatToolbarProps = {
+  /** Omit to render the toolbar without a mode chip. */
+  modeControl?: ChatToolbarModeControl;
   model: string;
   variant: string;
   modelOptions: (ModelOption | SessionModelOption)[];
@@ -25,8 +37,6 @@ type ChatToolbarProps = {
   onPaste?: () => void;
   /** Disabled state for the paste button; the composer's input rule owns it. */
   pasteDisabled?: boolean;
-  /** Custom mode options shown under the built-ins in the mode picker. */
-  customOptions?: ModeOption[];
   /** Locks the model picker to the pinned agent model (Cloud Agent only). */
   modelLocked?: boolean;
   /** Agent name shown in the locked model chip's accessibility label. */
@@ -42,9 +52,22 @@ type ChatToolbarProps = {
   onLayout?: (event: LayoutChangeEvent) => void;
 };
 
+function renderModeSelector(
+  { mode, onModeChange, customOptions }: ChatToolbarModeControl,
+  disabled: boolean
+) {
+  return (
+    <ModeSelector
+      value={mode}
+      onChange={onModeChange}
+      disabled={disabled}
+      customOptions={customOptions}
+    />
+  );
+}
+
 export function ChatToolbar({
-  mode,
-  onModeChange,
+  modeControl,
   model,
   variant,
   modelOptions,
@@ -54,20 +77,12 @@ export function ChatToolbar({
   order = 'mode-first',
   onPaste,
   pasteDisabled = false,
-  customOptions = [],
   modelLocked = false,
   modelLockLabel,
   className,
   onLayout,
 }: Readonly<ChatToolbarProps>) {
-  const modeSelector = (
-    <ModeSelector
-      value={mode}
-      onChange={onModeChange}
-      disabled={disabled}
-      customOptions={customOptions}
-    />
-  );
+  const modeSelector = modeControl ? renderModeSelector(modeControl, disabled) : null;
   const modelSelector = (
     <ModelSelector
       value={model}
@@ -80,9 +95,10 @@ export function ChatToolbar({
     />
   );
   // The paste button shares the model chip's line. The wrapper grows to fill the
-  // width the shrink-0 mode chip leaves; inside it the model chip is the only
-  // part that gives up width, so the paste button keeps `shrink-0` and stays on
-  // the same line at the row's trailing edge.
+  // width the shrink-0 mode chip leaves (the whole row when there is no mode
+  // chip); inside it the model chip is the only part that gives up width, so
+  // the paste button keeps `shrink-0` and stays on the same line at the row's
+  // trailing edge.
   const modelSelectorWithPaste = (
     // `min-w-0` lets the chip shrink below its content width, `shrink` makes the
     // wrapper give up that width (React Native defaults `flexShrink` to 0) and
@@ -106,7 +122,9 @@ export function ChatToolbar({
     // new-session composer at every width and locale. The mode chip is
     // `shrink-0`, so the model chip takes the remaining width and truncates a
     // long model name ("DeepSeek V4.1 Flash") with its own `numberOfLines={1}`,
-    // while the paste button keeps the trailing edge of the same line.
+    // while the paste button keeps the trailing edge of the same line. Without
+    // a mode chip, `modeSelector` is null in either `order` and the model chip
+    // starts the row.
     <View
       onLayout={onLayout}
       className={cn('flex-row items-center gap-2 px-3 py-2.5', disabled && 'opacity-50', className)}

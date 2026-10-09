@@ -103,7 +103,7 @@ describe('Home widget native compositions', () => {
       [172, 180],
       [266, 180],
       [360, 180],
-    ]) {
+    ] as const) {
       const props = propsFor([...MIXED]);
       const theme = render(props, [width, height]).light;
       expect(minimumHeight(theme), `${width}x${height}`).toBeLessThanOrEqual(height);

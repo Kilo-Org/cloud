@@ -17,6 +17,7 @@ type OutboundEmailParams = {
   html: string;
   replyTo?: string;
   category?: string;
+  marketingTag?: 'marketing';
 };
 
 function isAutomatedTest(): boolean {
@@ -99,6 +100,7 @@ export async function sendViaMailgun(params: OutboundEmailParams): Promise<boole
     to,
     subject,
     html: params.html,
+    ...(params.marketingTag ? { 'o:tag': params.marketingTag } : {}),
   });
 
   if (targetEnvironment === 'staging') {

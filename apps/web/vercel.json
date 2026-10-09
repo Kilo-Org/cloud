@@ -99,6 +99,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/store-credit-web-tip",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/dispatch-bouncer-credit-event-outbox",
       "schedule": "* * * * *"
     },

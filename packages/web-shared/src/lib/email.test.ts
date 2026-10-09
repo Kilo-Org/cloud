@@ -45,6 +45,26 @@ describe('template loading', () => {
   });
 });
 
+describe('store credit web tip rendering', () => {
+  it('escapes link variables without consuming the provider unsubscribe substitution', () => {
+    const html = renderTemplate(
+      'storeCreditWebTip',
+      {
+        credits_url: 'https://app.example/credits?account="><img src=x onerror=alert(1)>&other=1',
+        year: '2026',
+      },
+      'marketing-emails'
+    );
+
+    expect(html).toContain(
+      'href="https://app.example/credits?account=&quot;&gt;&lt;img src=x onerror=alert(1)&gt;&amp;other=1"'
+    );
+    expect(html).not.toContain('<img src=x');
+    expect(html).toContain('href="%tag_unsubscribe_url%"');
+    expect(html).not.toMatch(/\{\{\s*\w+\s*\}\}/);
+  });
+});
+
 describe('user data export ready email', () => {
   it('uses the required subject and only links to the authenticated export page', () => {
     const html = renderTemplate('userDataExportReady', {

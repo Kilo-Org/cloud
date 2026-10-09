@@ -1,6 +1,6 @@
-import { credit_transactions } from '@kilocode/db/schema';
+import { credit_transactions, kilo_pass_audit_log } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { enqueueCreditEvent } from '@kilocode/web-shared/lib/bouncer/credit-events';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
@@ -124,6 +124,14 @@ export async function completeStoreCreditPurchase(params: {
   const complete = async (tx: DrizzleTransaction) => {
     await lockStoreCreditPurchase(tx, storeTransaction);
 
+    // Apple and Google purchases for the same user share this lock. The first
+    // grant's audit marker commits or rolls back with its credits.
+    if (purchase.environment === 'Production') {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`store-credit-first-purchase:${user.id}`}, 0))`
+      );
+    }
+
     const findGrant = async () =>
       (
         await tx
@@ -157,6 +165,22 @@ export async function completeStoreCreditPurchase(params: {
     );
 
     if (didGrant) {
+      const priorProductionGrant =
+        purchase.environment === 'Production'
+          ? await tx
+              .select({ id: kilo_pass_audit_log.id })
+              .from(kilo_pass_audit_log)
+              .where(
+                and(
+                  eq(kilo_pass_audit_log.kilo_user_id, user.id),
+                  eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.StorePurchaseCompleted),
+                  eq(kilo_pass_audit_log.result, KiloPassAuditLogResult.Success),
+                  sql`${kilo_pass_audit_log.payload_json} @> '{"kind":"store_credit_pack","environment":"Production"}'::jsonb`
+                )
+              )
+              .limit(1)
+          : [];
+
       // The store purchase audit trail shared with Kilo Pass. A credit pack has
       // no subscription, so only the user and the granted credit row are linked.
       await appendKiloPassAuditLog(tx, {
@@ -171,6 +195,9 @@ export async function completeStoreCreditPurchase(params: {
           providerTransactionId: purchase.providerTransactionId,
           environment: purchase.environment,
           amountUsd,
+          ...(purchase.environment === 'Production' && priorProductionGrant.length === 0
+            ? { firstCreditPackPurchase: true }
+            : {}),
         },
       });
       await enqueueBouncerPurchase(tx);

@@ -101,20 +101,12 @@ export function renderNonAutolinkedText(str: string): RawHtml {
 // Both Next.js apps live at apps/<name> and run with their app directory as the
 // working directory, locally and on Vercel. Each app's next.config.mjs traces
 // these templates into its functions with outputFileTracingIncludes.
-const EMAIL_TEMPLATES_DIR = path.join(
-  process.cwd(),
-  '..',
-  '..',
-  'packages',
-  'web-shared',
-  'src',
-  'emails'
-);
+const EMAIL_TEMPLATES_DIR = path.join(process.cwd(), '..', '..', 'packages', 'web-shared', 'src');
 
 // Report an unreadable template before any caller can swallow the error; the
 // low-balance alert, for one, only logs send failures from after().
-function readTemplate(name: string): string {
-  const templatePath = path.join(EMAIL_TEMPLATES_DIR, `${name}.html`);
+function readTemplate(name: string, directory: 'emails' | 'marketing-emails'): string {
+  const templatePath = path.join(EMAIL_TEMPLATES_DIR, directory, `${name}.html`);
   try {
     return fs.readFileSync(templatePath, 'utf-8');
   } catch (error) {
@@ -126,8 +118,12 @@ function readTemplate(name: string): string {
   }
 }
 
-export function renderTemplate(name: string, vars: TemplateVars): string {
-  const html = readTemplate(name);
+export function renderTemplate(
+  name: string,
+  vars: TemplateVars,
+  directory: 'emails' | 'marketing-emails' = 'emails'
+): string {
+  const html = readTemplate(name, directory);
   return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
     if (!(key in vars)) {
       throw new Error(`Missing template variable '${key}' in email template '${name}'`);

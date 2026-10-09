@@ -96,6 +96,24 @@ describe('Home widget native compositions', () => {
     }
   });
 
+  it('never overflows at the card boundary with counts stacked and a detail line', () => {
+    // 180dp is where the card layout starts: hero floor, footer, three counts and a detail
+    // line do not all fit, so the layout must shed the detail and a count row instead.
+    for (const [width, height] of [
+      [172, 180],
+      [266, 180],
+      [360, 180],
+    ]) {
+      const props = propsFor([...MIXED]);
+      const theme = render(props, [width, height]).light;
+      expect(minimumHeight(theme), `${width}x${height}`).toBeLessThanOrEqual(height);
+      const collapsed = nodes(theme).filter(
+        node => typeof node.props.style?.height === 'number' && node.props.style.height <= 0
+      );
+      expect(collapsed, `${width}x${height}`).toEqual([]);
+    }
+  });
+
   it.each(CELLS)(
     'budgets German and Arabic/RTL without shrinking the count at %dx%d',
     (width, height) => {

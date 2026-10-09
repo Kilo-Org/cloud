@@ -48,8 +48,8 @@ import { recordWaitingAsk, selectWaitingAsk } from './waiting-ask';
 
 const FIXTURE_PATH = /(?:^|\/)dev\/glanceable-fixture\/([\w-]+)\/?(?:[?#].*)?$/;
 const RELEASE = 'release';
-/** Shape-valid, dev-only approval key: it matches no live permission. */
-const FIXTURE_APPROVAL_KEY = 'devfixture'.padEnd(64, '0');
+/** Shape-valid hex approval key (`homeWidgetDetailsSchema`); it matches no live permission. */
+const FIXTURE_APPROVAL_KEY = 'a'.repeat(64);
 
 /** The signed-in scope the publisher mount runs under, or null while none. */
 let scope: GlanceablePublisherContext | null = null;

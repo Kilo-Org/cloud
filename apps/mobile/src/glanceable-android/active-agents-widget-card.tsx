@@ -144,9 +144,14 @@ export function card({ props, copy, paint, info }: Frame) {
     firstEntry !== undefined &&
     firstEntry.title !== '' &&
     copy.detail.includes(firstEntry.title);
-  const supportRows = wide ? 0 : Math.min(3, copy.secondaryCounts.length);
   // Wide cards show the support counts beside the hero, so the hero must clear them.
   const besideCounts = wide ? Math.min(3, copy.secondaryCounts.length) * 26 : 0;
+  const heroFloor = Math.max(32, besideCounts);
+  // Keep as many stacked counts as the card can hold without squeezing the hero out.
+  let supportRows = wide ? 0 : Math.min(3, copy.secondaryCounts.length);
+  while (supportRows > 0 && inner - ACTION_TARGET - FOOTER_HEIGHT - supportRows * 26 < heroFloor) {
+    supportRows -= 1;
+  }
   const plan = (suppressDetail: boolean) => {
     const body =
       inner -
@@ -170,14 +175,12 @@ export function card({ props, copy, paint, info }: Frame) {
   const { rowHeight } = planned;
   // Never reserve height for rows the copy does not carry.
   const slots = Math.min(planned.slots, rows.length);
-  // With no rows the hero may take the room the entries would have used.
-  const free =
-    inner -
-    ACTION_TARGET -
-    supportRows * 26 -
-    FOOTER_HEIGHT -
-    (suppressed || !hasDetail ? 0 : DETAIL_HEIGHT);
-  const heroHeight = slots === 0 ? Math.min(free, 140) : planned.heroHeight;
+  // A short card cannot hold a hero, a detail line, the footer and the counts together: drop the detail first.
+  const bodyRoom = inner - ACTION_TARGET - supportRows * 26 - FOOTER_HEIGHT;
+  const showDetail = !(suppressed || !hasDetail) && bodyRoom - DETAIL_HEIGHT >= heroFloor;
+  // The hero keeps its floor and clears the counts beside it.
+  const free = bodyRoom - (showDetail ? DETAIL_HEIGHT : 0);
+  const heroHeight = slots === 0 ? Math.max(heroFloor, Math.min(free, 140)) : planned.heroHeight;
   const variant = heroVariantFor(heroHeight);
   // A 172dp-wide card can only fit the longest agent title at 11dp.
   const detailSize = info.width >= 280 ? 12 : 11;
@@ -217,13 +220,13 @@ export function card({ props, copy, paint, info }: Frame) {
             paint.rtl
           )}
         </FlexWidget>
-        {suppressed || !hasDetail
-          ? null
-          : rowDetail(copy, paint, {
+        {showDetail
+          ? rowDetail(copy, paint, {
               height: DETAIL_HEIGHT,
               size: detailSize,
               available: avail,
-            })}
+            })
+          : null}
         {wide ? null : (
           <FlexWidget style={{ width: 'match_parent', height: supportRows * 26 }}>
             {copy.secondaryCounts.slice(0, supportRows).map(line => countRow(line, paint))}

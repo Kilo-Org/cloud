@@ -172,6 +172,13 @@ describe('Home-only widget policy', () => {
     expect(homeWidgetRefreshAt(scheduled, now)).toBe(now + 5 * 60 * 1000);
     expect(homeWidgetRefreshAt(scheduled, now + 5 * 60 * 1000)).toBe(now + 35 * 60 * 1000);
   });
+
+  it('refreshes uncertain empty snapshots on the active cadence', () => {
+    for (const status of ['waiting', 'stale', 'expired'] as const) {
+      const data = buildHomeWidgetData({ ...scope, sessions: [], status });
+      expect(homeWidgetRefreshAt(data, now)).toBe(now + 30 * 60 * 1000);
+    }
+  });
 });
 
 describe('native Home presentation timeline', () => {

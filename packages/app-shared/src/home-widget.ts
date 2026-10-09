@@ -248,8 +248,7 @@ export function buildHomeWidgetPresentation(
 export function homeWidgetRefreshAt(data: HomeWidgetData, now: number): number {
   const { snapshot } = data;
   const terminal = snapshot.status === 'signed_out' || snapshot.status === 'privacy';
-  const active = !terminal && snapshot.needsInput + snapshot.running + snapshot.scheduled > 0;
-  const next = now + (active ? ACTIVE_REFRESH_MS : QUIET_REFRESH_MS);
+  const next = now + (terminal ? QUIET_REFRESH_MS : refreshInterval(snapshot));
   const wake = terminal || snapshot.scheduled === 0 ? null : usableTime(snapshot.scheduledAt);
   // An overdue wake is not proof of running and must not create a busy refresh loop.
   return wake !== null && wake > now ? Math.min(next, wake) : next;

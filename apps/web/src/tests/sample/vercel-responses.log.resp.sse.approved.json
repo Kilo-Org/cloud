@@ -12,6 +12,69 @@
   "streamed": true,
   "cancelled": null,
   "status_code": 200,
+  "vercelProviderMetadata": {
+    "openai": {
+      "responseId": "resp_0ede6566e7430a090169b2972009a08190b5772dcd3445bc73",
+      "serviceTier": "default"
+    },
+    "gateway": {
+      "routing": {
+        "originalModelId": "openai/gpt-5.4",
+        "resolvedProvider": "openai",
+        "resolvedProviderApiModelId": "gpt-5.4",
+        "internalResolvedModelId": "openai:gpt-5.4",
+        "fallbacksAvailable": [
+          "azure"
+        ],
+        "internalReasoning": "Selected openai as preferred provider for gpt-5.4. 1 fallback(s) available: azure",
+        "planningReasoning": "BYOK credentials available for: openai. System credentials planned for: openai, azure. Total execution order: openai(BYOK) → openai(system) → azure(system)",
+        "canonicalSlug": "openai/gpt-5.4",
+        "finalProvider": "openai",
+        "attempts": [
+          {
+            "provider": "openai",
+            "internalModelId": "openai:gpt-5.4",
+            "providerApiModelId": "gpt-5.4",
+            "credentialType": "byok",
+            "success": true,
+            "startTime": 2745546.630489,
+            "endTime": 2746198.21155,
+            "providerRequestId": "req_869e7f2d33124834a2d0a7fb0a271c1a",
+            "statusCode": 200,
+            "providerResponseId": "resp_0ede6566e7430a090169b2972009a08190b5772dcd3445bc73"
+          }
+        ],
+        "modelAttemptCount": 1,
+        "modelAttempts": [
+          {
+            "modelId": "openai:gpt-5.4",
+            "canonicalSlug": "openai/gpt-5.4",
+            "success": true,
+            "providerAttemptCount": 1,
+            "providerAttempts": [
+              {
+                "provider": "openai",
+                "internalModelId": "openai:gpt-5.4",
+                "providerApiModelId": "gpt-5.4",
+                "credentialType": "byok",
+                "success": true,
+                "startTime": 2745546.630489,
+                "endTime": 2746198.21155,
+                "providerRequestId": "req_869e7f2d33124834a2d0a7fb0a271c1a",
+                "statusCode": 200,
+                "providerResponseId": "resp_0ede6566e7430a090169b2972009a08190b5772dcd3445bc73"
+              }
+            ]
+          }
+        ],
+        "totalProviderAttemptCount": 1
+      },
+      "cost": "0",
+      "marketCost": "0.0061375",
+      "generationId": "gen_01KKGSWN56EG1YK9Q5ZV5V4GQ9",
+      "billableWebSearchCalls": 0
+    }
+  },
   "inputTokens": 2425,
   "outputTokens": 5,
   "cacheHitTokens": 0,

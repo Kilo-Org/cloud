@@ -220,6 +220,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
     streamed: true,
     cancelled: null,
     status_code: statusCode,
+    vercelProviderMetadata: providerMetadata ?? undefined,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
@@ -251,6 +252,7 @@ export function parseResponsesMicrodollarUsageFromString(
     streamed: false,
     cancelled: null,
     status_code: statusCode,
+    vercelProviderMetadata: providerMetadata ?? undefined,
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);

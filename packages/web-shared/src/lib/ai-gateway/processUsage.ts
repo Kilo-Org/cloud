@@ -21,6 +21,7 @@ import type {
 import { fetchGeneration } from './providers/upstream-request';
 import { OPENROUTER } from './providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
+import { storeVercelProviderMetadata } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
@@ -1066,7 +1067,26 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(async usageStats => {
+    const providerMetadataStored = storeVercelProviderMetadataForUsage(usageStats, usageContext);
+    try {
+      return await processTokenData(usageStats, usageContext);
+    } finally {
+      await providerMetadataStored;
+    }
+  });
+}
+
+/** Never rejects; runs alongside usage accounting so it does not delay billing. */
+async function storeVercelProviderMetadataForUsage(
+  usageStats: MicrodollarUsageStats | null,
+  usageContext: MicrodollarUsageContext
+): Promise<void> {
+  const providerMetadata = usageStats?.vercelProviderMetadata;
+  if (usageContext.provider !== 'vercel' || !providerMetadata) return;
+  const generationId = providerMetadata.gateway?.generationId ?? usageStats?.messageId;
+  if (!generationId) return;
+  await storeVercelProviderMetadata(generationId, providerMetadata);
 }
 
 export function processOpenRouterUsage(
@@ -1220,6 +1240,7 @@ export async function parseMicrodollarUsageFromStream(
     streamed: true,
     cancelled: null,
     status_code: effectiveStatusCode,
+    vercelProviderMetadata: vercelProviderMetadata ?? undefined,
   };
 
   const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
@@ -1263,6 +1284,7 @@ export function parseMicrodollarUsageFromString(
     streamed: false,
     cancelled: null,
     status_code: statusCode,
+    vercelProviderMetadata: vercelProviderMetadata ?? undefined,
   };
 
   const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);

@@ -45,6 +45,7 @@ export type VercelProviderMetaData = {
     };
     cost?: string;
     marketCost?: string;
+    generationId?: string;
   };
 };
 
@@ -94,6 +95,12 @@ export type NotYetCostedUsageStats = {
    *  response status and is overwritten by a numeric `error.code` encountered
    *  in-stream (e.g. a 200 response that ends up carrying a 502 error event). */
   status_code: number;
+  /**
+   * The response's whole `provider_metadata` object as parsed from the wire,
+   * including fields not modelled by `VercelProviderMetaData`. Only set for
+   * responses that carry one, which in practice means Vercel AI Gateway.
+   */
+  vercelProviderMetadata?: VercelProviderMetaData;
 };
 
 export type JustTheCostsUsageStats = {

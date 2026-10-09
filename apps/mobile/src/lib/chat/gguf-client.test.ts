@@ -50,6 +50,24 @@ function clientWith(contexts: readonly GgufContext[], file: GgufModelFile = FILE
   };
 }
 
+/**
+ * The shape llama.rn produced on the device: nulls where the schema wanted
+ * strings, and the whole answer in `text`.
+ */
+const NULL_HEAVY_ANSWER: Completion = async () => ({
+  text: 'Red\nGreen\nBlue',
+  content: null,
+  accumulated_text: null,
+  tool_calls: null,
+  tokens_evaluated: null,
+  tokens_predicted: null,
+  stopped_eos: true,
+  stopped_word: null,
+  stopped_limit: null,
+  context_full: null,
+  interrupted: null,
+});
+
 const SHORT_ANSWER: Completion = async () => ({
   text: 'ok',
   tokens_evaluated: 1,
@@ -119,6 +137,18 @@ describe('an answer over a downloaded model', () => {
       cacheWriteTokens: 0,
     });
     expect(doneOf(events)?.stop).toBe('end');
+  });
+
+  it('answers from a result that carries null for everything optional', async () => {
+    const { client } = clientWith([contextOf(TOOL_TEMPLATE, NULL_HEAVY_ANSWER).context]);
+
+    const events = await collect(client.stream(request));
+
+    expect(textOf(events)).toEqual(['Red\nGreen\nBlue']);
+    expect(doneOf(events)).toMatchObject({
+      stop: 'end',
+      usage: { inputTokens: 0, outputTokens: 0 },
+    });
   });
 
   it('sends tool definitions only for a model whose template renders tools', async () => {

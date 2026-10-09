@@ -294,6 +294,18 @@ describe('the saved list', () => {
   });
 });
 
+it('leaves a list it cannot fully read alone, so the next launch still protects the file', () => {
+  const h = harness();
+  h.index.text = JSON.stringify([{ fileId: 'other', name: 'Other' }]);
+  h.files.set(ggufModelName('other'), 20);
+
+  h.store.load();
+  h.store.load();
+
+  expect(h.index.text).toContain('other');
+  expect(h.files.has(ggufModelName('other'))).toBe(true);
+});
+
 describe('deleting a model', () => {
   it('releases the loaded context first, then the file and the list entry', async () => {
     const h = harness();

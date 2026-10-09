@@ -42,13 +42,26 @@ describe('the saved model list', () => {
   it('deletes only files the list never names', () => {
     const names = ['here.gguf', 'other.gguf', 'orphan.gguf', 'partial.gguf.part'];
     const index = JSON.stringify([saved, { fileId: 'other', name: 'Other' }]);
-    const keep = new Set([ggufModelName('here'), 'partial.gguf.part']);
 
-    expect(orphanedModelFiles(names, index, keep)).toEqual(['orphan.gguf']);
+    const orphans = orphanedModelFiles({
+      names,
+      index,
+      kept: readModelIndex(index),
+      partialName: 'partial.gguf.part',
+    });
+
+    expect(orphans).toEqual(['orphan.gguf']);
   });
 
   it('deletes nothing when the list cannot be read', () => {
     // A shape change or a truncated write must not destroy every download.
-    expect(orphanedModelFiles(['here.gguf'], '{ not json', new Set())).toEqual([]);
+    expect(
+      orphanedModelFiles({
+        names: ['here.gguf'],
+        index: '{ not json',
+        kept: [],
+        partialName: undefined,
+      })
+    ).toEqual([]);
   });
 });

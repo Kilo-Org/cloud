@@ -180,19 +180,45 @@ export function modelIndexMentionedNames(text: string | null): ReadonlySet<strin
 }
 
 /**
+ * Whether the saved list holds an entry this build cannot read.
+ *
+ * Such a list is not rewritten: writing it back would drop the entry, and the
+ * next launch would then treat its file as unlisted and delete it.
+ */
+export function modelIndexHasUnreadableEntries(text: string | null): boolean {
+  let parsed: unknown = undefined;
+  try {
+    parsed = JSON.parse(text ?? '[]');
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(parsed)) {
+    return false;
+  }
+  return parsed.some(entry => !modelRecord.safeParse(entry).success);
+}
+
+/**
  * The model files cleanup may delete: the ones the saved list never names.
  *
  * A list that could not be read is not a list of nothing, so it deletes
  * nothing. Neither does an entry this build cannot parse delete its own file,
  * because a shape change would otherwise destroy every download at once.
  */
-export function orphanedModelFiles(
-  names: readonly string[],
-  index: string | null,
-  keep: ReadonlySet<string>
-): readonly string[] {
+export function orphanedModelFiles(input: {
+  readonly names: readonly string[];
+  readonly index: string | null;
+  readonly kept: readonly GgufModelRecord[];
+  readonly partialName: string | undefined;
+}): readonly string[] {
+  const { names, index, kept, partialName } = input;
   if (!modelIndexIsReadable(index)) {
     return [];
+  }
+  const keep = new Set(kept.map(record => ggufModelName(record.fileId)));
+  if (partialName !== undefined) {
+    // A partial transfer is not a model and survives the cleanup.
+    keep.add(partialName);
   }
   const mentioned = modelIndexMentionedNames(index);
   return names.filter(name => name.includes('.gguf') && !keep.has(name) && !mentioned.has(name));

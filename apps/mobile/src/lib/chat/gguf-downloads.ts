@@ -9,6 +9,7 @@ import {
   type GgufModelRecord,
   ggufPartialName,
   type GgufStorage,
+  modelIndexHasUnreadableEntries,
   orphanedModelFiles,
   readModelIndex,
   settled,
@@ -213,15 +214,16 @@ export function ggufDownloads({
       const kept = readModelIndex(index).filter(model =>
         names.includes(ggufModelName(model.fileId))
       );
-      const keep = new Set(kept.map(model => ggufModelName(model.fileId)));
-      if (active !== undefined) {
-        // A partial transfer is not a model and survives the cleanup.
-        keep.add(ggufPartialName(active.fileId));
-      }
-      for (const name of orphanedModelFiles(names, index, keep)) {
+      const partial = active === undefined ? undefined : ggufPartialName(active.fileId);
+      for (const name of orphanedModelFiles({ names, index, kept, partialName: partial })) {
         storage.remove(name);
       }
-      save(kept);
+      models = kept;
+      // Rewriting a list with an entry this build cannot read would drop that
+      // entry, and the next launch would then delete the file it names.
+      if (!modelIndexHasUnreadableEntries(index)) {
+        save(kept);
+      }
       publish();
     },
     snapshot: () => snapshot,

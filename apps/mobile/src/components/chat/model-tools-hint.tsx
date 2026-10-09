@@ -15,9 +15,7 @@ type ModelToolsHintProps = {
 /** Says whether a custom or on-device model receives tools. Kilo models need no hint. */
 export function ModelToolsHint({ model, backends, localModels }: Readonly<ModelToolsHintProps>) {
   const { t } = useTranslation();
-  const ggufModel = useGgufModels().models.find(
-    one => localTargetId('gguf', one.fileId) === model
-  );
+  const ggufModel = useGgufModels().models.find(one => localTargetId('gguf', one.fileId) === model);
   const customTarget = decodeBackendTarget(model);
   const customModel = backends
     .find(backend => backend.id === customTarget?.backendId)

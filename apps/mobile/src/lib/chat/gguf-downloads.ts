@@ -134,27 +134,30 @@ export function ggufDownloads({
     publish();
   };
 
-  const onProgress = (download: () => Active | undefined) => (progress: {
-    readonly bytesWritten: number;
-    readonly totalBytes: number;
-  }) => {
-    const current = download();
-    if (current === undefined || active !== current || current.phase !== 'downloading') {
-      return;
-    }
-    // Bytes arriving after a resume mean the server accepted it.
-    current.resuming = false;
-    const firstLength = current.total <= 0 && progress.totalBytes > 0;
-    current.written = progress.bytesWritten;
-    current.total = progress.totalBytes > 0 ? progress.totalBytes : (current.expected ?? 0);
-    const room = storage.freeBytes();
-    if (firstLength && current.expected === undefined && room < current.total - current.written + STORAGE_HEADROOM_BYTES) {
-      current.stop = 'space';
-      current.task.cancel();
-      return;
-    }
-    publish();
-  };
+  const onProgress =
+    (download: () => Active | undefined) =>
+    (progress: { readonly bytesWritten: number; readonly totalBytes: number }) => {
+      const current = download();
+      if (current === undefined || active !== current || current.phase !== 'downloading') {
+        return;
+      }
+      // Bytes arriving after a resume mean the server accepted it.
+      current.resuming = false;
+      const firstLength = current.total <= 0 && progress.totalBytes > 0;
+      current.written = progress.bytesWritten;
+      current.total = progress.totalBytes > 0 ? progress.totalBytes : (current.expected ?? 0);
+      const room = storage.freeBytes();
+      if (
+        firstLength &&
+        current.expected === undefined &&
+        room < current.total - current.written + STORAGE_HEADROOM_BYTES
+      ) {
+        current.stop = 'space';
+        current.task.cancel();
+        return;
+      }
+      publish();
+    };
 
   /** A resume the server refused: drop the partial file and download it again from zero. */
   const restart = (download: Active) => {
@@ -247,7 +250,11 @@ export function ggufDownloads({
         // No partial file from an earlier attempt.
       }
       let download: Active | undefined = undefined;
-      const task = storage.createDownload(url, ggufPartialName(fileId), onProgress(() => download));
+      const task = storage.createDownload(
+        url,
+        ggufPartialName(fileId),
+        onProgress(() => download)
+      );
       download = {
         fileId,
         name,

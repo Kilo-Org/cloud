@@ -15,9 +15,9 @@ describe('the context window', () => {
     expect(
       contextWindowFor({ 'general.architecture': 'qwen2', 'qwen2.context_length': 32_768 })
     ).toBe(4096);
-    expect(contextWindowFor({ 'general.architecture': 'llama', 'llama.context_length': 1000 })).toBe(
-      768
-    );
+    expect(
+      contextWindowFor({ 'general.architecture': 'llama', 'llama.context_length': 1000 })
+    ).toBe(768);
   });
 
   it('uses the cap for a model that states no length, and for metadata it cannot read', () => {
@@ -34,7 +34,12 @@ const CAPS: Caps = { tools: true, toolCalls: true, systemRole: true, parallelToo
 
 describe('the tool rule', () => {
   it('sends tools only for a Jinja template that renders them and earlier calls', () => {
-    expect(templateSupportsTools({ llamaChat: false, jinja: { default: true, defaultCaps: CAPS, toolUse: false } })).toBe(true);
+    expect(
+      templateSupportsTools({
+        llamaChat: false,
+        jinja: { default: true, defaultCaps: CAPS, toolUse: false },
+      })
+    ).toBe(true);
     expect(
       templateSupportsTools({
         llamaChat: false,
@@ -42,7 +47,10 @@ describe('the tool rule', () => {
       })
     ).toBe(false);
     expect(
-      templateSupportsTools({ llamaChat: true, jinja: { default: false, defaultCaps: CAPS, toolUse: false } })
+      templateSupportsTools({
+        llamaChat: true,
+        jinja: { default: false, defaultCaps: CAPS, toolUse: false },
+      })
     ).toBe(false);
   });
 
@@ -50,7 +58,12 @@ describe('the tool rule', () => {
     expect(
       templateSupportsTools({
         llamaChat: false,
-        jinja: { default: false, defaultCaps: CAPS, toolUse: true, toolUseCaps: { ...CAPS, tools: false } },
+        jinja: {
+          default: false,
+          defaultCaps: CAPS,
+          toolUse: true,
+          toolUseCaps: { ...CAPS, tools: false },
+        },
       })
     ).toBe(false);
   });

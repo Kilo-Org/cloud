@@ -1,4 +1,3 @@
-
 import { describe, expect, it } from 'vitest';
 
 import { GGUF_CATALOG, readGgufLink } from './gguf-catalog';
@@ -6,7 +5,13 @@ import { GGUF_CATALOG, readGgufLink } from './gguf-catalog';
 describe('a direct download link', () => {
   it('accepts only an HTTPS .gguf link and names the model from the file', () => {
     const ok = readGgufLink('https://example.com/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf');
-    expect(ok).toEqual({ ok: true, value: { url: 'https://example.com/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf', name: 'Qwen2.5-0.5B-Instruct-Q4_K_M' } });
+    expect(ok).toEqual({
+      ok: true,
+      value: {
+        url: 'https://example.com/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf',
+        name: 'Qwen2.5-0.5B-Instruct-Q4_K_M',
+      },
+    });
   });
 
   it('reads a percent-encoded file name', () => {

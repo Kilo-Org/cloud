@@ -12,10 +12,7 @@ import {
   type GgufStorage,
 } from './gguf-records';
 
-type Progress = (progress: {
-  readonly bytesWritten: number;
-  readonly totalBytes: number;
-}) => void;
+type Progress = (progress: { readonly bytesWritten: number; readonly totalBytes: number }) => void;
 
 /** The task at a known position, so the assertions need no non-null assertion. */
 function taskAt(tasks: readonly Task[], index: number): Task {

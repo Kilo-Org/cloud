@@ -43,7 +43,10 @@ function clientWith(contexts: readonly GgufContext[], file: GgufModelFile = FILE
   });
   return {
     init,
-    ...ggufModelClient({ runtime: { init }, fileOf: id => (files.includes(id) ? file : undefined) }),
+    ...ggufModelClient({
+      runtime: { init },
+      fileOf: id => (files.includes(id) ? file : undefined),
+    }),
   };
 }
 

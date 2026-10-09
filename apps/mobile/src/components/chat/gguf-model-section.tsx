@@ -6,11 +6,7 @@ import { Alert, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
-import {
-  GGUF_CATALOG,
-  GGUF_URL_ERROR_KEYS,
-  readGgufLink,
-} from '@/lib/chat/gguf-catalog';
+import { GGUF_CATALOG, GGUF_URL_ERROR_KEYS, readGgufLink } from '@/lib/chat/gguf-catalog';
 import { ggufDownloadActions, ggufUrlSource, useGgufModels } from '@/lib/chat/gguf-models';
 import {
   type GgufDownload,
@@ -45,16 +41,20 @@ function progressKey(download: GgufDownload): string {
 }
 
 function confirmDelete(record: GgufModelRecord, t: TFunction) {
-  Alert.alert(t('modelChat.gguf.deleteTitle'), t('modelChat.gguf.deleteMessage', { name: record.name }), [
-    { text: t('common.cancel'), style: 'cancel' },
-    {
-      text: t('common.delete'),
-      style: 'destructive',
-      onPress: () => {
-        void ggufDownloadActions.remove(record.fileId);
+  Alert.alert(
+    t('modelChat.gguf.deleteTitle'),
+    t('modelChat.gguf.deleteMessage', { name: record.name }),
+    [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          void ggufDownloadActions.remove(record.fileId);
+        },
       },
-    },
-  ]);
+    ]
+  );
 }
 
 function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<RowProps>) {
@@ -106,7 +106,9 @@ function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<R
                 }}
               >
                 <Text>
-                  {t(download.phase === 'paused' ? 'modelChat.gguf.resume' : 'modelChat.gguf.pause')}
+                  {t(
+                    download.phase === 'paused' ? 'modelChat.gguf.resume' : 'modelChat.gguf.pause'
+                  )}
                 </Text>
               </Button>
               <Button

@@ -156,7 +156,9 @@ statuses = statusesOf();
 
 /** The provider for a decoded `local:` target, or undefined when this build has none. */
 export function localModelProvider(provider: LocalProvider): LocalModelProvider | undefined {
-  return provider === 'gguf' ? ggufModelProvider : system.find(one => one.provider === provider)?.model;
+  return provider === 'gguf'
+    ? ggufModelProvider
+    : system.find(one => one.provider === provider)?.model;
 }
 
 function subscribe(listener: () => void): () => void {

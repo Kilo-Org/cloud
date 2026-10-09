@@ -133,6 +133,11 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
       await stopChat(sessionId);
     },
     retry: async () => {
+      // A chat whose open failed is not held: entering it again is the retry.
+      // Entering an open chat does nothing, so the order is safe either way.
+      if (place !== null) {
+        await enterChat(place, sessionId);
+      }
       await retryChat(sessionId);
     },
   };

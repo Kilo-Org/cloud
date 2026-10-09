@@ -676,6 +676,17 @@ describe('a chat that could not be opened', () => {
     expect(snapshotOf('unreadable').status).toBe('idle');
     expect(released).toContain('unreadable');
   });
+
+  it('clears the safe failure once a later entry opens the chat', async () => {
+    failHistoryFor = 'flaky';
+    await enterChat(place, 'flaky');
+    expect(snapshotOf('flaky').failureKey).toBe('common.somethingWentWrong');
+
+    failHistoryFor = undefined;
+    await enterChat(place, 'flaky');
+
+    expect(snapshotOf('flaky')).toMatchObject({ status: 'idle', failureKey: null, turns: [TURN] });
+  });
 });
 
 describe('deleting a chat that was never opened', () => {

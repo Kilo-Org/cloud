@@ -322,6 +322,8 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       asked: asked?.text ?? null,
       askedModel: asked?.model ?? null,
       status: 'idle',
+      failed: null,
+      failureKey: null,
     });
     return;
   }

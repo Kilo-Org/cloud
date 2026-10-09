@@ -6,6 +6,7 @@ import {
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
+  kilo_pass_pause_events,
   kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
@@ -1427,6 +1428,12 @@ describe('completeStoreKiloPassPurchase', () => {
         user,
         purchase: applePurchase({ paymentProvider: oldProvider }),
       });
+      await db.insert(kilo_pass_pause_events).values({
+        kilo_pass_subscription_id: original.subscriptionId,
+        paused_at: '2026-06-01T12:30:00.000Z',
+        resumes_at: null,
+      });
+      const completionStartedAtMs = Date.now();
       const replacement = await completeStoreKiloPassPurchase({
         user,
         purchase: applePurchase({
@@ -1435,12 +1442,21 @@ describe('completeStoreKiloPassPurchase', () => {
           expiresAtIso: '2026-07-01T12:00:00.000Z',
         }),
       });
+      const completionFinishedAtMs = Date.now();
       expect(replacement.alreadyProcessed).toBe(false);
       const old = await db.query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.id, original.subscriptionId),
       });
       expect(old!.status).toBe('canceled');
-      expect(old!.ended_at).not.toBeNull();
+      expect(new Date(old!.ended_at!).toISOString()).toBe('2026-06-01T12:00:00.000Z');
+      const pauseEvents = await db
+        .select({ resumedAt: kilo_pass_pause_events.resumed_at })
+        .from(kilo_pass_pause_events)
+        .where(eq(kilo_pass_pause_events.kilo_pass_subscription_id, original.subscriptionId));
+      expect(pauseEvents).toHaveLength(1);
+      const resumedAtMs = new Date(pauseEvents[0]!.resumedAt!).getTime();
+      expect(resumedAtMs).toBeGreaterThanOrEqual(completionStartedAtMs);
+      expect(resumedAtMs).toBeLessThanOrEqual(completionFinishedAtMs);
       const after = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
       });

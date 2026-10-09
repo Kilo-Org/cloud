@@ -1012,6 +1012,28 @@ describe('Home widget approval key retention', () => {
     publisher.dispose();
   });
 
+  it('keeps the key when only the session behind the same visible ask changes', () => {
+    // The client sees titles and kinds, not session ids, so two waiting sessions
+    // with the same title are indistinguishable here. Keeping the key is
+    // deliberate: the press re-checks the digest, so a key that no longer matches
+    // the visible request answers nothing and reports the stale outcome.
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'permission', title: 'Migrate billing' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
+    publisher.dispose();
+  });
+
   it('drops the key once no permission is waiting', () => {
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });

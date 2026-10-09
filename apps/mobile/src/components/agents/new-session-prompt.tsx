@@ -417,15 +417,13 @@ export function NewSessionPrompt({
         />
       ) : (
         <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
+          modeControl={{ mode, onModeChange, customOptions }}
           model={model}
           variant={variant}
           modelOptions={modelOptions}
           onModelSelect={onModelSelect}
           disabled={isCreating}
           isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
           modelLocked={modelLocked}
           modelLockLabel={modelLockLabel}
           className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"

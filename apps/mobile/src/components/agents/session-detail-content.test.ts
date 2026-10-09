@@ -3612,6 +3612,17 @@ describe('session detail composer placeholder (explorer session-detail)', () => 
   });
 });
 
+describe('session detail composer mode chip', () => {
+  it('hands the composer a mode control, because a session has modes', async () => {
+    const view = await mountDetails([]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.modeControl).toMatchObject({
+      mode: expect.any(String),
+      onModeChange: expect.any(Function),
+    });
+  });
+});
+
 describe('session detail duplicate failure state', () => {
   // Stored messages are ordered by id, which is time-sortable ascending, so the
   // user row must sort before the assistant row for the Retry prompt to resolve.

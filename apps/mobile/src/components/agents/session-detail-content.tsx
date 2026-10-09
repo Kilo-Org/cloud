@@ -2487,12 +2487,14 @@ export function SessionDetailContent({
                 sendDisabled={!canSend}
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
-                mode={currentMode}
-                onModeChange={handleModeChange}
+                modeControl={{
+                  mode: currentMode,
+                  onModeChange: handleModeChange,
+                  customOptions,
+                }}
                 model={displayModel}
                 variant={displayVariant}
                 modelOptions={modelOptionsForToolbar}
-                customOptions={customOptions}
                 modelLocked={modelLocked}
                 modelLockLabel={pinned.agentName}
                 onModelSelect={handleModelSelect}

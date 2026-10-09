@@ -4,7 +4,6 @@
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type AgentMode } from '@/components/agents/mode-selector';
 import { type ChatComposer } from './chat-composer';
 
 // The attachment-only send contract: a ready (`uploaded`) attachment with an
@@ -290,8 +289,6 @@ function makeProps(overrides: Partial<ComposerProps> = {}): ComposerProps {
     onRestartSession: vi.fn(async () => true),
     onExitSession: vi.fn(async () => undefined),
     onStop: vi.fn(async () => undefined),
-    mode: 'code' as AgentMode,
-    onModeChange: vi.fn(() => undefined),
     model: 'anthropic/claude-sonnet-4',
     variant: 'medium',
     modelOptions: [],

@@ -54,7 +54,10 @@ const nextConfig = {
 
   // packages/web-shared/src/lib/email.ts reads these at runtime.
   outputFileTracingIncludes: {
-    '/**': ['../../packages/web-shared/src/emails/*.html'],
+    '/**': [
+      '../../packages/web-shared/src/emails/*.html',
+      '../../packages/web-shared/src/marketing-emails/*.html',
+    ],
   },
 
   // The dev-tools indicator is a fixed overlay pinned to a viewport corner. On

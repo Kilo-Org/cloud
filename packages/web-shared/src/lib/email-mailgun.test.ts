@@ -14,6 +14,7 @@ jest.mock('form-data', () => jest.fn());
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   MAILGUN_API_KEY: 'test-mailgun-key',
   MAILGUN_DOMAIN: 'mail.example.test',
+  NEXTAUTH_URL: 'https://app.example.test',
 }));
 jest.mock('@kilocode/web-shared/lib/email-local-outbox', () => ({
   writeEmailToLocalOutbox: (params: unknown) => writeEmailToLocalOutboxMock(params),
@@ -21,8 +22,13 @@ jest.mock('@kilocode/web-shared/lib/email-local-outbox', () => ({
 jest.mock('@sentry/nextjs', () => ({
   captureMessage: (...args: unknown[]) => captureMessageMock(...args),
 }));
+jest.mock('@kilocode/web-shared/lib/email-neverbounce', () => ({
+  verifyEmail: jest.fn(async () => true),
+}));
 
 import Mailgun from 'mailgun.js';
+import { sendAccountDeletionCompletedEmail } from '@kilocode/web-shared/lib/email';
+import { sendStoreCreditWebTipEmail } from '@kilocode/web-shared/lib/store-credit-web-tip-email';
 import {
   getEmailVerificationRecipient,
   sendViaMailgun,
@@ -92,6 +98,21 @@ describe('Mailgun email boundary', () => {
       subject: 'Transactional message',
       html: '<p>Hello</p>',
     });
+  });
+
+  it('scopes marketing suppression to marketing messages, not receipts', async () => {
+    restoreEnvironmentVariable('NODE_ENV', 'production');
+    process.env.VERCEL_TARGET_ENV = 'production';
+
+    await sendStoreCreditWebTipEmail(message.to);
+    expect(latestMessagesCreateMock()).toHaveBeenCalledWith(
+      'mail.example.test',
+      expect.objectContaining({ 'o:tag': 'marketing' })
+    );
+
+    await sendAccountDeletionCompletedEmail(message.to);
+    const transactionalMessage = latestMessagesCreateMock().mock.calls[0][1];
+    expect(transactionalMessage).not.toHaveProperty('o:tag');
   });
 
   it('never gives Mailgun the external staging recipient or Reply-To', async () => {

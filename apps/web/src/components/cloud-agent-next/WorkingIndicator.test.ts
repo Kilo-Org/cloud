@@ -25,7 +25,7 @@ describe('WorkingIndicator', () => {
     expect(markup).toContain('Setting up environment');
     expect(markup).toContain('0s');
     expect(markup).toContain('role="status"');
-    expect(markup).toContain('text-primary');
+    expect(markup).not.toContain('text-primary');
     expect(markup).toContain('text-foreground');
   });
 
@@ -46,19 +46,20 @@ describe('WorkingIndicator', () => {
       React.createElement(WorkingIndicator, { messages: [], isStreaming: true })
     );
     expect(markup).toContain('Considering next steps');
-    expect(markup).toContain('text-primary');
+    expect(markup).not.toContain('text-primary');
+    expect(markup).toContain('text-foreground');
   });
 });
 
 describe('SessionStatusIndicator', () => {
-  it('renders preparation progress with high-contrast text and an accent spinner', () => {
+  it('renders preparation progress with stronger contrast in the neutral palette', () => {
     const markup = renderToStaticMarkup(
       React.createElement(SessionStatusIndicator, {
         indicator: { type: 'progress', message: 'Preparing session…', timestamp: 0 },
       })
     );
     expect(markup).toContain('Preparing session');
-    expect(markup).toContain('text-primary');
+    expect(markup).not.toContain('text-primary');
     expect(markup).toContain('text-foreground');
     expect(markup).not.toContain('text-muted-foreground');
   });

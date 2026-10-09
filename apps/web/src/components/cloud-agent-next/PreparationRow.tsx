@@ -121,7 +121,7 @@ function AttemptIcon({
   if (summary.kind === 'incomplete') {
     return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;
   }
-  if (status === 'running') return <StatusSpinner className="text-primary h-4 w-4 shrink-0" />;
+  if (status === 'running') return <StatusSpinner className="h-4 w-4 shrink-0" />;
   if (status === 'completed') return <Check className="h-3 w-3 shrink-0" />;
   return <AlertCircle className="text-destructive h-3 w-3 shrink-0" />;
 }

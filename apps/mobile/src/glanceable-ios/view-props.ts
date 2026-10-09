@@ -102,6 +102,14 @@ export type GlanceableWidgetProps = Partial<GlanceableViewProps> & {
   pendingAction?: GlanceableWidgetAction;
   /** The exact request the pressed Approve displayed. */
   pendingApprovalKey?: string;
+  /**
+   * When the press happened (ms since epoch), recorded by the button's press
+   * patch and preserved by the extension across timeline rebuilds. A carried
+   * marker older than `PENDING_ACTION_TTL_MS` is dropped instead of run, so a
+   * press from an earlier session can never fire. Absent only for a marker no
+   * press patch wrote, which reads as fresh.
+   */
+  pendingActionAt?: number;
 };
 
 /**

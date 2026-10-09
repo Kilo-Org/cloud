@@ -102,7 +102,7 @@ enum HomeWidgetRefreshStore {
   static func clearLocked(_ defaults: UserDefaults) {
     SecItemDelete(keyQuery as CFDictionary)
     defaults.set(UUID().uuidString, forKey: "homeWidgetGeneration")
-    for key in ["homeWidgetData", "homeWidgetPresentation", "homeWidgetRefreshAt", "homeWidgetRefreshDelay", "homeWidgetTerminalFence", "__expo_widgets_\(widgetName)_timeline"] {
+    for key in ["homeWidgetData", "homeWidgetPresentation", "homeWidgetRefreshAt", "homeWidgetRefreshDelay", "homeWidgetTerminalFence", timelineKey] {
       defaults.removeObject(forKey: key)
     }
     defaults.synchronize()
@@ -153,6 +153,41 @@ enum HomeWidgetRefreshStore {
     return request
   }
 
+  /// How long a pressed marker may be carried forward across timeline rebuilds.
+  /// Long enough for a cold launch's JavaScript to boot and read it, short
+  /// enough that a press from a previous session can never fire. The app
+  /// mirrors it as `PENDING_ACTION_TTL_MS`.
+  static let pendingActionTTL: Double = 5 * 60 * 1000
+  static var timelineKey: String { "__expo_widgets_\(widgetName)_timeline" }
+
+  /// The press marker the stored timeline still carries, if any.
+  ///
+  /// Only a real press can put one there: the App Intent merges the button's
+  /// press patch — `pendingAction`/`pendingApprovalKey` and the `pendingActionAt`
+  /// it was pressed at — into the pressed entry's props. This reads the stored
+  /// timeline, never the server presentation, so a refresh can never manufacture
+  /// a press. A marker carrying no press time (an older patch) falls back to now.
+  static func storedPress(_ entries: [[String: Any]]?) -> [String: Any]? {
+    for entry in entries ?? [] {
+      guard let props = entry["props"] as? [String: Any],
+            let action = props["pendingAction"] as? String,
+            action == "approve" || action == "new-agent" else { continue }
+      var press: [String: Any] = ["action": action]
+      if let approvalKey = props["pendingApprovalKey"] as? String { press["approvalKey"] = approvalKey }
+      press["at"] = (props["pendingActionAt"] as? Double) ?? Date().timeIntervalSince1970 * 1000
+      return press
+    }
+    return nil
+  }
+
+  /// The marker to re-attach to the rebuilt timeline's first entry, or nil when
+  /// nothing waits or the recorded press is older than the TTL.
+  static func carriedPress(_ entries: [[String: Any]]?) -> [String: Any]? {
+    guard let press = storedPress(entries), let at = press["at"] as? Double,
+          Date().timeIntervalSince1970 * 1000 - at <= pendingActionTTL else { return nil }
+    return press
+  }
+
   static func refresh() async {
     let captured = locked { defaults -> ([String: Any], String)? in
       guard !defaults.bool(forKey: "homeWidgetFixture"), let config = context(),
@@ -173,7 +208,7 @@ enum HomeWidgetRefreshStore {
             let copy = config["copy"] as? [String: String] ?? [:]
             defaults.set([["timestamp": Int(Date().timeIntervalSince1970 * 1000),
               "props": ["statusLine": copy["privacy"] ?? "", "countLines": [], "primaryCount": 0,
-                "actions": ["approve": false, "newAgent": false]]]], forKey: "__expo_widgets_\(widgetName)_timeline")
+                "actions": ["approve": false, "newAgent": false]]]], forKey: timelineKey)
             defaults.synchronize()
           }
         }
@@ -204,9 +239,15 @@ enum HomeWidgetRefreshStore {
           phases.append(["at": expires, "home": retained])
           phases.sort { ($0["at"] as? Double ?? 0) < ($1["at"] as? Double ?? 0) }
         }
-        let entries = phases.compactMap { phase -> [String: Any]? in
+        // Read the marker before the rebuild: the entries below are built from
+        // the server presentation and the stored base props, and the marker is
+        // re-attached from this carried press alone while it is still fresh.
+        let stored = defaults.array(forKey: timelineKey) as? [[String: Any]]
+        let carried = carriedPress(stored)
+        let baseProps = (stored?.first?["props"] as? [String: Any]) ?? [:]
+        var entries = phases.compactMap { phase -> [String: Any]? in
           guard let at = phase["at"] as? Double, let presentation = phase["home"] as? [String: Any] else { return nil }
-          var props = (defaults.array(forKey: "__expo_widgets_\(widgetName)_timeline")?.first as? [String: Any])?["props"] as? [String: Any] ?? [:]
+          var props = baseProps
           props["home"] = presentation
           var counts = presentation["secondaryCounts"] as? [[String: Any]] ?? []
           if let kind = presentation["primaryKind"] as? String, let count = presentation["primaryCount"] as? Int, count > 0 {
@@ -235,11 +276,23 @@ enum HomeWidgetRefreshStore {
           props["newestTitle"] = nil
           props["actionLine"] = nil
           props["accessibilityLabel"] = counts.map { "\($0["count"] ?? 0) \(copy[$0["kind"] as? String ?? ""] ?? "")" }.joined(separator: ", ")
+          // The rebuild owns the marker: strip every copy so only the carried
+          // press below can put one back on the first entry while it is fresh.
           props.removeValue(forKey: "pendingAction")
+          props.removeValue(forKey: "pendingApprovalKey")
+          props.removeValue(forKey: "pendingActionAt")
           // JSON nulls aren't valid property-list values; expo-widgets omits them too.
           return ["timestamp": Int(at), "props": propertyList(props)]
         }
-        if !entries.isEmpty { defaults.set(entries, forKey: "__expo_widgets_\(widgetName)_timeline") }
+        if !entries.isEmpty {
+          if let carried, var props = entries[0]["props"] as? [String: Any] {
+            props["pendingAction"] = carried["action"]
+            if let approvalKey = carried["approvalKey"] { props["pendingApprovalKey"] = approvalKey }
+            props["pendingActionAt"] = carried["at"]
+            entries[0]["props"] = props
+          }
+          defaults.set(entries, forKey: timelineKey)
+        }
         defaults.synchronize()
       }
     } catch {

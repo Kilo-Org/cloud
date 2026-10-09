@@ -20,6 +20,7 @@ import { type UserInteractionEvent, type WidgetFamily } from 'expo-widgets';
 
 import { activeAgentsWidgetLayout, WIDGET_NAME } from './active-agents-widget';
 import {
+  PENDING_ACTION_TTL_MS,
   pendingActionForEvent,
   pendingActionOf,
   registerWidgetActionHandling,
@@ -235,6 +236,24 @@ describe('pendingActionOf', () => {
     expect(pendingActionOf(null)).toBeNull();
     expect(pendingActionOf(undefined)).toBeNull();
   });
+
+  it('keeps a carried marker inside the TTL and refuses one past it', () => {
+    // The first rebuild records the press; a marker read straight after the
+    // press carries no time yet and is never refused for age.
+    expect(pendingActionOf({ pendingAction: 'new-agent' }, NOW)).toBe('new-agent');
+    expect(
+      pendingActionOf(
+        { pendingAction: 'approve', pendingActionAt: NOW - PENDING_ACTION_TTL_MS },
+        NOW
+      )
+    ).toBe('approve');
+    expect(
+      pendingActionOf(
+        { pendingAction: 'approve', pendingActionAt: NOW - PENDING_ACTION_TTL_MS - 1 },
+        NOW
+      )
+    ).toBeNull();
+  });
 });
 
 describe('pendingActionForEvent', () => {
@@ -262,6 +281,19 @@ describe('pendingActionForEvent', () => {
   it('maps nothing when no entry still carries a marker', () => {
     expect(pendingActionForEvent(event(), [{ props: { primaryCount: 1 } }])).toBeNull();
     expect(pendingActionForEvent(event(), [])).toBeNull();
+  });
+
+  it('ignores a carried marker past its TTL', () => {
+    expect(
+      pendingActionForEvent(event(), [
+        {
+          props: {
+            pendingAction: 'new-agent',
+            pendingActionAt: Date.now() - PENDING_ACTION_TTL_MS - 1,
+          },
+        },
+      ])
+    ).toBeNull();
   });
 });
 
@@ -327,6 +359,41 @@ describe('runPendingWidgetActions', () => {
       { date: new Date(2), props: { statusLine: 'Updates delayed' } },
     ]);
     expect(mocks.runWidgetApprove).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a carried press older than the TTL without running it', async () => {
+    widgetState.timeline = [
+      {
+        date: new Date(1),
+        props: {
+          pendingAction: 'new-agent',
+          pendingActionAt: Date.now() - PENDING_ACTION_TTL_MS - 1,
+        },
+      },
+    ];
+
+    await runPendingWidgetActions();
+
+    // A press from a previous session is never answered late, and the stale
+    // marker is cleared so it cannot linger in the stored timeline.
+    expect(mocks.linkingOpenURL).not.toHaveBeenCalled();
+    expect(widgetState.timeline).toEqual([{ date: new Date(1), props: {} }]);
+  });
+
+  it('runs a carried press inside the TTL and clears its recorded time', async () => {
+    widgetState.timeline = [
+      {
+        date: new Date(1),
+        props: { pendingAction: 'new-agent', pendingActionAt: Date.now() - 1000 },
+      },
+    ];
+
+    await runPendingWidgetActions();
+
+    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
+    // Stripping the recorded time is the explicit clear: the extension finds no
+    // marker left to carry forward, so the press cannot run twice.
+    expect(widgetState.timeline).toEqual([{ date: new Date(1), props: {} }]);
   });
 
   it('never runs the same press twice on a second sweep', async () => {
@@ -798,7 +865,14 @@ describe('activeAgentsWidgetLayout', () => {
     family => {
       const tree = renderWidget(homeProps([{ status: 'permission' }], APPROVABLE), family);
       const newAgent = pressButton(tree, { pendingAction: 'new-agent' });
-      expect(newAgent?.props.openAppWhenRun).toBe(true);
+      if (newAgent === undefined) {
+        throw new Error(`New agent button missing in ${family}`);
+      }
+      expect(newAgent.props.openAppWhenRun).toBe(true);
+      // The press records its own time, so the extension carries the marker only
+      // while the press is younger than the TTL and a fresh press always resets it.
+      const patch = (newAgent.props.onPress as () => { pendingActionAt: number })();
+      expect(Math.abs(patch.pendingActionAt - Date.now())).toBeLessThan(1000);
       const approve = pressButton(tree, {
         pendingAction: 'approve',
         pendingApprovalKey: APPROVAL_KEY,

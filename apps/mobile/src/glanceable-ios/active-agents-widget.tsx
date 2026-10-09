@@ -27,7 +27,17 @@ import { withWidgetLogo } from './widget-logo';
 /* eslint-disable new-cap -- PlatformColor is a React Native factory */
 
 export type WidgetProps = GlanceableWidgetProps;
-type WidgetPressPatch = { pendingAction: GlanceableWidgetAction; pendingApprovalKey?: string };
+type WidgetPressPatch = {
+  pendingAction: GlanceableWidgetAction;
+  pendingApprovalKey?: string;
+  /**
+   * When the press happened (ms since epoch). The extension carries the marker
+   * across timeline rebuilds only while it is younger than the TTL, so the
+   * press records its own time: a marker that outlives a rebuild keeps the time
+   * it was pressed with, and a fresh press always resets it.
+   */
+  pendingActionAt: number;
+};
 type WidgetButtonProps = Omit<ButtonProps, 'onPress'> & {
   onPress?: () => WidgetPressPatch;
 };
@@ -611,7 +621,11 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
               controlSize('small'),
               accessibilityLabel(COPY.approve ?? 'Approve'),
             ]}
-            onPress={() => ({ pendingAction: 'approve', pendingApprovalKey: approvalKey })}
+            onPress={() => ({
+              pendingAction: 'approve',
+              pendingApprovalKey: approvalKey,
+              pendingActionAt: Date.now(),
+            })}
           >
             <Image systemName="checkmark.circle" size={21} color={PlatformColor('label')} />
           </WidgetButton>
@@ -626,7 +640,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
               controlSize('small'),
               accessibilityLabel(COPY.newAgent ?? 'New agent'),
             ]}
-            onPress={() => ({ pendingAction: 'new-agent' })}
+            onPress={() => ({ pendingAction: 'new-agent', pendingActionAt: Date.now() })}
           >
             <Image systemName="plus.circle.fill" size={23} color={PlatformColor('label')} />
           </WidgetButton>

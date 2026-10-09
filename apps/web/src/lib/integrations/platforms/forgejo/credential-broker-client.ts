@@ -93,7 +93,7 @@ export async function fetchForgejoCredential(
     actor.userId,
     {
       audience: FORGEJO_CREDENTIAL_BROKER_AUDIENCE,
-      expiresIn: TOKEN_EXPIRY.oneHour,
+      expiresIn: TOKEN_EXPIRY.fiveMinutes,
       organizationId: actor.organizationId,
     }
   );

@@ -121,9 +121,9 @@ export async function storeForgejoOAuthIntegration(
             ...(changedInstance ? ['configured_webhooks', 'project_tokens'] : []),
           ],
         };
-      });
+       });
 
-      await tx
+       await tx
         .update(platform_integrations)
         .set({
           integration_type: 'oauth',
@@ -132,6 +132,8 @@ export async function storeForgejoOAuthIntegration(
           platform_account_login: input.providerUser.login,
           scopes: input.scopes,
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          suspended_at: null,
+          suspended_by: null,
           repositories: input.repositories,
           updated_at: new Date().toISOString(),
         })

@@ -93,7 +93,7 @@ export async function fetchGiteaCredential(
     actor.userId,
     {
       audience: GITEA_CREDENTIAL_BROKER_AUDIENCE,
-      expiresIn: TOKEN_EXPIRY.oneHour,
+      expiresIn: TOKEN_EXPIRY.fiveMinutes,
       organizationId: actor.organizationId,
     }
   );

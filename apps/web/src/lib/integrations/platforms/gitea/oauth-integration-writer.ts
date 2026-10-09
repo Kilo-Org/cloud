@@ -128,6 +128,8 @@ export async function storeGiteaOAuthIntegration(
           platform_account_login: input.providerUser.login,
           scopes: input.scopes,
           integration_status: INTEGRATION_STATUS.ACTIVE,
+          suspended_at: null,
+          suspended_by: null,
           repositories: input.repositories,
           updated_at: new Date().toISOString(),
         })

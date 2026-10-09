@@ -9,6 +9,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 
@@ -832,6 +833,10 @@ export async function completeStoreKiloPassPurchase(params: {
           ended_at: new Date(previousExpiry).toISOString(),
         })
         .where(eq(kilo_pass_subscriptions.id, activeSubscription.id));
+      await closePauseEvent(tx, {
+        kiloPassSubscriptionId: activeSubscription.id,
+        resumedAt: dayjs().utc().toISOString(),
+      });
     }
 
     const previousStorePurchase =

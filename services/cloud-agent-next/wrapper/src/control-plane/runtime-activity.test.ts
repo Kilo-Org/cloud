@@ -42,7 +42,10 @@ function harness() {
       return read(input);
     },
     onDeadline: (_identity, reason) => deadlines.push(reason),
-    onFault: reason => faults.push(reason),
+    onFault: reason => {
+      faults.push(reason);
+      return true;
+    },
     onChange: () => undefined,
   });
   return {

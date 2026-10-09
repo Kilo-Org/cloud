@@ -66,7 +66,7 @@ import {
   readPreparationSteps,
   type PreparationOutcome,
 } from '../../session/preparation-history.js';
-import type { CommandsAvailableData } from '../../shared/protocol.js';
+import type { CommandsAvailableData, SessionStatus } from '../../shared/protocol.js';
 import {
   CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
@@ -122,6 +122,7 @@ import {
   type SessionMessageState,
 } from './messages.js';
 import { answerMessageIntent } from './answers.js';
+import { messageFailureText } from './failure-messages.js';
 import {
   createControlPlaneWorktreeChanges,
   type ControlPlaneWorktreeChanges,
@@ -172,6 +173,18 @@ const ROUTE_KEY = 'control_plane_route';
 const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
+const ROOT_STATUS_KEY = 'session_root_status';
+
+/**
+ * Kilo's last root `session.status` type; `settled` once an accepted message settled after it,
+ * so a stored `busy` no longer describes Cloud work.
+ */
+const rootStatusSchema = z.object({ type: z.string(), settled: z.boolean() });
+type RootStatus = z.infer<typeof rootStatusSchema>;
+const rootStatusEventSchema = z.object({
+  sessionID: z.string(),
+  status: z.object({ type: z.string() }),
+});
 
 /** Wrapper setup-command lifecycle events the Session DO renders itself. */
 const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
@@ -444,6 +457,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
+  private rootStatus: RootStatus | undefined;
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
   private readonly reportOutbox: ReportOutbox;
   /** Terminal callback outbox (plan B5); one job per drained batch. */
@@ -589,6 +603,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.pendingInteractions = pending.success ? pending.data : undefined;
     const commands = await this.ctx.storage.get<CommandsAvailableData>(AVAILABLE_COMMANDS_KEY);
     this.availableCommands = commands?.commands ? commands : { commands: [] };
+    const rootStatus = rootStatusSchema.safeParse(await this.ctx.storage.get(ROOT_STATUS_KEY));
+    this.rootStatus = rootStatus.success ? rootStatus.data : undefined;
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
     const recoveryAt = z
@@ -1157,6 +1173,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           this.pendingInteractions = next;
           await this.ctx.storage.put(PENDING_INTERACTIONS_KEY, next);
         }
+        await this.recordRootStatus(event);
         persistSandboxControlSessionEvent({
           sessionId: this.sessionId,
           payload: event,
@@ -1633,6 +1650,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.transportRecoveryAt = null;
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
+    this.rootStatus = undefined;
     this.worktreePreparationGeneration = undefined;
     this.preparationRecorders.clear();
   }
@@ -1731,6 +1749,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return createStreamHandler(this.ctx, this.eventQueries, this.sessionId, {
       deriveCloudStatus: async () => this.deriveCloudStatus(),
       deriveQueuedMessages: async () => this.deriveQueuedMessages(),
+      deriveSessionStatus: async () => this.deriveSessionStatus(),
       readPendingInteractions: () => this.readPendingInteractions(),
       getAvailableCommands: async () => this.availableCommands,
       getPreparationSnapshots: async () => getPreparationSnapshots(this.eventQueries),
@@ -2239,6 +2258,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     );
     this.messages = reduction.messages;
     await this.persistMessages(reduction.changed);
+    if (reduction.changed.some(message => previousStates.get(message.messageId) === 'accepted'))
+      await this.settleRootStatus();
     for (const message of reduction.changed) {
       const lifecycleEventInserted = this.emitTerminal(message);
       this.recordReport(message, facts);
@@ -2369,7 +2390,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               status: 'failed',
               delivery: accepted ? 'sent' : 'queued',
               accepted,
-              ...(message.reason === null ? {} : { reason: message.reason, error: message.reason }),
+              ...(message.reason === null
+                ? {}
+                : { reason: message.reason, error: messageFailureText(message.reason) }),
             };
     const timestamp = message.settledAt ?? Date.now();
     const id = this.eventQueries.insertUnique({
@@ -2441,6 +2464,34 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
   }
 
+  private async recordRootStatus(event: { type: string; properties: unknown }): Promise<void> {
+    if (event.type !== 'session.status') return;
+    const parsed = rootStatusEventSchema.safeParse(event.properties);
+    if (!parsed.success || parsed.data.sessionID !== this.registration?.spec.kiloSessionId) return;
+    this.rootStatus = { type: parsed.data.status.type, settled: false };
+    await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  private async settleRootStatus(): Promise<void> {
+    if (this.rootStatus === undefined || this.rootStatus.settled) return;
+    this.rootStatus = { ...this.rootStatus, settled: true };
+    await this.ctx.storage.put(ROOT_STATUS_KEY, this.rootStatus);
+  }
+
+  /**
+   * Kilo's stored root status can stay `busy` after a hang or kill ends the turn. A busy or
+   * retry status that an accepted message's settlement followed, with no message accepted
+   * since, is stale, so a reconnect starts idle. Otherwise Kilo's replayed status stays the
+   * source, including native work that runs without a Cloud message.
+   */
+  private deriveSessionStatus(): SessionStatus | undefined {
+    const root = this.rootStatus;
+    if (root === undefined || !root.settled) return undefined;
+    if (root.type !== 'busy' && root.type !== 'retry') return undefined;
+    if (this.messages.some(message => message.state === 'accepted')) return undefined;
+    return { type: 'idle' };
+  }
+
   private deriveQueuedMessages(): QueuedMessageSnapshot[] {
     return this.messages
       .filter(
@@ -2463,7 +2514,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             accepted: message.acceptedAt !== null,
             ...(message.reason === null
               ? { error: 'The message failed' }
-              : { reason: message.reason, error: message.reason }),
+              : { reason: message.reason, error: messageFailureText(message.reason) }),
             timestamp: message.settledAt ?? timestamp,
           };
         }

@@ -6,6 +6,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 
 // A renewal creates a paid order. Grace, hold, pause and restore can change the
 // same order's entitlement without creating another credit grant.
@@ -82,12 +83,19 @@ export async function reconcileGooglePlaySubscriptionState(
     .update(kilo_pass_store_purchases)
     .set({ expires_at: new Date(expiry).toISOString() })
     .where(eq(kilo_pass_store_purchases.id, latest.id));
+  const endedAt = status === 'canceled' ? new Date(expiry).toISOString() : null;
   await tx
     .update(kilo_pass_subscriptions)
     .set({
       status,
       cancel_at_period_end: status === 'active' && state === 'SUBSCRIPTION_STATE_CANCELED',
-      ended_at: status === 'canceled' ? new Date(expiry).toISOString() : null,
+      ended_at: endedAt,
     })
     .where(eq(kilo_pass_subscriptions.id, subscription.id));
+  if (endedAt) {
+    await closePauseEvent(tx, {
+      kiloPassSubscriptionId: subscription.id,
+      resumedAt: new Date().toISOString(),
+    });
+  }
 }

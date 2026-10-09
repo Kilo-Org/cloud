@@ -428,6 +428,8 @@ describe('sessionStatusErrorMessage', () => {
     ['Assistant request was rate limited'],
     ['Session metadata is unavailable'],
     ['Commit failed'],
+    ['Kilo was not responding and was restarted'],
+    ['The turn made no progress'],
     // A bounded workspace failure appends its own detail to the projection.
     ['Workspace setup failed: Devcontainer workspace preparation failed'],
   ] as const)('shows the safe projection copy for %s', raw => {

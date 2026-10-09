@@ -192,6 +192,39 @@ describe('native session supervision', () => {
     expect(f.failures[0].reason).toBe('no_progress');
   });
 
+  it('pauses no-progress during a memory hold, counting an overlapping user wait once', () => {
+    const f = fixture();
+    f.open();
+    f.advance(10 * MINUTE);
+    f.supervisor.holdMemory(true);
+    f.advance(2 * MINUTE);
+    f.event('question.asked', { sessionID: 'root', id: 'q1' });
+    f.advance(3 * MINUTE);
+    f.supervisor.holdMemory(false);
+    f.advance(MINUTE);
+    f.event('question.replied', { sessionID: 'root', requestID: 'q1' });
+    // 10 minutes ran before the hold; the hold and the wait overlap into one 6-minute pause.
+    f.advance(10 * MINUTE - 1);
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures[0].reason).toBe('no_progress');
+  });
+
+  it('starts an execution paused when it opens during a memory hold', () => {
+    const f = fixture();
+    f.supervisor.holdMemory(true);
+    f.open();
+    f.advance(25 * MINUTE);
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.supervisor.holdMemory(false);
+    f.advance(20 * MINUTE);
+    f.supervisor.tick();
+    expect(f.failures[0].reason).toBe('no_progress');
+  });
+
   it('keeps independent tools runnable while blocking questions wait, but not nonblocking ones', () => {
     const f = fixture();
     f.open();

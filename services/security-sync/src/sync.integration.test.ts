@@ -1,12 +1,20 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { randomUUID } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import { createDrizzleClient } from '@kilocode/db/client';
-import { agent_configs, kilocode_users, platform_integrations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  agent_configs,
+  github_app_installations,
+  kilocode_users,
+  platform_integrations,
+  security_findings,
+} from '@kilocode/db/schema';
+import type { PlatformRepository } from '@kilocode/db/schema-types';
+import { and, eq } from 'drizzle-orm';
 import {
   advanceOwnerSyncFreshness,
   claimOwnerSyncLease,
   clearSyncRunProgress,
+  getOwnerConfig,
   releaseOwnerSyncLease,
   syncOwner,
   writeSyncRunProgress,
@@ -50,6 +58,132 @@ async function resetRuntimeState(state: Record<string, unknown> = {}): Promise<v
     .update(agent_configs)
     .set({ runtime_state: state })
     .where(eq(agent_configs.id, agentConfigId));
+}
+
+const relinkAlert = {
+  number: 4242,
+  state: 'open',
+  dependency: {
+    package: { ecosystem: 'npm', name: 'lodash' },
+    manifest_path: 'package.json',
+    scope: 'runtime',
+  },
+  security_advisory: {
+    ghsa_id: 'GHSA-relink-0000-0001',
+    cve_id: null,
+    summary: 'Relink test advisory',
+    description: 'Advisory used to exercise platform integration relinking.',
+    severity: 'high',
+    cvss: { score: 7.5, vector_string: null },
+    cwes: [{ cwe_id: 'CWE-1321', name: 'Prototype Pollution' }],
+  },
+  security_vulnerability: {
+    vulnerable_version_range: '< 4.17.21',
+    first_patched_version: { identifier: '4.17.21' },
+  },
+  created_at: '2026-01-15T00:00:00Z',
+  updated_at: '2026-01-15T00:00:00Z',
+  fixed_at: null,
+  dismissed_at: null,
+  html_url: 'https://github.com/acme/relink/security/dependabot/4242',
+  url: 'https://api.github.com/repos/acme/relink/dependabot/alerts/4242',
+};
+
+function stubRelinkFetch(alerts: unknown = [relinkAlert]): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify(alerts), { status: 200 }))
+  );
+}
+
+async function insertSyncIntegration(repoFullName: string): Promise<string> {
+  const id = randomUUID();
+  const [, repoName] = repoFullName.split('/');
+  await client.db.insert(platform_integrations).values({
+    id,
+    owned_by_user_id: testUserId,
+    platform: 'github',
+    integration_type: 'app',
+    platform_installation_id: `security-sync-relink-${randomUUID()}`,
+    permissions: { vulnerability_alerts: 'read' },
+    repositories: [{ id: 1, name: repoName ?? 'relink', full_name: repoFullName, private: true }],
+    integration_status: 'active',
+    github_connection_role: 'workflow',
+  });
+  return id;
+}
+
+async function insertCanonicalInstallation(params: {
+  installationId: string;
+  repoFullName: string;
+  permissions: Record<string, string>;
+  lifecycleState?: 'active' | 'suspended';
+  repositories?: PlatformRepository[];
+}): Promise<string> {
+  const id = randomUUID();
+  const [, repoName] = params.repoFullName.split('/');
+  await client.db.insert(github_app_installations).values({
+    id,
+    installation_id: params.installationId,
+    github_app_type: 'standard',
+    lifecycle_state: params.lifecycleState ?? 'active',
+    permissions: params.permissions,
+    repositories: params.repositories ?? [
+      { id: 1, name: repoName ?? 'relink', full_name: params.repoFullName, private: true },
+    ],
+  });
+  return id;
+}
+
+async function attachCanonicalInstallation(
+  integrationId: string,
+  canonicalId: string,
+  installationId: string
+): Promise<void> {
+  await client.db
+    .update(platform_integrations)
+    .set({
+      github_installation_id: canonicalId,
+      platform_installation_id: installationId,
+      github_app_type: 'standard',
+    })
+    .where(eq(platform_integrations.id, integrationId));
+}
+
+async function readRelinkFinding(repoFullName: string) {
+  const [finding] = await client.db
+    .select()
+    .from(security_findings)
+    .where(
+      and(
+        eq(security_findings.repo_full_name, repoFullName),
+        eq(security_findings.owned_by_user_id, testUserId)
+      )
+    );
+  if (!finding) throw new Error(`Missing relink finding for ${repoFullName}`);
+  return finding;
+}
+
+async function cleanupRelink(repoFullName: string, integrationIds: string[]): Promise<void> {
+  await client.db
+    .delete(security_findings)
+    .where(
+      and(
+        eq(security_findings.repo_full_name, repoFullName),
+        eq(security_findings.owned_by_user_id, testUserId)
+      )
+    );
+  for (const id of integrationIds) {
+    await client.db.delete(platform_integrations).where(eq(platform_integrations.id, id));
+  }
+}
+
+function createSyncOwnerDeps() {
+  return {
+    db: client.db as never,
+    gitTokenService: { getToken: vi.fn(async () => 'github-token') } as never,
+    owner,
+  };
 }
 
 describe('security sync owner lease in PostgreSQL', () => {
@@ -376,4 +510,345 @@ describe('security sync owner lease in PostgreSQL', () => {
     const state = await readRuntimeState();
     expect(state.sync_lease).toMatchObject({ runId: 'run-stale', chunkIndex: 2 });
   });
+
+  it.each(['link', 'sla'] as const)(
+    'preserves a local dismissal during a %s-only update',
+    async change => {
+      const repo = `acme/relink-null-${randomUUID()}`;
+      const integrationId = await insertSyncIntegration(repo);
+      const ignoredAt = '2026-02-01T00:00:00.000Z';
+      try {
+        stubRelinkFetch();
+        await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-null-1', chunkIndex: 0 });
+
+        const inserted = await readRelinkFinding(repo);
+        expect(inserted.platform_integration_id).toBe(integrationId);
+
+        await client.db
+          .update(security_findings)
+          .set({
+            platform_integration_id: change === 'link' ? null : integrationId,
+            status: 'ignored',
+            ignored_reason: 'manual-dismissal',
+            ignored_by: 'test-user',
+            fixed_at: ignoredAt,
+          })
+          .where(eq(security_findings.id, inserted.id));
+
+        if (change === 'sla') {
+          await client.db
+            .update(agent_configs)
+            .set({ config: { sla_high_days: 14 } })
+            .where(eq(agent_configs.id, agentConfigId));
+        }
+
+        stubRelinkFetch();
+        await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-null-2', chunkIndex: 0 });
+
+        const relinked = await readRelinkFinding(repo);
+        expect(relinked).toMatchObject({
+          platform_integration_id: integrationId,
+          status: 'ignored',
+          ignored_reason: 'manual-dismissal',
+          ignored_by: 'test-user',
+        });
+        expect(new Date(relinked.fixed_at ?? '').toISOString()).toBe(ignoredAt);
+        if (change === 'sla') expect(relinked.sla_due_at).not.toBe(inserted.sla_due_at);
+      } finally {
+        await cleanupRelink(repo, [integrationId]);
+        await client.db
+          .update(agent_configs)
+          .set({ config: {} })
+          .where(eq(agent_configs.id, agentConfigId));
+      }
+    }
+  );
+
+  it('updates platform_integration_id when the active integration changes', async () => {
+    const repo = `acme/relink-changed-${randomUUID()}`;
+    const integrationA = await insertSyncIntegration(repo);
+    let integrationB: string | null = null;
+    try {
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-changed-1', chunkIndex: 0 });
+      expect((await readRelinkFinding(repo)).platform_integration_id).toBe(integrationA);
+
+      await client.db
+        .update(platform_integrations)
+        .set({ integration_status: 'suspended' })
+        .where(eq(platform_integrations.id, integrationA));
+      integrationB = await insertSyncIntegration(repo);
+
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-changed-2', chunkIndex: 0 });
+
+      expect((await readRelinkFinding(repo)).platform_integration_id).toBe(integrationB);
+    } finally {
+      await cleanupRelink(repo, [integrationA, ...(integrationB ? [integrationB] : [])]);
+    }
+  });
+
+  it('does not write an unchanged finding on re-sync', async () => {
+    const repo = `acme/relink-noop-${randomUUID()}`;
+    const integrationId = await insertSyncIntegration(repo);
+    const sentinel = '2020-01-01T00:00:00.000Z';
+    try {
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-noop-1', chunkIndex: 0 });
+
+      const inserted = await readRelinkFinding(repo);
+      await client.db
+        .update(security_findings)
+        .set({ last_synced_at: sentinel })
+        .where(eq(security_findings.id, inserted.id));
+
+      stubRelinkFetch();
+      await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-noop-2', chunkIndex: 0 });
+
+      const after = await readRelinkFinding(repo);
+      expect(new Date(after.last_synced_at).getTime()).toBe(new Date(sentinel).getTime());
+    } finally {
+      await cleanupRelink(repo, [integrationId]);
+    }
+  });
+
+  it.each([
+    ['empty canonical repositories', 'empty-repositories'],
+    ['revoked canonical permissions', 'permissions'],
+    ['unhealthy canonical lifecycle', 'lifecycle'],
+    ['mismatched canonical identity', 'mismatched'],
+    ['legacy integration shadowed by canonical metadata', 'legacy-shadowed'],
+  ] as const)('rejects an integration with %s before fetching', async (_label, condition) => {
+    const repo = `acme/ineligible-${randomUUID()}`;
+    const integrationId = await insertSyncIntegration(repo);
+    const installationId = randomInt(1, 2 ** 48 - 1).toString();
+    let canonicalId: string | null = null;
+    try {
+      canonicalId = await insertCanonicalInstallation({
+        installationId,
+        repoFullName: repo,
+        permissions: condition === 'permissions' ? {} : { vulnerability_alerts: 'read' },
+        lifecycleState: condition === 'lifecycle' ? 'suspended' : 'active',
+        repositories: condition === 'empty-repositories' ? [] : undefined,
+      });
+      if (condition === 'legacy-shadowed') {
+        await client.db
+          .update(platform_integrations)
+          .set({ platform_installation_id: installationId, github_app_type: 'standard' })
+          .where(eq(platform_integrations.id, integrationId));
+      } else {
+        await attachCanonicalInstallation(
+          integrationId,
+          canonicalId,
+          condition === 'mismatched' ? randomInt(1, 2 ** 48 - 1).toString() : installationId
+        );
+      }
+
+      await expect(getOwnerConfig(client.db as never, owner)).resolves.toEqual({
+        unavailable: 'GITHUB_TOKEN_UNAVAILABLE',
+      });
+      const getToken = vi.fn(async () => 'github-token');
+      const fetchStub = vi.fn();
+      vi.stubGlobal('fetch', fetchStub);
+
+      await expect(
+        syncOwner({
+          db: client.db as never,
+          gitTokenService: { getToken } as never,
+          owner,
+          runId: `ineligible-${condition}`,
+          chunkIndex: 0,
+        })
+      ).resolves.toMatchObject({ commandResultCode: 'GITHUB_TOKEN_UNAVAILABLE' });
+      expect(getToken).not.toHaveBeenCalled();
+      expect(fetchStub).not.toHaveBeenCalled();
+    } finally {
+      await cleanupRelink(repo, [integrationId]);
+      if (canonicalId) {
+        await client.db
+          .delete(github_app_installations)
+          .where(eq(github_app_installations.id, canonicalId));
+      }
+    }
+  });
+
+  it('selects a healthy canonical alternative and applies a fixed alert status', async () => {
+    const repo = `acme/canonical-alternative-${randomUUID()}`;
+    const invalidIntegrationId = await insertSyncIntegration(repo);
+    const invalidInstallationId = randomInt(1, 2 ** 48 - 1).toString();
+    const invalidCanonicalId = await insertCanonicalInstallation({
+      installationId: invalidInstallationId,
+      repoFullName: repo,
+      permissions: { vulnerability_alerts: 'read' },
+      repositories: [],
+    });
+    let healthyIntegrationId: string | null = null;
+    let healthyCanonicalId: string | null = null;
+    try {
+      stubRelinkFetch();
+      await syncOwner({
+        ...createSyncOwnerDeps(),
+        runId: 'canonical-alternative-open',
+        chunkIndex: 0,
+      });
+      expect((await readRelinkFinding(repo)).status).toBe('open');
+
+      await attachCanonicalInstallation(
+        invalidIntegrationId,
+        invalidCanonicalId,
+        invalidInstallationId
+      );
+      healthyIntegrationId = await insertSyncIntegration(repo);
+      const healthyInstallationId = randomInt(1, 2 ** 48 - 1).toString();
+      healthyCanonicalId = await insertCanonicalInstallation({
+        installationId: healthyInstallationId,
+        repoFullName: repo,
+        permissions: { vulnerability_alerts: 'read' },
+      });
+      await attachCanonicalInstallation(
+        healthyIntegrationId,
+        healthyCanonicalId,
+        healthyInstallationId
+      );
+
+      stubRelinkFetch([
+        {
+          ...relinkAlert,
+          state: 'fixed',
+          updated_at: '2026-02-15T00:00:00Z',
+          fixed_at: '2026-02-15T00:00:00Z',
+        },
+      ]);
+      await syncOwner({
+        ...createSyncOwnerDeps(),
+        runId: 'canonical-alternative-fixed',
+        chunkIndex: 0,
+      });
+
+      expect(await readRelinkFinding(repo)).toMatchObject({
+        platform_integration_id: healthyIntegrationId,
+        status: 'fixed',
+      });
+    } finally {
+      await cleanupRelink(repo, [
+        invalidIntegrationId,
+        ...(healthyIntegrationId ? [healthyIntegrationId] : []),
+      ]);
+      await client.db
+        .delete(github_app_installations)
+        .where(eq(github_app_installations.id, invalidCanonicalId));
+      if (healthyCanonicalId) {
+        await client.db
+          .delete(github_app_installations)
+          .where(eq(github_app_installations.id, healthyCanonicalId));
+      }
+    }
+  });
+
+  it.each(['association', 'canonical', 'new-alert'] as const)(
+    'rejects stale %s observations after integration retirement',
+    async retirement => {
+      const repo = `acme/relink-retired-${randomUUID()}`;
+      const integrationA = await insertSyncIntegration(repo);
+      let integrationB: string | null = null;
+      let canonicalId: string | null = null;
+      try {
+        stubRelinkFetch();
+        await syncOwner({ ...createSyncOwnerDeps(), runId: 'relink-retired-1', chunkIndex: 0 });
+
+        if (retirement === 'canonical') {
+          canonicalId = randomUUID();
+          const installationId = randomInt(1, 2 ** 48 - 1).toString();
+          await client.db.insert(github_app_installations).values({
+            id: canonicalId,
+            installation_id: installationId,
+            github_app_type: 'standard',
+            lifecycle_state: 'active',
+            permissions: { vulnerability_alerts: 'read' },
+            repositories: [{ id: 1, name: 'repo', full_name: repo, private: true }],
+          });
+          await client.db
+            .update(platform_integrations)
+            .set({
+              github_installation_id: canonicalId,
+              platform_installation_id: installationId,
+              github_app_type: 'standard',
+            })
+            .where(eq(platform_integrations.id, integrationA));
+        }
+
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(async () => {
+            if (canonicalId) {
+              await client.db
+                .update(github_app_installations)
+                .set({ lifecycle_state: 'suspended' })
+                .where(eq(github_app_installations.id, canonicalId));
+            } else {
+              await client.db
+                .update(platform_integrations)
+                .set({ integration_status: 'suspended' })
+                .where(eq(platform_integrations.id, integrationA));
+            }
+            integrationB = await insertSyncIntegration(repo);
+            await client.db
+              .update(security_findings)
+              .set({
+                platform_integration_id: integrationB,
+                status: 'ignored',
+                ignored_reason: 'manual-dismissal',
+                ignored_by: 'test-user',
+                fixed_at: '2026-02-01T00:00:00.000Z',
+              })
+              .where(
+                and(
+                  eq(security_findings.repo_full_name, repo),
+                  eq(security_findings.owned_by_user_id, testUserId)
+                )
+              );
+            return new Response(
+              JSON.stringify([
+                { ...relinkAlert, number: retirement === 'new-alert' ? 4243 : relinkAlert.number },
+              ]),
+              { status: 200 }
+            );
+          })
+        );
+
+        const result = await syncOwner({
+          ...createSyncOwnerDeps(),
+          runId: 'relink-retired-2',
+          chunkIndex: 0,
+        });
+        expect(result.errors).toBe(retirement === 'new-alert' ? 1 : 0);
+
+        const after = await readRelinkFinding(repo);
+        expect(after).toMatchObject({
+          platform_integration_id: integrationB,
+          status: 'ignored',
+          ignored_reason: 'manual-dismissal',
+          ignored_by: 'test-user',
+        });
+        expect(new Date(after.fixed_at ?? '').toISOString()).toBe('2026-02-01T00:00:00.000Z');
+        const rows = await client.db
+          .select({ id: security_findings.id })
+          .from(security_findings)
+          .where(
+            and(
+              eq(security_findings.repo_full_name, repo),
+              eq(security_findings.owned_by_user_id, testUserId)
+            )
+          );
+        expect(rows).toHaveLength(1);
+      } finally {
+        await cleanupRelink(repo, [integrationA, ...(integrationB ? [integrationB] : [])]);
+        if (canonicalId) {
+          await client.db
+            .delete(github_app_installations)
+            .where(eq(github_app_installations.id, canonicalId));
+        }
+      }
+    }
+  );
 });

@@ -4,7 +4,7 @@
   "name": "git-token-service",
   "main": "src/index.ts",
   "compatibility_date": "2025-09-15",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "enhanced_error_serialization"],
   "workers_dev": false,
   "preview_urls": false,
   "routes": [

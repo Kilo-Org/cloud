@@ -16,6 +16,7 @@ import {
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   agent_configs,
+  github_app_installations,
   platform_integrations,
   security_findings,
   security_finding_notifications,
@@ -26,6 +27,7 @@ import {
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
+  type IntegrationPermissions,
   type PlatformRepository,
 } from '@kilocode/db/schema-types';
 import {
@@ -714,6 +716,44 @@ function integrationOwnerFilter(owner: SecurityReviewOwner) {
   return eq(platform_integrations.owned_by_user_id, owner.userId);
 }
 
+function eligibleSecuritySyncIntegration(owner: SecurityReviewOwner) {
+  const canonicalInstallationMatchesIntegration = sql`
+    ${github_app_installations.lifecycle_state} = 'active'
+    AND ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+    AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+    AND ${github_app_installations.suspended_at} IS NULL
+    AND ${github_app_installations.deleted_at} IS NULL
+  `;
+  const legacyInstallationHasNoCanonicalRecord = sql`
+    ${platform_integrations.github_installation_id} IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM ${github_app_installations}
+      WHERE ${github_app_installations.installation_id} = ${platform_integrations.platform_installation_id}
+        AND ${github_app_installations.github_app_type} = COALESCE(${platform_integrations.github_app_type}, 'standard')
+    )
+  `;
+
+  return and(
+    integrationOwnerFilter(owner),
+    eq(platform_integrations.platform, 'github'),
+    eq(platform_integrations.github_connection_role, 'workflow'),
+    eq(platform_integrations.integration_type, 'app'),
+    eq(platform_integrations.integration_status, 'active'),
+    isNull(platform_integrations.suspended_at),
+    isNull(platform_integrations.github_disconnected_at),
+    isNotNull(platform_integrations.platform_installation_id),
+    or(legacyInstallationHasNoCanonicalRecord, canonicalInstallationMatchesIntegration),
+    sql`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})->>'vulnerability_alerts' IN ('read', 'write')`,
+    sql`EXISTS (
+      SELECT 1
+      FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
+      WHERE jsonb_typeof(repository->'id') = 'number'
+        AND jsonb_typeof(repository->'full_name') = 'string'
+        AND repository->>'full_name' <> ''
+    )`
+  );
+}
+
 function analysisOwnerStateFilter(owner: SecurityReviewOwner) {
   if (isOrgOwner(owner)) {
     return eq(security_analysis_owner_state.owned_by_organization_id, owner.organizationId);
@@ -759,7 +799,7 @@ type EnabledOwnerConfig = {
 export async function getOwnerConfig(
   db: WorkerDb,
   owner: SecurityReviewOwner
-): Promise<EnabledOwnerConfig | null> {
+): Promise<EnabledOwnerConfig | { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' } | null> {
   // Get agent config
   const configs = await db
     .select({
@@ -781,42 +821,35 @@ export async function getOwnerConfig(
   if (configs.length === 0) return null;
   const agentConfig = configs[0];
 
-  // Get platform integration
   const integrations = await db
     .select({
       id: platform_integrations.id,
       platform_installation_id: platform_integrations.platform_installation_id,
-      permissions: platform_integrations.permissions,
-      repositories: platform_integrations.repositories,
+      permissions: sql<IntegrationPermissions | null>`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})`,
+      repositories: sql<
+        PlatformRepository[] | null
+      >`COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories})`,
       authInvalidAt: platform_integrations.auth_invalid_at,
       githubAppType: platform_integrations.github_app_type,
     })
     .from(platform_integrations)
-    .where(
-      and(
-        integrationOwnerFilter(owner),
-        eq(platform_integrations.platform, 'github'),
-        eq(platform_integrations.github_connection_role, 'workflow'),
-        eq(platform_integrations.integration_type, 'app'),
-        eq(platform_integrations.integration_status, 'active'),
-        isNull(platform_integrations.suspended_at),
-        isNull(platform_integrations.github_disconnected_at),
-        isNotNull(platform_integrations.platform_installation_id)
-      )
+    .leftJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
     )
+    .where(eligibleSecuritySyncIntegration(owner))
     .orderBy(asc(platform_integrations.created_at), asc(platform_integrations.id))
     .limit(1);
 
-  if (integrations.length === 0) return null;
+  if (integrations.length === 0) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
   const integration = integrations[0];
 
-  if (!integration.platform_installation_id) return null;
+  if (!integration.platform_installation_id) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
 
-  // Check vulnerability_alerts permission
   const perms = integration.permissions;
   if (!perms || (perms.vulnerability_alerts !== 'read' && perms.vulnerability_alerts !== 'write')) {
     console.warn(`Integration ${integration.id} missing vulnerability_alerts permission, skipping`);
-    return null;
+    return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
   }
 
   // Filter repositories
@@ -826,7 +859,7 @@ export async function getOwnerConfig(
       typeof repository.full_name === 'string' &&
       repository.full_name.length > 0
   );
-  if (allRepos.length === 0) return null;
+  if (allRepos.length === 0) return { unavailable: 'GITHUB_TOKEN_UNAVAILABLE' };
 
   const repoNameToId = new Map(allRepos.map(r => [r.full_name, r.id]));
 
@@ -1162,22 +1195,13 @@ async function upsertSecurityFinding(
   const ownerOrganizationId = isOrgOwner(owner) ? owner.organizationId : null;
   const ownerUserId = isOrgOwner(owner) ? null : owner.userId;
 
-  // Only rewrite an existing finding when the source data actually changed. Re-syncing an
-  // unchanged finding otherwise rewrote the row on every run (bumping last_synced_at/
-  // updated_at), which — multiplied by ~13 indexes and the TOASTed raw_data column —
-  // produced large amounts of WAL for findings that had not changed.
-  //
-  // Every stored column is derived from the Dependabot alert (see parseDependabotAlert),
-  // and GitHub only advances the alert's updated_at on real changes, so comparing the
-  // stored raw_data (jsonb, order-independent) detects any source-driven change in one
-  // check. sla_due_at is the only value we compute ourselves, so it is compared separately
-  // to catch SLA-policy changes. When neither differs the DO UPDATE matches no row and the
-  // fallback SELECT below returns the existing finding with wasInserted=false and no
-  // status/severity delta, so notifications and audit events behave exactly as they did for
-  // an unchanged re-sync.
+  // Avoid WAL/TOAST churn on unchanged alerts. Metadata-only updates must not undo
+  // a dismissal applied after the source fetch.
+  const sourceDataChangedPredicate = sql`${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}`;
   const materialChangePredicate = sql`(
-        ${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}
+        ${sourceDataChangedPredicate}
         OR ${security_findings.sla_due_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)}
+        OR ${security_findings.platform_integration_id} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)}
       )`;
 
   const result = await db.execute<Record<string, unknown>>(sql`
@@ -1191,6 +1215,19 @@ async function upsertSecurityFinding(
         AND ${security_findings.source_id} = ${finding.source_id}
         AND ${findingOwnerPredicate(owner)}
       FOR UPDATE
+    ),
+    eligible_input AS (
+      SELECT 1
+      FROM ${platform_integrations}
+      LEFT JOIN ${github_app_installations}
+        ON ${platform_integrations.github_installation_id} = ${github_app_installations.id}
+      WHERE ${platform_integrations.id} = ${platformIntegrationId}
+        AND ${eligibleSecuritySyncIntegration(owner)}
+        AND EXISTS (
+          SELECT 1
+          FROM jsonb_array_elements(COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories}, '[]'::jsonb)) AS repository
+          WHERE repository->>'full_name' = ${repoFullName}
+        )
     ),
     upserted AS (
       INSERT INTO ${security_findings} (
@@ -1250,10 +1287,11 @@ async function upsertSecurityFinding(
         ${sql.param(finding.cwe_ids)}::text[],
         ${finding.cvss_score?.toString() ?? null},
         ${finding.dependency_scope}
-      FROM (SELECT 1) AS input
+      FROM eligible_input
       LEFT JOIN existing_match ON true
       ON CONFLICT ${findingOwnerConflictTarget(owner)} DO UPDATE
       SET
+        ${sql.identifier(security_findings.platform_integration_id.name)} = EXCLUDED.${sql.identifier(security_findings.platform_integration_id.name)},
         ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
         ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
         ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
@@ -1265,18 +1303,24 @@ async function upsertSecurityFinding(
         ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
         ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
         ${sql.identifier(security_findings.status.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.status}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.status}
           ELSE EXCLUDED.${sql.identifier(security_findings.status.name)}
         END,
         ${sql.identifier(security_findings.ignored_reason.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.ignored_reason}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_reason}
           ELSE EXCLUDED.${sql.identifier(security_findings.ignored_reason.name)}
         END,
         ${sql.identifier(security_findings.ignored_by.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.ignored_by}
           WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_by}
           ELSE EXCLUDED.${sql.identifier(security_findings.ignored_by.name)}
         END,
-        ${sql.identifier(security_findings.fixed_at.name)} = EXCLUDED.${sql.identifier(security_findings.fixed_at.name)},
+        ${sql.identifier(security_findings.fixed_at.name)} = CASE
+          WHEN NOT (${sourceDataChangedPredicate}) THEN ${security_findings.fixed_at}
+          ELSE EXCLUDED.${sql.identifier(security_findings.fixed_at.name)}
+        END,
         ${sql.identifier(security_findings.sla_due_at.name)} = EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)},
         ${sql.identifier(security_findings.dependabot_html_url.name)} = EXCLUDED.${sql.identifier(security_findings.dependabot_html_url.name)},
         ${sql.identifier(security_findings.raw_data.name)} = EXCLUDED.${sql.identifier(security_findings.raw_data.name)},
@@ -2235,13 +2279,14 @@ export async function syncOwner(params: {
   }
 
   const config = await getOwnerConfig(database, owner);
-  if (!config) {
-    console.info(`No enabled config for owner, skipping`, { runId, owner });
+  if (!config || 'unavailable' in config) {
+    const resultCode = config?.unavailable ?? 'CONFIG_DISABLED';
+    console.info('Skipping security sync before fetching', { runId, owner, resultCode });
     if (leaseHeld) {
       const teardown = await teardownOwnerLease(database, owner, runId, chunkIndex, 'abandoned');
       if (teardown) return teardown;
     }
-    return { ...createEmptySyncResult(), commandResultCode: 'CONFIG_DISABLED' };
+    return { ...createEmptySyncResult(), commandResultCode: resultCode };
   }
 
   const repositories = selectRepositoriesForSync(config, repoFullName);

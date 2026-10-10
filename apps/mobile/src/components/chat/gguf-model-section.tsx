@@ -16,6 +16,8 @@ import {
 } from '@/lib/chat/gguf-records';
 import { formatFileSize } from '@/lib/format';
 
+import { modelCapabilityKey } from './model-tools-hint';
+
 const FAILURE_KEYS = {
   space: 'modelChat.gguf.errors.space',
   network: 'modelChat.gguf.errors.network',
@@ -78,7 +80,7 @@ function GgufModelRow({ fileId, name, detail, snapshot, onDownload }: Readonly<R
             {t('modelChat.gguf.downloaded', { size: size(record.sizeBytes) })}
           </Text>
           <Text className="text-sm text-muted-foreground">
-            {t(record.tools ? 'modelChat.backends.modelTools' : 'modelChat.backends.textOnly')}
+            {t(modelCapabilityKey(record.tools, record.vision))}
           </Text>
           <Button
             variant="ghost"
@@ -218,7 +220,11 @@ export function GgufModelSection() {
           fileId={model.fileId}
           name={model.name}
           detail={t('modelChat.gguf.details', {
-            size: formatFileSize(model.sizeBytes, i18n.language),
+            // A vision model's projector is part of the same download.
+            size: formatFileSize(
+              model.sizeBytes + (model.projector?.sizeBytes ?? 0),
+              i18n.language
+            ),
             license: model.license,
           })}
           snapshot={snapshot}

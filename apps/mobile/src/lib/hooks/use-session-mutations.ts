@@ -20,6 +20,7 @@ import {
   type SessionsListData,
 } from '@/lib/session-list-cache';
 import { useTRPC } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 type SessionsListSnapshot = [QueryKey, SessionsListData | undefined][];
 
@@ -137,7 +138,16 @@ export function useSessionMutations() {
       if (!deleteOptions.mutationFn) {
         throw new Error('No mutationFn found');
       }
-      const result = await settleCurrentOperation(epoch, deleteOptions.mutationFn(input, context));
+      // NOT_FOUND means the session is already gone (deleted on another
+      // device, or a stale row the user deleted twice). The delete reached
+      // its goal: keep the row removed and report success.
+      const deletion = deleteOptions.mutationFn(input, context).catch((error: unknown) => {
+        if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
+          return { success: true, session_id: input.session_id };
+        }
+        throw error;
+      });
+      const result = await settleCurrentOperation(epoch, deletion);
       return result;
     },
   });

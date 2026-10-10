@@ -23,7 +23,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 const mockErrorExceptInTest = jest.mocked(errorExceptInTest);
 const originalFetch = global.fetch;
 const BUDGET_MS = 10 * 60 * 1000;
-const STREAMING_HEADER_TIMEOUT_MS = 6 * 60 * 1000;
 const encoder = new TextEncoder();
 
 function request(stream: boolean) {
@@ -78,24 +77,15 @@ function streamingUpstream() {
   return { push: (chunk: string) => push(chunk) };
 }
 
-describe('upstreamRequest timeouts', () => {
-  // Stand-ins for the AbortSignal.timeout timers, keyed by duration, so each
-  // test decides which limit runs out.
-  let timers: Map<number, AbortController>;
-  const fire = (ms: number) => {
-    const timer = timers.get(ms);
-    if (!timer) throw new Error(`no ${ms}ms timer was armed`);
-    timer.abort();
-  };
+describe('upstreamRequest duration budget', () => {
+  // Stands in for the 600s AbortSignal.timeout timer so each test decides when
+  // the budget runs out.
+  let budgetTimer: AbortController;
 
   beforeEach(() => {
     mockErrorExceptInTest.mockReset();
-    timers = new Map();
-    jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
-      const timer = new AbortController();
-      timers.set(ms, timer);
-      return timer.signal;
-    });
+    budgetTimer = new AbortController();
+    jest.spyOn(AbortSignal, 'timeout').mockReturnValue(budgetTimer.signal);
   });
 
   afterEach(() => {
@@ -103,15 +93,18 @@ describe('upstreamRequest timeouts', () => {
     jest.restoreAllMocks();
   });
 
-  it('fails a streaming request whose headers do not arrive within the header timeout', async () => {
+  it('logs the header message when the budget runs out before the headers arrive', async () => {
     headersNeverArrive();
 
-    const pending = request(true);
-    fire(STREAMING_HEADER_TIMEOUT_MS);
+    const pending = request(false);
+    budgetTimer.abort();
     const result = await pending;
 
+    // The only gateway timer is the total budget; undici's headersTimeout bounds the header wait.
+    expect(AbortSignal.timeout).toHaveBeenCalledTimes(1);
+    expect(AbortSignal.timeout).toHaveBeenCalledWith(BUDGET_MS);
     expect(mockErrorExceptInTest).toHaveBeenCalledWith(
-      '[upstreamRequest] gateway timeout after 360000ms waiting for upstream response headers',
+      '[upstreamRequest] gateway timeout after 600000ms waiting for upstream response headers',
       { vercelRequestId: 'iad1::request-id', phase: 'headers' }
     );
     expect(mockErrorExceptInTest).toHaveBeenCalledWith(
@@ -127,22 +120,7 @@ describe('upstreamRequest timeouts', () => {
     });
   });
 
-  it('lets a non-streaming request wait for headers up to the total budget', async () => {
-    headersNeverArrive();
-
-    const pending = request(false);
-    expect([...timers.keys()]).toEqual([BUDGET_MS]);
-    fire(BUDGET_MS);
-    const result = await pending;
-
-    expect(mockErrorExceptInTest).toHaveBeenCalledWith(
-      '[upstreamRequest] gateway timeout after 600000ms waiting for upstream response headers',
-      { vercelRequestId: 'iad1::request-id', phase: 'headers' }
-    );
-    expect(result.type).toBe('error');
-  });
-
-  it('keeps a flowing stream past the header timeout and stops it at the total budget', async () => {
+  it('logs the stream message when a stream outlives the budget after its headers arrived', async () => {
     const upstream = streamingUpstream();
     // The request starts at 1s and its headers arrive at 6s.
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(6_000);
@@ -152,13 +130,11 @@ describe('upstreamRequest timeouts', () => {
     const reader = result.response.body?.getReader();
     if (!reader) throw new Error('expected a response body');
 
-    // The header timer running out after the headers arrived changes nothing.
-    fire(STREAMING_HEADER_TIMEOUT_MS);
     upstream.push('data: {"choices":[]}\n\n');
     await expect(reader.read()).resolves.toMatchObject({ done: false });
     expect(mockErrorExceptInTest).not.toHaveBeenCalled();
 
-    fire(BUDGET_MS);
+    budgetTimer.abort();
     const readError = await reader.read().catch((error: unknown) => error);
 
     expect(readError).toBeInstanceOf(UpstreamTimeoutError);

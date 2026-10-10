@@ -40,28 +40,22 @@ type UpstreamFetchFailureFamily =
  * typical case (after() done within 80s of a stream that ran this full cap), but
  * only the design bound covers a slow usage endpoint, so the cap is not raised:
  * a function killed at maxDuration loses its usage record.
+ *
+ * There is no separate header timer here: Node's fetch (undici) already fails a
+ * header wait after 300s (`headersTimeout`, surfaced as UND_ERR_HEADERS_TIMEOUT
+ * and classified `headers_timeout`), and that limit stops once headers arrive.
  */
 const UPSTREAM_DURATION_BUDGET_MS = 10 * 60 * 1000;
-
-/**
- * Header wait for streaming requests only; it stops once the headers arrive, so
- * it never cuts a stream that is already flowing. Streaming responses are
- * observed to send headers within ~300s of the request (an upstream limit sits
- * just below that), so 360s leaves margin while failing a dead request 4 minutes
- * sooner. A non-streaming response sends its headers with the whole completion,
- * so only `UPSTREAM_DURATION_BUDGET_MS` bounds that wait.
- */
-const STREAMING_HEADER_TIMEOUT_MS = 6 * 60 * 1000;
 
 function formatSeconds(ms: number): string {
   return `${Number((ms / 1000).toFixed(1))}s`;
 }
 
 /**
- * Abort reason when the gateway's own limit stops an upstream call. Its name
- * stays `TimeoutError`, so failure classification is unchanged. It records
+ * Abort reason when `UPSTREAM_DURATION_BUDGET_MS` stops an upstream call. Its
+ * name stays `TimeoutError`, so failure classification is unchanged. It records
  * whether the response headers had arrived, so the logs and the client-visible
- * error can tell a header wait from a stream that outlived the duration budget.
+ * error can tell a header wait from a stream that outlived the budget.
  */
 export class UpstreamTimeoutError extends Error {
   override readonly name = 'TimeoutError';
@@ -300,27 +294,20 @@ export async function upstreamRequest({
 
   const fetchStartedAt = performance.now();
   let headersReceivedAfterMs: number | null = null;
-  // AbortSignal.timeout keeps its timers unref'd; re-aborting through our own
-  // controller lets the abort reason say which limit fired and in which phase.
+  // AbortSignal.timeout keeps its timer unref'd; re-aborting through our own
+  // controller lets the abort reason say which phase the budget ran out in.
   const timeoutController = new AbortController();
-  const abortOnTimeout = (limitMs: number) => {
-    const reason = new UpstreamTimeoutError(limitMs, headersReceivedAfterMs);
+  const budgetSignal = AbortSignal.timeout(UPSTREAM_DURATION_BUDGET_MS);
+  const onBudgetExceeded = () => {
+    const reason = new UpstreamTimeoutError(UPSTREAM_DURATION_BUDGET_MS, headersReceivedAfterMs);
     errorExceptInTest(`[upstreamRequest] ${reason.message}`, {
       vercelRequestId: vercelRequestId ?? '<none>',
       phase: headersReceivedAfterMs === null ? 'headers' : 'stream',
     });
     timeoutController.abort(reason);
   };
-  const budgetSignal = AbortSignal.timeout(UPSTREAM_DURATION_BUDGET_MS);
-  const onBudgetExceeded = () => abortOnTimeout(UPSTREAM_DURATION_BUDGET_MS);
   budgetSignal.addEventListener('abort', onBudgetExceeded);
-  const headerSignal =
-    body.stream === true ? AbortSignal.timeout(STREAMING_HEADER_TIMEOUT_MS) : null;
-  const onHeaderTimeout = () => abortOnTimeout(STREAMING_HEADER_TIMEOUT_MS);
-  headerSignal?.addEventListener('abort', onHeaderTimeout);
-  const stopHeaderTimeout = () => headerSignal?.removeEventListener('abort', onHeaderTimeout);
   after(() => {
-    stopHeaderTimeout();
     budgetSignal.removeEventListener('abort', onBudgetExceeded);
   });
   const combinedSignal = signal
@@ -341,12 +328,10 @@ export async function upstreamRequest({
       signal: combinedSignal,
     });
     headersReceivedAfterMs = performance.now() - fetchStartedAt;
-    stopHeaderTimeout();
     return { type: 'success', response };
   } catch (error) {
     // No response body to bound; a later fallback attempt must not be blamed
-    // for this attempt's timers.
-    stopHeaderTimeout();
+    // for this attempt's budget.
     budgetSignal.removeEventListener('abort', onBudgetExceeded);
     // The caller passes the incoming request signal, so a client that goes away
     // aborts this fetch as well. Those aborts are client-side cancellations and

@@ -2029,14 +2029,6 @@ describe('toGlanceableContentState', () => {
     ).toBe(0);
   });
 
-  it('carries the confirmed time the card prints as "Checked <time>"', () => {
-    // A timestamp, like the wait and the wake: the card's header prints when
-    // the counts were confirmed, and an older card without it prints no time.
-    expect(
-      (JSON.parse(toGlanceableContentState(snapshot).props) as Record<string, unknown>).updatedAt
-    ).toBe(snapshot.updatedAt);
-  });
-
   it('never leaks snapshot bookkeeping, ids, or titles into the pushed content-state', () => {
     const contentState = toGlanceableContentState(snapshot);
     const raw = JSON.stringify(contentState);

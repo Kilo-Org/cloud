@@ -9,8 +9,8 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
  *
  * Unlike the iOS widget extension, the Android surfaces render in the app's own
  * JS runtime, so `Intl` is already there and no digit table has to be baked into
- * a layout. Grouping is off: these counts never reach four figures, and a
- * separator in a two-character number is only noise.
+ * a layout. Grouping is on, with the language's own separator, so a count of
+ * four figures or more reads as the app's other numbers do.
  */
 export function formatGlanceableCount(value: number): string {
   return numberFormat(i18n.language, { useGrouping: true }).format(value);

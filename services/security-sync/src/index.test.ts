@@ -11,6 +11,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { settleOperation } from '@kilocode/db/operation-ledger';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
+import { PermanentSecurityCommandError } from './permanent-command-error.js';
 import { runSecurityNotificationSweep } from './notifications/sweep.js';
 import { syncOwner, releaseOwnerSyncLease } from './sync.js';
 import type * as SyncModule from './sync.js';
@@ -1275,6 +1276,188 @@ describe('manual dismissal dispatch', () => {
       } as CloudflareEnv
     );
 
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the command failed and acks without retrying when dismissal fails permanently', async () => {
+    vi.mocked(processSecurityFindingDismissal).mockRejectedValue(
+      new PermanentSecurityCommandError({
+        resultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+        lastErrorRedacted: 'GitHub integration is disconnected or inactive for this finding',
+      })
+    );
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState)
+      .mockResolvedValueOnce({ transitioned: true, command: {} } as never)
+      .mockResolvedValueOnce({
+        transitioned: true,
+        command: {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          operation_key: 'retry-safe-key-123',
+          status: 'failed',
+          result_code: 'GITHUB_TOKEN_UNAVAILABLE',
+        },
+      } as never);
+    const workerDb = ledgerDb([{ id: 'ledger-row-id' }]);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'dismiss-message-123',
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              actor: { id: 'user-123', email: 'owner@example.com' },
+              findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              installationId: 'installation-123',
+              reason: 'not_used',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+      } as CloudflareEnv
+    );
+
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      2,
+      workerDb,
+      expect.objectContaining({
+        commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        status: 'failed',
+        resultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+        lastErrorRedacted: 'GitHub integration is disconnected or inactive for this finding',
+      })
+    );
+    expect(settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        rowId: 'ledger-row-id',
+        status: 'failed',
+        outcomeCode: 'GITHUB_TOKEN_UNAVAILABLE',
+        outboxEvent: expect.objectContaining({ distinctId: 'owner@example.com' }),
+      })
+    );
+    expect(markSecurityAgentCommandRetriesExhausted).not.toHaveBeenCalled();
+    expect(retry).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails fast with the permanent result code on the final delivery attempt', async () => {
+    vi.mocked(processSecurityFindingDismissal).mockRejectedValue(
+      new PermanentSecurityCommandError({
+        resultCode: 'REPOSITORY_UNAVAILABLE',
+        lastErrorRedacted: 'GitHub no longer exposes this repository or alert to the App',
+      })
+    );
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState)
+      .mockResolvedValueOnce({ transitioned: true, command: {} } as never)
+      .mockResolvedValueOnce({
+        transitioned: true,
+        command: {
+          id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          operation_key: 'retry-safe-key-123',
+          status: 'failed',
+          result_code: 'REPOSITORY_UNAVAILABLE',
+        },
+      } as never);
+    const workerDb = ledgerDb([{ id: 'ledger-row-id' }]);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDb);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 4,
+            body: {
+              schemaVersion: 1,
+              kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'dismiss-message-123',
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              actor: { id: 'user-123', email: 'owner@example.com' },
+              findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              installationId: 'installation-123',
+              reason: 'not_used',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+      } as CloudflareEnv
+    );
+
+    expect(markSecurityAgentCommandRetriesExhausted).not.toHaveBeenCalled();
+    expect(releaseOwnerSyncLease).not.toHaveBeenCalled();
+    expect(retry).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to retrying when the permanent failure state cannot be persisted', async () => {
+    vi.mocked(processSecurityFindingDismissal).mockRejectedValue(
+      new PermanentSecurityCommandError({
+        resultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+        lastErrorRedacted: 'GitHub integration is disconnected or inactive for this finding',
+      })
+    );
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState)
+      .mockResolvedValueOnce({ transitioned: true, command: {} } as never)
+      .mockResolvedValueOnce({ transitioned: false, command: null } as never);
+    vi.mocked(getWorkerDb).mockReturnValue(workerDbStub());
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            attempts: 1,
+            body: {
+              schemaVersion: 1,
+              kind: 'dismiss',
+              commandId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'dismiss-message-123',
+              dispatchedAt: '2026-05-18T08:30:00.000Z',
+              owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              actor: { id: 'user-123', email: 'owner@example.com' },
+              findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              installationId: 'installation-123',
+              reason: 'not_used',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+      } as CloudflareEnv
+    );
+
+    expect(markSecurityAgentCommandRetriesExhausted).not.toHaveBeenCalled();
     expect(ack).not.toHaveBeenCalled();
     expect(retry).toHaveBeenCalledTimes(1);
   });

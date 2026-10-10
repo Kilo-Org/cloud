@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { processSecurityFindingDismissal } from './dismiss.js';
 import type { SecurityDismissMessage } from './index.js';
+import { PermanentSecurityCommandError } from './permanent-command-error.js';
 
 const finding = {
   id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -29,10 +30,13 @@ const finding = {
 };
 
 function createDb(
-  selectedFinding = finding,
+  selectedFinding: Omit<typeof finding, 'platform_integration_id'> & {
+    platform_integration_id: string | null;
+  } = finding,
   options: {
     failAuditInsert?: boolean;
     actor?: { id: string; email: string; name: string; isAdmin: boolean };
+    integration?: { githubAppType: string } | null;
   } = {}
 ) {
   const updates: unknown[] = [];
@@ -74,13 +78,12 @@ function createDb(
         where: () => ({
           limit: async () => {
             const currentSelect = selectCount++;
-            return [
-              currentSelect === 0
-                ? selectedFinding
-                : currentSelect === 1 && selectedFinding.source === 'dependabot'
-                  ? { githubAppType: 'standard' }
-                  : actor,
-            ];
+            if (currentSelect === 0) return [selectedFinding];
+            if (currentSelect === 1 && selectedFinding.source === 'dependabot') {
+              if (options.integration === null) return [];
+              return [options.integration ?? { githubAppType: 'standard' }];
+            }
+            return [actor];
           },
         }),
       }),
@@ -202,6 +205,161 @@ describe('processSecurityFindingDismissal', () => {
       })
     ).rejects.toThrow('GitHub Dependabot dismissal failed with 503');
 
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it.each([404, 410])(
+    'fails permanently with REPOSITORY_UNAVAILABLE when GitHub answers %i',
+    async status => {
+      const { db, updates, auditRows } = createDb();
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status }));
+
+      const error = await processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        message: createMessage(),
+      }).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(PermanentSecurityCommandError);
+      expect(error).toMatchObject({ resultCode: 'REPOSITORY_UNAVAILABLE' });
+      expect(updates).toHaveLength(0);
+      expect(auditRows).toHaveLength(0);
+    }
+  );
+
+  it.each([401, 403])(
+    'fails permanently with GITHUB_AUTH_INVALID when GitHub answers %i',
+    async status => {
+      const { db, updates, auditRows } = createDb();
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status }));
+
+      const error = await processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        message: createMessage(),
+      }).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(PermanentSecurityCommandError);
+      expect(error).toMatchObject({ resultCode: 'GITHUB_AUTH_INVALID' });
+      expect(updates).toHaveLength(0);
+      expect(auditRows).toHaveLength(0);
+    }
+  );
+
+  it('fails permanently with DISMISSAL_REJECTED when GitHub answers 422', async () => {
+    const { db, updates, auditRows } = createDb();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 422 }));
+
+    const error = await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+      message: createMessage(),
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(PermanentSecurityCommandError);
+    expect(error).toMatchObject({ resultCode: 'DISMISSAL_REJECTED' });
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it.each([429, 500])('keeps GitHub %i failures retryable', async status => {
+    const { db, updates, auditRows } = createDb();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status }));
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        message: createMessage(),
+      })
+    ).rejects.toThrow(`GitHub Dependabot dismissal failed with ${status}`);
+
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('fails permanently when the finding has no linked GitHub integration', async () => {
+    const { db, updates, auditRows } = createDb({ ...finding, platform_integration_id: null });
+    const getToken = vi.fn();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const error = await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken } as unknown as GitTokenService,
+      message: createMessage(),
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(PermanentSecurityCommandError);
+    expect(error).toMatchObject({ resultCode: 'GITHUB_TOKEN_UNAVAILABLE' });
+    expect(getToken).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('fails permanently when the GitHub integration is disconnected or inactive', async () => {
+    const { db, updates, auditRows } = createDb(finding, { integration: null });
+    const getToken = vi.fn();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const error = await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken } as unknown as GitTokenService,
+      message: createMessage(),
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(PermanentSecurityCommandError);
+    expect(error).toMatchObject({ resultCode: 'GITHUB_TOKEN_UNAVAILABLE' });
+    expect(getToken).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('fails permanently when the installation has no active integration association', async () => {
+    const { db, updates, auditRows } = createDb();
+    const accessDenied = new Error(
+      'GitHub installation is not available through one active association'
+    );
+    accessDenied.name = 'GitHubInstallationAccessDeniedError';
+    const getToken = vi.fn().mockRejectedValue(accessDenied);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const error = await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken } as unknown as GitTokenService,
+      message: createMessage(),
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(PermanentSecurityCommandError);
+    expect(error).toMatchObject({
+      resultCode: 'GITHUB_TOKEN_UNAVAILABLE',
+      cause: accessDenied,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('keeps token service infrastructure failures retryable', async () => {
+    const { db, updates, auditRows } = createDb();
+    const getToken = vi.fn().mockRejectedValue(new Error('token service unavailable'));
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken } as unknown as GitTokenService,
+        message: createMessage(),
+      })
+    ).rejects.toThrow('token service unavailable');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);
     expect(auditRows).toHaveLength(0);
   });

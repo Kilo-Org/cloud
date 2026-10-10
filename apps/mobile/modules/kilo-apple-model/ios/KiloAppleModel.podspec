@@ -2,7 +2,7 @@ Pod::Spec.new do |s|
   s.name = 'KiloAppleModel'
   s.version = '1.0.0'
   s.summary = 'Inference-only Apple Foundation Models bridge for Quick Chat'
-  s.description = 'Rebuilds the supplied transcript for each request and streams on-device text inference without storing chats or executing tools.'
+  s.description = 'Rebuilds the supplied transcript for each request and streams on-device inference without storing chats. Tool calls go to JavaScript, which runs them and returns their results.'
   s.license = { :type => 'Proprietary' }
   s.author = 'Kilo'
   s.homepage = 'https://github.com/Kilo-Org/cloud'

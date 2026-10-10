@@ -1,12 +1,11 @@
+import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import {
-  type KiloSessionId,
-  type KiloSdkMessageHistoryPage,
-  type StoredMessage,
-} from '@kilocode/cloud-agent-sdk';
-import { trpcClient } from '@/lib/trpc';
+  fetchMobileSessionSnapshotPage,
+  SESSION_HISTORY_FAILURE_MESSAGES,
+} from './mobile-session-page-adapter';
 
 /** Shared by the overlay read and the gesture-start prefetch, so a reopen paints from cache. */
-export const SESSION_TRANSCRIPT_QUERY_KEY = 'session-transcript-page';
+const SESSION_TRANSCRIPT_QUERY_KEY = 'session-transcript-page';
 
 /**
  * Read the newest page of a session's transcript through the access-checked,
@@ -20,35 +19,24 @@ export const SESSION_TRANSCRIPT_QUERY_KEY = 'session-transcript-page';
  * view, so one page is enough and never times out. The paged route keeps the
  * same access checks, so a foreign or missing session still rejects with
  * `NOT_FOUND` and the preview keeps its permission and error states.
+ *
+ * `sessionId` is the row's id, which the tRPC input schema accepts as a plain
+ * string; only the paged read itself needs the SDK's branded id.
  */
-export async function fetchNewestSessionTranscript(
-  kiloSessionId: KiloSessionId
-): Promise<readonly StoredMessage[]> {
-  const result = await trpcClient.cliSessionsV2.getSessionMessagesPage.query({
-    session_id: kiloSessionId,
-  });
-  const history = result.history;
-  if (history === null) {
-    return [];
+async function fetchNewestSessionTranscript(sessionId: string): Promise<readonly StoredMessage[]> {
+  const page = await fetchMobileSessionSnapshotPage(sessionId as KiloSessionId, {});
+  if (page.kind !== 'success') {
+    // A typed worker failure is not a page: the preview must show its error
+    // state instead of an empty transcript.
+    throw new Error(SESSION_HISTORY_FAILURE_MESSAGES[page.kind]);
   }
-  if ('messages' in history) {
-    return (history as KiloSdkMessageHistoryPage).messages as readonly StoredMessage[];
-  }
-  // A typed worker failure is not a page: the preview must show its error
-  // state instead of an empty transcript.
-  throw new Error(
-    history.kind === 'retryable_failure'
-      ? 'Session messages temporarily unavailable'
-      : history.kind === 'too_large'
-        ? 'Session messages too large to load'
-        : 'Session messages are unavailable'
-  );
+  return page.messages;
 }
 
 /** The overlay read and the gesture-start prefetch share this one key. */
-export function sessionTranscriptQueryOptions(kiloSessionId: KiloSessionId) {
+export function sessionTranscriptQueryOptions(sessionId: string) {
   return {
-    queryKey: [SESSION_TRANSCRIPT_QUERY_KEY, kiloSessionId] as const,
-    queryFn: () => fetchNewestSessionTranscript(kiloSessionId),
+    queryKey: [SESSION_TRANSCRIPT_QUERY_KEY, sessionId] as const,
+    queryFn: fetchNewestSessionTranscript.bind(null, sessionId),
   };
 }

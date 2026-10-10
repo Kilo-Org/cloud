@@ -543,7 +543,8 @@ describe('StoredSessionRow long-press preview', () => {
       pressableProps(renderer)?.onPressIn?.();
     });
     expect(prefetchSessionTranscript).toHaveBeenCalledWith(previewQueryClient, {
-      queryKey: ['transcript', 'stored-1'],
+      queryKey: ['session-transcript-page', 'stored-1'],
+      queryFn: expect.any(Function),
     });
   });
 

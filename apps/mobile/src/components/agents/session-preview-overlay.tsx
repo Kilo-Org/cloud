@@ -1,4 +1,4 @@
-import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Portal } from '@rn-primitives/portal';
 import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
@@ -89,7 +89,7 @@ function SessionPreviewContent({
   const { sessionId, live } = target;
 
   const transcriptQuery = useQuery({
-    ...sessionTranscriptQueryOptions(sessionId as KiloSessionId),
+    ...sessionTranscriptQueryOptions(sessionId),
     // Shared with the gesture-start prefetch, so a reopen paints from cache.
     staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
     // A failed read shows its error state; it is never retried without bound.
@@ -105,10 +105,8 @@ function SessionPreviewContent({
   });
   const liveRow = live ? liveRowQuery.data : undefined;
 
-  // SAFETY: the paged read returns the same `StoredMessage` shape
-  // (`info` + `parts`) the full snapshot did; the rows are only handed to
-  // `MessageBubble`, which reads exactly those two fields.
-  const messages = (transcriptQuery.data ?? EMPTY_MESSAGES) as readonly StoredMessage[];
+  // The paged read returns the same `StoredMessage` rows the full snapshot did.
+  const messages = transcriptQuery.data ?? EMPTY_MESSAGES;
   const transcriptState: SessionPreviewTranscriptState = {
     sessionId,
     messages,

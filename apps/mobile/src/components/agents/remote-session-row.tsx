@@ -2,7 +2,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { memo, useEffect, useMemo, useRef } from 'react';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -308,10 +307,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const handlePressIn = canManage
     ? () => {
-        void prefetchSessionTranscript(
-          queryClient,
-          sessionTranscriptQueryOptions(session.id as KiloSessionId)
-        );
+        void prefetchSessionTranscript(queryClient, sessionTranscriptQueryOptions(session.id));
       }
     : undefined;
 

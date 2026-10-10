@@ -12,7 +12,10 @@ import {
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
 import { withCloudAgentDiagnostics } from '@/components/agents/mobile-session-diagnostics';
 import { RequestDeadlineError } from '@kilocode/event-service';
-import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
+import {
+  fetchMobileSessionSnapshotPage,
+  SESSION_HISTORY_FAILURE_MESSAGES,
+} from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
 import {
@@ -293,19 +296,13 @@ export function createMobileAgentSessionManager({
         fetchMobileSessionSnapshotPage(id, {}),
       ]);
       if (page.kind !== 'success') {
-        throw new Error(
-          page.kind === 'retryable_failure'
-            ? 'Session history temporarily unavailable'
-            : page.kind === 'too_large'
-              ? 'Session history too large to load'
-              : 'Session history is unavailable'
-        );
+        throw new Error(SESSION_HISTORY_FAILURE_MESSAGES[page.kind]);
       }
       // The paged read already projects the goal from the session metadata, so
       // the fixed goal section survives a snapshot replay.
       return {
         info: {
-          id: page.info.id ?? sessionData.session_id,
+          id: page.info.id,
           parentID: page.info.parentID ?? sessionData.parent_session_id ?? undefined,
           ...(page.info.model ? { model: page.info.model } : {}),
           ...(page.info.goal === undefined ? {} : { goal: page.info.goal }),

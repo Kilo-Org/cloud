@@ -8,6 +8,16 @@ import {
 import { trpcClient } from '@/lib/trpc';
 
 /**
+ * User-facing text for a typed worker failure of the paged read. One source
+ * for the preview's error state and the manager's snapshot replay.
+ */
+export const SESSION_HISTORY_FAILURE_MESSAGES = {
+  retryable_failure: 'Session history temporarily unavailable',
+  too_large: 'Session history too large to load',
+  invalid_data: 'Session history is unavailable',
+} as const;
+
+/**
  * Type guard to narrow KiloSdkMessageHistory to the page variant.
  * The shared union is discriminated by the presence of the `messages` array.
  */

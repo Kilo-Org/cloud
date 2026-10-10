@@ -4,7 +4,6 @@ import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
@@ -17,7 +16,6 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
-import { useTRPC } from '@/lib/trpc';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
@@ -126,7 +124,6 @@ export function StoredSessionRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const trpc = useTRPC();
   // The backend names an unnamed session with a raw ISO placeholder
   // ("New session - 2026-09-22T02:05:22.778Z"); it is not a name the user
   // should see. `namedSessionTitle` uses the shared display helper and keeps
@@ -257,7 +254,7 @@ export function StoredSessionRow({
     ? () => {
         void prefetchSessionTranscript(
           queryClient,
-          sessionTranscriptQueryOptions(session.session_id as KiloSessionId)
+          sessionTranscriptQueryOptions(session.session_id)
         );
       }
     : undefined;

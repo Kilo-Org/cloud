@@ -550,7 +550,9 @@ has no key, so it restores and captures nothing: setup output is never published
   2-minute prompt-delivery budget; that budget stays current while the wait holds, so it does not
   expire the instant the response clears. The native 20-minute no-progress bound applies while
   executing; its clock pauses during user waits, and the 120-minute wall-clock cap still bounds
-  the wait. A command that is not currently observed, or a plain prompt, still expires as a stuck intake.
+  the wait, not the batch: the follower starts a new native execution once the response clears, so a
+  batch spanning several executions can outlive the accepted backstop and fail `no_outcome`. A command
+  that is not currently observed, or a plain prompt, still expires as a stuck intake.
   Ordinary prompts still reach Kilo during model execution through `prompt_async`. Kilo owns its
   native queue and execution; the wrapper must not add a shadow native queue or concurrent HTTP to
   bypass command ordering.

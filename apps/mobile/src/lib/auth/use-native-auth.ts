@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
@@ -279,6 +280,13 @@ export function useNativeAuth(): NativeAuthResult {
       const email = rawEmail.trim().toLowerCase();
       if (!email) {
         setEmailError(i18n.t('login.pleaseEnterEmail'));
+        return false;
+      }
+      // `/api/auth/native/otp` validates the address with zod's email check and
+      // answers 400 INVALID_REQUEST. Run the same check here, so a mistyped
+      // address shows the same inline error without a failed request.
+      if (!z.email().safeParse(email).success) {
+        setEmailError(mapError('INVALID_REQUEST'));
         return false;
       }
 

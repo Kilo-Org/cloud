@@ -215,9 +215,14 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         // Play dropped its billing client after this owner connected, so every
         // later tap would fail the same way. Restore the connection for the next
         // tap; the request itself never reached the store, so the generic copy
-        // below is still the truth for this one. A reconnect that fails leaves
-        // the store-unavailable state to the screen, as before.
-        void reconnectStore().catch(() => {});
+        // below is still the truth for this one.
+        void (async () => {
+          try {
+            await reconnectStore();
+          } catch {
+            // Still unreachable: the screen keeps its store-unavailable state.
+          }
+        })();
       }
       if (isStoreAlreadyOwnedError(error)) {
         // The store says the pack is already owned. For a consumable that is

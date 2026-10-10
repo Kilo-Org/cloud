@@ -1,5 +1,5 @@
 /** One pinned file: the URL holds a Hugging Face revision, so the bytes behind it cannot change. */
-export type CatalogFile = {
+type CatalogFile = {
   readonly url: string;
   /** Checked exactly before the download is accepted. */
   readonly sizeBytes: number;

@@ -175,9 +175,11 @@ private actor AppleModelEngine {
       }
       let model = SystemLanguageModel.default
       if let reason = Self.unavailableReason(model) { throw AppleModelFailure(reason: reason) }
-      try Self.validate(request, contextSize: Self.contextSize(model))
-      // Count actual role-aware transcript entries, including the latest user
-      // prompt, system instructions, and tool definitions, rather than joining
+      // A tool round's request ends on the tool outputs, not on a user prompt,
+      // and its count is still needed: only generation needs a prompt last.
+      try Self.validate(request, contextSize: Self.contextSize(model), promptLast: false)
+      // Count actual role-aware transcript entries, including the latest
+      // entry, system instructions, and tool definitions, rather than joining
       // their text together. These tools are never called.
       let tools = Self.tools(request.tools, token: UUID(), engine: self, session: SessionReference())
       return try await model.tokenCount(for: Self.entries(request, tools: tools))
@@ -204,7 +206,7 @@ private actor AppleModelEngine {
       guard #available(iOS 26.0, *) else { throw AppleModelFailure(reason: "unsupported_os") }
       let model = SystemLanguageModel.default
       if let reason = Self.unavailableReason(model) { throw AppleModelFailure(reason: reason) }
-      try Self.validate(request, contextSize: Self.contextSize(model))
+      try Self.validate(request, contextSize: Self.contextSize(model), promptLast: true)
       let requestToken = UUID()
       token = requestToken
       let task = Task { try await self.infer(request, token: requestToken, model: model, emit: emit) }
@@ -398,10 +400,15 @@ private actor AppleModelEngine {
   }
 
   @available(iOS 26.0, *)
-  private static func validate(_ request: AppleModelRequest, contextSize: Int) throws {
+  private static func validate(
+    _ request: AppleModelRequest,
+    contextSize: Int,
+    promptLast: Bool
+  ) throws {
     let roles: Set<String> = ["user", "assistant", "toolCalls", "toolOutput"]
     guard !request.id.isEmpty, request.maxTokens > 0, request.maxTokens <= contextSize,
-          request.messages.last?.role == "user",
+          !request.messages.isEmpty,
+          !promptLast || request.messages.last?.role == "user",
           request.messages.allSatisfy({ roles.contains($0.role) }) else {
       throw AppleModelFailure(reason: "invalid_request")
     }

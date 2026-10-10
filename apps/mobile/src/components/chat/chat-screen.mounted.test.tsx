@@ -102,12 +102,6 @@ vi.mock('@/components/agents/message-bubble', () => ({ MessageBubble: 'MessageBu
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
-vi.mock('@/components/agents/session-keyboard-container-state', () => ({
-  getSessionKeyboardContainerKind: () => 'keyboard-avoiding',
-}));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/icons', () => ({ MessageCircle: 'MessageCircle', Wrench: 'Wrench' }));

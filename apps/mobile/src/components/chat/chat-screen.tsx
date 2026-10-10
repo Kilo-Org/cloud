@@ -1,14 +1,8 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -16,8 +10,6 @@ import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { MessageCircle, Wrench } from '@/components/ui/icons';
@@ -157,7 +149,6 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     void stop();
   }, [stop]);
 
-  const keyboardKind = getSessionKeyboardContainerKind(Platform.OS);
   const { bottom } = useSafeAreaInsets();
   // A conversation fills the screen: the tab bar is gone and the composer sits
   // on the home indicator, except while the keyboard covers it.
@@ -279,13 +270,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         }
         showBackButton
       />
-      {keyboardKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">{renderBody()}</AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {renderBody()}
-        </KeyboardAvoidingView>
-      )}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
+        {renderBody()}
+      </KeyboardAvoidingView>
       <McpSettingsSheet
         visible={mcpOpen}
         onClose={() => {

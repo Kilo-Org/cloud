@@ -135,7 +135,8 @@
     "updated": "अद्यावधिक गरियो",
     "working": "काम गर्दै",
     "yourOwnRepositories": "तपाईंका आफ्नै रिपोजिटरीहरू",
-    "dismissed": "खारेज गरियो"
+    "dismissed": "खारेज गरियो",
+    "agent": "एजेन्ट"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
     "openSession": "खोल्नुहोस्",
     "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।",
-    "newestResult": "नवीनतम नतिजा",
-    "scheduledWakes": "{{time}} उठ्नेछ"
+    "checked": "जाँच गरिएको",
+    "lastKnown": "पछिल्लो ज्ञात",
+    "awaitingUpdate": "अपडेटको प्रतीक्षामा",
+    "nextRun": "अर्को सञ्चालन",
+    "waitingForYou": "तपाईंको प्रतीक्षामा",
+    "nextScheduled": "अब तय भएका",
+    "answerNeeded": "जवाफ चाहिन्छ",
+    "waitingToRetry": "फेरि प्रयासको प्रतीक्षामा"
   },
   "transcriptionModel": {
     "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",
@@ -3357,7 +3364,6 @@
       "template": "टेम्प्लेट",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS व्याख्या गर्नुहोस्",
-      "agent": "एजेन्ट",
       "subtask": "सबटास्कको रूपमा चलाउनुहोस्",
       "edit": "स्ल्याश आदेश सम्पादन गर्नुहोस्",
       "saveFailed": "आदेश सुरक्षित गर्न सकिएन",

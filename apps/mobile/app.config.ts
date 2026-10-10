@@ -484,6 +484,8 @@ const config: ExpoConfig = {
     // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
     // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
     // target reuses the existing app group; no second group is created.
+    // Native Home refresh runs after expo-widgets' source generation (mods run in reverse).
+    './plugins/withHomeWidgetRefresh',
     [
       'expo-widgets',
       {

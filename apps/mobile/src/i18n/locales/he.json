@@ -135,7 +135,8 @@
     "updated": "עודכן",
     "working": "בפעולה",
     "yourOwnRepositories": "המאגרים שלך",
-    "dismissed": "סומן להתעלמות"
+    "dismissed": "סומן להתעלמות",
+    "agent": "סוֹכֵן"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -3196,8 +3197,14 @@
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה.",
     "openSession": "פתח",
     "approveFailed": "לא ניתן היה לאשר. הקש על $t(common.approve) כדי לנסות שוב.",
-    "newestResult": "התוצאה החדשה ביותר",
-    "scheduledWakes": "מתעורר {{time}}"
+    "checked": "נבדק",
+    "lastKnown": "מצב אחרון ידוע",
+    "awaitingUpdate": "ממתין לעדכון",
+    "nextRun": "ההפעלה הבאה",
+    "waitingForYou": "ממתין לך",
+    "nextScheduled": "התזמונים הבאים",
+    "answerNeeded": "נדרשת תשובה",
+    "waitingToRetry": "ממתין לניסיון חוזר"
   },
   "transcriptionModel": {
     "title": "מודל תמלול",
@@ -3398,7 +3405,6 @@
       "template": "תבנית",
       "namePlaceholder": "explain",
       "templatePlaceholder": "הסבר $ARGUMENTS",
-      "agent": "סוֹכֵן",
       "subtask": "הפעל כתת-מטלת",
       "edit": "ערוך פקודת נטוי",
       "saveFailed": "לא ניתן לשמור את הפקודה",

@@ -135,7 +135,8 @@
     "updated": "A ti ṣe ìmúdójúìwọ̀n",
     "working": "Ń ṣiṣẹ́",
     "yourOwnRepositories": "Àwọn ibi ìpamọ́ kóòdù tìrẹ",
-    "dismissed": "A ti kọ̀ sílẹ̀"
+    "dismissed": "A ti kọ̀ sílẹ̀",
+    "agent": "Aṣoju"
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa.",
     "openSession": "Ṣí",
     "approveFailed": "A kò lè fọwọ́ sí. Tẹ $t(common.approve) láti tún gbìyànjú.",
-    "newestResult": "Àbájáde tuntun jùlọ",
-    "scheduledWakes": "yoo ji {{time}}"
+    "checked": "Ti ṣàyẹ̀wò",
+    "lastKnown": "Tí a mọ̀ kẹ́yìn",
+    "awaitingUpdate": "Ń dúró de ìmúdójúìwọ̀n",
+    "nextRun": "Ìṣiṣẹ́ tó kàn",
+    "waitingForYou": "Ń dúró dè ọ́",
+    "nextScheduled": "Àwọn ètò tó kàn",
+    "answerNeeded": "Nílò èsì",
+    "waitingToRetry": "Ń dúró láti tún gbìyànjú"
   },
   "transcriptionModel": {
     "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",
@@ -3357,7 +3364,6 @@
       "template": "Àdàkọ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Ṣe alaye $ARGUMENTS",
-      "agent": "Aṣoju",
       "subtask": "Ṣiṣe bi iṣẹ-ṣiṣe",
       "edit": "Ṣatunkọ pipaṣẹ idinku",
       "saveFailed": "Ko le fi aṣẹ pamọ",

@@ -14,6 +14,9 @@ import {
   CLOUD_AGENT_CONNECTION_ID,
   type ActiveSession,
 } from '@/lib/active-sessions-list';
+import { homeWidgetResponseSchema } from '@kilocode/app-shared/home-widget';
+import { buildHomeWidgetResponseForUser } from '@/lib/glanceable-agents-snapshot-server';
+import { issueHomeWidgetCredential } from '@/lib/auth/home-widget-credential';
 
 // Re-exported for existing consumers and tests.
 export {
@@ -167,6 +170,31 @@ export const activeSessionsRouter = createTRPCRouter({
       includeCloudAgentSessions,
     });
   }),
+
+  /** Foreground JS consumers use normal user auth; native background reads use the dedicated widget route. */
+  widgetSnapshot: baseProcedure
+    .input(z.object({ organizationId: z.uuid().nullable() }))
+    .output(homeWidgetResponseSchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId !== null) {
+        // A personal widget never uses the platform-admin elevation bypass.
+        await ensureOrganizationAccess(
+          { ...ctx, user: { ...ctx.user, is_admin: false } },
+          input.organizationId
+        );
+      }
+      return buildHomeWidgetResponseForUser({
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+      });
+    }),
+
+  widgetCredential: baseProcedure
+    .input(z.object({ organizationId: z.uuid().nullable() }))
+    .output(z.object({ token: z.string().min(1), expiresAt: z.number().int().positive() }))
+    .query(({ ctx, input }) =>
+      issueHomeWidgetCredential(ctx.user, input.organizationId, ctx.headersList)
+    ),
 
   /**
    * Live snapshot of every `kilo remote` instance currently connected for the

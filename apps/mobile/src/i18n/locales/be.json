@@ -135,7 +135,8 @@
     "updated": "Абноўлена",
     "working": "Працуе",
     "yourOwnRepositories": "Твае рэпазіторыі",
-    "dismissed": "Адхілена"
+    "dismissed": "Адхілена",
+    "agent": "Агент"
   },
   "language": {
     "restarting": "Перазапуск для змены мовы",
@@ -3237,8 +3238,14 @@
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
     "openSession": "Адкрыць",
     "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
-    "newestResult": "Найноўшы вынік",
-    "scheduledWakes": "прачынаецца {{time}}"
+    "checked": "Праверана",
+    "lastKnown": "Апошні вядомы стан",
+    "awaitingUpdate": "Чакае абнаўлення",
+    "nextRun": "Наступны запуск",
+    "waitingForYou": "Чакае вас",
+    "nextScheduled": "Наступныя запланаваныя",
+    "answerNeeded": "Патрэбны адказ",
+    "waitingToRetry": "Чакае паўторнай спробы"
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",
@@ -3439,7 +3446,6 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Растлумачце $ARGUMENTS",
-      "agent": "Агент",
       "subtask": "Запуск як падзадача",
       "edit": "Рэдагаваць каманду касой рысы",
       "saveFailed": "Не ўдалося захаваць каманду",

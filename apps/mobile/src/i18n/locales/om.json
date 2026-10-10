@@ -135,7 +135,8 @@
     "updated": "Haaromfame",
     "working": "Hojjechaa jira",
     "yourOwnRepositories": "Kuusaalee koodii mataa keetii",
-    "dismissed": "Dhiifame"
+    "dismissed": "Dhiifame",
+    "agent": "Bakka bu'aa"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
     "openSession": "Bani",
     "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi.",
-    "newestResult": "Bu'aa haaraa",
-    "scheduledWakes": "{{time}} dammaqaa"
+    "checked": "Mirkanaa'e",
+    "lastKnown": "Kan dhumarratti beekame",
+    "awaitingUpdate": "Haaromsa eeggachaa jira",
+    "nextRun": "Raawwii itti aanu",
+    "waitingForYou": "Si eeggachaa jira",
+    "nextScheduled": "Kan itti aansee karoorfame",
+    "answerNeeded": "Deebii barbaada",
+    "waitingToRetry": "Irra deebi'uuf eeggachaa jira"
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",
@@ -3357,7 +3364,6 @@
       "template": "Unkaa",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ibsi",
-      "agent": "Bakka bu'aa",
       "subtask": "Akka hojii xiqqaatti fiigi",
       "edit": "Ajaja slash gulaali",
       "saveFailed": "Ajaja qusachuu hin dandeenye",

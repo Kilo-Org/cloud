@@ -135,7 +135,8 @@
     "updated": "تم التحديث",
     "working": "جارٍ العمل",
     "yourOwnRepositories": "مستودعاتك الخاصة",
-    "dismissed": "مستبعدة"
+    "dismissed": "مستبعدة",
+    "agent": "عامل"
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -3319,8 +3320,14 @@
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
-    "newestResult": "أحدث نتيجة",
-    "scheduledWakes": "يستيقظ {{time}}"
+    "checked": "آخر تحقق",
+    "lastKnown": "آخر حالة معروفة",
+    "awaitingUpdate": "بانتظار تحديث",
+    "nextRun": "التشغيل التالي",
+    "waitingForYou": "بانتظارك",
+    "nextScheduled": "المواعيد المجدولة القادمة",
+    "answerNeeded": "بانتظار إجابتك",
+    "waitingToRetry": "بانتظار إعادة المحاولة"
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",
@@ -3521,7 +3528,6 @@
       "template": "نموذج",
       "namePlaceholder": "explain",
       "templatePlaceholder": "شرح $ARGUMENTS",
-      "agent": "عامل",
       "subtask": "تشغيل كمهمة فرعية",
       "edit": "تحرير أمر الشرطة المائلة",
       "saveFailed": "تعذر حفظ الأمر",

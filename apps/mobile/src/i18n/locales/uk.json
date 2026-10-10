@@ -135,7 +135,8 @@
     "updated": "Оновлено",
     "working": "У роботі",
     "yourOwnRepositories": "Власні репозиторії",
-    "dismissed": "Відхилено"
+    "dismissed": "Відхилено",
+    "agent": "Агент"
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -3237,8 +3238,14 @@
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані.",
     "openSession": "Відкрити",
     "approveFailed": "Не вдалося схвалити. Торкніться $t(common.approve), щоб спробувати ще раз.",
-    "newestResult": "Найновіший результат",
-    "scheduledWakes": "прокидається {{time}}"
+    "checked": "Перевірено",
+    "lastKnown": "Останній відомий стан",
+    "awaitingUpdate": "Очікує оновлення",
+    "nextRun": "Наступний запуск",
+    "waitingForYou": "Очікує на вас",
+    "nextScheduled": "Наступні заплановані",
+    "answerNeeded": "Очікує відповіді",
+    "waitingToRetry": "Очікує повторної спроби"
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",
@@ -3439,7 +3446,6 @@
       "template": "Шаблон",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Поясніть $ARGUMENTS",
-      "agent": "Агент",
       "subtask": "Запуск як підзавдання",
       "edit": "Редагувати команду косої риски",
       "saveFailed": "Не вдалося зберегти команду",

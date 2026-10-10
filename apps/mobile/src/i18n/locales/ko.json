@@ -135,7 +135,8 @@
     "updated": "업데이트됨",
     "working": "작업 중",
     "yourOwnRepositories": "내 저장소",
-    "dismissed": "무시됨"
+    "dismissed": "무시됨",
+    "agent": "대리인"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
     "openSession": "열기",
     "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요.",
-    "newestResult": "최신 결과",
-    "scheduledWakes": "{{time}}에 깨어남"
+    "checked": "마지막 확인",
+    "lastKnown": "마지막 알려진 상태",
+    "awaitingUpdate": "업데이트 대기",
+    "nextRun": "다음 실행",
+    "waitingForYou": "사용자 응답 대기",
+    "nextScheduled": "다음 예약",
+    "answerNeeded": "답변 필요",
+    "waitingToRetry": "재시도 대기"
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",
@@ -3357,7 +3364,6 @@
       "template": "주형",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS 설명",
-      "agent": "대리인",
       "subtask": "하위 작업으로 실행",
       "edit": "슬래시 명령 편집",
       "saveFailed": "명령을 저장할 수 없습니다",

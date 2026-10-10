@@ -135,7 +135,8 @@
     "updated": "Mis à jour",
     "working": "En cours",
     "yourOwnRepositories": "Vos propres dépôts",
-    "dismissed": "Ignoré"
+    "dismissed": "Ignoré",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -3196,8 +3197,14 @@
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
     "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
-    "newestResult": "Dernier résultat",
-    "scheduledWakes": "se réveille {{time}}"
+    "checked": "Vérifié",
+    "lastKnown": "Dernier état connu",
+    "awaitingUpdate": "En attente de mise à jour",
+    "nextRun": "Prochaine exécution",
+    "waitingForYou": "En attente de votre intervention",
+    "nextScheduled": "Prochaines exécutions",
+    "answerNeeded": "Réponse requise",
+    "waitingToRetry": "Nouvelle tentative en attente"
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
@@ -3398,7 +3405,6 @@
       "template": "Modèle",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Expliquez $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Exécuter en tant que sous-tâche",
       "edit": "Modifier la commande barre oblique",
       "saveFailed": "Impossible d'enregistrer la commande",

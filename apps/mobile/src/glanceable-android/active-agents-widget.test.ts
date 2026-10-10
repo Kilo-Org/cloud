@@ -1,707 +1,310 @@
-/* eslint-disable max-lines -- one suite covering every composition and the state matrix through a shared mock-element tree harness */
-import {
-  buildGlanceableSnapshot,
-  type GlanceableAgentsSnapshot,
-} from '@kilocode/app-shared/glanceable-agents-snapshot';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { _resetHomeWidgetDataForTests } from '@/lib/glanceable/home-widget-data';
 import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
-import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
+import { lightColors } from '@/lib/hooks/theme-colors.generated';
 
-import { renderActiveAgentsWidget } from './active-agents-widget';
+import { sizeClassFor } from './active-agents-widget';
 import {
-  type AndroidWidgetProps,
-  buildAndroidWidgetProps,
-  buildCurrentWidgetProps,
-} from './widget-props';
+  byKey,
+  CELLS,
+  DESIGN,
+  type Element,
+  hasKey,
+  nodes,
+  NOW,
+  placed,
+  type Rect,
+  rectOf,
+  render,
+  texts,
+} from './active-agents-widget.test-helpers';
+import {
+  close,
+  expectInsideBand,
+  ltr,
+  padFor,
+  type State,
+  stateProps,
+  STATES,
+  targets,
+} from './active-agents-widget.test-fixtures';
 
-// Stub the widget primitives so the layout functions return inspectable trees
-// without loading react-native. The real components are exercised by prebuild.
 vi.mock('react-native-android-widget', () => ({
-  FlexWidget: (props: Record<string, unknown>) => ({ kind: 'FlexWidget', props }),
-  TextWidget: (props: Record<string, unknown>) => ({ kind: 'TextWidget', props }),
-  ImageWidget: (props: Record<string, unknown>) => ({ kind: 'ImageWidget', props }),
-  requestWidgetUpdate: () => undefined,
+  FlexWidget: () => null,
+  ImageWidget: () => null,
+  OverlapWidget: () => null,
+  TextWidget: () => null,
 }));
 
-const NOW = 1_750_000_000_000;
-
-/** The newest result's timestamp, forwarded to the age formatter below. */
-const NEWEST_AT = new Date(NOW - 180_000).toISOString();
-/** Two hours ahead of the suite's clock: the soonest scheduled wake. */
-const WAKE = new Date(NOW + 7_200_000).toISOString();
-
-type MockElement = {
-  type?: { name?: string } | string;
-  props: {
-    text?: string;
-    clickAction?: string;
-    clickActionData?: { uri?: string };
-    accessibilityLabel?: string;
-    allowFontScaling?: boolean;
-    maxLines?: number;
-    style?: {
-      backgroundColor?: string;
-      borderColor?: string;
-      justifyContent?: string;
-      alignItems?: string;
-      height?: number | string;
-    };
-    children?: unknown;
-  };
-};
-
-const COPY: Record<string, string> = {
-  'glanceable.needsInput': 'Needs input',
-  'common.idle': 'Idle',
-  'common.working': 'Working',
-  'common.scheduled': 'Scheduled',
-  'glanceable.waiting': 'Waiting for agents',
-  'glanceable.empty': 'No work in progress',
-  'glanceable.expired': 'Status expired',
-  'glanceable.signedOut': 'Sign in to see agents',
-  'glanceable.privacy': 'Open Kilo to see agents',
-  'glanceable.stale': 'Updates delayed',
-  'glanceable.openAgents': 'Open agents',
-  'glanceable.newestResult': 'Newest result',
-  'glanceable.noneWaiting': 'No agents waiting',
-  'glanceable.newAgent': 'New agent',
-  'glanceable.approving': 'Approving…',
-  'glanceable.couldNotApprove': 'Could not approve',
-  'glanceable.newestSession': 'Newest: {{title}}',
-  'common.approve': 'Approve',
-};
-
+beforeEach(() => {
+  _resetHomeWidgetDataForTests();
+  vi.useFakeTimers();
+  vi.setSystemTime(NOW);
+});
 afterEach(() => {
-  setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
   vi.useRealTimers();
+  setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
 });
 
-function translate(key: string): string {
-  return COPY[key] ?? key;
-}
+const GLYPH_GAP = 4;
 
-/** The formatters the app injects, stubbed to short, realistic strings. */
-const formatAgo = (): string => '3 min ago';
-const formatClock = (): string => '8:00 PM';
+/** Placement is in tenths of a dp; a mirrored read-back adds float noise below that. */
+const tenths = (box: Rect) =>
+  Object.fromEntries(Object.entries(box).map(([key, value]) => [key, Math.round(value * 10)]));
 
-/**
- * The cell sizes (w x h dp) the Pixel 6 launcher reports for every span from
- * 2x1 to 4x4, portrait and landscape: the sizes the widget is drawn at.
- */
-const LAUNCHER_CELLS = [
-  { span: '2x1', width: 172, height: 104 },
-  { span: '3x1', width: 266, height: 104 },
-  { span: '4x1', width: 360, height: 104 },
-  { span: '2x2', width: 172, height: 224 },
-  { span: '3x2', width: 266, height: 224 },
-  { span: '4x2', width: 360, height: 224 },
-  { span: '2x3', width: 172, height: 344 },
-  { span: '3x3', width: 266, height: 344 },
-  { span: '4x3', width: 360, height: 344 },
-  { span: '4x4', width: 360, height: 464 },
-  { span: '2x1 landscape', width: 307, height: 62 },
-  { span: '3x1 landscape', width: 467, height: 62 },
-  { span: '4x1 landscape', width: 627, height: 62 },
-  { span: '2x2 landscape', width: 307, height: 135 },
-  { span: '3x2 landscape', width: 467, height: 135 },
-  { span: '4x2 landscape', width: 627, height: 135 },
-  { span: '2x3 landscape', width: 307, height: 208 },
-  { span: '3x3 landscape', width: 467, height: 208 },
-  { span: '4x3 landscape', width: 627, height: 208 },
-  { span: '4x4 landscape', width: 627, height: 281 },
-];
-
-function snapshotFor(
-  sessions: { status: string; statusUpdatedAt?: string; scheduledAt?: string }[],
-  revision = 0,
-  status?: GlanceableAgentsSnapshot['status']
-): GlanceableAgentsSnapshot {
-  return buildGlanceableSnapshot({
-    sessions,
-    userId: 'u1',
-    organizationId: null,
-    now: NOW,
-    previousRevision: revision,
-    ...(status === undefined ? {} : { status }),
-  });
-}
-
-function propsFor(snapshot: GlanceableAgentsSnapshot): AndroidWidgetProps {
-  return buildAndroidWidgetProps(snapshot, {}, translate, String, formatAgo, formatClock);
-}
-
-/** Every state at once: two approvable waits, work, a scheduled wake, idle, and a newest result. */
-function mixedProps(): AndroidWidgetProps {
-  return propsFor(
-    snapshotFor([
-      { status: 'permission' },
-      { status: 'permission' },
-      { status: 'busy', statusUpdatedAt: NEWEST_AT },
-      { status: 'scheduled', scheduledAt: WAKE },
-      { status: 'idle' },
-    ])
+/** The Approve control (circle or pill) and `+`, both in LTR design coordinates. */
+function controls(root: Element, frame: { width: number; rtl: boolean }) {
+  const approveKey = ['approve-glyph', 'approving-glyph', 'approve-pill'].find(key =>
+    hasKey(root, key)
   );
+  return {
+    approve: approveKey === undefined ? null : ltr(rectOf(byKey(root, approveKey)), frame),
+    plus: hasKey(root, 'create-glyph') ? ltr(rectOf(byKey(root, 'create-glyph')), frame) : null,
+  };
 }
 
-function children(element: MockElement): unknown[] {
-  const kids = element.props.children;
-  if (kids == null) {
-    return [];
-  }
-  return Array.isArray(kids) ? kids.flat(Infinity) : [kids];
-}
-
-function walk(node: unknown, visit: (element: MockElement) => void): void {
-  if (node == null || typeof node !== 'object') {
-    return;
-  }
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      walk(item, visit);
-    }
-    return;
-  }
-  const element = node as MockElement;
-  visit(element);
-  for (const child of children(element)) {
-    walk(child, visit);
-  }
-}
-
-function collectText(node: unknown): string[] {
-  const text: string[] = [];
-  walk(node, element => {
-    if (typeof element.props.text === 'string') {
-      text.push(element.props.text);
-    }
-  });
-  return text;
-}
-
-function findAll(node: unknown, match: (element: MockElement) => boolean): MockElement[] {
-  const found: MockElement[] = [];
-  walk(node, element => {
-    if (match(element)) {
-      found.push(element);
-    }
-  });
-  return found;
-}
-
-const NEW_AGENT_URI = 'kiloapp:///cloud/sessions/new';
-const isApprove = (element: MockElement): boolean => element.props.clickAction === 'approve';
-const isNewAgent = (element: MockElement): boolean =>
-  element.props.clickActionData?.uri === NEW_AGENT_URI;
-const isMark = (element: MockElement): boolean =>
-  typeof element.props === 'object' && 'imageWidth' in element.props;
-
-type Cell = { width: number; height: number; rtl?: boolean };
-
-function render(props: AndroidWidgetProps, cell: Cell) {
-  const { width, height, rtl = false } = cell;
-  return renderActiveAgentsWidget(
-    props,
-    {
-      widgetName: 'ActiveAgentsWidget',
-      widgetId: 1,
-      width,
-      height,
-      screenInfo: { screenWidthDp: 400, screenHeightDp: 800, density: 2, densityDpi: 320 },
-    },
-    rtl
-  ) as unknown as { light: MockElement; dark: MockElement };
-}
-
-/** The visible numbers, in order. */
-function counts(node: unknown): string[] {
-  return collectText(node).filter(text => /^\d+$/.test(text));
-}
-
-describe('renderActiveAgentsWidget', () => {
-  it('returns distinct light and dark layouts in the app palette', () => {
-    const rep = render(mixedProps(), { width: 360, height: 344 });
-
-    expect(rep.light).not.toBe(rep.dark);
-    expect(rep.light.props.style?.backgroundColor).toBe(lightColors.background);
-    expect(rep.dark.props.style?.backgroundColor).toBe(darkColors.background);
-    // One plan draws both themes, so they never differ in what they show.
-    expect(collectText(rep.dark)).toEqual(collectText(rep.light));
-  });
-
-  it('opens Kilo from the whole widget, in every composition', () => {
-    for (const cell of LAUNCHER_CELLS) {
-      for (const props of [mixedProps(), propsFor(snapshotFor([], 0, 'empty'))]) {
-        const { light } = render(props, cell);
-        expect(light.props.clickAction, cell.span).toBe('OPEN_URI');
-        expect(light.props.clickActionData, cell.span).toEqual({
-          uri: 'kiloapp:///cloud/sessions',
-        });
-        expect(light.props.accessibilityLabel, cell.span).toBe(props.accessibilityLabel);
-      }
-    }
-  });
-
-  // Rule: the action is always reachable. Every launcher cell can hold one line
-  // of content plus the 48 dp action, so every one of them offers it.
-  it('offers Approve at every launcher size, and never a count less', () => {
-    const props = mixedProps();
-    for (const cell of LAUNCHER_CELLS) {
-      const { light } = render(props, cell);
-      const approve = findAll(light, isApprove);
-      expect(approve, cell.span).toHaveLength(1);
-      expect(approve[0]?.props.accessibilityLabel).toBe('Approve');
-      expect(approve[0]?.props.style?.height, cell.span).toBe(48);
-      expect(counts(light), cell.span).toEqual(['2', '1', '1', '1']);
-    }
-  });
-
-  it('offers New agent at every launcher size for the empty state', () => {
-    const props = propsFor(snapshotFor([], 0, 'empty'));
-    for (const cell of LAUNCHER_CELLS) {
-      const { light } = render(props, cell);
-      const chip = findAll(light, isNewAgent);
-      expect(chip, cell.span).toHaveLength(1);
-      // Starting an agent needs the composer: a plain deep link, no headless task.
-      expect(chip[0]?.props.clickAction).toBe('OPEN_URI');
-      expect(collectText(light), cell.span).toEqual(['No agents waiting', 'New agent']);
-    }
-  });
-
-  it('offers New agent when every agent is idle', () => {
-    const props = propsFor(snapshotFor([{ status: 'idle' }, { status: 'idle' }]));
-    for (const cell of LAUNCHER_CELLS) {
-      expect(findAll(render(props, cell).light, isNewAgent), cell.span).toHaveLength(1);
-    }
-  });
-
-  // A retry or a question needs the app: no Approve whose press would only open it.
-  it('draws no Approve for a wait the action cannot answer', () => {
-    const props = propsFor(snapshotFor([{ status: 'retry' }]));
-    for (const cell of LAUNCHER_CELLS) {
-      expect(findAll(render(props, cell).light, isApprove), cell.span).toEqual([]);
-    }
-  });
-
-  it('offers no action for a state with nothing to act on', () => {
-    for (const status of ['waiting', 'signed_out', 'privacy', 'expired'] as const) {
-      const { light } = render(propsFor(snapshotFor([], 0, status)), { width: 360, height: 344 });
-      expect(
-        findAll(light, element => element !== light && element.props.clickAction !== undefined),
-        status
-      ).toEqual([]);
-    }
-  });
-
-  it('drops the action rather than clipping it in a cell too short for its target', () => {
-    const { light } = render(propsFor(snapshotFor([], 0, 'empty')), { width: 172, height: 40 });
-
-    expect(findAll(light, isNewAgent)).toEqual([]);
-    expect(collectText(light)).toEqual(['No agents waiting']);
-  });
-
-  // Rule: overflow order in narrow cells — the wake first, then the secondary
-  // labels, then the primary label, then the mark. Never a count, and never the
-  // action while the cell can hold it beside the bare counts.
-  it('drops the wake, then the labels, then the mark as a one-row cell narrows', () => {
-    const props = mixedProps();
-    const widths = [627, 520, 467, 400, 360, 307, 266];
-    const seen = widths.map(width => {
-      const { light } = render(props, { width, height: 62 });
-      const text = collectText(light);
-      return {
-        width,
-        time: text.includes('8:00 PM'),
-        secondary: text.includes('Working'),
-        primary: text.includes('Needs input'),
-        mark: findAll(light, isMark).length > 0,
-        approve: findAll(light, isApprove).length,
-        counts: counts(light),
-      };
-    });
-
-    for (const step of seen) {
-      expect(step.counts, `${step.width}`).toEqual(['2', '1', '1', '1']);
-      expect(step.approve, `${step.width}`).toBe(1);
-    }
-    // Once a piece is gone it stays gone at every narrower width.
-    for (const key of ['time', 'secondary', 'primary', 'mark'] as const) {
-      const firstGone = seen.findIndex(step => !step[key]);
-      if (firstGone !== -1) {
-        expect(
-          seen.slice(firstGone).every(step => !step[key]),
-          key
-        ).toBe(true);
-      }
-    }
-    // And a piece never outlives one ranked below it.
-    for (const step of seen) {
-      if (step.time) {
-        expect(step.secondary, `${step.width}`).toBe(true);
-      }
-      if (step.secondary) {
-        expect(step.primary, `${step.width}`).toBe(true);
-      }
-      if (step.primary) {
-        expect(step.mark, `${step.width}`).toBe(true);
-      }
-    }
-    expect(seen[0]).toMatchObject({ time: true, secondary: true, primary: true, mark: true });
-  });
-
-  it('mirrors every row for a right-to-left language', () => {
-    const props = propsFor(snapshotFor([{ status: 'permission' }, { status: 'busy' }]));
-    const ltr = collectText(render(props, { width: 627, height: 62 }).light);
-    const rtl = collectText(render(props, { width: 627, height: 62, rtl: true }).light);
-
-    // Each count row reads label-then-number, and the rows run right to left.
-    expect(rtl.filter(text => text !== 'Approve')).toEqual(
-      ltr.filter(text => text !== 'Approve').toReversed()
-    );
-  });
-
-  // Arabic falls back to a font with taller lines than Roboto: four stacked
-  // rows that fit a one-row cell in English cut the last one in Arabic.
-  it('budgets taller lines for Arabic copy, so a one-row cell never stacks four rows', () => {
-    const arabic: Record<string, string> = {
-      'glanceable.needsInput': 'بانتظار تدخلك',
-      'common.working': 'جارٍ العمل',
-      'common.scheduled': 'مجدول',
-      'common.idle': 'خامل',
-    };
-    const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'permission' }, { status: 'busy' }]),
-      {},
-      key => arabic[key] ?? translate(key),
-      String,
-      formatAgo,
-      formatClock
-    );
-    const stacks = (cell: Cell, input: AndroidWidgetProps) =>
-      findAll(
-        render(input, cell).light,
-        element =>
-          (element.props.style as { flexDirection?: string } | undefined)?.flexDirection ===
-            'column' && children(element).filter(child => counts(child).length === 1).length === 4
-      ).length;
-
-    expect(stacks({ width: 266, height: 104 }, mixedProps())).toBe(1);
-    expect(stacks({ width: 266, height: 104, rtl: true }, props)).toBe(0);
-    expect(counts(render(props, { width: 266, height: 104, rtl: true }).light)).toHaveLength(4);
-  });
-
-  it('hides counts and shows the expired copy for an expired snapshot', () => {
-    const props = propsFor({
-      ...snapshotFor([{ status: 'busy' }], 0),
-      status: 'expired',
-      running: 0,
-      needsInput: 0,
-      idle: 0,
-    });
-
-    expect(collectText(render(props, { width: 266, height: 104 }).light)).toEqual([
-      'Status expired',
-    ]);
-  });
-
-  // A widget cell is a fixed frame with no scrolling and no reflow, so text that
-  // scaled with the system font size pushed the action out of it at Large text.
-  it('pins every label to its dp size in every composition and theme', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
-    for (const cell of LAUNCHER_CELLS) {
-      for (const [theme, surface] of Object.entries(render(mixedProps(), cell))) {
-        const labels = findAll(surface, element => typeof element.props.text === 'string');
-        expect(labels.length).toBeGreaterThan(0);
-        for (const label of labels) {
-          expect(
-            label.props.allowFontScaling,
-            `${theme} \`${label.props.text}\` at ${cell.span}`
-          ).toBe(false);
+describe('Home widget geometry per cell and state', () => {
+  it.each(CELLS)('keeps every element inside the 14dp band of the %dx%d cell', (width, height) => {
+    const slots: Record<string, Rect> = {};
+    const sizeClass = sizeClassFor(width, height);
+    for (const [name, state] of Object.entries(STATES) as [string, State][]) {
+      const props = stateProps(state);
+      for (const rtl of [false, true]) {
+        const label = `${name} ${rtl ? 'rtl' : 'ltr'}`;
+        const { light, dark } = render(props, [width, height], rtl);
+        expect(texts(light), label).toEqual(texts(dark));
+        expect(light.props.clickActionData, label).toEqual({ uri: 'kiloapp:///cloud/sessions' });
+        expect(light.props.accessibilityLabel, label).toBe(props.homeCopy?.accessibilityLabel);
+        expect(hasKey(light, 'logo'), `${label} logo`).toBe(true);
+        for (const node of placed(light)) {
+          const rect = rectOf(node);
+          const where = `${label} ${String(node.key)} ${JSON.stringify(rect)}`;
+          expect(rect.width, where).toBeGreaterThan(0);
+          expect(rect.height, where).toBeGreaterThan(0);
+          expect(rect.x, where).toBeGreaterThanOrEqual(-0.05);
+          expect(rect.y, where).toBeGreaterThanOrEqual(-0.05);
+          expect(rect.x + rect.width, where).toBeLessThanOrEqual(width + 0.05);
+          expect(rect.y + rect.height, where).toBeLessThanOrEqual(height + 0.05);
+        }
+        expectInsideBand(light, [width, height], label);
+        for (const node of nodes(light).filter(child => child.props.text !== undefined)) {
+          expect(node.props.maxLines, label).toBeGreaterThanOrEqual(1);
+          if (node.props.text !== props.homeCopy?.primaryCount) {
+            expect(node.props.truncate, `${label} ${node.props.text}`).toBe('END');
+          }
+        }
+        const drawn = targets(light);
+        expect(drawn.length, label).toBe(
+          (['content', 'empty'].includes(props.home?.status ?? '') && props.home?.canCreate
+            ? 1
+            : 0) +
+            (props.home?.status === 'content' &&
+            props.home.canApprove &&
+            state.feedback !== 'approving'
+              ? 1
+              : 0)
+        );
+        for (const control of drawn) {
+          const rect = ltr(rectOf(control), { width, rtl });
+          expect(rect.height, label).toBeGreaterThanOrEqual(Math.min(48, height));
+          expect(control.props.accessibilityLabel, label).toBeTruthy();
+          // Action slots never move between states of one cell (the empty-state pill aside).
+          const slot = `${String(control.key)}-${rtl}`;
+          if (props.home?.status === 'content' && !['medium', 'large'].includes(sizeClass)) {
+            slots[slot] ??= rect;
+            expect(rect, `${label} ${slot}`).toEqual(slots[slot]);
+          }
+        }
+        const [first, second] = drawn.map(control => ltr(rectOf(control), { width, rtl }));
+        if (first !== undefined && second !== undefined) {
+          const [left, right] = first.x < second.x ? [first, second] : [second, first];
+          expect(left.x + left.width, label).toBeLessThanOrEqual(right.x + 0.05);
         }
       }
     }
   });
-});
 
-describe('the tall counts card', () => {
-  // Rule: a header row holds the mark at the leading edge and the action at the
-  // trailing edge, and the count rows sit below it.
-  it('heads the card with the mark and the action', () => {
-    const { light } = render(mixedProps(), { width: 360, height: 344 });
-    const header = findAll(
-      light,
-      element => findAll(element, isMark).length === 1 && findAll(element, isApprove).length === 1
-    ).at(-1);
-
-    expect(header).toBeDefined();
-    expect(counts(header)).toEqual([]);
-  });
-
-  // Rule: the footer is pinned only when its caption and its line both fit;
-  // the caption never draws alone.
-  it('draws the newest-result footer only whole', () => {
-    const props = mixedProps();
-    for (const cell of LAUNCHER_CELLS) {
-      const text = collectText(render(props, cell).light);
-      if (text.includes('Newest result')) {
-        expect(text, cell.span).toContain('Working');
-        expect(text.indexOf('Newest result'), cell.span).toBeLessThan(text.lastIndexOf('Working'));
+  it.each(CELLS)(
+    'keeps Approve 4dp before `+` and splits their targets at the gap at %dx%d',
+    (width, height) => {
+      for (const state of [STATES['needs input with Approve'], STATES.approving]) {
+        for (const rtl of [false, true]) {
+          const root = render(stateProps(state), [width, height], rtl).light;
+          const frame = { width, rtl };
+          const { approve, plus } = controls(root, frame);
+          if (approve === null || plus === null) {
+            throw new Error('both actions draw');
+          }
+          close(plus.x + plus.width, width - padFor(width, height));
+          expect(plus.x - (approve.x + approve.width)).toBeCloseTo(GLYPH_GAP, 5);
+          const plusTarget = ltr(rectOf(byKey(root, 'create-target')), frame);
+          // `+` owns the trailing edge from the middle of the gap: the largest target
+          // that cannot overlap Approve's, and 48dp wherever the glyph is large enough.
+          expect(plusTarget.x).toBeCloseTo(plus.x - GLYPH_GAP / 2, 5);
+          expect(plusTarget.x + plusTarget.width).toBeCloseTo(width, 5);
+          if (plus.width >= 32) {
+            expect(plusTarget.width).toBeGreaterThanOrEqual(48);
+          }
+          if (state === STATES.approving) {
+            expect(hasKey(root, 'approve-target')).toBe(false);
+          } else {
+            const approveTarget = ltr(rectOf(byKey(root, 'approve-target')), frame);
+            expect(approveTarget.x + approveTarget.width).toBeCloseTo(plusTarget.x, 5);
+            expect(approveTarget.width).toBeGreaterThanOrEqual(48);
+            // Each target covers its whole control.
+            expect(approveTarget.x).toBeLessThanOrEqual(approve.x + 0.05);
+            for (const [control, hit] of [
+              [approve, approveTarget],
+              [plus, plusTarget],
+            ] as const) {
+              expect(hit.y).toBeLessThanOrEqual(control.y + 0.05);
+              expect(hit.y + hit.height).toBeGreaterThanOrEqual(control.y + control.height - 0.05);
+            }
+          }
+        }
       }
     }
-    expect(collectText(render(props, { width: 360, height: 344 }).light)).toContain(
-      'Newest result'
-    );
-    expect(collectText(render(props, { width: 360, height: 224 }).light)).not.toContain(
-      'Newest result'
-    );
-  });
+  );
 
-  it('drops the footer age whole when the row would not fit with it', () => {
-    const props = mixedProps();
-
-    expect(collectText(render(props, { width: 360, height: 344 }).light)).toContain('3 min ago');
-    const narrow = collectText(
-      render(
-        { ...props, newestResultAgo: '12 minutes ago' },
-        {
-          width: 140,
-          height: 344,
-        }
-      ).light
-    );
-    expect(narrow).toContain('Newest result');
-    expect(narrow).not.toContain('12 minutes ago');
-  });
-
-  // Rule: tall cards scale the count rows up with the height.
-  it('sets the count rows larger in a taller card', () => {
-    const fontOf = (cell: Cell) =>
-      findAll(render(mixedProps(), cell).light, element => element.props.text === 'Needs input')[0]
-        ?.props.style as { fontSize?: number } | undefined;
-
-    const short = fontOf({ width: 360, height: 224 })?.fontSize ?? 0;
-    const tall = fontOf({ width: 360, height: 464 })?.fontSize ?? 0;
-    expect(tall).toBeGreaterThan(short);
-    // Numbers and labels in one row share one size.
-    const number = findAll(
-      render(mixedProps(), { width: 360, height: 464 }).light,
-      element => element.props.text === '2'
-    )[0]?.props.style as { fontSize?: number } | undefined;
-    expect(number?.fontSize).toBe(tall);
-  });
-
-  it('keeps the rows and states the delayed copy under the caption when stale', () => {
-    const props = propsFor({
-      ...snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0, 'stale'),
-      needsInput: 2,
-      idle: 3,
-      running: 4,
-    });
-    const text = collectText(render(props, { width: 360, height: 344 }).light);
-
-    expect(counts(render(props, { width: 360, height: 344 }).light)).toEqual(['2', '4', '0', '3']);
-    expect(text.slice(-2)).toEqual(['Newest result', 'Updates delayed']);
-  });
-
-  it('draws the delayed copy once the data lapses', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW + 31 * 60_000);
-    const props = buildCurrentWidgetProps(
-      {
-        ...snapshotFor([{ status: 'busy', statusUpdatedAt: NEWEST_AT }], 0),
-        needsInput: 2,
-        idle: 3,
-        running: 4,
-      },
-      translate,
-      String,
-      formatAgo,
-      formatClock
-    );
-    vi.useRealTimers();
-    const { light } = render(props, { width: 360, height: 344 });
-
-    expect(collectText(light).slice(-2)).toEqual(['Newest result', 'Updates delayed']);
-    expect(light.props.accessibilityLabel).toBe(
-      'Updates delayed, 2 Needs input, 4 Working, 3 Idle, Open agents'
-    );
-  });
-
-  it('draws the scheduled wake as a clock time, dropped whole when the row is too wide', () => {
-    const props = mixedProps();
-    // The deepest element that holds both the scheduled label and its count is its row.
-    const scheduledRow = (cell: Cell) =>
-      findAll(render(props, cell).light, element => {
-        const text = collectText(element);
-        return text.includes('Scheduled') && text.includes('1');
-      }).at(-1);
-
-    expect(collectText(scheduledRow({ width: 360, height: 344 }))).toEqual([
-      '1',
-      'Scheduled',
-      '8:00 PM',
-    ]);
-    expect(collectText(scheduledRow({ width: 172, height: 224 }))).toEqual(['1', 'Scheduled']);
-  });
-
-  it('gives the scheduled marker its own color instead of the idle outline', () => {
-    const rep = render(mixedProps(), { width: 360, height: 344 });
-    const styles = (node: unknown) =>
-      findAll(node, element => element.props.style !== undefined).map(
-        element => element.props.style ?? {}
-      );
-
-    expect(styles(rep.light).some(style => style.backgroundColor === lightColors.mutedSoft)).toBe(
-      true
-    );
-    expect(styles(rep.dark).some(style => style.backgroundColor === darkColors.mutedSoft)).toBe(
-      true
-    );
-    expect(styles(rep.light).some(style => style.borderColor === lightColors.foreground)).toBe(
-      true
-    );
-  });
-
-  const fontOf = (node: unknown, text: string): number | undefined =>
-    (
-      findAll(node, element => element.props.text === text)[0]?.props.style as
-        | { fontSize?: number }
-        | undefined
-    )?.fontSize;
-
-  // The footer follows the rows: large rows over a footnote read as a mistake.
-  it('scales the footer with the count rows, never below its base sizes', () => {
-    const tall = render(mixedProps(), { width: 360, height: 464 }).light;
-    const rowFont = fontOf(tall, 'Needs input') ?? 0;
-    const lineFont = fontOf(tall, '3 min ago') ?? 0;
-    const captionFont = fontOf(tall, 'Newest result') ?? 0;
-
-    expect(rowFont).toBeGreaterThan(20);
-    expect(lineFont).toBe(Math.round(rowFont * 0.7));
-    expect(captionFont).toBe(Math.round(rowFont * 0.6));
-
-    const short = render(mixedProps(), { width: 360, height: 344 }).light;
-    expect(fontOf(short, '3 min ago')).toBeGreaterThanOrEqual(13);
-    expect(fontOf(short, 'Newest result')).toBeGreaterThanOrEqual(11);
-  });
-
-  // Zero rows keep the grid still but must not compete with the real counts.
-  it('draws a zero row muted: glyph, number, and label, the number not bold', () => {
-    const props = propsFor(snapshotFor([{ status: 'permission' }]));
-    const { light } = render(props, { width: 360, height: 344 });
-    const working = findAll(light, element => {
-      const text = collectText(element);
-      return text.includes('Working') && text.includes('0');
-    }).at(-1);
-    const count = findAll(working, element => element.props.text === '0')[0]?.props.style as
-      | { color?: string; fontWeight?: string }
-      | undefined;
-    const needs = findAll(light, element => element.props.text === '1')[0]?.props.style as
-      | { color?: string; fontWeight?: string }
-      | undefined;
-
-    expect(count).toMatchObject({ color: lightColors.mutedForeground, fontWeight: 'normal' });
-    expect(needs).toMatchObject({ color: lightColors.foreground, fontWeight: 'bold' });
+  it('maps every cell to one size class', () => {
     expect(
-      findAll(working, element => element.props.style?.backgroundColor === lightColors.good)
-    ).toEqual([]);
-  });
-
-  // A chip too wide to sit beside the mark takes its own row at the bottom;
-  // the mark keeps the header.
-  it('moves a wide action under the counts and keeps the mark', () => {
-    const props = {
-      ...mixedProps(),
-      actions: { ...mixedProps().actions, approveLabel: 'Genehmigen' },
-    };
-    const { light } = render(props, { width: 172, height: 344 });
-    const top = children(light).filter(child => child !== null && child !== undefined);
-
-    expect(findAll(top[0], isMark)).toHaveLength(1);
-    expect(findAll(top[0], isApprove)).toEqual([]);
-    expect(findAll(top.at(-1), isApprove)).toHaveLength(1);
-  });
-
-  // One size for every row: a label too long for the cell shrinks the whole
-  // column, down to the minimum, before any label ends in an ellipsis.
-  it('shrinks the whole column to fit a long label, down to 12 dp', () => {
-    const translateDe = (key: string) =>
-      ({ 'glanceable.needsInput': 'Eingabe erforderlich' })[key] ?? translate(key);
-    const props = buildAndroidWidgetProps(
-      snapshotFor([{ status: 'permission' }, { status: 'busy' }]),
-      {},
-      translateDe,
-      String,
-      formatAgo,
-      formatClock
-    );
-    const { light } = render(props, { width: 172, height: 344 });
-    const sizes = ['Eingabe erforderlich', 'Working', 'Scheduled', 'Idle'].map(text =>
-      fontOf(light, text)
-    );
-
-    expect(new Set(sizes).size).toBe(1);
-    expect(sizes[0]).toBeLessThan(15);
-    expect(sizes[0]).toBeGreaterThanOrEqual(12);
+      CELLS.map(([width, height]) => `${width}x${height}:${sizeClassFor(width, height)}`)
+    ).toEqual([
+      '172x104:narrow',
+      '266x104:row',
+      '360x104:row',
+      '172x135:narrow',
+      '172x224:small',
+      '266x224:medium',
+      '360x224:medium',
+      '172x344:small',
+      '266x344:large',
+      '360x344:large',
+      '360x464:large',
+      '307x62:landscape',
+      '467x62:landscape',
+      '627x62:landscape',
+      '307x135:row',
+      '467x135:row',
+      '627x135:row',
+      '307x208:medium',
+      '467x208:medium',
+      '627x208:medium',
+      '627x281:medium',
+      '170x170:small',
+      '364x170:medium',
+      '364x382:large',
+      '360x104:row',
+      '172x104:narrow',
+      '627x62:landscape',
+    ]);
   });
 });
 
-describe('the in-flight and failed Approve', () => {
-  it('draws the progress line where the chip was while an Approve runs', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
-    const props = mixedProps();
-    for (const cell of LAUNCHER_CELLS) {
-      const { light } = render(props, cell);
-      expect(findAll(light, isApprove), cell.span).toEqual([]);
-      expect(collectText(light), cell.span).toContain('Approving…');
+describe('Home widget design coordinates at the design frames', () => {
+  const at = (size: readonly [number, number], state = STATES['needs input with Approve']) =>
+    render(stateProps(state), size).light;
+  const rect = (root: Element, key: string) => rectOf(byKey(root, key));
+
+  it('draws Small with the header on the padding line', () => {
+    const root = at(DESIGN.small);
+    expect(rect(root, 'logo')).toEqual({ x: 16, y: 19, width: 18, height: 18 });
+    expect(rect(root, 'create-glyph')).toEqual({ x: 130, y: 16, width: 24, height: 24 });
+    expect(rect(root, 'approve-glyph')).toEqual({ x: 102, y: 16, width: 24, height: 24 });
+    // `+` owns 16 + 24 + 2dp: the most it can take without overlapping Approve.
+    expect(rect(root, 'create-target')).toMatchObject({ x: 128, width: 42 });
+    expect(rect(root, 'approve-target')).toMatchObject({ x: 80, width: 48 });
+    expect(rect(root, 'count').x).toBe(16);
+    const footer = rect(root, 'footer');
+    close(footer.y + footer.height, 170 - 16);
+    expect(byKey(root, 'line-0').props.text).toBe('Review the release');
+  });
+
+  it('draws Medium with the Approve pill 4dp before `+` and two rows', () => {
+    const root = at(DESIGN.medium);
+    expect(rect(root, 'approve-pill')).toEqual({ x: 234, y: 16, width: 86, height: 24 });
+    expect(rect(root, 'create-glyph')).toEqual({ x: 324, y: 16, width: 24, height: 24 });
+    expect(rect(root, 'logo')).toEqual({ x: 16, y: 19, width: 18, height: 18 });
+    expect(hasKey(root, 'row-1-title')).toBe(true);
+    expect(hasKey(root, 'row-2-title')).toBe(false);
+  });
+
+  it('draws Large with secondary counts, the divider and three waiting rows', () => {
+    const root = at(DESIGN.large);
+    expect(rect(root, 'divider')).toMatchObject({ x: 16, width: 332, height: 1 });
+    for (const index of [0, 1, 2]) {
+      expect(hasKey(root, `row-${index}-title`)).toBe(true);
+    }
+    expect(byKey(root, 'section').props.text).toBe('Waiting for you');
+  });
+
+  it('compresses Row, Narrow and Landscape glyphs into the band', () => {
+    const rowRoot = at(DESIGN.row);
+    expect(rect(rowRoot, 'create-glyph')).toEqual({ x: 310, y: 34.5, width: 36, height: 36 });
+    expect(rect(rowRoot, 'approve-glyph')).toEqual({ x: 270, y: 34.5, width: 36, height: 36 });
+    expect(rect(rowRoot, 'logo')).toEqual({ x: 14, y: 16, width: 14, height: 14 });
+    expect(byKey(rowRoot, 'footer').props.text).toBe('· Checked 8:00 PM');
+    const narrowRoot = at(DESIGN.narrow);
+    expect(rect(narrowRoot, 'create-glyph')).toEqual({ x: 134, y: 14, width: 24, height: 24 });
+    expect(rect(narrowRoot, 'approve-glyph')).toEqual({ x: 106, y: 14, width: 24, height: 24 });
+    expect(rect(narrowRoot, 'logo')).toEqual({ x: 14, y: 18, width: 16, height: 16 });
+    const land = at(DESIGN.landscape);
+    expect(rect(land, 'create-glyph')).toEqual({ x: 581, y: 15, width: 32, height: 32 });
+    expect(rect(land, 'approve-glyph')).toEqual({ x: 545, y: 15, width: 32, height: 32 });
+    expect(texts(land)).toContain('Review the release');
+    expect(texts(at([307, 62]))).not.toContain('Review the release');
+  });
+
+  it('starts every Landscape line with the 18dp mark and a 6dp gap, locked too', () => {
+    for (const state of [STATES['needs input with Approve'], STATES.empty, STATES.privacy]) {
+      const root = at(DESIGN.landscape, state);
+      expect(rect(root, 'logo')).toEqual({ x: 14, y: 22, width: 18, height: 18 });
+      const lead = hasKey(root, 'lock-body') ? rect(root, 'lock-body') : rect(root, 'status');
+      expect(lead.x).toBe(38);
     }
   });
 
-  it('keeps the chip to retry, with the failure over it, at every launcher size', () => {
-    setSurfaceExtras({
-      newestSessionTitle: 'Fix the flaky test',
-      actionFeedback: 'couldNotApprove',
-    });
-    const props = mixedProps();
-    for (const cell of LAUNCHER_CELLS) {
-      const { light } = render(props, cell);
-      expect(findAll(light, isApprove), cell.span).toHaveLength(1);
-      expect(counts(light), cell.span).toEqual(['2', '1', '1', '1']);
+  it('keeps the count, dot and label in one 6dp row whose label alone ellipsizes', () => {
+    for (const size of [DESIGN.row, DESIGN.narrow, DESIGN.landscape]) {
+      const row = byKey(at(size), 'status');
+      expect(row.props.style?.flexDirection).toBe('row');
+      expect(row.props.style?.flexGap).toBe(6);
+      const [count, dotNode, labelSlot] = [row.props.children].flat() as Element[];
+      expect(count?.props.text).toBe('3');
+      expect(count?.props.truncate).toBeUndefined();
+      expect(count?.props.style?.width).toBeUndefined();
+      expect(dotNode?.props.style?.backgroundColor).toBe(lightColors.warn);
+      expect(labelSlot?.props.style).toMatchObject({ width: 0, flex: 1 });
+      const labelNode = nodes(labelSlot).find(node => node.props.text === 'Needs input');
+      expect(labelNode?.props).toMatchObject({ maxLines: 1, truncate: 'END' });
     }
-    const tall = collectText(render(props, { width: 360, height: 344 }).light);
-    expect(tall).toContain('Could not approve');
-    // The failure belongs to the chip, so the footer keeps the newest result.
-    expect(tall).toContain('Newest result');
   });
 
-  it('names the newest session over the newest result, and only once', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
-    const text = collectText(render(mixedProps(), { width: 360, height: 344 }).light);
-
-    expect(text.slice(-3)).toEqual(['Newest: Fix the flaky test', 'Working', '3 min ago']);
-    expect(text).not.toContain('Newest result');
-  });
-});
-
-describe('a state with no counts', () => {
-  // Rule: count-less states in tall cards are one centered composition.
-  it.each([
-    ['waiting', 'Waiting for agents'],
-    ['empty', 'No agents waiting'],
-    ['expired', 'Status expired'],
-    ['signed_out', 'Sign in to see agents'],
-    ['privacy', 'Open Kilo to see agents'],
-  ] as const)('centers the mark and the %s copy in a tall cell', (status, copy) => {
-    const { light, dark } = render(propsFor(snapshotFor([], 0, status)), {
-      width: 360,
-      height: 344,
-    });
-
-    expect(light.props.style?.justifyContent).toBe('center');
-    expect(light.props.style?.alignItems).toBe('center');
-    expect(findAll(light, isMark)).toHaveLength(1);
-    expect(collectText(light)[0]).toBe(copy);
-    expect(collectText(dark)[0]).toBe(copy);
-    expect(collectText(light)).not.toContain('Newest result');
+  it('mirrors every placed rectangle, the mark included, in RTL and aligns copy right', () => {
+    for (const size of Object.values(DESIGN)) {
+      for (const [name, state] of Object.entries(STATES) as [string, State][]) {
+        const props = stateProps(state);
+        const left = placed(render(props, size).light);
+        const right = placed(render(props, size, true).light);
+        expect(
+          right.map(node => node.key),
+          name
+        ).toEqual(left.map(node => node.key));
+        expect(
+          right.map(node => tenths(ltr(rectOf(node), { width: size[0], rtl: true }))),
+          name
+        ).toEqual(left.map(node => tenths(rectOf(node))));
+        expect(
+          right.map(node => node.key),
+          name
+        ).toContain('logo');
+        for (const node of right.filter(child => child.props.text !== undefined)) {
+          expect(['right', 'center'], `${name} ${String(node.key)}`).toContain(
+            node.props.style?.textAlign
+          );
+        }
+      }
+    }
   });
 });

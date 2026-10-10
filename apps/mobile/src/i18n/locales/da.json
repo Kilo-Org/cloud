@@ -135,7 +135,8 @@
     "updated": "Opdateret",
     "working": "I gang",
     "yourOwnRepositories": "Dine egne kodelagre",
-    "dismissed": "Afvist"
+    "dismissed": "Afvist",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
-    "newestResult": "Nyeste resultat",
-    "scheduledWakes": "vågner {{time}}"
+    "checked": "Kontrolleret",
+    "lastKnown": "Sidst kendt",
+    "awaitingUpdate": "Afventer opdatering",
+    "nextRun": "Næste kørsel",
+    "waitingForYou": "Afventer dig",
+    "nextScheduled": "Næste planlagte",
+    "answerNeeded": "Afventer svar",
+    "waitingToRetry": "Afventer nyt forsøg"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
@@ -3357,7 +3364,6 @@
       "template": "Skabelon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Forklar $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Kør som underopgave",
       "edit": "Rediger skråstreg kommando",
       "saveFailed": "Kommandoen kunne ikke gemmes",

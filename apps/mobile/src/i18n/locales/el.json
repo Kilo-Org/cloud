@@ -135,7 +135,8 @@
     "updated": "Ενημερώθηκε",
     "working": "Σε εξέλιξη",
     "yourOwnRepositories": "Τα δικά σου αποθετήρια",
-    "dismissed": "Απορρίφθηκε"
+    "dismissed": "Απορρίφθηκε",
+    "agent": "Μέσο"
   },
   "language": {
     "restarting": "Επανεκκίνηση για εφαρμογή της νέας γλώσσας",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Ενεργοποίησε τις ζωντανές δραστηριότητες στις ρυθμίσεις για να βλέπεις τους ενεργούς πράκτορες στην οθόνη κλειδώματος.",
     "openSession": "Άνοιξε",
     "approveFailed": "Δεν ήταν δυνατή η έγκριση. Πάτησε $t(common.approve) για να δοκιμάσεις ξανά.",
-    "newestResult": "Νεότερο αποτέλεσμα",
-    "scheduledWakes": "ξυπνάει {{time}}"
+    "checked": "Ελέγχθηκε",
+    "lastKnown": "Τελευταία γνωστή κατάσταση",
+    "awaitingUpdate": "Αναμονή ενημέρωσης",
+    "nextRun": "Επόμενη εκτέλεση",
+    "waitingForYou": "Αναμονή για εσάς",
+    "nextScheduled": "Επόμενα προγραμματισμένα",
+    "answerNeeded": "Αναμονή απάντησης",
+    "waitingToRetry": "Αναμονή νέας προσπάθειας"
   },
   "transcriptionModel": {
     "title": "Μοντέλο απομαγνητοφώνησης",
@@ -3357,7 +3364,6 @@
       "template": "Περίγραμμα",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Εξηγήστε τα $ARGUMENTS",
-      "agent": "Μέσο",
       "subtask": "Εκτέλεση ως δευτερεύουσα εργασία",
       "edit": "Επεξεργασία εντολής κάθετο",
       "saveFailed": "Δεν ήταν δυνατή η αποθήκευση της εντολής",

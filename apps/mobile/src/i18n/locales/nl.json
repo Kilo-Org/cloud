@@ -135,7 +135,8 @@
     "updated": "Bijgewerkt",
     "working": "Bezig",
     "yourOwnRepositories": "Je eigen coderepository's",
-    "dismissed": "Genegeerd"
+    "dismissed": "Genegeerd",
+    "agent": "Tussenpersoon"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
-    "newestResult": "Nieuwste resultaat",
-    "scheduledWakes": "wordt wakker {{time}}"
+    "checked": "Gecontroleerd",
+    "lastKnown": "Laatst bekend",
+    "awaitingUpdate": "Wacht op update",
+    "nextRun": "Volgende uitvoering",
+    "waitingForYou": "Wacht op jou",
+    "nextScheduled": "Hierna gepland",
+    "answerNeeded": "Antwoord nodig",
+    "waitingToRetry": "Wacht op nieuwe poging"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
@@ -3357,7 +3364,6 @@
       "template": "Sjabloon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Leg $ARGUMENTS uit",
-      "agent": "Tussenpersoon",
       "subtask": "Uitvoeren als subtaak",
       "edit": "Bewerk de slash-opdracht",
       "saveFailed": "Kan opdracht niet opslaan",

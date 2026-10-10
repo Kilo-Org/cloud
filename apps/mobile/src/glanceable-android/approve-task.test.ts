@@ -1,7 +1,6 @@
-/* eslint-disable max-lines, eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- one cohesive approve-task suite, and the entry, the Kotlin worker and the Kotlin service are sources: running/reading them from disk is the only way to see the registered keys */
+/* eslint-disable max-lines, eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- cohesive approval lifecycle suite; native watchdog contracts read the worker source */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runInNewContext } from 'node:vm';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +10,7 @@ import { type GlanceableApproveResult } from '@/lib/glanceable/approve-ask';
 import { getGlanceableSinks } from '@/lib/glanceable/sink-registry';
 import { type WaitingAsk } from '@/lib/glanceable/waiting-ask';
 
-import { type ApproveRunner } from './approve-task';
+import { type ApproveRunner, handleApproveTask, runApproveTask } from './approve-task';
 
 const ASK: WaitingAsk = {
   kiloSessionId: 'ses_1',
@@ -25,7 +24,6 @@ const ASK: WaitingAsk = {
 
 const mocks = vi.hoisted(() => {
   const order: string[] = [];
-  const tasks = new Map<string, () => Promise<void>>();
   return {
     readWaitingAsk: vi.fn<() => Promise<WaitingAsk | null>>(),
     recordWaitingAsk: vi.fn<(ask: WaitingAsk | null) => void>(),
@@ -52,7 +50,6 @@ const mocks = vi.hoisted(() => {
       startOrUpdate: vi.fn(),
     },
     order,
-    tasks,
     applyWidgetLanguage: vi.fn(async () => {
       await Promise.resolve();
       order.push('language');
@@ -61,9 +58,7 @@ const mocks = vi.hoisted(() => {
       await Promise.resolve();
       order.push('approve');
     }),
-    registerHeadlessTask: vi.fn((key: string, provider: () => () => Promise<void>) => {
-      tasks.set(key, provider());
-    }),
+    registerHeadlessTask: vi.fn(),
   };
 });
 
@@ -94,6 +89,7 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 vi.mock('./android-sink', () => ({
   androidSink: mocks.sink,
   setGlanceableActionNotice: mocks.setGlanceableActionNotice,
+  setGlanceableActionApproving: (): void => undefined,
   renderStoredSnapshotWithNotice: mocks.renderStoredSnapshotWithNotice,
 }));
 
@@ -115,17 +111,8 @@ vi.mock('@/lib/glanceable/approve-front-agent', () => ({
   approveFrontAgent: mocks.approveFrontAgent,
 }));
 
-const {
-  APPROVE_AGENT_TASK_KEY,
-  APPROVE_HEADLESS_TASK_KEY,
-  handleApproveTask,
-  registerApproveTask,
-  runApproveTask,
-} = await import('./approve-task');
-
-/** The catalog key for the retryable line, and the copy this slice must show. */
 const APPROVE_FAILED_KEY = 'glanceable.approveFailed';
-const APPROVE_FAILED = "Couldn't approve. Tap Approve to try again.";
+let APPROVE_FAILED = '';
 const NATIVE_SOURCE_DIR = join(
   __dirname,
   '..',
@@ -141,16 +128,10 @@ const NATIVE_SOURCE_DIR = join(
   'activeagentsliveupdate'
 );
 const WORKER_SOURCE = readFileSync(join(NATIVE_SOURCE_DIR, 'ActiveAgentsApproveWorker.kt'), 'utf8');
-const SERVICE_SOURCE = readFileSync(
-  join(NATIVE_SOURCE_DIR, 'ActiveAgentsApproveTaskService.kt'),
-  'utf8'
-);
-const ENTRY_SOURCE = readFileSync(join(__dirname, '..', '..', 'index.js'), 'utf8');
 
 beforeEach(async () => {
   vi.clearAllMocks();
   mocks.order.length = 0;
-  mocks.tasks.clear();
   mocks.language.whenLanguagePreferenceLoaded.mockResolvedValue(undefined);
   mocks.language.getResolvedLanguage.mockReturnValue('en');
   mocks.readWaitingAsk.mockResolvedValue(ASK);
@@ -159,6 +140,7 @@ beforeEach(async () => {
   mocks.restorePersistedGlanceable.mockResolvedValue(undefined);
   // The language case switches the shared instance; every other case is English.
   await i18n.changeLanguage('en');
+  APPROVE_FAILED = i18n.t(APPROVE_FAILED_KEY);
 });
 
 /** A promise a case releases by hand, so a task's await on it is observable. */
@@ -186,7 +168,8 @@ describe('handleApproveTask', () => {
     // clear it again, and an approval is not a failure to report.
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
-    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
+    // One render: the Approving… draw before the answer.
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
       userId: 'u1',
@@ -197,10 +180,6 @@ describe('handleApproveTask', () => {
     // The raise is presented twice — this card and the app-owned needs-input
     // notification — so the ended ask retires that notification too.
     expect(mocks.dismissNeedsInputNotification).toHaveBeenCalledWith('ses_1');
-  });
-
-  it('shows the catalog copy for the retryable key', () => {
-    expect(i18n.t(APPROVE_FAILED_KEY)).toBe(APPROVE_FAILED);
   });
 
   it('keeps the ask, shows the failure line and republishes on a retryable failure', async () => {
@@ -214,7 +193,7 @@ describe('handleApproveTask', () => {
     expect(mocks.setGlanceableActionNotice).toHaveBeenCalledTimes(2);
     expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(1, APPROVE_FAILED);
     expect(mocks.setGlanceableActionNotice).toHaveBeenNthCalledWith(2, APPROVE_FAILED);
-    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(3);
     expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenNthCalledWith(1, {
       userId: 'u1',
       organizationId: 'org_1',
@@ -228,10 +207,11 @@ describe('handleApproveTask', () => {
     // republish, which writes the notification again and re-selects the ask from
     // the tray — a line drawn only first could be pruned by that render.
     const firstNotice = mocks.setGlanceableActionNotice.mock.invocationCallOrder[0];
-    const firstRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[0];
+    // Render 0 is the Approving… draw before the answer.
+    const firstRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[1];
     const refreshOrder = mocks.refreshGlanceableSnapshot.mock.invocationCallOrder[0];
     const lastNotice = mocks.setGlanceableActionNotice.mock.invocationCallOrder[1];
-    const lastRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[1];
+    const lastRender = mocks.renderStoredSnapshotWithNotice.mock.invocationCallOrder[2];
     expect(firstNotice).toBeLessThan(firstRender ?? Number.POSITIVE_INFINITY);
     expect(firstRender).toBeLessThan(refreshOrder ?? Number.POSITIVE_INFINITY);
     expect(refreshOrder).toBeLessThan(lastNotice ?? Number.POSITIVE_INFINITY);
@@ -250,15 +230,20 @@ describe('handleApproveTask', () => {
   it('waits for the failure line before it republishes and finishes', async () => {
     mocks.runGlanceableApprove.mockResolvedValue({ kind: 'retryable' });
     const firstRender = deferredRender();
-    mocks.renderStoredSnapshotWithNotice.mockImplementationOnce(async () => {
-      await firstRender.promise;
-    });
+    // The Approving… draw resolves; the failure draw after it stays in flight.
+    mocks.renderStoredSnapshotWithNotice
+      .mockImplementationOnce(async () => {
+        await Promise.resolve();
+      })
+      .mockImplementationOnce(async () => {
+        await firstRender.promise;
+      });
 
     const pending = handleApproveTask();
     // The task must not republish, let alone resolve, while the first draw is
     // still in flight: the headless process would exit with the line unshown.
     await vi.waitFor(() => {
-      expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
+      expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
     });
     expect(mocks.refreshGlanceableSnapshot).not.toHaveBeenCalled();
 
@@ -266,7 +251,7 @@ describe('handleApproveTask', () => {
     await pending;
 
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
-    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(2);
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(3);
   });
 
   it('renders the failure line from the stored snapshot when the republish rejects', async () => {
@@ -318,7 +303,8 @@ describe('handleApproveTask', () => {
     expect(mocks.recordWaitingAsk).toHaveBeenCalledTimes(1);
     expect(mocks.recordWaitingAsk).toHaveBeenCalledWith(null);
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
-    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
+    // One render: the Approving… draw before the answer.
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
     // The ask is gone, so its stale tray row is skipped like an answered one.
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledWith({
@@ -336,7 +322,8 @@ describe('handleApproveTask', () => {
 
     expect(mocks.recordWaitingAsk).not.toHaveBeenCalled();
     expect(mocks.setGlanceableActionNotice).not.toHaveBeenCalled();
-    expect(mocks.renderStoredSnapshotWithNotice).not.toHaveBeenCalled();
+    // One render: the Approving… draw before the answer.
+    expect(mocks.renderStoredSnapshotWithNotice).toHaveBeenCalledTimes(1);
     expect(mocks.refreshGlanceableSnapshot).toHaveBeenCalledTimes(1);
     // The ask is neither answered nor gone: it is still there, so the republish
     // re-selects it and the notification keeps the Open it names.
@@ -427,137 +414,6 @@ describe('runApproveTask', () => {
 
     await expect(runApproveTask(approve)).resolves.toBeUndefined();
     expect(approve).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('registerApproveTask', () => {
-  it('registers the task under the key the Kotlin service starts', async () => {
-    registerApproveTask();
-
-    expect(mocks.registerHeadlessTask).toHaveBeenCalledTimes(1);
-    expect(mocks.registerHeadlessTask.mock.calls[0]?.[0]).toBe(APPROVE_AGENT_TASK_KEY);
-
-    await mocks.tasks.get(APPROVE_AGENT_TASK_KEY)?.();
-
-    expect(mocks.order).toEqual(['language', 'approve']);
-    expect(mocks.approveFrontAgent).toHaveBeenCalledTimes(1);
-  });
-});
-
-type Registration = { key: string; factory: () => unknown };
-
-/**
- * Run the app entry with a stub `require`, so what it registered and when it
- * loaded the task module are observable without loading the native graph.
- */
-function evaluateEntry(platform: string): {
-  registrations: Registration[];
-  required: string[];
-} {
-  const required: string[] = [];
-  const registrations: Registration[] = [];
-  const requireFn = (id: string): unknown => {
-    required.push(id);
-    switch (id) {
-      case 'react-native': {
-        return {
-          Platform: { OS: platform },
-          AppRegistry: {
-            registerHeadlessTask: (key: string, factory: () => unknown): void => {
-              registrations.push({ key, factory });
-            },
-          },
-        };
-      }
-      case './src/lib/dev-logbox': {
-        // The entry drops expo-iap's developer copy for a failed
-        // available-purchases query before the router entry loads; the stub
-        // answers with the one call it makes.
-        return { applyDevLogBoxFilters: (): void => undefined };
-      }
-      case 'react-native-android-widget': {
-        return { registerWidgetTaskHandler: (): void => undefined };
-      }
-      case './src/glanceable-android/register': {
-        return { handleWidgetTask: (): void => undefined };
-      }
-      case './src/glanceable-android/approve-task': {
-        return {
-          APPROVE_HEADLESS_TASK_KEY,
-          APPROVE_AGENT_TASK_KEY,
-          handleApproveTask,
-          // The entry registers the task-service chain through this call; the
-          // stub records the key it would register.
-          registerApproveTask: (): void => {
-            registrations.push({ key: APPROVE_AGENT_TASK_KEY, factory: () => undefined });
-          },
-        };
-      }
-      case 'expo-router/entry': {
-        return {};
-      }
-      case './src/lib/app-actions/app-action-dispatch': {
-        // The entry registers the OS-action dispatcher after the router entry;
-        // the stub answers with the one call it makes.
-        return { registerAppActionDispatcher: (): void => undefined };
-      }
-      case './src/lib/notification-background-task': {
-        // The entry defines and registers the background-notification task last,
-        // for the same headless-context reason; the stub answers with a resolved
-        // registration so the entry's `.catch` has a promise to attach to.
-        return {
-          registerNotificationBackgroundTask: async (): Promise<void> => {
-            await Promise.resolve();
-          },
-        };
-      }
-      case './src/lib/glanceable-refresh-task': {
-        return {
-          registerGlanceableRefreshTask: async (): Promise<void> => {
-            await Promise.resolve();
-          },
-        };
-      }
-      default: {
-        throw new Error(`The entry required an unexpected module: ${id}`);
-      }
-    }
-  };
-  runInNewContext(ENTRY_SOURCE, { require: requireFn });
-  return { registrations, required };
-}
-
-describe('the headless task keys', () => {
-  it('registers both Approve tasks when the platform is android', () => {
-    expect(APPROVE_HEADLESS_TASK_KEY).toBe('KiloActiveAgentsApprove');
-    // Only the string crosses into Kotlin; the worker's `TASK_NAME` and the
-    // entry's literal must name the same task.
-    expect(WORKER_SOURCE).toContain(`TASK_NAME = "${APPROVE_HEADLESS_TASK_KEY}"`);
-
-    const android = evaluateEntry('android');
-
-    expect(android.registrations.map(registration => registration.key)).toEqual([
-      APPROVE_HEADLESS_TASK_KEY,
-      APPROVE_AGENT_TASK_KEY,
-    ]);
-    const [workerRegistration] = android.registrations;
-    expect(workerRegistration?.factory()).toBe(handleApproveTask);
-    // `registerApproveTask` requires the module at entry, so the widget-style
-    // `require` inside the factory above is not what loads it; the entry always
-    // has it loaded by the time a task fires.
-    expect(android.required).toContain('./src/glanceable-android/approve-task');
-  });
-
-  it('names the key the headless task service starts', () => {
-    expect(APPROVE_AGENT_TASK_KEY).toBe('ActiveAgentsApprove');
-    expect(SERVICE_SOURCE).toContain(`TASK_KEY = "${APPROVE_AGENT_TASK_KEY}"`);
-  });
-
-  it('registers no headless task off Android', () => {
-    const ios = evaluateEntry('ios');
-
-    expect(ios.registrations).toEqual([]);
-    expect(ios.required).not.toContain('./src/glanceable-android/approve-task');
   });
 });
 

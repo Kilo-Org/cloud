@@ -94,6 +94,7 @@ export function toGlanceableContentState(
     needsInput: snapshot.needsInput,
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
+    updatedAt: snapshot.updatedAt,
     needsInputSince: snapshot.needsInputSince,
     scheduled: snapshot.scheduled,
     scheduledAt: snapshot.scheduledAt,
@@ -165,6 +166,12 @@ export type GlanceableDeliveryDeps = {
     onEndRejected?: (token: string) => Promise<void>,
     onStarted?: (token: string) => Promise<void>
   ) => Promise<void>;
+  /** Independent WidgetKit targets, never part of ActivityKit singleton/end grouping. */
+  sendIosWidgetHints?: (
+    userId: string,
+    organizationId: string | null,
+    isCurrent?: () => Promise<boolean>
+  ) => Promise<void>;
   /** Reserved before reading; do not assign a new timestamp after a delayed send. */
   apnsTimestampSeconds?: number;
   /** Durable generation fence, also checked by adapters after awaits and before outbound sends. */
@@ -224,6 +231,8 @@ export async function deliverGlanceableSnapshot(
       deps.onIosStarted
     );
   }
+
+  await deps.sendIosWidgetHints?.(params.userId, params.organizationId, deps.isCurrent);
 
   // iOS Expo tokens always need the data-only wake: it drives the widget
   // timeline through the background task while the app is not foregrounded.

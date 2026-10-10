@@ -2,31 +2,40 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-const PLACEHOLDER = '__KILO_WIDGET_LOGO_URI__';
-const LAYOUT_FILES = ['active-agents-live-activity.tsx', 'active-agents-widget.tsx'];
+import { withWidgetLogo } from './widget-logo';
+
+vi.mock('expo-widgets', () => ({ widgetsDirectory: 'file:///group/ExpoWidgets/' }));
+
+const MARK = '__KILO_WIDGET_LOGO_URI__';
+const GLYPH = '__KILO_WIDGET_GLYPH_URI__';
 
 const read = (file: string) => readFileSync(join(__dirname, file), 'utf8');
 
 /**
  * The `'widget'` layouts are stringified by Babel and re-evaluated inside the
  * widget process, where an imported binding is an undefined global that throws
- * and blanks the whole surface. So the placeholder must appear as a literal in
- * each layout source, never as the imported `WIDGET_LOGO_PLACEHOLDER`
- * identifier. These assertions read the sources because no widget transform
- * runs under vitest.
+ * and blanks the whole surface. So each placeholder must appear as a literal in
+ * the layout source. These assertions read the sources because no widget
+ * transform runs under vitest.
  */
-describe('widget logo placeholder', () => {
-  it('matches the token widget-logo.ts replaces', () => {
-    expect(read('widget-logo.ts')).toContain(`= '${PLACEHOLDER}'`);
+describe('widget logo placeholders', () => {
+  it('match the tokens widget-logo.ts replaces', () => {
+    const source = read('widget-logo.ts');
+    expect(source).toContain(`'${MARK}'`);
+    expect(source).toContain(`'${GLYPH}'`);
   });
 
-  for (const file of LAYOUT_FILES) {
-    it(`is a literal in ${file}`, () => {
-      const source = read(file);
-      expect(source).toContain(`= '${PLACEHOLDER}'`);
-      expect(source).not.toContain('logoUri = WIDGET_LOGO_PLACEHOLDER');
-    });
-  }
+  it('are literals in each layout that draws them', () => {
+    expect(read('active-agents-widget.tsx')).toContain(`= '${MARK}'`);
+    expect(read('active-agents-widget.tsx')).toContain(`= '${GLYPH}'`);
+    expect(read('active-agents-live-activity.tsx')).toContain(`= '${MARK}'`);
+  });
+
+  it('resolve to the app-group copies in a stringified layout', () => {
+    expect(withWidgetLogo(`const a = '${MARK}'; const b = '${GLYPH}';`)).toBe(
+      "const a = 'file:///group/ExpoWidgets/kilo-logo.png'; const b = 'file:///group/ExpoWidgets/kilo-logo-glyph.png';"
+    );
+  });
 });

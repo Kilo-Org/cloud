@@ -135,7 +135,8 @@
     "updated": "Ažurirano",
     "working": "U radu",
     "yourOwnRepositories": "Tvoji repozitoriji",
-    "dismissed": "Odbačeno"
+    "dismissed": "Odbačeno",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -3196,8 +3197,14 @@
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu.",
     "openSession": "Otvori",
     "approveFailed": "Odobravanje nije uspjelo. Dodirni $t(common.approve) da pokušaš ponovno.",
-    "newestResult": "Najnoviji rezultat",
-    "scheduledWakes": "budi se {{time}}"
+    "checked": "Provjereno",
+    "lastKnown": "Posljednje poznato",
+    "awaitingUpdate": "Čeka ažuriranje",
+    "nextRun": "Sljedeće pokretanje",
+    "waitingForYou": "Čeka vas",
+    "nextScheduled": "Sljedeće zakazano",
+    "answerNeeded": "Potreban odgovor",
+    "waitingToRetry": "Čeka ponovni pokušaj"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3398,7 +3405,6 @@
       "template": "Predložak",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Pokreni kao podzadatak",
       "edit": "Naredba za uređivanje kose crte",
       "saveFailed": "Nije moguće spremiti naredbu",

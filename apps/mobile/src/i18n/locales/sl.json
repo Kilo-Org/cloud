@@ -135,7 +135,8 @@
     "updated": "Posodobljeno",
     "working": "V teku",
     "yourOwnRepositories": "Tvoji repozitoriji",
-    "dismissed": "Zavrženo"
+    "dismissed": "Zavrženo",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -3237,8 +3238,14 @@
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
     "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
-    "newestResult": "Najnovejši rezultat",
-    "scheduledWakes": "zbudi se {{time}}"
+    "checked": "Preverjeno",
+    "lastKnown": "Nazadnje znano",
+    "awaitingUpdate": "Čaka na posodobitev",
+    "nextRun": "Naslednji zagon",
+    "waitingForYou": "Čaka na vas",
+    "nextScheduled": "Naslednje načrtovano",
+    "answerNeeded": "Potreben odgovor",
+    "waitingToRetry": "Čaka na ponovni poskus"
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",
@@ -3439,7 +3446,6 @@
       "template": "Predloga",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Pojasnite $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Zaženi kot podopravilo",
       "edit": "Uredi ukaz za poševnico",
       "saveFailed": "Ukaza ni bilo mogoče shraniti",

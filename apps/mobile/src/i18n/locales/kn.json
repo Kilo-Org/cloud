@@ -135,7 +135,8 @@
     "updated": "ನವೀಕರಿಸಲಾಗಿದೆ",
     "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
     "yourOwnRepositories": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು",
-    "dismissed": "ಕಡೆಗಣಿಸಲಾಗಿದೆ"
+    "dismissed": "ಕಡೆಗಣಿಸಲಾಗಿದೆ",
+    "agent": "ಏಜೆಂಟ್"
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ.",
     "openSession": "ತೆರೆಯಿರಿ",
     "approveFailed": "ಅನುಮೋದಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು $t(common.approve) ಟ್ಯಾಪ್ ಮಾಡಿ.",
-    "newestResult": "ಇತ್ತೀಚಿನ ಫಲಿತಾಂಶ",
-    "scheduledWakes": "{{time}} ಎಚ್ಚರಗೊಳ್ಳುತ್ತದೆ"
+    "checked": "ಪರಿಶೀಲಿಸಲಾಗಿದೆ",
+    "lastKnown": "ಕೊನೆಯದಾಗಿ ತಿಳಿದ ಸ್ಥಿತಿ",
+    "awaitingUpdate": "ನವೀಕರಣಕ್ಕಾಗಿ ಕಾಯುತ್ತಿದೆ",
+    "nextRun": "ಮುಂದಿನ ಚಾಲನೆ",
+    "waitingForYou": "ನಿಮಗಾಗಿ ಕಾಯುತ್ತಿದೆ",
+    "nextScheduled": "ಮುಂದಿನ ನಿಗದಿತ ಕಾರ್ಯಗಳು",
+    "answerNeeded": "ಉತ್ತರ ಅಗತ್ಯ",
+    "waitingToRetry": "ಮರುಪ್ರಯತ್ನಕ್ಕಾಗಿ ಕಾಯುತ್ತಿದೆ"
   },
   "transcriptionModel": {
     "title": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿ",
@@ -3357,7 +3364,6 @@
       "template": "ಟೆಂಪ್ಲೇಟ್",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ಅನ್ನು ವಿವರಿಸಿ",
-      "agent": "ಏಜೆಂಟ್",
       "subtask": "ಉಪಕಾರ್ಯದಂತೆ ರನ್ ಮಾಡಿ",
       "edit": "ಸ್ಲಾಶ್ ಆಜ್ಞೆಯನ್ನು ಸಂಪಾದಿಸಿ",
       "saveFailed": "ಆಜ್ಞೆಯನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",

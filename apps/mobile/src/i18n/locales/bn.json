@@ -135,7 +135,8 @@
     "updated": "আপডেট হয়েছে",
     "working": "কাজ চলছে",
     "yourOwnRepositories": "আপনার নিজের রিপোজিটরি",
-    "dismissed": "খারিজ"
+    "dismissed": "খারিজ",
+    "agent": "এজেন্ট"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।",
     "openSession": "খুলুন",
     "approveFailed": "অনুমোদন করা যায়নি। আবার চেষ্টা করতে $t(common.approve) স্পর্শ করুন।",
-    "newestResult": "সর্বশেষ ফলাফল",
-    "scheduledWakes": "{{time}} জাগবে"
+    "checked": "যাচাই করা হয়েছে",
+    "lastKnown": "সর্বশেষ জানা",
+    "awaitingUpdate": "আপডেটের অপেক্ষায়",
+    "nextRun": "পরবর্তী রান",
+    "waitingForYou": "আপনার অপেক্ষায়",
+    "nextScheduled": "পরবর্তী নির্ধারিত",
+    "answerNeeded": "উত্তর প্রয়োজন",
+    "waitingToRetry": "আবার চেষ্টার অপেক্ষায়"
   },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",
@@ -3357,7 +3364,6 @@
       "template": "টেমপ্লেট",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ব্যাখ্যা করুন",
-      "agent": "এজেন্ট",
       "subtask": "সাবটাস্ক হিসাবে চালান",
       "edit": "স্ল্যাশ কমান্ড সম্পাদনা করুন",
       "saveFailed": "কমান্ড সংরক্ষণ করা যায়নি",

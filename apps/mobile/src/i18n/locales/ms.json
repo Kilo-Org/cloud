@@ -135,7 +135,8 @@
     "updated": "Dikemas kini",
     "working": "Memproses…",
     "yourOwnRepositories": "Repositori anda sendiri",
-    "dismissed": "Diketepikan"
+    "dismissed": "Diketepikan",
+    "agent": "ejen"
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
     "openSession": "Buka",
     "approveFailed": "Tidak dapat meluluskan. Ketik $t(common.approve) untuk mencuba semula.",
-    "newestResult": "Hasil terbaharu",
-    "scheduledWakes": "bangun {{time}}"
+    "checked": "Disemak",
+    "lastKnown": "Terakhir diketahui",
+    "awaitingUpdate": "Menunggu kemas kini",
+    "nextRun": "Pelaksanaan seterusnya",
+    "waitingForYou": "Menunggu anda",
+    "nextScheduled": "Jadual seterusnya",
+    "answerNeeded": "Perlu jawapan",
+    "waitingToRetry": "Menunggu cubaan semula"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
@@ -3357,7 +3364,6 @@
       "template": "templat",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Terangkan $ARGUMENTS",
-      "agent": "ejen",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit arahan slash",
       "saveFailed": "Tidak dapat menyimpan arahan",

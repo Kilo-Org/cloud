@@ -135,7 +135,8 @@
     "updated": "અપડેટ થયું",
     "working": "કામ ચાલુ છે",
     "yourOwnRepositories": "તમારી પોતાની રિપોઝિટરીઓ",
-    "dismissed": "ખારિજ કરેલું"
+    "dismissed": "ખારિજ કરેલું",
+    "agent": "એજન્ટ"
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
     "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
-    "newestResult": "સૌથી નવું પરિણામ",
-    "scheduledWakes": "{{time}} જાગશે"
+    "checked": "ચકાસ્યું",
+    "lastKnown": "છેલ્લે જાણીતું",
+    "awaitingUpdate": "અપડેટની રાહમાં",
+    "nextRun": "આગામી રન",
+    "waitingForYou": "તમારી રાહમાં",
+    "nextScheduled": "આગામી નિર્ધારિત",
+    "answerNeeded": "જવાબ જરૂરી",
+    "waitingToRetry": "ફરી પ્રયાસની રાહમાં"
   },
   "transcriptionModel": {
     "title": "અવાજને લખાણમાં ફેરવવાનું મોડેલ",
@@ -3357,7 +3364,6 @@
       "template": "ઢાંચો",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS સમજાવો",
-      "agent": "એજન્ટ",
       "subtask": "સબટાસ્ક તરીકે ચલાવો",
       "edit": "સ્લેશ આદેશ સંપાદિત કરો",
       "saveFailed": "આદેશ સાચવી શકાયો નથી",

@@ -10066,7 +10066,7 @@ export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
 
 // ─── Activity Tokens (Live Activity / push-to-start / Android ongoing) ──
 //
-// Tokens for the glanceable surfaces (iOS Live Activity + push-to-start,
+// Tokens for glanceable surfaces (iOS Live Activity, push-to-start and WidgetKit,
 // Android ongoing notification). These are NOT Expo push tokens and never
 // share a table with `user_push_tokens`. `organization_id` is null for the
 // personal surface and is a server-only lookup key — it never enters a
@@ -10084,7 +10084,9 @@ export const user_activity_tokens = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     token: text().notNull(),
-    kind: text().$type<'ios_push_to_start' | 'ios_activity' | 'android_ongoing'>().notNull(),
+    kind: text()
+      .$type<'ios_push_to_start' | 'ios_activity' | 'ios_widget' | 'android_ongoing'>()
+      .notNull(),
     platform: text().$type<'ios' | 'android'>().notNull(),
     // Null means the personal surface. Server-only lookup key; never sent in a
     // glanceable payload.

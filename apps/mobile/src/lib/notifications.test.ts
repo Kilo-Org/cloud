@@ -2743,6 +2743,8 @@ describe('cold iOS background delivery', () => {
       // No ask is recorded for this cold push, so the app-built state says so
       // explicitly; the layout gates Approve on this flag.
       canApprove: false,
+      // The header shows the check time, so the app-built state carries it.
+      updatedAt: '2026-01-02T00:00:00.000Z',
     });
     expect(rows.has('scope-token')).toBe(true);
   });

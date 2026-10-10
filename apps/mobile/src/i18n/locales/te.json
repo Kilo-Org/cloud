@@ -135,7 +135,8 @@
     "updated": "నవీకరించారు",
     "working": "పని జరుగుతోంది",
     "yourOwnRepositories": "మీ స్వంత రిపోజిటరీలు",
-    "dismissed": "విస్మరించారు"
+    "dismissed": "విస్మరించారు",
+    "agent": "ఏజెంట్"
   },
   "language": {
     "restarting": "ఎంచుకున్న భాషను వర్తింపజేయడానికి పునఃప్రారంభిస్తోంది",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
     "openSession": "తెరవండి",
     "approveFailed": "ఆమోదించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి $t(common.approve) ని నొక్కండి.",
-    "newestResult": "సరికొత్త ఫలితం",
-    "scheduledWakes": "{{time}} మేల్కొంటుంది"
+    "checked": "తనిఖీ చేయబడింది",
+    "lastKnown": "చివరిగా తెలిసిన స్థితి",
+    "awaitingUpdate": "అప్‌డేట్ కోసం వేచి ఉంది",
+    "nextRun": "తదుపరి అమలు",
+    "waitingForYou": "మీ కోసం వేచి ఉంది",
+    "nextScheduled": "తదుపరి షెడ్యూల్",
+    "answerNeeded": "మీ సమాధానం అవసరం",
+    "waitingToRetry": "మళ్లీ ప్రయత్నించడానికి వేచి ఉంది"
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",
@@ -3357,7 +3364,6 @@
       "template": "మూస",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTSని వివరించండి",
-      "agent": "ఏజెంట్",
       "subtask": "సబ్‌టాస్క్‌గా అమలు చేయండి",
       "edit": "స్లాష్ ఆదేశాన్ని సవరించండి",
       "saveFailed": "ఆదేశాన్ని సేవ్ చేయడం సాధ్యపడలేదు",

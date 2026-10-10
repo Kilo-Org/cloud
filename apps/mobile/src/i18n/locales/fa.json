@@ -135,7 +135,8 @@
     "updated": "به‌روزشده",
     "working": "در حال کار",
     "yourOwnRepositories": "مخازن خودتان",
-    "dismissed": "نادیده‌گرفته‌شده"
+    "dismissed": "نادیده‌گرفته‌شده",
+    "agent": "عامل"
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
     "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
-    "newestResult": "جدیدترین نتیجه",
-    "scheduledWakes": "{{time}} بیدار می‌شود"
+    "checked": "آخرین بررسی",
+    "lastKnown": "آخرین وضعیت شناخته‌شده",
+    "awaitingUpdate": "در انتظار به‌روزرسانی",
+    "nextRun": "اجرای بعدی",
+    "waitingForYou": "در انتظار شما",
+    "nextScheduled": "زمانبندی‌های بعدی",
+    "answerNeeded": "نیازمند پاسخ",
+    "waitingToRetry": "در انتظار تلاش مجدد"
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",
@@ -3357,7 +3364,6 @@
       "template": "الگو",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS را توضیح دهید",
-      "agent": "عامل",
       "subtask": "به عنوان وظیفه فرعی اجرا شود",
       "edit": "ویرایش دستور اسلش",
       "saveFailed": "فرمان ذخیره نشد",

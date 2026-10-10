@@ -135,7 +135,8 @@
     "updated": "نوێکراوەتەوە",
     "working": "لە کاردا",
     "yourOwnRepositories": "کۆگاکانی خۆت",
-    "dismissed": "پشتگوێخراو"
+    "dismissed": "پشتگوێخراو",
+    "agent": "بریکار"
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە.",
     "openSession": "بیکەرەوە",
     "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە.",
-    "newestResult": "نوێترین ئەنجام",
-    "scheduledWakes": "{{time}} خەبەر دەبێت"
+    "checked": "پشکنراو",
+    "lastKnown": "دوایین دۆخی زانراو",
+    "awaitingUpdate": "چاوەڕێی نوێکردنەوە",
+    "nextRun": "جێبەجێکردنی داهاتوو",
+    "waitingForYou": "چاوەڕێی تۆ",
+    "nextScheduled": "خشتەکراوەکانی داهاتوو",
+    "answerNeeded": "چاوەڕێی وەڵام",
+    "waitingToRetry": "چاوەڕێی هەوڵدانەوە"
   },
   "transcriptionModel": {
     "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",
@@ -3357,7 +3364,6 @@
       "template": "قاڵب",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ڕوون بکەرەوە",
-      "agent": "بریکار",
       "subtask": "وەکو ئەرکی لاوەکی کارپێبکە",
       "edit": "فەرمانی دەستکاریکردنی slash",
       "saveFailed": "نەتوانرا فەرمانەکە پاشەکەوت بکرێت",

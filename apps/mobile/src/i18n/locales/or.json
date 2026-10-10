@@ -135,7 +135,8 @@
     "updated": "ଅଦ୍ୟତନ",
     "working": "କାମ କରୁଛି",
     "yourOwnRepositories": "ଆପଣଙ୍କ ନିଜ ରିପୋଜିଟୋରୀ",
-    "dismissed": "ଖାରଜ ହୋଇଛି"
+    "dismissed": "ଖାରଜ ହୋଇଛି",
+    "agent": "ଏଜେଣ୍ଟ।"
   },
   "language": {
     "restarting": "ଭାଷା ବଦଳାଇବାକୁ ଆପ୍ ପୁଣି ଆରମ୍ଭ ହେଉଛି",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।",
     "openSession": "ଖୋଲନ୍ତୁ",
     "approveFailed": "ଅନୁମୋଦନ କରିହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ $t(common.approve) ଟାପ୍ କରନ୍ତୁ।",
-    "newestResult": "ନୂତନତମ ଫଳାଫଳ",
-    "scheduledWakes": "{{time}} ଉଠିବ"
+    "checked": "ଯାଞ୍ଚ ହୋଇଛି",
+    "lastKnown": "ଶେଷ ଜଣା ସ୍ଥିତି",
+    "awaitingUpdate": "ଅପଡେଟ୍ ଅପେକ୍ଷାରେ",
+    "nextRun": "ପରବର୍ତ୍ତୀ ଚାଳନା",
+    "waitingForYou": "ଆପଣଙ୍କ ଅପେକ୍ଷାରେ",
+    "nextScheduled": "ପରବର୍ତ୍ତୀ ନିର୍ଧାରିତ",
+    "answerNeeded": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
+    "waitingToRetry": "ପୁନଃଚେଷ୍ଟା ଅପେକ୍ଷାରେ"
   },
   "transcriptionModel": {
     "title": "କଥାକୁ ଲେଖାରେ ବଦଳାଇବାର ମଡେଲ୍",
@@ -3357,7 +3364,6 @@
       "template": "ଟେମ୍ପଲେଟ୍।",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ବ୍ୟାଖ୍ୟା କର।",
-      "agent": "ଏଜେଣ୍ଟ।",
       "subtask": "ସବଟାସ୍କ ଭାବରେ ଚଲାନ୍ତୁ।",
       "edit": "ସ୍ଲାସ୍ କମାଣ୍ଡ୍ ଏଡିଟ୍ କରନ୍ତୁ।",
       "saveFailed": "କମାଣ୍ଡ୍ ସେଭ୍ କରିପାରିଲା ନାହିଁ।",

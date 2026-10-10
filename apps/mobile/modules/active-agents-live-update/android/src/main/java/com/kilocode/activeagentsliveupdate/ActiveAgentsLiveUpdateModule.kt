@@ -5,13 +5,20 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.util.Log
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.records.Field
+import expo.modules.kotlin.records.Record
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
@@ -24,9 +31,10 @@ import kotlinx.coroutines.asCoroutineDispatcher
  * its creation), the alert decision, and the revision guard; this module owns
  * the fixed notification id, the posted-channel mirror, the API 36.1+ promotion
  * gate, and the content intent plus named actions: Open deep-links into the
- * recorded session (the Agents tab when nothing waits), and Approve runs the
- * headless approval when a cloud-agent permission waits. Both platforms answer
- * through `src/lib/glanceable/approve-ask.ts`.
+ * recorded session (the Agents tab when nothing waits), Approve runs the
+ * headless approval when a cloud-agent permission waits, and New agent opens
+ * the composer on a working card. Both platforms answer through
+ * `src/lib/glanceable/approve-ask.ts`.
  *
  * This is the Android mechanism for the one shared kind model, not a second
  * behaviour: `@kilocode/notifications` maps each agent surface to `needs-input`
@@ -58,8 +66,8 @@ class ActiveAgentsLiveUpdateModule : Module() {
       notificationManager.isNotificationPolicyAccessGranted
     }
 
-    // Group the Open label and URL so both entry points fit Expo's eight-argument
-    // Function limit while preserving the action and notification-kind fields.
+    // The card's content and actions travel as one record so both entry points
+    // fit Expo's eight-argument Function limit beside the notification-kind fields.
     //
     // `start`, `update` and `end` are the durable writes whose state the JS side
     // never reads back in the same turn: their bodies commit to SharedPreferences
@@ -68,20 +76,18 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // thread. The JS bridge (`src/glanceable-android/live-update.ts`) declares
     // them `void` and never consumes the promise, which is why `durable` logs a
     // failure instead of letting it become an unhandled rejection.
-    AsyncFunction("start") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
+    AsyncFunction("start") { card: LiveUpdateCard, channelId: String, alerting: Boolean, promotion: Boolean ->
       durable {
-        post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, promotion, 0)
+        post(card, channelId, alerting, promotion, 0)
       }
     }.runOnQueue(moduleQueue)
 
-    // Expo's `Function` builder has one overload per arity and stops at eight
-    // arguments (expo-modules-core `ObjectDefinitionBuilder`), so `update`
-    // cannot carry `start`'s `promotion` flag on top of the terminal
-    // `timeoutMs`. The flag is redundant on this path: `post` gates promotion
-    // on `isPromotionCapable()` itself, which is the value the JS side passed.
-    AsyncFunction("update") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
+    // `update` carries the terminal `timeoutMs` instead of `start`'s `promotion`
+    // flag. The flag is redundant on this path: `post` gates promotion on
+    // `isPromotionCapable()` itself, which is the value the JS side passes.
+    AsyncFunction("update") { card: LiveUpdateCard, channelId: String, alerting: Boolean, timeoutMs: Double ->
       durable {
-        post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
+        post(card, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
       }
     }.runOnQueue(moduleQueue)
 
@@ -280,6 +286,30 @@ class ActiveAgentsLiveUpdateModule : Module() {
   }
 
   /**
+   * The New agent action: the app's fixed new-agent deep link. One constant URL,
+   * so the record under its request code never accumulates.
+   */
+  private fun newAgentPendingIntent(url: String): PendingIntent {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+      setPackage(context.packageName)
+    }
+    return PendingIntent.getActivity(
+      context,
+      NEW_AGENT_REQUEST_CODE,
+      intent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+  }
+
+  /** The app is drawing in its dark theme: the card's accent and retry red follow it. */
+  private fun isNight(): Boolean =
+    (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+      Configuration.UI_MODE_NIGHT_YES
+
+  private fun action(label: String, intent: PendingIntent): Notification.Action =
+    Notification.Action.Builder(Icon.createWithResource(context, smallIconId()), label, intent).build()
+
+  /**
    * The channel a card still in the shade carries, or null when no card is
    * posted. The stored marker alone can outlive the card: a terminal timeout
    * removes the notification without any further app call, and the marker
@@ -302,17 +332,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
   }
 
   private fun post(
-    title: String,
-    text: String,
-    openLabel: String,
-    openUrl: String,
-    approveLabel: String?,
-    compactText: String?,
+    card: LiveUpdateCard,
     channelId: String,
     alerting: Boolean,
     promotion: Boolean,
     timeoutMs: Long
   ) {
+    val openUrl = card.openUrl
     // Read the URL the shade card carries before this call can change it: a
     // failed post must leave `OPEN_URL` naming the previous card's record.
     val previousOpenUrl = notificationState.getString(OPEN_URL, null)
@@ -323,32 +349,38 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // uses. A needs-input card takes both; a progress card keeps the status
     // category and the silent behaviour it had.
     val needsInput = channelId == NEEDS_INPUT_CHANNEL_ID
+    // The system template, coloured with the app's primary (olive by day, lime
+    // by night). The retry line after a failed approve draws in the destructive
+    // red; everything else is the template's own text colour.
+    val night = isNight()
+    val text: CharSequence = if (card.textIsError) {
+      SpannableString(card.text).apply {
+        setSpan(
+          ForegroundColorSpan(Color.parseColor(if (night) ERROR_NIGHT else ERROR_DAY)),
+          0,
+          length,
+          Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        )
+      }
+    } else {
+      card.text
+    }
     val builder = newBuilder(channelId)
       .setSmallIcon(smallIconId())
-      .setContentTitle(title)
+      .setColor(Color.parseColor(if (night) PRIMARY_NIGHT else PRIMARY_DAY))
+      .setContentTitle(card.title)
       .setContentText(text)
+      .setSubText(card.subText)
       .setContentIntent(contentIntent)
       .setOngoing(true)
       .setCategory(if (needsInput) Notification.CATEGORY_MESSAGE else Notification.CATEGORY_STATUS)
-      .addAction(
-        Notification.Action.Builder(
-          Icon.createWithResource(context, smallIconId()),
-          openLabel,
-          contentIntent
-        ).build()
-      )
 
-    // No recorded approvable ask: the action is omitted, not disabled. The JS
-    // side drops the label once the wait is answered elsewhere.
-    if (approveLabel != null) {
-      builder.addAction(
-        Notification.Action.Builder(
-          Icon.createWithResource(context, smallIconId()),
-          approveLabel,
-          approvePendingIntent()
-        ).build()
-      )
-    }
+    // Approve first, then Open, then New agent. An action the card does not
+    // offer is omitted, not disabled: the JS side drops Approve once the wait is
+    // answered elsewhere or while an answer is in flight.
+    card.approveLabel?.let { builder.addAction(action(it, approvePendingIntent())) }
+    builder.addAction(action(card.openLabel, contentIntent))
+    card.newAgentLabel?.let { builder.addAction(action(it, newAgentPendingIntent(card.newAgentUrl))) }
 
     if (needsInput) {
       // Only the first entry into the kind alerts; a later update in the same
@@ -363,7 +395,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // setRequestPromotedOngoing does not exist; use the documented flag setter.
     if (promotion && isPromotionCapable()) {
       builder.setFlag(Notification.FLAG_PROMOTED_ONGOING, true)
-      builder.setShortCriticalText(compactText)
+      builder.setShortCriticalText(card.compactText)
       builder.setStyle(Notification.ProgressStyle())
     }
 
@@ -462,6 +494,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
     /** The kind marker in the channel id the JS side creates for needs-input. */
     const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
     const val APPROVE_REQUEST_CODE = 1003
+    const val NEW_AGENT_REQUEST_CODE = 1004
+
+    /** The app's primary and destructive colours (`global.css`), day and night. */
+    const val PRIMARY_DAY = "#4F5A10"
+    const val PRIMARY_NIGHT = "#E8F27A"
+    const val ERROR_DAY = "#B0483A"
+    const val ERROR_NIGHT = "#F28B7A"
 
     /**
      * The module's one serial queue for the durable write path, shared by every
@@ -490,4 +529,18 @@ class ActiveAgentsLiveUpdateModule : Module() {
     val durableQueue: ExecutorService =
       Executors.newSingleThreadExecutor { Thread(it, "active-agents-live-update") }
   }
+}
+
+/** One card's content and actions, as the JS bridge (`live-update.ts`) sends it. */
+class LiveUpdateCard : Record {
+  @Field val title: String = ""
+  @Field val text: String = ""
+  @Field val textIsError: Boolean = false
+  @Field val subText: String? = null
+  @Field val compactText: String? = null
+  @Field val openLabel: String = ""
+  @Field val openUrl: String = ""
+  @Field val approveLabel: String? = null
+  @Field val newAgentLabel: String? = null
+  @Field val newAgentUrl: String = ""
 }

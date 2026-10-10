@@ -135,7 +135,8 @@
     "updated": "Yangilangan",
     "working": "Ishlamoqda",
     "yourOwnRepositories": "O‘zingizga tegishli repozitoriylar",
-    "dismissed": "E’tiborsiz qoldirilgan"
+    "dismissed": "E’tiborsiz qoldirilgan",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
     "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
-    "newestResult": "Eng yangi natija",
-    "scheduledWakes": "{{time}} uyg'onadi"
+    "checked": "Tekshirilgan",
+    "lastKnown": "So‘nggi ma’lum holat",
+    "awaitingUpdate": "Yangilanish kutilmoqda",
+    "nextRun": "Keyingi ishga tushish",
+    "waitingForYou": "Sizni kutmoqda",
+    "nextScheduled": "Keyingi rejalashtirilganlar",
+    "answerNeeded": "Javob kutilmoqda",
+    "waitingToRetry": "Qayta urinish kutilmoqda"
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",
@@ -3357,7 +3364,6 @@
       "template": "Shablon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ni tushuntiring",
-      "agent": "Agent",
       "subtask": "Quyi vazifa sifatida ishga tushirish",
       "edit": "Slash buyrug'ini tahrirlash",
       "saveFailed": "Buyruq saqlanmadi",

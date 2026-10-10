@@ -135,7 +135,8 @@
     "updated": "Diperbarui",
     "working": "Bekerja",
     "yourOwnRepositories": "Repositori milikmu",
-    "dismissed": "Diabaikan"
+    "dismissed": "Diabaikan",
+    "agent": "Agen"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "openSession": "Buka",
     "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi.",
-    "newestResult": "Hasil terbaru",
-    "scheduledWakes": "bangun {{time}}"
+    "checked": "Diperiksa",
+    "lastKnown": "Terakhir diketahui",
+    "awaitingUpdate": "Menunggu pembaruan",
+    "nextRun": "Eksekusi berikutnya",
+    "waitingForYou": "Menunggu Anda",
+    "nextScheduled": "Jadwal berikutnya",
+    "answerNeeded": "Perlu jawaban",
+    "waitingToRetry": "Menunggu percobaan ulang"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",
@@ -3357,7 +3364,6 @@
       "template": "Templat",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Jelaskan $ARGUMENTS",
-      "agent": "Agen",
       "subtask": "Jalankan sebagai subtugas",
       "edit": "Edit perintah garis miring",
       "saveFailed": "Tidak dapat menyimpan perintah",

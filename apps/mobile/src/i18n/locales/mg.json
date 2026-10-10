@@ -135,7 +135,8 @@
     "updated": "Nohavaozina",
     "working": "Miasa",
     "yourOwnRepositories": "Ny tahirin-kaodinao manokana",
-    "dismissed": "Nesorina"
+    "dismissed": "Nesorina",
+    "agent": "mpandraharaha"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
     "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
-    "newestResult": "Vokatra vaovao indrindra",
-    "scheduledWakes": "mifoha {{time}}"
+    "checked": "Voamarina",
+    "lastKnown": "Fantatra farany",
+    "awaitingUpdate": "Miandry fanavaozana",
+    "nextRun": "Fampandehanana manaraka",
+    "waitingForYou": "Miandry anao",
+    "nextScheduled": "Voalahatra manaraka",
+    "answerNeeded": "Mila valiny",
+    "waitingToRetry": "Miandry hanandrana indray"
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",
@@ -3357,7 +3364,6 @@
       "template": "Endrika",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Hazavao ny $ARGUMENTS",
-      "agent": "mpandraharaha",
       "subtask": "Mihazakazaka toy ny subtask",
       "edit": "Ahitsio slash command",
       "saveFailed": "Tsy afaka mitahiry baiko",

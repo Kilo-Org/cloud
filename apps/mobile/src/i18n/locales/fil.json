@@ -135,7 +135,8 @@
     "updated": "Na-update",
     "working": "Nagtatrabaho",
     "yourOwnRepositories": "Mga sarili mong repositoryo",
-    "dismissed": "Binalewala"
+    "dismissed": "Binalewala",
+    "agent": "Ahente"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
-    "newestResult": "Pinakabagong resulta",
-    "scheduledWakes": "gigising {{time}}"
+    "checked": "Nakumpirma",
+    "lastKnown": "Huling nalaman",
+    "awaitingUpdate": "Naghihintay ng update",
+    "nextRun": "Susunod na pagpapatakbo",
+    "waitingForYou": "Hinihintay ka",
+    "nextScheduled": "Susunod na naka-iskedyul",
+    "answerNeeded": "Kailangan ng sagot",
+    "waitingToRetry": "Naghihintay ng muling pagsubok"
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
@@ -3357,7 +3364,6 @@
       "template": "Padron",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
-      "agent": "Ahente",
       "subtask": "Patakbuhin bilang subtask",
       "edit": "I-edit ang slash command",
       "saveFailed": "Hindi ma-save ang command",

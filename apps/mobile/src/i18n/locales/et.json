@@ -135,7 +135,8 @@
     "updated": "Uuendatud",
     "working": "Töös",
     "yourOwnRepositories": "Sinu enda hoidlad",
-    "dismissed": "Kõrvale jäetud"
+    "dismissed": "Kõrvale jäetud",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
     "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
-    "newestResult": "Uusim tulemus",
-    "scheduledWakes": "ärkab {{time}}"
+    "checked": "Kontrollitud",
+    "lastKnown": "Viimane teadaolev",
+    "awaitingUpdate": "Ootab uuendust",
+    "nextRun": "Järgmine käivitus",
+    "waitingForYou": "Ootab sind",
+    "nextScheduled": "Järgmisena ajastatud",
+    "answerNeeded": "Vajab vastust",
+    "waitingToRetry": "Ootab uut katset"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",
@@ -3357,7 +3364,6 @@
       "template": "Mall",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Selgitage $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Käivita alamülesandena",
       "edit": "Muuda kaldkriipsu käsku",
       "saveFailed": "Käsku ei saanud salvestada",

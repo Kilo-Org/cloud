@@ -196,6 +196,10 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         }
         return { rows: [] };
       }
+      if (sql.includes('from "user_activity_tokens"') && params.includes('ios_widget')) {
+        // These suites seed no widget tokens; keep the widget-hint read out of the Live Activity read.
+        return { rows: [] };
+      }
       if (sql.includes('from "user_activity_tokens"')) {
         if (params.includes('android_ongoing')) return { rows: [['subscription']] };
         await options.beforeIosTokens?.();
@@ -659,6 +663,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       needsInput: 0,
       needsApproval: 0,
       idle: 0,
+      updatedAt: expect.any(String),
       needsInputSince: null,
       scheduled: 0,
       scheduledAt: null,
@@ -1033,6 +1038,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           needsInput: 1,
           needsApproval: 0,
           idle: 0,
+          updatedAt: expect.any(String),
           needsInputSince: '2026-08-27T10:00:01.000Z',
           scheduled: 0,
           scheduledAt: null,
@@ -1587,6 +1593,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
                 needsInput: 0,
                 needsApproval: 0,
                 idle: 0,
+                updatedAt: expect.any(String),
                 needsInputSince: null,
                 scheduled: 0,
                 scheduledAt: null,
@@ -1983,6 +1990,7 @@ describe('toGlanceableContentState', () => {
       needsInput: 1,
       needsApproval: 1,
       idle: 0,
+      updatedAt: snapshot.updatedAt,
       needsInputSince: '2026-08-27T09:00:00.000Z',
       scheduled: 0,
       scheduledAt: null,
@@ -2029,7 +2037,6 @@ describe('toGlanceableContentState', () => {
     expect(raw).not.toContain('scopeKey');
     expect(raw).not.toContain('deadbeef');
     expect(raw).not.toContain('organizationBound');
-    expect(raw).not.toContain('updatedAt');
     expect(raw).not.toContain('expiresAt');
     expect(raw).not.toContain('accountEpoch');
     expect(raw).not.toContain('title');
@@ -2109,6 +2116,14 @@ describe('buildGlanceableExpoMessages', () => {
 });
 
 describe('deliverGlanceableSnapshot', () => {
+  it('sends independent WidgetKit hints even with no Live Activity targets', async () => {
+    const sendIosWidgetHints = vi.fn(async () => undefined);
+    const { deps, calls } = fakeDeps({ sendIosWidgetHints });
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: 'org-1' }, deps);
+    expect(sendIosWidgetHints).toHaveBeenCalledExactlyOnceWith('u1', 'org-1', undefined);
+    expect(calls.iosSends).toHaveLength(0);
+  });
+
   it('skips all delivery when the snapshot cannot be built', async () => {
     const { deps, calls } = fakeDeps({ buildSnapshot: vi.fn(async () => null) });
 

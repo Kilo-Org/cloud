@@ -135,7 +135,8 @@
     "updated": "Oppdatert",
     "working": "Jobber",
     "yourOwnRepositories": "Dine egne kodelagre",
-    "dismissed": "Avvist"
+    "dismissed": "Avvist",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
     "openSession": "Åpne",
     "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen.",
-    "newestResult": "Nyeste resultat",
-    "scheduledWakes": "våkner {{time}}"
+    "checked": "Sjekket",
+    "lastKnown": "Sist kjent",
+    "awaitingUpdate": "Venter på oppdatering",
+    "nextRun": "Neste kjøring",
+    "waitingForYou": "Venter på deg",
+    "nextScheduled": "Neste planlagte",
+    "answerNeeded": "Venter på svar",
+    "waitingToRetry": "Venter på nytt forsøk"
   },
   "transcriptionModel": {
     "title": "Transkripsjonsmodell",
@@ -3357,7 +3364,6 @@
       "template": "Mal",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Forklar $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Kjør som deloppgave",
       "edit": "Rediger skråstrek-kommando",
       "saveFailed": "Kunne ikke lagre kommandoen",

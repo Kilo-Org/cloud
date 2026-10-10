@@ -135,7 +135,8 @@
     "updated": "Emelitere",
     "working": "Na-arụ ọrụ",
     "yourOwnRepositories": "Ebe nchekwa koodu nke gị",
-    "dismissed": "Elegharala anya"
+    "dismissed": "Elegharala anya",
+    "agent": "Onye nnọchi anya"
   },
   "language": {
     "restarting": "Na-amalitegharị iji asụsụ ahọpụtara",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
     "openSession": "Meghe",
     "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ.",
-    "newestResult": "Nsonaazụ kacha ọhụrụ",
-    "scheduledWakes": "ga-eteta {{time}}"
+    "checked": "Enyochara",
+    "lastKnown": "Nke ikpeazụ a maara",
+    "awaitingUpdate": "Na-eche mmelite",
+    "nextRun": "Oge ọrụ ọzọ",
+    "waitingForYou": "Na-eche gị",
+    "nextScheduled": "Ihe ahaziri na-esote",
+    "answerNeeded": "Chọrọ azịza",
+    "waitingToRetry": "Na-eche ịnwale ọzọ"
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
@@ -3357,7 +3364,6 @@
       "template": "Ụdị",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Kọwaa $ARGUMENTS",
-      "agent": "Onye nnọchi anya",
       "subtask": "Gbaa ọsọ dị ka obere ọrụ",
       "edit": "Dezie slash iwu",
       "saveFailed": "Enweghị ike ịchekwa iwu",

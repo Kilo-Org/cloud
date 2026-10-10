@@ -1,14 +1,29 @@
-/* eslint-disable max-lines -- every family, the in-place action buttons, and the newest-result footer compose inside one stringified 'widget' layout, which cannot be split across modules */
-import { Button, type ButtonProps, HStack, Image, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+/* eslint-disable max-lines -- the 'widget' layout function is stringified whole, so its helpers cannot be extracted to module scope; every family stays in one function */
+import {
+  AccessoryWidgetBackground,
+  Button,
+  type ButtonProps,
+  Circle,
+  HStack,
+  Image,
+  type ImageProps,
+  Rectangle,
+  RoundedRectangle,
+  Spacer,
+  Text,
+  VStack,
+  ZStack,
+} from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
+  aspectRatio,
+  background,
   buttonStyle,
   containerBackground,
-  controlSize,
   cornerRadius,
-  type dynamicTypeSize,
   environment,
+  fixedSize,
   font,
   foregroundStyle,
   frame,
@@ -16,670 +31,1183 @@ import {
   lineLimit,
   monospacedDigit,
   multilineTextAlignment,
+  opacity,
+  padding,
   resizable,
+  shapes,
   widgetURL,
 } from '@expo/ui/swift-ui/modifiers';
 import { createWidget, type WidgetEnvironment } from 'expo-widgets';
-import { PlatformColor } from 'react-native';
+
+import { i18n } from '@/i18n';
 
 import { withGlanceableCopy } from './layout-copy';
-import { type GlanceableWidgetAction, type GlanceableWidgetProps } from './view-props';
+import {
+  buildGalleryPreviewProps,
+  type GlanceableWidgetAction,
+  type GlanceableWidgetProps,
+} from './view-props';
 import { withWidgetLogo } from './widget-logo';
 
-/* eslint-disable new-cap -- PlatformColor is a React Native factory function, not a constructor */
-
-// The layout function below is marked with the `'widget'` directive, so Babel
-// stringifies it and the widget extension re-evaluates the source. Everything
-// it references must be a widget global (`Text`, `VStack`, the modifiers,
-// `PlatformColor`) or a built-in. Do not call `@/` helpers or i18n from here —
-// translated copy arrives through `props`, and the gallery placeholder (which
-// has no props) falls back to the baked copy below.
-//
-// Two values are resolved after stringification, both from literals below:
-// `withWidgetLogo` swaps `__KILO_WIDGET_LOGO_URI__` for the app-group path of
-// the mark, and `withGlanceableCopy` swaps `__KILO_GLANCEABLE_COPY__` for the
-// translated copy.
-
-// The timeline props: the builder's props plus the press marker a widget
-// button's App Intent patches into the pressed entry (see GlanceableWidgetProps
-// in view-props).
-type WidgetProps = GlanceableWidgetProps;
-
-/**
- * The press patch. `@expo/ui` types `onPress` as `() => void`, but in the
- * widget process the bundle calls the handler and merges the returned patch
- * into the pressed entry's props (its `findAndCallOnPress`), so the return
- * value is load-bearing. The app maps the marker back to the action (see
- * `pendingActionOf` in widget-actions).
- */
+export type WidgetProps = GlanceableWidgetProps;
 type WidgetPressPatch = {
   pendingAction: GlanceableWidgetAction;
+  pendingApprovalKey?: string;
+  /**
+   * When the press happened (ms since epoch). The extension carries the marker
+   * across timeline rebuilds only while it is younger than the TTL, so the
+   * press records its own time: a marker that outlives a rebuild keeps the time
+   * it was pressed with, and a fresh press always resets it.
+   */
+  pendingActionAt: number;
 };
-
-/**
- * The shared Button with the widget press's real `onPress` contract: the
- * returned patch is load-bearing there. A local narrow cast, not a widening of
- * the shared UI types.
- */
 type WidgetButtonProps = Omit<ButtonProps, 'onPress'> & {
   onPress?: () => WidgetPressPatch;
+  /** expo-widgets runs the press intent in the foreground app when set. */
+  openAppWhenRun?: boolean;
 };
+type SystemSymbol = NonNullable<ImageProps['systemName']>;
+type Weight = 'regular' | 'semibold' | 'bold';
 
-export type { WidgetProps };
-
-// Babel replaces the annotated arrow with its source string, so `layout` is a
-// string at runtime while TypeScript still checks it as a component.
-const layout: (props: WidgetProps, widgetEnvironment: WidgetEnvironment) => React.JSX.Element = (
-  props,
-  widgetEnvironment
-) => {
+/**
+ * The approved Home widget design (direction A). Every number below is a point
+ * position or size from the design generators, measured from the widget's
+ * top-leading corner on the 170pt-tall small and medium and the 382pt-tall large card; gaps
+ * between text lines are derived from the design baselines with SF Pro's line
+ * metrics so the rendered baselines land where the design put them.
+ */
+// Everything this stringified function uses must be a widget global or a builtin.
+const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React.JSX.Element => {
   'widget';
 
-  // The literal, not the imported constant: the widget transform stringifies
-  // this function's source, so an imported binding would be an undefined
-  // global in the widget process. `withGlanceableCopy` replaces the token,
-  // quotes included, with the translated copy as a JSON source literal. Until
-  // then the value is the bare token, which is not JSON: falling back to an
-  // empty copy renders the fallback literals below instead of throwing a
-  // blank surface.
-  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
+  // The literal is replaced after Babel stringifies this function.
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- replaced source literal
   const copySource: string = '__KILO_GLANCEABLE_COPY__';
   const COPY = JSON.parse(copySource.startsWith('{') ? copySource : '{}') as Record<string, string>;
-  // The tag SwiftUI formats the relative wait with; English when the bake is
-  // somehow missing it, which is what the widget process would have used anyway.
-  const locale = COPY.locale ?? 'en';
-
-  // The counts are stringified here, not formatted: a pushed content state
-  // carries raw numbers and this process has no formatter. `COPY.digits` is the
-  // language's own ten, empty when it writes them the way `String` already
-  // does, so an Arabic count reads "١" beside the "٢٦ د" SwiftUI formats.
   const digits = COPY.digits ?? '';
-  const count = (value: number) =>
-    digits.length === 10
+  const groupSeparator = COPY.group ?? ',';
+  const count = (value: number) => {
+    // Grouped by hand: the widget process has no number formatter, and a
+    // global-regex replace is one of the forms that failed there.
+    const plain = String(value);
+    let grouped = '';
+    for (let index = 0; index < plain.length; index += 1) {
+      if (index > 0 && (plain.length - index) % 3 === 0) {
+        grouped += groupSeparator;
+      }
+      grouped += plain[index] ?? '';
+    }
+    return digits.length === 10
       ? // eslint-disable-next-line unicorn/prefer-spread -- `replaceAll` and a spread both failed in the widget process; this form is the one verified on device
-        String(value)
+        grouped
           .split('')
-          .map(character => digits[Number(character)] ?? character)
+          .map(character => (/[0-9]/.test(character) ? digits[Number(character)] : character))
           .join('')
-      : String(value);
-
-  const family = widgetEnvironment.widgetFamily;
-  // Guarded, not a bare `?? []`: a widget extension can evaluate this layout
-  // against props a *different* app version wrote to the app group (a placed
-  // widget keeps its stored timeline across an app update), and a non-array or
-  // a null row would throw out of `counts.map` — which expo-widgets renders as
-  // a red error box in every family, the gallery placeholder included.
-  const counts = (Array.isArray(props.countLines) ? props.countLines : []).filter(
-    // eslint-disable-next-line anti-slop/no-runtime-typeof, typescript-eslint/no-unnecessary-condition -- the widget process reads raw app-group JSON, not the typed props vitest renders
-    line => line !== null && typeof line === 'object'
-  );
-  const primaryLabel = props.primaryLabel ?? null;
-  const primaryKind = props.primaryKind ?? null;
-  // Only the medium row and the tall large card are wide enough for a time
-  // beside the label; in the small square the pair wraps and truncates both
-  // halves, so it draws neither (the time is the first thing a narrow cell
-  // drops).
-  const large = family === 'systemLarge';
-  const square = family === 'systemSmall';
-  const wide = family === 'systemMedium';
-  const timedRows = wide || large;
-  const needsInputSince = props.needsInputSince ?? null;
-  const scheduledAt = props.scheduledAt ?? null;
-  // Labels draw at their full text size and never scale: in the widget
-  // renderer a label with `minimumScaleFactor` always resolved at its minimum
-  // scale, room or not, which drew the labels far smaller than their counts.
-  // The square and the Lock Screen rectangle are the cells a wide row can
-  // overflow, so there the mark gives its width up before a label truncates
-  // (the count never does). The width measure available in this process is
-  // the row's character count, count digits included: 12 keeps "2 Needs
-  // input" beside the mark, and "128 Needs input" or German's "Eingabe
-  // erforderlich" take its place.
-  const widestRow = Math.max(
-    0,
-    ...counts.map(
-      line =>
-        // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
-        (typeof line.label === 'string' ? line.label.length : 0) + String(line.count).length
-    )
-  );
-  const crowdedRows = widestRow > 12;
-  // The rows carry zeros too, so their number never says whether work exists —
-  // the ranked primary does, because it is null only when every count is zero.
-  const hasCounts = primaryKind !== null;
-  const primaryCount = props.primaryCount ?? 0;
-  // A real frame always carries its status line. An entry with no status line
-  // and no counts is the native fallback: no app has written a timeline yet
-  // (never signed in) or the gallery placeholder. The Android widget shows
-  // the same sign-in copy for a widget with no snapshot.
-  const statusLine = props.statusLine ?? (hasCounts ? null : COPY.signed_out);
-
-  // Circle-based glyphs whose shapes differ as well as their colors, because
-  // the Lock Screen families render in an accented mode that flattens tint.
-  const GLYPH = {
-    needsInput: { icon: 'exclamationmark.circle.fill', color: PlatformColor('systemOrange') },
-    running: { icon: 'circle.fill', color: PlatformColor('systemGreen') },
-    scheduled: { icon: 'clock', color: PlatformColor('label') },
-    idle: { icon: 'circle', color: PlatformColor('label') },
+      : grouped;
+  };
+  const labels = {
+    needsInput: COPY.needsInput ?? 'Needs input',
+    running: COPY.running ?? 'Working',
+    scheduled: COPY.scheduled ?? 'Scheduled',
+    idle: COPY.idle ?? 'Idle',
+  };
+  // Lock Screen glyphs: the accessories are monochrome, so the symbol tells the states apart.
+  const glyphs = {
+    needsInput: 'exclamationmark.circle',
+    running: 'circle.fill',
+    scheduled: 'clock',
+    idle: 'circle',
   } as const;
-
-  // Total, never a bare index: a stale timeline entry or an older app version
-  // can name a kind this build does not draw, and `GLYPH[unknown].icon` would
-  // throw during stringified evaluation — the red error box the widget shows in
-  // every family when the layout raises. An unknown kind falls back to the
-  // neutral idle mark instead of blanking the surface.
-  const glyphFor = (kind: string | null | undefined) => {
-    if (kind !== null && kind !== undefined && Object.hasOwn(GLYPH, kind)) {
-      return GLYPH[kind as keyof typeof GLYPH];
-    }
-    return GLYPH.idle;
-  };
-
-  const primaryForeground = foregroundStyle(PlatformColor('label'));
-  // `secondaryLabel` in both appearances: `tertiaryLabel` on the light widget
-  // background left the ranked-down rows too faint to read.
-  const mutedForeground = foregroundStyle(PlatformColor('secondaryLabel'));
-  const a11y = [
-    // The widget process takes its locale from the device language, so without
-    // this the relative wait would be formatted in a different language than
-    // the labels the app translated into the props.
-    environment({ key: 'locale', value: locale }),
-    accessibilityElement('combine'),
-    accessibilityLabel(props.accessibilityLabel ?? ''),
-  ];
-
-  // The literal, not the imported constant: the widget transform stringifies
-  // this function's source, so an imported binding would be an undefined global
-  // in the widget process. It must stay equal to `WIDGET_LOGO_PLACEHOLDER`, which
-  // `withWidgetLogo` replaces with the app-group path.
-  // The annotation widens the literal: the token is replaced after this file is
-  // stringified, so the empty-path branch below is reachable at runtime.
-  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- see above
-  const logoUri: string = '__KILO_WIDGET_LOGO_URI__';
-  const logo = (size: number) =>
-    logoUri.length === 0 ? null : (
-      <Image
-        uiImage={logoUri}
-        modifiers={[resizable(), frame({ width: size, height: size }), cornerRadius(size * 0.24)]}
-      />
-    );
-
-  // The row text size per surface. Every row shares one type size and one
-  // glyph size so the counts and the labels line up on a grid; only the label
-  // colour ranks them. The tall large card scales the rows up with its height
-  // so it does not read empty, the medium row takes `footnote`, and the square
-  // steps down to `caption2` so "Needs input" fits beside the mark.
-  type RowStyle = 'caption' | 'caption2' | 'footnote' | 'title3';
-  let rowStyle: RowStyle = 'footnote';
-  let glyphSize = 13;
-  let rowSpacing = 7;
-  if (large) {
-    rowStyle = 'title3';
-    glyphSize = 17;
-    rowSpacing = 9;
-  } else if (square) {
-    rowStyle = 'caption2';
-  }
-  // A time that cannot fit beside its label is dropped whole, never
-  // truncated. The medium row holds every shipped label plus its time at
-  // `footnote`; the large card's `title3` holds a time beside labels up to 15
-  // characters (Spanish "En espera de respuesta" drops it).
-  const timeLabelBudget = large ? 15 : 24;
-  // `elapsed` is the repo-local @expo/ui style (patches/@expo+ui): the wait in
-  // its one largest unit, seconds only under a minute ("31 minutes", "20
-  // seconds"); before iOS 18 it is the relative style.
-  const waitStyle = 'elapsed';
-  // The rows a state actually has lead: a zero row is kept (the grid never
-  // reflows as work appears) but sinks below every non-zero one, and draws
-  // fully muted — glyph, number and label in the secondary colour, the number
-  // without its emphasis. A stable sort keeps the kind order inside each group.
-  const ledgerRows = [
-    ...counts.filter(line => line.count > 0),
-    ...counts.filter(line => line.count === 0),
-  ];
-  const mutedColor = PlatformColor('secondaryLabel');
-  // `compact` is the Lock Screen rectangle: four `caption` rows beside the mark.
-  const countRow = (
-    line: { label: string; kind: string; count: number },
-    isPrimary: boolean,
-    compact: boolean
-  ) => {
-    const glyph = glyphFor(line.kind);
-    const textStyle: RowStyle = compact ? 'caption' : rowStyle;
-    const zero = line.count === 0;
+  type Kind = keyof typeof labels;
+  // The widget process reads raw app-group JSON, so these parse each field at that boundary.
+  const kindOf = (value: unknown): Kind | null =>
     // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
-    const labelLength = typeof line.label === 'string' ? line.label.length : 0;
-    const timed = !compact && timedRows && labelLength <= timeLabelBudget;
-    // One time at most per row: a needs-input wait or a scheduled wake, never
-    // both. The wait is a duration ("31 minutes") and the wake a clock time
-    // ("9:00 AM"): a wait is an interval the user is enduring, a wake is the
-    // moment the user asked for. The medium and large cards draw both in the
-    // row's trailing column, so the two times line up.
-    let timeAt: string | null = null;
-    let timeStyle: 'elapsed' | 'time' = waitStyle;
-    if (timed && line.kind === 'needsInput') {
-      timeAt = needsInputSince;
-    } else if (timed && line.kind === 'scheduled') {
-      timeAt = scheduledAt;
-      timeStyle = 'time';
-    }
-    return (
-      <HStack
-        key={line.label}
-        alignment="center"
-        spacing={compact ? 4 : rowSpacing}
-        // A row that draws a trailing time fills the card's width, so its time
-        // sits in the same trailing column as every other row's.
-        modifiers={timedRows && !compact ? [frame({ maxWidth: 10_000, alignment: 'leading' })] : []}
-      >
-        <Image
-          systemName={glyph.icon}
-          color={zero ? mutedColor : glyph.color}
-          size={compact ? 11 : glyphSize}
-        />
-        <Text
-          modifiers={[
-            font({ textStyle, weight: zero ? 'regular' : 'semibold' }),
-            monospacedDigit(),
-            // The number is the whole point of the row, so it takes its space
-            // first: a long label truncates before the count does.
-            layoutPriority(1),
-            zero ? mutedForeground : primaryForeground,
-          ]}
-        >
-          {count(line.count)}
-        </Text>
-        <Text
-          modifiers={[
-            font({ textStyle }),
-            // One line at the row's own size. Do not add `minimumScaleFactor`:
-            // in the widget renderer it always drew the label at its minimum.
-            lineLimit(1),
-            // A live time reserves more width than it draws, so without the
-            // priority it took the label's room ("Eingabe erforde…" beside
-            // "31 Minuten" with space to spare).
-            layoutPriority(1),
-            isPrimary && !zero ? primaryForeground : mutedForeground,
-          ]}
-        >
-          {line.label}
-        </Text>
-        {timedRows && !compact ? <Spacer /> : null}
-        {timeAt === null ? null : (
-          <Text
-            date={new Date(timeAt)}
-            dateStyle={timeStyle}
-            // A live time reserves more width than it draws and draws at the
-            // leading edge of that box: trailing alignment puts the wait flush
-            // with the wake.
-            modifiers={[
-              font({ textStyle }),
-              monospacedDigit(),
-              lineLimit(1),
-              multilineTextAlignment('trailing'),
-              mutedForeground,
-            ]}
-          />
-        )}
-      </HStack>
-    );
+    typeof value === 'string' && Object.hasOwn(labels, value) ? (value as Kind) : null;
+  // eslint-disable-next-line anti-slop/no-runtime-typeof, unicorn/consistent-function-scoping -- the widget process reads raw app-group JSON, and the stringified 'widget' layout cannot hoist helpers to module scope
+  const safeText = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+  const filledText = (value: unknown): string | null => {
+    const text = safeText(value);
+    return text === null || text.length === 0 ? null : text;
   };
-
-  // accessoryCircular has room for one number, and accessoryInline for one
-  // glyph plus one line of text, so neither carries the mark.
-  if (family === 'accessoryCircular') {
-    return (
-      <VStack alignment="center" spacing={0} modifiers={[widgetURL('kiloapp:///cloud/sessions')]}>
-        {primaryKind === null ? null : (
-          <Image
-            systemName={glyphFor(primaryKind).icon}
-            color={glyphFor(primaryKind).color}
-            size={17}
-          />
-        )}
-        <Text
-          modifiers={[
-            font({ textStyle: 'title2', weight: 'bold' }),
-            monospacedDigit(),
-            primaryForeground,
-            ...a11y,
-          ]}
-        >
-          {hasCounts ? count(primaryCount) : '—'}
-        </Text>
-      </VStack>
-    );
-  }
-
-  if (family === 'accessoryInline') {
-    const label = hasCounts
-      ? `${count(primaryCount)}${primaryLabel !== null ? ` ${primaryLabel}` : ''}`
-      : (statusLine ?? '');
-    return (
-      <HStack
-        alignment="center"
-        spacing={4}
-        modifiers={[widgetURL('kiloapp:///cloud/sessions'), ...a11y]}
-      >
-        {primaryKind === null ? null : <Image systemName={glyphFor(primaryKind).icon} size={12} />}
-        <Text>{label}</Text>
-      </HStack>
-    );
-  }
-
-  // accessoryRectangular is the Lock Screen row: the mark plus the two
-  // top-ranked lines is all that fits.
-  if (family === 'accessoryRectangular') {
-    return (
-      <HStack
-        alignment="center"
-        spacing={6}
-        modifiers={[widgetURL('kiloapp:///cloud/sessions'), ...a11y]}
-      >
-        {crowdedRows ? null : logo(18)}
-        {hasCounts ? (
-          <VStack alignment="leading" spacing={1}>
-            {ledgerRows.map(line => countRow(line, line.kind === primaryKind, true))}
-          </VStack>
-        ) : (
-          <Text modifiers={[font({ textStyle: 'subheadline' })]}>{statusLine}</Text>
-        )}
-        <Spacer />
-      </HStack>
-    );
-  }
-
-  const systemRows = hasCounts ? (
-    // The Home Screen families keep the four rows inside one fixed card height,
-    // so the medium row and the small square run them tighter than the tall
-    // large card, whose extra height affords the wider gap.
-    <VStack alignment="leading" spacing={large ? 10 : 2}>
-      {ledgerRows.map(line => countRow(line, line.kind === primaryKind, false))}
-    </VStack>
-  ) : (
-    // Only the medium row draws a status this way; the square and the large
-    // card centre theirs. `subheadline` so the line is not lost in the card.
-    <Text modifiers={[font({ textStyle: 'subheadline' }), mutedForeground]}>{statusLine}</Text>
-  );
-
-  // The newest-session slot and the action row are Home Screen families only:
-  // the Lock Screen families keep their generic layout, which is what the
-  // snapshot privacy contract protects.
-  //
-  // The height is declared inside this function, not at module scope: the
-  // widget transform stringifies this function's source alone and the widget
-  // process evaluates it against widget globals, so a module-scope binding
-  // would be a `ReferenceError` at render.
-  const NEWEST_SLOT_HEIGHT = 16;
-  const newestLine = props.newestTitle ?? null;
-  const actions = props.actions ?? { approve: false, newAgent: false };
-  // The slot is laid out whether or not it carries a line, so a title arriving
-  // after a process restart, or an approve's progress line replacing it, moves
-  // neither the count rows above nor the actions below.
-  const newestSlot = (
-    <VStack alignment="leading" spacing={0} modifiers={[frame({ height: NEWEST_SLOT_HEIGHT })]}>
-      {newestLine === null ? null : (
-        <Text
-          modifiers={[
-            font({ textStyle: square ? 'caption2' : 'caption' }),
-            lineLimit(1),
-            mutedForeground,
-          ]}
-        >
-          {newestLine}
-        </Text>
-      )}
-    </VStack>
-  );
-
-  // The patch a press returns marks the action in the pressed entry's props;
-  // the app sweeps it up and runs it. `onPress` is the shared prop that
-  // @expo/ui's widget Button turns into the native `onButtonPress` event the
-  // widget bundle dispatches — the body keeps its own `widgetURL` deep link for
-  // taps beside the buttons. `WidgetButton` is the narrow local view of the
-  // shared Button whose `onPress` carries the patch the bundle reads; the
-  // shared `onPress: () => void` type would forbid the value-returning handler
-  // the widget press depends on.
-  //
-  // Approve answers in place, so its intent stays in the background. New agent
-  // needs the composer: `openAppWhenRun` selects the foregrounding intent in
-  // the patched expo-widgets button view, so the tap brings Kilo up and the
-  // app's press listener opens the new-session screen. Without it the intent
-  // only marked the timeline, and nothing happened until the next launch. It
-  // is a prop of that view, not of `@expo/ui`'s `Button`, so it travels as the
-  // plain extra prop the widget process serialises with the rest.
-  const WidgetButton = Button as (props: WidgetButtonProps) => React.JSX.Element;
-  const openButtonProps = { openAppWhenRun: true };
-  // `regular` is the tall card's centred empty composition, whose mark and
-  // status line scale up with the card; every count-bearing family takes the
-  // small control.
-  const actionButtons = (size: 'small' | 'regular') => (
-    <HStack alignment="center" spacing={8}>
-      {actions.approve ? (
-        <WidgetButton
-          label={COPY.approve}
-          modifiers={[
-            buttonStyle('borderedProminent'),
-            controlSize(size),
-            font({ textStyle: size === 'small' ? 'caption' : 'body' }),
-          ]}
-          onPress={() => ({ pendingAction: 'approve' })}
-        />
-      ) : null}
-      {actions.newAgent ? (
-        <WidgetButton
-          {...openButtonProps}
-          label={COPY.newAgent}
-          modifiers={[
-            buttonStyle('bordered'),
-            controlSize(size),
-            font({ textStyle: size === 'small' ? 'caption' : 'body' }),
-          ]}
-          onPress={() => ({ pendingAction: 'new-agent' })}
-        />
-      ) : null}
-    </HStack>
-  );
-
-  // Home Screen text cannot grow without bound: the four count rows, the
-  // reserved slot and the action row share one fixed card height, so the small
-  // square and the medium row cap growth at the default body size and the tall
-  // large card caps at an accessibility size. The factory is read off the
-  // widget global, not the imported binding: the stringified layout is
-  // evaluated in the widget process against widget globals, and the vitest
-  // swift-ui mock does not list `dynamicTypeSize`, so the import is only a type
-  // and a missing factory (an older `@expo/ui`, or the test harness) simply
-  // leaves the text uncapped.
-  const typeCeiling = family === 'systemLarge' ? 'accessibility2' : 'large';
-  const widgetGlobals = globalThis as typeof globalThis & {
-    dynamicTypeSize?: typeof dynamicTypeSize;
-  };
-  const typeCap = widgetGlobals.dynamicTypeSize;
-  const typeModifiers = typeCap === undefined ? [] : [typeCap({ max: typeCeiling })];
-  const systemModifiers = [
-    widgetURL('kiloapp:///cloud/sessions'),
-    containerBackground(PlatformColor('systemBackground'), 'widget'),
-    ...typeModifiers,
-    ...a11y,
-  ];
-
-  // The large card's lower third. A stale frame keeps the counts but drops the
-  // claim that they are current, so the footer prefers the delayed copy where
-  // the relative time would otherwise assert a freshness the snapshot no
-  // longer has.
-  const newestResultKind = props.newestResultKind ?? null;
-  const newestResultLabel = props.newestResultLabel ?? null;
-  const newestResultAt = props.newestResultAt ?? null;
-  const newestResultBody = () => {
-    if (statusLine !== null) {
-      return (
-        <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>{statusLine}</Text>
-      );
-    }
-    if (newestResultKind === null || newestResultLabel === null || newestResultAt === null) {
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
+  const safeCount = (value: unknown): number =>
+    // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
+  const validDate = (value: unknown): Date | null => {
+    // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
+    if (typeof value !== 'string') {
       return null;
     }
-    return (
-      <HStack alignment="center" spacing={6}>
+    const date = new Date(value);
+    return Number.isFinite(date.getTime()) ? date : null;
+  };
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
+  const records = (value: unknown): Record<string, unknown>[] =>
+    (Array.isArray(value) ? (value as unknown[]) : []).filter(
+      // eslint-disable-next-line anti-slop/no-runtime-typeof -- the widget process reads raw app-group JSON, not the typed props vitest renders
+      (row): row is Record<string, unknown> => row !== null && typeof row === 'object'
+    );
+  const localeModifier = environment({ key: 'locale', value: COPY.locale ?? 'en' });
+  const bodyURL = widgetURL('kiloapp:///cloud/sessions');
+  const genericA11y = [
+    localeModifier,
+    accessibilityElement('combine'),
+    accessibilityLabel(safeText(props.accessibilityLabel) ?? ''),
+  ];
+  const family = widgetEnvironment.widgetFamily;
+  // SwiftUI's default line box for SF Pro: ascent 0.952em over descent 0.241em.
+  // eslint-disable-next-line unicorn/consistent-function-scoping, max-params -- the stringified 'widget' layout cannot hoist helpers to module scope; the gap is between two baselines of two sizes
+  const gap = (baseline: number, size: number, nextBaseline: number, nextSize: number) =>
+    nextBaseline - 0.952 * nextSize - (baseline + 0.241 * size);
+
+  // A placed widget can carry props from an older app. This compatibility path
+  // only displays its existing values; freshness policy belongs to the shared builder.
+  const rawHome = props.home;
+  const home =
+    // eslint-disable-next-line anti-slop/no-runtime-typeof, typescript-eslint/no-unnecessary-condition -- the widget process reads raw app-group JSON, not the typed props vitest renders
+    rawHome !== null && typeof rawHome === 'object' ? rawHome : undefined;
+  const homeStatus = safeText(home?.status);
+  // The circular accessory has no room for a count line when nothing is counting.
+  // A lone dash is near-invisible over a light wallpaper and says nothing, so the
+  // no-count state draws a state glyph instead — filled, so it keeps contrast.
+  const statusGlyphs = {
+    waiting: 'arrow.triangle.2.circlepath',
+    empty: 'checkmark.circle.fill',
+    privacy: 'lock.fill',
+    unavailable: 'lock.fill',
+    signed_out: 'person.fill',
+  } as const;
+  type HomeStatusGlyph = keyof typeof statusGlyphs;
+  const statusGlyph =
+    homeStatus !== null && Object.hasOwn(statusGlyphs, homeStatus)
+      ? statusGlyphs[homeStatus as HomeStatusGlyph]
+      : 'circle.fill';
+
+  // ── Lock Screen accessories: monochrome (white and 62% white), no buttons ──
+  // Accessories deliberately ignore Home titles, feedback and retained work.
+  const genericKind = kindOf(props.primaryKind);
+  const genericCount = safeCount(props.primaryCount);
+  const genericStatus = safeText(props.statusLine) ?? COPY.signed_out ?? 'Sign in to see agents';
+  const genericLabel =
+    safeText(props.primaryLabel) ?? (genericKind === null ? '' : labels[genericKind]);
+  const white = foregroundStyle('#FFFFFF');
+  // The literals are replaced with app-group paths after Babel stringifies this
+  // function (`withWidgetLogo`): the full Kilo mark, and the glyph-only template
+  // the monochrome renderings draw, because the Lock Screen and the Tinted and
+  // Clear Home Screens keep only alpha and would flatten the opaque tile into a
+  // blob.
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- replaced source literal
+  const markUri: string = '__KILO_WIDGET_LOGO_URI__';
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- replaced source literal
+  const glyphUri: string = '__KILO_WIDGET_GLYPH_URI__';
+  const monochrome =
+    widgetEnvironment.widgetRenderingMode === 'accented' ||
+    widgetEnvironment.widgetRenderingMode === 'vibrant';
+  // The slot keeps its size while the image is missing (the copy has not landed
+  // yet), so "Kilo" beside it never moves. The glyphs sit inside the tile at 65%,
+  // so the template draws a little larger than that to read at the same weight.
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
+  const logo = (size: number, template: boolean) => (
+    <ZStack modifiers={[frame({ width: size, height: size })]}>
+      {template ? (
         <Image
-          systemName={glyphFor(newestResultKind).icon}
-          color={glyphFor(newestResultKind).color}
-          size={13}
+          uiImage={glyphUri}
+          modifiers={[resizable(), frame({ width: size * 0.78, height: size * 0.78 })]}
+        />
+      ) : (
+        <Image
+          uiImage={markUri}
+          modifiers={[resizable(), frame({ width: size, height: size }), cornerRadius(size * 0.22)]}
+        />
+      )}
+    </ZStack>
+  );
+  if (family === 'accessoryCircular') {
+    const value = count(genericCount);
+    let countSize = 30;
+    if (value.length > 4) {
+      countSize = 20;
+    } else if (value.length > 3) {
+      countSize = 22;
+    } else if (value.length > 2) {
+      countSize = 26;
+    }
+    return (
+      <ZStack modifiers={[bodyURL, ...genericA11y]}>
+        <AccessoryWidgetBackground />
+        <VStack alignment="center" spacing={2}>
+          {genericKind === null ? (
+            <Image systemName={statusGlyph} size={24} color="#FFFFFF" />
+          ) : (
+            <Image systemName={glyphs[genericKind]} size={13} color="#FFFFFF" />
+          )}
+          {genericKind === null ? null : (
+            <Text
+              modifiers={[
+                font({ size: countSize, weight: 'bold' }),
+                monospacedDigit(),
+                lineLimit(1),
+                white,
+              ]}
+            >
+              {value}
+            </Text>
+          )}
+        </VStack>
+      </ZStack>
+    );
+  }
+  if (family === 'accessoryInline') {
+    return (
+      <HStack spacing={4} modifiers={[bodyURL, ...genericA11y]}>
+        {genericKind === null ? null : <Image systemName={glyphs[genericKind]} size={12} />}
+        <Text modifiers={[lineLimit(1)]}>
+          {genericKind === null ? genericStatus : `${count(genericCount)} ${genericLabel}`}
+        </Text>
+      </HStack>
+    );
+  }
+  if (family === 'accessoryRectangular') {
+    const others = records(props.countLines)
+      .filter(row => {
+        const kind = kindOf(row.kind);
+        return kind !== null && kind !== genericKind && safeCount(row.count) > 0;
+      })
+      .slice(0, 3)
+      .map(
+        row =>
+          `${count(safeCount(row.count))} ${safeText(row.label) ?? labels[kindOf(row.kind) ?? 'idle']}`
+      );
+    // 160x72: the Kilo row (12pt, baseline 16.5), the primary count (15pt bold,
+    // baseline 40) and the other counts (12pt at 62%, baseline 62), 6pt in.
+    return (
+      <VStack
+        alignment="leading"
+        spacing={0}
+        modifiers={[
+          bodyURL,
+          ...genericA11y,
+          padding({ top: 16.5 - 0.952 * 12 - 1.25, leading: 6, trailing: 6 }),
+          frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
+        ]}
+      >
+        <HStack alignment="center" spacing={5}>
+          {logo(14, true)}
+          <Text modifiers={[font({ size: 12, weight: 'semibold' }), lineLimit(1), white]}>
+            Kilo
+          </Text>
+        </HStack>
+        <HStack
+          alignment="center"
+          spacing={4.5}
+          modifiers={[padding({ top: gap(16.5, 12, 40, 15) })]}
+        >
+          <Image
+            systemName={genericKind === null ? statusGlyph : glyphs[genericKind]}
+            size={11}
+            color="#FFFFFF"
+          />
+          <Text
+            modifiers={[
+              font({ size: 15, weight: 'bold' }),
+              monospacedDigit(),
+              lineLimit(genericKind === null ? 2 : 1),
+              white,
+            ]}
+          >
+            {genericKind === null ? genericStatus : `${count(genericCount)} ${genericLabel}`}
+          </Text>
+        </HStack>
+        {others.length === 0 ? null : (
+          <Text
+            modifiers={[
+              font({ size: 12 }),
+              monospacedDigit(),
+              lineLimit(1),
+              white,
+              opacity(0.62),
+              padding({ top: gap(40, 15, 62, 12) }),
+            ]}
+          >
+            {others.join(' · ')}
+          </Text>
+        )}
+      </VStack>
+    );
+  }
+
+  // ── Home Screen: systemSmall, systemMedium, systemLarge ──
+  const palette =
+    widgetEnvironment.colorScheme === 'dark'
+      ? {
+          bg: '#17171A',
+          fg: '#F2F0EB',
+          muted: '#8A8680',
+          warn: '#F2B05F',
+          good: '#5FCB8E',
+          info: '#60A5FA',
+          idle: '#56544F',
+          primary: '#E8F27A',
+          primaryFg: '#1A1A10',
+          secondary: '#26262B',
+          divider: '#2A2A30',
+        }
+      : {
+          bg: '#FBFAF5',
+          fg: '#14130F',
+          muted: '#6F6A61',
+          warn: '#956011',
+          good: '#24784A',
+          info: '#2260EB',
+          idle: '#A9A39A',
+          primary: '#4F5A10',
+          primaryFg: '#FFFFFF',
+          secondary: '#F0EEE6',
+          divider: '#E6E3DA',
+        };
+  const dotColors = {
+    needsInput: palette.warn,
+    running: palette.good,
+    scheduled: palette.info,
+    idle: palette.idle,
+  };
+
+  const primaryKind = home === undefined ? genericKind : kindOf(home.primaryKind);
+  const primaryCount = home === undefined ? genericCount : safeCount(home.primaryCount);
+  const status = home?.status ?? (genericKind === null ? 'signed_out' : 'content');
+  const content = status === 'content' && primaryKind !== null;
+  const stale = home?.stale === true;
+  const primaryLabel = primaryKind === null ? '' : labels[primaryKind];
+  const scheduledAt = validDate(home?.scheduledAt ?? props.scheduledAt);
+  const checkedAt = validDate(home?.checkedAt);
+  const awaitingUpdate = home?.awaitingUpdate === true;
+  const feedback = content ? safeText(props.actionFeedback) : null;
+  const failed = feedback === 'couldNotApprove';
+  // An untitled agent is still named, so its row never reads as blank.
+  const rawTitle = home === undefined ? null : safeText(home.primaryTitle);
+  const title = rawTitle === null ? null : (filledText(rawTitle) ?? COPY.agent ?? 'Agent');
+  const agentTitle = (value: unknown) => filledText(value) ?? COPY.agent ?? 'Agent';
+  const secondaryRows = (
+    home === undefined ? records(props.countLines) : records(home.secondaryCounts)
+  )
+    .filter(row => {
+      const kind = kindOf(row.kind);
+      return content && kind !== null && kind !== primaryKind && safeCount(row.count) > 0;
+    })
+    .slice(0, 3)
+    .map(row => ({ kind: kindOf(row.kind) ?? 'idle', count: safeCount(row.count) }));
+  const waitingAgents = content ? records(home?.waitingAgents).slice(0, 3) : [];
+  const scheduledAgents = content ? records(home?.scheduledAgents).slice(0, 3) : [];
+  let detailRows: Record<string, unknown>[] = [];
+  if (primaryKind === 'needsInput') {
+    detailRows = waitingAgents;
+  } else if (primaryKind === 'scheduled') {
+    detailRows = scheduledAgents;
+  }
+  const canCreate =
+    home === undefined
+      ? props.actions?.newAgent === true
+      : // eslint-disable-next-line typescript-eslint/no-unnecessary-boolean-literal-compare -- the widget process reads raw app-group JSON, not the typed props vitest renders
+        (status === 'content' || status === 'empty') && home.canCreate === true;
+  const approvalKey = home === undefined ? null : safeText(home.approvalKey);
+  const canApprove = content && home?.canApprove === true && approvalKey !== null;
+  const large = family === 'systemLarge';
+  const wide = family === 'systemMedium';
+  const WidgetButton = Button as (props: WidgetButtonProps) => React.JSX.Element;
+  const today = widgetEnvironment.date instanceof Date ? widgetEnvironment.date : new Date();
+  const intlLocale = (COPY.locale ?? 'en').split('_').join('-');
+
+  // System content margins vary by device and OS, so the card pads the
+  // difference to an equal 16pt band on all four sides; no ink enters it.
+  const margins = widgetEnvironment.widgetContentMargins;
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
+  const inset = (design: number, system: unknown) =>
+    // eslint-disable-next-line anti-slop/no-runtime-typeof -- the environment is read from the native host as raw JSON
+    design - (typeof system === 'number' && Number.isFinite(system) ? system : 0);
+  const rootModifiers = [
+    bodyURL,
+    containerBackground(palette.bg, 'widget'),
+    localeModifier,
+    frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
+    padding({
+      top: inset(16, margins?.top),
+      bottom: inset(16, margins?.bottom),
+      leading: inset(16, margins?.leading),
+      trailing: inset(16, margins?.trailing),
+    }),
+  ];
+
+  // ── shared pieces ──
+  // eslint-disable-next-line max-params -- a text run is its copy, size, colour and weight, named as the design names them
+  const text = (value: string, size: number, color: string, weight: Weight = 'regular') => (
+    <Text modifiers={[font({ size, weight }), lineLimit(1), foregroundStyle(color)]}>{value}</Text>
+  );
+  // A child moved down (or, for a negative offset, up into the line box above
+  // it) so its baseline sits where the design puts it.
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
+  const shifted = (offset: number, child: React.JSX.Element | null, leading = 0) =>
+    child === null ? null : (
+      <VStack alignment="leading" spacing={0} modifiers={[padding({ top: offset, leading })]}>
+        {child}
+      </VStack>
+    );
+  const dot = (diameter: number, color: string) => (
+    <Circle modifiers={[frame({ width: diameter, height: diameter }), foregroundStyle(color)]} />
+  );
+  const bar = (width: number, height: number, offset: number) =>
+    shifted(
+      offset,
+      <RoundedRectangle
+        cornerRadius={height / 2}
+        modifiers={[frame({ width, height }), foregroundStyle(palette.secondary)]}
+      />
+    );
+  const rule = (offset: number) =>
+    shifted(
+      offset,
+      <Rectangle
+        modifiers={[frame({ maxWidth: 10_000, height: 1 }), foregroundStyle(palette.divider)]}
+      />
+    );
+  const formatDate = (date: Date, options: Intl.DateTimeFormatOptions): string | null => {
+    try {
+      // eslint-disable-next-line no-restricted-globals -- the widget process cannot import @/lib/intl-cache; failure falls back to SwiftUI's date text
+      return new Intl.DateTimeFormat(intlLocale, options).format(date);
+    } catch {
+      return null;
+    }
+  };
+  // Today is the clock time alone; another day adds a locale-formatted date.
+  // There is no "Today"/"Tomorrow" word and no relative "ago" anywhere.
+  // eslint-disable-next-line max-params -- the time, its text size and colour, and how much date to add on another day
+  const when = (date: Date, size: number, color: string, style: 'short' | 'long') => {
+    if (date.toDateString() === today.toDateString()) {
+      return (
+        <Text
+          date={date}
+          dateStyle="time"
+          modifiers={[font({ size }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
+        />
+      );
+    }
+    const time = { hour: 'numeric', minute: '2-digit' } as const;
+    let options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', ...time };
+    if (style === 'long') {
+      options = { weekday: 'short', month: 'short', day: 'numeric', ...time };
+    } else if (Math.abs(date.getTime() - today.getTime()) < 6 * 24 * 60 * 60 * 1000) {
+      options = { weekday: 'short', ...time };
+    }
+    const formatted = formatDate(date, options);
+    if (formatted !== null) {
+      return text(formatted, size, color);
+    }
+    return (
+      <HStack spacing={3}>
+        <Text
+          date={date}
+          dateStyle="date"
+          modifiers={[font({ size }), lineLimit(1), foregroundStyle(color)]}
         />
         <Text
-          modifiers={[
-            font({ textStyle: 'subheadline', weight: 'semibold' }),
-            lineLimit(1),
-            primaryForeground,
-          ]}
-        >
-          {newestResultLabel}
-        </Text>
-        <Spacer />
-        <Text
-          date={new Date(newestResultAt)}
-          // `ago` words the age as a past reference ("3 minutes ago"), the way
-          // the Android widget and the session list read it; a bare duration
-          // there reads as one still running.
-          dateStyle="ago"
-          modifiers={[
-            font({ textStyle: 'subheadline' }),
-            monospacedDigit(),
-            lineLimit(1),
-            mutedForeground,
-          ]}
+          date={date}
+          dateStyle="time"
+          modifiers={[font({ size }), lineLimit(1), monospacedDigit(), foregroundStyle(color)]}
         />
       </HStack>
     );
   };
-
-  // The locked frames draw their status line through `systemRows` instead, so
-  // the footer is absent entirely there rather than repeating that copy.
-  const footerBody = newestResultBody();
-  const newestResultFooter =
-    !hasCounts || footerBody === null ? null : (
-      <VStack alignment="leading" spacing={4}>
-        <Text modifiers={[font({ textStyle: 'footnote' }), mutedForeground]}>
-          {COPY.newestResult}
-        </Text>
-        {footerBody}
-      </VStack>
-    );
-
-  const hasAction = actions.approve || actions.newAgent;
-
-  // A state with no counts (empty, signed out, waiting, locked, expired) in
-  // the square and the tall card: one centred composition — the mark, the
-  // status line, and New agent when offered — instead of one line stuck in a
-  // corner of a blank card. The tall card scales the mark, the status line and
-  // the control up with its height, or the composition reads as a stamp in a
-  // big card.
-  if (!hasCounts && (large || square)) {
-    return (
-      <VStack alignment="center" spacing={large ? 18 : 8} modifiers={systemModifiers}>
-        <Spacer />
-        {logo(large ? 56 : 28)}
-        <Text
-          modifiers={[
-            font({ textStyle: large ? 'title3' : 'footnote' }),
-            multilineTextAlignment('center'),
-            lineLimit(2),
-            mutedForeground,
-          ]}
-        >
-          {statusLine}
-        </Text>
-        {hasAction ? actionButtons(large ? 'regular' : 'small') : null}
-        <Spacer />
-      </VStack>
+  // Header: the Kilo mark and name, then the Approve slot and the `+` slot at
+  // the trailing edge. A hidden action leaves its slot empty, so `+` never moves.
+  // Tinted and Clear keep only each colour's alpha, so an opaque control fill
+  // would merge with its glyph into one solid blob; there the fill is the
+  // foreground at 22% and the glyph the full foreground.
+  const monochromeFill = `${palette.fg}38`;
+  // eslint-disable-next-line max-params -- the symbol, its size, and the circle's fill and glyph colours
+  const circleGlyph = (symbol: SystemSymbol, size: number, fill: string, color: string) => (
+    <Image
+      systemName={symbol}
+      color={monochrome ? palette.fg : color}
+      modifiers={[
+        font({ size, weight: 'semibold' }),
+        frame({ width: 24, height: 24 }),
+        background(monochrome ? monochromeFill : fill, shapes.circle()),
+      ]}
+    />
+  );
+  const pill = (label: string, fill: string, color: string) => (
+    <Text
+      modifiers={[
+        font({ size: 12, weight: 'semibold' }),
+        lineLimit(1),
+        foregroundStyle(monochrome ? palette.fg : color),
+        fixedSize({ horizontal: true, vertical: false }),
+        padding({ horizontal: 14 }),
+        frame({ minWidth: 86, height: 24 }),
+        background(monochrome ? monochromeFill : fill, shapes.capsule()),
+      ]}
+    >
+      {label}
+    </Text>
+  );
+  const approveButton = (child: React.JSX.Element) => (
+    <WidgetButton
+      modifiers={[buttonStyle('plain'), accessibilityLabel(COPY.approve ?? 'Approve')]}
+      onPress={() => ({
+        pendingAction: 'approve',
+        pendingApprovalKey: approvalKey ?? undefined,
+        pendingActionAt: Date.now(),
+      })}
+    >
+      {child}
+    </WidgetButton>
+  );
+  let approveControl: React.JSX.Element | null = null;
+  if (feedback === 'approving') {
+    approveControl =
+      wide || large
+        ? pill(COPY.approving ?? 'Approving…', palette.secondary, palette.muted)
+        : circleGlyph('ellipsis', 13, palette.secondary, palette.muted);
+  } else if (canApprove) {
+    approveControl = approveButton(
+      wide || large
+        ? pill(COPY.approve ?? 'Approve', palette.primary, palette.primaryFg)
+        : circleGlyph('checkmark', 12, palette.primary, palette.primaryFg)
     );
   }
+  const createButton = (child: React.JSX.Element) => (
+    <WidgetButton
+      openAppWhenRun
+      modifiers={[buttonStyle('plain'), accessibilityLabel(COPY.newAgent ?? 'New agent')]}
+      onPress={() => ({ pendingAction: 'new-agent', pendingActionAt: Date.now() })}
+    >
+      {child}
+    </WidgetButton>
+  );
+  // The empty Medium and Large cards offer New agent as a pill in the body, so
+  // the header `+` hides there and the card has a single create control.
+  const headerCreate = canCreate && (content || (status === 'empty' && !wide && !large));
+  // The Approve slot sits 4pt before `+`, the pill and the circle alike.
+  const header = (
+    <HStack alignment="center" spacing={0} modifiers={[frame({ height: 24 })]}>
+      {logo(18, monochrome)}
+      <Text
+        modifiers={[
+          font({ size: 13, weight: 'semibold' }),
+          lineLimit(1),
+          foregroundStyle(palette.fg),
+          padding({ leading: 6 }),
+        ]}
+      >
+        Kilo
+      </Text>
+      <Spacer minLength={8} />
+      <HStack
+        spacing={0}
+        modifiers={[
+          frame(wide || large ? { minWidth: 86, height: 24 } : { width: 24, height: 24 }),
+          padding({ trailing: 4 }),
+        ]}
+      >
+        {approveControl}
+      </HStack>
+      <HStack spacing={0} modifiers={[frame({ width: 24, height: 24 })]}>
+        {headerCreate ? createButton(circleGlyph('plus', 14, palette.secondary, palette.fg)) : null}
+      </HStack>
+    </HStack>
+  );
 
-  // StandBy draws this family on a charging phone in landscape. A header row
-  // holds the mark and the action, the count rows sit in the middle at a size
-  // that fills the card, and the newest result owns the bottom. An Approve in
-  // flight or failed says so under its button: the large card has no reserved
-  // slot for it. The spacers hold the rows in place as the footer appears and
-  // disappears, so a state change cannot shift the counts.
-  const actionLine = props.actionLine ?? null;
-  if (large) {
-    return (
-      <VStack alignment="leading" spacing={0} modifiers={systemModifiers}>
-        <HStack alignment="center" spacing={8} modifiers={[frame({ minHeight: 30 })]}>
-          {logo(28)}
-          <Spacer />
-          {hasAction ? actionButtons('small') : null}
-        </HStack>
-        {actionLine === null ? null : (
-          <HStack alignment="center" spacing={0}>
-            <Spacer />
-            <Text modifiers={[font({ textStyle: 'footnote' }), lineLimit(1), mutedForeground]}>
-              {actionLine}
-            </Text>
-          </HStack>
+  // Footer: "Checked <time>" or "Last known · <time>"; a failed Approve on the
+  // Medium and Large cards says so here instead.
+  let footer: React.JSX.Element | null = null;
+  if (failed && (wide || large)) {
+    footer = text(
+      COPY.approveFailed ?? "Couldn't approve. Tap Approve to try again.",
+      11,
+      palette.warn,
+      'semibold'
+    );
+  } else if (status === 'waiting') {
+    footer = text(COPY.waiting ?? 'Updating agents', 11, palette.muted);
+  } else if (checkedAt !== null) {
+    footer = (
+      <HStack spacing={3}>
+        {text(
+          stale ? `${COPY.lastKnown ?? 'Last known'} ·` : (COPY.checked ?? 'Checked'),
+          11,
+          palette.muted
         )}
-        <Spacer />
-        {systemRows}
-        <Spacer />
-        {newestResultFooter}
-      </VStack>
-    );
-  }
-
-  // The medium family is wide, not tall: the mark sits beside the rows and the
-  // whole block centres, the same composition as the Live Activity banner. A
-  // vertical layout there left the right half of the card empty. The body
-  // column's spacing is tightened so the four rows, the reserved slot and the
-  // action row stay inside the card's ~126 pt content box.
-  if (wide) {
-    return (
-      <HStack alignment="center" spacing={12} modifiers={systemModifiers}>
-        {logo(28)}
-        <VStack alignment="leading" spacing={3}>
-          {systemRows}
-          {hasCounts ? newestSlot : null}
-          {hasAction ? actionButtons('small') : null}
-        </VStack>
+        {when(checkedAt, 11, palette.muted, 'short')}
       </HStack>
     );
   }
+  const fill = <Spacer minLength={0} />;
+  // The slack above the body: the design's gap first, so a shorter device
+  // shrinks it before the body meets the footer. Callers pass a design top
+  // minus 40, where the header ends (the 16pt band plus the 24pt header).
+  const lead = (height: number) => (
+    <Spacer minLength={0} modifiers={[frame({ maxHeight: height }), layoutPriority(1)]} />
+  );
 
-  // The small square is the tightest Home Screen family: four count rows, the
-  // reserved slot and the action row fill its ~126 pt content box, so the mark
-  // sits beside the body rather than above it. A label too long for the square
-  // takes the mark's width instead.
-  return (
-    <HStack alignment="center" spacing={8} modifiers={systemModifiers}>
-      {crowdedRows ? null : logo(18)}
-      <VStack alignment="leading" spacing={3}>
-        {systemRows}
-        {newestSlot}
-        {hasAction ? actionButtons('small') : null}
+  // ── locked: privacy, unavailable, signed out ──
+  if (!content && status !== 'empty' && status !== 'waiting') {
+    const message =
+      status === 'signed_out'
+        ? (COPY.signed_out ?? 'Sign in to see agents')
+        : (COPY.privacy ?? 'Open Kilo to see agents');
+    // The small card breaks the message at the word that balances its two lines.
+    const words = message.split(' ');
+    let lines = [message];
+    for (let index = 1; index < words.length; index += 1) {
+      const candidate = [words.slice(0, index).join(' '), words.slice(index).join(' ')];
+      if (
+        Math.max(candidate[0]?.length ?? 0, candidate[1]?.length ?? 0) <
+        Math.max(...lines.map(line => line.length))
+      ) {
+        lines = candidate;
+      }
+    }
+    // Lock glyph sizes, the gap to the message, and the room the design keeps
+    // under the centred block: 26/6.6/1.7 small, 28/6.7/2.4 medium, 40/29/17 large.
+    let lockSize = 26;
+    let lockGap = 6.6;
+    let messageSize = 13;
+    let reserve = 1.7;
+    if (wide) {
+      lockSize = 28;
+      lockGap = 6.7;
+      messageSize = 15;
+      reserve = 2.4;
+    } else if (large) {
+      lockSize = 40;
+      lockGap = 29;
+      messageSize = 20;
+      reserve = 17;
+    }
+    const messageText = (line: string) => (
+      <Text
+        modifiers={[
+          font({ size: messageSize, weight: 'semibold' }),
+          lineLimit(1),
+          multilineTextAlignment('center'),
+          foregroundStyle(palette.fg),
+        ]}
+      >
+        {line}
+      </Text>
+    );
+    return (
+      <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
+        {header}
+        {fill}
+        <VStack
+          alignment="center"
+          spacing={0}
+          modifiers={[frame({ maxWidth: 10_000, alignment: 'center' })]}
+        >
+          <Image
+            systemName="lock.fill"
+            color={palette.fg}
+            modifiers={[
+              resizable(),
+              aspectRatio({ contentMode: 'fit' }),
+              frame({ width: lockSize * 0.86, height: lockSize * 1.071 }),
+            ]}
+          />
+          {shifted(lockGap, messageText(wide || large ? message : (lines[0] ?? message)))}
+          {wide || large || lines[1] === undefined
+            ? null
+            : shifted(gap(108, 13, 125, 13), messageText(lines[1]))}
+        </VStack>
+        {fill}
+        <Spacer minLength={0} modifiers={[frame({ height: reserve })]} />
       </VStack>
+    );
+  }
+
+  // ── updating (first load): placeholder bars, no actions ──
+  if (status === 'waiting') {
+    let body = (
+      <VStack alignment="leading" spacing={0}>
+        {bar(44, 30, 26)}
+        {bar(96, 12, 10)}
+      </VStack>
+    );
+    if (wide) {
+      body = (
+        <HStack alignment="top" spacing={0}>
+          <VStack
+            alignment="leading"
+            spacing={0}
+            modifiers={[frame({ width: 160, alignment: 'leading' })]}
+          >
+            {bar(44, 34, 26)}
+            {bar(96, 12, 8)}
+          </VStack>
+          <VStack alignment="leading" spacing={0}>
+            {bar(150, 12, 30)}
+            {bar(100, 10, 8)}
+            {bar(140, 12, 12)}
+            {bar(90, 10, 8)}
+          </VStack>
+        </HStack>
+      );
+    } else if (large) {
+      body = (
+        <VStack alignment="leading" spacing={0}>
+          {bar(70, 60, 44)}
+          {bar(140, 16, 12)}
+          {bar(300, 14, 42)}
+          {bar(180, 11, 8)}
+          {bar(260, 14, 19)}
+          {bar(160, 11, 8)}
+        </VStack>
+      );
+    }
+    return (
+      <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
+        {header}
+        {body}
+        {fill}
+        {footer}
+      </VStack>
+    );
+  }
+
+  // ── nothing running ──
+  if (!content) {
+    const message = COPY.homeEmpty ?? 'Nothing running right now';
+    // New agent pill: 28pt with a 12pt plus on medium, 36pt with a 14pt plus on large.
+    const newAgentPill = canCreate
+      ? createButton(
+          <HStack
+            alignment="center"
+            spacing={large ? 9 : 8}
+            modifiers={[
+              padding({ leading: large ? 11 : 8, trailing: large ? 16 : 12 }),
+              frame({ height: large ? 36 : 28 }),
+              background(monochrome ? monochromeFill : palette.secondary, shapes.capsule()),
+            ]}
+          >
+            <Image
+              systemName="plus"
+              color={palette.fg}
+              modifiers={[font({ size: large ? 16 : 14, weight: 'semibold' })]}
+            />
+            <Text
+              modifiers={[
+                font({ size: large ? 14 : 13, weight: 'semibold' }),
+                lineLimit(1),
+                foregroundStyle(palette.fg),
+              ]}
+            >
+              {COPY.newAgent ?? 'New agent'}
+            </Text>
+          </HStack>
+        )
+      : null;
+    let headlineSize = 17;
+    if (large) {
+      headlineSize = 22;
+    } else if (wide) {
+      headlineSize = 20;
+    }
+    const headline = (
+      <Text
+        modifiers={[
+          font({ size: headlineSize, weight: 'semibold' }),
+          lineLimit(2),
+          multilineTextAlignment(large ? 'center' : 'leading'),
+          foregroundStyle(palette.fg),
+        ]}
+      >
+        {message}
+      </Text>
+    );
+    if (large) {
+      return (
+        <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
+          {header}
+          {fill}
+          <VStack
+            alignment="center"
+            spacing={0}
+            modifiers={[frame({ maxWidth: 10_000, alignment: 'center' })]}
+          >
+            {headline}
+            {shifted(198 - (176 + 0.241 * 22), newAgentPill)}
+          </VStack>
+          {fill}
+          {footer}
+        </VStack>
+      );
+    }
+    return (
+      <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
+        {header}
+        {fill}
+        {headline}
+        {wide ? shifted(106 - (92 + 0.241 * 20), newAgentPill) : null}
+        {shifted(wide ? 141.53 - 134 : gap(124, 17, 152, 11), footer)}
+      </VStack>
+    );
+  }
+
+  // ── content ──
+  const countText = (size: number) => (
+    <Text
+      modifiers={[
+        font({ size, weight: 'bold' }),
+        monospacedDigit(),
+        lineLimit(1),
+        fixedSize({ horizontal: true, vertical: false }),
+        foregroundStyle(palette.fg),
+        accessibilityLabel(`${count(primaryCount)} ${primaryLabel}`),
+      ]}
+    >
+      {count(primaryCount)}
+    </Text>
+  );
+  // The dot sits a hair inside the count's edge, 6pt before the label.
+  const statusRow = (diameter: number, labelSize: number) => (
+    <HStack
+      alignment="center"
+      spacing={6}
+      modifiers={[padding({ leading: diameter > 8 ? 1.5 : 1 })]}
+    >
+      {dot(diameter, dotColors[primaryKind])}
+      <Text
+        modifiers={[
+          font({ size: labelSize, weight: 'semibold' }),
+          lineLimit(1),
+          foregroundStyle(palette.fg),
+        ]}
+      >
+        {primaryLabel}
+      </Text>
     </HStack>
+  );
+  // One row's second line: why the agent waits, or when it wakes.
+  const rowDetail = (row: Record<string, unknown>, size: number, style: 'short' | 'long') => {
+    if (primaryKind === 'needsInput') {
+      let reason = COPY.waitingToRetry ?? 'Waiting to retry';
+      if (row.kind === 'permission') {
+        reason = COPY.permissionRequired ?? 'Permission required';
+      } else if (row.kind === 'question') {
+        reason = COPY.answerNeeded ?? 'Answer needed';
+      }
+      return text(reason, size, palette.muted);
+    }
+    const date = validDate(row.scheduledAt);
+    if (date === null) {
+      return null;
+    }
+    if (date.getTime() <= today.getTime()) {
+      return text(COPY.awaitingUpdate ?? 'Awaiting update', size, palette.muted);
+    }
+    return when(date, size, palette.muted, style);
+  };
+  const rowColor = primaryKind === 'scheduled' ? palette.info : palette.warn;
+  const titleRow = (row: Record<string, unknown>, size: number) => (
+    <HStack alignment="center" spacing={8}>
+      {dot(8, rowColor)}
+      {text(agentTitle(row.title), size, palette.fg)}
+    </HStack>
+  );
+  const countRows = (spacing: number) => (
+    <VStack alignment="leading" spacing={spacing}>
+      {secondaryRows.map(row => (
+        <HStack key={row.kind} alignment="center" spacing={8}>
+          {dot(8, dotColors[row.kind])}
+          <Text
+            modifiers={[
+              font({ size: 13 }),
+              monospacedDigit(),
+              lineLimit(1),
+              foregroundStyle(palette.fg),
+            ]}
+          >
+            {`${count(row.count)} ${labels[row.kind]}`}
+          </Text>
+        </HStack>
+      ))}
+    </VStack>
+  );
+  const sectionLabel = (label: string) => text(label, 12, palette.muted, 'semibold');
+  // The scheduled line under the label: the next wake, Awaiting update, or the title.
+  const scheduledLine = (size: number, color: string) => {
+    if (awaitingUpdate) {
+      return text(COPY.awaitingUpdate ?? 'Awaiting update', size, palette.muted);
+    }
+    if (scheduledAt !== null) {
+      return (
+        <HStack spacing={3}>
+          {text(COPY.nextRun ?? 'Next run', size, color)}
+          {when(scheduledAt, size, color, 'short')}
+        </HStack>
+      );
+    }
+    return title === null ? null : text(title, size, color);
+  };
+
+  if (large) {
+    // One kind: count 88 @168, label 20 @203, rule 238, "Recent" @268, title 15 @292.
+    let body = (
+      <VStack alignment="leading" spacing={0}>
+        {lead(168 - 0.952 * 88 - 40)}
+        {countText(88)}
+        {shifted(gap(168, 88, 203, 20), statusRow(10, 20))}
+        {title === null ? null : rule(237.5 - (203 + 0.241 * 20))}
+        {title === null
+          ? null
+          : shifted(268 - 0.952 * 12 - 238.5, sectionLabel(COPY.recent ?? 'Recent'))}
+        {title === null ? null : shifted(gap(268, 12, 292, 15), text(title, 15, palette.fg))}
+      </VStack>
+    );
+    if (primaryKind === 'scheduled') {
+      // Count 80 @128, label 19 @158, line 13 @182, rule 206, "Next runs" @232, rows @258 + 34n.
+      body = (
+        <VStack alignment="leading" spacing={0}>
+          {lead(128 - 0.952 * 80 - 40)}
+          {countText(80)}
+          {shifted(gap(128, 80, 158, 19), statusRow(10, 19))}
+          {shifted(gap(158, 19, 182, 13), scheduledLine(13, palette.muted))}
+          {rule(205.5 - (182 + 0.241 * 13))}
+          {shifted(232 - 0.952 * 12 - 206.5, sectionLabel(COPY.nextScheduled ?? 'Next scheduled'))}
+          {detailRows.map((row, index) => (
+            <VStack
+              key={index}
+              alignment="leading"
+              spacing={0}
+              modifiers={[
+                padding({
+                  top: index === 0 ? gap(232, 12, 258, 14) : gap(258, 14, 292, 14),
+                  leading: 1,
+                }),
+              ]}
+            >
+              <HStack alignment="firstTextBaseline" spacing={8}>
+                {titleRow(row, 14)}
+                <Spacer minLength={0} />
+                {rowDetail(row, 12, 'long')}
+              </HStack>
+            </VStack>
+          ))}
+        </VStack>
+      );
+    } else if (primaryKind === 'needsInput') {
+      // Count 64 @106 with the other counts beside it; rule 152; "Waiting for
+      // you" @176; up to three rows @202 + 46n with their reason 17pt below.
+      const rows = detailRows;
+      body = (
+        <VStack alignment="leading" spacing={0}>
+          {lead(106 - 0.952 * 64 - 40)}
+          <HStack alignment="top" spacing={0}>
+            <VStack
+              alignment="leading"
+              spacing={0}
+              modifiers={[frame({ width: 206, alignment: 'leading' })]}
+            >
+              {countText(64)}
+              {shifted(gap(106, 64, 131, 17), statusRow(9, 17))}
+            </VStack>
+            {shifted(74 - 0.952 * 13 - (106 - 0.952 * 64), countRows(gap(74, 13, 96, 13)))}
+          </HStack>
+          {rule(151.5 - (131 + 0.241 * 17))}
+          {rows.length > 0
+            ? shifted(
+                176 - 0.952 * 12 - 152.5,
+                sectionLabel(COPY.waitingForYou ?? 'Waiting for you')
+              )
+            : null}
+          {rows.map((row, index) => (
+            <VStack
+              key={index}
+              alignment="leading"
+              spacing={0}
+              modifiers={[
+                padding({
+                  top: index === 0 ? gap(176, 12, 202, 14) : gap(219, 12, 248, 14),
+                  leading: 1,
+                }),
+              ]}
+            >
+              {titleRow(row, 14)}
+              {shifted(gap(202, 14, 219, 12), rowDetail(row, 12, 'long'), 16)}
+            </VStack>
+          ))}
+          {rows.length === 0 && title !== null
+            ? shifted(176 - 0.952 * 12 - 152.5, sectionLabel(COPY.recent ?? 'Recent'))
+            : null}
+          {rows.length === 0 && title !== null
+            ? shifted(gap(176, 12, 200, 15), text(title, 15, palette.fg))
+            : null}
+        </VStack>
+      );
+    } else if (secondaryRows.length > 0) {
+      // Mixed: count 64 @120 beside the other counts (@92 + 24n); rule 178;
+      // "Recent" @210 and its title @234; "Next scheduled" @284 with one row.
+      const next = scheduledAgents[0];
+      body = (
+        <VStack alignment="leading" spacing={0}>
+          {lead(120 - 0.952 * 64 - 40)}
+          <HStack alignment="top" spacing={0}>
+            <VStack
+              alignment="leading"
+              spacing={0}
+              modifiers={[frame({ width: 206, alignment: 'leading' })]}
+            >
+              {countText(64)}
+              {shifted(gap(120, 64, 145, 17), statusRow(9, 17))}
+            </VStack>
+            {shifted(92 - 0.952 * 13 - (120 - 0.952 * 64), countRows(gap(92, 13, 116, 13)))}
+          </HStack>
+          {rule(177.5 - (145 + 0.241 * 17))}
+          {title === null
+            ? null
+            : shifted(210 - 0.952 * 12 - 178.5, sectionLabel(COPY.recent ?? 'Recent'))}
+          {title === null ? null : shifted(gap(210, 12, 234, 15), text(title, 15, palette.fg))}
+          {next === undefined
+            ? null
+            : shifted(
+                title === null ? 210 - 0.952 * 12 - 178.5 : gap(234, 15, 284, 12),
+                sectionLabel(COPY.nextScheduled ?? 'Next scheduled')
+              )}
+          {next === undefined ? null : (
+            <VStack
+              alignment="leading"
+              spacing={0}
+              modifiers={[padding({ top: gap(284, 12, 308, 14), leading: 1 })]}
+            >
+              <HStack alignment="center" spacing={8}>
+                {dot(8, palette.info)}
+                {text(agentTitle(next.title), 14, palette.fg)}
+              </HStack>
+              {shifted(gap(308, 14, 326, 12), rowDetail(next, 12, 'long'), 16)}
+            </VStack>
+          )}
+        </VStack>
+      );
+    }
+    return (
+      <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
+        {header}
+        {body}
+        {fill}
+        {footer}
+      </VStack>
+    );
+  }
+
+  if (wide) {
+    // Leading: count 44 @92 and the label @112. Trailing, from x 168: up to two
+    // agent rows @74 + 42n, else the other counts @78 + 24n from x 172, else
+    // "Recent" @88 and the title @106 from x 176.
+    const countTop = 92 - 0.952 * 44;
+    const rows = detailRows.slice(0, 2);
+    let column: React.JSX.Element | null = null;
+    if (rows.length > 0) {
+      column = shifted(
+        74 - 0.952 * 13 - countTop,
+        <VStack alignment="leading" spacing={0}>
+          {rows.map((row, index) => (
+            <VStack
+              key={index}
+              alignment="leading"
+              spacing={0}
+              modifiers={[padding({ top: index === 0 ? 0 : gap(90, 11, 116, 13) })]}
+            >
+              {titleRow(row, 13)}
+              {shifted(
+                gap(74, 13, 90, 11),
+                rowDetail(row, 11, 'long') ?? (
+                  <Spacer minLength={0} modifiers={[frame({ height: 1.193 * 11 })]} />
+                ),
+                16
+              )}
+            </VStack>
+          ))}
+        </VStack>
+      );
+    } else if (secondaryRows.length > 0) {
+      column = shifted(78 - 0.952 * 13 - countTop, countRows(gap(78, 13, 102, 13)), 4);
+    } else if (title !== null) {
+      column = shifted(
+        88 - 0.952 * 11 - countTop,
+        <VStack alignment="leading" spacing={0}>
+          {text(COPY.recent ?? 'Recent', 11, palette.muted, 'semibold')}
+          {shifted(gap(88, 11, 106, 13), text(title, 13, palette.fg))}
+        </VStack>,
+        8
+      );
+    }
+    return (
+      <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
+        {header}
+        {lead(countTop - 40)}
+        <HStack alignment="top" spacing={0}>
+          <VStack
+            alignment="leading"
+            spacing={0}
+            modifiers={[frame({ width: 152, alignment: 'leading' })]}
+          >
+            {countText(44)}
+            {shifted(gap(92, 44, 112, 14), statusRow(8, 14))}
+          </VStack>
+          <VStack
+            alignment="leading"
+            spacing={0}
+            modifiers={[frame({ maxWidth: 10_000, alignment: 'leading' })]}
+          >
+            {column}
+          </VStack>
+        </HStack>
+        {fill}
+        {footer}
+      </VStack>
+    );
+  }
+
+  // Small: count 44 @78 right under the header, label @98, one line @117.
+  let detail: React.JSX.Element | null = null;
+  if (failed) {
+    detail = text(COPY.couldNotApprove ?? 'Could not approve', 13, palette.warn, 'semibold');
+  } else if (primaryKind === 'scheduled') {
+    detail = scheduledLine(13, palette.fg);
+  } else if (title !== null) {
+    detail = text(title, 13, palette.fg);
+  }
+  return (
+    <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
+      {header}
+      {countText(44)}
+      {shifted(gap(78, 44, 98, 14), statusRow(8, 14))}
+      {shifted(gap(98, 14, 117, 13), detail)}
+      {fill}
+      {footer}
+    </VStack>
   );
 };
 
 export const WIDGET_NAME = 'ActiveAgentsWidget';
-
-/**
- * The unpatched layout function, exported for unit tests: under vitest no
- * widget transform runs, so this still holds the real function, and the
- * unpatched copy token parses to an empty copy (see the COPY fallback above).
- * Registration wraps it with `withGlanceableCopy(withWidgetLogo(...))`.
- */
 export const activeAgentsWidgetLayout = layout;
-
 const registerLayout = () =>
   createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(withWidgetLogo(layout)));
-
 export const ActiveAgentsWidget = registerLayout();
 
 /**
- * Re-bake the stored layout in the active language. Only the gallery
- * placeholder reads this copy — a placed widget gets translated copy through
- * its timeline props — but the placeholder is the first thing the user sees in
- * the widget picker, so it must not stay English after a language change.
+ * The kind the widget extension draws in the gallery: the same layout over
+ * sample props. `HomeWidgetTimelineProvider.swift` reads it as `<name>Preview`
+ * for a preview snapshot and falls back to the placed widget's entry until the
+ * app has written it.
  */
+const WIDGET_GALLERY_PREVIEW_NAME = `${WIDGET_NAME}Preview`;
+
+/** Re-bake both layouts in the active language and re-write the gallery sample. */
 export function refreshActiveAgentsWidgetCopy(): void {
   registerLayout();
+  createWidget<WidgetProps>(
+    WIDGET_GALLERY_PREVIEW_NAME,
+    withGlanceableCopy(withWidgetLogo(layout))
+  ).updateSnapshot(buildGalleryPreviewProps(key => i18n.t(key)));
 }

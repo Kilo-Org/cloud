@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { buildGlanceableSnapshotForUser } from '@/lib/glanceable-agents-snapshot-server';
+import { buildHomeWidgetResponseForUser } from '@/lib/glanceable-agents-snapshot-server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const snapshot = await buildGlanceableSnapshotForUser({ userId, organizationId });
-  return NextResponse.json(snapshot, { status: 200 });
+  const data = await buildHomeWidgetResponseForUser({ userId, organizationId });
+  // Separate Home-only envelope field; the snapshot itself stays privacy-minimal.
+  return NextResponse.json({ ...data.snapshot, homeWidgetDetails: data.details }, { status: 200 });
 }

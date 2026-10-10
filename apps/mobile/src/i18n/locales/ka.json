@@ -135,7 +135,8 @@
     "updated": "განახლებულია",
     "working": "მუშაობს",
     "yourOwnRepositories": "შენი რეპოზიტორიები",
-    "dismissed": "უგულებელყოფილია"
+    "dismissed": "უგულებელყოფილია",
+    "agent": "აგენტი"
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
     "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
-    "newestResult": "უახლესი შედეგი",
-    "scheduledWakes": "{{time}} იღვიძებს"
+    "checked": "შემოწმდა",
+    "lastKnown": "ბოლო ცნობილი",
+    "awaitingUpdate": "განახლებას ელის",
+    "nextRun": "შემდეგი გაშვება",
+    "waitingForYou": "გელოდებათ",
+    "nextScheduled": "შემდეგი დაგეგმილი",
+    "answerNeeded": "პასუხს ელის",
+    "waitingToRetry": "ხელახალ ცდას ელის"
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
@@ -3357,7 +3364,6 @@
       "template": "შაბლონი",
       "namePlaceholder": "explain",
       "templatePlaceholder": "ახსენით $ARGUMENTS",
-      "agent": "აგენტი",
       "subtask": "გაშვება როგორც ქვეამოცანა",
       "edit": "დახრილი ბრძანების რედაქტირება",
       "saveFailed": "ბრძანების შენახვა ვერ მოხერხდა",

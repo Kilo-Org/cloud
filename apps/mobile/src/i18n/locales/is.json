@@ -135,7 +135,8 @@
     "updated": "Uppfært",
     "working": "Í vinnslu",
     "yourOwnRepositories": "Þín eigin kóðasöfn",
-    "dismissed": "Vísað frá"
+    "dismissed": "Vísað frá",
+    "agent": "Umboðsmaður"
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
     "openSession": "Opna",
     "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
-    "newestResult": "Nýjasta niðurstaðan",
-    "scheduledWakes": "vaknar {{time}}"
+    "checked": "Staðfest",
+    "lastKnown": "Síðast þekkta staða",
+    "awaitingUpdate": "Bíður eftir uppfærslu",
+    "nextRun": "Næsta keyrsla",
+    "waitingForYou": "Bíður eftir þér",
+    "nextScheduled": "Næst á dagskrá",
+    "answerNeeded": "Bíður eftir svari",
+    "waitingToRetry": "Bíður eftir endurtilraun"
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
@@ -3357,7 +3364,6 @@
       "template": "Sniðmát",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
-      "agent": "Umboðsmaður",
       "subtask": "Keyra sem undirverkefni",
       "edit": "Breyta skástrik skipun",
       "saveFailed": "Ekki tókst að vista skipunina",

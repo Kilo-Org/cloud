@@ -135,7 +135,8 @@
     "updated": "An sabunta",
     "working": "Ana aiki",
     "yourOwnRepositories": "Ma'ajiyoyinka",
-    "dismissed": "An yi watsi da shi"
+    "dismissed": "An yi watsi da shi",
+    "agent": "Wakili"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
     "openSession": "Buɗe",
     "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa.",
-    "newestResult": "Sabon sakamako",
-    "scheduledWakes": "zai farka {{time}}"
+    "checked": "An duba",
+    "lastKnown": "Na ƙarshe da aka sani",
+    "awaitingUpdate": "Ana jiran sabuntawa",
+    "nextRun": "Aiki na gaba",
+    "waitingForYou": "Ana jiran ku",
+    "nextScheduled": "Na gaba da aka tsara",
+    "answerNeeded": "Ana buƙatar amsa",
+    "waitingToRetry": "Ana jiran sake gwadawa"
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
@@ -3357,7 +3364,6 @@
       "template": "Samfura",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Yi bayani $ARGUMENTS",
-      "agent": "Wakili",
       "subtask": "Gudu azaman ƙaramin aiki",
       "edit": "Gyara umarnin slash",
       "saveFailed": "An kasa ajiye umarni",

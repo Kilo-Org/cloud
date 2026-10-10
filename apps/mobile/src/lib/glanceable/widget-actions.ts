@@ -2,6 +2,8 @@ import {
   buildGlanceableSnapshot,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { buildHomeWidgetDetails } from '@kilocode/app-shared/home-widget';
+import { CryptoDigestAlgorithm, digestStringAsync } from 'expo-crypto';
 
 import { buildActiveSessionsTrayInput, isAttentionStatus } from '@/lib/active-sessions-live';
 import { readStoredValue } from '@/lib/auth/secure-store-value';
@@ -13,7 +15,8 @@ import { trpcClient } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
 import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
-import { pickFrontApprovableSession } from './front-approval';
+import { rankApprovableSessions } from './front-approval';
+import { setHomeWidgetDetails } from './home-widget-data';
 import { resolveAnsweredRaises } from './attention-rows';
 import { newestSessionTitle } from './newest-session';
 import { getLastGlanceableSnapshot } from './persist';
@@ -42,8 +45,13 @@ import { getSurfaceExtras, setSurfaceExtras } from './surface-extras';
  * `none` = no waiting session to act on, so the caller opens the app instead.
  * `no-permission` = the waiting agent asks a free-form question; the widget
  * must never invent an answer, so the caller opens the app.
+ * `stale` = the request the widget displayed is no longer pending; nothing is
+ * answered and the caller shows the current state instead.
  */
-type WidgetApproveResultKind = 'approved' | 'none' | 'no-permission' | 'failed';
+type WidgetApproveResultKind = 'approved' | 'none' | 'no-permission' | 'stale' | 'failed';
+
+/** Bounds the tray reads one press makes while it looks for the displayed request. */
+const MAX_APPROVAL_CANDIDATES = 3;
 
 export type WidgetApproveResult = { kind: WidgetApproveResultKind };
 
@@ -145,21 +153,6 @@ function permissionIdOf(permission: unknown): string | null {
 }
 
 /**
- * The oldest pending permission request id, or null when none waits. The
- * server keeps the collection in arrival order, so the first entry with a
- * usable id is the one that has waited longest.
- */
-export function oldestPendingPermissionId(permissions: readonly unknown[]): string | null {
-  for (const permission of permissions) {
-    const id = permissionIdOf(permission);
-    if (id !== null) {
-      return id;
-    }
-  }
-  return null;
-}
-
-/**
  * One read whose failure must stay observable: reported at warning level and
  * rethrown, so the widget action settles on `failed` rather than acting on a
  * value it could not read — the same report-and-rethrow shape
@@ -183,65 +176,92 @@ async function readStoredScope(): Promise<WidgetScope> {
 }
 
 /**
- * Answer the longest-waiting permission with `'once'`. A rejected call is
- * `failed`; a tray with no permission waiting is `no-permission` when a
- * free-form question waits, and `none` otherwise — the caller opens the app for
- * either.
+ * The first pending permission on `sessionId` whose hashed ids equal the key
+ * the widget displayed, or null when none matches. Sequential so the search
+ * stops at the first match.
  */
-async function approveWaitingSession(organizationId: string | null): Promise<ApproveOutcome> {
+async function findVisiblePermissionId(
+  sessionId: string,
+  permissions: readonly unknown[],
+  expectedApprovalKey: string
+): Promise<string | null> {
+  for (const permission of permissions) {
+    const permissionId = permissionIdOf(permission);
+    if (permissionId !== null) {
+      // eslint-disable-next-line no-await-in-loop -- sequential: stops at the first match
+      const approvalKey = await digestStringAsync(
+        CryptoDigestAlgorithm.SHA256,
+        JSON.stringify([sessionId, permissionId])
+      );
+      if (approvalKey === expectedApprovalKey) {
+        return permissionId;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Answer exactly the permission the widget displayed. The key is a hash of
+ * the visible session and permission ids; a press whose request was answered,
+ * withdrawn, or replaced matches nothing and answers nothing.
+ */
+async function approveVisiblePermission(
+  organizationId: string | null,
+  expectedApprovalKey: string | null
+): Promise<ApproveOutcome> {
   const { sessions } = await trpcClient.activeSessions.list.query(
     buildActiveSessionsTrayInput(organizationId)
   );
-  // The Approve chip is offered on `needsApproval`, which counts exactly the
-  // `permission` rows, so the press must answer one of the rows that count
-  // describes: the longest-waiting permission, the same pick the wrist and
-  // notification controls make (`pickFrontApprovableSession`). Ranking every
-  // attention row instead would let an older `question` or `retry` shadow a
-  // newer permission — the chip would draw, and the press would only open the
-  // app instead of approving the permission the chip was offered for.
-  const waiting = pickFrontApprovableSession(sessions);
-  if (waiting === null) {
-    // Nothing approvable: a free-form question opens the app for an answer,
-    // while a tray with nothing to act on needs only the agents list.
+  // The server binds the displayed key to the front of this same ranking, so
+  // the bounded scan always reaches the displayed request first.
+  const candidates = rankApprovableSessions(sessions).slice(0, MAX_APPROVAL_CANDIDATES);
+  if (candidates.length === 0) {
     return {
       kind: resolveWaitingSession(sessions) === null ? 'none' : 'no-permission',
       answeredSessionId: null,
     };
   }
-  // Only a cloud-agent session carries pending interactions the control plane
-  // can answer; a remote CLI session has none, so the app owns it.
-  const session = await trpcClient.cliSessionsV2.get.query({ session_id: waiting.id });
-  const cloudAgentSessionId = session.cloud_agent_session_id;
-  if (cloudAgentSessionId === null) {
-    return { kind: 'none', answeredSessionId: null };
+  if (expectedApprovalKey === null) {
+    return { kind: 'stale', answeredSessionId: null };
   }
-  // The personal `getPendingInteractions` refuses an organization session (its
-  // ownership check requires a null `organization_id`), so pick the
-  // organization-scoped twin exactly like `answerPermission` below.
-  const pending = organizationId
-    ? await trpcClient.organizations.cloudAgentNext.getPendingInteractions.query({
-        cloudAgentSessionId,
-        organizationId,
-      })
-    : await trpcClient.cloudAgentNext.getPendingInteractions.query({
-        cloudAgentSessionId,
-      });
-  const permissionId = oldestPendingPermissionId(pending.permissions);
-  if (permissionId === null) {
-    return { kind: 'no-permission', answeredSessionId: null };
+  for (const row of candidates) {
+    // Sequential and bounded: each read can stop the search once it matches.
+    // eslint-disable-next-line no-await-in-loop -- see above
+    const session = await trpcClient.cliSessionsV2.get.query({ session_id: row.id });
+    const cloudAgentSessionId = session.cloud_agent_session_id;
+    if (cloudAgentSessionId !== null) {
+      // The personal read refuses an organization session, so an organization
+      // scope uses its own twin for both the read and the answer.
+      const pending = organizationId
+        ? // eslint-disable-next-line no-await-in-loop -- see above
+          await trpcClient.organizations.cloudAgentNext.getPendingInteractions.query({
+            cloudAgentSessionId,
+            organizationId,
+          })
+        : // eslint-disable-next-line no-await-in-loop -- see above
+          await trpcClient.cloudAgentNext.getPendingInteractions.query({ cloudAgentSessionId });
+      // eslint-disable-next-line no-await-in-loop -- see above
+      const permissionId = await findVisiblePermissionId(
+        row.id,
+        pending.permissions,
+        expectedApprovalKey
+      );
+      if (permissionId !== null) {
+        const answer = { sessionId: cloudAgentSessionId, permissionId, response: 'once' as const };
+        // eslint-disable-next-line no-await-in-loop -- the matching request is answered once
+        await (organizationId
+          ? trpcClient.organizations.cloudAgentNext.answerPermission.mutate({
+              ...answer,
+              organizationId,
+            })
+          : trpcClient.cloudAgentNext.answerPermission.mutate(answer));
+        ackSessionAttention(row.id);
+        return { kind: 'approved', answeredSessionId: row.id };
+      }
+    }
   }
-  const answer = { sessionId: cloudAgentSessionId, permissionId, response: 'once' as const };
-  if (organizationId) {
-    await trpcClient.organizations.cloudAgentNext.answerPermission.mutate({
-      ...answer,
-      organizationId,
-    });
-    ackSessionAttention(waiting.id);
-    return { kind: 'approved', answeredSessionId: waiting.id };
-  }
-  await trpcClient.cloudAgentNext.answerPermission.mutate(answer);
-  ackSessionAttention(waiting.id);
-  return { kind: 'approved', answeredSessionId: waiting.id };
+  return { kind: 'stale', answeredSessionId: null };
 }
 
 /**
@@ -268,6 +288,7 @@ async function republishTray(scope: WidgetScope, blankEpochAtStart: number): Pro
   if (isGlanceableOrgLost() || getTerminalBlankEpoch() !== blankEpochAtStart) {
     return;
   }
+  setHomeWidgetDetails(buildHomeWidgetDetails(resolveAnsweredRaises(sessions)));
   const snapshot: GlanceableAgentsSnapshot = buildGlanceableSnapshot({
     // A raise the user answered from the needs-input notification is no longer
     // waiting: count it the way the in-app list does.
@@ -295,7 +316,9 @@ async function republishTray(scope: WidgetScope, blankEpochAtStart: number): Pro
  * rejected call reports `failed` so the widget can say so and keep Approve
  * offered.
  */
-export async function runWidgetApprove(): Promise<WidgetApproveResult> {
+export async function runWidgetApprove(
+  expectedApprovalKey: string | null
+): Promise<WidgetApproveResult> {
   // Read the publication gate as the action starts; `republishTray` compares it
   // after the action, so a blank that lands while it runs wins the surface.
   const blankEpochAtStart = getTerminalBlankEpoch();
@@ -304,8 +327,8 @@ export async function runWidgetApprove(): Promise<WidgetApproveResult> {
     // rejection must settle the widget on its failure line instead of leaving
     // the progress line up with nothing driving it.
     const scope = await readStoredScope();
-    const outcome = await approveWaitingSession(scope.organizationId);
-    if (outcome.kind === 'approved') {
+    const outcome = await approveVisiblePermission(scope.organizationId, expectedApprovalKey);
+    if (outcome.kind === 'approved' || outcome.kind === 'stale') {
       // A republish that fails must not turn a completed approve into `failed`:
       // the approve landed, the failure is reported by the sink guard, and the
       // next tray event redraws the counts.

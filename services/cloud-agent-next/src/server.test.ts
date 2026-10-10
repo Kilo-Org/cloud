@@ -4,6 +4,7 @@ import path from 'node:path';
 import { parse } from 'jsonc-parser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { TRPCError } from '@trpc/server';
 import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/vercel-agent-sandbox.js';
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
@@ -2733,6 +2734,131 @@ describe('server /internal/streams/close', () => {
     expect(response.status).toBe(204);
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(closeOrgStreams).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /internal/widgets/approval-key', () => {
+  const cloudAgentSessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const kiloSessionId = 'ses_0123456789abcdefghijklmnop';
+  // sha256(JSON.stringify([kiloSessionId, permissionId])), computed with node:crypto.
+  const KEY_PER_WIDGET_1 = '5af2c75e8f72c8f988b4dddda11194e70bc8bab08c4b6abb9f9c6a5f8f34e099';
+  const KEY_PER_WIDGET_2 = '841791022542364fd7f7a8c347f13bd075c52134170cb9dc5d6c81e8c7c1a485';
+
+  function approvalKeyRequest(body: unknown, internalKey: string | null = 'test-internal-secret') {
+    return new Request('http://worker.test/internal/widgets/approval-key', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(internalKey === null ? {} : { 'x-internal-api-key': internalKey }),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function envWithPending(permissions: unknown[]) {
+    const env = createEnv();
+    const getPendingInteractions = vi.fn().mockResolvedValue({ questions: [], permissions });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('control-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ getPendingInteractions });
+    return { env, getPendingInteractions };
+  }
+
+  const body = { userId: 'usr_1', organizationId: 'org_1', kiloSessionId, cloudAgentSessionId };
+
+  beforeEach(() => {
+    requireCurrentSessionAccessMock.mockReset();
+    requireCurrentSessionAccessMock.mockResolvedValue({ kiloSessionId, organizationId: 'org_1' });
+  });
+
+  it.each([null, 'wrong-key'])('rejects internal key %s before any session read', async key => {
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(approvalKeyRequest(body, key), env);
+
+    expect(response.status).toBe(401);
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ...body, organizationId: undefined },
+    { ...body, kiloSessionId: 'not-a-kilo-session' },
+    { ...body, extra: 'mutation-authority' },
+  ])('rejects a malformed body', async invalid => {
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(approvalKeyRequest(invalid), env);
+
+    expect(response.status).toBe(400);
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+  });
+
+  it('binds the oldest pending permission of an owned control-plane session', async () => {
+    const { env, getPendingInteractions } = envWithPending([
+      { id: '' },
+      { id: 'per_widget_1', permission: 'edit', patterns: ['private/path'] },
+      { id: 'per_widget_2' },
+    ]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({ approvalKey: KEY_PER_WIDGET_1 });
+    expect(text).not.toContain('per_widget');
+    expect(text).not.toContain('private/path');
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'usr_1',
+      cloudAgentSessionId,
+      expectedOrganizationId: 'org_1',
+      expectedKiloSessionId: kiloSessionId,
+    });
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`usr_1:${cloudAgentSessionId}`);
+    expect(getPendingInteractions).toHaveBeenCalledTimes(1);
+  });
+
+  it('produces a different key for a different permission id', async () => {
+    const { env } = envWithPending([{ id: 'per_widget_2' }]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    await expect(response.json()).resolves.toEqual({ approvalKey: KEY_PER_WIDGET_2 });
+    expect(KEY_PER_WIDGET_2).not.toBe(KEY_PER_WIDGET_1);
+  });
+
+  it('returns a null key when nothing is pending', async () => {
+    const { env } = envWithPending([]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    await expect(response.json()).resolves.toEqual({ approvalKey: null });
+  });
+
+  it('refuses a session outside the exact user, organization, and session pairing', async () => {
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+    );
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(approvalKeyRequest({ ...body, organizationId: null }), env);
+
+    expect(response.status).toBe(403);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedOrganizationId: null })
+    );
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+  });
+
+  it('never reads a legacy session, whose pending set lives only in its sandbox', async () => {
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(
+      approvalKeyRequest({
+        ...body,
+        cloudAgentSessionId: 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      }),
+      env
+    );
+
+    await expect(response.json()).resolves.toEqual({ approvalKey: null });
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
   });
 });
 

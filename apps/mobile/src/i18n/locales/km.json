@@ -135,7 +135,8 @@
     "updated": "បានធ្វើបច្ចុប្បន្នភាព",
     "working": "កំពុងដំណើរការ",
     "yourOwnRepositories": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក",
-    "dismissed": "បានសម្គាល់ថាមិនអើពើ"
+    "dismissed": "បានសម្គាល់ថាមិនអើពើ",
+    "agent": "ភ្នាក់ងារ"
   },
   "language": {
     "restarting": "កំពុងចាប់ផ្តើមឡើងវិញដើម្បីប្រើភាសាដែលបានជ្រើសរើស",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
     "openSession": "បើក",
     "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។",
-    "newestResult": "លទ្ធផលថ្មីបំផុត",
-    "scheduledWakes": "ភ្ញាក់ {{time}}"
+    "checked": "បានពិនិត្យ",
+    "lastKnown": "ស្ថានភាពដែលដឹងចុងក្រោយ",
+    "awaitingUpdate": "រង់ចាំការធ្វើបច្ចុប្បន្នភាព",
+    "nextRun": "ការដំណើរការបន្ទាប់",
+    "waitingForYou": "កំពុងរង់ចាំអ្នក",
+    "nextScheduled": "កាលវិភាគបន្ទាប់",
+    "answerNeeded": "ត្រូវការការឆ្លើយតប",
+    "waitingToRetry": "រង់ចាំព្យាយាមម្ដងទៀត"
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",
@@ -3357,7 +3364,6 @@
       "template": "គំរូ",
       "namePlaceholder": "explain",
       "templatePlaceholder": "ពន្យល់ $ARGUMENTS",
-      "agent": "ភ្នាក់ងារ",
       "subtask": "ដំណើរការជាកិច្ចការរង",
       "edit": "កែសម្រួលពាក្យបញ្ជា slash",
       "saveFailed": "មិនអាចរក្សាទុកពាក្យបញ្ជាបានទេ។",

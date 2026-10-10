@@ -1,18 +1,8 @@
 // The app entry.
 //
-// Android redraws a placed widget, and answers the ongoing notification's
-// Approve action, from a headless JS task: the bundle loads with no Activity,
-// no route and no notification handler runs first, so both tasks have to be
-// registered here. The widget module loads only when its task fires — requiring
-// it at entry would start the widget sink before `expo-router/entry` sets the
-// app up.
+// Android widget redraws, native refresh, and notification approval run without
+// an Activity. Register their lazy task factories before the router entry.
 //
-// The Approve action on the Live Update notification boots the same kind of
-// headless run, so its task is registered here too, under the key its Kotlin
-// worker starts (`KiloActiveAgentsApprove`). `registerApproveTask` is the second
-// registration that action can take, through `ActiveAgentsApproveTaskService`:
-// it requires the task module itself, which is why the literal above is only a
-// factory.
 //
 // `require`, not `import`: ESM hoisting would run `expo-router/entry` first.
 const { AppRegistry, LogBox, Platform } = require('react-native');
@@ -32,12 +22,12 @@ if (Platform.OS === 'android') {
     await handleWidgetTask(task);
   });
 
-  // `KiloActiveAgentsApprove` is `APPROVE_HEADLESS_TASK_KEY`
-  // (src/glanceable-android/approve-task.ts) and the Kotlin worker's
-  // `TASK_NAME`; only the string crosses the native boundary, so the three are
-  // asserted equal in approve-task.test.ts. The factory keeps this registration
-  // bodyless, like the widget handler above; the module itself arrives with the
-  // eager `registerApproveTask` require.
+  AppRegistry.registerHeadlessTask(
+    'HomeWidgetRefresh',
+    () => require('./src/glanceable-android/register').handleHomeWidgetRefresh
+  );
+
+  // The Kotlin approval worker starts this key without a foreground Activity.
   AppRegistry.registerHeadlessTask(
     'KiloActiveAgentsApprove',
     () => require('./src/glanceable-android/approve-task').handleApproveTask

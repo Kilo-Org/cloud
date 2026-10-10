@@ -135,7 +135,8 @@
     "updated": "Bygewerk",
     "working": "Besig",
     "yourOwnRepositories": "Jou eie bewaarplekke",
-    "dismissed": "Verwerp"
+    "dismissed": "Verwerp",
+    "agent": "Agent"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
-    "newestResult": "Nuutste resultaat",
-    "scheduledWakes": "word wakker {{time}}"
+    "checked": "Gekontroleer",
+    "lastKnown": "Laas bekend",
+    "awaitingUpdate": "Wag op opdatering",
+    "nextRun": "Volgende uitvoering",
+    "waitingForYou": "Wag vir jou",
+    "nextScheduled": "Volgende geskeduleerde",
+    "answerNeeded": "Antwoord nodig",
+    "waitingToRetry": "Wag om weer te probeer"
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3357,7 +3364,6 @@
       "template": "Sjabloon",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Verduidelik $ARGUMENTS",
-      "agent": "Agent",
       "subtask": "Hardloop as subtaak",
       "edit": "Wysig skuinsstreep opdrag",
       "saveFailed": "Kon nie opdrag stoor nie",

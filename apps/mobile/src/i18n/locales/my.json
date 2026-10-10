@@ -135,7 +135,8 @@
     "updated": "မွမ်းမံပြီး",
     "working": "လုပ်ဆောင်နေ",
     "yourOwnRepositories": "သင့်ကိုယ်ပိုင် ကုဒ်သိုလှောင်ရာများ",
-    "dismissed": "ပယ်ချပြီး"
+    "dismissed": "ပယ်ချပြီး",
+    "agent": "အေးဂျင့်"
   },
   "language": {
     "restarting": "ရွေးထားသော ဘာသာစကားကို သုံးရန် ပြန်စတင်နေသည်",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
     "openSession": "ဖွင့်ပါ",
     "approveFailed": "အတည်ပြု၍မရပါ။ ထပ်ကြိုးစားရန် $t(common.approve) ကို နှိပ်ပါ။",
-    "newestResult": "အသစ်ဆုံး ရလဒ်",
-    "scheduledWakes": "{{time}} နိုးမည်"
+    "checked": "စစ်ဆေးထားသည်",
+    "lastKnown": "နောက်ဆုံး သိရှိထားသည်",
+    "awaitingUpdate": "အပ်ဒိတ် စောင့်နေ",
+    "nextRun": "နောက်တစ်ကြိမ် လုပ်ဆောင်ချိန်",
+    "waitingForYou": "သင့်ကို စောင့်နေ",
+    "nextScheduled": "နောက်ထပ် စီစဉ်ထားမှုများ",
+    "answerNeeded": "အဖြေ လိုအပ်",
+    "waitingToRetry": "ပြန်လည်ကြိုးစားရန် စောင့်နေ"
   },
   "transcriptionModel": {
     "title": "အသံမှစာသားပြောင်းမော်ဒယ်",
@@ -3357,7 +3364,6 @@
       "template": "ပုံစံခွက်",
       "namePlaceholder": "explain",
       "templatePlaceholder": "$ARGUMENTS ကိုရှင်းပြပါ။",
-      "agent": "အေးဂျင့်",
       "subtask": "လုပ်ငန်းခွဲအဖြစ် လုပ်ဆောင်ပါ။",
       "edit": "မျဥ်းစောင်းအမိန့်ကို တည်းဖြတ်ပါ။",
       "saveFailed": "အမိန့်ကို သိမ်းဆည်း၍မရပါ။",

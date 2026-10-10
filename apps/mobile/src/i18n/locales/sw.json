@@ -135,7 +135,8 @@
     "updated": "Imesasishwa",
     "working": "Inafanya kazi",
     "yourOwnRepositories": "Hazina zako mwenyewe",
-    "dismissed": "Imepuuzwa"
+    "dismissed": "Imepuuzwa",
+    "agent": "Wakala"
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -3155,8 +3156,14 @@
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
     "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
-    "newestResult": "Matokeo mapya zaidi",
-    "scheduledWakes": "itaamka {{time}}"
+    "checked": "Imethibitishwa",
+    "lastKnown": "Hali ya mwisho iliyojulikana",
+    "awaitingUpdate": "Inasubiri sasisho",
+    "nextRun": "Utekelezaji unaofuata",
+    "waitingForYou": "Inakusubiri",
+    "nextScheduled": "Zilizopangwa zinazofuata",
+    "answerNeeded": "Inasubiri jibu",
+    "waitingToRetry": "Inasubiri kujaribu tena"
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",
@@ -3357,7 +3364,6 @@
       "template": "Kiolezo",
       "namePlaceholder": "explain",
       "templatePlaceholder": "Eleza $ARGUMENTS",
-      "agent": "Wakala",
       "subtask": "Endesha kama kazi ndogo",
       "edit": "Hariri amri ya kufyeka",
       "saveFailed": "Haikuweza kuhifadhi amri",

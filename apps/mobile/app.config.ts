@@ -283,15 +283,14 @@ const config: ExpoConfig = {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Keep expo-task-manager's reflectively-loaded headless app loader.
-          extraProguardRules: ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES,
+          // R8 runs on release builds and llama.rn's JSI bindings are reached
+          // only through JNI, so every com.rnllama class has to be kept too.
+          extraProguardRules: `${ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES}\n-keep class com.rnllama.** { *; }`,
           // Old release AABs shipped without resource shrinking. Keep this on so
           // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
           enableShrinkResourcesInReleaseBuilds: true,
           usePrecompiledHeaders: true,
-          // R8 runs on release builds and llama.rn's JSI bindings are reached
-          // only through JNI, so every com.rnllama class has to be kept.
-          extraProguardRules: '-keep class com.rnllama.** { *; }',
         },
         ios: {
           ccacheEnabled: true,

@@ -20,9 +20,21 @@ export type NativeAvailability = {
   readonly maxOutputTokens: number;
   readonly systemInstructions: boolean;
   readonly tokenCounting?: boolean;
+  /** The model reads image parts. Absent means it reads none. */
+  readonly images?: boolean;
+  /** The most images one request can carry. Absent means no fixed limit. */
+  readonly maxImages?: number;
 };
 
-type NativeMessage = { readonly role: 'user' | 'assistant'; readonly text: string };
+/** A base64 image and its media type, as the harness prompt carries it. */
+type NativeImage = { readonly media: string; readonly data: string };
+
+type NativeMessage = {
+  readonly role: 'user' | 'assistant';
+  readonly text: string;
+  /** Present only for a model that reads images. */
+  readonly images?: readonly NativeImage[];
+};
 
 type NativeRequest = {
   readonly id: string;
@@ -96,21 +108,53 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
   });
 }
 
-/** Text only: reasoning, images, and tool parts never reach a system model. */
-function nativeRequest(request: ModelRequest, id: string, ceiling: number): NativeRequest {
+/**
+ * What a model gets in place of an image over its per-request limit. The
+ * newest images are the ones sent, and the model is told an older one was there.
+ */
+export const IMAGE_NOT_SENT =
+  '[An image was shared here. This model reads only the most recent images, so it is not sent.]';
+
+/**
+ * Text, plus the user's images for a model that reads them. Reasoning and tool
+ * parts never reach a system model.
+ */
+function nativeRequest(
+  request: ModelRequest,
+  id: string,
+  availability: NativeAvailability
+): NativeRequest {
+  const readsImages = availability.images === true;
+  let imageRoom = availability.maxImages ?? Number.POSITIVE_INFINITY;
   const messages: NativeMessage[] = [];
-  for (const message of request.prompt.messages) {
-    const text = message.parts
-      .flatMap(part => (part.kind === 'text' ? [part.text] : []))
-      .join('\n\n');
-    if (text !== '') {
+  // Newest first, so the newest images take the request's image limit.
+  for (const message of request.prompt.messages.toReversed()) {
+    const texts: string[] = [];
+    const images: NativeImage[] = [];
+    for (const part of message.parts.toReversed()) {
+      if (part.kind === 'text') {
+        texts.push(part.text);
+      } else if (part.kind === 'image' && readsImages && message.role === 'user') {
+        if (imageRoom > 0) {
+          imageRoom -= 1;
+          images.push({ media: part.media, data: part.data });
+        } else {
+          texts.push(IMAGE_NOT_SENT);
+        }
+      }
+    }
+    const text = texts.toReversed().join('\n\n');
+    if (images.length > 0) {
+      messages.push({ role: message.role, text, images: images.toReversed() });
+    } else if (text !== '') {
       messages.push({ role: message.role, text });
     }
   }
+  const ceiling = availability.maxOutputTokens;
   return {
     id,
     system: request.prompt.system.map(block => block.text).join('\n\n'),
-    messages,
+    messages: messages.toReversed(),
     maxTokens: ceiling > 0 ? Math.min(request.maxTokens, ceiling) : request.maxTokens,
   };
 }
@@ -147,7 +191,7 @@ function answer(
 ): Stream.Stream<ModelEvent, ModelError> {
   return Stream.async<ModelEvent, ModelError>(emit => {
     sequence += 1;
-    const native = nativeRequest(request, `quick-chat-${sequence}`, availability.maxOutputTokens);
+    const native = nativeRequest(request, `quick-chat-${sequence}`, availability);
     // `running` is the only state that owns a live native inference.
     let state: 'running' | 'finishing' | 'over' = 'running';
     let output = '';

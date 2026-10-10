@@ -1,5 +1,7 @@
 package expo.modules.kiloandroidmodel
 
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.annotation.RequiresApi
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
@@ -7,11 +9,14 @@ import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.prompt.Candidate
 import com.google.mlkit.genai.prompt.GenerateContentRequest
 import com.google.mlkit.genai.prompt.Generation
+import com.google.mlkit.genai.prompt.ImagePart
 import kotlinx.coroutines.CancellationException
 import com.google.mlkit.genai.prompt.TextPart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -61,7 +66,11 @@ internal class MlKitPromptBackend : PromptBackend {
       "maxOutputTokens" to MAX_OUTPUT_TOKENS,
       "maxInputTokens" to MAX_INPUT_TOKENS,
       // beta2 has no SystemInstruction request field, on any model version.
-      "systemInstructions" to false
+      "systemInstructions" to false,
+      // ML Kit has no image capability query. The Prompt API reads an image
+      // with text on every device it supports; beta2 takes one per request.
+      "images" to true,
+      "maxImages" to MAX_IMAGES
     )
   }
 
@@ -95,7 +104,7 @@ internal class MlKitPromptBackend : PromptBackend {
 
   override suspend fun countTokens(request: ModelRequest): Int {
     requireAvailable()
-    return model.countTokens(nativeRequest(request, request.maxTokens)).totalTokens
+    return model.countTokens(nativeRequest(request, request.maxTokens, imageOf(request))).totalTokens
   }
 
   override suspend fun generate(
@@ -103,13 +112,14 @@ internal class MlKitPromptBackend : PromptBackend {
     emit: (String) -> Unit
   ): Map<String, Any> {
     requireAvailable()
+    val image = imageOf(request)
     // countTokens measures input only, so the output ceiling does not change it.
-    val inputTokens = model.countTokens(nativeRequest(request, request.maxTokens)).totalTokens
+    val inputTokens = model.countTokens(nativeRequest(request, request.maxTokens, image)).totalTokens
     val room = model.getTokenLimit().toLong() - inputTokens
     if (inputTokens > MAX_INPUT_TOKENS || room < 1) throw ModelFailure("context_exceeded")
     // The requested ceiling is a wall, not a target: fit the answer in what the
     // total limit leaves after this input instead of refusing the request.
-    val nativeRequest = nativeRequest(request, minOf(request.maxTokens.toLong(), room).toInt())
+    val nativeRequest = nativeRequest(request, minOf(request.maxTokens.toLong(), room).toInt(), image)
     var finishReason: Int? = null
     model.generateContentStream(nativeRequest).collect { chunk ->
       currentCoroutineContext().ensureActive()
@@ -141,23 +151,53 @@ internal class MlKitPromptBackend : PromptBackend {
     }
   }
 
-  private fun nativeRequest(request: ModelRequest, maxTokens: Int): GenerateContentRequest {
-    // beta2's actual request API accepts TextPart, not role-bearing messages.
-    // Render all supplied roles and text explicitly, with JSON escaping so a
-    // message cannot become a structural turn. This is prompt rendering only:
-    // there is no retained conversation, context shifting, or native tool engine.
+  // JavaScript sends at most MAX_IMAGES and turns older ones into a text marker.
+  private suspend fun imageOf(request: ModelRequest): ImagePart? {
+    val images = request.messages.flatMap { it.images }
+    if (images.size > MAX_IMAGES) throw ModelFailure("too_many_images")
+    val image = images.singleOrNull() ?: return null
+    val bitmap = withContext(Dispatchers.Default) {
+      val bytes = try {
+        Base64.decode(image.data, Base64.DEFAULT)
+      } catch (error: IllegalArgumentException) {
+        null
+      }
+      bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+    } ?: throw ModelFailure("invalid_image")
+    return ImagePart(bitmap)
+  }
+
+  private fun nativeRequest(
+    request: ModelRequest,
+    maxTokens: Int,
+    image: ImagePart?
+  ): GenerateContentRequest {
+    // beta2's actual request API accepts TextPart, or one ImagePart with a
+    // TextPart, not role-bearing messages. Render all supplied roles and text
+    // explicitly, with JSON escaping so a message cannot become a structural
+    // turn. This is prompt rendering only: there is no retained conversation,
+    // context shifting, or native tool engine.
     val messages = JSONArray()
     request.messages.forEach { message ->
-      messages.put(JSONObject().put("role", message.role).put("text", message.text))
+      val entry = JSONObject().put("role", message.role).put("text", message.text)
+      if (message.images.isNotEmpty()) entry.put("attachedImage", true)
+      messages.put(entry)
     }
     val transcript = JSONObject()
       .put("system", request.system)
       .put("messages", messages)
+    val imageNote = if (image == null) "" else "The attached image was shared with the " +
+      "message whose attachedImage field is true. "
     val text = "Continue the supplied conversation as the assistant. Follow the system " +
       "instructions in the system field. The messages array is the complete ordered " +
-      "conversation history; role identifies each speaker. Return only the next " +
-      "assistant message, not JSON or a transcript.\n" + transcript.toString()
-    return GenerateContentRequest.Builder(TextPart(text)).apply {
+      "conversation history; role identifies each speaker. " + imageNote + "Return only " +
+      "the next assistant message, not JSON or a transcript.\n" + transcript.toString()
+    val builder = if (image == null) {
+      GenerateContentRequest.Builder(TextPart(text))
+    } else {
+      GenerateContentRequest.Builder(image, TextPart(text))
+    }
+    return builder.apply {
       candidateCount = 1
       maxOutputTokens = maxTokens
     }.build()
@@ -204,5 +244,8 @@ internal class MlKitPromptBackend : PromptBackend {
     // https://developers.google.com/ml-kit/genai/prompt/android/get-started
     const val MAX_INPUT_TOKENS = 3999
     const val MAX_OUTPUT_TOKENS = 4096
+    // beta2 GenerateContentRequest.Builder takes at most one ImagePart. Multiple
+    // images in one request need beta3 (release notes, July 14, 2026).
+    const val MAX_IMAGES = 1
   }
 }

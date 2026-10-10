@@ -33,7 +33,7 @@ export function ModelToolsHint({ model, backends, localModels }: Readonly<ModelT
   const customModel = backends
     .find(backend => backend.id === customTarget?.backendId)
     ?.models.find(one => one.id === customTarget?.modelId);
-  // System on-device models are text-only, like a custom model without tools.
+  // System on-device models get no tools, like a custom model without tools.
   if (
     customModel === undefined &&
     ggufModel === undefined &&

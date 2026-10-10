@@ -1,12 +1,20 @@
+import CoreGraphics
 import ExpoModulesCore
 import Foundation
 import FoundationModels
+import ImageIO
 
 // Records are decoded once by Expo and never mutated after crossing into the
 // engine actor. No transcript, session, or generated text survives a request.
+struct AppleModelImage: Record, @unchecked Sendable {
+  @Field var media: String = ""
+  @Field var data: String = ""
+}
+
 struct AppleModelMessage: Record, @unchecked Sendable {
   @Field var role: String = ""
   @Field var text: String = ""
+  @Field var images: [AppleModelImage] = []
 }
 
 struct AppleModelRequest: Record, @unchecked Sendable {
@@ -101,6 +109,7 @@ private actor AppleModelEngine {
       "status": reason == nil ? "available" : "unavailable", "modelId": modelId,
       "contextWindow": contextSize, "maxOutputTokens": contextSize,
       "systemInstructions": true, "tokenCounting": false,
+      "images": Self.readsImages(model),
     ]
     if #available(iOS 26.4, *) { result["tokenCounting"] = true }
     if let reason { result["reason"] = reason }
@@ -114,7 +123,7 @@ private actor AppleModelEngine {
       }
       let model = SystemLanguageModel.default
       if let reason = Self.unavailableReason(model) { throw AppleModelFailure(reason: reason) }
-      try Self.validate(request, contextSize: Self.contextSize(model))
+      try Self.validate(request, model: model)
       // Count actual role-aware transcript entries, including the latest user
       // prompt and system instructions, rather than joining their text together.
       return try await model.tokenCount(for: Self.entries(request))
@@ -136,7 +145,7 @@ private actor AppleModelEngine {
       guard #available(iOS 26.0, *) else { throw AppleModelFailure(reason: "unsupported_os") }
       let model = SystemLanguageModel.default
       if let reason = Self.unavailableReason(model) { throw AppleModelFailure(reason: reason) }
-      try Self.validate(request, contextSize: Self.contextSize(model))
+      try Self.validate(request, model: model)
       let requestToken = UUID()
       token = requestToken
       let task = Task { try await self.infer(request, model: model, emit: emit) }
@@ -181,7 +190,7 @@ private actor AppleModelEngine {
     emit: @escaping @Sendable ([String: Any]) -> Void
   ) async throws -> AppleModelCompletion {
     try Task.checkCancellation()
-    let inputEntries = Self.entries(request)
+    let inputEntries = try Self.entries(request)
     // The latest user entry is supplied through streamResponse; all earlier
     // entries are supplied verbatim, preserving role boundaries and their order.
     let session = LanguageModelSession(
@@ -189,7 +198,9 @@ private actor AppleModelEngine {
     )
     var options = GenerationOptions()
     options.maximumResponseTokens = request.maxTokens
-    let prompt = request.messages[request.messages.count - 1].text
+    // validate guarantees the last message, and so the last entry, is the user's.
+    let lastText = request.messages[request.messages.count - 1].text
+    let prompt = Self.prompt(of: inputEntries[inputEntries.count - 1], text: lastText)
     var output = ""
     var refused = false
     do {
@@ -249,16 +260,31 @@ private actor AppleModelEngine {
   }
 
   @available(iOS 26.0, *)
-  private static func validate(_ request: AppleModelRequest, contextSize: Int) throws {
-    guard !request.id.isEmpty, request.maxTokens > 0, request.maxTokens <= contextSize,
+  private static func validate(_ request: AppleModelRequest, model: SystemLanguageModel) throws {
+    guard !request.id.isEmpty, request.maxTokens > 0, request.maxTokens <= contextSize(model),
           request.messages.last?.role == "user",
-          request.messages.allSatisfy({ $0.role == "user" || $0.role == "assistant" }) else {
+          request.messages.allSatisfy({ $0.role == "user" || $0.role == "assistant" }),
+          request.messages.allSatisfy({ $0.role == "user" || $0.images.isEmpty }) else {
       throw AppleModelFailure(reason: "invalid_request")
+    }
+    if !readsImages(model), request.messages.contains(where: { !$0.images.isEmpty }) {
+      throw AppleModelFailure(reason: "images_unsupported")
     }
   }
 
+  /// Apple's public vision capability, never a guess from the device or OS
+  /// alone. SDK 27 adds the query and image attachments; older SDKs and
+  /// iOS 26 read no images.
   @available(iOS 26.0, *)
-  private static func entries(_ request: AppleModelRequest) -> [Transcript.Entry] {
+  private static func readsImages(_ model: SystemLanguageModel) -> Bool {
+    #if KILO_FOUNDATION_MODELS_USAGE
+    if #available(iOS 27.0, *) { return model.capabilities.contains(.vision) }
+    #endif
+    return false
+  }
+
+  @available(iOS 26.0, *)
+  private static func entries(_ request: AppleModelRequest) throws -> [Transcript.Entry] {
     var entries: [Transcript.Entry] = []
     entries.reserveCapacity(request.messages.count + 1)
     if !request.system.isEmpty {
@@ -267,7 +293,9 @@ private actor AppleModelEngine {
       )))
     }
     for message in request.messages {
-      let segments = [Transcript.Segment.text(Transcript.TextSegment(content: message.text))]
+      let segments = try imageSegments(message) + [
+        Transcript.Segment.text(Transcript.TextSegment(content: message.text)),
+      ]
       if message.role == "user" {
         entries.append(.prompt(Transcript.Prompt(segments: segments)))
       } else {
@@ -275,6 +303,52 @@ private actor AppleModelEngine {
       }
     }
     return entries
+  }
+
+  /// Decoded once per request. `validate` has already refused images for a
+  /// model or SDK that reads none.
+  @available(iOS 26.0, *)
+  private static func imageSegments(_ message: AppleModelMessage) throws -> [Transcript.Segment] {
+    #if KILO_FOUNDATION_MODELS_USAGE
+    if #available(iOS 27.0, *) {
+      return try message.images.map { image in
+        guard image.media.hasPrefix("image/"), let data = Data(base64Encoded: image.data),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+          throw AppleModelFailure(reason: "invalid_image")
+        }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let orientation = (properties?[kCGImagePropertyOrientation] as? UInt32)
+          .flatMap(CGImagePropertyOrientation.init(rawValue:))
+        return .attachment(Transcript.AttachmentSegment(
+          content: .image(Transcript.ImageAttachment(cgImage, orientation: orientation))
+        ))
+      }
+    }
+    #endif
+    return []
+  }
+
+  /// The latest user message as a prompt, with the images already decoded
+  /// into its transcript entry.
+  @available(iOS 26.0, *)
+  private static func prompt(of entry: Transcript.Entry, text: String) -> Prompt {
+    #if KILO_FOUNDATION_MODELS_USAGE
+    if #available(iOS 27.0, *), case .prompt(let prompt) = entry {
+      let images = prompt.segments.compactMap { segment -> FoundationModels.Attachment<ImageAttachmentContent>? in
+        guard case .attachment(let attachment) = segment,
+              case .image(let image) = attachment.content else { return nil }
+        return FoundationModels.Attachment(image.cgImage, orientation: image.orientation)
+      }
+      if !images.isEmpty {
+        return Prompt {
+          images
+          text
+        }
+      }
+    }
+    #endif
+    return Prompt(text)
   }
 
   @available(iOS 26.0, *)

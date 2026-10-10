@@ -1160,6 +1160,44 @@ export function resolveTargets(targets: string[]): string[] {
   return topologicalSort(resolveTransitiveDeps(allNames));
 }
 
+export type ServiceExclusion = {
+  serviceNames: string[];
+  skipped: string[];
+  /** Selected services that declare a dependency on a skipped service. */
+  dependents: Map<string, string[]>;
+};
+
+/**
+ * Drop explicitly unwanted services from a resolved selection, for memory-
+ * constrained environments that run only what they exercise. Unknown names
+ * throw so a typo cannot silently start the full stack.
+ */
+export function excludeServices(
+  serviceNames: readonly string[],
+  excluded: readonly string[]
+): ServiceExclusion {
+  for (const name of excluded) getService(name);
+  const excludedSet = new Set(excluded);
+  const kept = serviceNames.filter(name => !excludedSet.has(name));
+  const dependents = new Map<string, string[]>();
+  for (const name of kept) {
+    const missing = getService(name).dependsOn.filter(dep => excludedSet.has(dep));
+    if (missing.length > 0) dependents.set(name, missing);
+  }
+  return {
+    serviceNames: kept,
+    skipped: serviceNames.filter(name => excludedSet.has(name)),
+    dependents,
+  };
+}
+
+export function parseServiceList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map(name => name.trim())
+    .filter(name => name !== '');
+}
+
 export function getService(name: string): ServiceDef {
   const svc = services.get(name);
   if (!svc) throw new Error(`Unknown service: ${name}`);

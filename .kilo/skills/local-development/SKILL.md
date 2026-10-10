@@ -5,6 +5,8 @@ description: Start, reuse, inspect, or browser-test local apps and services in t
 
 # Local development
 
+In a Kilo Cloud Agent sandbox, load the `cloud-agent-sandbox` skill first.
+
 Read `DEVELOPMENT.md` for human setup and service procedures. Read `ENVIRONMENT.md` for the environment-variable inventory. Shared web environment mutations are governed by `apps/web/AGENTS.md`; do not use this skill for that workflow.
 
 ## Start or reuse services

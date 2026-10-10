@@ -9,8 +9,10 @@ import {
   candidatePortOffsets,
   clearDevLogs,
   computePortOffset,
+  excludeServices,
   getAlwaysOnGroupIds,
   getService,
+  parseServiceList,
   portOffset,
   readPersistedPortOffset,
   resolveGroups,
@@ -576,4 +578,34 @@ test('a tunnels restart keeps the live selection and reloads the HTTP worker', (
     'cloud-agent-next'
   );
   assert.equal(planTunnelRestart(['cloud-agent-public-tunnels']).reloadTarget, undefined);
+});
+
+test('excludes unwanted services and reports dependents that lose them', () => {
+  const selection = resolveTargets(['agents', 'fake-llm']);
+  const exclusion = excludeServices(selection, ['notifications', 'event-service']);
+
+  assert.ok(!exclusion.serviceNames.includes('notifications'));
+  assert.ok(!exclusion.serviceNames.includes('event-service'));
+  assert.ok(exclusion.serviceNames.includes('cloud-agent-next'));
+  assert.deepEqual(exclusion.skipped.toSorted(), ['event-service', 'notifications']);
+  assert.deepEqual(exclusion.dependents.get('cloud-agent-next'), ['notifications']);
+});
+
+test('ignores excluded services that are not selected', () => {
+  const exclusion = excludeServices(['postgres', 'nextjs'], ['notifications']);
+
+  assert.deepEqual(exclusion.serviceNames, ['postgres', 'nextjs']);
+  assert.deepEqual(exclusion.skipped, []);
+});
+
+test('rejects unknown excluded services instead of starting everything', () => {
+  assert.throws(() => excludeServices(['postgres'], ['notifcations']), /Unknown service/);
+});
+
+test('parses comma-separated service lists', () => {
+  assert.deepEqual(parseServiceList(' notifications, event-service ,,'), [
+    'notifications',
+    'event-service',
+  ]);
+  assert.deepEqual(parseServiceList(undefined), []);
 });

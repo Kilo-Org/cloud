@@ -317,11 +317,13 @@ function CodeBlockImpl({
   }, [code, onCopyCode]);
 
   const handleToggleCopyAction = useCallback((event?: GestureResponderEvent) => {
+    // Read the tap Y now: React releases the event after this handler returns,
+    // and the state updater runs later, when `nativeEvent` can be null.
+    const tappedY = event?.nativeEvent.locationY;
     setCopyActionTop(previous => {
       if (previous !== null) {
         return null;
       }
-      const tappedY = event?.nativeEvent.locationY;
       // A synthetic press (no touch event) has no coordinates; fall back to the
       // block top, which a short fence still shows.
       return tappedY === undefined || !Number.isFinite(tappedY) ? 0 : Math.max(0, tappedY);

@@ -794,6 +794,31 @@ describe('CodeBlock copy action', () => {
     await unmount(renderer);
   });
 
+  it('keeps the tap Y when React releases the press event before the state update runs', async () => {
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const renderer = await mount(blockElement({ code: 'x'.repeat(5000), onCopyCode }));
+    const onPress = propOf(
+      firstByTestId(renderer.root, 'code-block-copy-trigger'),
+      'onPress'
+    ) as (event: { nativeEvent: { locationY: number } | null }) => void;
+    const event: { nativeEvent: { locationY: number } | null } = {
+      nativeEvent: { locationY: 321 },
+    };
+
+    act(() => {
+      // A pending update on the block stops React from running the updater
+      // eagerly, so it runs at render time, after the event is released.
+      layout(firstByTestId(renderer.root, 'code-block-copy-measure'), 96, 28);
+      onPress(event);
+      event.nativeEvent = null;
+    });
+
+    expect(propOf(firstByTestId(renderer.root, 'code-block-copy-action'), 'style')).toEqual({
+      top: 321,
+    });
+    await unmount(renderer);
+  });
+
   it('falls back to the block top for a synthetic press with no coordinates', async () => {
     const onCopyCode = vi.fn<(code: string) => void>();
     const renderer = await mount(blockElement({ onCopyCode }));

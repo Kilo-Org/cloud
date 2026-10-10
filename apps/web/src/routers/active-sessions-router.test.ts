@@ -270,22 +270,17 @@ describe('active-sessions-router', () => {
       }
     });
 
-    it.each([500, 503, 401])(
-      'throws BAD_GATEWAY when the worker answers %i',
-      async status => {
-        jest
-          .spyOn(global, 'fetch')
-          .mockResolvedValue(new Response('upstream failed', { status }));
+    it.each([500, 503, 401])('throws BAD_GATEWAY when the worker answers %i', async status => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(new Response('upstream failed', { status }));
 
-        const caller = await createCallerForUser(regularUser.id);
+      const caller = await createCallerForUser(regularUser.id);
 
-        await expectMintFailure(
-          caller.activeSessions.createWebTicket(),
-          'BAD_GATEWAY',
-          `Session ingest failed to mint a ticket (status ${status})`
-        );
-      }
-    );
+      await expectMintFailure(
+        caller.activeSessions.createWebTicket(),
+        'BAD_GATEWAY',
+        `Session ingest failed to mint a ticket (status ${status})`
+      );
+    });
 
     it.each([
       ['a malformed', JSON.stringify({ ticket: '', expiresAt: 'not-a-number' })],

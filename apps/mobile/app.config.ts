@@ -291,9 +291,6 @@ const config: ExpoConfig = {
           // the inspector contract can catch a shrink regression before it lands.
           enableShrinkResourcesInReleaseBuilds: true,
           usePrecompiledHeaders: true,
-          // R8 runs on release builds and llama.rn's JSI bindings are reached
-          // only through JNI, so every com.rnllama class has to be kept.
-          extraProguardRules: '-keep class com.rnllama.** { *; }',
         },
         ios: {
           ccacheEnabled: true,

@@ -111,10 +111,7 @@ function asMessage(turn: Turn): StoredMessage {
 export const askedMessageId = (sessionId: string): string => `${sessionId}:asked`;
 
 /** A question that is not in the store yet, as the bubble a person sees. */
-function questionMessage(
-  turn: Pick<Turn, 'id' | 'sessionId'>,
-  question: Question
-): StoredMessage {
+function questionMessage(turn: Pick<Turn, 'id' | 'sessionId'>, question: Question): StoredMessage {
   const message = asMessage({
     ...turn,
     role: 'user',
@@ -151,7 +148,10 @@ export function asMessages(input: {
   if (input.asked !== null) {
     const id = askedMessageId(input.sessionId);
     drawn.push(
-      questionMessage({ id, sessionId: input.sessionId }, { text: input.asked, images: input.askedImages })
+      questionMessage(
+        { id, sessionId: input.sessionId },
+        { text: input.asked, images: input.askedImages }
+      )
     );
   }
   if (input.answering !== '') {
@@ -166,7 +166,10 @@ export function asMessages(input: {
   }
   for (const [index, question] of input.waiting.entries()) {
     drawn.push(
-      questionMessage({ id: `${input.sessionId}:waiting:${index}`, sessionId: input.sessionId }, question)
+      questionMessage(
+        { id: `${input.sessionId}:waiting:${index}`, sessionId: input.sessionId },
+        question
+      )
     );
   }
   return drawn;

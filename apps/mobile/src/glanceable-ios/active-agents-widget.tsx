@@ -948,18 +948,25 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
           {shifted(gap(158, 19, 182, 13), scheduledLine(13, palette.muted))}
           {rule(205.5 - (182 + 0.241 * 13))}
           {shifted(232 - 0.952 * 12 - 206.5, sectionLabel(COPY.nextScheduled ?? 'Next scheduled'))}
-          {detailRows.map((row, index) => {
-            const detail = rowDetail(row, 12, 'long');
-            return shifted(
-              index === 0 ? gap(232, 12, 258, 14) : gap(258, 14, 292, 14),
-              <HStack alignment="firstTextBaseline" spacing={8} key={index}>
+          {detailRows.map((row, index) => (
+            <VStack
+              key={index}
+              alignment="leading"
+              spacing={0}
+              modifiers={[
+                padding({
+                  top: index === 0 ? gap(232, 12, 258, 14) : gap(258, 14, 292, 14),
+                  leading: 1,
+                }),
+              ]}
+            >
+              <HStack alignment="firstTextBaseline" spacing={8}>
                 {titleRow(row, 14)}
                 <Spacer minLength={0} />
-                {detail}
-              </HStack>,
-              1
-            );
-          })}
+                {rowDetail(row, 12, 'long')}
+              </HStack>
+            </VStack>
+          ))}
         </VStack>
       );
     } else if (primaryKind === 'needsInput') {

@@ -7,9 +7,15 @@ export type GgufModelRecord = {
   readonly fileId: string;
   readonly name: string;
   readonly url: string;
+  /** The model file and its projector together. */
   readonly sizeBytes: number;
   readonly contextWindow: number;
   readonly tools: boolean;
+  /**
+   * True only when the model has a projector file and llama.cpp reported that
+   * it reads images. A record saved before projectors existed reads false.
+   */
+  readonly vision: boolean;
 };
 
 /** A downloaded model as the inference client needs it. */
@@ -19,13 +25,16 @@ export type GgufModelFile = {
   readonly contextWindow: number;
   /** True only when the model's own chat template was verified to render tools. */
   readonly tools: boolean;
+  /** The vision projector, present only for a model verified to read images. */
+  readonly projector: string | undefined;
 };
 
-/** The download in progress. One runs at a time, so storage is checked against one file. */
+/** The download in progress. One runs at a time, so storage is checked against one model. */
 export type GgufDownload = {
   readonly fileId: string;
   readonly name: string;
   readonly phase: 'downloading' | 'paused' | 'verifying';
+  /** The model file and its projector together, so one bar covers both. */
   readonly written: number;
   /** Zero until the server states a length. */
   readonly total: number;
@@ -67,11 +76,16 @@ export type GgufStorage = {
   ) => GgufDownloadTask;
 };
 
-/** What a model's own file says about it, read before the model is offered. */
-export type GgufInspection = { readonly contextWindow: number; readonly tools: boolean };
+/** What a model's own files say about it, read before the model is offered. */
+export type GgufInspection = {
+  readonly contextWindow: number;
+  readonly tools: boolean;
+  /** False without a projector. */
+  readonly vision: boolean;
+};
 
-/** Throws for a file llama.cpp cannot load. */
-export type GgufInspect = (path: string) => Promise<GgufInspection>;
+/** Throws for a file llama.cpp cannot load, and for a projector it cannot load with the model. */
+export type GgufInspect = (path: string, projector: string | undefined) => Promise<GgufInspection>;
 
 export type GgufDownloadSource =
   | { readonly kind: 'catalog'; readonly model: CatalogModel }
@@ -102,6 +116,11 @@ export const ggufModelName = (fileId: string) => `${fileId}.gguf`;
 /** A partial download is never resumed across launches, so its name is not a model's. */
 export const ggufPartialName = (fileId: string) => `${fileId}.gguf.part`;
 
+/** The vision projector (mmproj) that belongs to a model. */
+export const ggufProjectorName = (fileId: string) => `${fileId}.mmproj.gguf`;
+
+export const ggufProjectorPartialName = (fileId: string) => `${fileId}.mmproj.gguf.part`;
+
 const modelRecord = z.object({
   fileId: z.string().min(1),
   name: z.string(),
@@ -109,7 +128,34 @@ const modelRecord = z.object({
   sizeBytes: z.number(),
   contextWindow: z.number().positive(),
   tools: z.boolean(),
+  // Saved before projectors existed: the model reads text only.
+  vision: z.boolean().default(false),
 });
+
+/** The files a record keeps on the device. */
+export const recordFileNames = (record: GgufModelRecord) => [
+  ggufModelName(record.fileId),
+  ...(record.vision ? [ggufProjectorName(record.fileId)] : []),
+];
+
+/** The files the inference client loads for a downloaded model. */
+export function modelFileOf(storage: GgufStorage, record: GgufModelRecord): GgufModelFile {
+  return {
+    path: storage.path(ggufModelName(record.fileId)),
+    contextWindow: record.contextWindow,
+    tools: record.tools,
+    projector: record.vision ? storage.path(ggufProjectorName(record.fileId)) : undefined,
+  };
+}
+
+/** Deletes a file that may never have been written, or may already be gone. */
+export function removeQuietly(storage: GgufStorage, name: string): void {
+  try {
+    storage.remove(name);
+  } catch {
+    // Nothing to delete.
+  }
+}
 
 /**
  * The saved list, which is file input: an entry this build cannot read is
@@ -152,10 +198,11 @@ export function modelIndexIsReadable(text: string | null): boolean {
 const mentionedRecord = z.object({ fileId: z.string().min(1) }).loose();
 
 /**
- * Every model file the saved list names, read without trusting its shape.
+ * Every model and projector file the saved list names, read without trusting
+ * its shape.
  *
  * An entry this build cannot parse is still an entry that describes a
- * downloaded model, so its file is protected from cleanup. Reading the list
+ * downloaded model, so its files are protected from cleanup. Reading the list
  * strictly and then deleting whatever it does not name would destroy downloads
  * the moment a record shape changed.
  */
@@ -174,6 +221,7 @@ export function modelIndexMentionedNames(text: string | null): ReadonlySet<strin
     const record = mentionedRecord.safeParse(entry);
     if (record.success) {
       names.add(ggufModelName(record.data.fileId));
+      names.add(ggufProjectorName(record.data.fileId));
     }
   }
   return names;
@@ -210,17 +258,14 @@ export function orphanedModelFiles(input: {
   readonly names: readonly string[];
   readonly index: string | null;
   readonly kept: readonly GgufModelRecord[];
-  readonly partialName: string | undefined;
+  /** The partial files of the download in progress, which survive the cleanup. */
+  readonly partialNames: readonly string[];
 }): readonly string[] {
-  const { names, index, kept, partialName } = input;
+  const { names, index, kept, partialNames } = input;
   if (!modelIndexIsReadable(index)) {
     return [];
   }
-  const keep = new Set(kept.map(record => ggufModelName(record.fileId)));
-  if (partialName !== undefined) {
-    // A partial transfer is not a model and survives the cleanup.
-    keep.add(partialName);
-  }
+  const keep = new Set([...kept.flatMap(record => recordFileNames(record)), ...partialNames]);
   const mentioned = modelIndexMentionedNames(index);
   return names.filter(name => name.includes('.gguf') && !keep.has(name) && !mentioned.has(name));
 }

@@ -20,6 +20,14 @@ const HINT_KEYS = {
   none: 'modelChat.backends.textOnly',
 } as const;
 
+/** The sentence that says whether a model receives tools and reads images. */
+export function modelCapabilityKey(tools: boolean, images: boolean) {
+  if (tools) {
+    return images ? HINT_KEYS.toolsImages : HINT_KEYS.tools;
+  }
+  return images ? HINT_KEYS.images : HINT_KEYS.none;
+}
+
 /**
  * Says whether a custom or on-device model receives tools and images. Kilo
  * models need no hint: they all receive tools, and the attach control shows
@@ -42,11 +50,9 @@ export function ModelToolsHint({ model, backends, localModels }: Readonly<ModelT
     return null;
   }
   const tools = customModel?.tools === true || ggufModel?.tools === true;
-  let key: (typeof HINT_KEYS)[keyof typeof HINT_KEYS] = HINT_KEYS.none;
-  if (tools) {
-    key = images ? HINT_KEYS.toolsImages : HINT_KEYS.tools;
-  } else if (images) {
-    key = HINT_KEYS.images;
-  }
-  return <Text className="px-4 pt-2 text-xs text-muted-foreground">{t(key)}</Text>;
+  return (
+    <Text className="px-4 pt-2 text-xs text-muted-foreground">
+      {t(modelCapabilityKey(tools, images))}
+    </Text>
+  );
 }

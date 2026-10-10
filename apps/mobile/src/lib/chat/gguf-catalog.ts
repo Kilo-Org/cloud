@@ -1,17 +1,23 @@
+/** One pinned file: the URL holds a Hugging Face revision, so the bytes behind it cannot change. */
+export type CatalogFile = {
+  readonly url: string;
+  /** Checked exactly before the download is accepted. */
+  readonly sizeBytes: number;
+  /** The LFS hash Hugging Face publishes for that revision. */
+  readonly sha256: string;
+};
+
 /**
- * A small instruct model the app offers to download. The URL pins a Hugging
- * Face revision, so the bytes behind it cannot change; `sha256` is the LFS
- * hash Hugging Face publishes for that revision, and `sizeBytes` is checked
- * exactly before a download is accepted.
+ * A small instruct model the app offers to download. A vision model also
+ * names its projector (mmproj), which downloads as part of the same model and
+ * comes from the same repository and revision.
  */
-export type CatalogModel = {
+export type CatalogModel = CatalogFile & {
   readonly fileId: string;
   readonly name: string;
-  readonly url: string;
-  readonly sizeBytes: number;
-  readonly sha256: string;
   /** The license name as its publisher states it. A proper noun, not app copy. */
   readonly license: string;
+  readonly projector?: CatalogFile;
 };
 
 export const GGUF_CATALOG: readonly CatalogModel[] = [
@@ -38,6 +44,19 @@ export const GGUF_CATALOG: readonly CatalogModel[] = [
     sizeBytes: 1_117_320_736,
     sha256: '6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e',
     license: 'Apache 2.0',
+  },
+  {
+    fileId: 'smolvlm-500m-instruct-q8_0',
+    name: 'SmolVLM 500M Instruct (Q8_0)',
+    url: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/72e986006ef53e37cdd3f6d4241c90b0f01df376/SmolVLM-500M-Instruct-Q8_0.gguf',
+    sizeBytes: 436_806_912,
+    sha256: '9d4612de6a42214499e301494a3ecc2be0abdd9de44e663bda63f1152fad1bf4',
+    license: 'Apache 2.0',
+    projector: {
+      url: 'https://huggingface.co/ggml-org/SmolVLM-500M-Instruct-GGUF/resolve/72e986006ef53e37cdd3f6d4241c90b0f01df376/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf',
+      sizeBytes: 108_783_360,
+      sha256: 'd1eb8b6b23979205fdf63703ed10f788131a3f812c7b1f72e0119d5d81295150',
+    },
   },
 ];
 

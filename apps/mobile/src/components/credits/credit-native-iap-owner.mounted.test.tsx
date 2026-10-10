@@ -761,14 +761,14 @@ describe('CreditNativeIapOwner', () => {
     const notReady = { code: 'not-prepared', message: 'Billing client not ready' };
     const playListing = { type: 'in-app', id: 'credits_usd10', displayPrice: '$10.99' };
 
-    function loadPlayCatalog(handle: ProbeHandle) {
+    async function loadPlayCatalog(handle: ProbeHandle) {
       const fetchStoreProducts = handle.value?.fetchStoreProducts;
       if (!fetchStoreProducts) {
         throw new Error('CreditNativeIapOwner exposed no product fetch');
       }
-      return loadStoreCreditProducts({
+      return await loadStoreCreditProducts({
         fetchStoreProducts,
-        loadBackendProducts: async () => ({
+        loadBackendProducts: vi.fn().mockResolvedValue({
           appAccountToken: APP_ACCOUNT_TOKEN,
           products: [creditPack.backend],
         }),

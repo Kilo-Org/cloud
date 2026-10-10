@@ -1,11 +1,10 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
-process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq, sql } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   impact_advocate_participants,
   impact_advocate_registration_attempts,

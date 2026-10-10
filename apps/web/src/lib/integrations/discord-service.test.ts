@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   DISCORD_BOT_TOKEN: 'bot-token',
   DISCORD_CLIENT_ID: 'client-id',
   DISCORD_CLIENT_SECRET: 'client-secret',
@@ -11,7 +11,7 @@ const mockUpdateReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -32,7 +32,7 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getOrganizationById: jest.fn(),
 }));
 
@@ -40,7 +40,7 @@ jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'gpt-test'),
 }));
 
-jest.mock('@/lib/model-allow.server', () => ({
+jest.mock('@kilocode/web-shared/lib/model-allow.server', () => ({
   createAllowPredicateFromRestrictions: jest.fn(),
   hasActiveModelRestrictions: jest.fn(() => false),
 }));

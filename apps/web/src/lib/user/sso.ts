@@ -1,6 +1,6 @@
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser } from '@/lib/user';
-import { WORKOS_API_KEY } from '@/lib/config.server';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
@@ -9,12 +9,11 @@ import {
   getOrganizationById,
   getOrganizationMembers,
   skipCustomerSourceSurveyForOrgJoin,
-} from '@/lib/organizations/organizations';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { sendOrgSSOUserJoinedEmail } from '@/lib/email';
-import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { sendOrgSSOUserJoinedEmail } from '@kilocode/web-shared/lib/email';
+import { SSO_SIGNIN_PATH } from '@kilocode/web-shared/lib/auth/constants';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -72,7 +71,11 @@ async function processSSOInternal(
     trackingContext
   );
   if (!res.success) {
-    if (res.error === 'SIGNUP-RATE-LIMITED' || res.error === 'EMAIL-ALREADY-USED') {
+    if (
+      res.error === 'SIGNUP-RATE-LIMITED' ||
+      res.error === 'SIGNUP-UNAVAILABLE' ||
+      res.error === 'EMAIL-ALREADY-USED'
+    ) {
       return `${SSO_SIGNIN_PATH}?error=${res.error}`;
     }
     throw new Error(res.error);
@@ -113,8 +116,6 @@ async function processSSOInternal(
       organization_id: kiloOrg.id,
     });
   }
-
-  await ensureVerifiedDomainOrganizationMembership(savedUser.id);
 
   await createAuditLog({
     action: 'organization.user.login',

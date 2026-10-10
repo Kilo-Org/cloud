@@ -18,7 +18,6 @@ import {
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
 import {
   defaultMergeMethodFor,
   getMergeabilityStatus,
@@ -28,17 +27,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
 import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
-import { cn } from '@/lib/utils';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
 const MERGE_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/merge' as const;
-
-/** Width of a `Button` size `icon` control: a fixed 44dp square. */
-const HEADER_ICON_ACTION_WIDTH = 44;
-/** Width the Submit review label caps itself at (`max-w-[140px]`). */
-const HEADER_SUBMIT_REVIEW_WIDTH = 140;
-/** The `gap-1` between the header cluster's children, in dp. */
-const HEADER_ACTION_GAP = 4;
 
 type PrReviewScreenProps = {
   readonly owner: string;
@@ -183,14 +174,8 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     void markRecentPrFailed(recentIdentity);
   }, [pr.isError, recentIdentity]);
 
-  // Share the PR's public GitHub URL via the native share sheet. The URL comes
-  // from the route params, so this works before the PR query resolves; the title
-  // is added once it is known. Fire-and-forget, like the invite-link share in
-  // `invited-member-row.tsx` — cancelling resolves with `dismissedAction`, and a
-  // sheet the platform refuses to present has no actionable recovery.
-  // Null on a GitLab ref reached without an instance hint: there is no host to
-  // build a public link from, so the affordance is hidden rather than sharing
-  // a link into some other instance's project.
+  // Share the provider's public URL via the native share sheet. Without an
+  // instance hint a GitLab ref has no public URL, so Share stays disabled.
   const webUrl = providerPrWebUrl(queries.ref);
   const sharePullRequest = useCallback(() => {
     if (!webUrl) {
@@ -228,11 +213,8 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   }, [queryClient, queries, pr.data?.headSha]);
 
   const isMergeRequest = queries.platform === 'gitlab';
-  // A first-load failure of the overview leaves the screen without a PR
-  // body: Submit review and share would open sheets or share a link for a
-  // merge request that never loaded, so they stay rendered (no header
-  // shift) but stop responding. The tabs are disabled for the same reason —
-  // their reads cannot succeed while the overview that gates them failed.
+  // A first-load failure keeps the controls in place but disables actions and
+  // tabs that depend on a successfully loaded request.
   const loadFailed = pr.isError && pr.data === undefined;
   // The review-submit sheet is a route sibling on every provider (s6), so
   // the affordance is offered wherever its scope can actually be queried:
@@ -252,22 +234,6 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     (queries.ref.platform === 'github'
       ? getMergeabilityStatus(pr.data) === 'mergeable'
       : pr.data.state === 'open');
-
-  // The header's trailing cluster is bounded by design, so the header can
-  // reserve its width and reflow it onto its own row before the title is
-  // squeezed: `Button` size `icon` is a fixed 44dp square and the Submit review
-  // label caps itself at 140dp (`max-w-[140px]`), so the widths below are the
-  // widths that actually lay out, with `gap-1` between the children. Only the
-  // controls this screen renders are counted — a Files tab with Share and Merge
-  // alone is narrow enough to keep the title beside them.
-  const headerActionsWidths = [
-    webUrl ? HEADER_ICON_ACTION_WIDTH : 0,
-    tab === 'overview' && canSubmitReview ? HEADER_SUBMIT_REVIEW_WIDTH : 0,
-    canMerge ? HEADER_ICON_ACTION_WIDTH : 0,
-  ].filter(width => width > 0);
-  const headerRightWidth =
-    headerActionsWidths.reduce((total, width) => total + width, 0) +
-    Math.max(headerActionsWidths.length - 1, 0) * HEADER_ACTION_GAP;
 
   let body: ReactNode = null;
   if (!queries.isReady) {
@@ -330,63 +296,41 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         }
         eyebrow={`${owner}/${repo}`}
         eyebrowNumberOfLines={1}
-        headerRightWidth={headerRightWidth}
+        titleNumberOfLines={1}
+        allowHeaderRightStacking={false}
         headerRight={
           <View className="flex-row items-center gap-1">
-            {webUrl ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                onPress={sharePullRequest}
-                disabled={loadFailed}
-                accessibilityLabel={
-                  isMergeRequest
-                    ? t('prReview.terms.shareMergeRequest')
-                    : t('prReview.screen.shareA11y')
-                }
-              >
-                <ShareIcon size={18} color={colors.foreground} />
-              </Button>
-            ) : null}
-            {/* P1-F-46b: the Submit-review affordance is reachable from the
-                Overview tab (header right) and the Files tab (floating
-                action bar). The Discussion tab is intentionally left without
-                a submit affordance — comment threads there are read-only. */}
-            {tab === 'overview' && canSubmitReview ? (
-              <Button
-                size="sm"
-                onPress={openReviewSubmit}
-                disabled={loadFailed}
-                accessibilityLabel={t('prReview.submit.submitReview')}
-                // The Button's own base is `shrink-0`, so nothing squeezes it
-                // from outside: ScreenHeader's half-row clamp trims the
-                // cluster's box while this label keeps its width and a large
-                // font scale used to push the whole cluster off the right
-                // screen edge (#6328). A variable-width label must be bounded
-                // at its source. 140 dp keeps the cluster — Share and Merge
-                // icon buttons included — on the narrowest 320 dp viewport and
-                // leaves 96 dp for the label, where the scale-2 words
-                // ("Submit", "review") still fit, so the label wraps in place
-                // instead of clipping.
-                className={cn('min-w-0 max-w-[140px] shrink px-3')}
-              >
-                <Check size={14} color={colors.primaryForeground} />
-                <Text className="shrink text-center">{t('prReview.submit.submitReview')}</Text>
-              </Button>
-            ) : null}
-            {/* Owner request item 3: a Merge CTA at the top right, present only
-                while the PR is actually mergeable. The Overview merge section
-                stays the source of truth for why a blocked PR cannot merge. */}
-            {canMerge ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                onPress={openMerge}
-                accessibilityLabel={t('prReview.merge.mergeNow')}
-              >
-                <GitMerge size={18} color={colors.foreground} />
-              </Button>
-            ) : null}
+            <Button
+              size="icon"
+              variant="ghost"
+              onPress={sharePullRequest}
+              disabled={loadFailed || !webUrl}
+              accessibilityLabel={
+                isMergeRequest
+                  ? t('prReview.terms.shareMergeRequest')
+                  : t('prReview.screen.shareA11y')
+              }
+            >
+              <ShareIcon size={18} color={colors.foreground} />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onPress={openReviewSubmit}
+              disabled={loadFailed || !canSubmitReview}
+              accessibilityLabel={t('prReview.submit.submitReview')}
+            >
+              <Check size={18} color={colors.foreground} />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onPress={openMerge}
+              disabled={!canMerge}
+              accessibilityLabel={t('prReview.merge.mergeNow')}
+            >
+              <GitMerge size={18} color={colors.foreground} />
+            </Button>
           </View>
         }
       />

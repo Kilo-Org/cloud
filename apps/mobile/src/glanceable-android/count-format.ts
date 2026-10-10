@@ -1,6 +1,6 @@
 import { i18n } from '@/i18n';
 import { RTL_LANGUAGES, type SupportedLanguage } from '@/i18n/languages';
-import { numberFormat } from '@/lib/intl-cache';
+import { dateTimeFormat, numberFormat } from '@/lib/intl-cache';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -27,13 +27,25 @@ export function isWidgetRtl(): boolean {
 }
 
 /**
- * The relative time the large cell's newest-result footer shows.
+ * The relative time an Android glanceable draws: the large cell's newest-result
+ * footer, and the ongoing notification's scheduled wake.
  *
  * `timeAgo` already localizes through `Intl.RelativeTimeFormat` and falls back
  * to `common.justNow` for sub-minute ages, so the widget bakes no timer and no
- * second wording. `parseTimestamp` accepts both the ISO strings this app writes
- * and the PostgreSQL form Hermes cannot parse with `new Date`.
+ * second wording. It is direction-aware too, so a scheduled wake ahead of the
+ * clock reads "in 2 hours" rather than the "Just now" a past-only read would
+ * give. `parseTimestamp` accepts both the ISO strings this app writes and the
+ * PostgreSQL form Hermes cannot parse with `new Date`.
  */
 export function formatGlanceableAgo(at: string): string {
   return timeAgo(parseTimestamp(at));
+}
+
+/**
+ * The clock time a scheduled count row draws beside its count ("8:00 PM", or
+ * "20:00" where the language reads a 24-hour clock): the row says when the
+ * agent wakes, the way the iOS widget's scheduled row does.
+ */
+export function formatGlanceableClock(at: string): string {
+  return dateTimeFormat(i18n.language, { timeStyle: 'short' }).format(parseTimestamp(at));
 }

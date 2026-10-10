@@ -7,7 +7,7 @@
       "instanceLifecycle": "למופע שלך יש עדכון",
       "scheduledAction": "לפעולה מתוזמנת יש עדכון",
       "lowBalance": "היתרה שלך דורשת תשומת לב",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "ההוצאה שלך דורשת תשומת לב",
       "securityFinding": "ממצא אבטחה דורש תשומת לב",
       "activeAgentsGlanceable": "לסוכנים הפעילים יש עדכון"
     }
@@ -44,8 +44,8 @@
       "body": "היתרה של {{organizationName}} ירדה מתחת ל-${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "התראת הוצאה",
+      "body": "ההוצאה של {{scopeName}} חצתה ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "ממצא אבטחה חדש ({{severity}})",

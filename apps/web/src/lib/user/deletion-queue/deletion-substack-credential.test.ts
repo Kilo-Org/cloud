@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { user_deletion_provider_credentials } from '@kilocode/db/schema';
 import { UserDeletionProviderScope } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cookieFromCredential,
   deleteSubstackCredential,
@@ -10,7 +10,7 @@ import {
   replaceSubstackCredential,
   testSubstackCredentialMaterial,
 } from '@/lib/user/deletion-queue/deletion-substack-credential';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('cookieFromCredential', () => {
   it('builds a sid cookie from JSON sid material', () => {

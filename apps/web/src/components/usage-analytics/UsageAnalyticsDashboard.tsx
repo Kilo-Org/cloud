@@ -17,7 +17,7 @@ import {
 } from '@/lib/utils';
 import { Download, SlidersHorizontal } from 'lucide-react';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';

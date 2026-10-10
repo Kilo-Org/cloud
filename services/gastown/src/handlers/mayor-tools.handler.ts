@@ -17,8 +17,6 @@ import type { GastownEnv } from '../gastown.worker';
 
 const HANDLER_LOG = '[mayor-tools.handler]';
 
-// ── Schemas ──────────────────────────────────────────────────────────────
-
 const MayorSlingBody = z.object({
   rig_id: z.string().min(1),
   title: z.string().min(1),
@@ -78,8 +76,6 @@ const MayorMailBody = z.object({
 
 const NonNegativeInt = z.coerce.number().int().nonnegative();
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
 /**
  * Resolve the userId for the mayor's town.
  *
@@ -126,8 +122,6 @@ async function verifyRigBelongsToTown(
   const rig = await ownerDO.getRigAsync(rigId);
   return rig !== null && rig.town_id === townId;
 }
-
-// ── Handlers ─────────────────────────────────────────────────────────────
 
 /**
  * POST /api/mayor/:townId/tools/sling
@@ -383,8 +377,6 @@ export async function handleMayorConvoyStatus(
   return c.json(resSuccess(status));
 }
 
-// ── Edit operation schemas ────────────────────────────────────────────────
-
 const BeadUpdateBody = z
   .object({
     title: z.string().min(1).optional(),
@@ -423,8 +415,6 @@ const ConvoyUpdateBody = z
   .refine(data => data.merge_mode !== undefined || data.feature_branch !== undefined, {
     message: 'At least one field must be provided',
   });
-
-// ── Edit handlers ─────────────────────────────────────────────────────────
 
 /**
  * PATCH /api/mayor/:townId/tools/rigs/:rigId/beads/:beadId
@@ -503,7 +493,6 @@ export async function handleMayorBeadReassign(
     return c.json(resError('Bead does not belong to this rig'), 403);
   }
 
-  // Validate target agent belongs to this rig
   const targetAgent = await town.getAgentAsync(parsed.data.agent_id);
   if (!targetAgent) {
     return c.json(resError('Target agent not found'), 404);
@@ -523,7 +512,6 @@ export async function handleMayorBeadReassign(
     }
   }
 
-  // Return the updated bead so clients can read the new assignee
   const updated = await town.getBeadAsync(params.beadId);
   return c.json(resSuccess(updated));
 }
@@ -547,7 +535,6 @@ export async function handleMayorAgentReset(
 
   const town = getTownDOStub(c.env, params.townId);
 
-  // Verify the agent belongs to this rig
   const agent = await town.getAgentAsync(params.agentId);
   if (!agent) {
     return c.json(resError('Agent not found'), 404);
@@ -626,7 +613,6 @@ export async function handleMayorBeadDelete(
 
   const town = getTownDOStub(c.env, params.townId);
 
-  // Verify the bead belongs to this rig
   const bead = await town.getBeadAsync(params.beadId);
   if (!bead) {
     return c.json(resError('Bead not found'), 404);
@@ -847,7 +833,6 @@ export async function handleMayorUiAction(c: Context<GastownEnv>, params: { town
 
   const town = getTownDOStub(c.env, params.townId);
 
-  // Validate that the referenced rig belongs to this town
   const rigId = uiActionRigId(action);
   if (rigId) {
     const rig = await town.getRigAsync(rigId);

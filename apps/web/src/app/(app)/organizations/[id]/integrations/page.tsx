@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { IntegrationsPageClient } from './IntegrationsPageClient';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { SetPageTitle } from '@/components/SetPageTitle';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export default async function IntegrationsPage({ params }: { params: Promise<{ id: string }> }) {
   await getUserFromAuthOrRedirect('/users/sign_in');

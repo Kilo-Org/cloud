@@ -3,8 +3,8 @@ import 'server-only';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
 import { observeGitHubInstallationLifecycle } from '@/lib/integrations/db/github-installations';
 import {

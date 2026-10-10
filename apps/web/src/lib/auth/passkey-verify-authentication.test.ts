@@ -3,7 +3,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 // The guard runs before any database call, so the client is stubbed: were the
 // check to sit after the credential lookup, these tests would reject with a
 // TypeError from the stub instead of the ceremony's refusal.
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 
 import { PasskeyVerificationError, verifyAuthentication } from './passkey';
 

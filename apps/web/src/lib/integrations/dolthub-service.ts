@@ -1,14 +1,17 @@
 import 'server-only';
 import { z } from 'zod';
 import { captureMessage } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { DOLTHUB_APP_CLIENT_ID, DOLTHUB_APP_CLIENT_SECRET } from '@/lib/config.server';
+import {
+  DOLTHUB_APP_CLIENT_ID,
+  DOLTHUB_APP_CLIENT_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
 
 const DOLTHUB_TOKEN_URL = 'https://www.dolthub.com/api/oauth/access_token';
 const DOLTHUB_AUTHORIZE_URL = 'https://www.dolthub.com/oauth/authorize';

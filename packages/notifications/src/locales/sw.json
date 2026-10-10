@@ -7,7 +7,7 @@
       "instanceLifecycle": "Mfano wako umepokea sasisho",
       "scheduledAction": "Kitendo kilichopangwa kimepokea sasisho",
       "lowBalance": "Usawa wako unahitaji umakini",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Matumizi yako yanahitaji umakini",
       "securityFinding": "Tokeo la usalama linahitaji umakini",
       "activeAgentsGlanceable": "Mawakala wanaofanya kazi wana sasisho"
     }
@@ -44,8 +44,8 @@
       "body": "Usawa wa {{organizationName}} ulishuka chini ya ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Arifa ya matumizi",
+      "body": "Matumizi ya {{scopeName}} yalizidi ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Tokeo jipya la usalama ({{severity}})",

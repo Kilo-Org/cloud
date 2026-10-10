@@ -2,7 +2,7 @@ import 'server-only';
 import crypto from 'node:crypto';
 import type { SerializedMessage, SerializedThread, StateAdapter } from 'chat';
 import * as z from 'zod';
-import { botIdentityRedisKey } from '@/lib/redis-keys';
+import { botIdentityRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { createSignedToken, verifySignedToken } from '@/lib/signed-token';
 

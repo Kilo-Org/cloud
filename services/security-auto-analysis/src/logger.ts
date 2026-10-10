@@ -31,6 +31,16 @@ export type SecurityAutoAnalysisLogTags = {
   enqueued_owner_message_count?: number;
   discovered_remediation_attempt_count?: number;
   enqueued_remediation_message_count?: number;
+  command_id?: string;
+  command_type?: string;
+  owner_type?: 'org' | 'user';
+  owner_id?: string;
+  previous_status?: string;
+  result_code?: string | null;
+  started_at?: string | null;
+  accepted_at?: string | null;
+  age_ms?: number | null;
+  repo_full_name?: string | null;
 };
 
 export function sanitizedExceptionName(error: unknown): string {

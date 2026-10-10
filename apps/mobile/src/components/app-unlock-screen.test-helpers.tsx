@@ -120,7 +120,7 @@ const keyboard = vi.hoisted(() => {
     },
   };
 });
-export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
+export { announcements, catalogs, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -303,6 +303,11 @@ vi.mock('@/components/share/share-payload-navigator', () => ({
 }));
 vi.mock('@/lib/active-sessions-live-sync-mount', () => ({
   ActiveSessionsLiveSyncMount: 'ActiveSessionsLiveSyncMount',
+}));
+// The in-app-purchase recovery pass. It renders nothing, and it reaches the
+// store SDK, which needs a React Native runtime this harness does not provide.
+vi.mock('@/lib/iap/store-purchase-recovery-mount', () => ({
+  StorePurchaseRecoveryMount: 'StorePurchaseRecoveryMount',
 }));
 vi.mock('@/lib/artifacts/artifact-mirror-sync-mount', () => ({
   ArtifactMirrorSyncMount: 'ArtifactMirrorSyncMount',

@@ -17,9 +17,9 @@ import { NextResponse } from 'next/server';
 import { updateTriageTicketStatus, getTriageTicketById } from '@/lib/auto-triage/db/triage-tickets';
 import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-pending-tickets';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { TriageStatus, TriageClassification, TriageAction } from '@/lib/auto-triage/db/types';
 
 interface StatusUpdatePayload {

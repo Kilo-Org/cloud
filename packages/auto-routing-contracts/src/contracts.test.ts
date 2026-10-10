@@ -161,7 +161,6 @@ describe('auto routing contracts', () => {
           totalRequests: 0,
           classifiedRequests: 0,
           cachedRequests: 0,
-          fallbackRequests: 0,
           classifierErrors: 0,
           invalidRequests: 0,
           totalCostCredits: 0,
@@ -219,7 +218,7 @@ describe('BenchmarkConfigSchema defaults', () => {
   it('accepts explicit manual and excluded auto decider model lists', () => {
     const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
-      deciderModels: [{ id: 'model/b' }],
+      deciderModels: [{ id: 'model/b', variant: 'retired', reasoningEffort: 'high' }],
       manualDeciderModels: [{ id: 'model/c', reasoningEffort: 'high' }],
       autoDeciderModels: [{ id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 }],
       excludedAutoDeciderModels: ['model/d'],
@@ -233,10 +232,9 @@ describe('BenchmarkConfigSchema defaults', () => {
       updatedBy: null,
     });
 
-    expect(result.manualDeciderModels).toEqual([{ id: 'model/c', reasoningEffort: 'high' }]);
-    expect(result.autoDeciderModels).toEqual([
-      { id: 'model/b', reasoningEffort: null, avgAttemptCostUsd: 21.1 },
-    ]);
+    expect(result.deciderModels).toEqual([{ id: 'model/b' }]);
+    expect(result.manualDeciderModels).toEqual([{ id: 'model/c' }]);
+    expect(result.autoDeciderModels).toEqual([{ id: 'model/b', avgAttemptCostUsd: 21.1 }]);
     expect(result.excludedAutoDeciderModels).toEqual(['model/d']);
   });
 

@@ -236,9 +236,6 @@ export function SettingsOverviewScreen({
           <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
             <View className="flex-1 pr-3">
               <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
-              <Text variant="muted" className="text-xs">
-                {data.isEnabled ? repoCountLabel : t('common.disabled')}
-              </Text>
             </View>
             {capability.canManage ? (
               <Switch

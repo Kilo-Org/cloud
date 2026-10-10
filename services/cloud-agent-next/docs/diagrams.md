@@ -89,7 +89,7 @@ sequenceDiagram
   DO->>Runtime: send(MessageDeliveryRequest)
   Runtime->>Runtime: allocate/reuse WrapperRunFence
   Runtime->>Orch: execute(FencedWrapperDispatchRequest)
-  Orch->>SB: ensure bootstrap or devcontainer wrapper
+  Orch->>SB: ensure bootstrap wrapper
   Orch->>Wrap: POST /session/ready
   Orch->>Wrap: POST /job/prompt or /job/command
   Wrap-->>Runtime: accepted messageId

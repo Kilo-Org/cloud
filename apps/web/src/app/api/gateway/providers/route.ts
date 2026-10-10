@@ -1,5 +1,4 @@
-import { GET as openRouterProvidersGet } from '@/app/api/openrouter/providers/route';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { handleProvidersRequest } from '@kilocode/web-shared/lib/ai-gateway/handlers/providers';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
-// Re-wrap the already timed handler so the gateway alias emits its own line.
-export const GET = withRestTiming('/api/gateway/providers', openRouterProvidersGet);
+export const GET = withRestTiming('/api/gateway/providers', handleProvidersRequest);

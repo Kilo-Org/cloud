@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CountSurfaces } from '@/components/agents/agents-tab-badge.test-helpers';
 import { type ReactTestInstance } from '@/test/renderer';
@@ -7,6 +7,10 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 type Mount = Awaited<ReturnType<typeof renderWithProviders>>;
 const mounts: Mount[] = [];
+
+vi.mock('@/components/agents/session-preview-overlay', () => ({
+  SessionPreviewOverlay: () => null,
+}));
 
 function isHostType(item: ReactTestInstance, type: string) {
   return typeof item.type === 'string' && item.type === type;

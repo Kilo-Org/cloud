@@ -37,11 +37,11 @@ const mockGetWorktreeFile =
 import type * as SentryModule from '@sentry/nextjs';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
 
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: jest.fn(() => 'http://cloud-agent-next'),
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-secret',
 }));
 

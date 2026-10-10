@@ -103,10 +103,6 @@ function MessageBubbleImpl({
     canOpenDetails: onLongPressDetails !== undefined,
   });
 
-  // Stable identity matters: this handler becomes `onLongPressCode` in the
-  // markdown renderer's useMemo deps, so an inline function would rebuild the
-  // renderer (and re-parse the fence markdown) on every bubble render rather
-  // than only when the markdown source changes.
   const handleLongPress = useCallback(() => {
     onLongPressDetails?.(message);
   }, [message, onLongPressDetails]);
@@ -221,15 +217,7 @@ function MessageBubbleImpl({
               <Bubble side="user">
                 <InMessageBubbleContext.Provider value>
                   {userTextContent ? (
-                    <ChatMarkdownText
-                      value={userTextContent}
-                      variant="user"
-                      selectable={false}
-                      // Forward the bubble's long-press so a press-and-hold on a
-                      // code fence still opens message details instead of being
-                      // swallowed by the fence's copy trigger.
-                      onLongPressCode={onLongPressDetails ? handleLongPress : undefined}
-                    />
+                    <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
                   ) : null}
                   {fileParts.map(part => (
                     <FilePartRenderer
@@ -312,9 +300,6 @@ function MessageBubbleImpl({
       defaultReasoningExpanded={defaultReasoningExpanded}
       onOpenChildSession={onOpenChildSession}
       modelOptions={modelOptions}
-      // Markdown text parts forward this into the code-fence copy
-      // trigger so a long press still opens message details.
-      onLongPressCode={onLongPressDetails ? handleLongPress : undefined}
     />
   );
 

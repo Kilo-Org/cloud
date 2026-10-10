@@ -282,6 +282,36 @@ describe('assertReapOutcome', () => {
     ).toThrow(/no distinct replacement/);
   });
 
+  it('accepts a new-plane stop that only wrote a terminal native_stop', () => {
+    const evidence = collectReapEvidence(
+      [
+        {
+          logTag: 'sandbox_control',
+          diagnosticEvent: 'native_stop',
+          allocationName: ALLOCATION_NAME,
+          result: 'terminal',
+        },
+      ],
+      {
+        reapedAllocationRef: REAPED,
+        sandboxId: SANDBOX,
+        allocationName: ALLOCATION_NAME,
+      }
+    );
+    expect(evidence.providerStopObserved).toBe(true);
+    expect(evidence.physicalStopCause).toBeNull();
+    expect(() =>
+      assertReapOutcome({
+        evidence,
+        reapedAllocationRef: REAPED,
+        replacementAllocationRef: REPLACEMENT,
+        settledReapReason: 'recovery_settled_reap',
+        inflight: false,
+        controlPlane: true,
+      })
+    ).not.toThrow();
+  });
+
   it('rejects an inflight run without the runtime_unhealthy reconciliation', () => {
     expect(() =>
       assertReapOutcome({

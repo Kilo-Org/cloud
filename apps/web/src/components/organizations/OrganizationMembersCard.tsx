@@ -37,7 +37,7 @@ import type {
   OrganizationRole,
   OrganizationMemberResponse,
   OrganizationWithMembersResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   useIsKiloAdmin,
   useUserOrganizationRole,

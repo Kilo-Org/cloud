@@ -1,0 +1,21 @@
+diff --git a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
+index 22322f313fe4ff58a791a40aaae579a35b483e6b..fc4017f2ecdc731130f88d418d95b14730f8f8e1 100644
+--- a/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
++++ b/android/src/main/java/expo/modules/notifications/badge/BadgeHelper.kt
+@@ -12,12 +12,10 @@ object BadgeHelper {
+ 
+   fun setBadgeCount(context: Context, badgeCount: Int): Boolean {
+     return try {
+-      if (badgeCount == 0) {
+-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+-        notificationManager.cancelAll()
+-      } else {
+-        ShortcutBadger.applyCountOrThrow(context.applicationContext, badgeCount)
+-      }
++      // Clearing the badge must not clear the app's notifications. Upstream called
++      // NotificationManager.cancelAll() for a zero count, which also removed the
++      // app's ongoing Active Agents card whenever the needs-input count reached 0.
++      ShortcutBadger.applyCountOrThrow(context.applicationContext, badgeCount)
+       BadgeHelper.badgeCount = badgeCount
+       true
+     } catch (e: ShortcutBadgeException) {

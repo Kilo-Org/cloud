@@ -1,12 +1,12 @@
 import 'server-only';
-import { type db } from '@/lib/drizzle';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { type db } from '@kilocode/web-shared/lib/drizzle';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getModelUserByokProviders,
   getOrganizationByokProviderIds,
   getUserByokProviderIds,
-} from '@/lib/ai-gateway/byok';
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {

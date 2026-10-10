@@ -85,6 +85,7 @@ describe('ProductChoices', () => {
       'Security Agent',
       'PR Review',
     ]);
+    expect(rows(renderer.root).map(row => row.props.hue)).toEqual(['honey', 'honey', 'gold']);
     await unmount(renderer);
   });
 

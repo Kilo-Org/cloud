@@ -4,27 +4,14 @@ import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  AppState,
-  I18nManager,
-  Keyboard,
-  type KeyboardEvent,
-  Platform,
-  Pressable,
-  ScrollView,
-  View,
-} from 'react-native';
+import { I18nManager, Pressable, ScrollView, View } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import logo from '@/../assets/images/logo.png';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { CenteredState } from '@/components/centered-state';
-import {
-  resolveAppAwareKeyboardPadding,
-  resolveKeyboardPaddingEventsForPlatform,
-} from '@/components/kilo-chat/app-aware-keyboard-padding-state';
 import { IdleAuth } from '@/components/login/idle-auth';
 import { errorMessage, resolveKeyboardBottomPadding } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
@@ -43,10 +30,7 @@ import {
   type SsoRecoveryDraft,
 } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
-
-function keyboardHeightFromEvent(event: KeyboardEvent): number {
-  return event.endCoordinates.height;
-}
+import { useScreenInsets } from '@/lib/screen-insets';
 
 export function LoginScreen() {
   const { sessionEnded, signIn } = useAuth();
@@ -63,12 +47,12 @@ export function LoginScreen() {
     start,
     cancel,
     openBrowser,
+    clearError,
   } = useDeviceAuth();
   const colors = useThemeColors();
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   const { t } = useTranslation();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
@@ -123,54 +107,11 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // The login screen owns keyboard occlusion on both platforms, so the layout is
-  // one implementation: KeyboardAvoidingView used to handle iOS alone and left
-  // Android — whose window never resizes for the IME under API 35+
-  // EDGE_TO_EDGE_ENFORCED — to this listener. The only platform difference left
-  // is which keyboard events exist: Android fires no `keyboardWillShow`/
-  // `keyboardWillHide`, so `resolveKeyboardPaddingEventsForPlatform` names the
-  // pair each platform reports.
-  useEffect(() => {
-    const keyboardEvents = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
-    if (keyboardEvents === null) {
-      setKeyboardHeight(0);
-      return undefined;
-    }
-
-    const keyboardShowSubscription = Keyboard.addListener(keyboardEvents.show, event => {
-      setKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: {
-            type: 'keyboard-visible',
-            keyboardHeight: keyboardHeightFromEvent(event),
-          },
-        })
-      );
-    });
-    const keyboardHideSubscription = Keyboard.addListener(keyboardEvents.hide, () => {
-      setKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'keyboard-hidden' },
-        })
-      );
-    });
-    const appStateSubscription = AppState.addEventListener('change', appState => {
-      setKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'app-state-change', appState },
-        })
-      );
-    });
-
-    return () => {
-      keyboardShowSubscription.remove();
-      keyboardHideSubscription.remove();
-      appStateSubscription.remove();
-    };
-  }, []);
+  // The `KeyboardProvider` at the root measures the keyboard once in native
+  // code, so this screen reads the height instead of listening to React Native's
+  // keyboard events. The provider also clears the height when the app leaves the
+  // foreground, which the listener pair used to do itself.
+  const keyboardHeight = useKeyboardState(state => state.height);
 
   if (status === 'approved') {
     if (persistError) {
@@ -200,21 +141,33 @@ export function LoginScreen() {
   }
 
   // One padded wrapper for both platforms: the bottom inset is reserved at
-  // rest, and while the IME is up the reported keyboard occlusion is resolved
-  // from the platform's metric origin (see `resolveKeyboardBottomPadding` for
-  // the capability each platform reports). The ScrollView's centered form then
-  // re-centres in the space that stays above the keyboard, so "Continue" is
+  // rest, and while the IME is up the provider's keyboard height is reserved
+  // instead (see `resolveKeyboardBottomPadding`). The ScrollView's centered form
+  // then re-centres in the space that stays above the keyboard, so "Continue" is
   // never left under the keyboard, the navigation bar, or the home indicator.
   const bottomPadding = resolveKeyboardBottomPadding({
     keyboardHeight,
     bottomInset: insets.bottom,
-    platform: Platform.OS,
   });
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow
   // (pending/approved) or a busy auth action owns the screen.
   const globeDisabled = status === 'pending' || authFormBusy;
-  const globeTrailing = I18nManager.isRTL ? { left: 16 } : { right: 16 };
+  const globeTrailing = I18nManager.isRTL
+    ? { left: insets.left + 16 }
+    : { right: insets.right + 16 };
+  // A terminal device-auth error — an expired code, denied access, or the poll
+  // timing out — renders its message above the idle form. Idle, every terminal
+  // error, and a start that has not answered yet share the same single IdleAuth
+  // slot below, so dismissing the error when a new attempt starts preserves the
+  // form's in-flight state.
+  // A start that has not answered yet (`pending` with no code yet) keeps the
+  // idle form on screen too: beginning a new attempt dismisses the old error,
+  // and the form stays in place while the attempt runs, with the starting
+  // indicator below instead of a wholesale swap to the spinner.
+  const startInFlight = status === 'pending' && !code;
+  const showTerminalError = status === 'denied' || status === 'expired' || status === 'error';
+  const showIdleForm = status === 'idle' ? draft !== null : showTerminalError || startInFlight;
 
   return (
     // One wrapper owns the vertical space on both platforms: it paints the
@@ -224,7 +177,11 @@ export function LoginScreen() {
     <View
       className="flex-1 bg-background"
       // eslint-disable-next-line react-native/no-inline-styles -- dynamic keyboard and safe-area padding
-      style={{ paddingBottom: bottomPadding }}
+      style={{
+        paddingBottom: bottomPadding,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+      }}
     >
       <ScrollView
         className="flex-1 bg-background"
@@ -241,6 +198,16 @@ export function LoginScreen() {
             recovering only on relaunch — so these branches render without
             animation; status swaps are instant. */}
         <View className="w-full max-w-sm gap-3">
+          {/* A terminal device-auth error keeps the idle form on screen so the
+              user can retry. The banner is a sibling above one IdleAuth at one
+              JSX slot, so clearing the error when a new attempt starts does not
+              remount the form and lose an in-flight OTP challenge. */}
+          {showTerminalError && (
+            <Text className="text-center text-sm text-destructive">
+              {errorMessage(status, error)}
+            </Text>
+          )}
+
           {status === 'idle' && draft === null && (
             <>
               {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
@@ -249,12 +216,13 @@ export function LoginScreen() {
             </>
           )}
 
-          {status === 'idle' && draft !== null && (
+          {showIdleForm && (
             <IdleAuth
               start={start}
-              initialEmail={draft.email}
-              initialSsoRecovery={draft.ssoRecovery}
+              initialEmail={draft?.email ?? ''}
+              initialSsoRecovery={draft?.ssoRecovery ?? null}
               onBusyChange={setAuthFormBusy}
+              onSignInStart={clearError}
             />
           )}
 
@@ -322,20 +290,6 @@ export function LoginScreen() {
               <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
                 <Text>{t('common.cancel')}</Text>
               </Button>
-            </View>
-          )}
-
-          {(status === 'denied' || status === 'expired' || status === 'error') && (
-            <View className="w-full gap-3">
-              <Text className="text-center text-sm text-destructive">
-                {errorMessage(status, error)}
-              </Text>
-              <IdleAuth
-                start={start}
-                initialEmail={draft?.email ?? ''}
-                initialSsoRecovery={draft?.ssoRecovery ?? null}
-                onBusyChange={setAuthFormBusy}
-              />
             </View>
           )}
         </View>

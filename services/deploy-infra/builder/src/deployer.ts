@@ -1,8 +1,3 @@
-/**
- * Deployer - Orchestrates the deployment of Cloudflare Workers with assets.
- * Handles uploading assets and deploying worker scripts.
- */
-
 import { WorkerNotFoundError, type CloudflareAPI } from './cloudflare-api';
 import { DEPLOY_DISPATCH_NAMESPACE } from './dispatch-namespace';
 import type { DeploymentArtifacts } from './types';
@@ -40,19 +35,11 @@ export class Deployer {
     });
   }
 
-  /**
-   * Deploy a worker with its assets to Cloudflare
-   */
   async deploy(params: {
-    /** Worker script and asset files */
     artifacts: DeploymentArtifacts;
-    /** Name of the worker */
     workerName: string;
-    /** Callback for logging progress */
     logger: (message: string) => void;
-    /** Dispatch namespace to deploy to */
     dispatchNamespace?: string;
-    /** Optional environment variables (decrypted) */
     envVars?: PlaintextEnvVar[];
   }): Promise<void> {
     const {
@@ -71,7 +58,6 @@ export class Deployer {
     const secretEnvVars = envVars?.filter(v => v.isSecret) ?? [];
     const plainTextEnvVars = envVars?.filter(v => !v.isSecret) ?? [];
 
-    // Set secrets
     if (secretEnvVars.length > 0) {
       try {
         await this.api.setSecrets(workerName, dispatchNamespace, secretEnvVars);
@@ -87,7 +73,6 @@ export class Deployer {
       }
     }
 
-    // Handle case with no assets and no artifacts
     if (assets.length === 0 && artifactFiles.length === 0) {
       logger('No assets or artifacts found, deploying worker only');
       const metadata = {
@@ -112,7 +97,6 @@ export class Deployer {
 
     logger(`Found ${assets.length} asset files and ${artifactFiles.length} artifact files`);
 
-    // Calculate hashes and build data structures
     const fileContents = new Map<string, { buffer: Buffer; mimeType: string }>();
     const manifest: Record<string, { hash: string; size: number }> = {};
 
@@ -140,7 +124,6 @@ export class Deployer {
 
     logger(`Built asset manifest with ${assets.length} files, ${totalBytes} total bytes`);
 
-    // Create asset upload session
     const { jwt, buckets } = await this.api.createAssetUploadSession(
       workerName,
       manifest,
@@ -149,7 +132,6 @@ export class Deployer {
 
     logger(`Created asset upload session, ${buckets.length} buckets to upload`);
 
-    // Upload assets in batches
     let completionJwt: string | null = null;
 
     if (buckets.length === 0) {
@@ -157,7 +139,6 @@ export class Deployer {
       logger('All assets already exist on Cloudflare');
       completionJwt = jwt;
     } else {
-      // Upload new/changed assets
       for (let i = 0; i < buckets.length; i++) {
         const bucket = buckets[i];
         logger(`Uploading batch ${i + 1}/${buckets.length} (${bucket.length} files)`);
@@ -176,7 +157,6 @@ export class Deployer {
 
     logger('All assets uploaded successfully');
 
-    // Build worker metadata with asset configuration
     const bindings: Array<Record<string, unknown>> = [
       {
         name: 'ASSETS',
@@ -195,7 +175,6 @@ export class Deployer {
       },
     };
 
-    // Deploy worker with artifact files
     await this.api.deployWorker({
       scriptName: workerName,
       metadata,

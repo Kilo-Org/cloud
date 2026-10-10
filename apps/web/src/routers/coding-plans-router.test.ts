@@ -1,17 +1,17 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { generateText } from 'ai';
 import { eq } from 'drizzle-orm';
-import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
 import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
 import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
 import { CODING_PLAN_IDS } from '@/lib/coding-plans/pricing';
-import { redisClient } from '@/lib/redis';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   byok_api_keys,
   coding_plan_availability_intents,
@@ -22,8 +22,8 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-byteplus-access',
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-byteplus-secret',
 }));
@@ -34,7 +34,7 @@ jest.mock('ai', () => ({
   createGateway: jest.fn(() => jest.fn((modelId: string) => ({ modelId }))),
   generateText: jest.fn(),
 }));
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn(),
     set: jest.fn(),
@@ -1441,6 +1441,66 @@ describe('coding plans router', () => {
     ).rejects.toMatchObject({
       code: 'NOT_FOUND',
       message: 'No active subscription found.',
+    });
+  });
+
+  it('terminates a pending-cancellation subscription immediately and rejects canceled subscriptions', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const inventory = await insertInventory({ status: 'assigned' });
+    const [installedKey] = await db
+      .insert(byok_api_keys)
+      .values({
+        kilo_user_id: user.id,
+        provider_id: 'minimax',
+        encrypted_api_key: encryptApiKey('coding-plan-secret', BYOK_ENCRYPTION_KEY),
+        management_source: 'coding_plan',
+        created_by: user.id,
+      })
+      .returning();
+    const [pendingCancellation] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          key_inventory_id: inventory.id,
+          installed_byok_key_id: installedKey.id,
+          status: 'active',
+          cancel_at_period_end: true,
+        })
+      )
+      .returning();
+    const [canceled] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          plan_id: MAX_PLAN_ID,
+          status: 'canceled',
+          canceled_at: '2026-07-20T12:00:00.000Z',
+          cancellation_reason: 'user_cancelled',
+        })
+      )
+      .returning();
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.codingPlans.adminTerminateSubscription({ subscriptionId: pendingCancellation.id });
+    const [updated] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, pendingCancellation.id));
+    expect(updated.status).toBe('canceled');
+    expect(updated.installed_byok_key_id).toBeNull();
+
+    const [remainingKey] = await db
+      .select()
+      .from(byok_api_keys)
+      .where(eq(byok_api_keys.id, installedKey.id));
+    expect(remainingKey).toBeUndefined();
+
+    await expect(
+      caller.codingPlans.adminTerminateSubscription({ subscriptionId: canceled.id })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'No live subscription found.',
     });
   });
 

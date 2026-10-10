@@ -1,12 +1,12 @@
-import { renderTemplate, subjects } from '@/lib/email';
+import { renderTemplate, subjects } from '@kilocode/web-shared/lib/email';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
 
-jest.mock('@/lib/email-mailgun', () => ({
+jest.mock('@kilocode/web-shared/lib/email-mailgun', () => ({
   getEmailVerificationRecipient: (email: string) => email,
   sendViaMailgun: jest.fn(),
 }));
 
-jest.mock('@/lib/email-neverbounce', () => ({
+jest.mock('@kilocode/web-shared/lib/email-neverbounce', () => ({
   verifyEmail: jest.fn(),
 }));
 

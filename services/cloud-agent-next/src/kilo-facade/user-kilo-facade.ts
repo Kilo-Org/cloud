@@ -27,10 +27,26 @@ import { getPgDb } from '../db/pg.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
-import { sessionPlaneFromId } from '../session-plane.js';
+import {
+  getSandboxSessionStub,
+  resolveLegacySessionStub,
+} from '../sandbox-session/session-stub.js';
+import {
+  buildControlPlaneMessagePayload,
+  ControlPlaneMessageInputError,
+} from '../session/control-plane-session-input.js';
+import { fetchSessionMetadata } from '../session-service.js';
+import { isControlSession } from '../session-plane.js';
+import type { SessionId } from '../types/ids.js';
+import type {
+  ControlPlaneSendResult,
+  SandboxSessionV2,
+} from '../control-plane/session/session-do.js';
 import { interruptControlSession } from '../router/control-plane-session.js';
-import { preflightAndAdmitPromptMessage } from '../session/queue-message.js';
+import {
+  preflightAndAdmitPromptMessage,
+  pendingQueueFullAdmissionFailure,
+} from '../session/queue-message.js';
 import { parseBasicKiloPrompt } from './basic-prompt.js';
 import {
   isPublicCloudAgentExtensionSourceType,
@@ -783,8 +799,50 @@ async function defaultAdmitPrompt(params: {
   cloudAgentSessionId: string;
   request: SubmittedSessionMessageRequest;
 }): Promise<SessionMessageAdmissionResult> {
+  if (isControlSession(params.cloudAgentSessionId)) {
+    const sessionId = params.cloudAgentSessionId as SessionId;
+    const metadata = await fetchSessionMetadata(params.env, params.userId, sessionId);
+    if (!metadata) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    let payload;
+    try {
+      payload = await buildControlPlaneMessagePayload({
+        env: params.env,
+        userId: params.userId,
+        sessionId,
+        metadata,
+        turn: params.request.turn,
+        ...(params.request.finalization === undefined
+          ? {}
+          : { finalization: params.request.finalization }),
+        ...(params.request.agent === undefined ? {} : { agentOverride: params.request.agent }),
+      });
+    } catch (error) {
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: error instanceof ControlPlaneMessageInputError ? error.detail : 'Invalid message',
+      };
+    }
+    const result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneSendResult>(
+      () => getSandboxSessionStub(params.env, params.userId, sessionId),
+      stub => stub.send(payload),
+      'send'
+    );
+    if (result.type === 'session-not-found') {
+      return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    }
+    if (result.type === 'queue-full') {
+      return pendingQueueFullAdmissionFailure();
+    }
+    return {
+      success: true,
+      outcome: 'queued',
+      compatibilityDelivery: 'queued',
+      messageId: payload.messageId,
+    };
+  }
   return withDORetry<DurableObjectStub<CloudAgentSession>, SessionMessageAdmissionResult>(
-    () => resolveSessionStub(params.env, params.userId, params.cloudAgentSessionId),
+    () => resolveLegacySessionStub(params.env, params.userId, params.cloudAgentSessionId),
     stub => stub.admitSubmittedMessage(params.request),
     'admitSubmittedMessage'
   );
@@ -883,7 +941,7 @@ async function defaultInterruptPrompt(params: {
   userId: string;
   cloudAgentSessionId: string;
 }): Promise<Awaited<ReturnType<CloudAgentSession['interruptExecution']>>> {
-  if (sessionPlaneFromId(params.cloudAgentSessionId) === 'control') {
+  if (isControlSession(params.cloudAgentSessionId)) {
     const receipt = await interruptControlSession({
       env: params.env,
       ownerId: params.userId,
@@ -900,7 +958,7 @@ async function defaultInterruptPrompt(params: {
     DurableObjectStub<CloudAgentSession>,
     Awaited<ReturnType<CloudAgentSession['interruptExecution']>>
   >(
-    () => resolveSessionStub(params.env, params.userId, params.cloudAgentSessionId),
+    () => resolveLegacySessionStub(params.env, params.userId, params.cloudAgentSessionId),
     stub => stub.interruptExecution(),
     'interruptExecution'
   );
@@ -1621,7 +1679,21 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
   }
 
   private validateGlobalFeedProducer(source: GlobalFeedSource) {
-    const sessionStub = resolveSessionStub(this.env, source.userId, source.cloudAgentSessionId);
+    // The Kilo global feed is a legacy-plane producer route. A control session
+    // publishes through the control-plane ingest, so fail closed here rather
+    // than calling a legacy-only RPC.
+    if (isControlSession(source.cloudAgentSessionId)) {
+      return Promise.resolve({
+        success: false as const,
+        status: 404,
+        message: 'Session metadata not found',
+      });
+    }
+    const sessionStub = resolveLegacySessionStub(
+      this.env,
+      source.userId,
+      source.cloudAgentSessionId
+    );
     return sessionStub.validateKiloGlobalFeedProducer({
       kiloSessionId: source.kiloSessionId,
       wrapperRunId: source.wrapperRunId,

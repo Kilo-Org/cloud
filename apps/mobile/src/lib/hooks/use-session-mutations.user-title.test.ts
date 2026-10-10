@@ -1,4 +1,5 @@
 import type * as ReactQuery from '@tanstack/react-query';
+import type * as React from 'react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -22,6 +23,17 @@ const messages: string[] = [];
 const settled: (() => void)[] = [];
 const listKey = [['cliSessionsV2', 'list'], { type: 'infinite' }] as const;
 const activeFilter = { queryKey: [['activeSessions', 'list']] };
+
+// This suite calls the hook directly, outside a renderer, so its React hooks
+// must be inert. `useCallback` is a real React hook; run it as identity, the
+// same contract the react-query mocks below rely on.
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof React>('react');
+  return {
+    ...actual,
+    useCallback: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => fn),
+  };
+});
 
 // Execute the real rename mutation so the hook's optimistic write and its
 // recording of the user's title both run.

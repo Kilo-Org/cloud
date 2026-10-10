@@ -83,6 +83,21 @@ describe('mergeSnapshotForActiveSessions', () => {
     expect(unenrichedResult[0]?.updatedAt).toBeUndefined();
   });
 
+  it('forwards a scheduled wake time from the wire and drops it when the CLI omits it', () => {
+    const current = [
+      makeCached({ id: 'a', status: 'scheduled', scheduledAt: '2026-09-24T08:00:00.000Z' }),
+    ];
+    const row = { id: 'a', status: 'scheduled', title: 'Wake later', connectionId: 'c1' };
+    const withWake = mergeSnapshotForActiveSessions(current, [
+      { ...row, scheduledAt: '2026-09-24T09:00:00.000Z' },
+    ]);
+    expect(withWake[0]?.scheduledAt).toBe('2026-09-24T09:00:00.000Z');
+
+    const withoutWake = mergeSnapshotForActiveSessions(current, [row]);
+    expect(withoutWake[0]?.status).toBe('scheduled');
+    expect(withoutWake[0]?.scheduledAt).toBeUndefined();
+  });
+
   it('drops rows absent from the snapshot', () => {
     const current = [makeCached({ id: 'a' }), makeCached({ id: 'b' })];
     const snapshot = [{ id: 'a', status: 'running', title: 'A', connectionId: 'c1' }];

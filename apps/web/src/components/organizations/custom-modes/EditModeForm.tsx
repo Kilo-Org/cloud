@@ -12,8 +12,8 @@ import { LoadingCard } from '@/components/LoadingCard';
 import { ErrorCard } from '@/components/ErrorCard';
 import { toast } from 'sonner';
 import { DEFAULT_MODES } from './default-modes';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import { hasActiveOrganizationModelPolicy } from '@/lib/organizations/organization-auto-model-shared';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { hasActiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
 
 type EditModeFormProps = {
   organizationId: string;

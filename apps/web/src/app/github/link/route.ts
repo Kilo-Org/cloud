@@ -1,12 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { APP_URL } from '@/lib/constants';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { verifyGitHubLinkToken } from '@/lib/bot/github-link-token';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
 import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_CALLBACK_PATH = '/api/integrations/github/callback';

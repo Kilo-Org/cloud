@@ -2,6 +2,7 @@ import { jwtVerify, SignJWT } from 'jose';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, kilocode_users } from '@kilocode/db/schema';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 
 import type { Env } from '../env';
@@ -10,7 +11,6 @@ export const SESSION_SHARE_TOKEN_ISSUER = 'kilo-session-ingest';
 export const SESSION_SHARE_TOKEN_AUDIENCE = 'kilo-session-share';
 export const SESSION_SHARE_TOKEN_VERSION = 1;
 
-const sessionIdSchema = z.string().startsWith('ses_').length(30);
 const sessionShareTokenPayloadSchema = z
   .object({
     iss: z.literal(SESSION_SHARE_TOKEN_ISSUER),

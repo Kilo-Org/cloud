@@ -12,7 +12,7 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import {
   markTaskManuallyVerified,
@@ -21,7 +21,7 @@ import {
   retryBlockedPreflight,
 } from '@/lib/user/deletion-queue/deletion-outcomes';
 import { runDeletionPreflight } from '@/lib/user/deletion-queue/deletion-preflight';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('persistHandlerOutcome progress', () => {
   beforeEach(async () => {

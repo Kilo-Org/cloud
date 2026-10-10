@@ -1,12 +1,16 @@
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { preferredModels } from '@/lib/ai-gateway/models';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-
-const preferredSet = new Set(preferredModels);
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 
 export const modelsRouter = createTRPCRouter({
+  preferred: baseProcedure.query(() => getPreferredModels()),
+
   list: baseProcedure.query(async () => {
-    const response = await getEnhancedOpenRouterModels();
+    const [response, preferredModels] = await Promise.all([
+      getEnhancedOpenRouterModels(),
+      getPreferredModels(),
+    ]);
+    const preferredSet = new Set(preferredModels);
 
     return (response.data ?? []).map(model => ({
       id: model.id,

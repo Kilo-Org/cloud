@@ -5,7 +5,7 @@
  * - Ensures a test user row exists in Postgres (direct insert via
  *   `@kilocode/db`; no reliance on the Next.js fake-login HTTP flow).
  * - Mints Kilo user JWTs for tRPC and short-lived `stream_ticket` JWTs for
- *   the `/stream` WebSocket — same shapes as `apps/web/src/lib/tokens.ts`
+ *   the `/stream` WebSocket — same shapes as `packages/web-shared/src/lib/tokens.ts`
  *   and `apps/web/src/lib/cloud-agent/stream-ticket.ts`.
  *
  * Dev-only — never run against a production DB.
@@ -194,12 +194,13 @@ export type MintedTokens = {
 
 /**
  * Mint a Kilo user JWT for tRPC authentication. Mirrors
- * `apps/web/src/lib/tokens.ts:generateApiToken` but with a short expiry
+ * `packages/web-shared/src/lib/tokens.ts:generateApiToken` but with a short expiry
  * since the driver is ephemeral.
  */
 export function mintApiToken(
   user: { id: string; api_token_pepper?: string },
-  nextAuthSecret: string | undefined
+  nextAuthSecret: string | undefined,
+  expiresInSeconds = 60 * 60
 ): string {
   if (!nextAuthSecret) {
     throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
@@ -213,7 +214,7 @@ export function mintApiToken(
       tokenSource: 'cloud-agent',
     },
     nextAuthSecret,
-    { algorithm: 'HS256', expiresIn: '1h' }
+    { algorithm: 'HS256', expiresIn: expiresInSeconds }
   );
 }
 

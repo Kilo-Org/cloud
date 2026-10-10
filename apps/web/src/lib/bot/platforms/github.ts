@@ -7,7 +7,7 @@ import {
   truncate,
 } from '@/lib/bot/platforms/shared';
 import type { BotPlatform } from '@/lib/bot/platforms/types';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
 import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
 import { PLATFORM } from '@/lib/integrations/core/constants';

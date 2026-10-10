@@ -7,7 +7,7 @@
       "instanceLifecycle": "Örneğinizde bir güncelleme var",
       "scheduledAction": "Zamanlanmış bir eylemde güncelleme var",
       "lowBalance": "Bakiyeniz dikkat gerektiriyor",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Harcamanız dikkat gerektiriyor",
       "securityFinding": "Bir güvenlik bulgusu dikkat gerektiriyor",
       "activeAgentsGlanceable": "Etkin ajanlarda bir güncelleme var"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} bakiyesi ${{minimumBalanceUsd}} altına düştü"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Harcama uyarısı",
+      "body": "{{scopeName}} harcaması ${{amountUsd}} değerini aştı"
     },
     "securityFindingNew": {
       "title": "Yeni güvenlik bulgusu ({{severity}})",

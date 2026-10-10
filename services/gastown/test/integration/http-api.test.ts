@@ -43,8 +43,6 @@ describe('HTTP API', () => {
   const townId = 'test-town-http-api';
   const rigId = () => `rig-${crypto.randomUUID()}`;
 
-  // ── Dashboard ──────────────────────────────────────────────────────────
-
   describe('dashboard', () => {
     it('should serve HTML at /', async () => {
       const res = await SELF.fetch(api('/'));
@@ -55,8 +53,6 @@ describe('HTTP API', () => {
     });
   });
 
-  // ── Health ─────────────────────────────────────────────────────────────
-
   describe('health', () => {
     it('should return ok', async () => {
       const res = await SELF.fetch(api('/health'));
@@ -65,8 +61,6 @@ describe('HTTP API', () => {
       expect(body.status).toBe('ok');
     });
   });
-
-  // ── 404 ────────────────────────────────────────────────────────────────
 
   describe('not found', () => {
     it('should return 404 for unknown routes', async () => {
@@ -79,8 +73,6 @@ describe('HTTP API', () => {
       expect(body.error).toBe('Not found');
     });
   });
-
-  // ── Beads ──────────────────────────────────────────────────────────────
 
   describe('beads', () => {
     it('should create a bead', async () => {
@@ -119,7 +111,6 @@ describe('HTTP API', () => {
 
     it('should list beads', async () => {
       const id = rigId();
-      // Create two beads
       await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
@@ -190,7 +181,6 @@ describe('HTTP API', () => {
 
     it('should update bead status', async () => {
       const id = rigId();
-      // Create bead and agent
       const beadRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/beads`), {
         method: 'POST',
         headers: headers(),
@@ -248,8 +238,6 @@ describe('HTTP API', () => {
       expect(body.data.closed_at).toBeDefined();
     });
   });
-
-  // ── Agents ─────────────────────────────────────────────────────────────
 
   describe('agents', () => {
     it('should register an agent', async () => {
@@ -312,12 +300,9 @@ describe('HTTP API', () => {
     });
   });
 
-  // ── Hooks ──────────────────────────────────────────────────────────────
-
   describe('hooks', () => {
     it('should hook and unhook a bead', async () => {
       const id = rigId();
-      // Create agent and bead
       const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
@@ -332,7 +317,6 @@ describe('HTTP API', () => {
       });
       const bead = (await beadRes.json()).data;
 
-      // Hook
       const hookRes = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`),
         {
@@ -345,7 +329,6 @@ describe('HTTP API', () => {
       const hookBody = await hookRes.json();
       expect(hookBody.data.hooked).toBe(true);
 
-      // Verify agent has hooked bead (stays idle until alarm dispatches to container)
       const agentCheck = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
         {
@@ -356,7 +339,6 @@ describe('HTTP API', () => {
       expect(agentState.status).toBe('idle');
       expect(agentState.current_hook_bead_id).toBe(bead.bead_id);
 
-      // Unhook
       const unhookRes = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`),
         {
@@ -369,7 +351,6 @@ describe('HTTP API', () => {
 
     it('should hook via agent JWT auth', async () => {
       const id = rigId();
-      // Create agent and bead
       const agentRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
@@ -384,7 +365,6 @@ describe('HTTP API', () => {
       });
       const bead = (await beadRes.json()).data;
 
-      // Hook via agent JWT
       const jwtHeaders = agentHeaders({ agentId: agent.id, rigId: id });
       const hookRes = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`),
@@ -397,8 +377,6 @@ describe('HTTP API', () => {
       expect(hookRes.status).toBe(200);
     });
   });
-
-  // ── Prime ──────────────────────────────────────────────────────────────
 
   describe('prime', () => {
     it('should return prime context', async () => {
@@ -425,8 +403,6 @@ describe('HTTP API', () => {
     });
   });
 
-  // ── Done ───────────────────────────────────────────────────────────────
-
   describe('agent done', () => {
     it('should mark agent done and submit to review queue', async () => {
       const id = rigId();
@@ -444,14 +420,12 @@ describe('HTTP API', () => {
       });
       const bead = (await beadRes.json()).data;
 
-      // Hook the bead
       await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/hook`), {
         method: 'POST',
         headers: headers(),
         body: JSON.stringify({ bead_id: bead.bead_id }),
       });
 
-      // Mark done
       const res = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}/done`), {
         method: 'POST',
         headers: headers(),
@@ -465,7 +439,6 @@ describe('HTTP API', () => {
       const body = await res.json();
       expect(body.data.done).toBe(true);
 
-      // Verify agent is idle
       const agentCheck = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
         {
@@ -477,8 +450,6 @@ describe('HTTP API', () => {
       expect(agentState.current_hook_bead_id).toBeNull();
     });
   });
-
-  // ── Checkpoint ─────────────────────────────────────────────────────────
 
   describe('checkpoint', () => {
     it('should write and read checkpoint', async () => {
@@ -500,7 +471,6 @@ describe('HTTP API', () => {
       );
       expect(writeRes.status).toBe(200);
 
-      // Read checkpoint via agent get (checkpoint is on the agent record)
       const agentCheck = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${agent.id}`),
         {
@@ -512,12 +482,9 @@ describe('HTTP API', () => {
     });
   });
 
-  // ── Mail ───────────────────────────────────────────────────────────────
-
   describe('mail', () => {
     it('should send and check mail', async () => {
       const id = rigId();
-      // Create sender and receiver
       const senderRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/agents`), {
         method: 'POST',
         headers: headers(),
@@ -532,7 +499,6 @@ describe('HTTP API', () => {
       });
       const receiver = (await receiverRes.json()).data;
 
-      // Send mail
       const sendRes = await SELF.fetch(api(`/api/towns/${townId}/rigs/${id}/mail`), {
         method: 'POST',
         headers: headers(),
@@ -545,7 +511,6 @@ describe('HTTP API', () => {
       });
       expect(sendRes.status).toBe(201);
 
-      // Check mail
       const mailRes = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${receiver.id}/mail`),
         {
@@ -557,7 +522,6 @@ describe('HTTP API', () => {
       expect(mailBody.data).toHaveLength(1);
       expect(mailBody.data[0].subject).toBe('Hello');
 
-      // Check mail again — should be empty (delivered)
       const mailRes2 = await SELF.fetch(
         api(`/api/towns/${townId}/rigs/${id}/agents/${receiver.id}/mail`),
         {
@@ -568,8 +532,6 @@ describe('HTTP API', () => {
       expect(mailBody2.data).toHaveLength(0);
     });
   });
-
-  // ── Review Queue ───────────────────────────────────────────────────────
 
   describe('review queue', () => {
     it('should submit to review queue', async () => {
@@ -604,8 +566,6 @@ describe('HTTP API', () => {
     });
   });
 
-  // ── Escalations ────────────────────────────────────────────────────────
-
   describe('escalations', () => {
     it('should create an escalation bead', async () => {
       const id = rigId();
@@ -626,12 +586,9 @@ describe('HTTP API', () => {
     });
   });
 
-  // ── Agent identity enforcement (via JWT) ───────────────────────────────
   // These tests use agent JWTs to verify identity enforcement still works
   // even though authMiddleware is skipped in dev mode — the agentOnlyMiddleware
   // is separate and still applies to agent-scoped routes when a JWT is present.
-
-  // ── Query param validation ─────────────────────────────────────────────
 
   describe('query param validation', () => {
     it('should reject non-numeric limit', async () => {

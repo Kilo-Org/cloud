@@ -97,8 +97,10 @@ type SessionRowAccessibilityLabelInputs = {
    * to its status glyph). When set on a live row whose needs-input flag is
    * down, the label names the state the glyph draws instead of the static
    * LIVE eyebrow word: `common.working` for running, `common.idle` for idle.
-   * Omit it (or pass null) to keep the static word, so callers that do not
-   * pass it are byte-identical to before.
+   * A `scheduled` kind always speaks `common.scheduled` (the Clock the row
+   * draws), whether or not the row is live — a stored history row shows the
+   * SCHEDULED label too. Omit it (or pass null) to keep the static word, so
+   * callers that do not pass it are byte-identical to before.
    */
   statusKind?: GlanceableStatusKind | null;
   /**
@@ -138,9 +140,9 @@ type SessionRowAccessibilityLabelInputs = {
 /**
  * Compose the screen-reader label for a `SessionRow`, mirroring its visible
  * content in the order the row renders parts: title, then `needs input`
- * (or, on a live row, the state word the status glyph draws when the caller
- * passes `statusKind` from the shared derivation — else the static LIVE
- * eyebrow word), then the branch subtitle
+ * (or, on a `scheduled` row, `Scheduled`; or, on a live row, the state word
+ * the status glyph draws when the caller passes `statusKind` from the shared
+ * derivation — else the static LIVE eyebrow word), then the branch subtitle
  * (when present), then the `pull request <number>` phrase (when `prNumber`
  * is set), then the always-visible left-eyebrow badge, then the meta text
  * (only when the row visibly renders meta), then an optional platform origin
@@ -172,6 +174,12 @@ export function sessionRowAccessibilityLabel({
   const parts: string[] = [title];
   if (needsInput) {
     parts.push(i18n.t('agents.sessionRow.needsInput'));
+  } else if (statusKind === 'scheduled') {
+    // A scheduled row draws the Clock and the SCHEDULED label whether or not
+    // it is live (a stored history row reads SCHEDULED too), so the state word
+    // is spoken without the live gate. The wake time, when known, rides in
+    // `meta` and is appended below.
+    parts.push(i18n.t('common.scheduled'));
   } else if (live) {
     if (statusKind != null) {
       // Name the state the glyph draws. The ui row renders the running glyph

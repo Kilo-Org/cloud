@@ -1,6 +1,6 @@
 import pLimit from 'p-limit';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_memberships,
@@ -8,8 +8,8 @@ import {
   transactional_email_log,
 } from '@kilocode/db/schema';
 import { getOrganizationRecommendations } from './recommendations';
-import { sendRecommendationsDigestEmail } from '@/lib/email';
-import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { sendRecommendationsDigestEmail } from '@kilocode/web-shared/lib/email';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 // Cap the number of recommendations listed in the email; the rest live on the
 // dashboard the email links to.

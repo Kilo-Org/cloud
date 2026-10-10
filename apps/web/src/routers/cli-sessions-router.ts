@@ -1,7 +1,7 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   eq,
   and,
@@ -27,7 +27,7 @@ import {
   type FolderName,
   type FileName,
 } from '@/lib/r2/cli-sessions';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';

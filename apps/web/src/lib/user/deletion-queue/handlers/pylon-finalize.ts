@@ -13,7 +13,7 @@ import {
   pylonJson,
   pylonRequest,
 } from '@/lib/user/deletion-queue/handlers/pylon-client';
-import { USER_DELETION_PYLON_DELETE_COMPLETE_TAG } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_PYLON_DELETE_COMPLETE_TAG } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 export const handlePylonFinalize: DeletionHandler = async ({ request, context }) => {
   if (!request.pylon_ticket_ref) {

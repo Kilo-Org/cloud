@@ -7,7 +7,7 @@
       "instanceLifecycle": "Apeere rẹ ni imudojuiwọn",
       "scheduledAction": "Iṣe ti a ṣeto ni imudojuiwọn",
       "lowBalance": "Iwọntunwọnsi rẹ nilo akiyesi",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Inawo rẹ nilo akiyesi",
       "securityFinding": "Wiwa aabo nilo akiyesi",
       "activeAgentsGlanceable": "Awọn aṣoju to n ṣiṣẹ ni imudojuiwọn"
     }
@@ -44,8 +44,8 @@
       "body": "Iwọntunwọnsi {{organizationName}} ṣubu ni isalẹ ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Ifitonileti inawo",
+      "body": "Inawo {{scopeName}} kọja ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Wiwa aabo tuntun ({{severity}})",

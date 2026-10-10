@@ -15,8 +15,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { resolveGitCredentialsFromIntegration } from '@/lib/gastown/git-credentials';
-import { validateAuthorizationHeader } from '@/lib/tokens';
-import { db } from '@/lib/drizzle';
+import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
 import { platform_integrations } from '@kilocode/db';
 

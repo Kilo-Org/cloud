@@ -62,7 +62,7 @@ describe('useAgentProfileMutations deleteProfile', () => {
     const { unmount } = await renderWithProviders(createElement(ProfileOverviewProbe, { holder }), {
       queryClient,
       wrapper: ({ children }: { children: ReactNode }) =>
-        createElement(TRPCProvider, { trpcClient, queryClient }, children),
+        createElement(TRPCProvider, { trpcClient, queryClient, children }),
     });
     await waitFor(() => callsTo('agentProfiles.get') === 1 && callsTo('agentProfiles.list') === 1);
 

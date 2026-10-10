@@ -24,7 +24,7 @@ import { fitRows, phaseOf, stack } from './active-agents-widget-stack';
 
 /**
  * Small (2x2, 2x3), plus what Medium and Large share. Cards draw at the design
- * coordinates of a 170x170 / 364x170 / 364x382 widget inside a 14dp band on
+ * coordinates of a 170x170 / 364x170 / 364x382 widget inside a 16dp band on
  * every side. A taller cell keeps the layout: the extra height first buys agent
  * rows (up to 3), then splits evenly across the gaps; the footer's box ends on
  * the bottom padding line.

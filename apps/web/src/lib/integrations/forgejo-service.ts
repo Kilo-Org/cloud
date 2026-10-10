@@ -87,9 +87,7 @@ function getForgejoIntegrationOwner(integration: PlatformIntegration): Owner {
 /**
  * Get Forgejo integration for an owner
  */
-export async function getForgejoIntegration(
-  owner: Owner
-): Promise<PlatformIntegration | null> {
+export async function getForgejoIntegration(owner: Owner): Promise<PlatformIntegration | null> {
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
@@ -98,9 +96,7 @@ export async function getForgejoIntegration(
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(
-      and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.FORGEJO))
-    )
+    .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.FORGEJO)))
     .limit(1);
 
   return integration || null;
@@ -297,12 +293,7 @@ export async function disconnectForgejoIntegration(owner: Owner) {
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(
-      and(
-        ownershipCondition,
-        eq(platform_integrations.platform, PLATFORM.FORGEJO)
-      )
-    )
+    .where(and(ownershipCondition, eq(platform_integrations.platform, PLATFORM.FORGEJO)))
     .limit(1);
 
   if (!integration) {

@@ -43,9 +43,7 @@ export function normalizeGiteaInstanceUrl(instanceUrl?: string): string {
   }
 
   if (url.protocol !== 'https:') {
-    throw new GiteaInstanceUrlError(
-      'Invalid URL protocol. Gitea instance URLs must use https.'
-    );
+    throw new GiteaInstanceUrlError('Invalid URL protocol. Gitea instance URLs must use https.');
   }
 
   const path = normalizeBasePath(url.pathname);

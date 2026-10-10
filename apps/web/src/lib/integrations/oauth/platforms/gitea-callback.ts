@@ -191,8 +191,8 @@ export async function handleGiteaOAuthCallback(request: NextRequest) {
     const successPath = verifiedState.returnTo
       ? appendIntegrationOAuthRedirectQuery(verifiedState.returnTo, 'success=gitea_connected')
       : owner.type === 'org'
-      ? `/organizations/${owner.id}/integrations/gitea?success=connected`
-      : `/integrations/gitea?success=connected`;
+        ? `/organizations/${owner.id}/integrations/gitea?success=connected`
+        : `/integrations/gitea?success=connected`;
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {

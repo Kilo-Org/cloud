@@ -67,9 +67,7 @@ export async function storeForgejoOAuthIntegration(
   const [existing] = await db
     .select({ id: platform_integrations.id })
     .from(platform_integrations)
-    .where(
-      and(ownerCondition(input.owner), eq(platform_integrations.platform, PLATFORM.FORGEJO))
-    )
+    .where(and(ownerCondition(input.owner), eq(platform_integrations.platform, PLATFORM.FORGEJO)))
     .limit(1);
   const integrationId = existing?.id ?? randomUUID();
   const credentialId = randomUUID();
@@ -114,16 +112,14 @@ export async function storeForgejoOAuthIntegration(
             'refresh_token',
             'token_expires_at',
             'client_secret',
-            ...(isDefaultForgejoInstanceUrl(input.providerBaseUrl)
-              ? ['forgejo_instance_url']
-              : []),
+            ...(isDefaultForgejoInstanceUrl(input.providerBaseUrl) ? ['forgejo_instance_url'] : []),
             ...(input.oauthClientId && input.oauthClientSecret ? [] : ['client_id']),
             ...(changedInstance ? ['configured_webhooks', 'project_tokens'] : []),
           ],
         };
-       });
+      });
 
-       await tx
+      await tx
         .update(platform_integrations)
         .set({
           integration_type: 'oauth',

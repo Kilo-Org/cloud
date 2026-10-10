@@ -106,10 +106,7 @@ export async function handleForgejoOAuthCallback(request: NextRequest) {
     if (owner.type === 'org') {
       // Replacing an existing org Forgejo integration is a billing-scoped action;
       // a first-time connect keeps member-level access.
-      const existingIntegration = await getIntegrationForOrganization(
-        owner.id,
-        PLATFORM.FORGEJO
-      );
+      const existingIntegration = await getIntegrationForOrganization(owner.id, PLATFORM.FORGEJO);
       await ensureOrganizationAccess(
         { user },
         owner.id,
@@ -159,11 +156,7 @@ export async function handleForgejoOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL(redirectPath, APP_URL));
     }
 
-    const tokens = await exchangeForgejoOAuthCode(
-      code,
-      normalizedInstanceUrl,
-      customCredentials
-    );
+    const tokens = await exchangeForgejoOAuthCode(code, normalizedInstanceUrl, customCredentials);
 
     const forgejoUser = await fetchForgejoUser(tokens.access_token, normalizedInstanceUrl);
 
@@ -198,8 +191,8 @@ export async function handleForgejoOAuthCallback(request: NextRequest) {
     const successPath = verifiedState.returnTo
       ? appendIntegrationOAuthRedirectQuery(verifiedState.returnTo, 'success=forgejo_connected')
       : owner.type === 'org'
-      ? `/organizations/${owner.id}/integrations/forgejo?success=connected`
-      : `/integrations/forgejo?success=connected`;
+        ? `/organizations/${owner.id}/integrations/forgejo?success=connected`
+        : `/integrations/forgejo?success=connected`;
 
     return NextResponse.redirect(new URL(successPath, APP_URL));
   } catch (error) {

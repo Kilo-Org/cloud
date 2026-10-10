@@ -159,17 +159,17 @@ export const giteaRouter = createTRPCRouter({
       );
     }),
 
-    /**
-     * Validates that a URL points to a valid Gitea instance.
-     * Used to verify self-hosted Gitea URLs before OAuth setup.
-     */
-    validateInstance: baseProcedure
-      .input(
-        z.object({
-          instanceUrl: z.string().url(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        return validateGiteaInstance(input.instanceUrl);
-      }),
-  });
+  /**
+   * Validates that a URL points to a valid Gitea instance.
+   * Used to verify self-hosted Gitea URLs before OAuth setup.
+   */
+  validateInstance: baseProcedure
+    .input(
+      z.object({
+        instanceUrl: z.string().url(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return validateGiteaInstance(input.instanceUrl);
+    }),
+});

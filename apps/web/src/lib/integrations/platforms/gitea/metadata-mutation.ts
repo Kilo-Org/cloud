@@ -33,10 +33,7 @@ export async function readGiteaMetadataInTransaction(
     .select({ metadata: platform_integrations.metadata })
     .from(platform_integrations)
     .where(
-      and(
-        eq(platform_integrations.id, integrationId),
-        eq(platform_integrations.platform, 'gitea')
-      )
+      and(eq(platform_integrations.id, integrationId), eq(platform_integrations.platform, 'gitea'))
     )
     .limit(1);
 
@@ -70,10 +67,7 @@ export async function mutateGiteaMetadataInTransaction(
       updated_at: new Date().toISOString(),
     })
     .where(
-      and(
-        eq(platform_integrations.id, integrationId),
-        eq(platform_integrations.platform, 'gitea')
-      )
+      and(eq(platform_integrations.id, integrationId), eq(platform_integrations.platform, 'gitea'))
     );
 
   return updatedMetadata;

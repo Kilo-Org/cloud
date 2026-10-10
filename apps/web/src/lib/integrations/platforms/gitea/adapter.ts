@@ -24,7 +24,14 @@ const MAX_GITEA_REDIRECTS = 5;
 const MAX_GITEA_RESPONSE_BYTES = 10 * 1024 * 1024;
 const GITEA_REQUEST_TIMEOUT_MS = 30_000;
 
-const GITEA_OAUTH_SCOPES = ['read:user', 'read:repository', 'read:organization', 'openid', 'profile', 'email'] as const;
+const GITEA_OAUTH_SCOPES = [
+  'read:user',
+  'read:repository',
+  'read:organization',
+  'openid',
+  'profile',
+  'email',
+] as const;
 
 export type GiteaOAuthCredentials = {
   clientId: string;
@@ -98,10 +105,7 @@ async function fetchGiteaOnce(url: string, init?: RequestInit): Promise<Response
     return fetch(url, { ...init, redirect: 'manual' });
   }
 
-  return fetchGiteaBoundToAddress(
-    { ...resolvedUrl, address: resolvedUrl.address },
-    init
-  );
+  return fetchGiteaBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
 }
 
 function isGiteaRedirect(status: number): boolean {
@@ -312,11 +316,7 @@ export function buildGiteaOAuthUrl(
     scope: GITEA_OAUTH_SCOPES.join(' '),
   });
 
-  return buildGiteaUrl(
-    normalizedInstanceUrl,
-    '/login/oauth/authorize',
-    Object.fromEntries(params)
-  );
+  return buildGiteaUrl(normalizedInstanceUrl, '/login/oauth/authorize', Object.fromEntries(params));
 }
 
 export async function exchangeGiteaOAuthCode(
@@ -336,20 +336,23 @@ export async function exchangeGiteaOAuthCode(
     throw new Error('Gitea OAuth credentials not configured');
   }
 
-  const response = await fetchGitea(buildGiteaUrl(normalizedInstanceUrl, '/login/oauth/access_token'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: GITEA_REDIRECT_URI,
-    }),
-  });
+  const response = await fetchGitea(
+    buildGiteaUrl(normalizedInstanceUrl, '/login/oauth/access_token'),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: GITEA_REDIRECT_URI,
+      }),
+    }
+  );
 
   if (!response.ok) {
     const error = await response.text();

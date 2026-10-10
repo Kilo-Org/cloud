@@ -104,9 +104,7 @@ export async function handleForgejoOAuthConnect(request: NextRequest) {
   }
 }
 
-export async function handleForgejoOAuthConnectPost(
-  request: NextRequest
-): Promise<Response> {
+export async function handleForgejoOAuthConnectPost(request: NextRequest): Promise<Response> {
   const rawBody = await request.json().catch(() => null);
   const parsedBody = ForgejoOAuthConnectPostBodySchema.safeParse(rawBody);
 
@@ -216,10 +214,7 @@ async function resolveForgejoOAuthOwner(
 
   // Replacing an existing org Forgejo integration is a billing-scoped action;
   // a first-time connect keeps member-level access.
-  const existingIntegration = await getIntegrationForOrganization(
-    organizationId,
-    PLATFORM.FORGEJO
-  );
+  const existingIntegration = await getIntegrationForOrganization(organizationId, PLATFORM.FORGEJO);
   await ensureOrganizationAccess(
     { user },
     organizationId,

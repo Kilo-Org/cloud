@@ -24,7 +24,14 @@ const MAX_FORGEJO_REDIRECTS = 5;
 const MAX_FORGEJO_RESPONSE_BYTES = 10 * 1024 * 1024;
 const FORGEJO_REQUEST_TIMEOUT_MS = 30_000;
 
-const FORGEJO_OAUTH_SCOPES = ['read:user', 'read:repository', 'read:organization', 'openid', 'profile', 'email'] as const;
+const FORGEJO_OAUTH_SCOPES = [
+  'read:user',
+  'read:repository',
+  'read:organization',
+  'openid',
+  'profile',
+  'email',
+] as const;
 
 export type ForgejoOAuthCredentials = {
   clientId: string;
@@ -98,10 +105,7 @@ async function fetchForgejoOnce(url: string, init?: RequestInit): Promise<Respon
     return fetch(url, { ...init, redirect: 'manual' });
   }
 
-  return fetchForgejoBoundToAddress(
-    { ...resolvedUrl, address: resolvedUrl.address },
-    init
-  );
+  return fetchForgejoBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
 }
 
 function isForgejoRedirect(status: number): boolean {
@@ -367,7 +371,10 @@ export async function exchangeForgejoOAuthCode(
 
   let responseBody: string;
   const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json') || contentType.includes('application/x-www-form-urlencoded')) {
+  if (
+    contentType.includes('application/json') ||
+    contentType.includes('application/x-www-form-urlencoded')
+  ) {
     responseBody = await response.text();
     try {
       return JSON.parse(responseBody) as ForgejoOAuthTokens;
@@ -582,7 +589,8 @@ export async function validateForgejoInstance(
 
     return {
       valid: false,
-      error: 'Failed to validate Forgejo instance. Please verify the URL is correct and accessible.',
+      error:
+        'Failed to validate Forgejo instance. Please verify the URL is correct and accessible.',
     };
   }
 }

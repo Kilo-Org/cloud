@@ -52,8 +52,7 @@ async function readBoundedJson(response: Response): Promise<unknown> {
   const contentLength = response.headers.get('Content-Length');
   if (
     contentLength &&
-    (!/^[0-9]+$/.test(contentLength) ||
-      Number(contentLength) > GITEA_CREDENTIAL_RESPONSE_MAX_BYTES)
+    (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > GITEA_CREDENTIAL_RESPONSE_MAX_BYTES)
   ) {
     throw new Error('invalid_response');
   }
@@ -89,14 +88,11 @@ export async function fetchGiteaCredential(
   actor: GiteaOAuthCredentialActor,
   selector: GiteaCredentialSelector
 ): Promise<GiteaCredentialBrokerResult> {
-  const token = await generateBoundedInternalServiceToken(
-    actor.userId,
-    {
-      audience: GITEA_CREDENTIAL_BROKER_AUDIENCE,
-      expiresIn: TOKEN_EXPIRY.fiveMinutes,
-      organizationId: actor.organizationId,
-    }
-  );
+  const token = await generateBoundedInternalServiceToken(actor.userId, {
+    audience: GITEA_CREDENTIAL_BROKER_AUDIENCE,
+    expiresIn: TOKEN_EXPIRY.fiveMinutes,
+    organizationId: actor.organizationId,
+  });
 
   const apiUrl = new URL(`${GIT_TOKEN_SERVICE_API_URL}/gitea-credential`);
   apiUrl.searchParams.set('credential', selector.credential);

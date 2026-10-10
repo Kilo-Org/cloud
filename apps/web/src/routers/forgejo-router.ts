@@ -159,17 +159,17 @@ export const forgejoRouter = createTRPCRouter({
       );
     }),
 
-    /**
-     * Validates that a URL points to a valid Forgejo instance.
-     * Used to verify self-hosted Forgejo URLs before OAuth setup.
-     */
-    validateInstance: baseProcedure
-      .input(
-        z.object({
-          instanceUrl: z.string().url(),
-        })
-      )
-      .mutation(async ({ input }) => {
-        return validateForgejoInstance(input.instanceUrl);
-      }),
-  });
+  /**
+   * Validates that a URL points to a valid Forgejo instance.
+   * Used to verify self-hosted Forgejo URLs before OAuth setup.
+   */
+  validateInstance: baseProcedure
+    .input(
+      z.object({
+        instanceUrl: z.string().url(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      return validateForgejoInstance(input.instanceUrl);
+    }),
+});

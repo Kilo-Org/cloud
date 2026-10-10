@@ -870,7 +870,7 @@ export const authOptions: NextAuthOptions = {
       clientId: GITHUB_CLIENT_ID,
       clientSecret: GITHUB_CLIENT_SECRET,
     }),
-     GitlabProvider({
+    GitlabProvider({
       clientId: GITLAB_CLIENT_ID,
       clientSecret: GITLAB_CLIENT_SECRET,
     }),

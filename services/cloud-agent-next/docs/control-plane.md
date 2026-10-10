@@ -306,8 +306,8 @@ unrouted sessions, subagents and autonomous continuations. Its running or stoppi
 executions keep compute active independently of accepted Cloud messages and UI selection.
 Preparation, bounded prompt delivery, finalization and recent terminal input also contribute.
 The 2-minute delivery budget excludes legitimate serialized command/summarization waits
-described below. A follow-up blocked only behind a user-waiting command adds no compute
-activity. An accepted UI turn alone is not activity.
+described below. A follow-up waiting behind a serialized command adds no compute activity of
+its own; the command's live native execution decides it. An accepted UI turn alone is not activity.
 
 A session blocked only on questions or permissions does not need compute. Pending requests
 are tracked separately; answering one does not clear another, and an independent runnable

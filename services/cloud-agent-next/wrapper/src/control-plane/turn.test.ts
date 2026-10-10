@@ -570,7 +570,8 @@ describe('serialized command delivery wait', () => {
     h.advance(120_000);
     h.manager.tick();
     expect(outcomeFrames(h.frames)).toEqual([]);
-    expect(h.manager.hasPendingWork()).toBe(true);
+    // The live execution running the command keeps compute; the follower adds none.
+    expect(h.manager.hasPendingWork()).toBe(false);
 
     summary.resolve(true);
     await settle();

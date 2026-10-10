@@ -252,11 +252,6 @@ export function createTurnManager(deps: TurnManagerDeps) {
     return false;
   }
 
-  /** A follower held only by a command that is itself waiting on a question or permission. */
-  function behindUserBlockedCommand(turn: Turn, entry: PendingPrompt): boolean {
-    return liveNativeState(turn)?.activity === 'waiting' && blockedBySerializedCommand(turn, entry);
-  }
-
   /** Record the accepted wait for every follower, so its own deadline is not charged for it. */
   function refreshSerializedWaits(turn: Turn): void {
     for (const entry of turn.prompts) {
@@ -1223,10 +1218,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
           turn.prompts.some(
             entry =>
               !entry.nativeObserved &&
-              !deliveryExpired(turn, entry) &&
-              // A command waiting on a question or permission needs no compute, so a
-              // follower held only by that command does not hold it either.
-              !behindUserBlockedCommand(turn, entry)
+              // The live native execution running the serialized command owns compute,
+              // including sleeping while that command waits on the user.
+              !blockedBySerializedCommand(turn, entry) &&
+              !deliveryExpired(turn, entry)
           )
       );
     },

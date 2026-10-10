@@ -433,6 +433,7 @@ function createUserWebConnection(
               sendPing();
             }) ?? (() => {})
         : undefined,
+      hiddenPauseDelayMs: lifecycleHooks.hiddenPauseDelayMs,
     };
   }
 

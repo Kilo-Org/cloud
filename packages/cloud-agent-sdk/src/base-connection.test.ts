@@ -843,6 +843,117 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
     });
   });
 
+  describe('pause while hidden (hiddenPauseDelayMs)', () => {
+    const PAUSE_DELAY_MS = 15_000;
+
+    function createPausingConnection(overrides: Partial<BaseConnectionConfig> = {}) {
+      return createTestConnection({
+        lifecycleHooks: { ...createTestLifecycleHooks(), hiddenPauseDelayMs: PAUSE_DELAY_MS },
+        ...overrides,
+      });
+    }
+
+    it('keeps the socket open during the delay, then closes it', () => {
+      const onReplacingConnection = jest.fn();
+      const { connection, onDisconnected } = createPausingConnection({ onReplacingConnection });
+      connection.connect();
+      connectSocket(0);
+
+      simulateVisibilityChange('hidden');
+      jest.advanceTimersByTime(PAUSE_DELAY_MS - 1);
+      expect(sockets[0].close).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(1);
+      expect(sockets[0].close).toHaveBeenCalledTimes(1);
+      expect(onDisconnected).toHaveBeenCalledTimes(1);
+      expect(onReplacingConnection).toHaveBeenCalledTimes(1);
+
+      // A late close event from the paused socket schedules nothing.
+      closeSocket(0);
+      jest.advanceTimersByTime(10 * 60_000);
+      expect(sockets).toHaveLength(1);
+
+      connection.destroy();
+    });
+
+    it('does not replace a socket that drops while hidden, and refreshes no auth', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const { connection, onUnexpectedDisconnect } = createPausingConnection({
+        refreshAuth,
+        isAuthFailure: event => event.code === 4001,
+      });
+      connection.connect();
+      connectSocket(0);
+
+      simulateVisibilityChange('hidden');
+      closeSocket(0, 4001);
+      mockWindow.dispatchEvent(new Event('online'));
+      connection.retryReconnect();
+      await Promise.resolve();
+      jest.advanceTimersByTime(10 * 60_000);
+
+      expect(onUnexpectedDisconnect).toHaveBeenCalledTimes(1);
+      expect(sockets).toHaveLength(1);
+      expect(refreshAuth).not.toHaveBeenCalled();
+
+      connection.destroy();
+    });
+
+    it('reconnects with refreshed auth when visible again', async () => {
+      const refreshAuth = jest.fn(() => Promise.resolve());
+      const { connection, onReconnected } = createPausingConnection({ refreshAuth });
+      connection.connect();
+      connectSocket(0);
+
+      simulateVisibilityChange('hidden');
+      jest.advanceTimersByTime(PAUSE_DELAY_MS);
+      simulateVisibilityChange('visible');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(refreshAuth).toHaveBeenCalledTimes(1);
+      expect(sockets).toHaveLength(2);
+      connectSocket(1);
+      expect(onReconnected).toHaveBeenCalledTimes(1);
+
+      connection.destroy();
+    });
+
+    it('cancels the pause when visible again within the delay', () => {
+      const { connection, onDisconnected } = createPausingConnection();
+      connection.connect();
+      connectSocket(0);
+
+      simulateVisibilityChange('hidden');
+      jest.advanceTimersByTime(PAUSE_DELAY_MS - 1);
+      connectSocket(0);
+      simulateVisibilityChange('visible');
+      jest.advanceTimersByTime(PAUSE_DELAY_MS);
+
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0].close).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+
+      connection.destroy();
+    });
+
+    it('keeps reconnecting while hidden without the option', () => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const { connection } = createTestConnection();
+      connection.connect();
+      connectSocket(0);
+
+      simulateVisibilityChange('hidden');
+      closeSocket(0);
+      jest.advanceTimersByTime(500);
+
+      expect(sockets).toHaveLength(2);
+
+      connection.destroy();
+    });
+  });
+
   describe('listener lifecycle', () => {
     it('destroy() removes visibilitychange, pageshow, and online listeners', () => {
       const docRemoveSpy = jest.spyOn(mockDocument, 'removeEventListener');

@@ -93,6 +93,19 @@ export type TrpcResponseError = z.infer<typeof TrpcResponseErrorSchema>;
 const TRPC_PATH = '/api/trpc/';
 const HTTP_URL_PATTERN = /^https?:\/\//iu;
 
+/**
+ * Statuses the app handles as an answer, so a report would name no defect:
+ * - 401: the auth layer refreshes or signs out, and reports a terminal refusal
+ *   itself (`reportAuthTerminalFailure`).
+ * - 402: no credits; the paywall owns it.
+ * - 403: production 403s are the edge firewall (OFAC-sanctioned regions, IP
+ *   blocks) and the minimum-version gate, not app code.
+ * - 404: a stale ID for a deleted object; screens show "not found".
+ * - 409: a duplicate of an operation already in progress.
+ * - 429: a rate limit the caller backs off from.
+ */
+const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 403, 404, 409, 429]);
+
 /** Strip the query string from a URL. Returns empty string on a non-string. */
 export function stripQueryString(url: string): string {
   try {
@@ -173,8 +186,10 @@ export function readTrpcErrorContext(error: unknown): TrpcErrorContext {
  * Read the tRPC error out of a batch response body without consuming the
  * original: the clone is parsed, so the caller still owns `response`. A
  * batched (HTTP 207) body is an array of `{ result } | { error }`; a plain
- * failure body is `{ error }`. Total: a success-only, non-JSON, or otherwise
- * unreadable body yields `undefined` and never throws.
+ * failure body is `{ error }`. A batch yields its first error whose status is
+ * not in {@link EXPECTED_HTTP_STATUSES}, else its first error, so an expected
+ * 404 ahead of a 500 cannot hide the 500. Total: a success-only, non-JSON, or
+ * otherwise unreadable body yields `undefined` and never throws.
  */
 export async function readTrpcResponseError(
   response: Response
@@ -182,13 +197,14 @@ export async function readTrpcResponseError(
   try {
     const body: unknown = await response.clone().json();
     if (Array.isArray(body)) {
-      for (const item of body) {
-        const error = errorPropertyOf(item);
-        if (error !== undefined) {
-          return error;
-        }
-      }
-      return undefined;
+      const errors = body
+        .map(item => errorPropertyOf(item))
+        .filter((error): error is TrpcResponseError => error !== undefined);
+      const reportable = errors.find(error => {
+        const status = readTrpcErrorContext(error).httpStatus;
+        return status === undefined || !EXPECTED_HTTP_STATUSES.has(status);
+      });
+      return reportable ?? errors[0];
     }
     return errorPropertyOf(body);
   } catch {
@@ -347,19 +363,6 @@ export function reportNetworkError(context: NetworkErrorContext): void {
     // Telemetry must never throw into app code.
   }
 }
-
-/**
- * Statuses the app handles as an answer, so a report would name no defect:
- * - 401: the auth layer refreshes or signs out, and reports a terminal refusal
- *   itself (`reportAuthTerminalFailure`).
- * - 402: no credits; the paywall owns it.
- * - 403: production 403s are the edge firewall (OFAC-sanctioned regions, IP
- *   blocks) and the minimum-version gate, not app code.
- * - 404: a stale ID for a deleted object; screens show "not found".
- * - 409: a duplicate of an operation already in progress.
- * - 429: a rate limit the caller backs off from.
- */
-const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 403, 404, 409, 429]);
 
 /**
  * True when a failed response is an expected answer: one of

@@ -60,9 +60,12 @@ function resolvingFetch(response: Response): typeof fetch {
   return mock as unknown as typeof fetch;
 }
 
+function batchErrorItem(httpStatus: number): { error: Record<string, unknown> } {
+  return { error: { message: 'failed', code: -32_000, data: { httpStatus, path: 'user.getMe' } } };
+}
+
 function batchWithInnerStatus(httpStatus: number): Response {
-  const error = { message: 'failed', code: -32_000, data: { httpStatus, path: 'user.getMe' } };
-  return Response.json([{ result: { data: 'ok' } }, { error }], { status: 207 });
+  return Response.json([{ result: { data: 'ok' } }, batchErrorItem(httpStatus)], { status: 207 });
 }
 
 describe('stripQueryString', () => {
@@ -668,6 +671,24 @@ describe('createNetworkErrorFetch status policy', () => {
       ['network-error', 'trpc', 'user.getMe', `http.${status}`],
     ]);
     expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('reports a batch whose expected error comes before a real failure', async () => {
+    await respond(
+      'https://example.com/api/trpc/user.getMe,a.b?batch=1',
+      Response.json([batchErrorItem(404), batchErrorItem(500)], { status: 207 })
+    );
+    await respond(
+      'https://example.com/api/trpc/user.getMe,a.b?batch=1',
+      Response.json([batchErrorItem(404), batchErrorItem(409)], { status: 207 })
+    );
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'user.getMe,a.b', 'http.500'],
+    ]);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/trpc/user.getMe,a.b -> 404',
+    ]);
   });
 
   it('leaves a terminal refusal on a sign-in route to the auth layer', async () => {

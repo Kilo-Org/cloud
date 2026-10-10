@@ -2212,6 +2212,8 @@ describe('runGlanceableBackgroundRefresh', () => {
 
 describe('foreground attention-push suppression', () => {
   async function loadHandler() {
+    // The app posts its own raise only while notifications are allowed.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
     const loaded = await loadNotifications();
     // Imported through the same resetModules cycle as './notifications', so the
     // posted marker this test reads is the one the handler reads.

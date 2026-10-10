@@ -9,8 +9,6 @@ import type { WastelandConnectionRecord } from '../dos/town/wasteland';
 
 const HANDLER_LOG = '[wasteland-tools.handler]';
 
-// ── Schemas ──────────────────────────────────────────────────────────────
-
 const WastelandClaimBody = z.object({
   item_id: z.string().min(1),
 });
@@ -41,8 +39,6 @@ const WastelandWantedStatus = z.enum([
   'validated',
   'withdrawn',
 ]);
-
-// ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Resolve the userId of the caller from the mayor auth middleware. */
 function resolveUserId(c: Context<GastownEnv>): string | null {
@@ -85,8 +81,6 @@ function wastelandFailureToResponse(
     failure.code === 'PRECONDITION_FAILED' ? 412 : failure.code === 'NOT_FOUND' ? 404 : 502;
   return c.json(resError(failure.message), status as 400);
 }
-
-// ── Handlers ─────────────────────────────────────────────────────────────
 
 /**
  * GET /api/mayor/:townId/tools/wasteland/browse

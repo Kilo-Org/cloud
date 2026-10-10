@@ -22,6 +22,26 @@ export async function recoverGlanceableActivityKit(): Promise<void> {
   if (Platform.OS !== 'ios' || !getActivityKitDenied()) {
     return;
   }
+  await replayVerifiedSnapshot(clearActivityKitDeniedIfAvailable);
+}
+
+/**
+ * Start the Live Activity for work that was already live when the user granted
+ * notification permission. The sink skipped that start while the permission
+ * was missing, and the next publish can be minutes away.
+ */
+export async function replayGlanceableLiveActivity(): Promise<void> {
+  if (Platform.OS !== 'ios') {
+    return;
+  }
+  await replayVerifiedSnapshot(() => true);
+}
+
+/**
+ * Re-emit the current snapshot to every sink once the stored identity still
+ * owns it. `admit` runs after every fence passes and can veto the replay.
+ */
+async function replayVerifiedSnapshot(admit: () => boolean): Promise<void> {
   const authEpoch = currentAuthEpoch();
   const blankEpoch = getTerminalBlankEpoch();
   const scopeKey = getLocalScopeKey();
@@ -47,7 +67,7 @@ export async function recoverGlanceableActivityKit(): Promise<void> {
     getLastGlanceableSnapshot() !== snapshot ||
     userId === null ||
     buildOpaqueScopeKey({ userId, organizationId }) !== scopeKey ||
-    !clearActivityKitDeniedIfAvailable()
+    !admit()
   ) {
     return;
   }

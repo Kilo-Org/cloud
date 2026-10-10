@@ -1,8 +1,11 @@
 import 'server-only';
 
 import { z } from 'zod';
-import { INTERNAL_API_SECRET, USER_DATA_EXPORT_WORKER_URL } from '@/lib/config.server';
-import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import {
+  INTERNAL_API_SECRET,
+  USER_DATA_EXPORT_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import {
   USER_DATA_EXPORT_ASSERTION_TTL_SECONDS,
   USER_DATA_EXPORT_AUDIENCE,

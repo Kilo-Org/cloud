@@ -49,15 +49,15 @@ describe('resolveChatComposerControlState', () => {
     }
   });
 
-  it('keeps the input editable and gates send while the session cannot send', () => {
+  it('keeps the input editable, hides the toolbar, and gates send while the session cannot send', () => {
     const state = resolveChatComposerControlState({
       ...baseInput,
       sendDisabled: true,
       hasText: true,
     });
 
-    // The reader types the next message beside the error's Retry; sending and
-    // the toolbar wait for the session to recover.
+    // The reader types the next message beside the error's Retry; sending, the
+    // toolbar, and voice wait for the session to recover.
     expect([state.inputEditable, state.inputAccessibilityDisabled]).toEqual([true, false]);
     expect(state.hasSendableContent).toBe(true);
     expect([state.canSend, state.toolbarDisabled, state.voiceDisabled]).toEqual([
@@ -66,6 +66,20 @@ describe('resolveChatComposerControlState', () => {
       true,
     ]);
     expect(state.paperclipDisabled).toBe(true);
+    expect(state.showToolbar).toBe(false);
+  });
+
+  it('hides the toolbar while send-gated even when focused or holding text', () => {
+    for (const override of [
+      { sendDisabled: true },
+      { disabled: true },
+      { sendDisabled: true, isFocused: true },
+      { disabled: true, hasText: true, isFocused: true },
+    ]) {
+      const state = resolveChatComposerControlState({ ...baseInput, ...override, hasText: true });
+
+      expect(state.showToolbar).toBe(false);
+    }
   });
 
   it('keeps the input editable and toolbar enabled while streaming when text is present', () => {

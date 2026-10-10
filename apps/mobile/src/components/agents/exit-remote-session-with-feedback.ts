@@ -4,12 +4,7 @@ import { type Href } from 'expo-router';
 import { i18n } from '@/i18n';
 import { settleVoiceInputBeforeSubmit } from '@/lib/voice-input/voice-input-submit';
 
-import {
-  isNonRetryableExitError,
-  REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE,
-  REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE,
-  REMOTE_SESSION_EXIT_UPGRADE_PREFIX,
-} from './remote-session-exit-messages';
+import { exitErrorCopy, isNonRetryableExitError } from './remote-session-exit-messages';
 
 /** Structural subset of Expo Router's router used for post-exit navigation. */
 type ExitRemoteSessionRouter = {
@@ -65,20 +60,6 @@ type ExitRemoteSessionWithFeedbackInput = {
 };
 
 const SESSIONS_ROUTE = '/(app)/(tabs)/(2_agents)' as const;
-
-/** Catalog copy for a pinned SDK exit message, or null when it is not one. */
-function exitErrorCopy(message: string): string | null {
-  if (message === REMOTE_SESSION_EXIT_NOT_SUPPORTED_MESSAGE) {
-    return i18n.t('agentChat.remoteSession.exitNotSupported');
-  }
-  if (message === REMOTE_SESSION_EXIT_UNAVAILABLE_MESSAGE) {
-    return i18n.t('agentChat.remoteSession.exitUnavailable');
-  }
-  if (message.startsWith(REMOTE_SESSION_EXIT_UPGRADE_PREFIX)) {
-    return i18n.t('agentChat.remoteSession.exitNeedsNewerCli');
-  }
-  return null;
-}
 
 export async function exitRemoteSessionWithFeedback({
   exit,

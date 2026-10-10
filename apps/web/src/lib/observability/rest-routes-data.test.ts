@@ -22,7 +22,7 @@ jest.mock('@/lib/device-auth/device-auth', () => {
   };
 });
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
@@ -53,25 +53,28 @@ jest.mock('next/server', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
-  ...(jest.requireActual('@/lib/ai-gateway/providers/openrouter') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter') as Record<
+    string,
+    unknown
+  >),
   getEnhancedOpenRouterModels: jest.fn(),
   getOpenRouterTranscriptionModels: jest.fn(),
 }));
 
 // The providers catalogue reads through `createCachedFetch`; an empty cache
 // yields the route's controlled 503 without touching the database.
-jest.mock('@/lib/cached-fetch', () => ({
-  ...(jest.requireActual('@/lib/cached-fetch') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/cached-fetch', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/cached-fetch') as Record<string, unknown>),
   createCachedFetch: () => async () => null,
 }));
 
 import { createDeviceAuthRequest, pollDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
-} from '@/lib/ai-gateway/providers/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import * as codesRoute from '@/app/api/device-auth/codes/route';
 import * as codesCodeRoute from '@/app/api/device-auth/codes/[code]/route';
 import * as tokenRoute from '@/app/api/device-auth/token/route';
@@ -352,11 +355,11 @@ describe('dedicated data routes emit one api_timing line', () => {
   });
 });
 
-// A bare `export { GET } from '...'` re-exports the already timed handler by
-// reference, so the alias pathname is outside the inner pattern's static prefix
-// and no `api_timing` line is emitted at all. Each alias re-wraps the timed
+// A bare `export { GET } from '...'` of another route's timed handler would
+// leave the alias pathname outside that pattern's static prefix, so no
+// `api_timing` line would be emitted at all. Each alias wraps the shared
 // handler with its own pattern so the alias traffic is measured once.
-describe('alias routes re-exporting a timed handler emit one api_timing line', () => {
+describe('alias routes emit one api_timing line', () => {
   test('GET /api/gateway/models logs the gateway alias pattern only', async () => {
     mockGetEnhancedOpenRouterModels.mockRejectedValue(new Error('catalog down'));
 

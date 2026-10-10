@@ -32,7 +32,7 @@ const mockCreateCloudAgentNextClient = jest.fn(() => ({
 }));
 const mockCreateControlTokenForRequest = jest.fn(async () => ({ token: 'cloud-agent-token' }));
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { select: mockSelect },
 }));
 

@@ -7,7 +7,7 @@
  */
 
 import { updateFixTicketStatus } from '@/lib/auto-fix/db/fix-tickets';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { createPullRequest } from '@/lib/auto-fix/github/create-pull-request';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';

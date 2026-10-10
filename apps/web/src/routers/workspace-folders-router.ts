@@ -17,8 +17,8 @@ import {
   workspaceFolderNameSchema,
   type WorkspaceFolder,
 } from '@/lib/cloud-agent/workspace-folders';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 
 const uuidSchema = z.uuid().transform(id => id.toLowerCase());
 const scopeInputSchema = z.object({ organizationId: uuidSchema.nullable() });

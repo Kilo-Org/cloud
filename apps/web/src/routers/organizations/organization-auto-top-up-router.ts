@@ -1,24 +1,58 @@
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
   OrganizationIdInputSchema,
-} from '@/routers/organizations/utils';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_top_up_configs, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { successResult } from '@/lib/maybe-result';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import {
   OrgAutoTopUpAmountCentsSchema,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
-} from '@/lib/autoTopUpConstants';
-import type { OrgAutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
+import type { OrgAutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { createOrgAutoTopUpSetupCheckoutSession } from '@/lib/organizations/organization-auto-top-up';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
+
+/**
+ * Durably enqueues the bouncer `charge.attempted` for an org auto-top-up setup checkout. Callers
+ * await it: the enqueue is a database insert (no bouncer HTTP), so it stays cheap, and a DB error
+ * propagates instead of being floated.
+ */
+async function reportOrgAutoTopUpAttempt(params: {
+  organizationId: string;
+  userId: string;
+  amountCents: number;
+  ip?: string | null;
+  headers?: Headers;
+}): Promise<void> {
+  const organization = await getOrganizationById(params.organizationId);
+  if (!organization) {
+    return;
+  }
+  await reportChargeAttempted({
+    flow: 'auto_topup',
+    userId: params.userId,
+    orgId: params.organizationId,
+    amountCents: params.amountCents,
+    accountCreatedAt: organization.created_at,
+    accountUsedMicrodollars: organization.microdollars_used,
+    ip: params.ip,
+    ipCountry: ipCountryFromHeaders(params.headers),
+    ja4: ja4FromHeaders(params.headers),
+  });
+}
 
 export const organizationAutoTopUpRouter = createTRPCRouter({
   getConfig: organizationBillingProcedure.query(async ({ input }) => {
@@ -82,6 +116,14 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
           const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
           const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
 
+          await reportOrgAutoTopUpAttempt({
+            organizationId,
+            userId: ctx.user.id,
+            amountCents: selectedAmount,
+            ip: ctx.ip,
+            headers: ctx.headersList,
+          });
+
           const redirectUrl = await createOrgAutoTopUpSetupCheckoutSession(
             ctx.user.id,
             organizationId,
@@ -112,6 +154,14 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
 
       const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
+
+      await reportOrgAutoTopUpAttempt({
+        organizationId,
+        userId: ctx.user.id,
+        amountCents: selectedAmount,
+        ip: ctx.ip,
+        headers: ctx.headersList,
+      });
 
       const redirectUrl = await createOrgAutoTopUpSetupCheckoutSession(
         ctx.user.id,

@@ -1,6 +1,6 @@
 import type { UserDeletionRequest, UserDeletionStep } from '@kilocode/db/schema';
 import { UserDeletionStepKey } from '@kilocode/db/schema-types';
-import { USER_DELETION_CUSTOMERIO_TRACK_BASE } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_CUSTOMERIO_TRACK_BASE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import {
   customerioTrackBase,

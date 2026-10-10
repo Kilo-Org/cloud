@@ -75,22 +75,29 @@ vi.mock('react', async () => {
   };
 });
 
-const alertCalls = vi.hoisted(() => [] as { title: string; message: string }[]);
+type ConfirmRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+};
+
+const confirmRequests = vi.hoisted(() => [] as ConfirmRequest[]);
+
+// The sheet renders `{dialog}` from `useConfirmDialog`. The old Alert harness
+// auto-pressed the destructive button, so the stub records the request and
+// runs its confirm — the guarded submit still fires from one tap.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({
+    confirm: (request: ConfirmRequest) => {
+      confirmRequests.push(request);
+      request.onConfirm();
+    },
+    dialog: null,
+  }),
+}));
 
 vi.mock('react-native', () => ({
-  Alert: {
-    alert: vi.fn(
-      (
-        title: string,
-        message: string,
-        buttons: readonly { style?: string; onPress?: () => void }[]
-      ) => {
-        alertCalls.push({ title, message });
-        const destructive = buttons.find(b => b.style === 'destructive');
-        destructive?.onPress?.();
-      }
-    ),
-  },
   ScrollView: 'ScrollView',
   View: 'View',
   TextInput: 'TextInput',
@@ -266,7 +273,7 @@ function pressMerge(props: Parameters<typeof PrMergeSheet>[0]) {
   const element = PrMergeSheet(props);
   // The submit CTA lives inside MergeSheetFormBody (mocked as a string
   // element); the sheet wires its confirm handler as the `onConfirm` prop.
-  // Invoking it drives the same Alert → destructive-confirm → performSubmit
+  // Invoking it drives the same confirm → destructive-confirm → performSubmit
   // path the production Merge button press takes.
   const formBody = findElement({
     node: element,
@@ -494,7 +501,7 @@ const AUTO_MERGE_UNSUPPORTED: ProviderReviewCapability = {
 
 describe('PrMergeSheet provider merge arm (s6)', () => {
   beforeEach(() => {
-    alertCalls.length = 0;
+    confirmRequests.length = 0;
     __resetMergePartialSuccessStoreForTests();
     mergeMutationMocks.mutateAsync.mockReset();
     mergeMutationMocks.isPending = false;
@@ -515,9 +522,10 @@ describe('PrMergeSheet provider merge arm (s6)', () => {
 
     // The confirm dialog speaks the connected provider's noun, in sentence
     // form: "Merge merge request?", never "Merge Merge request?".
-    expect(alertCalls[0]).toEqual({
+    expect(confirmRequests[0]).toMatchObject({
       title: 'Merge merge request?',
       message: 'This will merge your changes into the base branch.',
+      confirmLabel: 'Merge',
     });
     expect(mergeMutationMocks.mutateAsync).toHaveBeenCalledWith({
       expectedHeadSha: 'a'.repeat(40),
@@ -537,7 +545,7 @@ describe('PrMergeSheet provider merge arm (s6)', () => {
     });
     pressMerge(baseProps);
 
-    expect(alertCalls[0]?.title).toBe('Merge pull request?');
+    expect(confirmRequests[0]?.title).toBe('Merge pull request?');
     expect(mergeMutationMocks.mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({
         owner: 'octocat',
@@ -728,7 +736,7 @@ describe('PrMergeSheet refused-merge wording (s6f)', () => {
 
 describe('PrMergeSheet provider auto-merge arms (s6)', () => {
   beforeEach(() => {
-    alertCalls.length = 0;
+    confirmRequests.length = 0;
     __resetMergePartialSuccessStoreForTests();
     mergeMutationMocks.mutateAsync.mockReset();
     autoMergeMutationMocks.mutateAsync.mockReset();
@@ -772,7 +780,7 @@ describe('PrMergeSheet provider auto-merge arms (s6)', () => {
     expect(findComponent(element, ProviderAutoMergeBody)).not.toBeNull();
 
     pressSubmit(element)();
-    expect(alertCalls[0]?.message).toBe(
+    expect(confirmRequests[0]?.message).toBe(
       'The merge request will merge automatically once its pipeline succeeds.'
     );
     expect(autoMergeMutationMocks.mutateAsync).toHaveBeenCalledWith({

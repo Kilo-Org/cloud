@@ -13,6 +13,10 @@ import { MessageErrorBoundary as V1MessageErrorBoundary } from '@/components/clo
 import { convertToCloudMessages } from '@/components/cloud-agent/store/db-session-atoms';
 import { MessageBubble as V2MessageBubble } from '@/components/cloud-agent-next/MessageBubble';
 import { MessageErrorBoundary as V2MessageErrorBoundary } from '@/components/cloud-agent-next/MessageErrorBoundary';
+import {
+  formatSessionCost,
+  isRenderableSessionCost,
+} from '@/components/cloud-agent-next/session-cost-breakdown';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import {
   useAdminSessionTrace,
@@ -31,6 +35,7 @@ import {
   Download,
   Server,
   Tag,
+  DollarSign,
 } from 'lucide-react';
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
@@ -39,7 +44,11 @@ import { SessionContainerTelemetryContent } from './SessionContainerTelemetry';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SES_PREFIX = 'ses_';
-const AGENT_PREFIX = 'agent_';
+const CLOUD_AGENT_SESSION_PREFIXES = ['agent_', 'workspace_'] as const;
+
+function isCloudAgentSessionId(value: string): boolean {
+  return CLOUD_AGENT_SESSION_PREFIXES.some(prefix => value.startsWith(prefix));
+}
 
 function formatModelLabel(providerId: unknown, modelId: unknown): string | null {
   if (typeof providerId !== 'string' || typeof modelId !== 'string') {
@@ -121,7 +130,7 @@ export function SessionTraceViewer() {
   // Initialize from URL parameter on mount
   useEffect(() => {
     if (!sessionIdFromUrl) return;
-    if (sessionIdFromUrl.startsWith(AGENT_PREFIX)) {
+    if (isCloudAgentSessionId(sessionIdFromUrl)) {
       setInputValue(sessionIdFromUrl);
       setPendingAgentId(sessionIdFromUrl);
       setSearchedSessionId(null);
@@ -152,10 +161,10 @@ export function SessionTraceViewer() {
       return;
     }
 
-    const isAgent = trimmed.startsWith(AGENT_PREFIX);
-    if (!UUID_REGEX.test(trimmed) && !trimmed.startsWith(SES_PREFIX) && !isAgent) {
+    const isCloudAgent = isCloudAgentSessionId(trimmed);
+    if (!UUID_REGEX.test(trimmed) && !trimmed.startsWith(SES_PREFIX) && !isCloudAgent) {
       setValidationError(
-        'Invalid session ID. Expected a UUID, a v2 ID (ses_...), or a cloud agent session ID (agent_...)'
+        'Invalid session ID. Expected a UUID, a v2 ID (ses_...), or a cloud agent session ID (agent_... or workspace_...)'
       );
       return;
     }
@@ -163,7 +172,7 @@ export function SessionTraceViewer() {
     setValidationError(null);
     setResolvedFromAgent(null);
 
-    if (isAgent) {
+    if (isCloudAgent) {
       setPendingAgentId(trimmed);
       setSearchedSessionId(null);
     } else {
@@ -278,14 +287,14 @@ export function SessionTraceViewer() {
           <CardHeader>
             <CardTitle>Session Trace Viewer</CardTitle>
             <CardDescription>
-              Enter a CLI session ID (UUID or ses_...) or a cloud agent session ID (agent_...) to
-              view the full session trace
+              Enter a CLI session ID (UUID or ses_...) or a cloud agent session ID (agent_... or
+              workspace_...) to view the full session trace
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000, ses_abc123..., or agent_..."
+                placeholder="e.g., 550e8400-e29b-41d4-a716-446655440000, ses_abc123..., agent_..., or workspace_..."
                 value={inputValue}
                 onChange={e => setInputValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -403,6 +412,18 @@ export function SessionTraceViewer() {
                   </span>
                 </div>
               )}
+              {sessionQuery.data.total_cost_microdollars != null &&
+                isRenderableSessionCost(sessionQuery.data.total_cost_microdollars / 1_000_000) && (
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="text-muted-foreground h-4 w-4" />
+                    <span className="text-sm">
+                      Cost:{' '}
+                      <span className="font-mono tabular-nums">
+                        {formatSessionCost(sessionQuery.data.total_cost_microdollars / 1_000_000)}
+                      </span>
+                    </span>
+                  </div>
+                )}
               {latestContainerInterval?.cloudflareInstanceId && (
                 <div className="flex min-w-0 items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />

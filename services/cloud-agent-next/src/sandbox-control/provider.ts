@@ -5,10 +5,60 @@ import {
   vercelSandboxResourcesSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
-import type {
-  CredentialContainmentRequirements,
-  VercelAllocationConfig,
-} from '../sandbox-state/model/allocation.js';
+import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
+import type { CredentialContainmentRequirements } from './credential-containment.js';
+
+export type ProviderCreationCause =
+  | 'insufficient_credits'
+  | 'stopping'
+  | 'meter_unavailable'
+  | 'invalid_configuration';
+
+export class ProviderCreationError extends AgentSandboxUnavailableError {
+  constructor(public readonly code: ProviderCreationCause) {
+    super(
+      code === 'insufficient_credits'
+        ? 'Sandbox billing requires additional credits'
+        : code === 'invalid_configuration'
+          ? 'Sandbox configuration is invalid or unsupported'
+          : code === 'stopping'
+            ? 'Sandbox is stopping'
+            : 'Sandbox billing admission is temporarily unavailable',
+      code === 'insufficient_credits'
+        ? 'billing_blocked'
+        : code === 'invalid_configuration'
+          ? 'provider_not_configured'
+          : 'runtime_creation_failed'
+    );
+    this.name = 'ProviderCreationError';
+  }
+
+  get permanentReason(): 'billing_blocked' | 'invalid_configuration' | null {
+    return this.code === 'insufficient_credits'
+      ? 'billing_blocked'
+      : this.code === 'invalid_configuration'
+        ? 'invalid_configuration'
+        : null;
+  }
+}
+
+export const vercelAllocationConfigSchema = z
+  .object({
+    projectId: z.string().min(1).optional(),
+    snapshotId: z.string().min(1).optional(),
+    runtimeBuildId: z.string().min(1).optional(),
+    runtime: z.string().min(1).optional(),
+    resources: z
+      .object({
+        vcpus: z.number().int().positive(),
+        memory: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export type VercelAllocationConfig = z.infer<typeof vercelAllocationConfigSchema>;
 
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('cloudflare') }).strict(),
@@ -56,6 +106,18 @@ export type ProviderObservation = {
   providerRef?: string;
 };
 
+/** What a physical start used: the image, or a repository snapshot of it. */
+export type ProviderStartSource = 'image' | 'repository';
+
+export type ProviderLaunchOptions = {
+  /** Keyed hash of the launch's scope, repository and env; a provider may start from its snapshot. */
+  repoKey?: string;
+  /** Start from the image and forget the snapshot stored for `repoKey`. */
+  discardRepository?: true;
+};
+
+export type ProviderLaunchResult = { startSource: ProviderStartSource };
+
 export type ProviderAdapter = {
   readonly resumable: boolean;
   /** The workspace survives a stop; a persistent provider is never destroyed. */
@@ -64,7 +126,11 @@ export type ProviderAdapter = {
   readonly destroysOnStop: boolean;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
-  launch(ref: string, env: Record<string, string>): Promise<void>;
+  launch(
+    ref: string,
+    env: Record<string, string>,
+    options?: ProviderLaunchOptions
+  ): Promise<ProviderLaunchResult>;
   observe(
     ref: string | null,
     intent?: ProviderAllocationIntent | null
@@ -72,6 +138,12 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
+  /**
+   * Save the running container as the repository snapshot for `repoKey`. Only a
+   * provider that can start from one implements it; `false` is a failed capture
+   * that the caller ignores.
+   */
+  captureRepository?(ref: string, repoKey: string, commit?: string): Promise<boolean>;
   updateNetworkPolicy?(
     providerRef: string,
     networkPolicy: VercelSandboxNetworkPolicy
@@ -106,7 +178,9 @@ export function createMemoryProviderAdapter(options?: {
       }
       return { providerRef };
     },
-    async launch() {},
+    async launch() {
+      return { startSource: 'image' };
+    },
     async observe(ref, intent) {
       const providerRef = ref ?? (intent ? `mem_${intent.intentId}` : undefined);
       if (!providerRef) return { status: 'terminal' };

@@ -1,5 +1,5 @@
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import * as profileService from '@kilocode/cloud-agent-profile';
@@ -12,8 +12,8 @@ import * as profileKiloCommandsService from '@kilocode/cloud-agent-profile';
 import * as repoBindingService from '@kilocode/cloud-agent-profile';
 import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
-import { db } from '@/lib/drizzle';
-import { AGENT_ENV_VARS_PUBLIC_KEY } from '@/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 
 function isForeignKeyViolation(error: unknown): boolean {
   return (

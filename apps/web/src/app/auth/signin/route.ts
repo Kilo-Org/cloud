@@ -1,4 +1,4 @@
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { type NextRequest, NextResponse } from 'next/server';
 

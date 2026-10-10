@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { sql, count, or } from 'drizzle-orm';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBlacklistedDomains } from '@/lib/blacklist-domains-config';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 export async function GET() {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });

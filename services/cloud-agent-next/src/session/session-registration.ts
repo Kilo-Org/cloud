@@ -49,22 +49,40 @@ import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
-import jwt from 'jsonwebtoken';
 
 import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
+  DEVCONTAINER_RETIRED_MESSAGE,
   CurrentSessionMetadataSchema,
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import {
+  getSandboxSessionStub,
+  resolveLegacySessionStub,
+  resolveSessionStub,
+  type SessionStub,
+} from '../sandbox-session/session-stub.js';
+import type { SandboxSessionV2 } from '../control-plane/session/session-do.js';
+import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
+import {
+  buildControlPlaneCreateInput,
+  buildControlPlaneRegisterInput,
+  ControlPlaneRegistrationError,
+} from './control-plane-session-input.js';
+import type { GroupedRegisterSessionInput } from './session-registration-metadata.js';
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
-import { isWorktreeOwner, sessionPlaneForNewOwner, type SessionPlane } from '../session-plane.js';
+import {
+  isWorktreeOwner,
+  sessionPlaneForNewOwner,
+  sessionPlaneFromId,
+  type SessionPlane,
+} from '../session-plane.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   createCloudAgentSessionReport,
@@ -78,10 +96,11 @@ import {
 } from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
-import { sha256Hex } from '../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { createMessageId } from './message-id.js';
+import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
   AcceptedExecutionTurn,
@@ -106,7 +125,8 @@ type SharedSandboxRouteMetadata = NonNullable<
  */
 function sessionPlaneForCreate(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string }
 ): SessionPlane {
   return sandboxAllocationRequiresControlPlane(input.runtime?.sandboxAllocation)
     ? 'control'
@@ -116,7 +136,10 @@ function sessionPlaneForCreate(
           userId: ctx.userId,
           orgId: input.options?.kilocodeOrganizationId,
         },
-        { createdOnPlatform: input.options?.createdOnPlatform }
+        {
+          createdOnPlatform: input.options?.createdOnPlatform,
+          billingOrigin: options?.billingOrigin,
+        }
       );
 }
 
@@ -125,13 +148,15 @@ function assertSupportedSandboxAllocation(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
+  if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: DEVCONTAINER_RETIRED_MESSAGE });
+  }
   const allocation = input.runtime?.sandboxAllocation;
   if (allocation === undefined) return;
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
   }
   if (
-    input.runtime?.devcontainer === true ||
     options?.billingOrigin === 'code-review' ||
     input.options?.createdOnPlatform === 'code-review'
   ) {
@@ -141,7 +166,10 @@ function assertSupportedSandboxAllocation(
     });
   }
   // Isolated Standard predates the selectable allocations and remains legacy-plane only.
-  if (allocation === 'isolated-standard' && sessionPlaneForCreate(input, ctx) === 'control') {
+  if (
+    allocation === 'isolated-standard' &&
+    sessionPlaneForCreate(input, ctx, options) === 'control'
+  ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: 'Isolated Standard allocation is not supported for control-plane sessions',
@@ -476,8 +504,7 @@ function computeCredentialContainment(
     env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
   );
   if (controlPlaneContainment) return controlPlaneContainment;
-  const containmentEnabled =
-    env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false' && input.runtime?.devcontainer !== true;
+  const containmentEnabled = env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
   return {
     github: containmentEnabled && input.repository.type === 'github',
     gitlab: containmentEnabled && input.repository.type === 'gitlab',
@@ -496,7 +523,6 @@ function isEligibleFirstWorktreeSession(
     input.options.operationKey !== undefined &&
     input.initialTurn !== undefined &&
     input.clone === undefined &&
-    input.runtime?.devcontainer !== true &&
     ctx.botId === undefined
   );
 }
@@ -561,15 +587,7 @@ async function issueSessionRuntimeAuthorization(
 ): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
-  // authMiddleware has verified this bearer (including legacy tokens) against
-  // its audience and current pepper. Decode only selects the compatibility path;
-  // createRuntimeAuthorization re-verifies modern claims and runtime admission.
-  const claims = jwt.decode(ctx.authToken);
-  const isPolicyBearing =
-    claims !== null &&
-    typeof claims === 'object' &&
-    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
-  if (isPolicyBearing) {
+  if (isPolicyBearingAuthToken(ctx.authToken)) {
     if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;
     const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
@@ -626,7 +644,7 @@ async function allocateNewSession(
   }
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx));
+  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx, options));
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
@@ -670,7 +688,11 @@ async function allocateNewSession(
 
     if (initialTurn) {
       await createCloudAgentSessionReport(
-        { cloudAgentSessionId, kiloSessionId, initialMessageId: initialTurn.messageId },
+        {
+          cloudAgentSessionId,
+          kiloSessionId,
+          initialMessageId: initialTurn.messageId,
+        },
         ctx.env
       );
     }
@@ -690,7 +712,6 @@ async function allocateNewSession(
       cloudAgentSessionId,
       ctx.botId,
       {
-        devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: options?.billingOrigin === 'code-review' ? 'code-review' : undefined,
         sandboxAllocation,
       }
@@ -714,7 +735,6 @@ async function allocateNewSession(
         userId: ctx.userId,
         sandboxId,
         sessionId: cloudAgentSessionId,
-        devcontainer: input.runtime?.devcontainer,
         sandboxAllocation,
       });
     }
@@ -1081,12 +1101,39 @@ function buildSessionRegistrationCommand(
         : {}),
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
       credentialContainment: allocation.credentialContainment,
-      ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
       ...(input.runtime?.sandboxAllocation
         ? { sandboxAllocation: input.runtime.sandboxAllocation }
         : {}),
     },
   };
+}
+
+/**
+ * Registers a control-plane session without an initial turn through the V2
+ * `registerSessionFromMetadata` RPC. A metadata rejection maps to the legacy
+ * registration rejection shape so the retry/idempotency handling is unchanged.
+ */
+async function registerControlPlaneSession(
+  command: GroupedRegisterSessionInput,
+  ctx: SessionRegistrationContext,
+  allocation: NewSessionAllocation
+): Promise<{ success: true } | { success: false; error: string }> {
+  let input: Awaited<ReturnType<typeof buildControlPlaneRegisterInput>>;
+  try {
+    input = await buildControlPlaneRegisterInput({ command, env: ctx.env });
+  } catch (error) {
+    if (!(error instanceof ControlPlaneRegistrationError)) throw error;
+    return { success: false, error: error.detail };
+  }
+  const result = await withDORetry<
+    DurableObjectStub<SandboxSessionV2>,
+    { success: true } | { success: false; error: string }
+  >(
+    () => getSandboxSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
+    stub => stub.registerSessionFromMetadata(input),
+    'registerSessionFromMetadata'
+  );
+  return result.success ? { success: true } : { success: false, error: result.error };
 }
 
 /**
@@ -1103,12 +1150,19 @@ export async function registerNewSession(
 ): Promise<SessionRegistrationResult> {
   assertSupportedSandboxAllocation(input, ctx, options);
   const allocation = await allocateNewSession(input, ctx, options);
-  const stub = resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
-  let registerResult: Awaited<ReturnType<typeof stub.registerSession>>;
+  const stub = resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId);
+  let registerResult: { success: boolean; error?: string };
   try {
-    registerResult = await stub.registerSession(
-      buildSessionRegistrationCommand(input, ctx, allocation, options)
-    );
+    registerResult =
+      sessionPlaneFromId(allocation.cloudAgentSessionId) === 'control'
+        ? await registerControlPlaneSession(
+            buildSessionRegistrationCommand(input, ctx, allocation, options),
+            ctx,
+            allocation
+          )
+        : await stub.registerSession(
+            buildSessionRegistrationCommand(input, ctx, allocation, options)
+          );
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -1143,6 +1197,61 @@ export async function registerNewSession(
 }
 
 /**
+ * Admits the canonical initial turn on the plane the session ID selects. The
+ * control plane receives the strict Worker-facing create input (metadata plus a
+ * materialized prompt payload and provider pin); the legacy plane keeps its
+ * grouped command. A metadata rejection projects to the same registration
+ * failure the legacy DO would have returned.
+ */
+async function admitInitialTurn(
+  command: GroupedRegisterSessionInput,
+  ctx: SessionRegistrationContext,
+  allocation: NewSessionAllocation,
+  initialTurn: AcceptedExecutionTurn
+): Promise<SessionMessageAdmissionResult> {
+  if (sessionPlaneFromId(allocation.cloudAgentSessionId) === 'control') {
+    let v2Input: Awaited<ReturnType<typeof buildControlPlaneCreateInput>>;
+    try {
+      const attachments =
+        initialTurn.type === 'prompt'
+          ? await buildSignedPromptAttachments({
+              env: ctx.env,
+              userId: command.identity.userId,
+              sessionId: allocation.cloudAgentSessionId,
+              attachments: initialTurn.attachments,
+              createdOnPlatform: command.identity.createdOnPlatform,
+            })
+          : [];
+      v2Input = await buildControlPlaneCreateInput({
+        command,
+        env: ctx.env,
+        attachments,
+        agent: command.agent,
+      });
+    } catch (error) {
+      if (!(error instanceof ControlPlaneRegistrationError)) throw error;
+      return {
+        success: false,
+        code: 'BAD_REQUEST',
+        error: error.detail,
+        failureBoundary: 'registration',
+      };
+    }
+    return await withDORetry<DurableObjectStub<SandboxSessionV2>, SessionMessageAdmissionResult>(
+      () => getSandboxSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
+      stub => stub.createSessionWithInitialAdmission(v2Input),
+      'createSessionWithInitialAdmission'
+    );
+  }
+
+  return await withDORetry<DurableObjectStub<CloudAgentSession>, SessionMessageAdmissionResult>(
+    () => resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
+    stub => stub.createSessionWithInitialAdmission({ ...command, message: { initialTurn } }),
+    'createSessionWithInitialAdmission'
+  );
+}
+
+/**
  * Register the allocated session in its Durable Object and durably admit the
  * canonical initial turn through one grouped operation. The ownership row is an
  * external prerequisite; an explicit Durable Object rejection triggers
@@ -1166,17 +1275,11 @@ async function registerAndAdmitInitialTurn(
   }
   let admission: SessionMessageAdmissionResult;
   try {
-    admission = await withDORetry<
-      DurableObjectStub<CloudAgentSession>,
-      SessionMessageAdmissionResult
-    >(
-      () => resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
-      stub =>
-        stub.createSessionWithInitialAdmission({
-          ...buildSessionRegistrationCommand(input, ctx, allocation, options),
-          message: { initialTurn },
-        }),
-      'createSessionWithInitialAdmission'
+    admission = await admitInitialTurn(
+      buildSessionRegistrationCommand(input, ctx, allocation, options),
+      ctx,
+      allocation,
+      initialTurn
     );
   } catch (error) {
     await recordPostSetupFailure(() =>
@@ -1271,17 +1374,20 @@ async function registerAllocatedSession(
   allocation: NewSessionAllocation,
   ledger: SessionCreationLedgerHooks | undefined
 ): Promise<{ cloudAgentSessionId: string; kiloSessionId: string }> {
-  let registerResult: Awaited<ReturnType<CloudAgentSession['registerSession']>>;
+  const command = buildSessionRegistrationCommand(input, ctx, allocation, options);
+  let registerResult: { success: boolean; error?: string };
   try {
-    registerResult = await withDORetry<
-      DurableObjectStub<CloudAgentSession>,
-      Awaited<ReturnType<CloudAgentSession['registerSession']>>
-    >(
-      () => resolveSessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
-      stub =>
-        stub.registerSession(buildSessionRegistrationCommand(input, ctx, allocation, options)),
-      'registerSession'
-    );
+    registerResult =
+      sessionPlaneFromId(allocation.cloudAgentSessionId) === 'control'
+        ? await registerControlPlaneSession(command, ctx, allocation)
+        : await withDORetry<
+            DurableObjectStub<CloudAgentSession>,
+            Awaited<ReturnType<CloudAgentSession['registerSession']>>
+          >(
+            () => resolveLegacySessionStub(ctx.env, ctx.userId, allocation.cloudAgentSessionId),
+            stub => stub.registerSession(command),
+            'registerSession'
+          );
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -1378,12 +1484,6 @@ export const SESSION_CREATE_FINALIZATION_VERSION_KEY = 'finalizationVersion';
  * Deterministic JSON serialization: object keys are sorted and undefined
  * values are dropped (JSON semantics), so field order or an explicit
  * `undefined` never changes a fingerprint.
- *
- * Deliberately not shared with the stricter `canonicalJson` in
- * `workspace-backup-cache.ts`: that one rejects (returns null) where this one
- * serializes — a top-level `undefined`, an `undefined` array element, a
- * non-finite number, or an exotic object. Swapping it in here rotates every
- * live create-intent fingerprint, so the two stay separate.
  */
 function canonicalJson(value: unknown): string {
   if (value === undefined || value === null) {
@@ -1415,6 +1515,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
         githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
+        pullRequestNumber: repository.pullRequestNumber,
         branch: repository.branch,
       };
     case 'gitlab':
@@ -1522,7 +1623,6 @@ export async function sessionCreateIntentFingerprint(
       finalization: input.finalization,
       runtime: input.runtime
         ? {
-            ...(input.runtime.devcontainer ? { devcontainer: true } : {}),
             ...(input.runtime.sandboxAllocation
               ? { sandboxAllocation: input.runtime.sandboxAllocation }
               : {}),
@@ -2224,10 +2324,7 @@ async function confirmInitialMessageAdmitted(args: {
 
   let messageResult: MessageResultRPCResponse;
   try {
-    messageResult = await withDORetry<
-      DurableObjectStub<CloudAgentSession>,
-      MessageResultRPCResponse
-    >(
+    messageResult = await withDORetry<SessionStub, MessageResultRPCResponse>(
       () => resolveSessionStub(ctx.env, ctx.userId, ids.cloudAgentSessionId),
       stub => stub.getMessageResult(initialMessageId),
       'getMessageResult'

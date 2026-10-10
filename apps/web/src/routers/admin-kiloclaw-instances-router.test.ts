@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   kiloclaw_admin_audit_logs,
@@ -19,7 +19,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { UpstreamApiError } from '@/lib/trpc/init';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const mockGetDebugStatus: jest.Mock<any, any> = jest.fn();

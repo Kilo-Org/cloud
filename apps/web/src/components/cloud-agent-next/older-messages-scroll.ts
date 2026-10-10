@@ -121,6 +121,7 @@ type UseOlderMessagesPaginationInputs = {
   lastScrollTopRef: RefObject<number>;
   resetKey: string | null | undefined;
   overflowCheckKey?: unknown;
+  ready: boolean;
 };
 
 export function useOlderMessagesPagination({
@@ -133,6 +134,7 @@ export function useOlderMessagesPagination({
   lastScrollTopRef,
   resetKey,
   overflowCheckKey,
+  ready,
 }: UseOlderMessagesPaginationInputs): {
   requestOlderMessages: () => void;
   tryLoadOlderFromScroll: (scrollTop: number) => void;
@@ -149,6 +151,7 @@ export function useOlderMessagesPagination({
 
   const requestOlderMessages = useCallback(() => {
     if (
+      !ready ||
       !shouldTriggerOlderMessagesLoad({
         hasOlderMessages,
         isLoadingOlderMessages,
@@ -166,9 +169,17 @@ export function useOlderMessagesPagination({
         inFlightRef.current = false;
       });
     });
-  }, [hasOlderMessages, isLoadingOlderMessages, olderMessagesError, onLoad, scrollElementRef]);
+  }, [
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    olderMessagesError,
+    onLoad,
+    ready,
+    scrollElementRef,
+  ]);
 
   useLayoutEffect(() => {
+    if (!ready) return;
     const wasLoading = wasLoadingRef.current;
     wasLoadingRef.current = isLoadingOlderMessages;
     if (!wasLoading || isLoadingOlderMessages) return;
@@ -196,11 +207,13 @@ export function useOlderMessagesPagination({
     isProgrammaticScrollRef,
     lastScrollTopRef,
     olderMessagesError,
+    ready,
     requestOlderMessages,
     scrollElementRef,
   ]);
 
   useLayoutEffect(() => {
+    if (!ready) return;
     if (olderMessagesError) return;
     const el = scrollElementRef.current;
     if (!el) return;
@@ -208,7 +221,7 @@ export function useOlderMessagesPagination({
     if (el.scrollHeight <= el.clientHeight) {
       requestOlderMessages();
     }
-  }, [olderMessagesError, overflowCheckKey, requestOlderMessages, scrollElementRef]);
+  }, [olderMessagesError, overflowCheckKey, ready, requestOlderMessages, scrollElementRef]);
 
   const tryLoadOlderFromScroll = useCallback(
     (scrollTop: number) => {

@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 export type StreamTicketPayload = {
   purpose?: 'stream' | 'terminal';

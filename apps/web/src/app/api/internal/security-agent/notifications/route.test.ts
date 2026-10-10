@@ -1,7 +1,7 @@
 import { after, NextRequest } from 'next/server';
 import { and, eq, sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { RawHtml, send as sendEmail } from '@/lib/email';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { RawHtml, send as sendEmail } from '@kilocode/web-shared/lib/email';
 import {
   agent_configs,
   kilocode_users,
@@ -14,22 +14,22 @@ import {
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
 } from '@kilocode/db/schema-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'security-notification-secret',
   NEXTAUTH_URL: 'https://app.example.test',
 }));
 
-jest.mock('@/lib/email', () => {
-  const actual = jest.requireActual('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/email', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/email');
   return {
     ...actual,
     send: jest.fn(),
   };
 });
 
-jest.mock('@/lib/notifications-worker-client', () => ({
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   dispatchSecurityFindingPush: jest.fn().mockResolvedValue(undefined),
   dispatchSecurityLifecyclePush: jest.fn().mockResolvedValue(undefined),
   dispatchLowBalancePush: jest.fn().mockResolvedValue(undefined),
@@ -55,7 +55,7 @@ import { POST } from './route';
 import {
   dispatchSecurityFindingPush,
   dispatchSecurityLifecyclePush,
-} from '@/lib/notifications-worker-client';
+} from '@kilocode/web-shared/lib/notifications-worker-client';
 
 const mockSendEmail = jest.mocked(sendEmail);
 const mockDispatchSecurityFindingPush = jest.mocked(dispatchSecurityFindingPush);

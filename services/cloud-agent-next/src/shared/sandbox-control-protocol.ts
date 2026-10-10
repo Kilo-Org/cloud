@@ -17,6 +17,8 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES = [
   'model_unavailable',
   'provider_authentication',
   'provider_unavailable',
+  'provider_disconnect',
+  'gateway_unavailable',
   'timeout',
   'invalid_request',
   'context_limit',
@@ -306,6 +308,8 @@ export const sandboxHelloPayloadSchema = z.object({
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      gitAuthor: z.boolean().optional(),
+      mcpServers: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })
@@ -458,6 +462,48 @@ export const worktreeDeleteResultSchema = z
 export type WorktreeDeletePayload = z.infer<typeof worktreeDeletePayloadSchema>;
 export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
 
+export const gitAuthorSchema = z
+  .object({
+    name: z.string().min(1).max(256),
+    email: z.string().min(1).max(320),
+  })
+  .strict();
+
+const sessionAttachMcpValueSchema = z.string().max(8192);
+const sessionAttachMcpValuesSchema = z
+  .record(z.string().min(1).max(256), sessionAttachMcpValueSchema)
+  .refine(values => Object.keys(values).length <= 50, {
+    message: 'An MCP server can have at most 50 environment variables or headers',
+  });
+const sessionAttachMcpServerSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('local'),
+      command: z.array(z.string().max(8192)).min(1).max(50),
+      environment: sessionAttachMcpValuesSchema.optional(),
+      enabled: z.boolean().optional(),
+      timeout: z.number().int().positive().max(3_600_000).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('remote'),
+      url: z.string().url().max(4096),
+      headers: sessionAttachMcpValuesSchema.optional(),
+      enabled: z.boolean().optional(),
+      timeout: z.number().int().positive().max(3_600_000).optional(),
+    })
+    .strict(),
+]);
+export const sessionAttachMcpServersSchema = z
+  .record(z.string().min(1).max(100), sessionAttachMcpServerSchema)
+  .refine(servers => Object.keys(servers).length <= 20, {
+    message: 'A session can have at most 20 MCP servers',
+  })
+  .refine(servers => new TextEncoder().encode(JSON.stringify(servers)).byteLength <= 80 * 1024, {
+    message: 'Serialized MCP configuration exceeds the 80 KiB limit',
+  });
+
 export const sessionAttachPayloadSchema = z
   .object({
     captureNativeRuntimeId: z.literal(true).optional(),
@@ -489,16 +535,12 @@ export const sessionAttachPayloadSchema = z
         url: z.string().min(1).max(2048),
         token: z.string().min(1).max(4096).optional(),
         platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
-      })
-      .strict()
-      .optional(),
-    snapshot: z
-      .object({
-        url: z.string().min(1).max(4096),
+        author: gitAuthorSchema.optional(),
       })
       .strict()
       .optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     preparation: z
@@ -1128,6 +1170,8 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       eventReceipts: z.boolean().optional(),
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      gitAuthor: z.boolean().optional(),
+      mcpServers: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })

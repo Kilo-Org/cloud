@@ -7,7 +7,7 @@
       "instanceLifecycle": "I-instance yakho inokubuyekezwa",
       "scheduledAction": "Isenzo esihleliwe sinokubuyekezwa",
       "lowBalance": "Ibhalansi yakho idinga ukunakwa",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Izindleko zakho zidinga ukunakwa",
       "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa",
       "activeAgentsGlanceable": "Ama-agent asebenzayo anokubuyekezwa"
     }
@@ -44,8 +44,8 @@
       "body": "Ibhalansi ye-{{organizationName}} yehle ngezansi kwe-${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Isaziso sezindleko",
+      "body": "Izindleko ze-{{scopeName}} zeqe i-${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Okutholakele okusha kokuphepha ({{severity}})",

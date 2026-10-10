@@ -1,9 +1,9 @@
 import type { OrganizationSortableField } from '@/types/admin';
-import type { PageSize } from '@/types/pagination';
+import type { PageSize } from '@kilocode/web-shared/types/pagination';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useInvalidateAllOrganizationData } from '@/app/api/organizations/hooks';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { StripeSubscriptionStatusValue } from '@/lib/admin/stripe-subscription-statuses';
 import { useEffect } from 'react';
 

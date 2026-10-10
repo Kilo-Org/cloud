@@ -19,9 +19,9 @@ import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getFixTicketById, updateFixTicketStatus } from '@/lib/auto-fix/db/fix-tickets';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { createPullRequest } from '@/lib/auto-fix/github/create-pull-request';
 import { postIssueComment } from '@/lib/auto-fix/github/post-comment';
 

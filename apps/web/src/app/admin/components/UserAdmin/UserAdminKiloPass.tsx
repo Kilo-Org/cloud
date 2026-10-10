@@ -20,7 +20,7 @@ import { formatMicrodollars, formatDate } from '@/lib/admin-utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
 import CheckKiloPassButton from './CheckKiloPassButton';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 function formatUsd(value: number | string | null | undefined): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;

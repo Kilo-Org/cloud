@@ -13,6 +13,8 @@ import {
   type QuestionRequest,
   type SessionCommandResponse,
   type SessionPromptResponse,
+  type SessionMessagesResponse2,
+  type SuggestionRequest,
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
@@ -22,6 +24,7 @@ import {
   type BoundedSlashCommandCatalog,
   type SlashCommandInfo,
 } from '../../src/shared/slash-commands.js';
+import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -210,6 +213,10 @@ export type WrapperPtySize = {
   rows: number;
 };
 
+export type KiloSessionMetadata = { id: string; directory: string; parentID?: string };
+export const KILO_ACTIVITY_MESSAGE_LIMIT = 32;
+export const KILO_ACTIVITY_DISCOVERY_LIMIT = 1_000;
+
 /**
  * Shape of an event yielded by `subscribeEvents().stream`. The wrapper unwraps
  * the SDK global event envelope before handing events to `connection.ts`, which
@@ -247,7 +254,30 @@ export type WrapperKiloClient = {
     sessionId: string,
     directory: string,
     signal?: AbortSignal
-  ) => Promise<{ id: string; directory: string }>;
+  ) => Promise<KiloSessionMetadata>;
+  /** Process-wide metadata discovery; no default directory filter. Fails on truncation. */
+  listSessionMetadata: (signal: AbortSignal) => Promise<KiloSessionMetadata[]>;
+  /** Bounded recent window; callers must not interpret a partial window as all execution. */
+  getRecentSessionMessages: (
+    sessionId: string,
+    directory: string,
+    signal: AbortSignal
+  ) => Promise<SessionMessagesResponse2>;
+  getSessionMessage: (
+    sessionId: string,
+    directory: string,
+    messageId: string,
+    signal: AbortSignal
+  ) => Promise<SessionMessagesResponse2[number]>;
+  getSuggestions: (directory: string, signal: AbortSignal) => Promise<SuggestionRequest[]>;
+  /** Metadata only; never return tool input or output to diagnostics. */
+  probeMessagePart?: (
+    sessionId: string,
+    directory: string,
+    messageId: string,
+    partId: string,
+    signal: AbortSignal
+  ) => Promise<{ status: string; outputBytes?: number } | null>;
   ensureSession: (sessionId: string, directory: string, signal?: AbortSignal) => Promise<void>;
   sendPrompt: (opts: PromptOptions) => Promise<SessionPromptResponse>;
   sendPromptAsync: (opts: PromptOptions) => Promise<void>;
@@ -338,6 +368,7 @@ export function createWrapperKiloClient(
 ): WrapperKiloClient {
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
   const v2Client = createV2Client({ baseUrl: serverUrl, directory: workspacePath });
+  const globalClient = createV2Client({ baseUrl: serverUrl });
 
   function promptParameters(opts: PromptOptions) {
     const rawParts =
@@ -400,7 +431,67 @@ export function createWrapperKiloClient(
       if (data.id !== sessionId || data.directory !== directory) {
         throw new Error('Session cleanup lookup returned an invalid session');
       }
-      return { id: data.id, directory: data.directory };
+      return {
+        id: data.id,
+        directory: data.directory,
+        ...(data.parentID ? { parentID: data.parentID } : {}),
+      };
+    },
+
+    listSessionMetadata: async signal => {
+      // The timestamp-only pagination cursor can skip equal-timestamp rows. Require
+      // a complete bounded page rather than silently missing an execution directory.
+      const result = await globalClient.experimental.session.list(
+        { limit: KILO_ACTIVITY_DISCOVERY_LIMIT, archived: true },
+        { signal }
+      );
+      const sessions = requireSdkData(result, 'Activity session discovery');
+      if (result.response?.headers.has('x-next-cursor')) {
+        throw new Error('Activity session discovery exceeded its bounded complete window');
+      }
+      return sessions.map(({ id, directory, parentID }) => ({
+        id,
+        directory,
+        ...(parentID ? { parentID } : {}),
+      }));
+    },
+
+    getRecentSessionMessages: async (sessionId, directory, signal) => {
+      const result = await v2Client.session.messages(
+        { sessionID: sessionId, directory, limit: KILO_ACTIVITY_MESSAGE_LIMIT },
+        { signal }
+      );
+      return requireSdkData(result, 'Activity session messages');
+    },
+
+    getSessionMessage: async (sessionId, directory, messageId, signal) => {
+      const result = await v2Client.session.message(
+        { sessionID: sessionId, directory, messageID: messageId },
+        { signal }
+      );
+      return requireSdkData(result, 'Activity session message');
+    },
+
+    getSuggestions: async (directory, signal) => {
+      const result = await v2Client.suggestion.list({ directory }, { signal });
+      return requireSdkData(result, 'Activity suggestions');
+    },
+
+    probeMessagePart: async (sessionId, directory, messageId, partId, signal) => {
+      const result = await v2Client.session.message(
+        { sessionID: sessionId, messageID: messageId, directory },
+        { signal }
+      );
+      if (result.response?.status === 404) return null;
+      const message = requireSdkData(result, 'Session message probe');
+      const part = message.parts.find(item => item.id === partId);
+      if (part?.type !== 'tool') return null;
+      return {
+        status: part.state.status,
+        ...(part.state.status === 'completed'
+          ? { outputBytes: Buffer.byteLength(part.state.output, 'utf8') }
+          : {}),
+      };
     },
 
     ensureSession: async (sessionId, directory, signal) => {
@@ -435,7 +526,7 @@ export function createWrapperKiloClient(
           projectID: project.id,
           slug: sessionId.slice(0, 24),
           title: 'New session - ' + new Date(now).toISOString(),
-          version: '7.6.2',
+          version: KILO_CLI_VERSION,
           timeCreated: now,
           timeUpdated: now,
         },
@@ -466,7 +557,7 @@ export function createWrapperKiloClient(
 
     abortSession: async opts => {
       const result = await v2Client.session.abort(
-        { sessionID: opts.sessionId, directory: opts.directory ?? workspacePath },
+        { sessionID: opts.sessionId, directory: opts.directory ?? workspacePath, scope: 'tree' },
         { signal: opts.signal }
       );
       const operation = `Session abort for ${opts.sessionId}`;

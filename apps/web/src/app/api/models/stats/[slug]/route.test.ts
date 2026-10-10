@@ -2,21 +2,21 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { GET, dynamic, revalidate } from './route';
 import { NextRequest } from 'next/server';
 import type { ModelStats } from '@kilocode/db/schema';
-import { getModelStatsSnapshot } from '@/lib/model-stats/model-stats-cache';
-import type * as Cache from '@/lib/model-stats/model-stats-cache';
-import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
+import { getModelStatsSnapshot } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
+import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },
   ENKRYPT_SYNC_ENABLED: false,
 }));
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
-jest.mock('@/lib/model-stats/model-stats-cache', () => ({
-  ...jest.requireActual<typeof Cache>('@/lib/model-stats/model-stats-cache'),
+jest.mock('@kilocode/web-shared/lib/model-stats/model-stats-cache', () => ({
+  ...jest.requireActual<typeof Cache>('@kilocode/web-shared/lib/model-stats/model-stats-cache'),
   getModelStatsSnapshot: jest.fn(),
 }));
 

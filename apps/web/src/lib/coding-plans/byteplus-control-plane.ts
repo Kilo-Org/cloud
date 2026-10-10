@@ -6,7 +6,7 @@ import * as z from 'zod';
 import {
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID,
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 
 const BYTEPLUS_CONTROL_PLANE_URL = 'https://ark.ap-southeast-1.byteplusapi.com/';
 const BYTEPLUS_CONTROL_PLANE_HOST = 'ark.ap-southeast-1.byteplusapi.com';

@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   credit_transactions,
@@ -7,9 +7,12 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { eq, and, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { hasOrganizationEverPaid } from '@/lib/creditTransactions';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { hasOrganizationEverPaid } from '@kilocode/web-shared/lib/creditTransactions';
 import type { User, Organization } from '@kilocode/db/schema';
 
 let ownerUser: User;

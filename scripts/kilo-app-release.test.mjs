@@ -19,6 +19,7 @@ import {
   hasSectionHeading,
   insertSection,
   isVersionBumpCommit,
+  linkPullRequest,
   parseConfigVersion,
   sectionHeading,
   splitSections,
@@ -202,7 +203,10 @@ test('body lists app PRs oldest first and drops bumps, non-app, changelog and un
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, '- fix(mobile): second (#101)\n');
+    assert.equal(
+      result.stdout,
+      '- fix(mobile): second ([#101](https://github.com/Kilo-Org/cloud/pull/101))\n'
+    );
 
     const empty = runScript(NOTES, ['body', '--from', 'nopr'], { cwd: dir });
     assert.equal(empty.status, 0, empty.stderr);
@@ -210,6 +214,14 @@ test('body lists app PRs oldest first and drops bumps, non-app, changelog and un
   } finally {
     cleanup(dir);
   }
+});
+
+test('linkPullRequest links only the trailing pull-request ref', () => {
+  assert.equal(
+    linkPullRequest('fix(mobile): keep (#4) open (#101)'),
+    'fix(mobile): keep (#4) open ([#101](https://github.com/Kilo-Org/cloud/pull/101))'
+  );
+  assert.equal(linkPullRequest('feat(mobile): no ref'), 'feat(mobile): no ref');
 });
 
 test('body prints the initial-release marker without --from', () => {
@@ -294,7 +306,10 @@ test('body drops the squashed version-bump merge that carries the changelog', ()
 
     const result = runScript(NOTES, ['body', '--from', 'base'], { cwd: dir });
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.stdout, '- fix(mobile): a real fix (#7002)\n');
+    assert.equal(
+      result.stdout,
+      '- fix(mobile): a real fix ([#7002](https://github.com/Kilo-Org/cloud/pull/7002))\n'
+    );
 
     const onlyBump = runScript(NOTES, ['body', '--from', 'base', '--to', bumpMerge], { cwd: dir });
     assert.equal(onlyBump.status, 0, onlyBump.stderr);

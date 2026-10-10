@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { mutateGitLabMetadataInTransaction } from './metadata-mutation';
 
 function createTransactionHarness(initialMetadata: Record<string, unknown>) {

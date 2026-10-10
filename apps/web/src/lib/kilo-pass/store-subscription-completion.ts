@@ -9,6 +9,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 
@@ -19,11 +20,11 @@ import {
   settleOperation,
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
-import { db } from '@/lib/drizzle';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/utils';
-import { getMonthlyPriceUsd } from './bonus';
-import { dayjs } from './dayjs';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -32,19 +33,19 @@ import {
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   type KiloPassTier,
-} from './enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   appendKiloPassAuditLog,
   computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
-} from './issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
 } from './subscription-accounting';
-import { isStripeSubscriptionEnded } from './stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;
@@ -253,6 +254,81 @@ function getUpgradeBonusReversalDescription(kind: KiloPassIssuanceItemKind): str
   return 'Kilo Pass upgrade promo clawback';
 }
 
+/**
+ * Frees the month's base issuance item when a store refund already took its
+ * credits back. A user refunded in month M who pays again in month M must be
+ * granted base credits for that payment; the issuance keeps one base item per
+ * month, so the refunded one would otherwise make the new grant a no-op.
+ *
+ * A base item counts as refunded only while its clawback is open: a store
+ * refund reversal puts the credits back and the item stands again.
+ */
+async function releaseRefundedBaseIssuanceItem(
+  tx: DrizzleTransaction,
+  params: {
+    issuanceId: string;
+    subscriptionId: string;
+    kiloUserId: string;
+    purchase: ValidatedStoreKiloPassPurchase;
+  }
+): Promise<void> {
+  const [baseItem] = await tx
+    .select({
+      itemId: kilo_pass_issuance_items.id,
+      creditTransactionId: kilo_pass_issuance_items.credit_transaction_id,
+    })
+    .from(kilo_pass_issuance_items)
+    .where(
+      and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      )
+    )
+    .limit(1);
+  if (!baseItem) return;
+
+  // Both stores key a base clawback `kilo-pass-store-refund:<provider>:<tx>:base:<item>`
+  // (Apple adds `:r<n>` per later cycle), where <item> is the base credit row id.
+  // A restoration mirrors it under `kilo-pass-store-refund-reversal:`.
+  const itemSuffix = `:${KiloPassIssuanceItemKind.Base}:${baseItem.creditTransactionId}`;
+  const ledgerRows = await tx
+    .select({ category: credit_transactions.credit_category })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.kilo_user_id, params.kiloUserId),
+        or(
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund:%${itemSuffix}`}`,
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund:%${itemSuffix}:r%`}`,
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund-reversal:%${itemSuffix}`}`,
+          sql`${credit_transactions.credit_category} LIKE ${`kilo-pass-store-refund-reversal:%${itemSuffix}:r%`}`
+        )
+      )
+    );
+  const clawbacks = ledgerRows.filter(row =>
+    row.category?.startsWith('kilo-pass-store-refund:')
+  ).length;
+  const restorations = ledgerRows.length - clawbacks;
+  if (clawbacks <= restorations) return;
+
+  await tx.delete(kilo_pass_issuance_items).where(eq(kilo_pass_issuance_items.id, baseItem.itemId));
+  await appendKiloPassAuditLog(tx, {
+    action: KiloPassAuditLogAction.BaseCreditsIssued,
+    result: KiloPassAuditLogResult.Success,
+    kiloUserId: params.kiloUserId,
+    kiloPassSubscriptionId: params.subscriptionId,
+    relatedCreditTransactionId: baseItem.creditTransactionId,
+    relatedMonthlyIssuanceId: params.issuanceId,
+    payload: {
+      kind: 'store_refunded_base_item_released',
+      releasedIssuanceItemId: baseItem.itemId,
+      refundedBaseCreditTransactionId: baseItem.creditTransactionId,
+      providerSubscriptionId: params.purchase.providerSubscriptionId,
+      repurchaseProviderTransactionId: params.purchase.providerTransactionId,
+    },
+  });
+}
+
 async function resetIssuanceItemsForStoreUpgrade(
   tx: DrizzleTransaction,
   params: {
@@ -456,6 +532,12 @@ async function applyStoreUpgradeCreditAdjustments(
   }
 }
 
+/**
+ * The first order of a Play replacement token starts at the switch, seconds from the token's
+ * start time. A later order of the token starts when a paid period ends.
+ */
+const PLAY_REPLACEMENT_FIRST_ORDER_TOLERANCE_MS = 5 * 60 * 1000;
+
 // ----- purchase ledger (P1-A-08d) -------------------------------------------
 
 const PURCHASE_LEDGER_DOMAIN = 'purchase' as const;
@@ -577,11 +659,11 @@ export async function completeStoreKiloPassPurchase(params: {
       if (otherActive && !isStripeSubscriptionEnded(otherActive.status)) {
         throw new Error(ACTIVE_KILO_PASS_SUBSCRIPTION_MESSAGE);
       }
+      const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
+        where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
+        orderBy: desc(kilo_pass_store_purchases.purchased_at),
+      });
       if (replacement.deferred) {
-        const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
-          where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
-          orderBy: desc(kilo_pass_store_purchases.purchased_at),
-        });
         if (
           !receipt ||
           receipt.kilo_pass_subscription_id !== subscription.id ||
@@ -600,18 +682,42 @@ export async function completeStoreKiloPassPurchase(params: {
         });
         if (refund) throw new Error('Store purchase has been refunded');
       }
+      // Every other replacement mode switches the plan at once, but Play bills the new price at
+      // the old renewal date (WITHOUT_PRORATION) or converts the unused time (WITH_TIME_PRORATION).
+      // The first order of the new token then starts at the switch, inside the paid period, and
+      // pays for no period of the new plan. Keep the paid tier and its credits; the next order of
+      // the token (its renewal) changes the tier. A charged switch (CHARGE_*_PRICE) waits too: a
+      // prorated charge near the period end must not buy a full base of the new tier.
+      const startedAt = purchase.subscriptionStartedAtIso
+        ? dayjs(purchase.subscriptionStartedAtIso).valueOf()
+        : NaN;
+      const periodStart = dayjs(purchase.purchasedAtIso).valueOf();
+      const isMidPeriodReplacement =
+        !replacement.deferred &&
+        receipt?.expires_at != null &&
+        Math.abs(periodStart - startedAt) <= PLAY_REPLACEMENT_FIRST_ORDER_TOLERANCE_MS &&
+        periodStart < dayjs(receipt.expires_at).valueOf();
       await tx
         .update(kilo_pass_subscriptions)
         .set({ provider_subscription_id: purchase.providerSubscriptionId })
         .where(eq(kilo_pass_subscriptions.id, subscription.id));
-      return replacement.deferred
-        ? {
-            subscriptionId: subscription.id,
-            tier: purchase.tier,
-            cadence: purchase.cadence,
-            alreadyProcessed: true,
-          }
-        : null;
+      if (replacement.deferred) {
+        return {
+          subscriptionId: subscription.id,
+          tier: purchase.tier,
+          cadence: purchase.cadence,
+          alreadyProcessed: true,
+        };
+      }
+      if (isMidPeriodReplacement) {
+        return {
+          subscriptionId: subscription.id,
+          tier: subscription.tier,
+          cadence: subscription.cadence,
+          alreadyProcessed: true,
+        };
+      }
+      return null;
     };
     const transferred = params.dbOrTx
       ? await transfer(params.dbOrTx)
@@ -727,6 +833,10 @@ export async function completeStoreKiloPassPurchase(params: {
           ended_at: new Date(previousExpiry).toISOString(),
         })
         .where(eq(kilo_pass_subscriptions.id, activeSubscription.id));
+      await closePauseEvent(tx, {
+        kiloPassSubscriptionId: activeSubscription.id,
+        resumedAt: dayjs().utc().toISOString(),
+      });
     }
 
     const previousStorePurchase =
@@ -854,6 +964,14 @@ export async function completeStoreKiloPassPurchase(params: {
     });
 
     const baseAmountUsd = getMonthlyPriceUsd(purchase.tier);
+    if (!isAppStoreSamePeriodUpgrade) {
+      await releaseRefundedBaseIssuanceItem(tx, {
+        issuanceId: issuanceHeader.issuanceId,
+        subscriptionId,
+        kiloUserId: user.id,
+        purchase,
+      });
+    }
     const baseCreditsResult = isAppStoreSamePeriodUpgrade
       ? {
           wasIssued: false,

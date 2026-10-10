@@ -1,5 +1,5 @@
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { signInUrlWithCallbackPath } from '@/lib/user/server';
+import { signInUrlWithCallbackPath } from '@kilocode/web-shared/lib/user/server';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { redirect } from 'next/navigation';

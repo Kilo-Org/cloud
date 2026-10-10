@@ -476,6 +476,7 @@ describe('classifyControlPlaneRunFailure', () => {
     expect(run(testCase)).toEqual({
       stage: testCase.stage,
       code: testCase.code,
+      reportStatus: testCase.stage === 'interruption' ? 'interrupted' : 'failed',
       ...(testCase.responsibility === undefined ? {} : { responsibility: testCase.responsibility }),
       ...(testCase.failureReason === undefined ? {} : { failureReason: testCase.failureReason }),
     });

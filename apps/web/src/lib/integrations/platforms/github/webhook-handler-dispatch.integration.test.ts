@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cli_sessions_v2,
   github_app_installations,
@@ -8,8 +8,8 @@ import {
   github_installation_webhook_receipts,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
 import {
   claimGitHubInstallationDelivery,
@@ -66,11 +66,10 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
   let sessionCounter = 0;
 
   /**
-   * The PR cache upsert short-circuits unless a `cli_sessions_v2` row exists
-   * in this tenant for the same `(git_url, git_branch)`. Seed one before the
-   * webhook so the dispatch path can write the cache row.
+   * The PR cache upsert only writes when a `cli_sessions_v2` row verifiably
+   * links this exact PR. Seed a linked session before the webhook.
    */
-  async function seedSession(branch: string) {
+  async function seedSession(branch: string, prNumber: number) {
     const sessionId = `ses_test_webhook_handler_${Date.now()}_${sessionCounter++}`;
     await db.insert(cli_sessions_v2).values({
       session_id: sessionId,
@@ -79,6 +78,9 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
       created_on_platform: 'cloud-agent-web',
+      pr_url: `${NORMALIZED_GIT_URL}/pull/${prNumber}`,
+      pr_number: prNumber,
+      pr_head_ref: branch,
     });
     sessionIdsToCleanup.push(sessionId);
   }
@@ -166,7 +168,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
       })
       .returning();
     const branch = 'feature/workflow-only';
-    await seedSession(branch);
+    await seedSession(branch, 333);
     const sessionId = `ses_secondary_${Date.now()}`;
     await db.insert(cli_sessions_v2).values({
       session_id: sessionId,
@@ -263,7 +265,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
   }
 
   it('routes a closed+merged pull_request webhook through to the upsert, setting pr_state=merged', async () => {
-    await seedSession('feature/merge-me');
+    await seedSession('feature/merge-me', 555);
     // Seed by first sending an `opened` webhook.
     const openedResponse = await handleGitHubWebhook(
       buildPullRequestWebhook({
@@ -306,7 +308,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
   });
 
   it('records pr_state=closed when a pull_request is closed without merging', async () => {
-    await seedSession('feature/abandon');
+    await seedSession('feature/abandon', 556);
     const response = await handleGitHubWebhook(
       buildPullRequestWebhook({
         action: 'closed',
@@ -327,7 +329,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
   });
 
   it('deduplicates redelivered pull_request webhooks before the upsert runs', async () => {
-    await seedSession('feature/dedup');
+    await seedSession('feature/dedup', 557);
     // Seed with an opened webhook.
     const openedRequest = buildPullRequestWebhook({
       action: 'opened',
@@ -388,7 +390,7 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
   const sessionIdsToCleanup: string[] = [];
   let sessionCounter = 0;
 
-  async function seedSession(branch: string, platform = 'cloud-agent-web') {
+  async function seedSession(branch: string, prNumber = 1, platform = 'cloud-agent-web') {
     const sessionId = `ses_test_wh_review_${Date.now()}_${sessionCounter++}`;
     await db.insert(cli_sessions_v2).values({
       session_id: sessionId,
@@ -397,18 +399,21 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
       created_on_platform: platform,
+      pr_url: `${NORMALIZED_GIT_URL}/pull/${prNumber}`,
+      pr_number: prNumber,
+      pr_head_ref: branch,
     });
     sessionIdsToCleanup.push(sessionId);
     return sessionId;
   }
 
-  async function seedPrCacheRow(branch: string) {
+  async function seedPrCacheRow(branch: string, prNumber: number) {
     await db.insert(github_branch_pull_requests).values({
       git_url: NORMALIZED_GIT_URL,
       git_branch: branch,
       owned_by_user_id: testUserId,
-      pr_url: `https://github.com/${REPO}/pull/1`,
-      pr_number: 1,
+      pr_url: `https://github.com/${REPO}/pull/${prNumber}`,
+      pr_number: prNumber,
       pr_state: 'open',
     });
   }
@@ -507,8 +512,8 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
 
   it('routes a pull_request_review webhook and updates pr_review_decision on the cache row', async () => {
     const branch = 'feature/review-dispatch';
-    await seedSession(branch);
-    await seedPrCacheRow(branch);
+    await seedSession(branch, 1);
+    await seedPrCacheRow(branch, 1);
 
     const response = await handleGitHubWebhook(
       buildPullRequestReviewWebhook({
@@ -534,13 +539,13 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
 
   it('deduplicates redelivered pull_request_review webhooks', async () => {
     const branch = 'feature/review-dedup';
-    await seedSession(branch);
-    await seedPrCacheRow(branch);
+    await seedSession(branch, 2);
+    await seedPrCacheRow(branch, 2);
 
     const firstResponse = await handleGitHubWebhook(
       buildPullRequestReviewWebhook({
         action: 'submitted',
-        prNumber: 1,
+        prNumber: 2,
         branch,
         deliveryId: 'delivery-review-dedup-1',
       }),
@@ -552,7 +557,7 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
     const redelivered = await handleGitHubWebhook(
       buildPullRequestReviewWebhook({
         action: 'submitted',
-        prNumber: 1,
+        prNumber: 2,
         branch,
         deliveryId: 'delivery-review-dedup-1',
       }),

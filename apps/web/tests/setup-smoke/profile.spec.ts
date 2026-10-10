@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { randomUUID } from 'node:crypto';
 
 test.describe('local setup smoke', () => {

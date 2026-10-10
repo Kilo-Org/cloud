@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one suite for the thread card's collapsed/expanded states, its resolve action, its CTA scope and the own-comment row wiring */
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -131,6 +132,12 @@ function findPressableByA11yLabel(
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
   return findNode(root, 'Pressable', p => p.accessibilityLabel === label);
+}
+
+function findCommentRow(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  return renderer.root.find(
+    node => typeof node.type === 'string' && (node.type as string) === 'CommentRow'
+  );
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -281,6 +288,46 @@ describe('DiscussionThread comment row CTA scope (s2)', () => {
       commentKind: 'review',
       comment: { commentId: 1 },
     });
+
+    renderer.unmount();
+  });
+});
+
+// s4: the tab owns the own-comment writes; the thread card binds each comment
+// with `kind: 'review'` and forwards it to the callback.
+describe('DiscussionThread own-comment action binding (s4)', () => {
+  it('binds each comment with kind review and hands it to the callback', async () => {
+    const onEditComment = vi.fn<(comment: unknown, kind: unknown) => void>();
+    const onDeleteComment = vi.fn<(comment: unknown, kind: unknown) => void>();
+    const thread = makeThread();
+    const renderer = await render(
+      createElement(DiscussionThread, {
+        ...baseProps,
+        thread,
+        expanded: true,
+        onEditComment,
+        onDeleteComment,
+      })
+    );
+
+    const row = findCommentRow(renderer);
+    (row.props.onEditComment as () => void)();
+    (row.props.onDeleteComment as () => void)();
+    expect(onEditComment).toHaveBeenCalledWith(thread.comments[0], 'review');
+    expect(onDeleteComment).toHaveBeenCalledWith(thread.comments[0], 'review');
+
+    renderer.unmount();
+  });
+
+  it('leaves the row without own-comment callbacks when none are passed (provider scope)', async () => {
+    const thread = makeThread();
+    const renderer = await render(
+      createElement(DiscussionThread, { ...baseProps, thread, expanded: true })
+    );
+
+    const row = findCommentRow(renderer);
+    expect(row.props.onEditComment).toBeUndefined();
+    expect(row.props.onDeleteComment).toBeUndefined();
 
     renderer.unmount();
   });

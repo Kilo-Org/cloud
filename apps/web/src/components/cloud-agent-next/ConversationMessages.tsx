@@ -39,7 +39,8 @@ const ConversationMessageGroup = memo(
     onOpenPreparationDetails,
   }: ConversationMessageGroupProps) {
     const first = messages[0];
-    if (!first) return null;
+    const last = messages.at(-1);
+    if (!first || !last) return null;
 
     const displayMessage =
       messages.length === 1
@@ -50,6 +51,7 @@ const ConversationMessageGroup = memo(
       <MessageErrorBoundary>
         <MessageBubble
           message={displayMessage}
+          displayTimestamp={last.info.time.created}
           isStreaming={isStreaming}
           deliveryState={deliveryState}
           getChildMessages={getChildMessages}
@@ -73,7 +75,6 @@ const ConversationMessageGroup = memo(
     previous.deliveryState === next.deliveryState &&
     previous.preparations === next.preparations &&
     previous.commits === next.commits &&
-    previous.getChildMessages === next.getChildMessages &&
     previous.onOpenChildSession === next.onOpenChildSession &&
     previous.onOpenPreparationDetails === next.onOpenPreparationDetails &&
     previous.messages.length === next.messages.length &&
@@ -128,5 +129,18 @@ export const ConversationMessages = memo(
       );
     });
   },
-  (previous, next) => !previous.active && !next.active
+  (previous, next) => {
+    if (!previous.active && !next.active) return true;
+    return (
+      previous.active === next.active &&
+      previous.isStreaming === next.isStreaming &&
+      previous.staticMessages === next.staticMessages &&
+      previous.dynamicMessages === next.dynamicMessages &&
+      previous.pendingMessages === next.pendingMessages &&
+      previous.preparationByMessageId === next.preparationByMessageId &&
+      previous.commitsAfterMessage === next.commitsAfterMessage &&
+      previous.onOpenChildSession === next.onOpenChildSession &&
+      previous.onOpenPreparationDetails === next.onOpenPreparationDetails
+    );
+  }
 );

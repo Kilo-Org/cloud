@@ -2,10 +2,10 @@ import 'server-only';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import { user_model_preferences } from '@kilocode/db/schema';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 const lastSelectedInput = z.object({
   model: z.string().min(1),

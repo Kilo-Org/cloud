@@ -28,6 +28,7 @@ const captureInteraction = vi.hoisted(() => (cb: () => void) => {
   return { cancel: interactionState.cancel };
 });
 const getProfileAgentScopeMock = vi.hoisted(() => vi.fn());
+const openExternalUrlFn = vi.hoisted(() => vi.fn());
 
 export {
   authState,
@@ -130,8 +131,20 @@ vi.mock('@/lib/security-agent', () => ({
   getSecurityAgentPath: () => '/security-agent',
 }));
 
+vi.mock('@/lib/external-link', () => ({
+  openExternalUrl: openExternalUrlFn,
+}));
+
 vi.mock('@/lib/feedback', () => ({
   showFeedbackPrompt: vi.fn(),
+}));
+
+vi.mock('@/components/use-feedback-prompt', () => ({
+  useFeedbackPrompt: () => ({ requestPrompt: vi.fn(), promptDialog: null }),
+}));
+
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
 
 vi.mock('@/components/ui/icons', () => ({
@@ -147,6 +160,7 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
   Smartphone: 'Smartphone',
+  Sparkles: 'Sparkles',
   Trash2: 'Trash2',
 }));
 

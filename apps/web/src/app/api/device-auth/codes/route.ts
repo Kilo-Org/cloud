@@ -4,12 +4,12 @@ import {
   DeviceAuthPendingLimitError,
 } from '@/lib/device-auth/device-auth';
 import { headers } from 'next/headers';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   buildDeviceAuthVerificationUrl,
   getDeviceAuthAppModeFromRequestUrl,
 } from '@/app/device-auth/device-auth-url';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 export const POST = withRestTiming('/api/device-auth/codes', async (request: Request) => {
   const headersList = await headers();

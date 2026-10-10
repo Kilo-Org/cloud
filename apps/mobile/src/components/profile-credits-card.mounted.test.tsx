@@ -77,7 +77,14 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  isMoneyRole: () => false,
+  // Real semantics: owner/admin/billing_manager can manage billing.
+  isMoneyRole: (role: string | undefined) =>
+    role === 'owner' || role === 'admin' || role === 'billing_manager',
+}));
+
+const routerPush = vi.hoisted(() => vi.fn());
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: routerPush }),
 }));
 
 // The mounted OrganizationProvider resolves its default from this list; an
@@ -144,8 +151,18 @@ vi.mock('@/components/ui/skeleton', () => ({
 
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
+const addCreditsRowProps = vi.hoisted(() => ({
+  latest: undefined as { url?: string; onPress?: () => void } | undefined,
+}));
 vi.mock('@/components/add-credits-row', () => ({
-  AddCreditsRow: () => 'ADD_CREDITS_ROW',
+  AddCreditsButton: (props: { url?: string; onPress?: () => void }) => {
+    addCreditsRowProps.latest = props;
+    return 'ADD_CREDITS_BUTTON';
+  },
+  AddCreditsRow: (props: { url?: string; onPress?: () => void }) => {
+    addCreditsRowProps.latest = props;
+    return 'ADD_CREDITS_ROW';
+  },
 }));
 
 const kiloPassCardProps = vi.hoisted(() => ({
@@ -238,6 +255,8 @@ beforeEach(() => {
   windowDims.width = 390;
   savedMetadata.clear();
   saveCompletion = undefined;
+  addCreditsRowProps.latest = undefined;
+  routerPush.mockReset();
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
     return savedMetadata.get(key) ?? null;
@@ -254,6 +273,7 @@ beforeEach(() => {
   getContextBalanceQueryFn.mockResolvedValue(null);
   personalCreditBlocksQueryFn.mockReset();
   orgCreditBlocksQueryFn.mockReset();
+  orgCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
   refetchUserId.mockReset();
   currentUser.userId = undefined;
   currentUser.isError = false;
@@ -352,8 +372,10 @@ describe('CreditsCard balance state', () => {
     const { texts, unmount } = await mountCard();
 
     expect(texts()).toContain('SKELETON');
-    expect(texts()).not.toContain('ADD_CREDITS_ROW');
     expect(texts()).not.toContain('$0.00');
+    // The personal CTA lives inside the balance card, so it arrives with the
+    // card instead of beside the balance skeleton.
+    expect(texts()).not.toContain('ADD_CREDITS_BUTTON');
 
     unmount();
   });
@@ -426,6 +448,8 @@ describe('CreditsCard balance state', () => {
     const { renderer, texts, unmount } = await mountCard();
 
     expect(texts()).toContain('Failed to load balance. Tap to retry.');
+    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(texts()).not.toContain('$0.00');
 
     const errorPressable = renderer.root.find(node => node.type === Pressable);
     await act(async () => {
@@ -464,6 +488,112 @@ describe('CreditsCard balance state', () => {
     });
     expect(texts()).toContain('$10.00');
     expect(texts()).not.toContain('*****');
+
+    unmount();
+  });
+});
+
+describe('CreditsCard add-credits entry point', () => {
+  it.each([
+    ['ios', 0],
+    ['ios', 10],
+    ['android', 0],
+    ['android', 10],
+  ] as const)(
+    'renders the personal in-app CTA in the balance card on %s at a %i balance',
+    async (os, balance) => {
+      Platform.OS = os;
+      currentUser.userId = 'user-1';
+      const queryClient = createTestQueryClient();
+      queryClient.setQueryData([...BALANCE_KEY], { balance });
+
+      const { texts, unmount } = await mountCard(queryClient);
+      await waitFor(() => texts().includes(`$${balance.toFixed(2)}`));
+
+      expect(texts()).toContain('ADD_CREDITS_BUTTON');
+      expect(addCreditsRowProps.latest?.url).toBeUndefined();
+      expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
+
+      act(() => {
+        addCreditsRowProps.latest?.onPress?.();
+      });
+      expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
+
+      unmount();
+    }
+  );
+
+  it('keeps personal Buy credits actionable when the balance request fails', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
+
+    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(texts()).not.toContain('$0.00');
+    expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
+    act(() => {
+      addCreditsRowProps.latest?.onPress?.();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
+
+    unmount();
+  });
+
+  it('does not render the retired iOS-only personal disclosure copy', async () => {
+    Platform.OS = 'ios';
+    currentUser.userId = 'user-1';
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
+
+    const { texts, unmount } = await mountCard(queryClient);
+    await waitFor(() => texts().includes('$0.00'));
+
+    expect(texts()).not.toContain(
+      'Your credit balance is empty. Credits are managed outside the iOS app for this account.'
+    );
+    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+
+    unmount();
+  });
+
+  it('keeps the org payment-details URL for a money-role member', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+
+    const { texts, unmount } = await mountCard(queryClient, orgs);
+    await waitFor(() => addCreditsRowProps.latest?.url !== undefined);
+
+    expect(texts()).toContain('ADD_CREDITS_ROW');
+    expect(addCreditsRowProps.latest?.url).toBe(
+      'https://example.com/organizations/org-a/payment-details'
+    );
+    expect(addCreditsRowProps.latest?.onPress).toBeUndefined();
+
+    unmount();
+  });
+
+  it('renders no row for a non-money-role org member', async () => {
+    currentUser.userId = 'user-1';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData([...BALANCE_KEY], { balance: 0 });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'member' },
+    ] as OrgListEntry[];
+
+    const { texts, unmount } = await mountCard(queryClient, orgs);
+    await waitFor(() => texts().includes('Acme'));
+
+    // The personal row may render before the stored org resolves; the settled
+    // tree must hold no row at all for a member who cannot manage billing.
+    expect(texts()).not.toContain('ADD_CREDITS_ROW');
 
     unmount();
   });

@@ -24,6 +24,7 @@ type DeviceAuthResult = DeviceAuthState & {
   start: (mode?: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
   cancel: () => void;
   openBrowser: () => Promise<void>;
+  clearError: () => void;
 };
 
 const START_TIMEOUT_MS = 15_000;
@@ -251,6 +252,21 @@ export function useDeviceAuth(): DeviceAuthResult {
     setState(idleDeviceAuthState());
   }, [cleanup]);
 
+  // Dismisses a terminal error (denied/expired/timed out) when a new sign-in
+  // attempt starts, so a stale timeout message does not sit above the form while
+  // the next attempt runs. A live flow (pending/approved/idle) is left alone.
+  // An `error` is not always terminal: a failed Open-browser tap sets one while
+  // the poll stays registered, so tearing the flow down here — rather than only
+  // dropping its code — keeps that still-running poll from flipping the screen
+  // to approved (signing the user in mid-attempt) after the error is dismissed.
+  const clearError = useCallback(() => {
+    if (state.status !== 'error' && state.status !== 'denied' && state.status !== 'expired') {
+      return;
+    }
+    cleanup();
+    setState(idleDeviceAuthState());
+  }, [cleanup, state.status]);
+
   const openBrowser = useCallback(async () => {
     if (state.verificationUrl) {
       try {
@@ -267,5 +283,5 @@ export function useDeviceAuth(): DeviceAuthResult {
     }
   }, [state.verificationUrl]);
 
-  return { ...state, start, cancel, openBrowser };
+  return { ...state, start, cancel, openBrowser, clearError };
 }

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { buildGitLabOAuthUrl } from '@/lib/integrations/platforms/gitlab/adapter';
 import { createGitLabOAuthState } from '@/lib/integrations/platforms/gitlab/oauth-state';
 import { storeGitLabOAuthCredentials } from '@/lib/integrations/platforms/gitlab/oauth-credentials';
 
-jest.mock('@/lib/user/server');
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({

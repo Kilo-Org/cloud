@@ -2850,10 +2850,9 @@ describe('api routes', () => {
   });
 
   it('POST /user/web-ticket retries a retryable Durable Object error', async () => {
-    const reset = Object.assign(
-      new Error('Durable Object reset because its code was updated.'),
-      { retryable: true }
-    );
+    const reset = Object.assign(new Error('Durable Object reset because its code was updated.'), {
+      retryable: true,
+    });
     const mint = vi.fn().mockRejectedValueOnce(reset).mockResolvedValueOnce(undefined);
     const env = makeTestEnv();
     env.CONNECTION_TICKET_DO.newUniqueId.mockReturnValue({ toString: () => 'b'.repeat(64) });

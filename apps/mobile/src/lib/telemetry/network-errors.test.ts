@@ -1,7 +1,12 @@
 /* oxlint-disable max-lines -- one network-error suite; splitting the fetch and unit cases would duplicate the fake-sink scaffold */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import {
+  setBreadcrumbSink,
+  setTelemetrySink,
+  type TelemetryBreadcrumb,
+  type TelemetryEvent,
+} from '@/lib/telemetry/error-sink';
 import {
   createNetworkErrorFetch,
   isAbortError,
@@ -53,6 +58,11 @@ function resolvingFetch(response: Response): typeof fetch {
   const mock = vi.fn();
   mock.mockResolvedValue(response);
   return mock as unknown as typeof fetch;
+}
+
+function batchWithInnerStatus(httpStatus: number): Response {
+  const error = { message: 'failed', code: -32_000, data: { httpStatus, path: 'user.getMe' } };
+  return Response.json([{ result: { data: 'ok' } }, { error }], { status: 207 });
 }
 
 describe('stripQueryString', () => {
@@ -389,8 +399,8 @@ describe('createNetworkErrorFetch', () => {
     expect(event?.error).toBeInstanceOf(Error);
   });
 
-  it('(d2) reports a 404 with a synthesized <METHOD> <path> -> <status> error', async () => {
-    const response = new Response('missing', { status: 404, statusText: 'Not Found' });
+  it('(d2) reports a 412 with a synthesized <METHOD> <path> -> <status> error', async () => {
+    const response = new Response('stale', { status: 412, statusText: 'Precondition Failed' });
     const wrapped = createNetworkErrorFetch(resolvingFetch(response));
 
     await wrapped('https://example.com/api/trpc/a.b', { method: 'POST' });
@@ -398,14 +408,14 @@ describe('createNetworkErrorFetch', () => {
     const event = reportedEvent();
     expect(event?.tags).toMatchObject({
       'http.method': 'POST',
-      'http.status': 404,
+      'http.status': 412,
       'http.status_class': '4xx',
       'network.outcome': 'http_error',
     });
-    expect(event?.fingerprint).toEqual(['network-error', 'fetch', 'a.b', 'http.404']);
+    expect(event?.fingerprint).toEqual(['network-error', 'fetch', 'a.b', 'http.412']);
     // The message drops the scheme, host, and port so it is stable across
     // environments and worktrees.
-    expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b -> 404');
+    expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b -> 412');
   });
 
   it('(e) does not report a 200 response', async () => {
@@ -478,9 +488,9 @@ describe('createNetworkErrorFetch', () => {
 
   it('(i) reports one warning for a 207 batch with the parsed error and keeps the response', async () => {
     const batchError = {
-      message: 'forbidden',
-      code: -32_003,
-      data: { code: 'FORBIDDEN', httpStatus: 403, path: 'session.list' },
+      message: 'bad request',
+      code: -32_600,
+      data: { code: 'BAD_REQUEST', httpStatus: 400, path: 'session.list' },
     };
     const body = [{ result: { data: 'ok' } }, { error: batchError }];
     const response = Response.json(body, {
@@ -505,27 +515,27 @@ describe('createNetworkErrorFetch', () => {
       'http.status': 207,
       'network.outcome': 'http_error',
       'trpc.procedure': 'session.list',
-      'trpc.code': 'FORBIDDEN',
+      'trpc.code': 'BAD_REQUEST',
     });
     expect(event?.contexts?.network).toMatchObject({
       url: 'https://example.com/api/trpc/session.list',
       status: 207,
       statusText: 'Multi-Status',
       outcome: 'http_error',
-      trpcCode: 'FORBIDDEN',
+      trpcCode: 'BAD_REQUEST',
     });
     // The parsed tRPC body is not passed to `captureException` (Sentry would
     // title the issue from an SDK frame): a real Error carries the stable
     // message and the body rides in the payload context `scrubEvent` redacts.
     expect(event?.error).toBeInstanceOf(Error);
-    expect(errorMessageOf(event)).toBe('GET /api/trpc/session.list -> 403');
+    expect(errorMessageOf(event)).toBe('GET /api/trpc/session.list -> 400');
     expect(event?.contexts?.[NETWORK_BODY_CONTEXT]).toEqual({ data: batchError });
     // Keyed away from the synthesized exception name: that context is owned by
     // `extraErrorDataIntegration`, which would overwrite it with `{}`.
     expect(event?.contexts?.NetworkError).toBeUndefined();
     // The inner status names the defect; the 207 envelope only says the body
-    // is a batch, so keying on it would merge a 403 and a 500 of one procedure.
-    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.403']);
+    // is a batch, so keying on it would merge a 400 and a 500 of one procedure.
+    expect(event?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.400']);
   });
 
   it('(i2) keys a 207 batch on the parsed inner status, not the envelope', async () => {
@@ -555,12 +565,12 @@ describe('createNetworkErrorFetch', () => {
       return reportedEvent();
     };
 
-    const forbidden = await report(403, 'FORBIDDEN');
+    const badRequest = await report(400, 'BAD_REQUEST');
     const serverError = await report(500, 'INTERNAL_SERVER_ERROR');
     // With no inner status the tRPC code keys the group, never the envelope.
     const noInnerStatus = await report(undefined, 'TOO_MANY_REQUESTS');
 
-    expect(forbidden?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.403']);
+    expect(badRequest?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.400']);
     expect(serverError?.fingerprint).toEqual(['network-error', 'trpc', 'session.list', 'http.500']);
     expect(noInnerStatus?.fingerprint).toEqual([
       'network-error',
@@ -568,8 +578,8 @@ describe('createNetworkErrorFetch', () => {
       'session.list',
       'TOO_MANY_REQUESTS',
     ]);
-    expect(serverError?.fingerprint).not.toEqual(forbidden?.fingerprint);
-    expect(errorMessageOf(forbidden)).toBe('GET /api/trpc/session.list -> 403');
+    expect(serverError?.fingerprint).not.toEqual(badRequest?.fingerprint);
+    expect(errorMessageOf(badRequest)).toBe('GET /api/trpc/session.list -> 400');
     expect(errorMessageOf(serverError)).toBe('GET /api/trpc/session.list -> 500');
   });
 
@@ -582,6 +592,120 @@ describe('createNetworkErrorFetch', () => {
 
     expect(result).toBe(response);
     expect(events).toHaveLength(0);
+  });
+});
+
+describe('createNetworkErrorFetch status policy', () => {
+  let breadcrumbs: TelemetryBreadcrumb[] = [];
+
+  beforeEach(() => {
+    breadcrumbs = [];
+    setBreadcrumbSink(breadcrumb => {
+      breadcrumbs.push(breadcrumb);
+    });
+  });
+
+  afterEach(() => {
+    setBreadcrumbSink(null);
+  });
+
+  const trpcOptions = {
+    source: 'trpc',
+    isResponseError: (status: number) => status >= 400 || status === 207,
+    readResponseError: readTrpcResponseError,
+  } as const;
+
+  async function respond(url: string, response: Response, trpc = true): Promise<void> {
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response), trpc ? trpcOptions : {});
+    await wrapped(url, { method: 'POST' });
+  }
+
+  it.each([401, 402, 403, 404, 409, 429])(
+    'records a %i as a breadcrumb and files no issue',
+    async status => {
+      await respond(
+        'https://example.com/api/trpc/user.getMe?batch=1',
+        new Response('', { status })
+      );
+
+      expect(events).toHaveLength(0);
+      expect(breadcrumbs).toEqual([
+        {
+          category: 'network',
+          level: 'warning',
+          message: `POST /api/trpc/user.getMe -> ${status}`,
+          data: expect.objectContaining({
+            'error.source': 'trpc',
+            'http.status': status,
+            'network.outcome': 'http_error',
+            'trpc.procedure': 'user.getMe',
+          }),
+        },
+      ]);
+    }
+  );
+
+  it.each([401, 402, 403, 404, 409, 429])(
+    'records a 207 batch whose inner status is %i as a breadcrumb',
+    async status => {
+      await respond(
+        'https://example.com/api/trpc/user.getMe?batch=1',
+        batchWithInnerStatus(status)
+      );
+
+      expect(events).toHaveLength(0);
+      expect(breadcrumbs).toHaveLength(1);
+      expect(breadcrumbs[0]?.message).toBe(`POST /api/trpc/user.getMe -> ${status}`);
+    }
+  );
+
+  it.each([400, 500])('still reports a %i exactly once', async status => {
+    await respond('https://example.com/api/trpc/user.getMe', new Response('', { status }));
+    await respond('https://example.com/api/trpc/user.getMe?batch=1', batchWithInnerStatus(status));
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'trpc', 'user.getMe', `http.${status}`],
+      ['network-error', 'trpc', 'user.getMe', `http.${status}`],
+    ]);
+    expect(breadcrumbs).toHaveLength(0);
+  });
+
+  it('leaves a terminal refusal on a sign-in route to the auth layer', async () => {
+    await respond(
+      'https://example.com/api/auth/native/token',
+      new Response('', { status: 400 }),
+      false
+    );
+    await respond(
+      'https://example.com/api/auth/native/otp',
+      new Response('', { status: 412 }),
+      false
+    );
+
+    expect(events).toHaveLength(0);
+    expect(breadcrumbs.map(breadcrumb => breadcrumb.message)).toEqual([
+      'POST /api/auth/native/token -> 400',
+      'POST /api/auth/native/otp -> 412',
+    ]);
+  });
+
+  it('still reports a retryable sign-in failure and a 400 on a route the auth layer does not own', async () => {
+    await respond(
+      'https://example.com/api/auth/native/token',
+      new Response('', { status: 500 }),
+      false
+    );
+    await respond(
+      'https://example.com/api/auth/native/exchange',
+      new Response('', { status: 400 }),
+      false
+    );
+
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['network-error', 'fetch', '/api/auth/native/token', 'http.500'],
+      ['network-error', 'fetch', '/api/auth/native/exchange', 'http.400'],
+    ]);
+    expect(breadcrumbs).toHaveLength(0);
   });
 });
 

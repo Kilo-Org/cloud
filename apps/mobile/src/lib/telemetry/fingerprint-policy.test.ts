@@ -163,7 +163,7 @@ describe('fingerprint policy', () => {
           error: {
             message: 'failed',
             code: -32_000,
-            data: { code: 'FORBIDDEN', httpStatus, path: 'session.list' },
+            data: { code: 'BAD_REQUEST', httpStatus, path: 'session.list' },
           },
         },
       ];
@@ -179,11 +179,11 @@ describe('fingerprint policy', () => {
       await wrapped('http://127.0.0.1:10416/api/trpc/session.list?batch=1');
     };
 
-    await report(403);
+    await report(400);
     await report(500);
 
     const [first, second] = groupKeys();
-    expect(first).toBe('network-error | trpc | session.list | http.403');
+    expect(first).toBe('network-error | trpc | session.list | http.400');
     expect(second).toBe('network-error | trpc | session.list | http.500');
     expect(second).not.toBe(first);
   });

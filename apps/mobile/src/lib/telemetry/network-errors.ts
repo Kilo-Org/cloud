@@ -22,7 +22,8 @@
 
 import { z } from 'zod';
 
-import { captureTelemetry } from '@/lib/telemetry/error-sink';
+import { classifyAuthResponse, isAuthTerminalRoute } from '@/lib/auth/auth-response-class';
+import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
 import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
 
@@ -347,6 +348,63 @@ export function reportNetworkError(context: NetworkErrorContext): void {
   }
 }
 
+/**
+ * Statuses the app handles as an answer, so a report would name no defect:
+ * - 401: the auth layer refreshes or signs out, and reports a terminal refusal
+ *   itself (`reportAuthTerminalFailure`).
+ * - 402: no credits; the paywall owns it.
+ * - 403: production 403s are the edge firewall (OFAC-sanctioned regions, IP
+ *   blocks) and the minimum-version gate, not app code.
+ * - 404: a stale ID for a deleted object; screens show "not found".
+ * - 409: a duplicate of an operation already in progress.
+ * - 429: a rate limit the caller backs off from.
+ */
+const EXPECTED_HTTP_STATUSES: ReadonlySet<number> = new Set([401, 402, 403, 404, 409, 429]);
+
+/**
+ * True when a failed response is an expected answer: one of
+ * {@link EXPECTED_HTTP_STATUSES} (for a tRPC batch, the inner status), or a
+ * terminal refusal on a sign-in route, which the auth layer reports once.
+ */
+function isExpectedResponse(context: NetworkErrorContext): boolean {
+  const status = effectiveHttpStatus(context, readTrpcErrorContext(context.error));
+  if (status === undefined) {
+    return false;
+  }
+  if (EXPECTED_HTTP_STATUSES.has(status)) {
+    return true;
+  }
+  const path = normalizeUrlPath(context.url);
+  return isAuthTerminalRoute(path) && classifyAuthResponse({ path, status }).kind === 'terminal';
+}
+
+/**
+ * Record an expected failed response as a breadcrumb, so the next real event
+ * still shows it. Same message and tags as a report; no query string.
+ */
+function recordExpectedResponse(context: NetworkErrorContext): void {
+  try {
+    const trpc = readTrpcErrorContext(context.error);
+    const path = normalizeUrlPath(context.url);
+    const procedure = trpcProcedureFromUrl(context.url);
+    addTelemetryBreadcrumb({
+      category: 'network',
+      level: 'warning',
+      message: buildSyntheticError(context, path, trpc).message,
+      data: {
+        'error.source': context.source,
+        'network.outcome': networkOutcome(context),
+        durationMs: context.durationMs,
+        ...(context.status === undefined ? {} : { 'http.status': context.status }),
+        ...(procedure === undefined ? {} : { 'trpc.procedure': procedure }),
+        ...(trpc.code === undefined ? {} : { 'trpc.code': trpc.code }),
+      },
+    });
+  } catch {
+    // Telemetry must never throw into app code.
+  }
+}
+
 function requestUrlString(input: RequestInfo | URL): string {
   if (input instanceof URL) {
     return input.href;
@@ -383,9 +441,10 @@ function safeShouldReport(url: string, shouldReport: (url: string) => boolean): 
  * Wrap a fetch implementation so every failed (or error-status) http(s)
  * request is reported once at warning level. `isResponseError` chooses the
  * statuses that count as errors (default `>= 400`; tRPC adds 207 so a mixed
- * batch is reported). `readResponseError` may parse the body via a clone to
- * enrich the report. The original rejection is re-thrown and the original
- * Response is returned unchanged; the original body is never read.
+ * batch is reported). An expected answer (`isExpectedResponse`) is a
+ * breadcrumb instead of a report. `readResponseError` may parse the body via a
+ * clone to enrich the report. The original rejection is re-thrown and the
+ * original Response is returned unchanged; the original body is never read.
  */
 export function createNetworkErrorFetch(
   baseFetch: typeof fetch,
@@ -410,7 +469,7 @@ export function createNetworkErrorFetch(
             error = undefined;
           }
         }
-        reportNetworkError({
+        const context: NetworkErrorContext = {
           source,
           url,
           method,
@@ -418,7 +477,12 @@ export function createNetworkErrorFetch(
           statusText: response.statusText,
           durationMs: Date.now() - startedAt,
           ...(error === undefined ? {} : { error }),
-        });
+        };
+        if (isExpectedResponse(context)) {
+          recordExpectedResponse(context);
+        } else {
+          reportNetworkError(context);
+        }
       }
       return response;
     } catch (error) {

@@ -14,7 +14,7 @@
 import * as Sentry from '@sentry/react-native';
 
 import { LATENCY_INGEST_URL } from '@/lib/config';
-import { setTelemetrySink } from '@/lib/telemetry/error-sink';
+import { setBreadcrumbSink, setTelemetrySink } from '@/lib/telemetry/error-sink';
 import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
 import { LATENCY_INGEST_URL_DEFAULT } from '@/lib/url-contract';
 
@@ -110,6 +110,9 @@ function installSentrySink(): void {
     } else {
       Sentry.captureMessage(event.message ?? 'Telemetry event', options);
     }
+  });
+  setBreadcrumbSink(breadcrumb => {
+    Sentry.addBreadcrumb(breadcrumb);
   });
 }
 

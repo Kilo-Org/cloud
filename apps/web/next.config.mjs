@@ -3,6 +3,7 @@ import createMDX from '@next/mdx';
 import { statSync } from 'fs';
 import { resolve } from 'path';
 import NextBundleAnalyzer from '@next/bundle-analyzer';
+import { getAiGatewayRewrites } from './ai-gateway-rewrites.mjs';
 
 const withBundleAnalyzer = NextBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
@@ -63,29 +64,14 @@ const nextConfig = {
   // errors are still surfaced without the indicator.
   devIndicators: false,
 
+  experimental: {
+    proxyTimeout: 800_000,
+  },
+
   async rewrites() {
-    // Global API rewrites - proxy to global-api.kilo.ai when not on global backend
-    // Uses beforeFiles to ensure the rewrite happens BEFORE filesystem routes are checked
-    // See: https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites
     const globalApiRewrites =
       process.env.VERCEL_ENV === 'production' && process.env.GLOBAL_KILO_BACKEND !== 'true'
         ? [
-            {
-              source: '/api/fim/completions',
-              destination: 'https://global-api.kilo.ai/api/fim/completions',
-            },
-            {
-              source: '/api/edit/completions',
-              destination: 'https://global-api.kilo.ai/api/edit/completions',
-            },
-            {
-              source: '/api/gateway/:path*',
-              destination: 'https://global-api.kilo.ai/api/gateway/:path*',
-            },
-            {
-              source: '/api/openrouter/:path*',
-              destination: 'https://global-api.kilo.ai/api/openrouter/:path*',
-            },
             {
               source: '/api/exa/:path*',
               destination: 'https://global-api.kilo.ai/api/exa/:path*',
@@ -98,7 +84,7 @@ const nextConfig = {
         : [];
 
     return {
-      beforeFiles: globalApiRewrites,
+      beforeFiles: [...getAiGatewayRewrites(), ...globalApiRewrites],
       afterFiles: [
         // /config.json is handled by src/app/config.json/route.ts which merges
         // Kilo-specific schema additions on top of the upstream opencode schema.

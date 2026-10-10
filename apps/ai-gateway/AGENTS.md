@@ -16,8 +16,11 @@ Next.js app that serves the AI gateway API on its own. It deploys to the
   `packages/web-shared/AGENTS.md`.
 - Handlers that depend on the path accept both apps' paths, such as the LLM
   proxy's path validation.
-- `pnpm dev` runs with the web app's environment files. Start it with
-  `pnpm dev:start ai-gateway`.
+- `pnpm dev` runs with the web app's environment files. `pnpm dev:start` starts
+  it automatically as a dependency of the web app, on port 3010 plus the worktree
+  port offset. The web app rewrites gateway requests to it in development and to
+  `https://ai-gateway.kilo.ai` in production or `https://staging-ai-gateway.kilo.ai`
+  when `VERCEL_TARGET_ENV=staging`, on both global and non-global backends.
 - The scheduled `deploy-production.yml` and `deploy-staging.yml` deploy this
   app with the web apps, from the same CI-green commit, after migrations. A
   release is only recorded as complete once the gateway is live too.

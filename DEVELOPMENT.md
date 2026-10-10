@@ -221,7 +221,7 @@ pnpm drizzle:verify-bootstrap
 pnpm dev:start
 ```
 
-This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+This generates the local environment files and launches a tmux dashboard with the Next.js web app, the standalone AI gateway app, and local infrastructure. The web app proxies gateway routes to the local gateway on port 3010 plus the worktree port offset. It does not run database migrations.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
@@ -248,7 +248,6 @@ should pass against the local PostgreSQL database.
 |---|---|
 | `KILO_PORT_OFFSET=auto pnpm dev:start` | Start all local services in a tmux dashboard with worktree-safe ports |
 | `pnpm dev:start agents cloud-agent-public-tunnels` | Same as `dev:start agents`, plus Cloudflare quick tunnels for sandbox-facing Worker/Next/session-ingest URLs |
-| `pnpm dev:start ai-gateway` | Also start the standalone AI gateway app (`apps/ai-gateway`) on port 3010 plus the port offset |
 | `pnpm dev:stop` | Stop the tmux session and all services |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` (see [Worker `.dev.vars` setup](#worker-dev-vars-setup)) |
 | `pnpm dev:env --missing-secrets-only` | Sync env files and create missing local Secrets Store entries without refreshing existing secrets |

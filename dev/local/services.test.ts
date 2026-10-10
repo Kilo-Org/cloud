@@ -199,7 +199,7 @@ test('keeps auto routing workers in their own opt-in group', () => {
   assert.ok(!alwaysOn.includes('auto-routing-benchmark'));
 });
 
-test('keeps the AI gateway app in its own opt-in group', () => {
+test('starts the AI gateway app whenever the web app starts', () => {
   const service = getService('ai-gateway');
 
   assert.equal(service.group, 'ai-gateway');
@@ -219,7 +219,27 @@ test('keeps the AI gateway app in its own opt-in group', () => {
     'redis-http',
     'ai-gateway',
   ]);
-  assert.ok(!resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+  for (const target of ['nextjs', 'app', 'core', 'agents']) {
+    const targets = resolveTargets([target]);
+    assert.ok(targets.includes('ai-gateway'));
+    assert.ok(targets.indexOf('ai-gateway') < targets.indexOf('nextjs'));
+  }
+});
+
+test('passes the same gateway port to the web app and gateway on every worktree offset', () => {
+  const initialOffset = portOffset;
+  try {
+    for (const offset of [0, 2500]) {
+      applyPortOffset(offset);
+      const gateway = getService('ai-gateway');
+      const web = getService('nextjs');
+      assert.equal(web.command[1], `AI_GATEWAY_PORT=${gateway.port}`);
+      assert.equal(gateway.command[1], web.command[1]);
+    }
+  } finally {
+    applyPortOffset(initialOffset);
+  }
 });
 
 test('registers user data export with worktree-aware ports and dependencies', () => {
@@ -231,11 +251,12 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
+    'redis',
     'postgres',
     'stripe',
-    'redis',
-    'cloudflare-session-ingest',
     'redis-http',
+    'cloudflare-session-ingest',
+    'ai-gateway',
     'nextjs',
     'user-data-export',
   ]);

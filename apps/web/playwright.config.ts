@@ -22,8 +22,20 @@ const e2eEnv = Object.fromEntries(
 );
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+const gatewayPort = process.env.AI_GATEWAY_PORT ? Number(process.env.AI_GATEWAY_PORT) : port + 10;
 // Use localhost instead of 127.0.0.1 to match cookie domain
 const baseURL = `http://localhost:${port}`;
+const webServerEnv = {
+  ...e2eEnv,
+  NODE_ENV: 'development',
+  DEBUG_SHOW_DEV_UI: 'true',
+  APP_URL_OVERRIDE: baseURL,
+  NEXTAUTH_URL: baseURL,
+  PORT: String(port),
+  AI_GATEWAY_PORT: String(gatewayPort),
+  VERCEL_ENV: '',
+  VERCEL_TARGET_ENV: '',
+};
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -71,25 +83,27 @@ export default defineConfig({
     },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    // Always use dev mode for Playwright tests - never production
-    command: `pnpm run copy:swagger-ui-assets && pnpm next dev -p ${port}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    stdout: 'ignore',
-    stderr: 'pipe',
-    env: {
-      ...e2eEnv,
-      // Always use development mode for Playwright tests
-      NODE_ENV: 'development',
-      DEBUG_SHOW_DEV_UI: 'true', // Enable fake login
-      APP_URL_OVERRIDE: baseURL,
-      NEXTAUTH_URL: baseURL,
-      PORT: String(port),
-      VERCEL_ENV: '',
-      VERCEL_TARGET_ENV: '',
+  webServer: [
+    {
+      name: 'ai-gateway',
+      command: `pnpm --filter ai-gateway exec next dev -p ${gatewayPort}`,
+      // Playwright accepts 401 as ready, without needing model-provider access.
+      url: `http://localhost:${gatewayPort}/api/v1/organizations/playwright/models`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      env: webServerEnv,
     },
-  },
+    {
+      name: 'web',
+      command: `pnpm run copy:swagger-ui-assets && pnpm next dev -p ${port}`,
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+      stdout: 'ignore',
+      stderr: 'pipe',
+      env: webServerEnv,
+    },
+  ],
 });

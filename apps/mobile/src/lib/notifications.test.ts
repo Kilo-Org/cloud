@@ -20,7 +20,7 @@ import {
   registerGlanceableSink,
   unregisterGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
-import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import { ACTIVE_USER_ID_KEY, AUTH_TOKEN_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
@@ -2433,6 +2433,8 @@ describe('cold iOS background delivery', () => {
     secureStore.set('glanceable-scope-key', SCOPE_KEY);
     secureStore.set(ACTIVE_USER_ID_KEY, 'u1');
     secureStore.set(ORGANIZATION_STORAGE_KEY, 'org-9');
+    // A signed-in cold process reads its access token from the keychain.
+    secureStore.set(AUTH_TOKEN_KEY, 'access-token');
     mocks.getItemAsync.mockImplementation(secureStoreMock.getItemAsync);
     mocks.setItemAsync.mockImplementation(secureStoreMock.setItemAsync);
     mocks.deleteItemAsync.mockImplementation(async (key: string) => {

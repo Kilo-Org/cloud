@@ -13,6 +13,11 @@ import {
 import { trpcClient } from '@/lib/trpc';
 
 import { enqueueTokenMutation, resetTokenMutationQueue } from './token-mutation-queue';
+import {
+  _resetUnregisterSessionForTests,
+  noteUnregisterFailure,
+  readUnregisterAuthToken,
+} from './unregister-session';
 
 import { canRegisterActivityTokenKind } from './live-activity-switch';
 import {
@@ -278,6 +283,11 @@ const delivery: GlanceableDelivery = {
       const tokens = [
         ...new Set(includeScope ? [...scopeTokens, ...activityTokens] : activityTokens),
       ];
+      // Without a session the delete can only answer 401: keep the tokens for an authorized cleanup.
+      const authToken = tokens.length > 0 ? await readUnregisterAuthToken() : null;
+      if (authToken === null) {
+        return { ok: tokens.length === 0, tokens };
+      }
       const results = await Promise.all(
         tokens.map(async token => {
           try {
@@ -285,7 +295,8 @@ const delivery: GlanceableDelivery = {
             scopeTokens.delete(token);
             activityTokens.delete(token);
             return true;
-          } catch {
+          } catch (error) {
+            noteUnregisterFailure(authToken, error);
             return false;
           }
         })
@@ -319,6 +330,7 @@ export function _resetDeliveryRegistrationForTests(): void {
   activityTokens.clear();
   pushToStartToken = null;
   resetTokenMutationQueue();
+  _resetUnregisterSessionForTests();
   if (Platform.OS === 'ios') {
     observePushToStart(null);
   }

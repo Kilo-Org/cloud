@@ -61,7 +61,7 @@ vi.mock('react-native', () => ({
 }));
 // The unregister session gate reads the token owner, whose cold path imports the native store.
 vi.mock('expo-secure-store', () => ({
-  getItemAsync: vi.fn(async () => null),
+  getItemAsync: vi.fn().mockResolvedValue(null),
   setItemAsync: vi.fn(),
   deleteItemAsync: vi.fn(),
 }));

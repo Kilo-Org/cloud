@@ -112,6 +112,37 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
+  it('keeps a secondary-rate-limited 403 retryable instead of FORBIDDEN', async () => {
+    mockListGitHubBranches.mockRejectedValue(
+      githubRefusal(403, 'You have exceeded a secondary rate limit.')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
+  it('keeps a primary-rate-limited 403 retryable', async () => {
+    mockListGitHubBranches.mockRejectedValue(
+      Object.assign(new Error('API rate limit exceeded'), {
+        status: 403,
+        response: { headers: { 'x-ratelimit-remaining': '0' } },
+      })
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
   it('maps a missing repository (404) to NOT_FOUND instead of a 500', async () => {
     mockListGitHubBranches.mockRejectedValue(githubRefusal(404, 'Not Found'));
 

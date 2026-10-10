@@ -27,6 +27,7 @@ import {
   getIntegrationsByOrganization,
 } from '@/lib/integrations/db/platform-integrations';
 import * as githubAppsService from '@/lib/integrations/github-apps-service';
+import { isGitHubRateLimitError } from '@/lib/integrations/platforms/github/adapter';
 import {
   fetchGitLabBranches,
   GitLabBranchesFetchError,
@@ -225,9 +226,17 @@ async function listGitHubBranches(
     return toListing(branches);
   } catch (error) {
     // A blocked or missing repository is GitHub's own refusal, not a server
-    // fault: surface it as 403/404 so the caller stops retrying a 500.
+    // fault: surface it as 403/404 so the caller stops retrying a 500. 403 is
+    // overloaded — a rate-limited request is transient and stays retryable.
     const status = refusalStatus(error);
     if (status === 403) {
+      if (isGitHubRateLimitError(error)) {
+        throw new TRPCError({
+          code: 'BAD_GATEWAY',
+          message: 'GitHub is limiting requests. Try again in a moment.',
+          cause: error,
+        });
+      }
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: githubRepositoryForbiddenMessage,

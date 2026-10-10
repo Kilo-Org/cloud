@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -43,6 +44,7 @@ import { ChatFailureRow } from './chat-failure-row';
 import { McpSettingsSheet, useMcpSettings } from './mcp-settings-sheet';
 import { BackendSettingsControl } from './backend-settings-sheet';
 import { ModelToolsHint } from './model-tools-hint';
+import { useChatMessageActions } from './use-chat-message-actions';
 
 /**
  * One conversation.
@@ -158,30 +160,12 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   }, []);
 
   const messages = asMessages(state);
-  // The question that has no answer is the last thing on screen, and while the
-  // chat is idle it is the one that offers a Retry.
-  const unanswered =
-    state.status === 'idle' && state.asked !== null ? messages.at(-1)?.info.id : undefined;
+  const actions = useChatMessageActions(state, messages, retry);
+  const { actionsFor } = actions;
 
   const renderItem: ListRenderItem<StoredMessage> = useCallback(
-    ({ item }) => (
-      <MessageBubble
-        message={item}
-        {...(item.info.id === unanswered
-          ? {
-              deliveryState: {
-                status: 'failed' as const,
-                error: 'unanswered',
-                reason: 'interrupted' as const,
-              },
-              onRetryMessage: () => {
-                void retry();
-              },
-            }
-          : {})}
-      />
-    ),
-    [retry, unanswered]
+    ({ item }) => <MessageBubble message={item} {...actionsFor(item)} />,
+    [actionsFor]
   );
 
   const handleSend = useCallback(
@@ -272,13 +256,17 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           </View>
         ) : null}
 
-        {state.status === 'idle' && unanswered === undefined && state.failureKey !== null ? (
-          <ChatFailureRow failureKey={state.failureKey} onRetry={() => void retry()} />
+        {state.status === 'idle' && state.failureKey !== null ? (
+          <ChatFailureRow
+            failureKey={state.failureKey}
+            onRetry={actions.hasUnanswered ? undefined : () => void retry()}
+          />
         ) : null}
 
         <View style={composerPadding}>
           <ModelToolsHint model={model} backends={backends} localModels={localModels} />
           <ChatComposer
+            controlRef={actions.composerControlRef}
             onSend={handleSend}
             onSendCommand={noSessionCommand}
             onCreateSession={noSessionChange}
@@ -345,6 +333,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         }}
         settings={mcp}
       />
+      <MessageDetailsSheet {...actions.details} modelOptions={modelOptions.options} />
     </View>
   );
 }

@@ -12,9 +12,16 @@ import { type Turn } from '@kilocode/harness-sdk';
  * The fields a chat has no answer for are filled with neutral values: there is
  * no path, no cost and no token accounting on the device, and inventing numbers
  * for them would put wrong ones on the screen.
+ *
+ * The model and the time are left blank too, and the details sheet then leaves
+ * out their rows. A turn does not say which model wrote it, and a session
+ * freezes its model: a switch copies every turn into a session on the new one.
+ * Naming the model the chat is on now would credit the new model with what the
+ * old one wrote. The copy gives every turn a new identifier, so the time inside
+ * that identifier is the time of the switch, not the time the turn was said.
  */
 
-const infoFor = (turn: Turn, model: string): MessageInfo =>
+const infoFor = (turn: Turn): MessageInfo =>
   turn.role === 'user'
     ? {
         id: turn.id,
@@ -22,7 +29,7 @@ const infoFor = (turn: Turn, model: string): MessageInfo =>
         role: 'user',
         time: { created: 0 },
         agent: 'chat',
-        model: { providerID: 'kilo', modelID: model },
+        model: { providerID: '', modelID: '' },
       }
     : {
         id: turn.id,
@@ -30,8 +37,8 @@ const infoFor = (turn: Turn, model: string): MessageInfo =>
         role: 'assistant',
         time: { created: 0 },
         parentID: '',
-        modelID: model,
-        providerID: 'kilo',
+        modelID: '',
+        providerID: '',
         mode: 'ask',
         agent: 'chat',
         path: { cwd: '', root: '' },
@@ -50,9 +57,9 @@ const infoFor = (turn: Turn, model: string): MessageInfo =>
  */
 const said = (turn: Turn) => turn.parts.filter(part => part.kind === 'text');
 
-function asMessage(turn: Turn, model: string): StoredMessage {
+function asMessage(turn: Turn): StoredMessage {
   return {
-    info: infoFor(turn, model),
+    info: infoFor(turn),
     parts: said(turn).map(part => ({
       id: part.id,
       sessionID: turn.sessionId,
@@ -62,6 +69,9 @@ function asMessage(turn: Turn, model: string): StoredMessage {
     })),
   };
 }
+
+/** The identifier of the question that has no answer yet. Its Retry hangs off it. */
+export const askedMessageId = (sessionId: string): string => `${sessionId}:asked`;
 
 /**
  * The whole transcript, plus what is not in the store yet: the question being
@@ -75,53 +85,42 @@ function asMessage(turn: Turn, model: string): StoredMessage {
  */
 export function asMessages(input: {
   readonly sessionId: string;
-  readonly model: string;
   readonly turns: readonly Turn[];
   readonly answering: string;
   readonly asked: string | null;
   /** Questions typed while an answer was arriving, in the order they go. */
   readonly waiting: readonly string[];
 }): StoredMessage[] {
-  const drawn = input.turns
-    .filter(turn => said(turn).length > 0)
-    .map(turn => asMessage(turn, input.model));
+  const drawn = input.turns.filter(turn => said(turn).length > 0).map(turn => asMessage(turn));
   if (input.asked !== null) {
+    const id = askedMessageId(input.sessionId);
     drawn.push(
-      asMessage(
-        {
-          id: `${input.sessionId}:asked`,
-          sessionId: input.sessionId,
-          role: 'user',
-          parts: [{ id: `${input.sessionId}:asked:text`, kind: 'text', body: input.asked }],
-        },
-        input.model
-      )
+      asMessage({
+        id,
+        sessionId: input.sessionId,
+        role: 'user',
+        parts: [{ id: `${id}:text`, kind: 'text', body: input.asked }],
+      })
     );
   }
   if (input.answering !== '') {
     drawn.push(
-      asMessage(
-        {
-          id: `${input.sessionId}:answering`,
-          sessionId: input.sessionId,
-          role: 'assistant',
-          parts: [{ id: `${input.sessionId}:answering:text`, kind: 'text', body: input.answering }],
-        },
-        input.model
-      )
+      asMessage({
+        id: `${input.sessionId}:answering`,
+        sessionId: input.sessionId,
+        role: 'assistant',
+        parts: [{ id: `${input.sessionId}:answering:text`, kind: 'text', body: input.answering }],
+      })
     );
   }
   for (const [index, question] of input.waiting.entries()) {
     drawn.push(
-      asMessage(
-        {
-          id: `${input.sessionId}:waiting:${index}`,
-          sessionId: input.sessionId,
-          role: 'user',
-          parts: [{ id: `${input.sessionId}:waiting:${index}:text`, kind: 'text', body: question }],
-        },
-        input.model
-      )
+      asMessage({
+        id: `${input.sessionId}:waiting:${index}`,
+        sessionId: input.sessionId,
+        role: 'user',
+        parts: [{ id: `${input.sessionId}:waiting:${index}:text`, kind: 'text', body: question }],
+      })
     );
   }
   return drawn;

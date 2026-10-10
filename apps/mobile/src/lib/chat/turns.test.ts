@@ -1,7 +1,9 @@
 import { type Turn } from '@kilocode/harness-sdk';
 import { describe, expect, it } from 'vitest';
 
-import { asMessages } from './turns';
+import { getMessageDetailsContent } from '@/components/agents/message-details-content';
+
+import { askedMessageId, asMessages } from './turns';
 
 const turn = (id: string, role: Turn['role'], parts: Turn['parts']): Turn => ({
   id,
@@ -23,7 +25,6 @@ describe('asMessages', () => {
     expect(
       drawn({
         sessionId: 's1',
-        model: 'kilo/one',
         turns: [
           turn('t1', 'user', [text('p1', 'what is a monad')]),
           turn('t2', 'assistant', [text('p2', 'a burrito')]),
@@ -42,7 +43,6 @@ describe('asMessages', () => {
     expect(
       drawn({
         sessionId: 's1',
-        model: 'kilo/one',
         turns: [
           turn('t1', 'assistant', [
             { id: 'p1', kind: 'reasoning', body: 'working it out' },
@@ -61,7 +61,6 @@ describe('asMessages', () => {
     expect(
       drawn({
         sessionId: 's1',
-        model: 'kilo/one',
         turns: [turn('t1', 'user', [text('p1', 'first')])],
         answering: 'well',
         asked: 'second',
@@ -77,7 +76,6 @@ describe('asMessages', () => {
   it('gives every message its own identifier, so a list can key on it', () => {
     const messages = asMessages({
       sessionId: 's1',
-      model: 'kilo/one',
       turns: [turn('t1', 'user', [text('p1', 'first')])],
       answering: 'well',
       asked: 'second',
@@ -91,7 +89,6 @@ describe('asMessages', () => {
     expect(
       drawn({
         sessionId: 's1',
-        model: 'kilo/one',
         turns: [],
         answering: 'a bur',
         asked: 'what is a monad',
@@ -107,7 +104,6 @@ describe('asMessages', () => {
     expect(
       drawn({
         sessionId: 's1',
-        model: 'kilo/one',
         turns: [],
         answering: 'a bur',
         asked: 'what is a monad',
@@ -121,16 +117,41 @@ describe('asMessages', () => {
     ]);
   });
 
-  it('names the model the conversation is on', () => {
-    const [message] = asMessages({
+  it('marks the unanswered question with the identifier its Retry hangs off', () => {
+    const messages = asMessages({
       sessionId: 's1',
-      model: 'kilo/two',
-      turns: [turn('t1', 'assistant', [text('p1', 'a burrito')])],
+      turns: [],
+      answering: '',
+      asked: 'what is a monad',
+      waiting: ['and a functor'],
+    });
+
+    expect(messages.map(message => message.info.id)).toEqual([
+      askedMessageId('s1'),
+      's1:waiting:0',
+    ]);
+  });
+
+  it('names no model and no time, so the details sheet leaves those rows out', () => {
+    const messages = asMessages({
+      sessionId: 's1',
+      turns: [
+        turn('t1', 'user', [text('p1', 'what is a monad')]),
+        turn('t2', 'assistant', [text('p2', 'a burrito')]),
+      ],
       answering: '',
       asked: null,
       waiting: [],
     });
 
-    expect(message?.info).toMatchObject({ modelID: 'kilo/two', providerID: 'kilo' });
+    for (const message of messages) {
+      expect(getMessageDetailsContent(message, [])).toMatchObject({
+        sentTimeLabel: null,
+        modelLabel: null,
+        costLabel: null,
+        tokenRows: null,
+        copyText: message.info.role === 'user' ? 'what is a monad' : 'a burrito',
+      });
+    }
   });
 });

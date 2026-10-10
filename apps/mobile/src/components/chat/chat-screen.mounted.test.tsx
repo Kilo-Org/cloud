@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
+/* eslint-disable max-lines -- the screen's states share one mounted fixture: opening, backend approval, failure, and message actions. */
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -20,7 +21,8 @@ import { backendTargetId } from '@/lib/chat/backend-target';
 
 const state = vi.hoisted(() => ({
   status: 'opening' as 'opening' | 'idle' | 'working',
-  messages: [] as { info: { id: string } }[],
+  messages: [] as { info: { id: string; role?: string } }[],
+  asked: null as string | null,
   failed: null as string | null,
   failureKey: null as string | null,
   retry: vi.fn(),
@@ -84,7 +86,7 @@ vi.mock('@/lib/chat/use-chat', () => ({
       turns: [],
       answering: '',
       status: state.status,
-      asked: null,
+      asked: state.asked,
       waiting: [],
       failed: state.failed,
       failureKey: state.failureKey,
@@ -94,7 +96,10 @@ vi.mock('@/lib/chat/use-chat', () => ({
     retry: state.retry,
   }),
 }));
-vi.mock('@/lib/chat/turns', () => ({ asMessages: () => state.messages }));
+vi.mock('@/lib/chat/turns', () => ({
+  asMessages: () => state.messages,
+  askedMessageId: (sessionId: string) => `${sessionId}:asked`,
+}));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => ({ organizationId: null }),
 }));
@@ -124,6 +129,9 @@ vi.mock('@/components/chat/backend-settings-sheet', () => ({
 }));
 vi.mock('@/components/agents/chat-composer', () => ({ ChatComposer: 'ChatComposer' }));
 vi.mock('@/components/agents/message-bubble', () => ({ MessageBubble: 'MessageBubble' }));
+vi.mock('@/components/agents/message-details-sheet', () => ({
+  MessageDetailsSheet: 'MessageDetailsSheet',
+}));
 vi.mock('@/components/agents/session-message-list', () => ({
   SessionMessageList: 'SessionMessageList',
 }));
@@ -170,6 +178,7 @@ let view: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefine
 beforeEach(() => {
   state.status = 'opening';
   state.messages = [];
+  state.asked = null;
   state.failed = null;
   state.failureKey = null;
   state.retry.mockClear();
@@ -321,5 +330,117 @@ describe('a retained chat failure', () => {
       onPress();
     });
     expect(state.retry).toHaveBeenCalledOnce();
+  });
+});
+
+type BubbleProps = {
+  onLongPressDetails?: (message: unknown) => void;
+  deliveryState?: { status: string; error?: string; reason?: string };
+  onRetryMessage?: (message: unknown) => void;
+  onCopyToComposer?: (text: string) => void;
+};
+
+type RenderItem = (info: { item: unknown; index: number }) => { props: BubbleProps };
+
+/** The props the transcript hands the bubble of one message. */
+function bubbleFor(tree: ReactTestRenderer, id: string): BubbleProps {
+  const list = tree.root.find(node => (node.type as string) === 'SessionMessageList');
+  const renderItem = list.props.renderItem as RenderItem;
+  const item = state.messages.find(message => message.info.id === id);
+  if (item === undefined) {
+    throw new TypeError(`No message ${id}`);
+  }
+  return renderItem({ item, index: 0 }).props;
+}
+
+const sheetOf = (tree: ReactTestRenderer) =>
+  tree.root.find(node => (node.type as string) === 'MessageDetailsSheet').props as {
+    visible: boolean;
+    message: unknown;
+    deliveryState?: unknown;
+    onClose: () => void;
+  };
+
+describe('message actions', () => {
+  it('opens the details of a question and of an answer on long-press', async () => {
+    state.status = 'idle';
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 't2', role: 'assistant' } },
+    ];
+    const tree = await mount();
+    expect(sheetOf(tree).visible).toBe(false);
+
+    for (const message of state.messages) {
+      act(() => {
+        bubbleFor(tree, message.info.id).onLongPressDetails?.(message);
+      });
+      expect(sheetOf(tree)).toMatchObject({ visible: true, message });
+      act(() => {
+        sheetOf(tree).onClose();
+      });
+      expect(sheetOf(tree).visible).toBe(false);
+    }
+  });
+
+  it('puts Retry and Copy to composer on the failed question, and states why under the transcript', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.failureKey = 'modelChat.backends.deletedBackend';
+    state.messages = [
+      { info: { id: 't1', role: 'user' } },
+      { info: { id: 's1:asked', role: 'user' } },
+      // Typed while the answer failed: it waits under the question.
+      { info: { id: 's1:waiting:0', role: 'user' } },
+    ];
+    const tree = await mount();
+    const failed = bubbleFor(tree, 's1:asked');
+
+    expect(failed.deliveryState).toEqual({ status: 'failed', error: '', reason: 'execution' });
+    expect(bubbleFor(tree, 's1:waiting:0').onRetryMessage).toBeUndefined();
+    expect(bubbleFor(tree, 't1').deliveryState).toBeUndefined();
+    expect(tree.root.find(node => (node.type as string) === 'AccessibleStatus').props.message).toBe(
+      'This chat backend was deleted. Choose another backend to continue.'
+    );
+    // The message carries the one Retry.
+    expect(count(tree, 'Button')).toBe(0);
+
+    act(() => {
+      failed.onRetryMessage?.(state.messages[1]);
+    });
+    expect(state.retry).toHaveBeenCalledOnce();
+
+    const setText = vi.fn();
+    const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+    const controlRef = composer.props.controlRef as { current: unknown };
+    controlRef.current = { setText, hasContent: () => false, restoreAttachments: () => undefined };
+    act(() => {
+      failed.onCopyToComposer?.('what is a monad');
+    });
+    expect(setText).toHaveBeenCalledWith('what is a monad');
+
+    act(() => {
+      failed.onLongPressDetails?.(state.messages[1]);
+    });
+    expect(sheetOf(tree).deliveryState).toEqual(failed.deliveryState);
+  });
+
+  it('reads a question with no failure as stopped, with no row under the transcript', async () => {
+    state.status = 'idle';
+    state.asked = 'what is a monad';
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:asked').deliveryState).toMatchObject({ reason: 'interrupted' });
+    expect(count(tree, 'AccessibleStatus')).toBe(0);
+  });
+
+  it('offers no Retry while the question is still being answered', async () => {
+    state.status = 'working';
+    state.asked = 'what is a monad';
+    state.messages = [{ info: { id: 's1:asked', role: 'user' } }];
+    const tree = await mount();
+
+    expect(bubbleFor(tree, 's1:asked').onRetryMessage).toBeUndefined();
   });
 });

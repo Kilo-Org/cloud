@@ -274,7 +274,7 @@ enum HomeWidgetRefreshStore {
           props["needsInputSince"] = snapshot["needsInputSince"]
           props["scheduledAt"] = presentation["scheduledAt"]
           props["newestTitle"] = nil
-          props["actionLine"] = nil
+          props["actionFeedback"] = nil
           props["accessibilityLabel"] = counts.map { "\($0["count"] ?? 0) \(copy[$0["kind"] as? String ?? ""] ?? "")" }.joined(separator: ", ")
           // The rebuild owns the marker: strip every copy so only the carried
           // press below can put one back on the first entry while it is fresh.

@@ -36,6 +36,7 @@ const JsonTextSchema = z.string();
 // hostile or half-built value can never reach the Sentry options.
 const TelemetryDescriptionSchema = z.looseObject({
   fingerprint: z.array(z.string()).min(1),
+  level: z.enum(['warning', 'error']).optional(),
   tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
   contexts: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   extra: z.record(z.string(), z.unknown()).optional(),
@@ -167,12 +168,13 @@ function declaredTelemetryDescription(error: unknown): TelemetryDescription | un
 }
 
 /**
- * Report an error observed by a React Query cache at error level, unless the
- * network layer already reported it. A typed error that declares its own
- * telemetry (see `TELEMETRY_DESCRIPTION_KEY`) is filed under that stable
- * fingerprint and tags; every other error keeps the catch-all `app-error` one.
- * The query key rides in `extra` (not tags, which are indexed and can carry
- * ids). Never throws.
+ * Report an error observed by a React Query cache, unless the network layer
+ * already reported it. The query cache calls this once per fetch, after the
+ * query's last retry failed. A typed error that declares its own telemetry
+ * (see `TELEMETRY_DESCRIPTION_KEY`) is filed under that stable fingerprint,
+ * tags and level; every other error keeps the catch-all `app-error`
+ * fingerprint at error level. The query key rides in `extra` (not tags, which
+ * are indexed and can carry ids). Never throws.
  */
 export function reportAppError(error: unknown, context: AppErrorContext): void {
   try {
@@ -182,7 +184,7 @@ export function reportAppError(error: unknown, context: AppErrorContext): void {
     const declared = declaredTelemetryDescription(error);
     captureTelemetry({
       error,
-      level: 'error',
+      level: declared?.level ?? 'error',
       tags: {
         'error.subsystem': 'app',
         'error.source': context.source,

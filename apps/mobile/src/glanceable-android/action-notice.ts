@@ -31,9 +31,16 @@ export function setGlanceableActionNotice(notice: string | null): void {
   noticeAskKey = notice === null ? null : askKey(getWaitingAsk());
 }
 
-/** Mark (or clear) the in-flight answer; it ends with the ask like the notice does. */
+/**
+ * Mark (or clear) the in-flight answer; it ends with the ask like the notice does.
+ * A new answer supersedes the last failure: the notice outranks "Approving…" on
+ * the card, so a retry would otherwise keep showing the old failure line.
+ */
 export function setGlanceableActionApproving(value: boolean): void {
   approving = value;
+  if (value) {
+    setGlanceableActionNotice(null);
+  }
 }
 
 export function isActionApproving(): boolean {

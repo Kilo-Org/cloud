@@ -21,6 +21,7 @@ import {
   getCurrentWidgetProps,
   handleAppStateActive,
   renderStoredSnapshotWithNotice,
+  setGlanceableActionApproving,
   setGlanceableActionNotice,
 } from './android-sink';
 import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
@@ -1082,6 +1083,21 @@ describe('renderStoredSnapshotWithNotice', () => {
       title: '2 Needs input',
       text: 'Approval failed',
       approveLabel: i18n.t('common.approve'),
+    });
+  });
+
+  it('reads Approving… on a retry, not the previous failure line', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_retry' }));
+    mocks.native.setWidgetSnapshot(JSON.stringify(MIXED), 0);
+    setGlanceableActionNotice('Approval failed');
+
+    setGlanceableActionApproving(true);
+    await renderStoredSnapshotWithNotice(CTX);
+
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: i18n.t('glanceable.approving'),
+      textIsError: false,
     });
   });
 

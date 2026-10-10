@@ -92,9 +92,9 @@ describe('selectRetryAction', () => {
   });
 
   it('keeps Retry when Code Reviewer is on and needs no attention', () => {
-    expect(selectRetryAction({ hasManualConfig: false, configPending: false, config: enabled })).toBe(
-      'retry'
-    );
+    expect(
+      selectRetryAction({ hasManualConfig: false, configPending: false, config: enabled })
+    ).toBe('retry');
   });
 
   it('links to the settings when Code Reviewer is off', () => {

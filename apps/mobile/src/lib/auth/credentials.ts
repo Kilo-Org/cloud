@@ -11,6 +11,7 @@ import {
 import { deleteStoredValue, writeStoredValue } from '@/lib/auth/secure-store-value';
 import { getActiveToken, isSignOutTeardownActive, setActiveToken } from '@/lib/auth/token-owner';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { isProtectedDataAvailable } from '@/lib/protected-data';
 import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 
@@ -295,6 +296,11 @@ async function doRefresh(): Promise<RefreshOutcome> {
       if (superseded()) {
         return { ok: false, refused: false, superseded: true };
       }
+    }
+    if (storedRefreshToken === null && !isProtectedDataAvailable()) {
+      // The device locked during the reads: the null is a refused read, not an
+      // unreadable credential set. Retry later; never raise the restore error.
+      return { ok: false, refused: false };
     }
     if (storedRefreshToken === null) {
       // The credential set is one unit: a refresh-token null while another

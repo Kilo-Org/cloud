@@ -1,6 +1,7 @@
 import * as ExpoSecureStore from 'expo-secure-store';
 
 import { secureStoreOptionsArgs } from '@/lib/auth/secure-store-value';
+import { assertProtectedDataAvailable } from '@/lib/protected-data';
 import {
   reportSecureStoreFailure,
   type SecureStoreOperation,
@@ -21,6 +22,10 @@ import {
  * The key and the stored value are never attached to the report: a stored
  * value can be a credential.
  *
+ * While the device is locked every call rejects with an unreported
+ * `ProtectedDataUnavailableError` and never reaches the keychain, which would
+ * refuse it anyway (see `lib/protected-data`).
+ *
  * Semantics are unchanged — the rejection still propagates, because each
  * caller owns its recoverable state (sign-in's persist error, the retryable
  * session-restore surface, a widget action's `failed`). A call whose failure
@@ -40,6 +45,7 @@ export async function getItemAsync(
   key: string,
   options?: SecureStoreOptions
 ): Promise<string | null> {
+  assertProtectedDataAvailable();
   try {
     return await ExpoSecureStore.getItemAsync(key, ...secureStoreOptionsArgs(options));
   } catch (error) {
@@ -52,6 +58,7 @@ export async function setItemAsync(
   value: string,
   options?: SecureStoreOptions
 ): Promise<void> {
+  assertProtectedDataAvailable();
   try {
     await ExpoSecureStore.setItemAsync(key, value, ...secureStoreOptionsArgs(options));
   } catch (error) {
@@ -60,6 +67,7 @@ export async function setItemAsync(
 }
 
 export async function deleteItemAsync(key: string, options?: SecureStoreOptions): Promise<void> {
+  assertProtectedDataAvailable();
   try {
     await ExpoSecureStore.deleteItemAsync(key, ...secureStoreOptionsArgs(options));
   } catch (error) {
@@ -68,6 +76,7 @@ export async function deleteItemAsync(key: string, options?: SecureStoreOptions)
 }
 
 export function getItem(key: string, options?: SecureStoreOptions): string | null {
+  assertProtectedDataAvailable();
   try {
     return ExpoSecureStore.getItem(key, ...secureStoreOptionsArgs(options));
   } catch (error) {
@@ -76,6 +85,7 @@ export function getItem(key: string, options?: SecureStoreOptions): string | nul
 }
 
 export function setItem(key: string, value: string, options?: SecureStoreOptions): void {
+  assertProtectedDataAvailable();
   try {
     ExpoSecureStore.setItem(key, value, ...secureStoreOptionsArgs(options));
   } catch (error) {

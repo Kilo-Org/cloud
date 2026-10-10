@@ -5,10 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { modelDownload } from './android-model-download';
 import { localModelOptions } from './backend-model-options';
-import { routedModelClient } from './backend-routing';
+import { IMAGE_OMITTED, routedModelClient } from './backend-routing';
 import { backendFailureKey } from './backend-target';
 import { localModelProvider, type LocalModelStatus } from './local-models';
 import { type NativeAvailability, type NativeModelEvent } from './native-model-client';
+import { IMAGE_NOT_SENT } from './native-request';
 
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('./backend-store', () => ({ listChatBackends: () => [] }));
@@ -133,6 +134,63 @@ describe('Android Gemini Nano', () => {
       expect(kilo).not.toHaveBeenCalled();
     }
   );
+
+  it('sends an image only after the device model reports that it reads images', async () => {
+    const withImages: ModelRequest = {
+      ...question,
+      prompt: {
+        ...question.prompt,
+        messages: [
+          {
+            role: 'user',
+            cache: false,
+            parts: [
+              { kind: 'image', media: 'image/jpeg', data: 'T2xk' },
+              { kind: 'text', text: 'Before' },
+            ],
+          },
+          { role: 'assistant', cache: false, parts: [{ kind: 'text', text: 'Seen.' }] },
+          {
+            role: 'user',
+            cache: false,
+            parts: [
+              { kind: 'image', media: 'image/jpeg', data: 'TmV3' },
+              { kind: 'text', text: 'And this?' },
+            ],
+          },
+        ],
+      },
+    };
+    const provider = localModelProvider('android');
+    const { client } = router();
+
+    await provider?.availability();
+    expect(provider?.supportsImages('system')).toBe(false);
+    await Effect.runPromise(Stream.runCollect(client.stream(withImages)));
+    expect(android.generate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        messages: [
+          { role: 'user', text: `${IMAGE_OMITTED}\n\nBefore` },
+          { role: 'assistant', text: 'Seen.' },
+          { role: 'user', text: `${IMAGE_OMITTED}\n\nAnd this?` },
+        ],
+      })
+    );
+
+    android.availability.mockResolvedValue({ ...android.available, images: true, maxImages: 1 });
+    await provider?.availability();
+    expect(provider?.supportsImages('system')).toBe(true);
+    await Effect.runPromise(Stream.runCollect(client.stream(withImages)));
+    expect(android.generate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        messages: [
+          { role: 'user', text: `${IMAGE_NOT_SENT}\n\nBefore` },
+          { role: 'assistant', text: 'Seen.' },
+          { role: 'user', text: 'And this?', images: [{ media: 'image/jpeg', data: 'TmV3' }] },
+        ],
+      })
+    );
+  });
 });
 
 function fakeDownload() {

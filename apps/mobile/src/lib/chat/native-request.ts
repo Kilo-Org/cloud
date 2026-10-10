@@ -8,12 +8,20 @@ export type NativeToolCall = {
   readonly arguments: string;
 };
 
+/** A base64 image and its media type, as the harness prompt carries it. */
+type NativeImage = { readonly media: string; readonly data: string };
+
 /**
- * One transcript entry. The text roles reach every provider. The tool roles
- * reach only a provider that runs tools, and each output names its call.
+ * One transcript entry. The text roles reach every provider; a user entry
+ * carries images only for a model that reads them. The tool roles reach only
+ * a provider that runs tools, and each output names its call.
  */
 type NativeMessage =
-  | { readonly role: 'user' | 'assistant'; readonly text: string }
+  | {
+      readonly role: 'user' | 'assistant';
+      readonly text: string;
+      readonly images?: readonly NativeImage[];
+    }
   | { readonly role: 'toolCalls'; readonly calls: readonly NativeToolCall[] }
   | {
       readonly role: 'toolOutput';
@@ -39,34 +47,67 @@ type RequestOptions = {
   readonly ceiling: number;
   /** Whether the provider runs the tool loop. */
   readonly tools: boolean;
+  /** Whether the provider's model reads image parts. */
+  readonly images: boolean;
+  /** The most images one request can carry; absent means no fixed limit. */
+  readonly maxImages?: number;
 };
 
 /**
- * The transcript a system model reads. Reasoning and images never reach it.
+ * What a model gets in place of an image over its per-request limit. The
+ * newest images are the ones sent, and the model is told an older one was there.
+ */
+export const IMAGE_NOT_SENT =
+  '[An image was shared here. This model reads only the most recent images, so it is not sent.]';
+
+/**
+ * The transcript a system model reads. Reasoning never reaches it. User images
+ * reach only a model that reads them, newest first within its image limit.
  * Tool calls and results reach only a model that runs tools, and then only in
  * pairs: a call with no result, or a result with no call, is left out.
  */
 export function nativeRequest(request: ModelRequest, options: RequestOptions): NativeRequest {
-  const { id, ceiling, tools } = options;
+  const { id, ceiling, tools, images: readsImages } = options;
   const answered = new Set(
     request.prompt.messages.flatMap(message =>
       message.parts.flatMap(part => (part.kind === 'toolResult' ? [part.callId] : []))
     )
   );
+  const userImages = readsImages
+    ? request.prompt.messages
+        .filter(message => message.role === 'user')
+        .flatMap(message => message.parts.filter(part => part.kind === 'image')).length
+    : 0;
+  // The oldest images over the limit are not sent, so the newest take the room.
+  let unsent = Math.max(0, userImages - (options.maxImages ?? Number.POSITIVE_INFINITY));
   // The name of each call by its id, for the output that answers it.
   const names = new Map<string, string>();
   const messages: NativeMessage[] = [];
   for (const message of request.prompt.messages) {
-    const text = message.parts
-      .flatMap(part => (part.kind === 'text' ? [part.text] : []))
-      .join('\n\n');
+    const texts: string[] = [];
+    const images: NativeImage[] = [];
+    for (const part of message.parts) {
+      if (part.kind === 'text') {
+        texts.push(part.text);
+      } else if (part.kind === 'image' && readsImages && message.role === 'user') {
+        if (unsent > 0) {
+          unsent -= 1;
+          texts.push(IMAGE_NOT_SENT);
+        } else {
+          images.push({ media: part.media, data: part.data });
+        }
+      }
+    }
+    const text = texts.join('\n\n');
     for (const part of tools ? message.parts : []) {
       const name = part.kind === 'toolResult' ? names.get(part.callId) : undefined;
       if (part.kind === 'toolResult' && name !== undefined) {
         messages.push({ role: 'toolOutput', callId: part.callId, name, text: part.body });
       }
     }
-    if (text !== '') {
+    if (images.length > 0) {
+      messages.push({ role: message.role, text, images });
+    } else if (text !== '') {
       messages.push({ role: message.role, text });
     }
     const calls = (tools ? message.parts : []).flatMap(part =>

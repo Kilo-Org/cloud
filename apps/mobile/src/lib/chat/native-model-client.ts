@@ -29,6 +29,10 @@ export type NativeAvailability = {
   readonly tokenCounting?: boolean;
   /** True when the module runs the harness tool loop. Absent means text only. */
   readonly tools?: boolean;
+  /** The model reads image parts. Absent means it reads none. */
+  readonly images?: boolean;
+  /** The most images one request can carry. Absent means no fixed limit. */
+  readonly maxImages?: number;
 };
 
 export type NativeModelEvent =
@@ -106,6 +110,7 @@ function failure(problem: LocalModelProblem, started: boolean): ModelError {
   });
 }
 
+
 /**
  * A deliberately high guess of about three characters per token. It is not a
  * count: it exists so a session on a small on-device window still compacts
@@ -148,6 +153,8 @@ function answer(
       id: `quick-chat-${sequence}`,
       ceiling: availability.maxOutputTokens,
       tools,
+      images: availability.images === true,
+      maxImages: availability.maxImages,
     });
     const results = tools ? resultsOf(request) : undefined;
     const { waiting } = loop;

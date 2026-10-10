@@ -114,9 +114,10 @@ function systemModelProvider(
       addListener: (eventName, listener) => native.addListener(eventName, listener),
     }),
     facts: () => systemFacts(known.get(provider)),
-    // The module says whether it runs the tool loop. Until it answers, no tools are sent.
+    // The module says whether it runs the tool loop and whether its model reads
+    // images. Until it answers, neither tools nor images are sent.
     supportsTools: () => known.get(provider)?.tools === true,
-    supportsImages: () => false,
+    supportsImages: () => known.get(provider)?.images === true,
   };
 }
 

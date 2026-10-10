@@ -11,7 +11,14 @@ internal interface PromptBackend {
 
 internal class ModelFailure(val reason: String) : Exception(reason)
 
-internal data class ModelMessage(val role: String, val text: String)
+/** A base64 image as JavaScript sends it. The backend decodes it off the main thread. */
+internal data class ModelImage(val media: String, val data: String)
+
+internal data class ModelMessage(
+  val role: String,
+  val text: String,
+  val images: List<ModelImage> = emptyList()
+)
 
 internal data class ModelRequest(
   val system: String,
@@ -28,7 +35,7 @@ internal data class ModelRequest(
         val role = message["role"] as? String ?: throw ModelFailure("invalid_request")
         val text = message["text"] as? String ?: throw ModelFailure("invalid_request")
         if (role != "user" && role != "assistant") throw ModelFailure("invalid_request")
-        ModelMessage(role, text)
+        ModelMessage(role, text, parseImages(message["images"], role))
       }
       val tokens = (value["maxTokens"] as? Number)?.toDouble()
         ?: throw ModelFailure("invalid_request")
@@ -36,6 +43,20 @@ internal data class ModelRequest(
         throw ModelFailure("invalid_max_tokens")
       }
       return ModelRequest(system, messages, tokens.toInt())
+    }
+
+    // Only a user message carries images, and only as a list of media/data pairs.
+    private fun parseImages(value: Any?, role: String): List<ModelImage> {
+      if (value == null) return emptyList()
+      val items = value as? List<*> ?: throw ModelFailure("invalid_request")
+      if (items.isNotEmpty() && role != "user") throw ModelFailure("invalid_request")
+      return items.map { item ->
+        val image = item as? Map<*, *> ?: throw ModelFailure("invalid_request")
+        val media = image["media"] as? String ?: throw ModelFailure("invalid_request")
+        val data = image["data"] as? String ?: throw ModelFailure("invalid_request")
+        if (!media.startsWith("image/") || data.isEmpty()) throw ModelFailure("invalid_image")
+        ModelImage(media, data)
+      }
     }
   }
 }

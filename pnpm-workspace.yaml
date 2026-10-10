@@ -189,6 +189,7 @@ overrides:
   fast-uri: 3.1.8
   joi: 17.13.8
   postcss-selector-parser@^7.0.0: 7.1.6
+  postcss-selector-parser@6.0.10: 7.1.6
   toml: 4.2.0
   '@opentelemetry/core': 2.8.0
   body-parser: 2.3.0

@@ -526,6 +526,16 @@ export function useAgentAttachmentUpload(
             localFileOwned = true;
           }
           const filename = normalizeFilename(candidate.name, ext);
+          // A strip-failed image is a terminal error chip: it never uploads,
+          // hides Retry, and blocks Send/Start. A local image never uploads
+          // either, so its chip is 'local' rather than 'pending': it reports no
+          // progress and no upload affordance.
+          let status: AgentAttachment['status'] = 'pending';
+          if (metadataStripFailed) {
+            status = 'error';
+          } else if (delivery === 'local') {
+            status = 'local';
+          }
           additions.push({
             id: Crypto.randomUUID(),
             filename,
@@ -536,9 +546,7 @@ export function useAgentAttachmentUpload(
             localUri,
             localFileOwned,
             metadataStripFailed: metadataStripFailed || undefined,
-            // A strip-failed image is a terminal error chip: it never uploads,
-            // hides Retry, and blocks Send/Start.
-            status: metadataStripFailed ? 'error' : 'pending',
+            status,
             error: metadataStripFailed ? i18n.t('chat.attachment.metadataStripFailed') : undefined,
             terminal: metadataStripFailed ? true : undefined,
             // A local image never uploads, so its chip shows no upload progress.

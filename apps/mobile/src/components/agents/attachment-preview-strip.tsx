@@ -342,7 +342,10 @@ function AttachmentChip({
               {description.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {description.message ?? `${description.sizeText} · ${description.progressText}`}
+              {description.message ??
+                (description.progressText === ''
+                  ? description.sizeText
+                  : `${description.sizeText} · ${description.progressText}`)}
             </Text>
           </View>
         </View>

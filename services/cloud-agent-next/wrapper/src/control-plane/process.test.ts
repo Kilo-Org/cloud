@@ -262,11 +262,9 @@ describe('control-plane wrapper process', () => {
       process.kill(handle.child.pid, 'SIGTERM');
       expect(await waitForExit(handle.child, 8_000)).toBe(1);
       const stoppedText = handle.stderr();
-      const failedIndex = stoppedText.indexOf(
-        '"event":"wrapper.lifecycle","fields":{"phase":"failed"'
-      );
-      expect(failedIndex).toBeGreaterThanOrEqual(0);
-      expect(stoppedText.slice(failedIndex)).not.toContain('"event":"wrapper.status"');
+      const stoppingIndex = stoppedText.indexOf('"phase":"stopping"');
+      expect(stoppingIndex).toBeGreaterThanOrEqual(0);
+      expect(stoppedText.slice(stoppingIndex)).not.toContain('"event":"wrapper.status"');
     } finally {
       if (handle.child.exitCode === null) handle.child.kill();
       await handle.child.exited;

@@ -52,8 +52,8 @@ export type ControlPlaneExitEvent =
  * the supervisor does not restart it), a wrapper-only SIGTERM (exit 1 so the
  * supervisor restarts it within its existing budget), or an uncaught exception
  * (exit 1). An unhandled rejection is logged and does not exit. The supervisor's
- * own TERM/INT trap is a separate intentional-shutdown owner and exits
- * terminally without consulting this policy.
+ * own TERM/INT trap forwards SIGTERM here too and then exits terminally whatever
+ * this exit code is.
  */
 export function controlPlaneExitPolicy(event: ControlPlaneExitEvent): number | null {
   switch (event) {
@@ -110,7 +110,11 @@ export function createControlPlaneLifecycle(
   const proc = deps.process ?? process;
   let shuttingDown = false;
 
-  async function shutdown(exitCode: number, reason: string): Promise<void> {
+  async function shutdown(
+    exitCode: number,
+    reason: string,
+    phase: 'stopping' | 'failed' = exitCode === 0 ? 'stopping' : 'failed'
+  ): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
@@ -118,7 +122,7 @@ export function createControlPlaneLifecycle(
     await settle(() => deps.stop?.() ?? Promise.resolve());
     const detail = diagnosticDetail(reason);
     deps.diagnostics.onDiagnostic('wrapper.lifecycle', {
-      phase: exitCode === 0 ? 'stopping' : 'failed',
+      phase,
       exitCode,
       ...(detail ? { detail } : {}),
     });
@@ -133,7 +137,10 @@ export function createControlPlaneLifecycle(
       log(`control-plane wrapper ignored ${reason}`);
       return;
     }
-    void shutdown(exitCode, reason);
+    // SIGTERM is a stop, not a wrapper failure: the wrapper cannot tell the
+    // supervisor's forwarded TERM from a stray one, and the supervisor's
+    // `wrapper_restart` or `supervisor_exit` line records which it was.
+    void shutdown(exitCode, reason, event === 'sigterm' ? 'stopping' : 'failed');
   }
 
   proc.once('SIGTERM', () => handleExitEvent('sigterm', 'SIGTERM'));

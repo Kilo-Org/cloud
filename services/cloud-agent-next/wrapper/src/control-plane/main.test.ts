@@ -157,7 +157,8 @@ describe('createControlPlaneLifecycle', () => {
     state.process.emit('SIGTERM');
     await Bun.sleep(0);
     expect(state.exits).toEqual([1]);
-    expect(state.phases).toContain('failed');
+    expect(state.phases).toContain('stopping');
+    expect(state.phases).not.toContain('failed');
     expect(state.finalizes()).toEqual({ diagnostics: 1, fileLogs: 1 });
     expect(state.connectionState.closed()).toBe(1);
   });

@@ -57,3 +57,40 @@ export function captureTelemetry(event: TelemetryEvent): void {
     // Telemetry must never throw into app code.
   }
 }
+
+/**
+ * A diagnostic trail entry. It rides on the next captured event and is never
+ * an event of its own: use it for an expected condition (a device without
+ * network) that explains a later failure but is not a defect.
+ */
+export type TelemetryBreadcrumb = {
+  category: string;
+  message: string;
+  level: TelemetryLevel;
+  data?: Record<string, string | number | boolean>;
+};
+
+export type BreadcrumbSink = (breadcrumb: TelemetryBreadcrumb) => void;
+
+let breadcrumbSink: BreadcrumbSink | null = null;
+
+/** Install the active breadcrumb sink, or detach with `null`. */
+export function setBreadcrumbSink(next: BreadcrumbSink | null): void {
+  breadcrumbSink = next;
+}
+
+/**
+ * Route one breadcrumb to the installed sink. No-op until a sink is
+ * installed, and a throwing sink is swallowed so it can never break a caller.
+ */
+export function addTelemetryBreadcrumb(breadcrumb: TelemetryBreadcrumb): void {
+  const current = breadcrumbSink;
+  if (current === null) {
+    return;
+  }
+  try {
+    current(breadcrumb);
+  } catch {
+    // Telemetry must never throw into app code.
+  }
+}

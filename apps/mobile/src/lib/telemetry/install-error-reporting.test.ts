@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const sentryMock = vi.hoisted(() => ({
+  addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
   captureMessage: vi.fn(),
 }));
@@ -37,6 +38,7 @@ const baseFetch = vi.fn();
 const INSTALLED_FLAG = '__kiloErrorReportingInstalled__';
 
 beforeEach(() => {
+  sentryMock.addBreadcrumb.mockClear();
   sentryMock.captureException.mockClear();
   sentryMock.captureMessage.mockClear();
   configMock.latencyIngestUrl = 'https://latency.kiloapps.io';
@@ -78,6 +80,25 @@ describe('installErrorReporting', () => {
       'network down',
       expect.objectContaining({ level: 'error' })
     );
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+  });
+
+  it('routes a breadcrumb to addBreadcrumb and sends no event', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+    const { addTelemetryBreadcrumb } = await import('@/lib/telemetry/error-sink');
+
+    const breadcrumb = {
+      category: 'auth',
+      message: 'auth branch',
+      level: 'warning',
+      data: { 'auth.cause': 'user' },
+    } as const;
+    addTelemetryBreadcrumb(breadcrumb);
+
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(sentryMock.addBreadcrumb).toHaveBeenCalledWith(breadcrumb);
+    expect(sentryMock.captureMessage).not.toHaveBeenCalled();
     expect(sentryMock.captureException).not.toHaveBeenCalled();
   });
 

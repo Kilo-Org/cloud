@@ -766,7 +766,7 @@ describe('CreditNativeIapOwner', () => {
       if (!fetchStoreProducts) {
         throw new Error('CreditNativeIapOwner exposed no product fetch');
       }
-      return await loadStoreCreditProducts({
+      const products = await loadStoreCreditProducts({
         fetchStoreProducts,
         loadBackendProducts: vi.fn().mockResolvedValue({
           appAccountToken: APP_ACCOUNT_TOKEN,
@@ -774,6 +774,7 @@ describe('CreditNativeIapOwner', () => {
         }),
         storefront: 'play',
       });
+      return products;
     }
 
     it('reconnects and prices the packs on the second ask', async () => {

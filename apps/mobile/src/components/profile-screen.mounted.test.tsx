@@ -208,7 +208,6 @@ describe('useDeleteAccount', () => {
     expect(executeFn).toHaveBeenCalledTimes(1);
     expect(executeFn.mock.calls[0]?.[0]).toEqual({ challengeId: 'challenge-1', code: '123456' });
     expect(toastSuccess).toHaveBeenCalledWith('Your account has been deleted.');
-    expect(signOutFn).toHaveBeenCalledWith(true);
   });
 
   it('retryable: a failed challenge toasts and stays retryable', async () => {

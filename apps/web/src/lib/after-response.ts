@@ -7,7 +7,7 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import { after } from 'next/server';
 
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Runs `work` after the response has been sent so serverless functions stay

@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, type TextProps } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { useStatusAnnouncement } from '@/lib/a11y/status-announcement';
@@ -21,12 +21,29 @@ type AccessibleStatusProps = {
   /** Default text color for the tone; call sites override with `className`. */
   tone?: keyof typeof TONE_CLASS;
   className?: string;
+  /**
+   * Truncate to this many lines, forwarded to the rendered `Text`. A status
+   * that shares a row with other content (the composer's reason line) caps a
+   * long line so it cannot grow the layout it sits above.
+   */
+  numberOfLines?: number;
+  /** How truncation marks overflow, forwarded to the rendered `Text`. */
+  ellipsizeMode?: TextProps['ellipsizeMode'];
+  /**
+   * Cap on the OS font scale, forwarded to the rendered `Text`. A status that
+   * wraps beside other content (the composer's reason line) must not grow
+   * without bound under a large accessibility scale.
+   */
+  maxFontSizeMultiplier?: number;
 };
 
 export function AccessibleStatus({
   message,
   tone = 'error',
   className,
+  numberOfLines,
+  ellipsizeMode,
+  maxFontSizeMultiplier,
 }: Readonly<AccessibleStatusProps>) {
   useStatusAnnouncement(message);
   if (message == null) {
@@ -35,6 +52,9 @@ export function AccessibleStatus({
   return (
     <Text
       accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
+      numberOfLines={numberOfLines}
+      ellipsizeMode={ellipsizeMode}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       className={cn(TONE_CLASS[tone], className)}
     >
       {message}

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The context sheet composes the usage ring, token totals, and per-model cost rows. */
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,7 @@ import { useTRPC } from '@/lib/trpc';
 import { type SessionAutoApproveState } from './session-auto-approve';
 import { SessionAutoApproveRow } from './session-auto-approve-row';
 import { ContextUsageRing } from './context-usage-ring';
+import { useOptionalSessionManager } from './session-manager-context';
 import {
   type ContextTone,
   formatCost,
@@ -68,6 +69,16 @@ type SessionContextSheetProps = {
 
 const SHEET_RING_SIZE = 96;
 const SHEET_RING_STROKE = 8;
+
+// The PR row pulls in expo-router, the browser helper, the badge, and its
+// native analytics/skeleton modules, which the mounted sheet test's node
+// environment cannot load. Lazy-loading the whole row keeps them out of this
+// module's graph until a session with a manager and an associated PR renders
+// it, the same reason the session rows import the router at press time.
+const LazySessionContextPrRow = lazy(async () => {
+  const { SessionContextPrRow } = await import('./session-context-pr-row');
+  return { default: SessionContextPrRow };
+});
 
 const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
@@ -161,6 +172,7 @@ export function SessionContextSheet({
 }: Readonly<SessionContextSheetProps>) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const manager = useOptionalSessionManager();
   const runningOn = useRunningOnLabel(activeSessionType, ownerConnectionId, visible);
   const idCopy = useCopyRowFeedback(
     async () => {
@@ -185,6 +197,9 @@ export function SessionContextSheet({
     connectionLabel = t('agentChat.sessionConnection.connectionLost');
   } else if (connectionDisplay === 'reconnecting') {
     connectionLabel = t('agentChat.sessionConnection.reconnecting');
+  } else if (connectionDisplay === 'scheduled') {
+    // i18n-dup-ok: 'common.scheduled' is the sentence-case connection label and the spoken a11y word; 'sessionRow.scheduled' is the full-caps mono row badge, and each locale cases the badge form itself — the same split as glanceable.needsInput beside sessionRow.needsInput.
+    connectionLabel = t('common.scheduled');
   }
   const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info?.percentage);
@@ -321,6 +336,16 @@ export function SessionContextSheet({
               {sessionTitle}
             </Text>
           </Row>
+
+          {/* The pill is independent of goal and PR status: the sheet shows the
+              associated PR in every state (open/draft/merged/closed) whenever
+              the session has one, unlike the session page which gates on an
+              active goal and an active PR. */}
+          {manager ? (
+            <Suspense fallback={null}>
+              <LazySessionContextPrRow manager={manager} sessionId={sessionId} onClose={onClose} />
+            </Suspense>
+          ) : null}
 
           <CopyRow
             testID="session-context-sheet-copy-id"

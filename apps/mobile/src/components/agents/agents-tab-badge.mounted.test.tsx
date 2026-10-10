@@ -99,7 +99,9 @@ describe('Agents needs-input badge and shared live count', () => {
         queryFn: makeQueryFn(),
       });
       const result = await mount(queryClient);
-      expectCounts(result.renderer, undefined, 0);
+      // The fetched snapshot is an accepted empty: both surfaces withhold the
+      // count, the badge hiding at zero and the eyebrow matching it.
+      expectCounts(result.renderer, undefined, undefined);
       expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
       expect(queryClient.getQueryCache().find({ queryKey: key() })?.getObserversCount()).toBe(2);
       await updateSessions(result, [

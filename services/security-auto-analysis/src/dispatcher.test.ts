@@ -96,11 +96,93 @@ describe('dispatchDueOwners telemetry', () => {
       requeued_pending_count: 1,
       failed_running_count: 2,
     });
-    const serializedLogs = JSON.stringify(loggerMock.withTags.mock.calls);
-    expect(serializedLogs).not.toContain('sensitive-owner-id');
-    expect(serializedLogs).not.toContain('sensitive-command-id');
-    expect(serializedLogs).not.toContain('sensitive-attempt-id');
-    expect(serializedLogs).not.toContain('postgres://');
+    const serializedStageLogs = JSON.stringify(
+      loggerMock.withTags.mock.calls.filter(
+        ([tags]) =>
+          (tags as { event_name?: string }).event_name ===
+          'security_auto_analysis.dispatcher_stage_succeeded'
+      )
+    );
+    expect(serializedStageLogs).not.toContain('sensitive-owner-id');
+    expect(serializedStageLogs).not.toContain('sensitive-command-id');
+    expect(serializedStageLogs).not.toContain('sensitive-attempt-id');
+    expect(serializedStageLogs).not.toContain('postgres://');
+  });
+
+  it('logs one command_stalled event per reconciled stale command', async () => {
+    vi.mocked(reconcileStaleSecurityAgentCommands).mockResolvedValueOnce({
+      staleAccepted: [
+        {
+          id: 'stale-accepted-id',
+          command_type: 'sync',
+          owned_by_organization_id: 'org-123',
+          accepted_at: new Date(Date.now() - 5_000).toISOString(),
+          result_code: 'COMMAND_STALLED',
+          repo_full_name: 'acme/widgets',
+        },
+      ],
+      staleRunning: [
+        {
+          id: 'stale-running-id',
+          command_type: 'sync',
+          owned_by_user_id: 'user-123',
+          accepted_at: new Date(Date.now() - 9_000).toISOString(),
+          started_at: new Date(Date.now() - 4_000).toISOString(),
+          last_error_redacted: 'must-not-be-logged',
+        },
+      ],
+    } as never);
+
+    await dispatchDueOwners(env(), 'dispatch-123');
+
+    const stallTags = loggerMock.withTags.mock.calls
+      .map(([tags]) => tags as Record<string, unknown>)
+      .filter(tags => tags.event_name === 'security_auto_analysis.command_stalled');
+    expect(stallTags).toHaveLength(2);
+    expect(stallTags[0]).toMatchObject({
+      command_id: 'stale-accepted-id',
+      command_type: 'sync',
+      owner_type: 'org',
+      owner_id: 'org-123',
+      previous_status: 'accepted',
+      result_code: 'COMMAND_STALLED',
+      repo_full_name: 'acme/widgets',
+    });
+    expect(Number(stallTags[0]?.age_ms)).toBeGreaterThanOrEqual(4_000);
+    expect(stallTags[1]).toMatchObject({
+      command_id: 'stale-running-id',
+      owner_type: 'user',
+      owner_id: 'user-123',
+      previous_status: 'running',
+      result_code: null,
+    });
+    expect(Number(stallTags[1]?.age_ms)).toBeGreaterThanOrEqual(3_000);
+    const serializedStallLogs = JSON.stringify(stallTags);
+    expect(serializedStallLogs).not.toContain('must-not-be-logged');
+    expect(serializedStallLogs).not.toContain('postgres://');
+    expect(stallTags[1]?.age_ms).not.toBeNull();
+  });
+
+  it('logs command_stalled with a null age_ms when timestamps are absent', async () => {
+    vi.mocked(reconcileStaleSecurityAgentCommands).mockResolvedValueOnce({
+      staleAccepted: [{ id: 'no-timestamp-id', command_type: 'sync' }],
+      staleRunning: [],
+    } as never);
+
+    await dispatchDueOwners(env(), 'dispatch-123');
+
+    const stallTags = loggerMock.withTags.mock.calls
+      .map(([tags]) => tags as Record<string, unknown>)
+      .filter(tags => tags.event_name === 'security_auto_analysis.command_stalled');
+    expect(stallTags).toHaveLength(1);
+    expect(stallTags[0]).toMatchObject({
+      command_id: 'no-timestamp-id',
+      age_ms: null,
+      started_at: null,
+      accepted_at: null,
+      result_code: null,
+      repo_full_name: null,
+    });
   });
 
   it.each([

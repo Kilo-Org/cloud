@@ -1,4 +1,4 @@
-import type { CreditTransactionForBlocks } from '@/lib/creditExpiration';
+import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
 import { getCreditBlocks } from './getCreditBlocks';
 
 const makeTransaction = (

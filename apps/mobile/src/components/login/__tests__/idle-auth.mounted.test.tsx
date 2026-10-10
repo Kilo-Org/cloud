@@ -21,8 +21,8 @@ import {
   TOUCH_TARGET_DP,
 } from '@/lib/a11y/tap-target';
 import { PRIVACY_URL, TERMS_URL } from '@/lib/config';
-
 import { i18n } from '@/i18n';
+
 import { IdleAuth, PROVIDER_GLYPH_SLOT_CLASS } from '../idle-auth';
 
 type StartFn = (mode: 'signin' | 'sso', ssoEmail?: string) => Promise<void>;
@@ -141,10 +141,10 @@ afterEach(async () => {
   await i18n.changeLanguage('en');
 });
 
-async function mountIdleAuth(start: StartFn): Promise<R> {
+async function mountIdleAuth(start: StartFn, onSignInStart?: () => void): Promise<R> {
   const ref: { current: R | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(createElement(IdleAuth, { start }));
+    ref.current = TestRenderer.create(createElement(IdleAuth, { start, onSignInStart }));
     await Promise.resolve();
   });
   const r = ref.current;
@@ -605,6 +605,38 @@ describe('IdleAuth passkey control', () => {
     // The other ways in are untouched.
     expect(findButton(renderer.root, 'Continue with email')).toBeTruthy();
   });
+
+  // The reported capture: the Arabic passkey label ("تسجيل الدخول بمفتاح
+  // المرور") wrapped onto two lines and made the passkey button visibly taller
+  // than the single-line Google button directly above it. Both provider rows
+  // keep the label on the icon's line at one row height: no `flex-wrap` on the
+  // row, and the label's `flex-1` box takes the whole remaining width.
+  it.each(['ar', 'en'])('keeps both provider rows on one line in %s', async language => {
+    providers.googleConfigured = true;
+    passkeySupport.supported = true;
+    await i18n.changeLanguage(language);
+
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+    const copies = [i18n.t('login.signInWithGoogle'), i18n.t('login.signInWithPasskey')];
+
+    for (const copy of copies) {
+      const text = renderer.root.find(
+        n =>
+          typeof n.type === 'string' && (n.type as string) === 'Text' && n.props.children === copy
+      );
+      const labelClasses = String(text.props.className).split(/\s+/);
+      expect(labelClasses).toContain('flex-1');
+      expect(labelClasses).toContain('text-center');
+      const button = renderer.root.findByProps({ accessibilityLabel: copy });
+      // The row itself must not wrap either: a wrapping row moves the label
+      // onto a second line and grows the button again.
+      expect(button.props.className).not.toContain('flex-wrap');
+      // The full label stays the control's accessible name.
+      expect(button.props.accessibilityLabel).toBe(copy);
+    }
+
+    await i18n.changeLanguage('en');
+  });
 });
 describe('IdleAuth provider label layout', () => {
   beforeEach(() => {
@@ -745,6 +777,68 @@ describe('IdleAuth provider label layout', () => {
     });
   });
 });
+describe('IdleAuth new-attempt notification', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.emailError = undefined;
+    nativeAuth.signInWithApple.mockClear();
+    nativeAuth.signInWithPasskey.mockClear();
+    nativeAuth.requestEmailCode.mockReset();
+    passkeySupport.supported = true;
+    providers.appleAvailable = false;
+    providers.googleConfigured = false;
+  });
+
+  it('notifies at the start of an email sign-in attempt', async () => {
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    await act(async () => {
+      (findButton(renderer.root, 'Continue with email').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('notifies when a provider sign-in starts', async () => {
+    providers.appleAvailable = true;
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    act(() => {
+      (findButton(renderer.root, 'Sign in with Apple').props.onPress as () => void)();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('notifies when the passkey ceremony starts', async () => {
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    act(() => {
+      (findButton(renderer.root, 'Sign in with a passkey').props.onPress as () => void)();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
 describe('IdleAuth email continue copy', () => {
   it('shows a Continue button with email accessibility', async () => {
     const start = vi.fn<StartFn>();

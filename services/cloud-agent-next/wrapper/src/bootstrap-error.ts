@@ -9,6 +9,12 @@ export class WrapperBootstrapError extends Error {
   readonly code: WrapperBootstrapErrorCode;
   readonly subtype?: WorkspaceFailureSubtype;
   readonly detail?: string;
+  /**
+   * Bounded, allowlisted key=value provenance for a classified git failure
+   * (`matcher`/`http`/`operation`/`route`). Never carries raw output, URLs,
+   * paths or credentials. Wrapper-local; not part of any wire frame.
+   */
+  readonly gitFailure?: string;
   readonly retryable: boolean;
 
   constructor(options: {
@@ -16,6 +22,7 @@ export class WrapperBootstrapError extends Error {
     subtype?: WorkspaceFailureSubtype;
     message: string;
     detail?: string;
+    gitFailure?: string;
     retryable: boolean;
   }) {
     super(options.message);
@@ -23,6 +30,7 @@ export class WrapperBootstrapError extends Error {
     this.code = options.code;
     this.subtype = options.subtype;
     this.detail = options.detail;
+    this.gitFailure = options.gitFailure;
     this.retryable = options.retryable;
   }
 }
@@ -31,13 +39,15 @@ export function workspaceBootstrapError(
   subtype: WorkspaceFailureSubtype,
   message: string,
   detail?: string,
-  retryable = true
+  retryable = true,
+  gitFailure?: string
 ): WrapperBootstrapError {
   return new WrapperBootstrapError({
     code: 'WORKSPACE_SETUP_FAILED',
     subtype,
     message,
     detail,
+    ...(gitFailure === undefined ? {} : { gitFailure }),
     retryable,
   });
 }

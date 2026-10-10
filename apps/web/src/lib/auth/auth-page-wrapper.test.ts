@@ -1,12 +1,12 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getAuthPageProps } from './auth-page-wrapper';
 
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(),
 }));
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 

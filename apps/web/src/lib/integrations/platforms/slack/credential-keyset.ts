@@ -3,7 +3,7 @@ import 'server-only';
 import { Buffer } from 'node:buffer';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { z } from 'zod';
-import { SLACK_CREDENTIAL_KEYSET_JSON } from '@/lib/config.server';
+import { SLACK_CREDENTIAL_KEYSET_JSON } from '@kilocode/web-shared/lib/config.server';
 import type { ActiveEnvelopePublicKey, EnvelopePrivateKeySlots } from '@kilocode/encryption';
 
 /**

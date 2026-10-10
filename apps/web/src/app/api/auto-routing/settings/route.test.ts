@@ -2,36 +2,36 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import type { AutoRoutingSettingsResponse } from '@kilocode/auto-routing-contracts';
-import type * as KiloExclusiveModels from '@/lib/ai-gateway/kilo-exclusive-models';
+import type * as KiloExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { NextRequest } from 'next/server';
 import {
   getAutoRoutingMode,
   getAutoRoutingSettings,
   updateAutoRoutingSettings,
-} from '@/lib/ai-gateway/auto-routing-admin-client';
-import { poolValidationMessage } from '@/lib/ai-gateway/auto-routing-pool-validation';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { poolValidationMessage } from '@/lib/auto-routing-pool-validation';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { GET, PUT } from './route';
 
-jest.mock('@/lib/ai-gateway/auto-routing-admin-client');
-jest.mock('@/lib/organizations/trial-middleware');
-jest.mock('@/lib/user/server');
-jest.mock('@/routers/organizations/utils');
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client');
+jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware');
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/routers/organizations/utils');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
   getDirectByokModelsForOrganization: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organization-models', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
   gemma_4_26b_a4b_it_free_model: jest.requireActual<typeof KiloExclusiveModels>(
-    '@/lib/ai-gateway/kilo-exclusive-models'
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
   ).gemma_4_26b_a4b_it_free_model,
   kiloExclusiveModels: [
     { public_id: 'kilo/hidden-model', status: 'hidden' },
@@ -39,12 +39,14 @@ jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => ({
   ],
 }));
 
-const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
+const { getEnhancedOpenRouterModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
+);
 const { getDirectByokModelsForUser, getDirectByokModelsForOrganization } = jest.requireMock(
-  '@/lib/ai-gateway/providers/direct-byok'
+  '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
 );
 const { getAvailableModelsForOrganization } = jest.requireMock(
-  '@/lib/organizations/organization-models'
+  '@kilocode/web-shared/lib/organizations/organization-models'
 );
 
 const mockedGetAutoRoutingSettings = jest.mocked(getAutoRoutingSettings);

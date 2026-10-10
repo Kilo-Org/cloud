@@ -1,16 +1,16 @@
 import 'server-only';
 
 import { kilo_pass_scheduled_changes } from '@kilocode/db/schema';
-import { auto_deleted_at } from '@/lib/drizzle';
-import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
+import { auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray, isNull, not } from 'drizzle-orm';
 
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
-} from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;

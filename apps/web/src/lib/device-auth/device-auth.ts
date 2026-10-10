@@ -1,8 +1,8 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_auth_requests, device_sessions, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, lt, lte, gt, isNull, isNotNull, sql } from 'drizzle-orm';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { randomInt, createHash, randomBytes } from 'node:crypto';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
 

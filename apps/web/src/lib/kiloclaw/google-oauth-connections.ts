@@ -1,12 +1,12 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID,
   GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY,
-} from '@/lib/config.server';
-import { encryptWithSymmetricKey } from '@/lib/encryption';
+} from '@kilocode/web-shared/lib/config.server';
+import { encryptWithSymmetricKey } from '@kilocode/web-shared/lib/encryption';
 import {
   kiloclaw_google_oauth_connections,
   type KiloClawGoogleOAuthStatus,

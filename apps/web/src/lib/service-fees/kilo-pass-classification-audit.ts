@@ -1,5 +1,5 @@
-import { getOrganizationKiloPassMetadata } from '@/lib/kilo-pass-org/stripe-metadata';
-import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
+import { getOrganizationKiloPassMetadata } from '@kilocode/web-shared/lib/kilo-pass-org/stripe-metadata';
+import { getKiloPassMetadataFromStripeMetadata } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
 
 export const SERVICE_FEE_KILO_PASS_CLASSIFICATION_EVENT =
   'service_fee.kilo_pass_classification_audit';

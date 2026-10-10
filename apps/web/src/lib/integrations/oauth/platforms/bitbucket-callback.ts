@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
   appendIntegrationOAuthRedirectQuery,
@@ -20,9 +20,9 @@ import {
   storeBitbucketIntegration,
 } from '@/lib/integrations/platforms/bitbucket/credentials';
 import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platforms/bitbucket/repository-cache';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 type CallbackState = { owner: string; returnTo?: string };
 type CallbackPhase =

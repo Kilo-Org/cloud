@@ -110,7 +110,12 @@ vi.mock('@/lib/utils', () => ({
 async function render(
   comment: ReviewComment,
   viewerLogin: string | null = 'bob',
-  extra: { readOnly?: boolean; reactionsSupported?: boolean } = {}
+  extra: {
+    readOnly?: boolean;
+    reactionsSupported?: boolean;
+    onEditComment?: () => void;
+    onDeleteComment?: () => void;
+  } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
@@ -341,6 +346,134 @@ describe('CommentRow overflow actions', () => {
     openOverflow(renderer);
 
     expect(disabledButtonIndices()).toEqual([1, 2, 3]);
+
+    renderer.unmount();
+  });
+});
+
+// s4: the viewer's own comment gains Edit comment / Delete comment. The
+// self-target moderation trio is dropped when those callbacks are wired (a row
+// of disabled entries is a dead affordance); a read-only provider row passes
+// neither callback and keeps today's menu exactly.
+describe('CommentRow own-comment actions (s4)', () => {
+  beforeEach(() => {
+    alertCalls.length = 0;
+    showActionSheetMock.mockClear();
+    mutateFns.length = 0;
+    capturedOptions.length = 0;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('offers Edit comment then Delete comment on the viewer’s own comment and dispatches each once', async () => {
+    const onEditComment = vi.fn<() => void>();
+    const onDeleteComment = vi.fn<() => void>();
+    const renderer = await render(
+      makeComment({ author: { login: 'bob', avatarUrl: null } }),
+      'bob',
+      { onEditComment, onDeleteComment }
+    );
+    openOverflow(renderer);
+
+    expect(overflowOptions()).toEqual([
+      'Edit comment',
+      'Delete comment',
+      'Report content',
+      'Cancel',
+    ]);
+
+    // Index 0 is Edit comment; index 1 is Delete comment.
+    selectOverflowAction(0);
+    expect(onEditComment).toHaveBeenCalledTimes(1);
+    expect(onDeleteComment).not.toHaveBeenCalled();
+
+    selectOverflowAction(1);
+    expect(onDeleteComment).toHaveBeenCalledTimes(1);
+    expect(onEditComment).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('matches the viewer login case-insensitively for the own-comment gate', async () => {
+    const onEditComment = vi.fn<() => void>();
+    const onDeleteComment = vi.fn<() => void>();
+    const renderer = await render(
+      makeComment({ author: { login: 'Bob', avatarUrl: null } }),
+      'bob',
+      { onEditComment, onDeleteComment }
+    );
+    openOverflow(renderer);
+
+    expect(overflowOptions()).toEqual([
+      'Edit comment',
+      'Delete comment',
+      'Report content',
+      'Cancel',
+    ]);
+
+    renderer.unmount();
+  });
+
+  it('offers no edit and no delete on another author’s comment', async () => {
+    const onEditComment = vi.fn<() => void>();
+    const onDeleteComment = vi.fn<() => void>();
+    const renderer = await render(makeComment(), 'bob', { onEditComment, onDeleteComment });
+    openOverflow(renderer);
+
+    expect(overflowOptions()).toEqual(['Report content', 'Report user', 'Mute', 'Block', 'Cancel']);
+
+    // Report content is index 0 here — never a stale own-comment index.
+    selectOverflowAction(0);
+    expect(onEditComment).not.toHaveBeenCalled();
+    expect(onDeleteComment).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('offers no edit and no delete to an anonymous viewer (null login)', async () => {
+    const onEditComment = vi.fn<() => void>();
+    const onDeleteComment = vi.fn<() => void>();
+    const renderer = await render(
+      makeComment({ author: { login: 'bob', avatarUrl: null } }),
+      null,
+      { onEditComment, onDeleteComment }
+    );
+    openOverflow(renderer);
+
+    expect(overflowOptions()).toEqual(['Report content', 'Report user', 'Mute', 'Block', 'Cancel']);
+
+    selectOverflowAction(0);
+    expect(onEditComment).not.toHaveBeenCalled();
+    expect(onDeleteComment).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('offers no edit and no delete without callbacks (provider scope), keeping today’s disabled trio', async () => {
+    const renderer = await render(
+      makeComment({ author: { login: 'bob', avatarUrl: null } }),
+      'bob'
+    );
+    openOverflow(renderer);
+
+    expect(overflowOptions()).toEqual(['Report content', 'Report user', 'Mute', 'Block', 'Cancel']);
+    expect(disabledButtonIndices()).toEqual([1, 2, 3]);
+
+    renderer.unmount();
+  });
+
+  it('offers no edit and no delete on a deleted-author comment (author null)', async () => {
+    const onEditComment = vi.fn<() => void>();
+    const onDeleteComment = vi.fn<() => void>();
+    const renderer = await render(makeComment({ author: null }), 'bob', {
+      onEditComment,
+      onDeleteComment,
+    });
+    openOverflow(renderer);
+
+    expect(overflowOptions()).toEqual(['Report content', 'Cancel']);
 
     renderer.unmount();
   });

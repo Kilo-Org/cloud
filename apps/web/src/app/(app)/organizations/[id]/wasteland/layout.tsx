@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 /**
  * Do NOT hard-code a `callbackPath` on the sign-in URL — the layout

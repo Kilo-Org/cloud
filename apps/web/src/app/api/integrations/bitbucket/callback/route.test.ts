@@ -14,10 +14,10 @@ import {
   storeBitbucketIntegration,
 } from '@/lib/integrations/platforms/bitbucket/credentials';
 import { scheduleBitbucketRepositoryCachePrime } from '@/lib/integrations/platforms/bitbucket/repository-cache';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
-jest.mock('@/lib/user/server');
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
 jest.mock('@/lib/integrations/platforms/bitbucket/adapter', () => ({

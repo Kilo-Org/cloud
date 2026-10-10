@@ -4,6 +4,7 @@ import type {
   VercelSandboxNetworkPolicy,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloSandboxTargets } from '../kilo/kilo-targets.js';
+import { EXA_PROXY_PATHS } from '../kilo/runtime-credential-proxy-routes.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 
 export type VercelCredentialPolicyInput = {
@@ -291,6 +292,16 @@ function runtimeProxyInjectionRules(
       add(provider, `${basePath(provider)}/api/gateway${path}`, ['POST'], authorization);
     }
     add(ingest, `${basePath(ingest)}/api/session`, ['POST'], authorization);
+    // Only the opaque handle reaches this facade; its resolver enforces scoped ingestion.
+    rules.push(
+      createCredentialRule({
+        target: ingest,
+        path: { startsWith: `${basePath(ingest)}/api/session/` },
+        methods: ['POST'],
+        expectedAuthorization: authorization,
+        injectedAuthorization: authorization,
+      })
+    );
     const sessionId = member.kiloSessionId;
     for (const [suffix, methods] of [
       ['export', ['GET']],
@@ -303,6 +314,9 @@ function runtimeProxyInjectionRules(
         [...methods],
         authorization
       );
+    }
+    for (const path of EXA_PROXY_PATHS) {
+      add(backend, `${basePath(backend)}${path}`, ['POST'], authorization);
     }
   }
   return rules;

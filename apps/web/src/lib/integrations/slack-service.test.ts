@@ -1,5 +1,4 @@
 process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
-process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 const mockLimit = jest.fn();
 const mockUpdateSet = jest.fn();
@@ -11,7 +10,7 @@ const mockInsertReturning = jest.fn();
 const mockAuthRevoke = jest.fn();
 const mockAuthTest = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({

@@ -27,8 +27,8 @@ export type ReplyFocusScroll = {
  *
  * Android is the exposed case: with edge-to-edge, `adjustResize` no longer
  * resizes the window and `automaticallyAdjustKeyboardInsets` is iOS-only, so
- * the keyboard-open lift of the CTA bar (AppAwareKeyboardPaddingView) just
- * shrinks the list viewport under the focused row — the reply input and its
+ * the keyboard-open lift of the CTA bar just shrinks the list viewport under
+ * the focused row — the reply input and its
  * submit button end up behind the lifted CTA with nothing scrolling them back
  * into view. The fix scrolls the focused thread row so its BOTTOM (the reply
  * input + submit button) aligns with the viewport bottom, just above the CTA.

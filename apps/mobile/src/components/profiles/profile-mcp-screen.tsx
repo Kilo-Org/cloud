@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -13,6 +13,7 @@ import {
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Lock, Pencil, Server, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -82,9 +83,6 @@ function McpServerRowView({
           </Text>
         ) : null}
       </View>
-      <Text className="text-xs text-muted-foreground">
-        {server.enabled ? t('common.enabled') : t('common.disabled')}
-      </Text>
       <Switch value={server.enabled} accessibilityLabel={server.name} onValueChange={onToggle} />
       <Pressable
         className="h-11 w-11 items-center justify-center active:opacity-70"
@@ -122,6 +120,7 @@ export function ProfileMcpScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
@@ -164,16 +163,14 @@ export function ProfileMcpScreen({
   };
 
   const confirmDelete = (target: McpServerSource) => {
-    Alert.alert(t('common.delete'), target.name, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void runDelete(target.id);
-        },
+    confirm({
+      title: t('common.delete'),
+      message: target.name,
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        void runDelete(target.id);
       },
-    ]);
+    });
   };
 
   let content: ReactNode = null;
@@ -268,6 +265,8 @@ export function ProfileMcpScreen({
           }}
         />
       ) : null}
+
+      {dialog}
     </View>
   );
 }

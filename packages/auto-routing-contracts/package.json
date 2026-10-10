@@ -15,7 +15,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@openrouter/sdk": "^0.12.79",
     "zod": "catalog:"
   },
   "devDependencies": {

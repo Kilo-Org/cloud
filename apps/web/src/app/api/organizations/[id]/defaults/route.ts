@@ -1,16 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { KILO_AUTO_FREE_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import { isOrganizationAutoConfigured } from '@/lib/organizations/organization-auto-model';
-import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getModelIdToProviderSlugsIndex } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  KILO_AUTO_FREE_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { isOrganizationAutoConfigured } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 type DefaultsResponse = {
   defaultModel: string;

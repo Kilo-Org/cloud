@@ -14,9 +14,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { captureException } from '@sentry/nextjs';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   handleCommentReply,
   CommentReplyPayloadSchema,

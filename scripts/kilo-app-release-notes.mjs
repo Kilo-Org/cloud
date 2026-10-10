@@ -4,9 +4,9 @@
  *
  * The kilo-app Release workflow writes the section after a successful store
  * submission. `body` lists the merged pull requests that shipped between two
- * refs, `identity` reads the store build identity from the built IPA, and
- * `write` inserts the section above the newest one and (with --land) pushes it
- * onto a branch.
+ * refs and links each one, `identity` reads the store build identity from the
+ * built IPA, and `write` inserts the section above the newest one and (with
+ * --land) pushes it onto a branch.
  *
  * Usage:
  *   node scripts/kilo-app-release-notes.mjs body [--from <ref>] [--to <ref>]
@@ -53,6 +53,10 @@ import { pathToFileURL } from 'node:url';
 
 const CHANGELOG_DEFAULT = 'apps/mobile/CHANGELOG.md';
 
+// The repository the app commits ship in. A changelog line links its pull
+// request here, so a reader opens the pull request from the rendered file.
+const REPO_URL = 'https://github.com/Kilo-Org/cloud';
+
 // The same app paths the release workflow watches, minus the changelog itself:
 // a changelog commit must never be its own release reason.
 const APP_PATHS = [
@@ -73,7 +77,7 @@ const CHANGELOG_EXCLUDE = ':(exclude)apps/mobile/CHANGELOG.md';
 const VERSION_BUMP_FILES = new Set(['apps/mobile/app.config.ts', 'apps/mobile/CHANGELOG.md']);
 
 const VERSION_RE = /^ {2}version: '([0-9][0-9.]*)',$/m;
-const PR_SUBJECT_RE = /\(#\d+\)$/;
+const PR_SUBJECT_RE = /\(#(\d+)\)$/;
 const DIFF_CHANGE_RE = /^[+-][^+-]/;
 const DIFF_VERSION_RE = /^[+-] {2}version: '/;
 
@@ -96,7 +100,7 @@ function git(args, options = {}) {
   return execFileSync('git', args, { encoding: 'utf8', ...options });
 }
 
-function reasonOf(error) {
+export function reasonOf(error) {
   const stderr = error && error.stderr ? String(error.stderr).trim() : '';
   const lines = stderr
     .split('\n')
@@ -115,6 +119,14 @@ export function parseConfigVersion(configText) {
 /** A commit subject is a shipped PR when it ends with `(#<digits>)`. */
 export function isPullRequestSubject(subject) {
   return PR_SUBJECT_RE.test(subject);
+}
+
+/** The subject with its trailing `(#<n>)` as a markdown link to the PR. */
+export function linkPullRequest(subject) {
+  return subject.replace(
+    PR_SUBJECT_RE,
+    (_, number) => `([#${number}](${REPO_URL}/pull/${number}))`
+  );
 }
 
 /**
@@ -178,7 +190,7 @@ export function splitSections(text) {
 }
 
 /** The heading line of a section, i.e. its first line. */
-function headingOf(section) {
+export function headingOf(section) {
   return section.split('\n')[0];
 }
 
@@ -399,7 +411,7 @@ function runBody(args) {
     return 0;
   }
   for (const subject of subjects) {
-    console.log(`- ${subject}`);
+    console.log(`- ${linkPullRequest(subject)}`);
   }
   return 0;
 }
@@ -478,7 +490,7 @@ function treeFile(parent, path) {
 }
 
 /** A commit on top of `parent` that replaces one file with `content`. */
-function commitOn(parent, path, content, message) {
+export function commitOn(parent, path, content, message) {
   const blob = git(['hash-object', '-w', '--stdin'], { input: content }).trim();
   const work = mkdtempSync(join(tmpdir(), 'kilo-notes-commit-'));
   try {

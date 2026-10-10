@@ -1,5 +1,4 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -35,7 +34,7 @@ type OrgUsageStatsProps = {
 /** "Last 30 days" eyebrow + 2x2 usage stat tile grid. Visible to all org roles. */
 export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) {
   const { t } = useTranslation();
-  const { data, isLoading, isError } = useOrgUsageStats(organizationId);
+  const { data, isPending, isError } = useOrgUsageStats(organizationId);
 
   // An embedded stat block has no room for a retry affordance — hide the
   // section on a hard failure instead of showing a full QueryError. Stale
@@ -44,46 +43,41 @@ export function OrgUsageStats({ organizationId }: Readonly<OrgUsageStatsProps>) 
     return null;
   }
 
-  let body: ReactNode = null;
-  if (isLoading) {
-    body = (
-      <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
-        <View className="flex-row gap-3">
-          <StatTileSkeleton />
-          <StatTileSkeleton />
-        </View>
-        <View className="flex-row gap-3">
-          <StatTileSkeleton />
-          <StatTileSkeleton />
-        </View>
-      </Animated.View>
-    );
-  } else if (data) {
-    body = (
-      <Animated.View entering={FadeIn.duration(200)} className="gap-3">
-        <View className="flex-row gap-3">
-          <StatTile
-            label={t('common.cost')}
-            value={formatMoney(fromMicrodollars(data.totalCost), i18n.language)}
-          />
-          <StatTile
-            label={t('organization.usageStats.requests')}
-            value={formatNumber(data.totalRequestCount, i18n.language)}
-          />
-        </View>
-        <View className="flex-row gap-3">
-          <StatTile
-            label={t('organization.usageStats.inputTokens')}
-            value={formatNumber(data.totalInputTokens, i18n.language)}
-          />
-          <StatTile
-            label={t('organization.usageStats.outputTokens')}
-            value={formatNumber(data.totalOutputTokens, i18n.language)}
-          />
-        </View>
-      </Animated.View>
-    );
-  }
+  const body = isPending ? (
+    <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
+      <View className="flex-row gap-3">
+        <StatTileSkeleton />
+        <StatTileSkeleton />
+      </View>
+      <View className="flex-row gap-3">
+        <StatTileSkeleton />
+        <StatTileSkeleton />
+      </View>
+    </Animated.View>
+  ) : (
+    <Animated.View entering={FadeIn.duration(200)} className="gap-3">
+      <View className="flex-row gap-3">
+        <StatTile
+          label={t('common.cost')}
+          value={formatMoney(fromMicrodollars(data.totalCost), i18n.language)}
+        />
+        <StatTile
+          label={t('organization.usageStats.requests')}
+          value={formatNumber(data.totalRequestCount, i18n.language)}
+        />
+      </View>
+      <View className="flex-row gap-3">
+        <StatTile
+          label={t('organization.usageStats.inputTokens')}
+          value={formatNumber(data.totalInputTokens, i18n.language)}
+        />
+        <StatTile
+          label={t('organization.usageStats.outputTokens')}
+          value={formatNumber(data.totalOutputTokens, i18n.language)}
+        />
+      </View>
+    </Animated.View>
+  );
 
   return (
     <Animated.View layout={LinearTransition} className="gap-3">

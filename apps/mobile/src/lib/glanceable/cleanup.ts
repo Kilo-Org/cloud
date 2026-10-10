@@ -86,7 +86,9 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
     running: 0,
     needsInput: 0,
     idle: 0,
+    scheduled: 0,
     needsInputSince: null,
+    scheduledAt: null,
     // A terminal scope asserts nothing about work, so the newest-result fact is
     // blank with the counts.
     newestResultKind: null,

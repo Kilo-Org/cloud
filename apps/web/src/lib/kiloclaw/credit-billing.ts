@@ -3,7 +3,7 @@ import 'server-only';
 import { and, desc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
@@ -23,8 +23,8 @@ import {
   kiloclaw_subscriptions,
 } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
-import { processTopUp } from '@/lib/credits';
-import { sendKiloClawSubscriptionStartedEmail } from '@/lib/email';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import { sendKiloClawSubscriptionStartedEmail } from '@kilocode/web-shared/lib/email';
 import {
   autoResumeIfSuspended,
   clearTrialInactivityStopAfterTrialTransition,
@@ -33,18 +33,21 @@ import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
 } from '@/lib/impact/affiliate-events';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
-import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
+import {
+  getKiloPassStateForUser,
+  type KiloPassSubscriptionState,
+} from '@kilocode/web-shared/lib/kilo-pass/state';
 import {
   computeProjectedKiloPassBonusMicrodollars,
   getEffectiveKiloPassThreshold,
 } from '@kilocode/worker-utils/kilo-pass-bonus-projection';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { IMPACT_ORDER_ID_MACRO } from '@/lib/impact';
 import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
-} from '@/lib/kiloclaw/stripe-price-ids.server';
+} from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import {
   CurrentPersonalSubscriptionResolutionError,
   resolveCurrentPersonalSubscriptionRow,
@@ -1107,7 +1110,7 @@ function planDisplayName(plan: 'commit' | 'standard'): string {
  * email per activation, not one per instance lifetime.
  *
  * Known gaps shared with every other insert-before-send email path in this
- * codebase (`maybeSendTopUpConfirmationEmail` in `apps/web/src/lib/credits.ts`,
+ * codebase (`maybeSendTopUpConfirmationEmail` in `packages/web-shared/src/lib/credits.ts`,
  * `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
  * `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
  * 1. A crash between the marker insert and the provider send permanently

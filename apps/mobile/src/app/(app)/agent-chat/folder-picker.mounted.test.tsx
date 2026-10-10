@@ -21,11 +21,11 @@ const bridge = vi.hoisted(() => ({
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const router = vi.hoisted(() => ({ back: vi.fn() }));
 
-// FlatList renders through a callback, so a host-string mock would drop every
+// FlashList renders through a callback, so a host-string mock would drop every
 // row and empty state. This mock mirrors the real list: rows via renderItem,
 // the header only when there are rows, and the empty component only when the
 // data is empty — which lets each phase assert its own content.
-const flatListMock = vi.hoisted(
+const flashListMock = vi.hoisted(
   () =>
     (props: {
       data: readonly { name: string; path: string }[];
@@ -43,12 +43,13 @@ const flatListMock = vi.hoisted(
       );
       const header = props.data.length > 0 ? props.ListHeaderComponent : null;
       const empty = props.data.length === 0 ? props.ListEmptyComponent : null;
-      return createElement('FlatList', null, header, ...rows, empty);
+      return createElement('FlashList', null, header, ...rows, empty);
     }
 );
 
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
-  FlatList: flatListMock,
+  FlatList: 'FlatList',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -158,12 +159,12 @@ describe('FolderPickerScreen body', () => {
     insets.bottom = 0;
   });
 
-  it('renders one FlatList in the skeleton phase, with skeleton rows as the empty content', async () => {
+  it('renders one FlashList in the skeleton phase, with skeleton rows as the empty content', async () => {
     // Never resolve: the listing stays in the skeleton phase for the whole mount.
     listFn.mockReturnValueOnce(new Promise(() => undefined));
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(1);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(5);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
 
@@ -176,7 +177,7 @@ describe('FolderPickerScreen body', () => {
     listFn.mockResolvedValueOnce({ ok: false, reason: 'transport' });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     expect(propOf(emptyState[0], 'action')).toBeTruthy();
@@ -191,7 +192,7 @@ describe('FolderPickerScreen body', () => {
     listFn.mockResolvedValueOnce({ ok: false, reason: 'unsupported' });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     expect(propOf(emptyState[0], 'action')).toBeUndefined();
@@ -223,7 +224,7 @@ describe('FolderPickerScreen body', () => {
     await settle();
     expect(findByType(renderer.root, 'SheetHeader')[0]).toBe(header);
     expect(header.parent).toBe(group);
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     act(() => {
       (header.props.onDone as () => void)();
@@ -238,7 +239,7 @@ describe('FolderPickerScreen body', () => {
     listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
     expect(findByType(renderer.root, 'Button')).toHaveLength(0);

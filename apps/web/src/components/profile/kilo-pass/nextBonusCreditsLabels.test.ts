@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 import { formatIsoDateLabel, getNextBonusCreditsDateInlineLabel } from './nextBonusCreditsLabels';
 

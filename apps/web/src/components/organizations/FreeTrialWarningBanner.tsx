@@ -7,11 +7,11 @@ import { AlertCircle, AlertTriangle, Clock } from 'lucide-react';
 import {
   getOrgTrialStatusFromDays,
   type OrganizationTrialDisplayStatus,
-} from '@/lib/organizations/trial-utils';
+} from '@kilocode/web-shared/lib/organizations/trial-utils';
 import type {
   OrganizationRole,
   OrganizationWithMembersResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { capitalize, cn } from '@/lib/utils';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 

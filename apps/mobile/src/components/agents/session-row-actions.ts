@@ -1,19 +1,61 @@
-import { type ActionSheetOptions } from '@expo/react-native-action-sheet';
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { createElement, type ReactNode, useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { i18n } from '@/i18n';
-import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
-export function showDeleteConfirm(onDelete: () => void) {
-  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  Alert.alert(i18n.t('agents.sessionRow.deleteTitle'), i18n.t('agents.sessionRow.deleteMessage'), [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('common.delete'), style: 'destructive', onPress: onDelete },
-  ]);
+type SessionDeleteConfirm = {
+  /** Warns haptically, then opens the confirm for `onDelete`. */
+  confirmDelete: (onDelete: () => void) => void;
+  /** The confirm node; render it in the host that owns the delete trigger. */
+  deleteDialog: ReactNode;
+};
+
+/**
+ * Delete-session confirm. The native `Alert.alert` cannot carry the
+ * destructive affordance on Android: its `AlertDialog` paints every button
+ * with the theme accent, so `style: 'destructive'` never reaches the screen
+ * there. This is the in-app `DestructiveConfirmDialog` on both platforms
+ * instead — one implementation, with the destructive red fill and a neutral
+ * outline.
+ *
+ * The hook holds the pending delete and returns the node the caller mounts;
+ * the node is null while the confirm is closed. A dismissal (Cancel, backdrop,
+ * Android back) drops the pending delete without running it.
+ */
+export function useSessionDeleteConfirm(): SessionDeleteConfirm {
+  const [pendingDelete, setPendingDelete] = useState<{ run: () => void } | null>(null);
+
+  const confirmDelete = useCallback((onDelete: () => void) => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setPendingDelete({ run: onDelete });
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setPendingDelete(null);
+  }, []);
+
+  return {
+    confirmDelete,
+    deleteDialog:
+      pendingDelete === null
+        ? null
+        : createElement(DestructiveConfirmDialog, {
+            title: i18n.t('agents.sessionRow.deleteTitle'),
+            message: i18n.t('agents.sessionRow.deleteMessage'),
+            confirmLabel: i18n.t('common.delete'),
+            onConfirm: () => {
+              const pending = pendingDelete;
+              dismiss();
+              pending.run();
+            },
+            onCancel: dismiss,
+          }),
+  };
 }
 
 /** iOS-only — uses Alert.prompt which is unavailable on Android. */
@@ -85,73 +127,84 @@ export async function copySessionLink(
   }
 }
 
-type SessionActionMenuOptions = {
-  showActionSheetWithOptions: (
-    options: ActionSheetOptions,
-    onSelect: (index?: number) => void
-  ) => void;
-  onCopySessionId: () => void;
-  /** Omitted → no Rename entry. */
-  onRename?: () => void;
-  /**
-   * Omitted → no Exit session entry. Additive for the running-session row:
-   * the old menu form (Copy / Rename / Delete / Cancel) stays unchanged for
-   * callers that omit `onExit`.
-   */
-  onExit?: () => void;
-  /** Omitted → no Delete entry. */
-  onDelete?: () => void;
-  /** Themed sheet base options (`useThemedActionSheetOptions()`), spread first. */
-  themedSheet: ThemedActionSheetOptions;
+export type SessionActionMenuItem = {
+  key: 'open' | 'copy' | 'view-pr' | 'rename' | 'exit' | 'delete';
+  label: string;
+  destructive: boolean;
+  run: () => void;
+};
+
+export type SessionActionMenu = {
+  items: SessionActionMenuItem[];
+  cancelLabel: string;
 };
 
 /**
- * Shared session long-press menu. Builds one options list — Copy session ID,
- * optional Rename, optional Exit session, optional Delete session, Cancel —
- * and dispatches by index. Exit session is additive when `onExit` is passed;
- * callers that omit it keep the old Copy / Rename / Delete / Cancel form.
- * iOS delegates to native ActionSheetIOS via @expo/react-native-action-sheet;
- * Android gets backdrop-tap and hardware-back dismiss from the library.
+ * The one session action set, in today's order: Open, optional Copy session ID,
+ * optional View PR, optional Rename, optional Exit session, optional Delete
+ * session. Copy ID and View PR are additive when their callbacks are passed, so
+ * a session without an associated PR never shows View PR, and a caller that
+ * does not own the clipboard keeps the preview-only form. Delete wins when both
+ * exist; Exit is destructive only when Delete is absent. The preview panel
+ * builds from here so its order, copy and indices cannot diverge.
  */
-export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
-  const { showActionSheetWithOptions, onCopySessionId, onRename, onExit, onDelete, themedSheet } =
-    opts;
-
-  const options = [i18n.t('agents.sessionRow.copyId')];
-  const handlers: (() => void)[] = [onCopySessionId];
-
-  if (onRename) {
-    options.push(i18n.t('common.rename'));
-    handlers.push(onRename);
-  }
-  if (onExit) {
-    options.push(i18n.t('agentChat.remoteSession.exitSession'));
-    handlers.push(onExit);
-  }
-  if (onDelete) {
-    options.push(i18n.t('agents.sessionRow.deleteSession'));
-    handlers.push(onDelete);
-  }
-  options.push(i18n.t('common.cancel'));
-
-  const cancelButtonIndex = options.length - 1;
-  const deleteIndex = options.indexOf(i18n.t('agents.sessionRow.deleteSession'));
-  const exitIndex = options.indexOf(i18n.t('agentChat.remoteSession.exitSession'));
-  // Delete wins when both exist; Exit is destructive only when Delete is absent.
-  const destructiveButtonIndex = [deleteIndex, exitIndex].find(index => index !== -1);
-
-  showActionSheetWithOptions(
+export function buildSessionActionMenuItems(input: {
+  onOpen: () => void;
+  onCopySessionId?: () => void;
+  onViewPr?: () => void;
+  onRename?: () => void;
+  onExit?: () => void;
+  onDelete?: () => void;
+}): SessionActionMenu {
+  const items: SessionActionMenuItem[] = [
     {
-      ...themedSheet,
-      options,
-      cancelButtonIndex,
-      ...(destructiveButtonIndex !== undefined && { destructiveButtonIndex }),
+      key: 'open',
+      label: i18n.t('glanceable.openSession'),
+      destructive: false,
+      run: input.onOpen,
     },
-    index => {
-      if (index === undefined || index === cancelButtonIndex) {
-        return;
-      }
-      handlers[index]?.();
-    }
-  );
+  ];
+
+  if (input.onCopySessionId) {
+    items.push({
+      key: 'copy',
+      label: i18n.t('agents.sessionRow.copyId'),
+      destructive: false,
+      run: input.onCopySessionId,
+    });
+  }
+  if (input.onViewPr) {
+    items.push({
+      key: 'view-pr',
+      label: i18n.t('securityAgent.findingRow.viewPr'),
+      destructive: false,
+      run: input.onViewPr,
+    });
+  }
+  if (input.onRename) {
+    items.push({
+      key: 'rename',
+      label: i18n.t('common.rename'),
+      destructive: false,
+      run: input.onRename,
+    });
+  }
+  if (input.onExit) {
+    items.push({
+      key: 'exit',
+      label: i18n.t('agentChat.remoteSession.exitSession'),
+      destructive: input.onDelete === undefined,
+      run: input.onExit,
+    });
+  }
+  if (input.onDelete) {
+    items.push({
+      key: 'delete',
+      label: i18n.t('agents.sessionRow.deleteSession'),
+      destructive: true,
+      run: input.onDelete,
+    });
+  }
+
+  return { items, cancelLabel: i18n.t('common.cancel') };
 }

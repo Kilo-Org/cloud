@@ -6,9 +6,9 @@ import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
-import { isMobileClient } from '@/lib/trpc/min-version';
+import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import { createCloudAgentNextClient, type CreateWorktreeChatOutput } from './cloud-agent-client';
 
 type CreateWorktreeChatOptions = {

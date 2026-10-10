@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { renderTemplate, subjects, type TemplateName } from '@/lib/email';
+import { renderTemplate, subjects, type TemplateName } from '@kilocode/web-shared/lib/email';
 import { fixtureTemplateVars } from './email-testing-router';
 
 /**

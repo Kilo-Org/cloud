@@ -1,18 +1,18 @@
-import { createStripeCustomer, deleteStripeCustomer } from '@/lib/stripe-client';
+import { createStripeCustomer, deleteStripeCustomer } from '@kilocode/web-shared/lib/stripe-client';
 import { randomUUID } from 'crypto';
-import { createTimer } from '@/lib/timer';
-import PostHogClient from '@/lib/posthog';
+import { createTimer } from '@kilocode/web-shared/lib/timer';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { WORKOS_API_KEY } from '@/lib/config.server';
-import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { clearOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
 import {
   createSoftDeletedBlockedReason,
   isSoftDeletedBlockedReason,
 } from '@kilocode/db/user-soft-delete';
-import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
   kilocode_users,
@@ -31,7 +31,6 @@ import {
   code_indexing_search,
   code_indexing_manifest,
   referral_codes,
-  organizations,
   organization_memberships,
   organization_groups,
   organization_group_memberships,
@@ -120,6 +119,8 @@ import {
   deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
+  bouncer_credit_event_outbox,
+  bouncer_usage_event_outbox,
   external_side_effect_outbox,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -129,37 +130,28 @@ import {
   user_moderation_mutes,
   user_terms_acceptances,
 } from '@kilocode/db/schema';
-import {
-  eq,
-  and,
-  inArray,
-  isNotNull,
-  isNull,
-  sql,
-  or,
-  gte,
-  count,
-  ne,
-  notExists,
-} from 'drizzle-orm';
-import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
-import type { AuthErrorType } from '@/lib/auth/constants';
+import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
+import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
+import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { strict as assert } from 'node:assert';
-import type { OptionalError, Result } from '@/lib/maybe-result';
-import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
+import type { OptionalError, Result } from '@kilocode/web-shared/lib/maybe-result';
+import { failureResult, successResult, trpcFailure } from '@kilocode/web-shared/lib/maybe-result';
 import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import * as z from 'zod';
 import {
   generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
-} from '@/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@/lib/utils';
+} from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { normalizeEmail } from '@kilocode/web-shared/lib/email-address';
+import { normalizeJa4, signupDecide } from '@kilocode/web-shared/lib/bouncer/client';
+import { signupOperationId } from '@kilocode/web-shared/lib/bouncer/signup';
+import { bareIpLiteral } from '@kilocode/web-shared/lib/bouncer/inference';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
   deleteAllOwnedByUserIdPages,
@@ -185,21 +177,9 @@ import { revokeGatewayStateForUser } from '@/lib/mcp-gateway/lifecycle-service';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 const workos = new WorkOS(WORKOS_API_KEY);
-
-/**
- * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
- */
-export async function findUserById(
-  userId: string,
-  fromDb: typeof db = db
-): Promise<User | undefined> {
-  return await fromDb.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.id, userId),
-  });
-}
 
 export async function findUsersByIds(userIds: string[]): Promise<Map<string, User>> {
   if (userIds.length === 0) return new Map();
@@ -224,62 +204,8 @@ if (process.env.NEXT_PUBLIC_POSTHOG_DEBUG) {
   posthogClient.debug();
 }
 
-// Per-IP signup rate limit. Two overlapping windows so an IP can absorb a
-// one-off spike (e.g. meetup where 100 people sign up from the same NAT in a
-// single day) while still bounding sustained abuse. Passing requires both:
-//   - <= 100 signups in the last 24h (burst)
-//   - <= 150 signups in the last 30d  (sustained, averages ~5/day)
-// After a full burst day, only ~50 more signups are allowed over the next
-// 29 days, and the burst day must roll out of the 30d window before the IP
-// can spike again.
-const SIGNUP_BURST_MAX = 100;
-const SIGNUP_BURST_WINDOW_MS = 24 * 60 * 60 * 1000;
-const SIGNUP_SUSTAINED_MAX = 150;
-const SIGNUP_SUSTAINED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
-
 function getSignupIp(requestHeaders?: Headers): string | null {
   return requestHeaders?.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
-}
-
-async function countSignupsFromIpSince(
-  signupIp: string,
-  sinceIso: string,
-  tx: DrizzleTransaction
-): Promise<number> {
-  const [result] = await tx
-    .select({ count: count() })
-    .from(kilocode_users)
-    .where(and(eq(kilocode_users.signup_ip, signupIp), gte(kilocode_users.created_at, sinceIso)));
-  return result?.count ?? 0;
-}
-
-async function checkSignupIpRateLimit(
-  signupIp: string | null,
-  tx: DrizzleTransaction
-): Promise<Result<null, AuthErrorType>> {
-  if (IS_DEVELOPMENT) return successResult(null);
-  if (!signupIp) return successResult(null);
-
-  const now = Date.now();
-  const burstWindowStart = new Date(now - SIGNUP_BURST_WINDOW_MS).toISOString();
-  const sustainedWindowStart = new Date(now - SIGNUP_SUSTAINED_WINDOW_MS).toISOString();
-
-  const burstCount = await countSignupsFromIpSince(signupIp, burstWindowStart, tx);
-  const sustainedCount = await countSignupsFromIpSince(signupIp, sustainedWindowStart, tx);
-
-  if (burstCount < SIGNUP_BURST_MAX && sustainedCount < SIGNUP_SUSTAINED_MAX) {
-    return successResult(null);
-  }
-
-  console.warn('[auth] Signup rejected due to per-IP rate limit', {
-    ip_address: signupIp,
-    existing_accounts_24h: burstCount,
-    existing_accounts_30d: sustainedCount,
-    max_signups_24h: SIGNUP_BURST_MAX,
-    max_signups_30d: SIGNUP_SUSTAINED_MAX,
-  });
-
-  return failureResult('SIGNUP-RATE-LIMITED');
 }
 
 async function checkNormalizedEmailUnique(
@@ -404,92 +330,6 @@ export async function findUserByNormalizedEmail(email: string): Promise<User | u
   });
 }
 
-async function fireAuthEvent(
-  user: Pick<
-    User,
-    | 'id'
-    | 'google_user_email'
-    | 'created_at'
-    | 'hosted_domain'
-    | 'signup_ip'
-    | 'is_admin'
-    | 'is_bot'
-    | 'blocked_at'
-    | 'completed_welcome_form'
-    | 'linkedin_url'
-    | 'github_url'
-    | 'discord_server_membership_verified_at'
-    | 'customer_source'
-    | 'cohorts'
-    | 'has_validation_stytch'
-    | 'has_validation_novel_card_with_hold'
-  >,
-  eventType: 'signup' | 'signin',
-  provider: AuthProviderId,
-  requestHeaders?: Headers
-) {
-  if (!requestHeaders) return;
-
-  const enrichmentResult = await Promise.all([
-    db
-      .select({ provider: user_auth_provider.provider })
-      .from(user_auth_provider)
-      .where(eq(user_auth_provider.kilo_user_id, user.id)),
-    db
-      .select({
-        organization_id: organization_memberships.organization_id,
-        role: organization_memberships.role,
-        plan: organizations.plan,
-        sso_domain: organizations.sso_domain,
-        free_trial_end_at: organizations.free_trial_end_at,
-      })
-      .from(organization_memberships)
-      .innerJoin(organizations, eq(organization_memberships.organization_id, organizations.id))
-      .where(
-        and(eq(organization_memberships.kilo_user_id, user.id), isNull(organizations.deleted_at))
-      ),
-  ]).catch(() => null);
-
-  // DB enrichment failures must not abort auth telemetry; fall through with empty arrays
-  const authProviderRows = enrichmentResult?.[0] ?? [];
-  const membershipRows = enrichmentResult?.[1] ?? [];
-
-  void reportAuthEvent({
-    kilo_user_id: user.id,
-    event_type: eventType,
-    email: user.google_user_email,
-    account_created_at: user.created_at,
-    ip_address: requestHeaders.get('x-forwarded-for'),
-    geo_city: requestHeaders.get('x-vercel-ip-city'),
-    geo_country: requestHeaders.get('x-vercel-ip-country'),
-    ja4_digest: requestHeaders.get('x-vercel-ja4-digest'),
-    user_agent: requestHeaders.get('user-agent'),
-    auth_method: provider,
-    hosted_domain: user.hosted_domain,
-    signup_ip: user.signup_ip,
-    signup_geo_country: null, // not stored on user; set at signup time only via request headers
-    is_admin: user.is_admin,
-    is_bot: user.is_bot,
-    is_blocked: user.blocked_at != null,
-    completed_welcome_form: user.completed_welcome_form,
-    has_linkedin_url: user.linkedin_url != null,
-    has_github_url: user.github_url != null,
-    has_discord_verified: user.discord_server_membership_verified_at != null,
-    customer_source: user.customer_source,
-    cohorts: Object.keys(user.cohorts),
-    has_validation_stytch: user.has_validation_stytch,
-    has_validation_novel_card_with_hold: user.has_validation_novel_card_with_hold,
-    auth_providers: authProviderRows.map(r => r.provider),
-    org_memberships: membershipRows.map(m => ({
-      organization_id: m.organization_id,
-      role: m.role,
-      plan: m.plan,
-      has_sso: m.sso_domain != null,
-      in_free_trial: m.free_trial_end_at != null && new Date(m.free_trial_end_at) > new Date(),
-    })),
-  });
-}
-
 async function recordSignupImpactTracking(args: {
   user: User;
   affiliateTrackingId?: string | null;
@@ -597,8 +437,6 @@ export async function createOrUpdateUser(
 > {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
-    void fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
-
     if (deferSignInAnalytics) {
       return successResult({
         user: existingUser,
@@ -683,7 +521,6 @@ export async function createOrUpdateUser(
           return { success: false, error: linkResult.error };
         }
       }
-      void fireAuthEvent(linkedUser, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
       if (deferSignInAnalytics) {
         return successResult({
@@ -748,16 +585,57 @@ export async function createOrUpdateUser(
     throw new Error('Abuser warning: turnstile guid reuse detected ' + turnstile_guid);
 
   const signupIp = getSignupIp(requestHeaders);
+  const normalizedEmail = normalizeEmail(args.google_user_email);
+  const operationId = signupOperationId(normalizedEmail);
+  const bouncerIp = bareIpLiteral(signupIp ?? undefined);
+  if (!IS_DEVELOPMENT) {
+    const verdict = bouncerIp
+      ? await signupDecide({
+          operationId,
+          ip: bouncerIp,
+          ja4: normalizeJa4(requestHeaders?.get('x-vercel-ja4-digest')),
+        })
+      : null;
+    console.info('[auth] Bouncer signup admission', {
+      operationId,
+      enforced: verdict?.enforced ?? false,
+      available: verdict !== null,
+      flags: verdict?.flags ?? [],
+    });
+    if (verdict === null) {
+      console.info('[auth] Signup creation outcome', {
+        operationId,
+        outcome: 'rejected',
+        reason: bouncerIp ? 'bouncer_unavailable' : 'signup_ip_unavailable',
+      });
+      return failureResult('SIGNUP-UNAVAILABLE');
+    }
+    if (verdict.enforced) {
+      console.info('[auth] Signup creation outcome', {
+        operationId,
+        outcome: 'rejected',
+        reason: 'bouncer',
+      });
+      return failureResult('SIGNUP-RATE-LIMITED');
+    }
+  }
   const newUserId = turnstile_guid ?? randomUUID();
 
   // New user creation path — Stripe customer is created before the DB
   // transaction because stripe_customer_id is NOT NULL. If the transaction
-  // fails (rate limit, constraint violation, etc.) we clean up the Stripe
-  // customer to prevent orphans.
+  // fails (uniqueness rejection, constraint violation, etc.) we clean up the
+  // Stripe customer to prevent orphans.
   const stripeCustomer = await createStripeCustomer({
     email: args.google_user_email,
     name: args.google_user_name,
     metadata: { kiloUserId: newUserId },
+  }).catch(error => {
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: 'failed',
+      reason: 'stripe',
+    });
+    throw error;
   });
 
   const newUser = {
@@ -777,7 +655,7 @@ export async function createOrUpdateUser(
     openrouter_downstream_safety_identifier:
       generateOpenRouterDownstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
-    normalized_email: normalizeEmail(args.google_user_email),
+    normalized_email: normalizedEmail,
     email_domain: extractEmailDomain(args.google_user_email),
   } satisfies typeof kilocode_users.$inferInsert;
 
@@ -786,9 +664,6 @@ export async function createOrUpdateUser(
   let caughtError: unknown;
   try {
     txResult = await db.transaction(async tx => {
-      const signupRateLimitResult = await checkSignupIpRateLimit(signupIp, tx);
-      if (!signupRateLimitResult.success) return signupRateLimitResult;
-
       const dedupResult = await checkNormalizedEmailUnique(newUser.normalized_email, tx);
       if (!dedupResult.success) return dedupResult;
 
@@ -822,8 +697,13 @@ export async function createOrUpdateUser(
   }
 
   // Clean up the Stripe customer when signup didn't succeed (thrown error
-  // or returned failure like rate-limit rejection).
+  // or returned failure like a normalized-email uniqueness rejection).
   if (!txResult.success) {
+    console.info('[auth] Signup creation outcome', {
+      operationId,
+      outcome: caughtError ? 'failed' : 'rejected',
+      reason: txResult.error,
+    });
     deleteStripeCustomer(stripeCustomer.id).catch(cleanupErr =>
       captureException(cleanupErr, {
         tags: { source: 'signup-stripe-cleanup' },
@@ -834,14 +714,17 @@ export async function createOrUpdateUser(
     return txResult;
   }
   const savedUser = txResult.user;
+  console.info('[auth] Signup creation outcome', {
+    operationId,
+    outcome: 'created',
+    userId: savedUser.id,
+  });
 
   await recordSignupImpactTracking({
     user: savedUser,
     affiliateTrackingId,
     trackingContext,
   });
-
-  void fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 
   // User created event in PostHog
   posthogClient.capture({
@@ -1097,6 +980,10 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
+ * - bouncer_credit_event_outbox (every row for the user; its payload carries the
+ *   user id, client ip, and card fingerprint)
+ * - bouncer_usage_event_outbox (every row for the user; its payload carries the
+ *   account id, client ip, and client-fingerprint digest)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -1169,6 +1056,16 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(analytics_event_outbox)
     .where(inArray(analytics_event_outbox.distinct_id, [originalEmail, userId]));
+  // Bouncer credit-event payloads carry the user id, client ip, and card
+  // fingerprint, so every row for the user is deleted rather than retained.
+  // `enqueueCreditEvent` also refuses to store new rows for a soft-deleted
+  // account, so a late webhook cannot reintroduce the PII.
+  await tx
+    .delete(bouncer_credit_event_outbox)
+    .where(eq(bouncer_credit_event_outbox.user_id, userId));
+  // Bouncer usage-event payloads carry the account id, client ip, and JA4
+  // digest. The usage-event drainer also rechecks the owner before sending.
+  await tx.delete(bouncer_usage_event_outbox).where(eq(bouncer_usage_event_outbox.user_id, userId));
 
   // ── 1. Anonymize the user row ────────────────────────────────────────
   await tx
@@ -2023,8 +1920,6 @@ export async function softDeleteUser(userId: string) {
   await db.transaction(async tx => {
     await anonymizeCloudUserData(tx, userId);
   });
-
-  void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
 }
 
 // We always stytch approve users who accept organization invites

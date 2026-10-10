@@ -15,8 +15,6 @@ function api(path: string): string {
 describe('Town Container Routes', () => {
   const townId = () => `town-${crypto.randomUUID()}`;
 
-  // ── Container start agent route ─────────────────────────────────────────
-
   describe('POST /agents/start', () => {
     it('should reject start-agent without body', async () => {
       const id = townId();
@@ -28,8 +26,6 @@ describe('Town Container Routes', () => {
       expect(res.status).toBe(400);
     });
   });
-
-  // ── Container message route ─────────────────────────────────────────────
 
   describe('POST /agents/:agentId/message', () => {
     it('should reject message without body', async () => {
@@ -49,7 +45,6 @@ describe('Heartbeat Endpoint', () => {
   it('should update agent activity via heartbeat', async () => {
     const id = rigId();
 
-    // Register an agent first
     const createRes = await SELF.fetch(api(`/api/rigs/${id}/agents`), {
       method: 'POST',
       headers: headers(),
@@ -60,10 +55,8 @@ describe('Heartbeat Endpoint', () => {
     const agentId = createBody.data.id;
     const oldActivity = createBody.data.last_activity_at;
 
-    // Wait a tiny bit to ensure timestamp changes
     await new Promise(r => setTimeout(r, 10));
 
-    // Send heartbeat
     const heartbeatRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}/heartbeat`), {
       method: 'POST',
       headers: headers(),
@@ -75,7 +68,6 @@ describe('Heartbeat Endpoint', () => {
     expect(heartbeatBody.success).toBe(true);
     expect(heartbeatBody.data.heartbeat).toBe(true);
 
-    // Verify agent's activity was updated
     const getRes = await SELF.fetch(api(`/api/rigs/${id}/agents/${agentId}`), {
       headers: headers(),
     });
@@ -100,7 +92,6 @@ describe('Town DO — touchAgentHeartbeat', () => {
     const id = `town-${crypto.randomUUID()}`;
     const town = env.TOWN.get(env.TOWN.idFromName(id));
 
-    // Register agent
     const agent = await town.registerAgent({
       role: 'polecat',
       name: 'heartbeat-test',
@@ -110,10 +101,8 @@ describe('Town DO — touchAgentHeartbeat', () => {
     const initialActivity = agent.last_activity_at;
     await new Promise(r => setTimeout(r, 10));
 
-    // Touch via heartbeat
     await town.touchAgentHeartbeat(agent.id);
 
-    // Verify updated
     const updated = await town.getAgentAsync(agent.id);
     expect(updated).not.toBeNull();
     expect(updated!.last_activity_at).not.toBe(initialActivity);

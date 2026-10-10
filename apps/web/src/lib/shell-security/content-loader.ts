@@ -1,4 +1,4 @@
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   security_advisor_check_catalog,
   security_advisor_kiloclaw_coverage,

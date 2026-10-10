@@ -18,9 +18,9 @@ import {
   type Message,
 } from '@kilocode/kilo-chat';
 import { useCallback, useRef, useState } from 'react';
-import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { i18n } from '@/i18n';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
@@ -48,6 +48,7 @@ export function useConversationMessageActions({
 }: Params) {
   const { showActionSheetWithOptions } = useActionSheet();
   const themedSheet = useThemedActionSheetOptions();
+  const { confirm, dialog: deleteDialog } = useConfirmDialog();
   const [reactionPickerMessage, setReactionPickerMessage] = useState<Message | null>(null);
   const [recentReactions, setRecentReactions] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -176,33 +177,28 @@ export function useConversationMessageActions({
             return;
           }
 
-          Alert.alert(
-            i18n.t('chat.messageActions.deleteTitle'),
-            i18n.t('chat.messageActions.deleteMessage'),
-            [
-              { text: i18n.t('common.cancel'), style: 'cancel' },
-              {
-                text: i18n.t('common.delete'),
-                style: 'destructive',
-                onPress: () => {
-                  deleteMessage.mutate(
-                    { messageId: message.id, conversationId },
-                    {
-                      onError: err => {
-                        toast.error(
-                          formatMobileKiloChatError(err, i18n.t('chat.messageActions.deleteFailed'))
-                        );
-                      },
-                    }
-                  );
-                },
-              },
-            ]
-          );
+          confirm({
+            title: i18n.t('chat.messageActions.deleteTitle'),
+            message: i18n.t('chat.messageActions.deleteMessage'),
+            confirmLabel: i18n.t('common.delete'),
+            onConfirm: () => {
+              deleteMessage.mutate(
+                { messageId: message.id, conversationId },
+                {
+                  onError: err => {
+                    toast.error(
+                      formatMobileKiloChatError(err, i18n.t('chat.messageActions.deleteFailed'))
+                    );
+                  },
+                }
+              );
+            },
+          });
         }
       );
     },
     [
+      confirm,
       conversationId,
       currentUserId,
       deleteMessage,
@@ -230,6 +226,7 @@ export function useConversationMessageActions({
   );
 
   return {
+    deleteDialog,
     handleExecuteAction,
     handleLongPressMessage,
     handleReactionPress,

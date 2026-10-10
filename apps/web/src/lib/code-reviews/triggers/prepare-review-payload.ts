@@ -10,10 +10,10 @@
 import { captureException } from '@sentry/nextjs';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import {
   generateGitHubInstallationToken,
   findKiloReviewComment,
@@ -64,7 +64,11 @@ import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/con
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { logExceptInTest, errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import {
+  logExceptInTest,
+  errorExceptInTest,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 import type { CodeReviewPlatform } from '../core/schemas';
 import {
   normalizeRepositoryReviewInstructions,
@@ -120,6 +124,8 @@ export type SessionInput = {
   upstreamBranch: string;
   /** GitHub installation token (for GitHub platform) */
   githubToken?: string;
+  /** GitHub pull request number the review must publish its summary to. */
+  githubPullRequestNumber?: number;
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
   /** Git platform type for correct token/env var handling */
@@ -135,6 +141,8 @@ export type SessionInput = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** Council runs only: one inline sub-agent per specialist, each pinned to its own model. */
   runtimeAgents?: RuntimeAgentInput[];
+  /** Session environment variables, e.g. the publication self-check opt-in. */
+  envVars?: Record<string, string>;
 };
 
 /**
@@ -383,6 +391,7 @@ export async function prepareReviewPayload(
     };
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
+    let summaryObservation: { observed: boolean; body: string | null } | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
     let repositorySize: string | null = null;
@@ -464,11 +473,18 @@ export async function prepareReviewPayload(
         }
 
         // Build complete review state for intelligent update/create decisions
+        const summaryLookup = findKiloReviewComment(
+          installationId,
+          repoOwner,
+          repoName,
+          review.pr_number,
+          appType
+        );
         try {
           // Fetch all state in parallel for efficiency
           const [summaryComment, inlineComments, headCommitSha, reviewInstructions] =
             await Promise.all([
-              findKiloReviewComment(installationId, repoOwner, repoName, review.pr_number, appType),
+              summaryLookup,
               fetchPRInlineComments(installationId, repoOwner, repoName, review.pr_number, appType),
               getPRHeadCommit(installationId, repoOwner, repoName, review.pr_number, appType),
               repositoryReviewInstructionsPromise ??
@@ -477,6 +493,7 @@ export async function prepareReviewPayload(
           repositoryReviewInstructionsLookup = reviewInstructions;
 
           existingReviewState = buildReviewState(summaryComment, inlineComments, headCommitSha);
+          summaryObservation = { observed: true, body: summaryComment?.body ?? null };
 
           logExceptInTest('[prepareReviewPayload] Built GitHub review state', {
             reviewId,
@@ -494,6 +511,13 @@ export async function prepareReviewPayload(
             reviewId,
             error: stateLookupError,
           });
+        } finally {
+          if (summaryObservation === null) {
+            summaryObservation = await summaryLookup.then(
+              summaryComment => ({ observed: true, body: summaryComment?.body ?? null }),
+              () => ({ observed: false, body: null })
+            );
+          }
         }
       } else if (platform === 'gitlab') {
         // GitLab: Use Project Access Token (PrAT) for all operations
@@ -584,15 +608,15 @@ export async function prepareReviewPayload(
           : undefined;
 
         // Build complete review state for GitLab (using PrAT for reading)
+        const mrIid = review.pr_number;
+        // Use repo_full_name as the project path for GitLab API calls
+        const repoPath = review.repo_full_name;
+        const summaryLookup = findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl);
         try {
-          const mrIid = review.pr_number;
-          // Use repo_full_name as the project path for GitLab API calls
-          const repoPath = review.repo_full_name;
-
           // Fetch all state in parallel for efficiency (using PrAT)
           const [summaryNote, inlineComments, headCommitSha, diffRefs, reviewInstructions] =
             await Promise.all([
-              findKiloReviewNote(gitlabToken, repoPath, mrIid, instanceUrl),
+              summaryLookup,
               fetchMRInlineComments(gitlabToken, repoPath, mrIid, instanceUrl),
               getMRHeadCommit(gitlabToken, repoPath, mrIid, instanceUrl),
               getMRDiffRefs(gitlabToken, repoPath, mrIid, instanceUrl),
@@ -620,6 +644,7 @@ export async function prepareReviewPayload(
             convertedInlineComments,
             headCommitSha
           );
+          summaryObservation = { observed: true, body: summaryNote?.body ?? null };
 
           // Store GitLab diff context for prompt generation
           gitlabContext = {
@@ -644,6 +669,13 @@ export async function prepareReviewPayload(
             reviewId,
             error: stateLookupError,
           });
+        } finally {
+          if (summaryObservation === null) {
+            summaryObservation = await summaryLookup.then(
+              summaryNote => ({ observed: true, body: summaryNote?.body ?? null }),
+              () => ({ observed: false, body: null })
+            );
+          }
         }
       } else {
         throw new Error(
@@ -715,8 +747,11 @@ export async function prepareReviewPayload(
 
     await Promise.all([
       updatePreviousReviewSummary(reviewId, {
-        body: existingReviewState?.summaryComment?.body ?? null,
+        body: summaryObservation
+          ? summaryObservation.body
+          : (existingReviewState?.summaryComment?.body ?? null),
         headSha: existingReviewState?.summaryComment ? previousHeadSha : null,
+        observed: summaryObservation?.observed ?? null,
       }),
       updateRepositoryReviewInstructionsMetadata(reviewId, {
         used: repositoryReviewInstructionsLookup.used,
@@ -811,6 +846,7 @@ export async function prepareReviewPayload(
               // GitHub: use owner/repo format
               githubRepo: review.repo_full_name,
               githubToken,
+              githubPullRequestNumber: review.pr_number,
               platform: 'github',
               kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
               prompt,

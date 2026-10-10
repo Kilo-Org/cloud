@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { organizations } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 describe('organization hierarchy', () => {
   const createdOrganizationIds: string[] = [];

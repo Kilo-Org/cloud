@@ -1,5 +1,9 @@
 import { createLinearAdapter } from '@chat-adapter/linear';
-import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET, LINEAR_WEBHOOK_SECRET } from '@/lib/config.server';
+import {
+  LINEAR_CLIENT_ID,
+  LINEAR_CLIENT_SECRET,
+  LINEAR_WEBHOOK_SECRET,
+} from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Linear chat adapter configured for multi-tenant OAuth installs.

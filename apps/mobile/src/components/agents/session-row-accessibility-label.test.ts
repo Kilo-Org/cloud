@@ -213,6 +213,47 @@ describe('sessionRowAccessibilityLabel', () => {
         })
       ).toBe('Fix login bug, Working, and CLI');
     });
+
+    it('speaks Scheduled instead of Working for a scheduled live row', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'scheduled',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, Scheduled, and CLI');
+    });
+
+    it('appends the wake the meta arg carries beside Scheduled', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'scheduled',
+          badge: 'CLI',
+          meta: '9:00 AM',
+        })
+      ).toBe('Fix login bug, Scheduled, CLI, and 9:00 AM');
+    });
+
+    it('speaks Scheduled for a stored (non-live) scheduled row too', () => {
+      // The scheduled branch keys off the status, not the live flag: a stored
+      // history row reads SCHEDULED visibly, so the label must name it.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: false,
+          statusKind: 'scheduled',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, Scheduled, and CLI');
+    });
   });
 
   describe('needs-input variant — StoredSessionRow (meta omitted)', () => {

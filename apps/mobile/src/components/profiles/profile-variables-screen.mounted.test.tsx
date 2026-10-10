@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import {
   changeText,
-  confirmAlert,
+  confirmRequest,
   findAll,
   findField,
   findOne,
@@ -12,7 +12,7 @@ import {
   pressButton,
   pressPressable,
   rerenderScreen,
-  type TestAlertMock,
+  type TestConfirmMock,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-variables-screen.test-helpers';
@@ -20,7 +20,7 @@ import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
-  alert: vi.fn(),
+  confirm: vi.fn(),
   error: vi.fn(),
   query: {
     data: undefined as TestProfileDetail | undefined,
@@ -45,7 +45,6 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   Switch: 'Switch',
-  Alert: { alert: h.alert },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -53,6 +52,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     secondaryForeground: '#000000',
     destructive: '#FF0000',
   }),
+}));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -318,7 +320,7 @@ describe('ProfileVariablesScreen', () => {
     const { renderer, unmount } = await mountScreen();
     pressPressable(renderer.root, 'Delete');
     await act(async () => {
-      confirmAlert(h.alert as TestAlertMock);
+      confirmRequest(h.confirm as TestConfirmMock);
       await Promise.resolve();
     });
 
@@ -342,14 +344,14 @@ describe('ProfileVariablesScreen', () => {
     });
     expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(true);
     pressPressable(renderer.root, 'Delete');
-    expect(h.alert).not.toHaveBeenCalled();
+    expect(h.confirm).not.toHaveBeenCalled();
     h.mutations.deleteVar.isPending = false;
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
     expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(false);
     pressPressable(renderer.root, 'Delete');
-    expect(h.alert).toHaveBeenCalledTimes(1);
+    expect(h.confirm).toHaveBeenCalledTimes(1);
     unmount();
   });
 

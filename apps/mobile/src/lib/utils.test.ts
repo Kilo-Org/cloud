@@ -35,4 +35,15 @@ describe('timeAgo', () => {
     expect(timeAgo(created, 'en', Date.parse('2026-08-23T12:00:30Z'))).toBe('1 minute ago');
     expect(timeAgo(created, 'en', Date.parse('2026-08-23T12:05:30Z'))).toBe('6 minutes ago');
   });
+
+  it('reads a future instant forward, for a scheduled wake', () => {
+    // A glanceable's scheduled row formats a wake ahead of the clock; without
+    // the sign it would read "Just now", because the magnitude alone is small.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-23T12:00:00Z'));
+
+    expect(timeAgo(new Date('2026-08-23T12:05:00Z'), 'en')).toBe('in 5 minutes');
+    expect(timeAgo(new Date('2026-08-23T14:00:00Z'), 'en')).toBe('in 2 hours');
+    expect(timeAgo(new Date('2026-08-23T12:00:30Z'), 'en')).toBe('Just now');
+  });
 });

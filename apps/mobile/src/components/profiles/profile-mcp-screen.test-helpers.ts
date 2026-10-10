@@ -97,16 +97,18 @@ export function pressSheetDone(root: ReactTestInstance): void {
   });
 }
 
-type TestAlertMock = { mock: { calls: unknown[][] } };
+type TestConfirmRequest = { onConfirm?: () => void };
 
-/** Confirm the destructive button of the first Alert the screen raised. */
-export function confirmAlert(alert: TestAlertMock): void {
-  const buttons = alert.mock.calls[0]?.[2] as { style: string; onPress?: () => void }[] | undefined;
-  const destructive = buttons?.find(button => button.style === 'destructive');
-  if (!destructive?.onPress) {
-    throw new Error('destructive alert button was not registered');
+/** The mock surface `useConfirmDialog().confirm` exposes to the harness. */
+export type TestConfirmMock = { mock: { calls: unknown[][] } };
+
+/** Fire the last confirm request the screen raised through the in-app dialog. */
+export function confirmRequest(confirm: TestConfirmMock): void {
+  const request = confirm.mock.calls.at(-1)?.[0] as TestConfirmRequest | undefined;
+  if (!request?.onConfirm) {
+    throw new Error('the destructive confirm request was not registered');
   }
-  destructive.onPress();
+  request.onConfirm();
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged

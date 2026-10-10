@@ -70,6 +70,7 @@ import {
 import {
   _resetLiveActivitySwitchForTests,
   setLiveActivityEnabledValue,
+  setNotificationPermissionGrantedValue,
 } from './live-activity-switch';
 import { GlanceablePublisher } from './publisher';
 import { getGlanceableDelivery } from './sink-registry';
@@ -142,6 +143,7 @@ describe('delivery registerTokens', () => {
     logoutMock.awaitLogoutReconciliationSettled.mockResolvedValue(undefined);
     logoutMock.hasPendingActivityUnregister.mockResolvedValue(false);
     _resetLiveActivitySwitchForTests();
+    setNotificationPermissionGrantedValue(true);
   });
 
   afterEach(() => {
@@ -810,6 +812,22 @@ describe('delivery registerTokens', () => {
 
     // Switching back on restores it on the next scope refresh.
     setLiveActivityEnabledValue(true);
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(rows).toEqual(new Map([['scope-token', 'org-1']]));
+  });
+
+  it('hands the server no push-to-start token before notification permission is granted', async () => {
+    // A remote start raises iOS's "Allow Live Activities?" prompt just like a
+    // local one, so the token waits for the user's notification opt-in.
+    setNotificationPermissionGrantedValue(false);
+    const rows = trackRemoteTokens();
+    expoWidgetsMock.pushToStartListener?.({ activityPushToStartToken: 'scope-token' });
+    getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
+    await flushRegistration();
+    expect(rows.size).toBe(0);
+
+    setNotificationPermissionGrantedValue(true);
     getGlanceableDelivery().registerScopeTokens('org-1', 'u1');
     await flushRegistration();
     expect(rows).toEqual(new Map([['scope-token', 'org-1']]));

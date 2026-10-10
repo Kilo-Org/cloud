@@ -4,7 +4,7 @@ import { z } from 'zod';
 import {
   USER_DEPLOYMENTS_DISPATCHER_URL,
   USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 import { fetchWithTimeout } from '@/lib/user-deployments/fetch-utils';
 
 const successResponseSchema = z.object({ success: z.literal(true) });

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { github_connection_attempts } from '@kilocode/db/schema';

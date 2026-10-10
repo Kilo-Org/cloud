@@ -6,7 +6,7 @@ import { MergeRequestPayloadSchema } from '@/lib/integrations/platforms/gitlab/w
 import { findGitLabIntegrationByWebhookToken } from '@/lib/integrations/db/platform-integrations';
 import { handleMergeRequest } from '@/lib/integrations/platforms/gitlab/webhook-handlers';
 import { PLATFORM, GITLAB_EVENT, GITLAB_ACTION } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';

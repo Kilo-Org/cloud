@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 jest.mock('@/lib/user/deletion-queue/deletion-attention-slack-summary', () => ({
   sendUserDeletionAttentionSlackSummary: jest.fn(),
 }));

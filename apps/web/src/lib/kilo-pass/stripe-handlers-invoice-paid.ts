@@ -9,11 +9,11 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { blockUser } from '@/lib/user/block';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import {
@@ -21,13 +21,15 @@ import {
   applyPendingKiloPassReferralBonusForIssuance,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
-} from '@/lib/kilo-pass/issuance';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { computeMonthlyKiloPassBonusDecision } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
+import { getMonthlyWelcomePromoAccountContext } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import {
   getKiloPassMetadataFromStripeMetadata,
   getKiloPassPriceMetadataFromInvoice,
   getKiloPassSubscriptionMetadata,
-} from '@/lib/kilo-pass/stripe-handlers-metadata';
+} from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import {
   getInvoiceIssueMonth,
@@ -35,9 +37,9 @@ import {
   resolveSettledInvoicePayment,
   getStripeEndedAtIso,
   type SettledInvoicePaymentResolution,
-} from '@/lib/kilo-pass/stripe-handlers-utils';
+} from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
 import type Stripe from 'stripe';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -45,8 +47,9 @@ import {
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { captureException } from '@sentry/nextjs';
 import {
   acquireDuplicateCardSubscriptionLock,
@@ -58,7 +61,7 @@ import {
   type DuplicateCardGateResult,
   type PaymentFingerprintClaimResult,
 } from '@/lib/kilo-pass/card-fingerprint-gate';
-import { processTopUp } from '@/lib/credits';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
@@ -72,12 +75,12 @@ import {
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
 import { processPersonalKiloPassStripePaidConversion } from '@/lib/impact/kilo-pass-referrals';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 import {
   settleKiloPassInvoiceServiceFee,
   type KiloPassServiceFeeSettlementResult,
 } from '@/lib/service-fees/settlement';
-import { isServiceFeeInvoiceLine } from '@/lib/service-fees/stripe-lines';
+import { isServiceFeeInvoiceLine } from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 import {
   runAfterResponse,
   trackKiloPassPurchaseCompleted,
@@ -656,6 +659,12 @@ export async function handleKiloPassInvoicePaid(params: {
 
       const kiloPassSubscriptionId = row.id;
       const priorStatus = existingSubscription?.status ?? null;
+      if (derivedEndedAt) {
+        await closePauseEvent(tx, {
+          kiloPassSubscriptionId,
+          resumedAt: dayjs().utc().toISOString(),
+        });
+      }
 
       let settledPaymentResolutionPromise: Promise<SettledInvoicePaymentResolution> | null = null;
       const getSettledPaymentResolution = (): Promise<SettledInvoicePaymentResolution> => {
@@ -711,10 +720,12 @@ export async function handleKiloPassInvoicePaid(params: {
           },
         });
 
+        const duplicateCardEndedAt = dayjs().utc().toISOString();
         await tx
           .update(kilo_pass_subscriptions)
-          .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
+          .set({ status: 'canceled', ended_at: duplicateCardEndedAt })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+        await closePauseEvent(tx, { kiloPassSubscriptionId, resumedAt: duplicateCardEndedAt });
 
         await blockUser({
           kiloUserId,
@@ -835,12 +846,36 @@ export async function handleKiloPassInvoicePaid(params: {
       didMutateBalance ||= baseCreditsResult.wasIssued;
 
       let referralBonusBlocksNormalBonus = false;
+      let monthlyStreakMonths = 1;
       if (cadence === KiloPassCadence.Monthly) {
+        const wasInactivePreviously =
+          priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
+        const computedStreak = await computeMonthlyKiloPassStreak(tx, {
+          subscriptionId: kiloPassSubscriptionId,
+          issueMonth,
+        });
+        monthlyStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);
+
+        // A referral bonus fills the issuance bonus slot. Keep the slot free for the welcome promo.
+        const welcomePromoAccountContext = await getMonthlyWelcomePromoAccountContext(tx, {
+          kiloUserId,
+          subscriptionId: kiloPassSubscriptionId,
+          paymentProvider: KiloPassPaymentProvider.Stripe,
+        });
+        const isWelcomePromoIssuance = computeMonthlyKiloPassBonusDecision({
+          tier,
+          startedAtIso: dayjs.unix(subscription.start_date).utc().toISOString(),
+          streakMonths: monthlyStreakMonths,
+          ...welcomePromoAccountContext,
+          issueMonth,
+        }).shouldIssueFirstMonthPromo;
+
         const referralBonusResult = await applyPendingKiloPassReferralBonusForIssuance(tx, {
           issuanceId: issuanceHeader.issuanceId,
           subscriptionId: kiloPassSubscriptionId,
           kiloUserId,
           stripeInvoiceId: invoice.id,
+          deferForWelcomePromo: isWelcomePromoIssuance,
         });
         referralBonusBlocksNormalBonus =
           referralBonusResult.wasIssued || referralBonusResult.issuanceItemId !== null;
@@ -883,17 +918,9 @@ export async function handleKiloPassInvoicePaid(params: {
         return null;
       }
 
-      const wasInactivePreviously = priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
-
-      const computedStreak = await computeMonthlyKiloPassStreak(tx, {
-        subscriptionId: kiloPassSubscriptionId,
-        issueMonth,
-      });
-      const newStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);
-
       await tx
         .update(kilo_pass_subscriptions)
-        .set({ current_streak_months: newStreakMonths, next_yearly_issue_at: null })
+        .set({ current_streak_months: monthlyStreakMonths, next_yearly_issue_at: null })
         .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
       return null;

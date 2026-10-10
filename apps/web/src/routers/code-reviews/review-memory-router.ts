@@ -1,7 +1,11 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
-import { createTRPCRouter, baseProcedure, type TRPCContext } from '@/lib/trpc/init';
+import {
+  createTRPCRouter,
+  baseProcedure,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { runReviewMemoryAnalysis } from '@/lib/code-reviews/review-memory/aggregation';
 import {
   countActiveProposals,
@@ -23,8 +27,8 @@ import {
 } from '@/lib/code-reviews/review-memory/change-request';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { REVIEW_MEMORY_PROPOSAL_STATUSES } from '@kilocode/db/schema-types';
 
 const OwnerInputSchema = z.object({ organizationId: z.uuid().optional() });

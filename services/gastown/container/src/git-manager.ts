@@ -638,9 +638,6 @@ async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
   return dir;
 }
 
-/**
- * Remove a git worktree.
- */
 export function removeWorktree(rigId: string, branch: string): Promise<void> {
   return withRigLock(rigId, async () => {
     const repo = await repoDir(rigId);
@@ -653,9 +650,6 @@ export function removeWorktree(rigId: string, branch: string): Promise<void> {
   });
 }
 
-/**
- * List all active worktrees for a rig.
- */
 export async function listWorktrees(rigId: string): Promise<string[]> {
   const repo = await repoDir(rigId);
   if (!(await pathExists(repo))) return [];

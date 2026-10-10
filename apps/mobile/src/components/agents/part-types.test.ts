@@ -245,4 +245,26 @@ describe('withoutReasoningParts', () => {
     expect(result[1]?.info).toBe(changed.info);
     expect(result[1]?.parts.map(part => part.type)).toEqual(['text']);
   });
+
+  it('reuses the derived message object for the same reasoning-bearing input', () => {
+    const message = storedMessage('m1', [makeReasoningPart('thinking'), makeTextPart('a')]);
+
+    const first = withoutReasoningParts([message]);
+    const second = withoutReasoningParts([message]);
+
+    expect(first[0]).not.toBe(message);
+    expect(second[0]).toBe(first[0]);
+  });
+
+  it('keeps every unchanged derived identity when only the last message changes', () => {
+    const stripped = storedMessage('m1', [makeReasoningPart('thinking'), makeTextPart('a')]);
+    const passThrough = storedMessage('m2', [makeTextPart('b')]);
+    const before = withoutReasoningParts([stripped, passThrough]);
+
+    const changed = storedMessage('m2', [makeTextPart('b changed')]);
+    const after = withoutReasoningParts([stripped, changed]);
+
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(changed);
+  });
 });

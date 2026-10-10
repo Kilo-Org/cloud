@@ -7,7 +7,7 @@
       "instanceLifecycle": "У вашому інстансі є оновлення",
       "scheduledAction": "У запланованій дії є оновлення",
       "lowBalance": "Ваш баланс потребує уваги",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Ваші витрати потребують уваги",
       "securityFinding": "Результат безпеки потребує уваги",
       "activeAgentsGlanceable": "В активних агентів є оновлення"
     }
@@ -44,8 +44,8 @@
       "body": "Баланс {{organizationName}} впав нижче ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Попередження про витрати",
+      "body": "Витрати {{scopeName}} перевищили ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Новий результат безпеки ({{severity}})",

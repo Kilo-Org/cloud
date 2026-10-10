@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { enkrypt_sync_state } from '@kilocode/db/schema';
 import type { NewEnkryptSyncState } from '@kilocode/db/schema';
 import { ENKRYPT_STALE_AFTER_MS, EnkryptFailureCategorySchema } from '@kilocode/db/schema-types';
@@ -10,7 +10,7 @@ import { getEnkryptSyncHealth } from './enkrypt-status';
 let mockEnabled = true;
 let mockApiKey: string | undefined = 'test-key';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_SYNC_ENABLED() {
     return mockEnabled;
   },

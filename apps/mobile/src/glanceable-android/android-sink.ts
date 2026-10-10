@@ -287,15 +287,10 @@ export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext)
  */
 export function refreshPostedCardAction(): void {
   const snapshot = lastWidgetSnapshot ?? getStoredWidgetSnapshot();
-  if (
-    !notificationActive ||
-    snapshot === null ||
-    !hasCurrentWork(snapshot) ||
-    postedAction === actionKey(snapshot)
-  ) {
-    return;
+  const changed = snapshot !== null && postedAction !== actionKey(snapshot);
+  if (notificationActive && changed && hasCurrentWork(snapshot)) {
+    postNotification(snapshot, 'update');
   }
-  postNotification(snapshot, 'update');
 }
 
 /** Retry a pending start after permission turns granted. Caller owns the check. */

@@ -799,7 +799,7 @@ describe('Lock Screen accessories', () => {
     expect(texts(render(props, 'accessoryInline'))).toEqual(['1 Needs input']);
   });
 
-  it('draws a state glyph, never a placeholder dash, when nothing counts', () => {
+  it('draws the Kilo glyph over a state glyph, never a placeholder dash, when nothing counts', () => {
     const expected = {
       waiting: 'arrow.triangle.2.circlepath',
       empty: 'checkmark.circle.fill',
@@ -808,12 +808,19 @@ describe('Lock Screen accessories', () => {
     } as const;
     for (const status of Object.keys(expected) as (keyof typeof expected)[]) {
       const tree = render(propsFor([], { status }), 'accessoryCircular');
-      expect(
-        collect(tree)
-          .filter(node => node.kind === 'Image')
-          .map(node => node.props.systemName)
-      ).toEqual([expected[status]]);
+      const images = collect(tree).filter(node => node.kind === 'Image');
+      expect(images.map(node => node.props.uiImage ?? node.props.systemName)).toEqual([
+        '__KILO_WIDGET_GLYPH_URI__',
+        expected[status],
+      ]);
       expect(texts(tree)).not.toContain('—');
     }
+  });
+
+  it('heads the signed-out rectangular with the Kilo glyph', () => {
+    const tree = render(propsFor([], { status: 'signed_out' }), 'accessoryRectangular');
+    const marks = collect(tree).filter(node => node.props.uiImage !== undefined);
+    expect(marks.map(node => node.props.uiImage)).toEqual(['__KILO_WIDGET_GLYPH_URI__']);
+    expect(texts(tree)).toContain('Kilo');
   });
 });

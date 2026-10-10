@@ -170,7 +170,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const homeStatus = safeText(home?.status);
   // The circular accessory has no room for a count line when nothing is counting.
   // A lone dash is near-invisible over a light wallpaper and says nothing, so the
-  // no-count state draws a state glyph instead — filled, so it keeps contrast.
+  // no-count state draws the Kilo glyph over a state glyph instead — filled, so
+  // it keeps contrast.
   const statusGlyphs = {
     waiting: 'arrow.triangle.2.circlepath',
     empty: 'checkmark.circle.fill',
@@ -237,8 +238,9 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       <ZStack modifiers={[bodyURL, ...genericA11y]}>
         <AccessoryWidgetBackground />
         <VStack alignment="center" spacing={2}>
+          {genericKind === null ? logo(18, true) : null}
           {genericKind === null ? (
-            <Image systemName={statusGlyph} size={24} color="#FFFFFF" />
+            <Image systemName={statusGlyph} size={18} color="#FFFFFF" />
           ) : (
             <Image systemName={glyphs[genericKind]} size={13} color="#FFFFFF" />
           )}

@@ -1,4 +1,4 @@
-import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type KiloSessionId, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { Portal } from '@rn-primitives/portal';
 import { useQuery } from '@tanstack/react-query';
 import { BlurView } from 'expo-blur';
@@ -37,6 +37,7 @@ import {
   type SessionPreviewTranscriptState,
 } from './session-preview-transcript';
 import { SESSION_TITLE_MAX_LENGTH } from './session-detail-rename-state';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import {
   buildSessionActionMenuItems,
   showRenamePrompt,
@@ -88,7 +89,7 @@ function SessionPreviewContent({
   const { sessionId, live } = target;
 
   const transcriptQuery = useQuery({
-    ...trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: sessionId }),
+    ...sessionTranscriptQueryOptions(sessionId as KiloSessionId),
     // Shared with the gesture-start prefetch, so a reopen paints from cache.
     staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
     // A failed read shows its error state; it is never retried without bound.
@@ -104,10 +105,10 @@ function SessionPreviewContent({
   });
   const liveRow = live ? liveRowQuery.data : undefined;
 
-  // SAFETY: `getSessionMessages` answers with the raw ingest snapshot, whose
-  // `messages` are the SDK's `StoredMessage` shape (`info` + `parts`); the rows
-  // are only handed to `MessageBubble`, which reads exactly those two fields.
-  const messages = (transcriptQuery.data?.messages ?? EMPTY_MESSAGES) as readonly StoredMessage[];
+  // SAFETY: the paged read returns the same `StoredMessage` shape
+  // (`info` + `parts`) the full snapshot did; the rows are only handed to
+  // `MessageBubble`, which reads exactly those two fields.
+  const messages = (transcriptQuery.data ?? EMPTY_MESSAGES) as readonly StoredMessage[];
   const transcriptState: SessionPreviewTranscriptState = {
     sessionId,
     messages,

@@ -4,6 +4,7 @@ import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { SessionRow } from '@/components/ui/session-row';
 import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
@@ -27,6 +28,7 @@ import {
   formatSessionTotalCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
 import {
@@ -255,7 +257,7 @@ export function StoredSessionRow({
     ? () => {
         void prefetchSessionTranscript(
           queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.session_id })
+          sessionTranscriptQueryOptions(session.session_id as KiloSessionId)
         );
       }
     : undefined;

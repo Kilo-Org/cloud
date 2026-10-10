@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { memo, useEffect, useMemo, useRef } from 'react';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -39,6 +40,7 @@ import {
   remoteSessionEyebrowLabel,
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
 import { type RowVariant } from './session-row';
@@ -308,7 +310,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     ? () => {
         void prefetchSessionTranscript(
           queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
+          sessionTranscriptQueryOptions(session.id as KiloSessionId)
         );
       }
     : undefined;

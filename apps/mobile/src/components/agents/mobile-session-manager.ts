@@ -5,10 +5,8 @@ import {
   type FetchedSessionData,
   type JotaiStore,
   type KiloSessionId,
-  projectSessionGoal,
   type ResolvedSession,
   type SessionManager,
-  type SessionSnapshot,
   type UserWebConnection,
 } from '@kilocode/cloud-agent-sdk';
 import { normalizeTransportPayload } from '@/components/agents/mobile-session-transport-payload';
@@ -287,25 +285,32 @@ export function createMobileAgentSessionManager({
       return result;
     },
     fetchSnapshot: async (id: KiloSessionId) => {
-      const [sessionData, messagesResult] = await Promise.all([
+      // Bounded fallback: the transports prefer `fetchSnapshotPage`, and this
+      // legacy seam now reads the same newest page instead of exporting the
+      // whole session (`getSessionMessages`), which timed out on long sessions.
+      const [sessionData, page] = await Promise.all([
         trpcClient.cliSessionsV2.get.query({ session_id: id }),
-        trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
+        fetchMobileSessionSnapshotPage(id, {}),
       ]);
-      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']> & {
-        metadata?: unknown;
-      };
-      // The goal lives in the session metadata; project it into `info` so the
-      // fixed goal section survives a snapshot replay (which would otherwise
-      // clobber the goal carried by the live session state).
-      const goal = projectSessionGoal(snapshotInfo.metadata);
+      if (page.kind !== 'success') {
+        throw new Error(
+          page.kind === 'retryable_failure'
+            ? 'Session history temporarily unavailable'
+            : page.kind === 'too_large'
+              ? 'Session history too large to load'
+              : 'Session history is unavailable'
+        );
+      }
+      // The paged read already projects the goal from the session metadata, so
+      // the fixed goal section survives a snapshot replay.
       return {
         info: {
-          id: snapshotInfo.id ?? sessionData.session_id,
-          parentID: snapshotInfo.parentID ?? sessionData.parent_session_id ?? undefined,
-          ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
-          ...(goal === undefined ? {} : { goal }),
+          id: page.info.id ?? sessionData.session_id,
+          parentID: page.info.parentID ?? sessionData.parent_session_id ?? undefined,
+          ...(page.info.model ? { model: page.info.model } : {}),
+          ...(page.info.goal === undefined ? {} : { goal: page.info.goal }),
         },
-        messages: messagesResult.messages as SessionSnapshot['messages'],
+        messages: page.messages,
       };
     },
     fetchSnapshotPage: async (id: KiloSessionId, options: { cursor?: string }) => {

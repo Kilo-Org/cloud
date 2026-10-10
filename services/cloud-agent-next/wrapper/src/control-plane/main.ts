@@ -49,15 +49,17 @@ export type ControlPlaneExitEvent =
 
 /**
  * Spec §7 "Crash resistance": the wrapper exits only on `shutdown` (exit 0 so
- * the supervisor does not restart it), SIGTERM (exit 0), or an uncaught
- * exception (exit 1 so the supervisor restarts it). An unhandled rejection is
- * logged and does not exit.
+ * the supervisor does not restart it), a wrapper-only SIGTERM (exit 1 so the
+ * supervisor restarts it within its existing budget), or an uncaught exception
+ * (exit 1). An unhandled rejection is logged and does not exit. The supervisor's
+ * own TERM/INT trap is a separate intentional-shutdown owner and exits
+ * terminally without consulting this policy.
  */
 export function controlPlaneExitPolicy(event: ControlPlaneExitEvent): number | null {
   switch (event) {
     case 'shutdown':
-    case 'sigterm':
       return 0;
+    case 'sigterm':
     case 'uncaught_exception':
       return 1;
     case 'unhandled_rejection':

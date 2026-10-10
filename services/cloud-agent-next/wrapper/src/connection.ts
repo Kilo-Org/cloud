@@ -27,7 +27,10 @@ import {
 import { logToFile } from './utils.js';
 import type { KiloEvent, WrapperKiloClient } from './kilo-api.js';
 import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-model-diagnostics.js';
-import { gateResultFromProperties } from '../../src/shared/kilo-event-properties.js';
+import {
+  gateResultFromProperties,
+  permissionCategoryFromProperties,
+} from '../../src/shared/kilo-event-properties.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
 import { slashCommandCatalogStatus } from '../../src/shared/slash-commands.js';
@@ -62,26 +65,6 @@ function statusTypeFromProperties(properties: Record<string, unknown>): string |
 
 function isInteractiveStatusType(statusType: string | undefined): boolean {
   return statusType === 'question' || statusType === 'permission';
-}
-
-function permissionCategoryFromProperties(properties: Record<string, unknown>): string {
-  const permission = properties.permission;
-  if (isRecord(permission)) {
-    const type = permission.type;
-    if (typeof type === 'string') return type;
-    const tool = permission.tool;
-    if (typeof tool === 'string') return tool;
-  }
-
-  if (typeof permission !== 'string') return 'unknown';
-  const normalized = permission.toLowerCase();
-  if (normalized.includes('glab')) return 'bash:glab';
-  if (normalized === 'gh' || normalized.includes('gh ')) return 'bash:gh';
-  if (normalized.includes('git ')) return 'bash:git';
-  if (normalized.includes('bash')) return 'bash';
-  if (normalized.includes('edit')) return 'edit';
-  if (normalized.includes('web')) return 'web';
-  return 'unknown';
 }
 
 function getActivitySessionID(

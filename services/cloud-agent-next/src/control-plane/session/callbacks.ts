@@ -235,12 +235,20 @@ export function createMessageCallbacks(
         ...(status === 'completed'
           ? {}
           : {
-              clientError: projectTerminalClientError({ status, error: errorMessage }),
+              clientError: projectTerminalClientError({
+                status,
+                error: errorMessage,
+                failureCode: failure?.code,
+                failureStage: failure?.stage,
+              }),
             }),
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
         kiloSessionId,
         lastAssistantMessageText,
         recentActivity,
+        ...(status === 'completed' && facts?.gateResult !== undefined
+          ? { gateResult: facts.gateResult }
+          : {}),
         idempotencyKey: message.messageId,
       },
     };

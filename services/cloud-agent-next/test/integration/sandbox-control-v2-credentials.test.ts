@@ -1269,11 +1269,12 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const broker = createFakeCredentialBroker();
     const stub = await setup(provider, broker);
 
-    const { prepareFrame } = await prepareWarmRoute(
-      stub,
-      provider,
-      prepareInput(SESSION, { ...credentialsSource(SESSION), createdOnPlatform: 'code-review' })
-    );
+    const input = prepareInput(SESSION, {
+      ...credentialsSource(SESSION),
+      createdOnPlatform: 'code-review',
+    });
+    input.spec.env = { GH_TOKEN: 'profile-token', GITHUB_TOKEN: 'profile-github-token' };
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
 
     expect(prepareFrame?.type).toBe('session.prepare');
     const serialized = JSON.stringify(prepareFrame);
@@ -1291,6 +1292,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(prepareFrame.spec.kilo?.token).toBe(prepareFrame.credentials?.kilo.token);
     expect(prepareFrame.spec.env?.KILOCODE_TOKEN).toMatch(/^kcp1\./);
     expect(prepareFrame.spec.env?.GH_TOKEN).toMatch(/^kcp1\./);
+    expect(prepareFrame.spec.env?.GH_TOKEN).toBe(prepareFrame.credentials?.git?.token);
     expect(prepareFrame.credentials?.sessionId).toBe(SESSION);
 
     const row = await readRouteRow(stub, SESSION);
@@ -1303,6 +1305,51 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(broker.kiloIssued()).toBe(1);
     expect(broker.githubIssued()).toBe(1);
   });
+
+  it.each(['standard', 'lite'] as const)(
+    'derives the %s publisher from the issued app and preserves review permissions through projection and refresh',
+    async appType => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker(appType);
+      const stub = await setup(provider, broker);
+      await runInDurableObject(stub, instance => {
+        instance.env.GITHUB_APP_SLUG = 'review';
+        instance.env.GITHUB_APP_BOT_USER_ID = '123';
+        instance.env.GITHUB_LITE_APP_SLUG = 'review-lite';
+        instance.env.GITHUB_LITE_APP_BOT_USER_ID = '456';
+      });
+      const input = prepareInput(SESSION, {
+        ...credentialsSource(SESSION, {
+          repository: { type: 'github', repo: 'acme/widgets', pullRequestNumber: 42 },
+        }),
+        createdOnPlatform: 'code-review',
+      });
+      input.spec.permission = { question: 'deny', edit: 'deny', bash: { 'git push': 'deny' } };
+      input.spec.runtimeIsolation = 'per-session';
+      const { prepareFrame, wrapper } = await prepareWarmRoute(stub, provider, input);
+      if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+      const expectedTarget = {
+        repo: 'acme/widgets',
+        pullRequestNumber: 42,
+        appType,
+        botUserId: appType === 'standard' ? '123' : '456',
+      };
+      expect(prepareFrame.spec.githubReviewTarget).toEqual(expectedTarget);
+      expect(prepareFrame.spec.permission).toEqual(input.spec.permission);
+      expect(prepareFrame.spec.runtimeIsolation).toBe('per-session');
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+      expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+        'sent'
+      );
+      expect(broker.kiloIssued()).toBe(2);
+      expect(broker.githubIssued()).toBe(2);
+      expect((await wrapper.next())?.type).toBe('session.credentials');
+      expect((await wrapper.next())?.type).toBe('session.prompt');
+      const refreshed = JSON.parse((await readRouteRow(stub, SESSION))?.spec ?? '{}');
+      expect(refreshed.githubReviewTarget).toEqual(expectedTarget);
+      expect(refreshed.permission).toEqual(input.spec.permission);
+    }
+  );
 
   it('re-issues below one hour with fresh tokens and sends session.credentials before prompts', async () => {
     const provider = createFakeProvider();
@@ -1337,6 +1384,72 @@ describe('SandboxControlV2 credentials (B3)', () => {
     if (credentialsFrame?.type !== 'session.credentials') throw new Error('missing frame');
     expect(credentialsFrame.kilo.token).toBe(refreshed.kilo.alias);
     expect(credentialsFrame.sessionId).toBe(SESSION);
+  });
+
+  it('preserves the resolved GitHub app for managed Vercel review credentials', async () => {
+    const provider = createFakeProvider();
+    const broker = Object.assign(createFakeCredentialBroker('lite'), {
+      getCloudAgentAuthForRepo: async () => ({
+        success: true,
+        githubToken: 'native-github-review-test-token',
+        installationId: 1,
+        appType: 'lite',
+        accountLogin: 'acme',
+        source: 'installation',
+        gitAuthor: {
+          name: 'review-lite[bot]',
+          email: '456+review-lite[bot]@users.noreply.github.com',
+        },
+      }),
+    });
+    const stub = await setupVercel(provider, broker);
+    await runInDurableObject(stub, instance => {
+      instance.env.GITHUB_LITE_APP_SLUG = 'review-lite';
+      instance.env.GITHUB_LITE_APP_BOT_USER_ID = '456';
+    });
+    const source = {
+      ...vercelSource(SESSION),
+      createdOnPlatform: 'code-review',
+      repository: { type: 'github' as const, repo: 'acme/widgets', pullRequestNumber: 42 },
+    };
+    const spec = {
+      ...routeSpec(SESSION),
+      runtimeIsolation: 'per-session' as const,
+      permission: { question: 'deny' as const, edit: 'deny' as const },
+    };
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      prepareInput(SESSION, source, spec)
+    );
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.githubReviewTarget).toEqual({
+      repo: 'acme/widgets',
+      pullRequestNumber: 42,
+      appType: 'lite',
+      botUserId: '456',
+    });
+    expect(prepareFrame.spec.permission).toEqual(spec.permission);
+  });
+
+  it('keeps reviews usable when the selected app bot identity is not configured', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker('lite'), {
+      GITHUB_LITE_APP_SLUG: '',
+      GITHUB_LITE_APP_BOT_USER_ID: '',
+    });
+    const input = prepareInput(SESSION, {
+      ...credentialsSource(SESSION, {
+        repository: { type: 'github', repo: 'acme/widgets', pullRequestNumber: 42 },
+      }),
+      createdOnPlatform: 'code-review',
+    });
+    input.spec.runtimeIsolation = 'per-session';
+    input.spec.permission = { question: 'deny', edit: 'deny' };
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.githubReviewTarget).toBeUndefined();
+    expect(prepareFrame.spec.permission).toEqual(input.spec.permission);
   });
 
   it('resolves contained outbound credentials for a routed session and rejects unknown/expired/mutated', async () => {

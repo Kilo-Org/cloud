@@ -975,7 +975,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           kiloAuth,
           spec.env ?? {},
           inheritedEnv,
-          spec.mcp
+          spec.mcp,
+          spec
         ),
         spec
       );
@@ -1117,7 +1118,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         },
         route.spec.env ?? {},
         inheritedEnv,
-        route.spec.mcp
+        route.spec.mcp,
+        route.spec
       ),
       route.spec
     );

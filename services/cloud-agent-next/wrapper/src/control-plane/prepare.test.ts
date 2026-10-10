@@ -2146,6 +2146,71 @@ describe('capturing a repository snapshot', () => {
 });
 
 describe('control-plane runtime profiles', () => {
+  it('installs the trusted GitHub publisher and retains its target and denies on credential refresh', async () => {
+    const harness = createHarness(FAST_TIMERS);
+    const githubReviewTarget = {
+      repo: 'acme/widgets',
+      pullRequestNumber: 42,
+      appType: 'standard' as const,
+      botUserId: '123',
+    };
+    const spec = routeSpec({
+      createdOnPlatform: 'code-review',
+      githubReviewTarget,
+      runtimeIsolation: 'per-session',
+      permission: { bash: { 'gh api repos/*/issues/*/comments --input*': 'allow' } },
+      env: {
+        KILO_GITHUB_REVIEW_TARGET: '{"forged":true}',
+        KILO_GITHUB_REVIEW_API_BASE: 'https://evil.test',
+      },
+      mcp: { code_review: { type: 'local', command: ['fake-publisher'] } },
+    });
+    await harness.manager.prepare(spec);
+    expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    const assertEnvironment = (env: Record<string, string>) => {
+      expect(JSON.parse(env.KILO_GITHUB_REVIEW_TARGET)).toEqual(githubReviewTarget);
+      expect(env.KILO_GITHUB_REVIEW_API_BASE).toBeUndefined();
+      const config = JSON.parse(env.KILO_CONFIG_CONTENT);
+      expect(config.mcp.code_review.command).toEqual(['github-review-publish-mcp']);
+      expect(config.permission.code_review_publish_review_summary).toBe('allow');
+      expect(config.permission.bash['gh api repos/*/issues/*/comments* --input*']).toBe('deny');
+      expect(config.permission.bash['gh pr comment']).toBe('deny');
+    };
+    assertEnvironment(harness.ensureInputs[0].env);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'rotated-token' },
+    });
+    assertEnvironment(harness.installCalls[0].env);
+  });
+
+  it('retains worker-owned permissions through preparation and credential refresh', async () => {
+    const harness = createHarness(FAST_TIMERS);
+    const permission = {
+      question: 'deny' as const,
+      edit: 'allow' as const,
+      bash: { 'git push': 'allow' as const, curl: 'deny' as const },
+      webfetch: 'deny' as const,
+    };
+    const spec = routeSpec({
+      permission,
+      runtimeIsolation: 'per-session',
+      env: { KILO_CONFIG_CONTENT: '{"permission":{"bash":"allow"}}' },
+    });
+    await harness.manager.prepare(spec);
+    expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    expect(JSON.parse(harness.ensureInputs[0].env.KILO_CONFIG_CONTENT).permission).toMatchObject(
+      permission
+    );
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'rotated-token' },
+    });
+    expect(JSON.parse(harness.installCalls[0].env.KILO_CONFIG_CONTENT).permission).toMatchObject(
+      permission
+    );
+  });
+
   it('materializes skills, agents and commands before Kilo starts and retains them through credential refresh', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-'));
     const profile = {

@@ -31,6 +31,8 @@ import { hasModernRuntimeAuthorization } from '../../session/runtime-authorizati
 import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
 import { getControlPlaneSessionDirectory } from '../../workspace.js';
+import { getCommandGuardPolicy, getCommandGuardPermissions } from '../../session-service.js';
+import { codeReviewIdFromCallbackTarget } from '../../router/schemas.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -169,7 +171,10 @@ export function buildControlPlaneSessionRegistration(
   metadata: SessionMetadata,
   sandboxSelection: ControlPlaneSandboxSelection,
   mcpPrivateKey?: string,
-  runtimeConfiguration?: { containmentEnabled: boolean; workerUrl: string | undefined }
+  runtimeConfiguration?: {
+    containmentEnabled: boolean;
+    workerUrl: string | undefined;
+  }
 ): ControlPlaneSessionRegistration {
   const kiloSessionId = metadata.auth.kiloSessionId;
   if (kiloSessionId === undefined || kiloSessionId.length === 0) {
@@ -238,18 +243,50 @@ export function buildControlPlaneSessionRegistration(
     ...(profile.runtimeAgents?.length ? { runtimeAgents: profile.runtimeAgents } : {}),
     ...(profile.kiloCommands?.length ? { kiloCommands: profile.kiloCommands } : {}),
   };
+  const createdOnPlatform = metadata.identity.createdOnPlatform;
+  const bitbucketReviewId = isReadOnlyBitbucketReview(metadata)
+    ? (codeReviewIdFromCallbackTarget(metadata.callback?.target) ?? undefined)
+    : undefined;
+  const commandGuard = getCommandGuardPolicy(
+    createdOnPlatform,
+    payload.git?.platform,
+    bitbucketReviewId
+  );
+  if (payload.directory === undefined)
+    throw new Error('Session attach payload requires a directory');
+  const permission = {
+    ...(createdOnPlatform !== 'cloud-agent-web' ? { question: 'deny' } : {}),
+    ...(commandGuard
+      ? getCommandGuardPermissions(commandGuard, payload.directory, bitbucketReviewId)
+      : {}),
+  };
   const spec = controlPlaneRouteSpecSchema.parse({
     ...runtimeProfile,
+    ...(Object.keys(permission).length > 0 ? { permission } : {}),
     ...controlPlaneRouteSpecFromAttachPayload(
       payload,
       { sessionId: metadata.identity.sessionId, kiloSessionId },
-      hasModernRuntimeAuthorization(metadata) ||
+      Object.keys(permission).length > 0 ||
+        hasModernRuntimeAuthorization(metadata) ||
         hasEncryptedSecrets ||
         Object.keys(payload.env ?? {}).some(key => key !== 'KILOCODE_TOKEN') ||
         Object.keys(runtimeProfile).length > 0
         ? { runtimeIsolation: 'per-session' }
         : undefined
     ),
+    ...(commandGuard
+      ? {
+          env: {
+            ...withoutRawKiloToken(payload.env),
+            CI: 'true',
+            GIT_TERMINAL_PROMPT: '0',
+            GH_PROMPT_DISABLED: '1',
+            PAGER: 'cat',
+            GIT_PAGER: 'cat',
+            TERM: 'dumb',
+          },
+        }
+      : {}),
   });
   // `payload.mcp` is present only when materialization was not omitted for a
   // read-only Bitbucket review, so the encrypted snapshot is gated on it too.

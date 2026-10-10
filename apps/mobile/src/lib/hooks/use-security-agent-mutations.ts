@@ -91,8 +91,10 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
   return classifyPrReviewMutationError(error).kind === 'retryable';
 }
 
+// The copy is a user-facing conflict, not a defect: keeping the server error as
+// `cause` lets the app-error reporter skip it like any other tRPC error.
 function mapOperationInProgress(error: unknown, copy: string) {
-  return isOperationInProgress(error) ? new Error(copy) : error;
+  return isOperationInProgress(error) ? new Error(copy, { cause: error }) : error;
 }
 
 /** Maps the raw in-progress marker onto retryable sync copy; others pass through. */

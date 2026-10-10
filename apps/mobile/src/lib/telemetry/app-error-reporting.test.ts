@@ -55,6 +55,19 @@ describe('isAlreadyReportedNetworkError', () => {
     expect(isAlreadyReportedNetworkError(new Error('plain'))).toBe(false);
   });
 
+  it('skips user-facing copy that wraps a tRPC error as its cause', () => {
+    const server = Object.assign(new Error('operation_in_progress'), {
+      data: { code: 'CONFLICT' },
+    });
+    expect(isAlreadyReportedNetworkError(new Error('copy', { cause: server }))).toBe(true);
+  });
+
+  it('does not skip an error whose cause is a plain Error', () => {
+    expect(isAlreadyReportedNetworkError(new Error('outer', { cause: new Error('inner') }))).toBe(
+      false
+    );
+  });
+
   it('does not skip a non-Error throw and never throws on null', () => {
     expect(isAlreadyReportedNetworkError('plain string')).toBe(false);
     expect(isAlreadyReportedNetworkError(null)).toBe(false);

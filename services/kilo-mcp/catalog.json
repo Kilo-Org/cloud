@@ -7179,8 +7179,7 @@
                       "maxItems": 5,
                       "type": "array",
                       "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                        "type": "string"
                       }
                     }
                   },
@@ -7665,8 +7664,7 @@
                       "maxItems": 5,
                       "type": "array",
                       "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                        "type": "string"
                       }
                     }
                   },
@@ -8114,8 +8112,7 @@
               "maxItems": 5,
               "type": "array",
               "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                "type": "string"
               }
             }
           },
@@ -19777,8 +19774,7 @@
                           "maxItems": 5,
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                            "type": "string"
                           }
                         }
                       },
@@ -20263,8 +20259,7 @@
                           "maxItems": 5,
                           "type": "array",
                           "items": {
-                            "type": "string",
-                            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                            "type": "string"
                           }
                         }
                       },
@@ -20786,8 +20781,7 @@
               "maxItems": 5,
               "type": "array",
               "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|jpeg|webp|gif|pdf|txt|md|csv)$"
+                "type": "string"
               }
             }
           },

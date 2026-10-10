@@ -14,6 +14,7 @@
  */
 
 import { atom } from 'jotai';
+import type { EnvironmentSelectionState } from '@/components/cloud-agent-next/environment-selection';
 
 export type EnvVar = {
   key: string;
@@ -39,6 +40,17 @@ export const manualEnvVarsAtom = atom<Record<string, string>>({});
 export const manualSetupCommandsAtom = atom<string[]>([]);
 
 export const selectedProfileIdAtom = atom<string | null>(null);
+
+/**
+ * Currently selected repository environment, paired with the repository
+ * identity it belongs to. The identity lives with the id so a remount can tell
+ * a real repository change from a fresh component that lost local state, and
+ * keep an existing selection.
+ */
+export const selectedEnvironmentAtom = atom<EnvironmentSelectionState>({
+  id: null,
+  identity: null,
+});
 
 /**
  * Whether we've auto-selected the default profile on initial load
@@ -137,6 +149,7 @@ export const resetSessionFormAtom = atom(null, (_get, set) => {
   set(manualEnvVarsAtom, {});
   set(manualSetupCommandsAtom, []);
   set(selectedProfileIdAtom, null);
+  set(selectedEnvironmentAtom, { id: null, identity: null });
   set(hasAutoSelectedDefaultAtom, false);
   set(profileConfigAtom, null);
 });

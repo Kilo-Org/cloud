@@ -638,6 +638,22 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts and preserves an optional environmentId', () => {
+    const environmentId = '123e4567-e89b-12d3-a456-426614174099';
+    const result = personalPrepareSessionNextSchema.safeParse({
+      githubRepo: 'acme/repo',
+      prompt: 'Use environment',
+      mode: 'code',
+      model: 'kilo/test-model',
+      environmentId,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.environmentId).toBe(environmentId);
+    }
+  });
+
   it('does not accept client provenance from public session preparation input', () => {
     const result = basePrepareSessionNextSchema.parse({
       githubRepo: 'acme/repo',

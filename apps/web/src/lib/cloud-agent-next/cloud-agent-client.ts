@@ -153,6 +153,8 @@ type PrepareSessionSharedFields = {
   kilocodeOrganizationId?: string;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
   profileId?: string;
+  /** Repository environment ID forwarded to cloud-agent-next for resolution. */
+  environmentId?: string;
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];

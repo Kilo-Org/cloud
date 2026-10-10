@@ -41,6 +41,7 @@ import { useModelSelectorList } from '@/lib/hooks/use-openrouter-models';
 import {
   selectedProfileIdAtom,
   resetSessionFormAtom,
+  selectedEnvironmentAtom,
 } from '@/components/cloud-agent/store/session-form-atoms';
 import {
   type RepositoryOption,
@@ -53,6 +54,8 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
+import { EnvironmentPicker } from '@/components/cloud-agent-next/EnvironmentPicker';
+import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
 import { Popover, PopoverContent, PopoverTrigger, PopoverAnchor } from '@/components/ui/popover';
 import {
   Command as UICommand,
@@ -285,6 +288,7 @@ export function NewSessionPanel({
   // Session form atoms (profile override)
   // ---------------------------------------------------------------------------
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
+  const [selectedEnvironment] = useAtom(selectedEnvironmentAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
 
   // Clear any lingering manual overrides whenever the page loads
@@ -1034,6 +1038,24 @@ export function NewSessionPanel({
       repositoryUuid: repository.id,
     };
   }, [organizationId, selectedPlatform, selectedRepo, unifiedRepositories]);
+
+  const environmentRepository = useMemo<EnvironmentRepository | undefined>(() => {
+    if (!selectedRepo) return undefined;
+    if (selectedPlatform === 'bitbucket') {
+      if (!bitbucketRepo) return undefined;
+      return {
+        platform: 'bitbucket',
+        fullName: bitbucketRepo.fullName,
+        workspaceUuid: bitbucketRepo.workspaceUuid,
+        repositoryUuid: bitbucketRepo.repositoryUuid,
+      };
+    }
+    if (selectedPlatform === 'gitlab') {
+      return { platform: 'gitlab', projectPath: selectedRepo };
+    }
+    return { platform: 'github', fullName: selectedRepo };
+  }, [selectedRepo, selectedPlatform, bitbucketRepo]);
+
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
     const slashMatch = /^\s*\/([\w.-]+)(?:\s+([\s\S]*))?\s*$/.exec(trimmed);
@@ -1047,6 +1069,7 @@ export function NewSessionPanel({
       model: displayModel,
       variant: displayVariant,
       profileId: selectedProfileId ?? undefined,
+      environmentId: selectedEnvironment.id ?? undefined,
       autoCommit: true,
       autoInitiate: true,
       attachments: buildCloudAgentAttachments(attachmentMessageUuid, attachmentUpload.attachments),
@@ -1067,6 +1090,7 @@ export function NewSessionPanel({
     displayModel,
     displayVariant,
     selectedProfileId,
+    selectedEnvironment.id,
     attachmentMessageUuid,
     attachmentUpload.attachments,
   ]);
@@ -1860,6 +1884,7 @@ export function NewSessionPanel({
               repoFullName={selectedRepo || undefined}
               platform={profileBindingPlatform}
             />
+            <EnvironmentPicker organizationId={organizationId} repository={environmentRepository} />
           </div>
         </div>
 

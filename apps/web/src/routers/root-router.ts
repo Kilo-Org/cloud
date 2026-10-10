@@ -36,6 +36,7 @@ import { kiloPassRouter } from '@/routers/kilo-pass-router';
 import { creditsRouter } from '@/routers/credits-router';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 import { cloudAgentSettingsRouter } from '@/routers/cloud-agent-settings-router';
+import { cloudEnvironmentsRouter } from '@/routers/cloud-environments-router';
 import { webhookTriggersRouter } from '@/routers/webhook-triggers-router';
 import { userFeedbackRouter } from '@/routers/user-feedback-router';
 import { feedbackRouter } from '@/routers/feedback-router';
@@ -93,6 +94,7 @@ export const rootRouter = createTRPCRouter({
   credits: creditsRouter,
   agentProfiles: agentProfilesRouter,
   cloudAgentSettings: cloudAgentSettingsRouter,
+  cloudEnvironments: cloudEnvironmentsRouter,
   webhookTriggers: webhookTriggersRouter,
   userFeedback: userFeedbackRouter,
   feedback: feedbackRouter,

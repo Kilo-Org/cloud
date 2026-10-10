@@ -16,7 +16,8 @@ requirements remain in force.
 
 Draft -- created 2026-08-24, revised 2026-08-27 to define the passive sandbox
 status contract alongside shared worktree navigation and durability; revised
-2026-09-11 to add the continuity contract for long-lived, recoverable chats.
+2026-09-11 to add the continuity contract for long-lived, recoverable chats;
+revised 2026-10-07 to add the optional repository environment.
 
 ## Conventions
 
@@ -29,6 +30,9 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
+- **Repository environment**: an optional saved setup for one repository --
+  setup commands, plaintext variables, and secrets -- distinct from the sandbox
+  Environment. At most one may be selected for a session.
 - **Worktree**: a group of independent browser chats that share the same
   checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
@@ -59,6 +63,9 @@ repository.
 4. A first prompt that is exactly a known slash command MUST run as that
    command, not as free text.
 5. An over-long prompt, or an attachment still uploading, MUST block submission.
+6. The user MAY select one saved repository environment for the chosen
+   repository. Omitting it leaves launch unchanged. Its setup commands MUST run
+   as preparation steps and MUST NOT reveal secret values.
 
 ### Preparation
 
@@ -429,6 +436,13 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-10-07 -- Repository environments
+
+- Added the repository environment definition and a Start rule: an optional
+  saved setup for the chosen repository, distinct from the sandbox Environment.
+  Omitting it leaves launch unchanged; its setup commands run as preparation
+  steps and never reveal secret values.
 
 ### 2026-09-26 -- Bounded workspace control recovery
 

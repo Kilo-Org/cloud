@@ -1762,6 +1762,26 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     );
   });
 
+  it('forwards environmentId to cloud-agent-next in organization context', async () => {
+    const caller = createCaller({
+      user: { id: 'organization-env', is_admin: false } as User,
+      headersList: new Headers({ 'x-kilo-client': 'web' }),
+    });
+    const environmentId = '123e4567-e89b-12d3-a456-426614174099';
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      environmentId,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(expect.objectContaining({ environmentId }));
+  });
+
   it('derives mobile provenance even when organization input attempts to forge browser provenance', async () => {
     const caller = createCaller({
       user: { id: 'organization-mobile', is_admin: false } as User,

@@ -429,6 +429,9 @@ const PrepareSessionSharedFields = {
    */
   profileId: z.uuid().optional(),
 
+  /** Optional repository environment id resolved by cloud-agent-next. */
+  environmentId: z.uuid().optional(),
+
   // Optional configuration
   envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
   setupCommands: z.array(z.string().max(500)).max(20).optional(),

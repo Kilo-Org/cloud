@@ -248,6 +248,11 @@ patchedDependencies:
   # rejects valid navigations.
   '@expo/router-server@57.0.11': patches/@expo+router-server@57.0.11.patch
   expo-server-sdk: patches/expo-server-sdk.patch
+  # Android: keep the React host after a headless expo-task-manager run. The
+  # loader destroyed the host after each background task, and a destroyed host
+  # keeps its native memory, so each background push or refresh added a new
+  # instance until a native allocation aborted the process (KILO-APP-3EF).
+  expo-modules-core@57.0.20: patches/expo-modules-core@57.0.20.patch
   # Null-guard the headless app loader in TaskService.executeTask. Without it a
   # data-only FCM wake during cold start dereferences a null loader and fatally
   # crashes the app (KILO-APP-9V; expo/expo#41663, expo/expo#46449).

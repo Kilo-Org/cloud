@@ -329,6 +329,23 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     renderer.unmount();
   });
 
+  it('announces and draws a file this device keeps as no upload at all', async () => {
+    const renderer = await mount([
+      makeAttachment({ kind: 'image', filename: 'photo.png', status: 'local', progress: null }),
+    ]);
+
+    const body = chipBody(renderer.root);
+    expect(body.props.accessibilityLabel).toBe('photo.png, 1 kB');
+    expect(body.props.accessibilityRole).toBe('button');
+    expect(body.props.accessibilityState).toBeUndefined();
+    expect(body.props.accessibilityValue).toBeUndefined();
+    // No upload is under way, so the chip draws no spinner.
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ accessibilityState: { busy: true } })).toHaveLength(0);
+
+    renderer.unmount();
+  });
+
   it('exposes busy button semantics when progress is indeterminate', async () => {
     const renderer = await mount([makeAttachment({ status: 'uploading', progress: null })]);
 

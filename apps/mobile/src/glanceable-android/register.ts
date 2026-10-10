@@ -30,7 +30,12 @@ import { getSurfaceExtras, setSurfaceExtras } from '@/lib/glanceable/surface-ext
 import { runWidgetApprove } from '@/lib/glanceable/widget-actions';
 
 import { renderActiveAgentsWidget, WIDGET_NAME } from './active-agents-widget';
-import { androidSink, getCurrentWidgetProps, handleAppStateActive } from './android-sink';
+import {
+  androidSink,
+  getCurrentWidgetProps,
+  handleAppStateActive,
+  refreshPostedCardAction,
+} from './android-sink';
 import {
   formatGlanceableAgo,
   formatGlanceableClock,
@@ -125,6 +130,7 @@ async function handleWidgetApprove(
     actionFeedback: result.kind === 'failed' ? 'couldNotApprove' : null,
   });
   draw();
+  refreshPostedCardAction();
   // Nothing to act on, or the agent asked a free-form question the widget must
   // never invent an answer to: open the agents list. A failed call stays on the
   // widget, whose retry row and body tap remain offered.

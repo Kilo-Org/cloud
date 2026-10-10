@@ -21,6 +21,7 @@ import {
   androidSink,
   getCurrentWidgetProps,
   handleAppStateActive,
+  refreshPostedCardAction,
   renderStoredSnapshotWithNotice,
   setGlanceableActionApproving,
   setGlanceableActionNotice,
@@ -1138,6 +1139,25 @@ describe('the Home widget Approve on the ongoing card', () => {
       textIsError: true,
       approveLabel: i18n.t('common.approve'),
     });
+  });
+
+  it('offers Approve again on the posted card once the widget Approve settles', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_widget' }));
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'approving' });
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toMatchObject({ approveLabel: null });
+
+    // The approve failed in a way that leaves the ask open; no snapshot follows.
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+    refreshPostedCardAction();
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      textIsError: false,
+      approveLabel: i18n.t('common.approve'),
+    });
+    expect(mocks.getNotification()?.text).not.toBe(i18n.t('glanceable.approving'));
   });
 });
 

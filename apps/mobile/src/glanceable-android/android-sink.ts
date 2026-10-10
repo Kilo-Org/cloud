@@ -279,6 +279,25 @@ export async function renderStoredSnapshotWithNotice(ctx: GlanceableSinkContext)
   await tryStartOrUpdate(snapshot, ctx, { carryNotice: true });
 }
 
+/**
+ * Redraw a posted card whose approve state changed outside a publish. The Home
+ * widget's in-place Approve settles by changing the shared surface extras, which
+ * no snapshot carries, so without this the card would keep "Approving…" and hide
+ * Approve until an unrelated snapshot arrived. Never starts a card.
+ */
+export function refreshPostedCardAction(): void {
+  const snapshot = lastWidgetSnapshot ?? getStoredWidgetSnapshot();
+  if (
+    !notificationActive ||
+    snapshot === null ||
+    !hasCurrentWork(snapshot) ||
+    postedAction === actionKey(snapshot)
+  ) {
+    return;
+  }
+  postNotification(snapshot, 'update');
+}
+
 /** Retry a pending start after permission turns granted. Caller owns the check. */
 async function retryPendingStart(): Promise<void> {
   const p = pending;

@@ -21,7 +21,7 @@ function mockModifier(name: string) {
   return (args?: unknown) => ({ $type: name, args });
 }
 
-vi.mock('expo-widgets', () => ({ createWidget: () => ({}) }));
+vi.mock('expo-widgets', () => ({ createWidget: () => ({}), widgetsDirectory: '' }));
 vi.mock('@expo/ui/swift-ui', () => ({
   AccessoryWidgetBackground: mockComponent('AccessoryWidgetBackground'),
   Button: mockComponent('Button'),
@@ -44,6 +44,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
     args: { style, shape },
   }),
   buttonStyle: mockModifier('buttonStyle'),
+  cornerRadius: mockModifier('cornerRadius'),
   containerBackground: (style: unknown) => ({ $type: 'containerBackground', args: style }),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
@@ -113,12 +114,21 @@ type Modifier = { $type: string; args: Record<string, unknown> | undefined };
 function render(
   props: GlanceableWidgetProps,
   family: WidgetFamily,
-  { colorScheme = 'light', at = NOW }: { colorScheme?: 'light' | 'dark'; at?: number } = {}
+  {
+    colorScheme = 'light',
+    at = NOW,
+    renderingMode = 'fullColor',
+  }: {
+    colorScheme?: 'light' | 'dark';
+    at?: number;
+    renderingMode?: 'fullColor' | 'accented' | 'vibrant';
+  } = {}
 ): Rendered {
   return activeAgentsWidgetLayout(props, {
     widgetFamily: family,
     date: new Date(at),
     colorScheme,
+    widgetRenderingMode: renderingMode,
     configuration: undefined,
   }) as unknown as Rendered;
 }
@@ -251,8 +261,8 @@ function place(node: Rendered, top: number, out: Baseline[]): number {
 /** Baselines of every text in a Home card at the design's reference size. */
 function baselines(tree: Rendered, family: WidgetFamily): Baseline[] {
   const [, height] = SIZE[family] ?? [0, 0];
-  const top = 12;
-  const bottom = height - 15;
+  const top = 16;
+  const bottom = height - 16;
   const segments: Rendered[][] = [[]];
   for (const child of children(tree)) {
     if (isFill(child)) {
@@ -324,25 +334,77 @@ const ACCESSORY_FAMILIES: WidgetFamily[] = [
 ];
 
 describe('Home header', () => {
-  it.each(HOME_FAMILIES)('draws the tile, Kilo, and a fixed trailing + slot in %s', family => {
-    for (const props of [
-      propsFor([PERMISSION, BUSY]),
-      propsFor([], { status: 'empty' }),
-      propsFor([], { status: 'waiting' }),
-      propsFor([], { status: 'privacy' }),
-    ]) {
+  const STATES = [
+    propsFor([PERMISSION, BUSY]),
+    propsFor([BUSY]),
+    propsFor([], { status: 'empty' }),
+    propsFor([], { status: 'waiting' }),
+    propsFor([], { status: 'privacy' }),
+    propsFor([], { status: 'signed_out' }),
+  ];
+
+  it.each(HOME_FAMILIES)('draws the Kilo mark, Kilo, and a fixed trailing + slot in %s', family => {
+    for (const props of STATES) {
       const header = children(render(props, family))[0];
       if (header === undefined) {
         throw new Error('no header');
       }
       expect(fixedHeight(header)).toBe(24);
       const parts = children(header);
-      expect(parts[0]?.kind).toBe('RoundedRectangle');
+      // The real mark in a fixed 18pt slot, never a drawn tile.
+      expect(modifier(parts[0], 'frame')).toEqual({ width: 18, height: 18 });
+      expect(children(parts[0])[0]?.props.uiImage).toBe('__KILO_WIDGET_LOGO_URI__');
       expect(parts[1]?.props.children).toBe('Kilo');
       // `+` always owns the last 24pt slot, so a hidden action never moves it.
       expect(modifier(parts.at(-1), 'frame')).toEqual({ width: 24, height: 24 });
+      // The Approve slot ends 4pt before `+`, pill and circle alike.
+      expect(modifier(parts.at(-2), 'padding')).toEqual({ trailing: 4 });
     }
   });
+
+  it.each(HOME_FAMILIES)('keeps an equal 16pt band on all four sides in %s', family => {
+    for (const props of STATES) {
+      expect(modifier(render(props, family), 'padding')).toEqual({
+        top: 16,
+        bottom: 16,
+        leading: 16,
+        trailing: 16,
+      });
+    }
+  });
+
+  it.each(['accented', 'vibrant'] as const)(
+    'draws the glyph template and see-through action fills when %s',
+    renderingMode => {
+      const tree = render(propsFor([PERMISSION, BUSY]), 'systemMedium', { renderingMode });
+      const header = children(tree)[0];
+      expect(children(children(header)[0])[0]?.props.uiImage).toBe('__KILO_WIDGET_GLYPH_URI__');
+      const fills = collect(header ?? tree)
+        .map(node => modifier(node, 'background')?.style)
+        .filter(style => style !== undefined);
+      expect(fills.length).toBeGreaterThan(0);
+      // The foreground at 22% alpha, so the glyph on top stays visible.
+      for (const style of fills) {
+        expect(style).toBe('#14130F38');
+      }
+    }
+  );
+
+  it.each([...HOME_FAMILIES, ...ACCESSORY_FAMILIES])(
+    'lays %s out in leading and trailing terms only, so RTL mirrors it',
+    family => {
+      for (const props of STATES) {
+        for (const node of collect(render(props, family))) {
+          expect(JSON.stringify(node.props.alignment ?? '')).not.toMatch(/left|right/i);
+          for (const entry of modifiers(node)) {
+            expect(entry.$type).not.toBe('offset');
+            expect(Object.keys(entry.args ?? {}).join(',')).not.toMatch(/left|right|\bx\b/i);
+            expect(JSON.stringify(entry.args?.alignment ?? '')).not.toMatch(/left|right/i);
+          }
+        }
+      }
+    }
+  );
 
   it('paints the approved light and dark palettes', () => {
     const background = (scheme: 'light' | 'dark') =>
@@ -365,10 +427,10 @@ describe('needs input', () => {
   it('places the small card per round 2', () => {
     const tree = render(propsFor([PERMISSION, QUESTION]), 'systemSmall');
     expectBaselines(tree, 'systemSmall', [
-      ['2', 78],
-      ['Needs input', 98],
-      ['Migrate the billing webhooks', 117],
-      ['Checked', 152],
+      ['2', 82],
+      ['Needs input', 102],
+      ['Migrate the billing webhooks', 121],
+      ['Checked', 151],
     ]);
     expect(buttons(tree)).toContainEqual(
       expect.objectContaining({ pendingAction: 'approve', pendingApprovalKey: APPROVAL_KEY })
@@ -384,7 +446,7 @@ describe('needs input', () => {
       ['Permission required', 90],
       ['Pick a color for the badge', 116],
       ['Answer needed', 132],
-      ['Checked', 152],
+      ['Checked', 151],
     ]);
     expect(texts(tree)).not.toContain('Recover the interrupted build');
     expect(texts(tree)).toContain('Approve');
@@ -407,7 +469,7 @@ describe('needs input', () => {
       ['Pick a color for the badge', 248],
       ['Recover the interrupted build', 294],
       ['Waiting to retry', 311],
-      ['Checked', 364],
+      ['Checked', 363],
     ]);
   });
 
@@ -433,13 +495,13 @@ describe('needs input', () => {
     if (family === 'systemSmall') {
       // The failure replaces the detail line; the footer keeps the checked time.
       expectBaselines(tree, family, [
-        ['Could not approve', 117],
-        ['Checked', 152],
+        ['Could not approve', 121],
+        ['Checked', 151],
       ]);
     } else {
       // The failure replaces the footer.
       const footer = "Couldn't approve. Tap Approve to try again.";
-      expectBaselines(tree, family, [[footer, family === 'systemLarge' ? 364 : 152]]);
+      expectBaselines(tree, family, [[footer, family === 'systemLarge' ? 363 : 151]]);
       expect(texts(tree)).not.toContain('Checked');
       expect(modifier(textNode(tree, footer), 'foregroundStyle')).toBe('#956011');
     }
@@ -449,9 +511,9 @@ describe('needs input', () => {
 describe('working, idle, mixed', () => {
   it('names the newest working agent under the count in small', () => {
     expectBaselines(render(propsFor([BUSY]), 'systemSmall'), 'systemSmall', [
-      ['1', 78],
-      ['Working', 98],
-      ['Fix the flaky login test', 117],
+      ['1', 82],
+      ['Working', 102],
+      ['Fix the flaky login test', 121],
     ]);
   });
 
@@ -480,7 +542,7 @@ describe('working, idle, mixed', () => {
       ['Working', 203],
       ['Recent', 268],
       ['Fix the flaky login test', 292],
-      ['Checked', 364],
+      ['Checked', 363],
     ]);
     expect(fontSize(textNode(tree, '1'))).toBe(88);
   });
@@ -514,8 +576,8 @@ describe('scheduled', () => {
     ];
     const small = render(propsFor(rows), 'systemSmall');
     expectBaselines(small, 'systemSmall', [
-      ['Scheduled', 98],
-      ['Next run', 117],
+      ['Scheduled', 102],
+      ['Next run', 121],
     ]);
     expect(collect(small).some(node => node.props.dateStyle === 'time')).toBe(true);
     expectBaselines(render(propsFor(rows), 'systemMedium'), 'systemMedium', [
@@ -547,7 +609,7 @@ describe('scheduled', () => {
   it('shows nothing for an unknown time: the title in small, no detail in the rows', () => {
     const rows = [scheduled('Dependency audit', null), scheduled('Usage report', null)];
     expectBaselines(render(propsFor(rows), 'systemSmall'), 'systemSmall', [
-      ['Dependency audit', 117],
+      ['Dependency audit', 121],
     ]);
     const medium = render(propsFor(rows), 'systemMedium');
     // The rows keep their pitch with an empty detail slot.
@@ -584,17 +646,17 @@ describe('nothing running, updating, last known', () => {
   it('keeps + on the small card and moves create into a pill on medium and large', () => {
     const props = propsFor([], { status: 'empty' });
     expectBaselines(render(props, 'systemSmall'), 'systemSmall', [
-      ['Nothing running right now', 124],
-      ['Checked', 152],
+      ['Nothing running right now', 123],
+      ['Checked', 151],
     ]);
     expectBaselines(render(props, 'systemMedium'), 'systemMedium', [
-      ['Nothing running right now', 92],
-      ['New agent', 125],
-      ['Checked', 152],
+      ['Nothing running right now', 91],
+      ['New agent', 124],
+      ['Checked', 151],
     ]);
     expectBaselines(render(props, 'systemLarge'), 'systemLarge', [
-      ['Nothing running right now', 176],
-      ['New agent', 221],
+      ['Nothing running right now', 177.5],
+      ['New agent', 222.5],
     ]);
     for (const family of HOME_FAMILIES) {
       const presses = buttons(render(props, family));
@@ -610,9 +672,9 @@ describe('nothing running, updating, last known', () => {
     expect(buttons(tree)).toEqual([]);
     expect(texts(tree)).toEqual(['Kilo', 'Updating agents']);
     expect(collect(tree).filter(node => node.kind === 'RoundedRectangle').length).toBeGreaterThan(
-      2
+      1
     );
-    expectBaselines(tree, family, [['Updating agents', family === 'systemLarge' ? 364 : 152]]);
+    expectBaselines(tree, family, [['Updating agents', family === 'systemLarge' ? 363 : 151]]);
   });
 
   it.each(HOME_FAMILIES)(
@@ -635,12 +697,12 @@ describe('locked', () => {
     const small = render(props, 'systemSmall');
     expect(texts(small)).toEqual(['Kilo', first, second]);
     expectBaselines(small, 'systemSmall', [
-      [first, 108],
-      [second, 125],
+      [first, 109.5],
+      [second, 126.5],
     ]);
     const full = `${first} ${second}`;
-    expectBaselines(render(props, 'systemMedium'), 'systemMedium', [[full, 118]]);
-    expectBaselines(render(props, 'systemLarge'), 'systemLarge', [[full, 236]]);
+    expectBaselines(render(props, 'systemMedium'), 'systemMedium', [[full, 119.5]]);
+    expectBaselines(render(props, 'systemLarge'), 'systemLarge', [[full, 237.5]]);
     for (const family of HOME_FAMILIES) {
       const tree = render(props, family);
       expect(buttons(tree)).toEqual([]);
@@ -721,6 +783,9 @@ describe('Lock Screen accessories', () => {
     expect(texts(tree)).toEqual(['Kilo', '1 Needs input', '1 Working · 1 Scheduled']);
     const others = textNode(tree, '1 Working · 1 Scheduled');
     expect(modifier(others, 'opacity')).toBe(0.62);
+    // The monochrome glyph template, never the yellow tile.
+    const marks = collect(tree).filter(node => node.props.uiImage !== undefined);
+    expect(marks.map(node => node.props.uiImage)).toEqual(['__KILO_WIDGET_GLYPH_URI__']);
   });
 
   it('draws the symbol over the count in the circular and symbol + count in the inline', () => {

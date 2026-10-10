@@ -18,15 +18,16 @@ function mockModifier(name: string) {
   return (args?: unknown) => ({ $type: name, args });
 }
 
-vi.mock('expo-widgets', () => ({ createLiveActivity: () => ({}) }));
+vi.mock('expo-widgets', () => ({ createLiveActivity: () => ({}), widgetsDirectory: '' }));
 vi.mock('@expo/ui/swift-ui', () => ({
   Button: mockComponent('Button'),
   Circle: mockComponent('Circle'),
   HStack: mockComponent('HStack'),
-  RoundedRectangle: mockComponent('RoundedRectangle'),
+  Image: mockComponent('Image'),
   Spacer: mockComponent('Spacer'),
   Text: mockComponent('Text'),
   VStack: mockComponent('VStack'),
+  ZStack: mockComponent('ZStack'),
 }));
 vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   accessibilityElement: mockModifier('accessibilityElement'),
@@ -34,6 +35,7 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   activityBackgroundTint: mockModifier('activityBackgroundTint'),
   background: (style: unknown) => ({ $type: 'background', args: style }),
   buttonStyle: mockModifier('buttonStyle'),
+  cornerRadius: mockModifier('cornerRadius'),
   environment: mockModifier('environment'),
   fixedSize: mockModifier('fixedSize'),
   font: mockModifier('font'),
@@ -42,7 +44,8 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   lineLimit: mockModifier('lineLimit'),
   monospacedDigit: mockModifier('monospacedDigit'),
   padding: mockModifier('padding'),
-  shapes: { capsule: () => ({}), roundedRectangle: () => ({}) },
+  resizable: mockModifier('resizable'),
+  shapes: { capsule: () => ({}) },
 }));
 vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 
@@ -196,6 +199,14 @@ describe('Live Activity Dynamic Island (round 7)', () => {
     const { expandedBottom } = render(PERMISSION);
     expect(texts(expandedBottom)).toContain('3 Working · 1 Scheduled');
     expect(buttons(expandedBottom).map(button => button.props.target)).toEqual(['approve']);
+  });
+
+  it('draws the real Kilo mark on the card, compact, and expanded presentations', () => {
+    const layout = render(PERMISSION);
+    for (const surface of [layout.banner, layout.compactLeading, layout.expandedBottom]) {
+      const marks = collect(surface).filter(item => item.kind === 'Image');
+      expect(marks.map(item => item.props.uiImage)).toEqual(['__KILO_WIDGET_LOGO_URI__']);
+    }
   });
 });
 

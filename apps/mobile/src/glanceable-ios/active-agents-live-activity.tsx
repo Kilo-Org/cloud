@@ -1,11 +1,12 @@
 /* eslint-disable max-lines -- the 'widget' layout function is stringified whole, so its helpers cannot be extracted to module scope; the surface stays in one function */
-import { Button, Circle, HStack, RoundedRectangle, Spacer, Text, VStack } from '@expo/ui/swift-ui';
+import { Button, Circle, HStack, Image, Spacer, Text, VStack, ZStack } from '@expo/ui/swift-ui';
 import {
   accessibilityElement,
   accessibilityLabel,
   activityBackgroundTint,
   background,
   buttonStyle,
+  cornerRadius,
   environment,
   fixedSize,
   font,
@@ -14,6 +15,7 @@ import {
   lineLimit,
   monospacedDigit,
   padding,
+  resizable,
   shapes,
 } from '@expo/ui/swift-ui/modifiers';
 import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
@@ -21,6 +23,7 @@ import { createLiveActivity, type LiveActivityComponent } from 'expo-widgets';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import { withGlanceableCopy } from './layout-copy';
+import { withWidgetLogo } from './widget-logo';
 
 // The layout function below is marked with the `'widget'` directive, so Babel
 // stringifies it and the widget extension re-evaluates the source. Everything
@@ -28,9 +31,10 @@ import { withGlanceableCopy } from './layout-copy';
 // modifiers) or a built-in. Do not call `@/` helpers or i18n from here.
 //
 // `withGlanceableCopy` swaps `__KILO_GLANCEABLE_COPY__` for the translated copy
-// after stringification. The copy is baked in rather than passed through the
-// content state because the notifications Worker pushes the same raw shape and
-// knows no locale.
+// after stringification, and `withWidgetLogo` swaps `__KILO_WIDGET_LOGO_URI__`
+// for the app-group path of the Kilo mark. The copy is baked in rather than
+// passed through the content state because the notifications Worker pushes the
+// same raw shape and knows no locale (nor any device path).
 
 // The pushed content state plus the facts only the app can add: whether the
 // recorded ask is one Approve can answer, the failure line a retryable Approve
@@ -47,7 +51,7 @@ type ContentState = Partial<GlanceableLiveActivityContentState> & {
 
 /**
  * The approved Live Activity design (round 7). The Lock Screen card is 364pt
- * wide: the header at 16pt (tile, Kilo, and the checked time trailing), the
+ * wide: the header at 16pt (mark, Kilo, and the checked time trailing), the
  * status row centred at 74pt (count 36, dot, label 16, Approve pill 96x32), and
  * an optional muted line at 118pt — the card is 140pt tall with it and 108pt
  * without. The expanded Dynamic Island repeats it on black at count 32 and
@@ -139,8 +143,6 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     fg: string;
     muted: string;
     warn: string;
-    tile: string;
-    inner: string;
     primary: string;
     primaryFg: string;
     secondary: string;
@@ -150,8 +152,6 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   };
   const card: Scheme = {
     ...palette,
-    tile: palette.fg,
-    inner: palette.bg,
     dots: {
       needsInput: palette.warn,
       running: palette.good,
@@ -166,8 +166,6 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     fg: '#FFFFFF',
     muted: '#8A8680',
     warn: '#F2B05F',
-    tile: '#F2F0EB',
-    inner: '#17171A',
     primary: '#E8F27A',
     primaryFg: '#1A1A10',
     secondary: '#26262B',
@@ -221,17 +219,19 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
   const dot = (diameter: number, color: string) => (
     <Circle modifiers={[frame({ width: diameter, height: diameter }), foregroundStyle(color)]} />
   );
-  // The Kilo tile: a filled square with a smaller square of the background in it.
-  const tile = (size: number, fill: string, inner: string) => (
-    <RoundedRectangle
-      cornerRadius={1}
-      modifiers={[
-        foregroundStyle(inner),
-        frame({ width: size * 0.44, height: size * 0.44 }),
-        frame({ width: size, height: size }),
-        background(fill, shapes.roundedRectangle({ cornerRadius: size * 0.22 })),
-      ]}
-    />
+  // The literal is replaced with the app-group path of the Kilo mark after
+  // Babel stringifies this function (`withWidgetLogo`).
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- replaced source literal
+  const markUri: string = '__KILO_WIDGET_LOGO_URI__';
+  // The real mark on every presentation. The slot keeps its size while the
+  // image is missing (the copy has not landed yet), so nothing beside it moves.
+  const mark = (size: number) => (
+    <ZStack modifiers={[frame({ width: size, height: size })]}>
+      <Image
+        uiImage={markUri}
+        modifiers={[resizable(), frame({ width: size, height: size }), cornerRadius(size * 0.22)]}
+      />
+    </ZStack>
   );
   // The clock time alone today; another day adds its weekday.
   const clock = (date: Date, color: string) => {
@@ -263,10 +263,10 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
     }
   };
 
-  // Header: the tile, Kilo, and the checked time at the trailing edge.
+  // Header: the mark, Kilo, and the checked time at the trailing edge.
   const header = (scheme: Scheme) => (
     <HStack alignment="center" spacing={6} modifiers={[frame({ height: 18 })]}>
-      {tile(18, scheme.tile, scheme.inner)}
+      {mark(18)}
       {text('Kilo', 13, scheme.fg, 'semibold')}
       <Spacer minLength={8} />
       {checkedAt === null ? null : (
@@ -429,8 +429,8 @@ const layout: LiveActivityComponent<ContentState> = (props, activityEnvironment)
         </VStack>
       </VStack>
     ),
-    // Compact: the tile leading, the dot and count trailing.
-    compactLeading: tile(18, island.tile, island.inner),
+    // Compact: the mark leading, the dot and count trailing.
+    compactLeading: mark(18),
     compactTrailing:
       primary === null ? null : (
         <HStack
@@ -517,7 +517,11 @@ export const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
 
 export const activeAgentsLiveActivityLayout = layout;
 const registerLayout = () =>
-  createLiveActivity<ContentState>(LIVE_ACTIVITY_NAME, withGlanceableCopy(layout), OPEN_AGENTS_URL);
+  createLiveActivity<ContentState>(
+    LIVE_ACTIVITY_NAME,
+    withGlanceableCopy(withWidgetLogo(layout)),
+    OPEN_AGENTS_URL
+  );
 
 export const ActiveAgentsLiveActivity = registerLayout();
 

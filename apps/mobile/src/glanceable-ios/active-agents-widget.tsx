@@ -21,6 +21,7 @@ import {
   background,
   buttonStyle,
   containerBackground,
+  cornerRadius,
   environment,
   fixedSize,
   font,
@@ -46,6 +47,7 @@ import {
   type GlanceableWidgetAction,
   type GlanceableWidgetProps,
 } from './view-props';
+import { withWidgetLogo } from './widget-logo';
 
 export type WidgetProps = GlanceableWidgetProps;
 type WidgetPressPatch = {
@@ -69,8 +71,8 @@ type Weight = 'regular' | 'semibold' | 'bold';
 
 /**
  * The approved Home widget design (direction A). Every number below is a point
- * position or size from the design generators, measured from the widget's top
- * left on the 170pt-tall small and medium and the 382pt-tall large card; gaps
+ * position or size from the design generators, measured from the widget's
+ * top-leading corner on the 170pt-tall small and medium and the 382pt-tall large card; gaps
  * between text lines are derived from the design baselines with SF Pro's line
  * metrics so the rendered baselines land where the design put them.
  */
@@ -190,17 +192,36 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const genericLabel =
     safeText(props.primaryLabel) ?? (genericKind === null ? '' : labels[genericKind]);
   const white = foregroundStyle('#FFFFFF');
+  // The literals are replaced with app-group paths after Babel stringifies this
+  // function (`withWidgetLogo`): the full Kilo mark, and the glyph-only template
+  // the monochrome renderings draw, because the Lock Screen and the Tinted and
+  // Clear Home Screens keep only alpha and would flatten the opaque tile into a
+  // blob.
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- replaced source literal
+  const markUri: string = '__KILO_WIDGET_LOGO_URI__';
+  // eslint-disable-next-line typescript-eslint/no-inferrable-types -- replaced source literal
+  const glyphUri: string = '__KILO_WIDGET_GLYPH_URI__';
+  const monochrome =
+    widgetEnvironment.widgetRenderingMode === 'accented' ||
+    widgetEnvironment.widgetRenderingMode === 'vibrant';
+  // The slot keeps its size while the image is missing (the copy has not landed
+  // yet), so "Kilo" beside it never moves. The glyphs sit inside the tile at 65%,
+  // so the template draws a little larger than that to read at the same weight.
   // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
-  const logoTile = (size: number, fill: string, inner: string) => (
-    <RoundedRectangle
-      cornerRadius={1}
-      modifiers={[
-        foregroundStyle(inner),
-        frame({ width: size * 0.44, height: size * 0.44 }),
-        frame({ width: size, height: size }),
-        background(fill, shapes.roundedRectangle({ cornerRadius: size * 0.22 })),
-      ]}
-    />
+  const logo = (size: number, template: boolean) => (
+    <ZStack modifiers={[frame({ width: size, height: size })]}>
+      {template ? (
+        <Image
+          uiImage={glyphUri}
+          modifiers={[resizable(), frame({ width: size * 0.78, height: size * 0.78 })]}
+        />
+      ) : (
+        <Image
+          uiImage={markUri}
+          modifiers={[resizable(), frame({ width: size, height: size }), cornerRadius(size * 0.22)]}
+        />
+      )}
+    </ZStack>
   );
   if (family === 'accessoryCircular') {
     const value = count(genericCount);
@@ -272,7 +293,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         ]}
       >
         <HStack alignment="center" spacing={5}>
-          {logoTile(11, '#FFFFFF', '#000000')}
+          {logo(14, true)}
           <Text modifiers={[font({ size: 12, weight: 'semibold' }), lineLimit(1), white]}>
             Kilo
           </Text>
@@ -398,8 +419,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   const intlLocale = (COPY.locale ?? 'en').split('_').join('-');
 
   // System content margins vary by device and OS, so the card pads the
-  // difference to the design's 16pt sides, 12pt above the header controls and
-  // 15pt below the footer line.
+  // difference to an equal 16pt band on all four sides; no ink enters it.
   const margins = widgetEnvironment.widgetContentMargins;
   // eslint-disable-next-line unicorn/consistent-function-scoping -- the stringified 'widget' layout cannot hoist helpers to module scope
   const inset = (design: number, system: unknown) =>
@@ -411,8 +431,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     localeModifier,
     frame({ maxWidth: 10_000, maxHeight: 10_000, alignment: 'topLeading' }),
     padding({
-      top: inset(12, margins?.top),
-      bottom: inset(15, margins?.bottom),
+      top: inset(16, margins?.top),
+      bottom: inset(16, margins?.bottom),
       leading: inset(16, margins?.leading),
       trailing: inset(16, margins?.trailing),
     }),
@@ -497,17 +517,21 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       </HStack>
     );
   };
-  // Header: the Kilo tile and name, then the Approve slot and the `+` slot at
+  // Header: the Kilo mark and name, then the Approve slot and the `+` slot at
   // the trailing edge. A hidden action leaves its slot empty, so `+` never moves.
+  // Tinted and Clear keep only each colour's alpha, so an opaque control fill
+  // would merge with its glyph into one solid blob; there the fill is the
+  // foreground at 22% and the glyph the full foreground.
+  const monochromeFill = `${palette.fg}38`;
   // eslint-disable-next-line max-params -- the symbol, its size, and the circle's fill and glyph colours
   const circleGlyph = (symbol: SystemSymbol, size: number, fill: string, color: string) => (
     <Image
       systemName={symbol}
-      color={color}
+      color={monochrome ? palette.fg : color}
       modifiers={[
         font({ size, weight: 'semibold' }),
         frame({ width: 24, height: 24 }),
-        background(fill, shapes.circle()),
+        background(monochrome ? monochromeFill : fill, shapes.circle()),
       ]}
     />
   );
@@ -516,11 +540,11 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       modifiers={[
         font({ size: 12, weight: 'semibold' }),
         lineLimit(1),
-        foregroundStyle(color),
+        foregroundStyle(monochrome ? palette.fg : color),
         fixedSize({ horizontal: true, vertical: false }),
         padding({ horizontal: 14 }),
         frame({ minWidth: 86, height: 24 }),
-        background(fill, shapes.capsule()),
+        background(monochrome ? monochromeFill : fill, shapes.capsule()),
       ]}
     >
       {label}
@@ -563,9 +587,10 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   // The empty Medium and Large cards offer New agent as a pill in the body, so
   // the header `+` hides there and the card has a single create control.
   const headerCreate = canCreate && (content || (status === 'empty' && !wide && !large));
+  // The Approve slot sits 4pt before `+`, the pill and the circle alike.
   const header = (
     <HStack alignment="center" spacing={0} modifiers={[frame({ height: 24 })]}>
-      {logoTile(18, palette.fg, palette.bg)}
+      {logo(18, monochrome)}
       <Text
         modifiers={[
           font({ size: 13, weight: 'semibold' }),
@@ -581,7 +606,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
         spacing={0}
         modifiers={[
           frame(wide || large ? { minWidth: 86, height: 24 } : { width: 24, height: 24 }),
-          padding({ trailing: wide || large ? 8 : 4 }),
+          padding({ trailing: 4 }),
         ]}
       >
         {approveControl}
@@ -618,7 +643,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   }
   const fill = <Spacer minLength={0} />;
   // The slack above the body: the design's gap first, so a shorter device
-  // shrinks it before the body meets the footer.
+  // shrinks it before the body meets the footer. Callers pass a design top
+  // minus 40, where the header ends (the 16pt band plus the 24pt header).
   const lead = (height: number) => (
     <Spacer minLength={0} modifiers={[frame({ maxHeight: height }), layoutPriority(1)]} />
   );
@@ -760,7 +786,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
             modifiers={[
               padding({ leading: large ? 11 : 8, trailing: large ? 16 : 12 }),
               frame({ height: large ? 36 : 28 }),
-              background(palette.secondary, shapes.capsule()),
+              background(monochrome ? monochromeFill : palette.secondary, shapes.capsule()),
             ]}
           >
             <Image
@@ -928,7 +954,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     // One kind: count 88 @168, label 20 @203, rule 238, "Recent" @268, title 15 @292.
     let body = (
       <VStack alignment="leading" spacing={0}>
-        {lead(168 - 0.952 * 88 - 36)}
+        {lead(168 - 0.952 * 88 - 40)}
         {countText(88)}
         {shifted(gap(168, 88, 203, 20), statusRow(10, 20))}
         {title === null ? null : rule(237.5 - (203 + 0.241 * 20))}
@@ -942,7 +968,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       // Count 80 @128, label 19 @158, line 13 @182, rule 206, "Next runs" @232, rows @258 + 34n.
       body = (
         <VStack alignment="leading" spacing={0}>
-          {lead(128 - 0.952 * 80 - 36)}
+          {lead(128 - 0.952 * 80 - 40)}
           {countText(80)}
           {shifted(gap(128, 80, 158, 19), statusRow(10, 19))}
           {shifted(gap(158, 19, 182, 13), scheduledLine(13, palette.muted))}
@@ -975,7 +1001,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       const rows = detailRows;
       body = (
         <VStack alignment="leading" spacing={0}>
-          {lead(106 - 0.952 * 64 - 36)}
+          {lead(106 - 0.952 * 64 - 40)}
           <HStack alignment="top" spacing={0}>
             <VStack
               alignment="leading"
@@ -1024,7 +1050,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
       const next = scheduledAgents[0];
       body = (
         <VStack alignment="leading" spacing={0}>
-          {lead(120 - 0.952 * 64 - 36)}
+          {lead(120 - 0.952 * 64 - 40)}
           <HStack alignment="top" spacing={0}>
             <VStack
               alignment="leading"
@@ -1074,7 +1100,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   }
 
   if (wide) {
-    // Left: count 44 @92 and the label @112. Right, from x 168: up to two
+    // Leading: count 44 @92 and the label @112. Trailing, from x 168: up to two
     // agent rows @74 + 42n, else the other counts @78 + 24n from x 172, else
     // "Recent" @88 and the title @106 from x 176.
     const countTop = 92 - 0.952 * 44;
@@ -1118,7 +1144,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
     return (
       <VStack alignment="leading" spacing={0} modifiers={rootModifiers}>
         {header}
-        {lead(countTop - 36)}
+        {lead(countTop - 40)}
         <HStack alignment="top" spacing={0}>
           <VStack
             alignment="leading"
@@ -1165,7 +1191,8 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
 
 export const WIDGET_NAME = 'ActiveAgentsWidget';
 export const activeAgentsWidgetLayout = layout;
-const registerLayout = () => createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(layout));
+const registerLayout = () =>
+  createWidget<WidgetProps>(WIDGET_NAME, withGlanceableCopy(withWidgetLogo(layout)));
 export const ActiveAgentsWidget = registerLayout();
 
 /**
@@ -1179,7 +1206,8 @@ const WIDGET_GALLERY_PREVIEW_NAME = `${WIDGET_NAME}Preview`;
 /** Re-bake both layouts in the active language and re-write the gallery sample. */
 export function refreshActiveAgentsWidgetCopy(): void {
   registerLayout();
-  createWidget<WidgetProps>(WIDGET_GALLERY_PREVIEW_NAME, withGlanceableCopy(layout)).updateSnapshot(
-    buildGalleryPreviewProps(key => i18n.t(key))
-  );
+  createWidget<WidgetProps>(
+    WIDGET_GALLERY_PREVIEW_NAME,
+    withGlanceableCopy(withWidgetLogo(layout))
+  ).updateSnapshot(buildGalleryPreviewProps(key => i18n.t(key)));
 }

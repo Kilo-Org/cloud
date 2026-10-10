@@ -22,6 +22,7 @@ import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { handleGlanceableInteraction } from './interaction';
 import { iosSink, sweepStrayActivities } from './ios-sink';
 import { registerWidgetActionHandling } from './widget-actions';
+import { ensureWidgetLogo } from './widget-logo';
 
 type InteractionSubscription = ReturnType<typeof addUserInteractionListener>;
 
@@ -73,6 +74,11 @@ if (Platform.OS === 'ios') {
   // widget's press marker, while the subscription above owns the Live Activity's
   // `approve` and `open` targets, so a press is answered by exactly one of them.
   registerWidgetActionHandling();
+
+  // Copy the Kilo mark and its monochrome glyph into the shared app group so
+  // the widget extension can read them. Fire and forget: it lands long before
+  // the first snapshot arrives, and a failure only costs the logo.
+  void ensureWidgetLogo();
 
   // The widget gallery shows the approved Needs input layouts with sample
   // agents; this writes that preview in the language i18n holds now, and the

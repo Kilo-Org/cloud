@@ -20,6 +20,8 @@ enum HomeWidgetRefreshStore {
     config.timeoutIntervalForResource = 20
     return URLSession(configuration: config, delegate: HomeWidgetNetworkDelegate(), delegateQueue: nil)
   }()
+  /// The app language's direction. patches/expo-widgets (`appLayoutDirection` in
+  /// WidgetLiveActivity.swift) derives the Live Activity's from the same key the same way.
   static var layoutDirection: LayoutDirection {
     let locale = defaults?.string(forKey: "homeWidgetLocale") ?? Locale.current.identifier
     let language = locale.replacingOccurrences(of: "_", with: "-").split(separator: "-").first.map(String.init) ?? "en"

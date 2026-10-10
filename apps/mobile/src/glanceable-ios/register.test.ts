@@ -50,6 +50,7 @@ vi.mock('./active-agents-widget', () => ({
 vi.mock('./widget-actions', () => ({
   registerWidgetActionHandling: mocks.registerWidgetActionHandling,
 }));
+vi.mock('./widget-logo', () => ({ ensureWidgetLogo: vi.fn() }));
 vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 vi.mock('@/lib/glanceable/live-activity-switch', () => ({
   getLiveActivityEnabled: () => true,

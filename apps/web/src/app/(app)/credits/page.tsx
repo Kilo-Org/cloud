@@ -419,22 +419,12 @@ function CreditsPageContent() {
             <CardTitle>Your credit balance</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1px_1fr_1px_1fr]">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1px_1fr]">
               <div>
                 <div className="type-title text-foreground tabular-nums">
                   {formatMicrodollars(currentBalance)}
                 </div>
                 <div className="type-label text-muted-foreground mt-1">available</div>
-              </div>
-
-              <div className="bg-border hidden w-px self-stretch lg:block" />
-
-              <div className="flex items-start gap-2">
-                <CheckCircle2 className="text-status-success-icon mt-0.5 size-4 shrink-0" />
-                <div>
-                  <p className="type-body text-muted-foreground">Purchased credits</p>
-                  <p className="type-body font-medium">Never expire</p>
-                </div>
               </div>
 
               <div className="bg-border hidden w-px self-stretch lg:block" />
@@ -455,8 +445,7 @@ function CreditsPageContent() {
             </div>
 
             <div className="type-label text-muted-foreground border-border border-t pt-4">
-              Purchased credits do not expire. Promotional credits may have their own expiration
-              timestamp.
+              Promotional credits may have their own expiration timestamp.
             </div>
           </CardContent>
         </Card>

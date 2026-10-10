@@ -184,7 +184,6 @@ export function AutoTopUpToggle() {
                       repeat charges; you can resume automatic top ups at any time.
                     </li>
                     <li>You can disable automatic top up at any time.</li>
-                    <li>As always, purchased credits never expire.</li>
                   </ul>
                 </div>
               </DialogDescription>

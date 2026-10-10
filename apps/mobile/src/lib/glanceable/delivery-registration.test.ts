@@ -59,6 +59,12 @@ vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
 vi.mock('react-native', () => ({
   Platform: platformMock,
 }));
+// The unregister session gate reads the token owner, whose cold path imports the native store.
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(async () => null),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { setActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';

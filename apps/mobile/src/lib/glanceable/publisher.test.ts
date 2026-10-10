@@ -1018,7 +1018,8 @@ describe('Home widget approval key retention', () => {
     // deliberate: the press re-checks the digest, so a key that no longer matches
     // the visible request answers nothing and reports the stale outcome.
     const { sink, calls } = makeSink();
-    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    let now = NOW;
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
     rememberHomeWidgetData({
       snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
       details: {
@@ -1032,15 +1033,19 @@ describe('Home widget approval key retention', () => {
       [{ id: 'ses_first', status: 'permission', title: 'Migrate billing' }],
       PUB_CTX
     );
-    expect(
-      getHomeWidgetDataForSnapshot(lastSnapshot(calls, 'startOrUpdate')).details.approvalKey
-    ).toBe(KEY);
+    const first = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(first).details.approvalKey).toBe(KEY);
     // A different session with the same visible title replaces the first one.
+    // The visible content is unchanged, so only a due renewal writes a frame:
+    // step past the margin so the second call really reaches the sink.
+    now += GLANCEABLE_RENEW_MARGIN_MS;
     publisher.handleSessions(
       [{ id: 'ses_second', status: 'permission', title: 'Migrate billing' }],
       PUB_CTX
     );
+    expect(count(calls, 'startOrUpdate')).toBe(2);
     const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(published.revision).toBeGreaterThan(first.revision);
     expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
     publisher.dispose();
   });

@@ -315,13 +315,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     event('message.part.updated', {
       part: { id: PART_ID, sessionID: SESSION_ID, messageID: ASSISTANT_ID, type: 'text', text },
     });
+    // Stop the cadence before the idle status, so a tick cannot land inside the
+    // grace window below and overwrite it with a 'busy' heartbeat.
+    clearInterval(heartbeatTimer);
     event('session.status', { sessionID: SESSION_ID, status: { type: 'idle' } });
     heartbeat('idle');
     await sleep(1_000);
   } finally {
-    // Clear the heartbeat and the socket on every path: either one left open
-    // after a failed stream keeps the event loop alive, so the seed would hang
-    // instead of exiting with the error.
+    // The clear above covers the success path; this one covers a stream that
+    // threw. The interval or the socket left open keeps the event loop alive,
+    // so the seed would hang instead of exiting with the error.
     clearInterval(heartbeatTimer);
     socket.close();
   }

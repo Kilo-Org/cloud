@@ -351,8 +351,8 @@ describe('Home header', () => {
       }
       expect(fixedHeight(header)).toBe(24);
       const parts = children(header);
-      // The real mark in a fixed 18pt slot, never a drawn tile.
-      expect(modifier(parts[0], 'frame')).toEqual({ width: 18, height: 18 });
+      // The real mark in a fixed 24pt slot, as tall as the header buttons, never a drawn tile.
+      expect(modifier(parts[0], 'frame')).toEqual({ width: 24, height: 24 });
       expect(children(parts[0])[0]?.props.uiImage).toBe('__KILO_WIDGET_LOGO_URI__');
       expect(parts[1]?.props.children).toBe('Kilo');
       // `+` always owns the last 24pt slot, so a hidden action never moves it.

@@ -77,6 +77,10 @@ describe('Home widget geometry per cell and state', () => {
         expect(light.props.clickActionData, label).toEqual({ uri: 'kiloapp:///cloud/sessions' });
         expect(light.props.accessibilityLabel, label).toBe(props.homeCopy?.accessibilityLabel);
         expect(hasKey(light, 'logo'), `${label} logo`).toBe(true);
+        if (sizeClass === 'small' || sizeClass === 'medium' || sizeClass === 'large') {
+          // The 24dp mark tops the band at 16dp, with or without the header buttons.
+          expect(rectOf(byKey(light, 'logo')), label).toMatchObject({ y: 16, height: 24 });
+        }
         for (const node of placed(light)) {
           const rect = rectOf(node);
           const where = `${label} ${String(node.key)} ${JSON.stringify(rect)}`;
@@ -209,7 +213,7 @@ describe('Home widget design coordinates at the design frames', () => {
 
   it('draws Small with the header on the padding line', () => {
     const root = at(DESIGN.small);
-    expect(rect(root, 'logo')).toEqual({ x: 16, y: 19, width: 18, height: 18 });
+    expect(rect(root, 'logo')).toEqual({ x: 16, y: 16, width: 24, height: 24 });
     expect(rect(root, 'create-glyph')).toEqual({ x: 130, y: 16, width: 24, height: 24 });
     expect(rect(root, 'approve-glyph')).toEqual({ x: 102, y: 16, width: 24, height: 24 });
     // `+` owns 16 + 24 + 2dp: the most it can take without overlapping Approve.
@@ -225,7 +229,7 @@ describe('Home widget design coordinates at the design frames', () => {
     const root = at(DESIGN.medium);
     expect(rect(root, 'approve-pill')).toEqual({ x: 234, y: 16, width: 86, height: 24 });
     expect(rect(root, 'create-glyph')).toEqual({ x: 324, y: 16, width: 24, height: 24 });
-    expect(rect(root, 'logo')).toEqual({ x: 16, y: 19, width: 18, height: 18 });
+    expect(rect(root, 'logo')).toEqual({ x: 16, y: 16, width: 24, height: 24 });
     expect(hasKey(root, 'row-1-title')).toBe(true);
     expect(hasKey(root, 'row-2-title')).toBe(false);
   });

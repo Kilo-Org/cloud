@@ -590,7 +590,7 @@ const layout = (props: WidgetProps, widgetEnvironment: WidgetEnvironment): React
   // The Approve slot sits 4pt before `+`, the pill and the circle alike.
   const header = (
     <HStack alignment="center" spacing={0} modifiers={[frame({ height: 24 })]}>
-      {logo(18, monochrome)}
+      {logo(24, monochrome)}
       <Text
         modifiers={[
           font({ size: 13, weight: 'semibold' }),

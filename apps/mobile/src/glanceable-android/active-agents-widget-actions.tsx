@@ -160,8 +160,8 @@ export function pillActions(f: Frame, create: boolean) {
   if (slot !== null) {
     const value = slot === 'approve' ? f.props.actions.approveLabel : (f.copy.actionLine ?? '');
     const natural = Math.ceil(estimateWidth(value, 12, true)) + 28;
-    // Never into "Kilo": the brand ends at 80dp.
-    const width = Math.min(approveEnd - 80, Math.max(slot === 'approve' ? 86 : 96, natural));
+    // Never into "Kilo": the brand ends at 86dp.
+    const width = Math.min(approveEnd - 86, Math.max(slot === 'approve' ? 86 : 96, natural));
     const x = approveEnd - width;
     nodes.push(
       pill(f, 'approve-pill', {

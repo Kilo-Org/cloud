@@ -33,9 +33,12 @@ import { fitRows, phaseOf, stack } from './active-agents-widget-stack';
 /** Header ink ends where the 24dp glyphs, their tops on the padding line, end. */
 export const HEADER_BOTTOM = HEADER_GLYPH.cy + HEADER_GLYPH.r;
 
-/** The Kilo mark and "Kilo", centred on the header glyphs. */
+/**
+ * The Kilo mark, as tall as the header glyphs so its top sits on the padding
+ * line, and "Kilo" centred on it.
+ */
 export function brand(f: Frame) {
-  const size = 18;
+  const size = 2 * HEADER_GLYPH.r;
   return [
     logo(f, { x: CARD_PAD, y: HEADER_GLYPH.cy - size / 2, size }),
     label(f, 'brand', {

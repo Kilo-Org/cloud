@@ -424,17 +424,18 @@ describe('useNativeAuth email validation feedback', () => {
     }
   );
 
-  it('keeps a malformed address inline as INVALID_REQUEST without sending a request', async () => {
-    const resultRef = await mountNativeAuth();
-    for (const address of ['http://localhost:3000/device-auth?code=test', 'user@example', 'user']) {
+  it.each(['http://localhost:3000/device-auth?code=test', 'user@example', 'user'])(
+    'keeps malformed address %s inline as INVALID_REQUEST without sending a request',
+    async address => {
+      const resultRef = await mountNativeAuth();
       await act(async () => {
         expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
       });
       expect(resultRef.current?.emailError).toBe(mapError('INVALID_REQUEST'));
+      expect(mockPostAuth).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
     }
-    expect(mockPostAuth).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
-  });
+  );
 
   it('keeps an empty-email error inline without sending a request', async () => {
     const resultRef = await mountNativeAuth();

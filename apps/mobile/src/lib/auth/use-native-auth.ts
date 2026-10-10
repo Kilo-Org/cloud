@@ -27,6 +27,11 @@ import {
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { type SsoRecovery, useSsoRecovery } from '@/lib/auth/use-sso-recovery';
 
+// `/api/auth/native/otp` validates the address with zod's email check and
+// answers 400 INVALID_REQUEST. The hook runs the same check first, so a
+// mistyped address shows the same inline error without a failed request.
+const emailAddressSchema = z.email();
+
 // Module-level guard — GoogleSignin.configure() is cheap but re-calling it
 // on every button press is pointless; upgrade to a re-configure path if client IDs
 // ever need to change at runtime.
@@ -282,10 +287,7 @@ export function useNativeAuth(): NativeAuthResult {
         setEmailError(i18n.t('login.pleaseEnterEmail'));
         return false;
       }
-      // `/api/auth/native/otp` validates the address with zod's email check and
-      // answers 400 INVALID_REQUEST. Run the same check here, so a mistyped
-      // address shows the same inline error without a failed request.
-      if (!z.email().safeParse(email).success) {
+      if (!emailAddressSchema.safeParse(email).success) {
         setEmailError(mapError('INVALID_REQUEST'));
         return false;
       }

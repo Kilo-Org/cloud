@@ -1,9 +1,10 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
-import { Alert, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { SessionRow } from '@/components/ui/session-row';
 import { type ChatSummary } from '@/lib/chat/store';
 import { useChatStatus } from '@/lib/chat/use-chat';
@@ -34,21 +35,20 @@ export function ChatRow({ chat, modelName, last, onPress, onDelete }: Readonly<C
   const working = useChatStatus(chat.sessionId) === 'working';
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
+  const { confirm, dialog } = useConfirmDialog();
   const title = chat.title === '' ? t('chat.conversation.untitled') : chat.title;
   const label = modelName === '' ? t('common.chat') : modelName;
 
   function confirmDelete() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(t('modelChat.list.deleteTitle'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          onDelete(chat.sessionId);
-        },
+    confirm({
+      title: t('modelChat.list.deleteTitle'),
+      message: title,
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        onDelete(chat.sessionId);
       },
-    ]);
+    });
   }
 
   function openActions() {
@@ -70,26 +70,29 @@ export function ChatRow({ chat, modelName, last, onPress, onDelete }: Readonly<C
   }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      accessibilityHint={t('modelChat.list.openHint')}
-      className="active:opacity-70"
-      onPress={() => {
-        onPress(chat.sessionId);
-      }}
-      onLongPress={openActions}
-    >
-      <SessionRow
-        agentLabel={label}
-        title={title}
-        meta={timeAgo(new Date(chat.updatedAt))}
-        live={working}
-        metaWhileLive
-        last={last}
-        stripMode="inline"
-        className="pl-[22px] pr-[22px]"
-      />
-    </Pressable>
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityHint={t('modelChat.list.openHint')}
+        className="active:opacity-70"
+        onPress={() => {
+          onPress(chat.sessionId);
+        }}
+        onLongPress={openActions}
+      >
+        <SessionRow
+          agentLabel={label}
+          title={title}
+          meta={timeAgo(new Date(chat.updatedAt))}
+          live={working}
+          metaWhileLive
+          last={last}
+          stripMode="inline"
+          className="pl-[22px] pr-[22px]"
+        />
+      </Pressable>
+      {dialog}
+    </>
   );
 }

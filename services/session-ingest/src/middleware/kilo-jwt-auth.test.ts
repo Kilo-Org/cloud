@@ -538,13 +538,12 @@ describe('kiloJwtAuthMiddleware', () => {
     expect(original.status).toBe(401);
   });
 
-  it.each([
-    ['a bare UUID', crypto.randomUUID()],
-    ['an invalid object id', `not-an-object-id.${crypto.randomUUID()}`],
-    ['extra segments', `${'a'.repeat(64)}.${crypto.randomUUID()}.extra`],
-  ])('rejects %s ticket on /api/user/web', async (_label, ticket) => {
+  // Guard coverage for the ticket format lives in connection-ticket.test.ts.
+  // This case only checks that a legacy UUID ticket from a pre-deploy mint
+  // still gets the middleware's 401.
+  it('rejects a legacy UUID ticket on /api/user/web', async () => {
     const res = await makeApp().fetch(
-      new Request(`http://local/api/user/web?ticket=${ticket}`, {
+      new Request(`http://local/api/user/web?ticket=${crypto.randomUUID()}`, {
         headers: { Upgrade: 'websocket' },
       }),
       makeEnv(TEST_JWT_SECRET)

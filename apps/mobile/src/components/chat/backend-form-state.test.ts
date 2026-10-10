@@ -66,7 +66,7 @@ describe('backend form boundary', () => {
     }
   );
 
-  it('accepts positive whole token limits and explicit tool support', () => {
+  it('accepts positive whole token limits and explicit tool and image support', () => {
     expect(
       backendDraftFromFields(
         {
@@ -76,11 +76,16 @@ describe('backend form boundary', () => {
             contextWindow: '8192',
             maxOutputTokens: '1024',
             tools: true,
+            images: true,
           })),
         },
         false
       ).models[0]
-    ).toMatchObject({ contextWindow: 8192, maxOutputTokens: 1024, tools: true });
+    ).toMatchObject({ contextWindow: 8192, maxOutputTokens: 1024, tools: true, images: true });
+  });
+
+  it('saves a model with the image flag off as text-only', () => {
+    expect(backendDraftFromFields(fields, false).models[0]).toMatchObject({ images: false });
   });
 
   it.each(['max_completion_tokens', 'max_tokens'] as const)(

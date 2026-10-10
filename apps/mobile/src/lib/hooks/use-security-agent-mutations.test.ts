@@ -260,9 +260,7 @@ describe('useTriggerSecuritySync (P1-A-08e wiring)', () => {
     personalTriggerSyncMutateMock.mockRejectedValueOnce(server);
     useTriggerSecuritySync('personal');
 
-    const rejection = await lastCapturedOptions
-      ?.mutationFn?.({})
-      .catch((error: unknown) => error);
+    const rejection = await lastCapturedOptions?.mutationFn?.({}).catch((error: unknown) => error);
     // The global MutationCache onError runs this reporter after the hook's onError.
     lastCapturedOptions?.onError?.(rejection);
     reportAppError(rejection, { source: 'mutation' });

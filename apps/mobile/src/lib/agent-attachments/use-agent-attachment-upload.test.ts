@@ -1750,7 +1750,9 @@ describe('local delivery', () => {
       await local().addCandidates([{ name: 'photo.png', uri: 'file:///cache/photo.png' }]);
     });
 
-    expect(local().attachments.map(chip => chip.status)).toEqual(['pending']);
+    expect(local().attachments.map(chip => [chip.status, chip.progress])).toEqual([
+      ['pending', null],
+    ]);
     expect(await readLocal()).toEqual({
       ok: true,
       wire: undefined,

@@ -32,26 +32,30 @@ export class LocalImageError extends Error {
  */
 export async function encodeLocalImage(uri: string): Promise<LocalImage> {
   let data: string | undefined = undefined;
+  // The live native image is released however this ends, including a failed
+  // read or a failed save: it holds the decoded pixels, and nothing else does.
+  let live: ImageManipulator.ImageRef | undefined = undefined;
   try {
-    const source = await ImageManipulator.ImageManipulator.manipulate(uri).renderAsync();
-    const { width, height } = source;
+    live = await ImageManipulator.ImageManipulator.manipulate(uri).renderAsync();
+    const { width, height } = live;
     const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
-    let image = source;
     if (scale < 1) {
-      source.release();
-      image = await ImageManipulator.ImageManipulator.manipulate(uri)
+      const source = live;
+      live = await ImageManipulator.ImageManipulator.manipulate(uri)
         .resize({ width: Math.round(width * scale), height: Math.round(height * scale) })
         .renderAsync();
+      source.release();
     }
-    const saved = await image.saveAsync({
+    const saved = await live.saveAsync({
       format: ImageManipulator.SaveFormat.JPEG,
       compress: QUALITY,
       base64: true,
     });
-    image.release();
     ({ base64: data } = saved);
   } catch {
     throw new LocalImageError('unreadable');
+  } finally {
+    live?.release();
   }
   if (data === undefined || data === '') {
     throw new LocalImageError('unreadable');

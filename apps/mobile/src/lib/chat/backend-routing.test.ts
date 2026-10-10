@@ -21,6 +21,7 @@ const apple = vi.hoisted(() => {
     maxOutputTokens: 4096,
     systemInstructions: true,
     tokenCounting: true,
+    tools: true,
   };
   return {
     available,
@@ -40,6 +41,7 @@ const apple = vi.hoisted(() => {
       }
     }),
     cancel: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
+    resume: vi.fn<(id: string) => Promise<void>>().mockResolvedValue(undefined),
     countTokens: vi.fn<() => Promise<number>>().mockResolvedValue(9),
     addListener: (_name: string, listener: (event: NativeModelEvent) => void) => {
       listeners.add(listener);
@@ -100,8 +102,9 @@ const question = (model: string): ModelRequest => ({
   },
 });
 
-it('routes an on-device target to its native model without Kilo or tool definitions', async () => {
+it('routes an on-device target to its native model without Kilo, with the tools it runs', async () => {
   const { client, kilo, fetch } = localRouter();
+  expect(targetSupportsTools('local:apple')).toBe(false);
   const events = await Effect.runPromise(Stream.runCollect(client.stream(question('local:apple'))));
   expect([...events]).toMatchObject([
     { kind: 'delta', text: 'On device' },
@@ -110,8 +113,11 @@ it('routes an on-device target to its native model without Kilo or tool definiti
   expect(kilo).not.toHaveBeenCalled();
   expect(fetch).not.toHaveBeenCalled();
   expect(apple.generate).toHaveBeenCalledOnce();
-  expect(apple.generate.mock.calls[0]?.[0]).not.toHaveProperty('tools');
-  expect(targetSupportsTools('local:apple')).toBe(false);
+  expect(apple.generate.mock.calls[0]?.[0]).toMatchObject({
+    tools: [{ name: 'time', description: 'Current time' }],
+  });
+  // The module said it runs the tool loop, so new chats on it are opened with tools.
+  expect(targetSupportsTools('local:apple')).toBe(true);
   expect(targetSupportsTools('kilo/default')).toBe(true);
   // The availability read at send time supplies the window that drives compaction.
   expect(targetModelFacts('local:apple', [], { apiKinds: ['messages'] })).toEqual({

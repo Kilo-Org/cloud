@@ -39,7 +39,9 @@ export type LocalModelStatus = {
 type SystemModelModule = InstanceType<
   typeof NativeModule<{ onModelEvent: (event: NativeModelEvent) => void }>
 > &
-  Required<Omit<NativeModelBridge, 'addListener'>>;
+  Required<Omit<NativeModelBridge, 'addListener' | 'resume'>> &
+  // Only a module that runs the tool loop has it: Apple has it, Android does not.
+  Pick<NativeModelBridge, 'resume'>;
 
 /** A provider that cannot answer its availability check is unavailable, not missing. */
 const UNANSWERED: NativeAvailability = {
@@ -100,11 +102,18 @@ function systemModelProvider(
         const count = await native.countTokens(request);
         return count;
       },
+      ...(native.resume === undefined
+        ? {}
+        : {
+            resume: async (id, results) => {
+              await native.resume?.(id, results);
+            },
+          }),
       addListener: (eventName, listener) => native.addListener(eventName, listener),
     }),
     facts: () => systemFacts(known.get(provider)),
-    // System on-device models are text-only: no tool definitions are sent.
-    supportsTools: () => false,
+    // The module says whether it runs the tool loop. Until it answers, no tools are sent.
+    supportsTools: () => known.get(provider)?.tools === true,
   };
 }
 

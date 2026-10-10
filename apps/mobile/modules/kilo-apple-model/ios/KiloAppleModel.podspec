@@ -15,7 +15,8 @@ Pod::Spec.new do |s|
   s.weak_frameworks = 'FoundationModels'
 
   # SDK 26.4 supplies transcript token counting. SDK 27 additionally supplies
-  # reported usage and the new error types; do not make those a build requirement.
+  # reported usage, the new error types, the vision capability, and image
+  # attachments; do not make those a build requirement.
   # Use the selected Xcode's iPhoneOS SDK, the same toolchain used for pod builds.
   sdk_version = `xcrun --sdk iphoneos --show-sdk-version`.strip
   if sdk_version.empty? || Gem::Version.new(sdk_version) < Gem::Version.new('26.4')

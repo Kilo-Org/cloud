@@ -105,9 +105,10 @@ function systemModelProvider(
       addListener: (eventName, listener) => native.addListener(eventName, listener),
     }),
     facts: () => systemFacts(known.get(provider)),
-    // System on-device models are text-only: no tool definitions or images are sent.
+    // System on-device models get no tool definitions. They get images only
+    // when the last availability answer says the device's model reads them.
     supportsTools: () => false,
-    supportsImages: () => false,
+    supportsImages: () => known.get(provider)?.images === true,
   };
 }
 

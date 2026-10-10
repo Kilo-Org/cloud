@@ -51,7 +51,7 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**863 procedures** — **370 queries**, **493 mutations** — under **53 prefixes**.
+**860 procedures** — **369 queries**, **491 mutations** — under **52 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -95,7 +95,6 @@ each row's `summary` and `tags` are what the search matches.
 | `slack` | 4 | 1 | 3 |
 | `credits` | 3 | 1 | 2 |
 | `linear` | 3 | 1 | 2 |
-| `quickChat` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
 | `mcpGatewayAuthorizations` | 2 | 1 | 1 |
 | `models` | 2 | 2 | 0 |

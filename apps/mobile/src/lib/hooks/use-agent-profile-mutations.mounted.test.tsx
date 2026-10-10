@@ -1,5 +1,5 @@
 import { type MobileRouter } from '@kilocode/trpc/mobile';
-import { createElement, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -59,10 +59,13 @@ describe('useAgentProfileMutations deleteProfile', () => {
   it('refetches the profile list but not the deleted profile while its screen is mounted', async () => {
     const queryClient = createTestQueryClient();
     const holder: { current: DeleteProfile | null } = { current: null };
-    const { unmount } = await renderWithProviders(createElement(ProfileOverviewProbe, { holder }), {
+    const { unmount } = await renderWithProviders(<ProfileOverviewProbe holder={holder} />, {
       queryClient,
-      wrapper: ({ children }: { children: ReactNode }) =>
-        createElement(TRPCProvider, { trpcClient, queryClient, children }),
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <TRPCProvider trpcClient={trpcClient} queryClient={queryClient}>
+          {children}
+        </TRPCProvider>
+      ),
     });
     await waitFor(() => callsTo('agentProfiles.get') === 1 && callsTo('agentProfiles.list') === 1);
 

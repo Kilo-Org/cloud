@@ -30,15 +30,12 @@ export function RecentCodeIndexSearches({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Fetch recent searches
   const { data: recentSearches, isLoading: isLoadingSearches } = useQuery(
     trpc.codeIndexing.getRecentSearches.queryOptions({ organizationId })
   );
 
-  // State for expanded search row
   const [expandedSearchId, setExpandedSearchId] = useState<string | null>(null);
 
-  // Invalidate recent searches after search results are loaded
   useEffect(() => {
     if (searchResults && submittedSearch) {
       void queryClient.invalidateQueries({

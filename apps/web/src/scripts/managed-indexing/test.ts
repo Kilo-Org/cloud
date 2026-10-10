@@ -10,7 +10,6 @@ import { z } from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 
-// Types
 type ManifestResponse = {
   organizationId: string | null;
   projectId: string;
@@ -42,7 +41,6 @@ type AuthConfig = {
   organizationId: string | null;
 };
 
-// Constants
 const DEFAULT_GIT_BRANCH = 'main';
 const DEFAULT_SEARCHES = [
   { name: 'Organization Role Changes', query: 'organization change role permissions member' },
@@ -53,7 +51,6 @@ const DEFAULT_SEARCHES = [
   { name: 'Self-search', query: 'script to test qdrant' },
 ];
 
-// Authentication
 async function getAuthConfig(organizationId: string): Promise<AuthConfig> {
   console.log('🔑 Generating authentication token...');
   if (z.uuid().safeParse(organizationId).success) {
@@ -80,7 +77,6 @@ async function getAuthConfig(organizationId: string): Promise<AuthConfig> {
   }
 }
 
-// File operations
 function findTypeScriptFiles(dir: string): string[] {
   const files: string[] = [];
   const entries = readdirSync(dir, { withFileTypes: true });
@@ -89,7 +85,6 @@ function findTypeScriptFiles(dir: string): string[] {
     const fullPath = join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      // Skip node_modules, .git, and other common directories
       if (!['node_modules', '.git', '.next', 'dist', 'build', '.turbo'].includes(entry.name)) {
         files.push(...findTypeScriptFiles(fullPath));
       }
@@ -106,7 +101,6 @@ function computeFileHash(filePath: string): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
-// API operations
 async function uploadFile(
   filePath: string,
   organizationId: string | null,
@@ -242,7 +236,6 @@ async function performSearch(
   return response.json() as Promise<SearchResult[]>;
 }
 
-// Display functions
 function displaySearchResults(searchName: string, query: string, results: SearchResult[]): void {
   console.log(`\n📝 ${searchName} (${results.length} results)`);
   console.log(`   Query: "${query}"`);
@@ -259,7 +252,6 @@ function displaySearchResults(searchName: string, query: string, results: Search
   });
 }
 
-// Main operations
 async function indexFiles(
   organizationId: string | null,
   projectId: string,
@@ -275,7 +267,6 @@ async function indexFiles(
   console.log(`   Base URL: ${baseUrl}`);
   console.log('');
 
-  // Fetch existing manifest to check which files need updating
   console.log('📋 Fetching existing manifest...');
   let existingManifest: ManifestResponse;
   try {
@@ -314,7 +305,6 @@ async function indexFiles(
     manifestMap.set(filePath, fileHash);
   }
 
-  // Resolve the folder path (handle relative, absolute, and ~/ paths)
   let srcDir: string;
   if (folderPath.startsWith('~/')) {
     srcDir = join(homedir(), folderPath.slice(2));
@@ -329,10 +319,6 @@ async function indexFiles(
   console.log(`   Found ${allFiles.length} TypeScript files`);
   console.log('');
 
-  // Filter files that need to be uploaded
-  // A file needs indexing if:
-  // 1. It's not in the manifest at all, OR
-  // 2. The file hash has changed (content was modified)
   console.log('🔍 Checking which files need indexing...');
   const filesToUpload = allFiles.filter(file => {
     const relPath = relative(process.cwd(), file);
@@ -344,12 +330,10 @@ async function indexFiles(
       return true;
     }
 
-    // If file not in manifest, it needs indexing
     if (!manifestHash) {
       return true;
     }
 
-    // If file hash changed, it needs re-indexing
     const currentHash = computeFileHash(file);
     if (currentHash !== manifestHash) {
       return true;
@@ -369,7 +353,6 @@ async function indexFiles(
     return;
   }
 
-  // Index files with concurrency limit
   console.log('📤 Indexing files (up to 10 concurrent requests)...');
   let successCount = 0;
   let totalChunks = 0;
@@ -424,7 +407,6 @@ async function indexFiles(
   console.log(`   📦 Total chunks: ${totalChunks}`);
   console.log('');
 
-  // Fetch and display final manifest
   console.log('📋 Fetching final manifest...');
   try {
     const startTime = Date.now();
@@ -454,10 +436,8 @@ async function runSearches(
   console.log(`   Project ID: ${projectId}`);
   console.log(`   Base URL: ${baseUrl}`);
 
-  // Track search timings
   const searchTimings: Array<{ query: string; name: string; timeMs: number }> = [];
 
-  // Perform default searches
   for (const search of DEFAULT_SEARCHES) {
     try {
       const startTime = Date.now();
@@ -479,7 +459,6 @@ async function runSearches(
     }
   }
 
-  // Display timing summary
   console.log('\n⏱️  Search Timing Summary:');
   console.log('   ─────────────────────────────────────────────────────────────────');
   for (const timing of searchTimings) {
@@ -492,14 +471,6 @@ async function runSearches(
   console.log('\n✨ Search complete!');
 }
 
-/**
- * Main test function
- * Indexes all TypeScript files in the specified folder and performs searches
- *
- * @param orgId - Organization ID or user email
- * @param projectId - Project identifier (default: 'test-project')
- * @param folderPath - Path to folder containing files to index (relative, absolute, or ~/path)
- */
 export async function run(
   orgId: string,
   projectId: string = 'test-project',

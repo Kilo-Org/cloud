@@ -60,14 +60,11 @@ describe('useAgentProfileMutations deleteProfile', () => {
   it('refetches the profile list but not the deleted profile while its screen is mounted', async () => {
     const queryClient = createTestQueryClient();
     const holder: { current: DeleteProfile | null } = { current: null };
-    const { unmount } = await renderWithProviders(
-      createElement(ProfileOverviewProbe, { holder }),
-      {
-        queryClient,
-        wrapper: ({ children }: { children: ReactNode }) =>
-          createElement(TRPCProvider, { trpcClient, queryClient }, children),
-      }
-    );
+    const { unmount } = await renderWithProviders(createElement(ProfileOverviewProbe, { holder }), {
+      queryClient,
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(TRPCProvider, { trpcClient, queryClient }, children),
+    });
     await waitFor(() => callsTo('agentProfiles.get') === 1 && callsTo('agentProfiles.list') === 1);
 
     await act(async () => {

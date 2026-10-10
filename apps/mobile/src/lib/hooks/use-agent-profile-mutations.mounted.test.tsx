@@ -1,4 +1,4 @@
-import type { MobileRouter } from '@kilocode/trpc/mobile';
+import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { createElement, type ReactNode } from 'react';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -50,11 +50,10 @@ function ProfileOverviewProbe({ holder }: { holder: { current: DeleteProfile | n
 
 describe('useAgentProfileMutations deleteProfile', () => {
   beforeEach(() => {
-    transport
-      .mockReset()
-      .mockImplementation(async input =>
-        Response.json({ result: { data: responses[procedureOf(input)] } })
-      );
+    transport.mockReset().mockImplementation(async input => {
+      await Promise.resolve();
+      return Response.json({ result: { data: responses[procedureOf(input)] } });
+    });
   });
 
   it('refetches the profile list but not the deleted profile while its screen is mounted', async () => {

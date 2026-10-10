@@ -1,4 +1,4 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 export type ControllerTelemetryRow = {
   timestamp: string;

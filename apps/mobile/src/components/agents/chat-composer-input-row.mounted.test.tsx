@@ -1,14 +1,21 @@
-import { createElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+import { type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ChatComposerInputRow } from './chat-composer-input-row';
+import {
+  findAllByType,
+  findByAccessibilityLabel,
+  findTextInput,
+  makeProps,
+  type RenderProps,
+  renderRow,
+} from './chat-composer-input-row.mounted.test-helpers';
 
 const platformOS = vi.hoisted(() => ({ os: 'ios' }));
 
 function reactNativeMock() {
   return {
     ActivityIndicator: 'ActivityIndicator',
+    I18nManager: { isRTL: false },
     Platform: { OS: platformOS.os },
     Pressable: 'Pressable',
     TextInput: 'TextInput',
@@ -44,88 +51,6 @@ vi.mock('@/components/agents/chat-composer-input-height', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6b7280' }),
 }));
-
-type RenderProps = {
-  canSend?: boolean;
-  hasSendableContent?: boolean;
-  inputEditable: boolean;
-  inputEmpty?: boolean;
-  isStreaming?: boolean;
-  onSubmit?: () => void;
-  placeholder?: string;
-  returnSendsMessage?: boolean;
-  voiceInputAvailable?: boolean;
-};
-
-function makeProps(overrides: Partial<RenderProps> = {}) {
-  return {
-    attachmentsEnabled: false,
-    canSend: false,
-    disabled: false,
-    hasSendableContent: false,
-    inputAccessibilityDisabled: false,
-    inputEditable: false,
-    inputEmpty: true,
-    inputRef: { current: null },
-    isSending: false,
-    isStreaming: false,
-    maxInputHeight: 120,
-    measureHeight: 40,
-    onAddAttachment: () => undefined,
-    onChangeText: () => undefined,
-    onInputBlur: () => undefined,
-    onInputFocus: () => undefined,
-    onInputLayout: () => undefined,
-    onInputContentSizeChange: () => undefined,
-    onInsertNewline: () => undefined,
-    onSelectionChange: () => undefined,
-    onStop: () => undefined,
-    onSubmit: () => undefined,
-    onToggleVoice: () => undefined,
-    paperclipDisabled: false,
-    placeholder: 'Message the agent',
-    returnSendsMessage: false,
-    textInputStyle: {},
-    voiceDisabled: false,
-    voiceInputAvailable: false,
-    voiceInputStatus: 'idle' as const,
-    ...overrides,
-  };
-}
-
-function findTextInput(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  return root.find(node => typeof node.type === 'string' && (node.type as string) === 'TextInput');
-}
-
-function findAllByType(
-  root: TestRenderer.ReactTestInstance,
-  type: string
-): TestRenderer.ReactTestInstance[] {
-  return root.findAll(node => typeof node.type === 'string' && (node.type as string) === type);
-}
-
-function findByAccessibilityLabel(
-  root: TestRenderer.ReactTestInstance,
-  label: string
-): TestRenderer.ReactTestInstance | null {
-  const matches = root.findAll(
-    node => typeof node.type === 'string' && node.props.accessibilityLabel === label
-  );
-  return matches[0] ?? null;
-}
-
-async function renderRow(props: RenderProps): Promise<TestRenderer.ReactTestRenderer> {
-  const holder: { current?: TestRenderer.ReactTestRenderer } = {};
-  await act(async () => {
-    await Promise.resolve();
-    holder.current = TestRenderer.create(createElement(ChatComposerInputRow, makeProps(props)));
-  });
-  const renderer = holder.current;
-  if (!renderer) {
-    throw new Error('renderer was not created');
-  }
-  return renderer;
-}
 
 describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
   beforeEach(() => {

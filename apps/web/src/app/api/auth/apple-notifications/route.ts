@@ -1,13 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_refresh_tokens, device_sessions, user_auth_provider } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest } from '@/lib/utils.server';
-import { APPLE_CLIENT_ID } from '@/lib/config.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { APPLE_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import { AppleJwtClientError, verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
-import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { revokeWebSessions } from '@kilocode/web-shared/lib/web-session-revocation';
 
 type AppleEvent = {
   type: 'consent-revoked' | 'account-delete' | 'email-disabled' | 'email-enabled';

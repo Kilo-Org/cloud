@@ -62,6 +62,12 @@ export const TOOL_SUMMARY_TRANSLATION_MODEL_KEY = 'tool-summary-translation-mode
 export const VOICE_INPUT_LANGUAGE_KEY = 'voice-input-language';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
+/**
+ * Revocable per-host list of markdown image hosts whose images load without a
+ * tap. Separate from `TRUSTED_HOSTS_KEY`: opening a link and fetching an image
+ * from a host are different consents.
+ */
+export const TRUSTED_IMAGE_HOSTS_KEY = 'trusted-image-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
 /** Group consecutive tool calls on the session page into one condensed row. */
 export const CONDENSE_TOOL_CALLS_KEY = 'condense-tool-calls';

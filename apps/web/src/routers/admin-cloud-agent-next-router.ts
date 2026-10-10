@@ -1,5 +1,5 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
 import { and, desc, eq, gte, isNotNull, lt, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import * as z from 'zod';

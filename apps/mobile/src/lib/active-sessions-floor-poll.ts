@@ -191,6 +191,17 @@ type UseActiveSessionsFloorPollOptions = {
  * while the app is not foregrounded, while a tick is already in flight, or
  * before the first payload is in the cache (nothing to compare against, and an
  * empty cache belongs to the initial fetch, not this poll).
+ *
+ * On the false->true edge of the `enabled && visible` gate — a surface that
+ * shows live agents becoming visible, or the read gate re-arming — one leading
+ * tick runs before the interval is installed, so the rows reconcile as soon as
+ * the surface is on screen instead of up to a full floor interval later. The
+ * cold-start arm is not an edge: the surface's own query mount already fetches,
+ * so the poll never duplicates it. A `connected` flip only re-arms the
+ * interval: a reconnect already gets its freshness from the live-sync path, so
+ * it must not add a request. The leading tick is the ordinary `tick` and keeps
+ * every guard below, so it is a no-op while hidden, backgrounded, in flight, or
+ * before the cache holds a payload.
  */
 export function useActiveSessionsFloorPoll({
   enabled,
@@ -202,9 +213,14 @@ export function useActiveSessionsFloorPoll({
 }: UseActiveSessionsFloorPollOptions): void {
   const { authEpoch } = useAuth();
   const inFlight = useRef(false);
+  // True while an interval is armed. Starts armed so the cold-start mount is
+  // not treated as a visible edge, and is kept across the `connected` re-arm so
+  // only the gate's own false->true edge leads a tick, never a reconnect.
+  const armed = useRef(true);
 
   useEffect(() => {
     if (!enabled || !visible) {
+      armed.current = false;
       return undefined;
     }
     const controller = new AbortController();
@@ -265,6 +281,14 @@ export function useActiveSessionsFloorPoll({
         }
       }
     };
+    // One leading tick on the gate's false->true edge, then the unchanged
+    // interval. `tick` owns every guard, so a backgrounded, hidden-cache or
+    // already-in-flight arm leads to no request.
+    const shouldLeadTick = !armed.current;
+    armed.current = true;
+    if (shouldLeadTick) {
+      void tick();
+    }
     const interval = setInterval(
       () => {
         void tick();

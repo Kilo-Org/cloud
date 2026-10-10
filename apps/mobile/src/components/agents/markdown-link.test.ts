@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  getLinkAccessibilityActions,
-  getLinkAccessibilityHint,
-  getLinkLongPressHandler,
-  resolveLinkAccessibilityLabel,
-} from './markdown-link';
-
-const onLongPressLink = () => undefined;
+import { getLinkAccessibilityActions, resolveLinkAccessibilityLabel } from './markdown-link';
 
 describe('resolveLinkAccessibilityLabel', () => {
   it('prefers an explicit title', () => {
@@ -34,19 +27,10 @@ describe('resolveLinkAccessibilityLabel', () => {
 });
 
 describe('link action accessibility', () => {
-  it('describes the existing in-app browser behavior', () => {
-    expect(getLinkAccessibilityHint()).toBe('Opens in browser');
-  });
-
   it('exposes link actions only when the chat callback is enabled', () => {
     expect(getLinkAccessibilityActions(false)).toBeUndefined();
     expect(getLinkAccessibilityActions(true)).toEqual([
       { name: 'showLinkActions', label: 'Show link actions' },
     ]);
-  });
-
-  it('attaches a long-press handler only when chat link actions are enabled', () => {
-    expect(getLinkLongPressHandler(undefined, 'https://kilo.ai')).toBeUndefined();
-    expect(getLinkLongPressHandler(onLongPressLink, 'https://kilo.ai')).toBeTypeOf('function');
   });
 });

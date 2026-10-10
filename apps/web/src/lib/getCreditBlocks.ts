@@ -1,5 +1,5 @@
-import type { CreditTransactionForBlocks } from '@/lib/creditExpiration';
-import { computeExpiration } from '@/lib/creditExpiration';
+import type { CreditTransactionForBlocks } from '@kilocode/web-shared/lib/creditExpiration';
+import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
 import { toNonNullish } from '@/lib/utils';
 
 type EntityForCreditBlocks = {

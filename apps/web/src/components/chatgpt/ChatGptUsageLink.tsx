@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { ChatGptUsageLinkView } from '@/components/chatgpt/ChatGptUsageLinkView';
-import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 
 /**
  * The usage-page link, which renders only for a live connection. It reads the

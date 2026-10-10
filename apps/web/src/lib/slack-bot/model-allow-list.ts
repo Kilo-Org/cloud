@@ -1,9 +1,10 @@
-import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/ai-gateway/models';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   getEffectiveModelDecision,
   resolveOrganizationDefaultModelPolicy,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 /**
  * Get a default model that is allowed for an organization.
@@ -47,7 +48,7 @@ export async function getDefaultAllowedModel(
   }
 
   // Try each preferred/recommended model in order
-  for (const model of preferredModels) {
+  for (const model of await getPreferredModels()) {
     if (await isAllowed(model)) {
       return model;
     }

@@ -17,13 +17,13 @@ const insertChain = {
 const insertMock = jest.fn(() => insertChain);
 const dbMock = { insert: insertMock };
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   get db() {
     return dbMock;
   },
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID() {
     return 'github-token-key-v1';
   },
@@ -32,7 +32,7 @@ jest.mock('@/lib/config.server', () => ({
   },
 }));
 
-jest.mock('@/lib/encryption', () => ({
+jest.mock('@kilocode/web-shared/lib/encryption', () => ({
   encryptKeyedEnvelope: (...args: [string, string, unknown, string]) =>
     mockEncryptKeyedEnvelope(...args),
 }));

@@ -1,11 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import type { PlatformIntegration, User } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import type { UpsertPlatformIntegrationResult } from '@/lib/integrations/db/platform-integrations';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type TestIntegration = {
   id: string;
@@ -84,7 +84,7 @@ jest.mock('@/lib/integrations/github-apps-service', () => ({
   uninstallApp: () => mockUninstallApp(),
 }));
 
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: (
     ctx: { user: User },
     organizationId: string,

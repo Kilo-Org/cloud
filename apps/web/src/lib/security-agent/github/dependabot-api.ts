@@ -15,7 +15,11 @@ import type {
   DependabotAlertsAvailability,
   DependabotAlertState,
 } from '../core/types';
-import { errorExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
+import {
+  errorExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 
 const log = sentryLogger('security-agent:dependabot-api', 'info');
 const warn = sentryLogger('security-agent:dependabot-api', 'warning');
@@ -386,7 +390,6 @@ export async function fetchAllDependabotAlerts(
         // No state filter - get all alerts including fixed/dismissed
       },
       response => {
-        // Track rate limit on each page response
         const remaining = response.headers['x-ratelimit-remaining'];
         const limit = response.headers['x-ratelimit-limit'];
         if (remaining !== undefined && Number(remaining) < 100) {
@@ -467,7 +470,6 @@ export async function fetchOpenDependabotAlerts(
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
-    // Use Octokit's paginate helper which handles cursor-based pagination automatically
     const data = await octokit.paginate(octokit.rest.dependabot.listAlertsForRepo, {
       owner,
       repo,
@@ -529,7 +531,6 @@ export async function fetchDependabotAlert(
       return null;
     }
 
-    // Return null if alert not found
     if (status === 404) {
       return null;
     }
@@ -592,7 +593,6 @@ export async function isDependabotEnabled(
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
-    // Try to fetch alerts - if it succeeds, Dependabot is enabled
     await octokit.rest.dependabot.listAlertsForRepo({
       owner,
       repo,

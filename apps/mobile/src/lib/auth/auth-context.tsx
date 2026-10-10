@@ -69,7 +69,7 @@ import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-owners
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
-import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   isSignOutActive,
   setSignOutActive,
@@ -128,7 +128,7 @@ const jwtPayloadSchema = z.object({ kiloUserId: z.string().optional() });
 /**
  * Best-effort read of the signed-in user id from a Kilo bearer token. The
  * token is a JWT whose payload carries `kiloUserId` (see `generateApiToken`
- * in apps/web/src/lib/tokens.ts). Decode-only: the server already accepted
+ * in packages/web-shared/src/lib/tokens.ts). Decode-only: the server already accepted
  * the token, so the id is read without verifying the signature (the app has
  * no signing secret). Returns null for a non-JWT or malformed token so a
  * decode failure can never break sign-in.

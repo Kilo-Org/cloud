@@ -145,39 +145,86 @@ describe('useActiveSessionsFloorPoll', () => {
     expect(queryFn).not.toHaveBeenCalled();
   });
 
-  it('polls after 30s while visible and connected, and not before', async () => {
+  it('runs one leading tick on a visible edge, then keeps the 30s connected interval', async () => {
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    await render({ enabled: true, visible: false, connected: true, queryFn });
     await render({ enabled: true, visible: true, connected: true, queryFn });
+    expect(queryFn).toHaveBeenCalledTimes(1);
     await advanceBy(29_000);
-    expect(queryFn).not.toHaveBeenCalled();
+    expect(queryFn).toHaveBeenCalledTimes(1);
     await advanceBy(1000);
-    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(queryFn).toHaveBeenCalledTimes(2);
   });
 
-  it('polls after 10s while the socket is not connected', async () => {
-    const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
-    client.setQueryData(QUERY_KEY, payload('a', 'running'));
-    await render({ enabled: true, visible: true, connected: false, queryFn });
-    await advanceBy(10_000);
-    expect(queryFn).toHaveBeenCalledTimes(1);
-  });
-
-  it('re-arms the interval when the connection state flips', async () => {
+  it('does not lead a tick on the cold-start arm; the surface fetch already covers it', async () => {
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     client.setQueryData(QUERY_KEY, payload('a', 'running'));
     await render({ enabled: true, visible: true, connected: true, queryFn });
+    expect(queryFn).not.toHaveBeenCalled();
+    await render({ enabled: true, visible: true, connected: false, queryFn });
+    expect(queryFn).not.toHaveBeenCalled();
+  });
+
+  it('runs a leading tick when the surface becomes visible', async () => {
+    const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    await render({ enabled: true, visible: false, connected: true, queryFn });
+    expect(queryFn).not.toHaveBeenCalled();
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs a leading tick when the read gate re-arms while visible', async () => {
+    const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    await render({ enabled: false, visible: true, connected: true, queryFn });
+    expect(queryFn).not.toHaveBeenCalled();
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a changed payload on the leading tick, without waiting for the interval', async () => {
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    const changed = payload('a', 'idle');
+    const queryFn = vi.fn<QueryFn>().mockResolvedValue(changed);
+    await render({ enabled: true, visible: false, connected: true, queryFn });
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    await advanceBy(0);
+    expect(client.getQueryData(QUERY_KEY)).toEqual(changed);
+  });
+
+  it('keeps the 10s disconnected interval after the leading tick', async () => {
+    const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    await render({ enabled: true, visible: false, connected: false, queryFn });
+    await render({ enabled: true, visible: true, connected: false, queryFn });
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    await advanceBy(10_000);
+    expect(queryFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-arms the interval on a reconnect without leading an extra tick', async () => {
+    const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    await render({ enabled: true, visible: false, connected: true, queryFn });
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    expect(queryFn).toHaveBeenCalledTimes(1);
     await advanceBy(29_000);
     await render({ enabled: true, visible: true, connected: false, queryFn });
-    await advanceBy(10_000);
+    // A connection flip only re-arms the interval; the leading tick is reserved
+    // for the visible/read gate edge, so a reconnect adds no request.
     expect(queryFn).toHaveBeenCalledTimes(1);
+    await advanceBy(10_000);
+    expect(queryFn).toHaveBeenCalledTimes(2);
     await advanceBy(20_000);
-    expect(queryFn).toHaveBeenCalledTimes(3);
+    expect(queryFn).toHaveBeenCalledTimes(4);
   });
 
   it('never polls before a payload is in the cache', async () => {
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     await render({ enabled: true, visible: true, connected: true, queryFn });
+    expect(queryFn).not.toHaveBeenCalled();
     await advanceBy(60_000);
     expect(queryFn).not.toHaveBeenCalled();
   });
@@ -187,9 +234,12 @@ describe('useActiveSessionsFloorPoll', () => {
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     const setData = vi.spyOn(client, 'setQueryData');
     const { events, unsubscribe } = subscribeToCacheEvents();
+    await render({ enabled: true, visible: false, connected: true, queryFn });
     await render({ enabled: true, visible: true, connected: true, queryFn });
-    await advanceBy(30_000);
     expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(setData).not.toHaveBeenCalled();
+    await advanceBy(30_000);
+    expect(queryFn).toHaveBeenCalledTimes(2);
     expect(setData).not.toHaveBeenCalled();
     expect(events).toHaveLength(0);
     unsubscribe();
@@ -218,9 +268,12 @@ describe('useActiveSessionsFloorPoll', () => {
     const queryFn = vi.fn<QueryFn>().mockRejectedValue(new Error('offline'));
     const setData = vi.spyOn(client, 'setQueryData');
     const { events, unsubscribe } = subscribeToCacheEvents();
+    await render({ enabled: true, visible: false, connected: true, queryFn });
     await render({ enabled: true, visible: true, connected: true, queryFn });
-    await advanceBy(30_000);
     expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(setData).not.toHaveBeenCalled();
+    await advanceBy(30_000);
+    expect(queryFn).toHaveBeenCalledTimes(2);
     expect(setData).not.toHaveBeenCalled();
     expect(events).toHaveLength(0);
     expect(client.getQueryData(QUERY_KEY)).toEqual(payload('a', 'running'));

@@ -28,14 +28,14 @@ import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 import pLimit from 'p-limit';
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, gt, isNull, sql, inArray, or } from 'drizzle-orm';
 import {
   computeExpiration,
   processLocalExpirations,
   type ExpiringTransaction,
-} from '@/lib/creditExpiration';
+} from '@kilocode/web-shared/lib/creditExpiration';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

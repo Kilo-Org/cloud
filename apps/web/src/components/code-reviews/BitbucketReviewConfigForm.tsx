@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { useTRPC } from '@/lib/trpc/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';

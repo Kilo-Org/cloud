@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
   isInstanceKeyedSandboxId,
   instanceIdFromSandboxId,

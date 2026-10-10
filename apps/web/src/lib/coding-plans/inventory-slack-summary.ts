@@ -1,12 +1,12 @@
 import 'server-only';
 
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getCodingPlanAvailabilityIntentCounts, getKeyInventoryCounts } from '@/lib/coding-plans';
 import { getCodingPlanCatalog } from '@/lib/coding-plans/pricing';
 import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
 
 export type CodingPlanInventoryCount = {
   providerId: string;

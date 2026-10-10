@@ -78,6 +78,7 @@ const mocks = vi.hoisted(() => ({
   clearSettingsToolsEnabled: vi.fn(),
   clearTrustedHosts: vi.fn(),
   forgetRemoteMcp: vi.fn(),
+  clearTrustedImageHosts: vi.fn(),
   notifyArtifactsChanged: vi.fn(),
   reapTempFiles: vi.fn(),
   resetArtifactMirrorSyncState: vi.fn(),
@@ -112,6 +113,11 @@ vi.mock('@/lib/agent-attachments/clipboard-image', () => ({
 vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   clearTrustedHosts: mocks.clearTrustedHosts,
 }));
+// Image-host trust is a second SecureStore preference; its module reaches
+// SecureStore and Sentry on import, so it is mocked beside the link list.
+vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
+  clearTrustedImageHosts: mocks.clearTrustedImageHosts,
+}));
 vi.mock('@/lib/temp-file-registry', () => ({ reapTempFiles: mocks.reapTempFiles }));
 // The remote MCP connection, its stored servers and the settings-tools group
 // switch are account-scoped; their own suites cover what each clear resets.
@@ -136,6 +142,7 @@ vi.mock('@/lib/artifacts/artifact-mirror-sync', () => ({
 /** Every mocked member, in declaration order; the mirror and goal stores stay real. */
 const SESSION_MEMBERS = [
   mocks.clearTrustedHosts,
+  mocks.clearTrustedImageHosts,
   mocks.clearMarkdownImageConfirmMemory,
   mocks.clearToolCardImageCache,
   mocks.clearFilePartCache,

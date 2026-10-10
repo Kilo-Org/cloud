@@ -2,7 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
-import { createTRPCContext } from '@/lib/trpc/init';
+import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { PrefetchedOrganizations } from './PrefetchedOrganizations';
 
 // The component relies on the automatic JSX runtime; jest's classic transform
@@ -10,7 +10,7 @@ import { PrefetchedOrganizations } from './PrefetchedOrganizations';
 // `SidebarUserFooter.test.ts` does.
 (globalThis as typeof globalThis & { React: typeof React }).React = React;
 
-jest.mock('@/lib/trpc/init', () => ({ createTRPCContext: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => ({ createTRPCContext: jest.fn() }));
 jest.mock('@/routers/root-router', () => ({ rootRouter: {} }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@trpc/tanstack-react-query', () => ({

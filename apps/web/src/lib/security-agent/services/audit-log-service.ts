@@ -8,8 +8,8 @@
 import 'server-only';
 import { security_audit_log } from '@kilocode/db/schema';
 import type { SecurityAuditLogEntry } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { SecurityAuditLogAction } from '../core/enums';
 import type { SecurityReviewOwner } from '../core/types';
 import { captureException } from '@sentry/nextjs';

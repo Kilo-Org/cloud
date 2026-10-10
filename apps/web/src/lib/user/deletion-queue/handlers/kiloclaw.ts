@@ -1,4 +1,4 @@
-import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@/lib/config.server';
+import { INTERNAL_API_SECRET, KILOCLAW_API_URL } from '@kilocode/web-shared/lib/config.server';
 import {
   listAllActiveInstanceRows,
   markActiveInstanceBatchDestroyedForGdpr,
@@ -6,7 +6,7 @@ import {
   workerInstanceId,
 } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawApiError, KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { classifyHttpStatus } from '@/lib/user/deletion-queue/deletion-http';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
 import type { DeletionHandlerOutcome } from '@/lib/user/deletion-queue/deletion-types';

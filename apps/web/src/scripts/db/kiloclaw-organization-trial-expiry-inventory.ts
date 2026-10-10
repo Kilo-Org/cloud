@@ -6,7 +6,7 @@
  *   pnpm --filter web script:run db kiloclaw-organization-trial-expiry-inventory --as-of 2026-05-19T00:00:00.000Z
  */
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   evaluateOrganizationTrialExpiryInventory,
   formatOrganizationTrialExpiryInventoryReport,

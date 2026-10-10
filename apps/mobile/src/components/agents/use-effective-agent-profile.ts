@@ -1,16 +1,12 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import {
   resolveSessionProfilePicker,
   type SessionProfilePickerProfile,
 } from '@/components/agents/session-profile-picker-model';
 import { useTRPC } from '@/lib/trpc';
 import { type AgentProfileListItem } from '@/lib/hooks/agent-profile-types';
-
-type ProfileSummary = inferRouterOutputs<MobileRouter>['agentProfiles']['list'][number];
-type CombinedProfiles = inferRouterOutputs<MobileRouter>['agentProfiles']['listCombined'];
 
 /** The read-only capability view the new-session form renders. */
 export type EffectiveAgentProfile = SessionProfilePickerProfile & {
@@ -31,30 +27,6 @@ function toEffective(profile: AgentProfileListItem): EffectiveAgentProfile {
     commandCount: profile.commandCount,
     agentCount: profile.agentCount,
   };
-}
-
-/**
- * Resolve the personal default from a `list` result: the first profile marked
- * `isDefault`, else none.
- */
-export function resolvePersonalDefault(profiles: ProfileSummary[]): ProfileSummary | null {
-  return profiles.find(profile => profile.isDefault) ?? null;
-}
-
-/**
- * Resolve the effective profile from a `listCombined` result. The server has
- * already applied "personal default > org default"; `effectiveDefaultId` names
- * the winner, and this locates its summary in either bucket.
- */
-export function resolveCombinedDefault(combined: CombinedProfiles): ProfileSummary | null {
-  if (combined.effectiveDefaultId === null) {
-    return null;
-  }
-  return (
-    combined.personalProfiles.find(profile => profile.id === combined.effectiveDefaultId) ??
-    combined.orgProfiles.find(profile => profile.id === combined.effectiveDefaultId) ??
-    null
-  );
 }
 
 /**

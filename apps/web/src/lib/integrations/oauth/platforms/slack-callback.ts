@@ -1,14 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';

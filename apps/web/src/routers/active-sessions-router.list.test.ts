@@ -1,13 +1,15 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',
@@ -196,6 +198,59 @@ describe('active-sessions-router.list', () => {
     } finally {
       await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
     }
+  });
+
+  it('carries a scheduled worker row through with its ISO scheduledAt', async () => {
+    const sessionId = 'ses_active_scheduled_at_1234';
+    const scheduledAt = '2026-09-24T09:30:00.000Z';
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: regularUser.id,
+      created_on_platform: 'cli',
+      // Stored status is not attention, so the live `scheduled` status wins.
+      status: 'idle',
+    });
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'scheduled',
+        title: 'wakes later',
+        connectionId: 'conn-sched',
+        scheduledAt,
+      },
+    ]);
+
+    try {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.activeSessions.list();
+
+      expect(result.sessions).toHaveLength(1);
+      expect(result.sessions[0]?.status).toBe('scheduled');
+      expect(result.sessions[0]?.scheduledAt).toBe(scheduledAt);
+    } finally {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    }
+  });
+
+  it('omits scheduledAt when a scheduled worker row carries no wake time', async () => {
+    const sessionId = 'ses_active_scheduled_no_at_1234';
+
+    fetchSpy = mockWorkerSessions([
+      {
+        id: sessionId,
+        status: 'scheduled',
+        title: 'wakes later, no time',
+        connectionId: 'conn-sched-no-at',
+      },
+    ]);
+
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list();
+
+    expect(result.sessions).toHaveLength(1);
+    expect(result.sessions[0]?.status).toBe('scheduled');
+    expect(result.sessions[0]).not.toHaveProperty('scheduledAt');
   });
 
   it('passes sessions with undefined enrichment fields when no matching row exists', async () => {

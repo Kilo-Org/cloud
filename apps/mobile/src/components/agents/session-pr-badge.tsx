@@ -52,6 +52,20 @@ const ACCENT_COLOR_KEY = {
 export type SessionPrBadgeProps = Readonly<{
   pr: AssociatedPrData | null;
   loading: boolean;
+  /**
+   * Replaces the badge's own press navigation. The context sheet passes a
+   * handler that closes the sheet before routing through
+   * `resolveSessionPrTapTarget`, because a native `Modal` outlives the
+   * imperative route push and would cover the destination.
+   */
+  onPress?: () => void;
+  /**
+   * Extra classes for the pressable. The compact pill is ~18pt tall, below the
+   * 44pt touch-target minimum; a caller whose row reserves the taller box
+   * (the context sheet's PR row) passes `self-stretch justify-center` so the
+   * whole row height answers the tap instead of the short pill alone.
+   */
+  className?: string;
 }>;
 
 /**
@@ -88,6 +102,10 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   const Icon = ICON_BY_KIND[descriptor.icon];
 
   function handlePress() {
+    if (props.onPress) {
+      props.onPress();
+      return;
+    }
     // Flag off: GitHub taps fall back to the browser (same as chat links).
     if (!prReviewEnabled) {
       void openExternalUrl(pr.url, { label: t('common.pullRequest') });
@@ -108,7 +126,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
       onPress={handlePress}
       accessibilityRole="button"
       accessibilityLabel={descriptor.accessibilityLabel}
-      className="active:opacity-70"
+      className={cn('active:opacity-70', props.className)}
     >
       <View className="flex-row items-center gap-1 rounded-full bg-secondary py-0.5 pl-1.5 pr-2">
         <Icon size={12} color={colors[ACCENT_COLOR_KEY[descriptor.accent]]} />

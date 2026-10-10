@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
 import { and, isNull, count, not, or, sql } from 'drizzle-orm';

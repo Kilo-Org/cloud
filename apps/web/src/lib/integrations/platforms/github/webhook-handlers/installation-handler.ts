@@ -5,7 +5,7 @@ import {
   lockGitHubInstallationIdentity,
   observeGitHubInstallationLifecycle,
 } from '@/lib/integrations/db/github-installations';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne } from 'drizzle-orm';
 import {
@@ -30,7 +30,7 @@ import type {
 } from '../webhook-schemas';
 import { buildInstallationData } from '../webhook-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';

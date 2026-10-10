@@ -2,7 +2,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { kilocode_users, user_deletion_requests, type User } from '@kilocode/db/schema';
 import { UserDeletionRequestStatus } from '@kilocode/db/schema-types';
 import { isSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { assertNoLiveSubscriptionsForSoftDelete, SoftDeletePreconditionError } from '@/lib/user';
 import { persistPreflightOutcomeTx } from '@/lib/user/deletion-queue/deletion-outcomes';
 import { classifyCloudSubject } from '@/lib/user/deletion-queue/deletion-enqueue';

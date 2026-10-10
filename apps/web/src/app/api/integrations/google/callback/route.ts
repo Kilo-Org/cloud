@@ -2,11 +2,11 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL } from '@/lib/constants';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
-import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
+import { requireOrganizationKiloClawComputeEntitlement } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
 import {
   exchangeGoogleOAuthCode,

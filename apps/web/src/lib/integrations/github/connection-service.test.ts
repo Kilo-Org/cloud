@@ -1,4 +1,4 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   github_connection_attempts,
   kilocode_users,
@@ -17,7 +17,7 @@ import {
   fetchGitHubRepositoriesForMaintenance,
 } from '@/lib/integrations/platforms/github/adapter';
 import { disconnectGitHubInstallation } from '@/lib/integrations/db/github-installations';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 

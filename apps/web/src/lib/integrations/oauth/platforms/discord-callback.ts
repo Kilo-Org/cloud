@@ -1,11 +1,11 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
 import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   appendIntegrationOAuthRedirectQuery,

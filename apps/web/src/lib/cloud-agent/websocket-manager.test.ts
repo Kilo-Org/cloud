@@ -114,6 +114,37 @@ afterEach(() => {
 });
 
 describe('websocket-manager', () => {
+  it('ignores status frames from replaced or disconnected sockets', () => {
+    const onEvent = jest.fn();
+    const manager = createWebSocketManager({
+      url: 'wss://example.com/stream',
+      ticket: 'ticket',
+      onEvent,
+      onStateChange: jest.fn(),
+    });
+    manager.connect();
+    const first = MockWebSocket.getLatest();
+    if (!first) throw new Error('Missing initial socket');
+    const frame = JSON.stringify({
+      eventId: 0,
+      executionId: '',
+      sessionId: 'workspace_status',
+      streamEventType: 'cloud.sandbox.status',
+      timestamp: new Date().toISOString(),
+      data: {},
+    });
+    manager.connect();
+    first.simulateMessage(frame);
+    expect(onEvent).not.toHaveBeenCalled();
+    const current = MockWebSocket.getLatest();
+    if (!current) throw new Error('Missing replacement socket');
+    current.simulateMessage(frame);
+    expect(onEvent).toHaveBeenCalledTimes(1);
+    manager.disconnect();
+    current.simulateMessage(frame);
+    expect(onEvent).toHaveBeenCalledTimes(1);
+  });
+
   describe('auth failure reconnect', () => {
     it('refreshes ticket once on auth failure and reconnects with new ticket', async () => {
       const onRefreshTicket = jest

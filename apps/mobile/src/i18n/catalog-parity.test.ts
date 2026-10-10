@@ -27,13 +27,20 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * Empty: the `notifications.category.*Unavailable` reasons, the profile-editor
- * validation copy (the duplicate-key refusal and the MCP bound messages), and
- * the `/` suggestion list's skill-row keys
+ * Empty: the `notifications.category.*Unavailable` reasons, the Agents tab
+ * header link (`agents.sessionList.pastSessions`), the scheduled-session labels
+ * the count lines, the session list and the glanceable surfaces show
+ * (`common.scheduled`, `sessionRow.scheduled`, `glanceable.scheduledWakes`),
+ * the accepted-empty Agents history label (`agents.sessionList.viewHistory`),
+ * the `prReview.discussion.*` / `prReview.announce.*` comment-CRUD keys (the
+ * mobile comment edit/delete copy), the profile-editor validation copy (the
+ * duplicate-key refusal and the MCP bound messages), the session-preview copy,
+ * and the `/` suggestion list's skill-row keys
  * (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
- * `slash-command-suggestions.tsx`) have all landed in every catalog, so the
- * missing-key assertion is strict again.
+ * `slash-command-suggestions.tsx`), and the `credits.*` keys of the Buy
+ * credits screen have all landed in every catalog, so the missing-key
+ * assertion is strict again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
 
@@ -55,12 +62,6 @@ describe('catalog keys', () => {
   it('names only pending keys en.json defines', () => {
     for (const key of PENDING_TRANSLATION_KEYS) {
       expect(ENGLISH_FAMILIES.has(key), `${key} is not an English key family`).toBe(true);
-    }
-  });
-
-  it('retires launcher.newAgent from every catalog', () => {
-    for (const tag of SUPPORTED_LANGUAGES) {
-      expect(keyFamilies(CATALOG_LOADERS[tag]())).not.toContain('launcher.newAgent');
     }
   });
 

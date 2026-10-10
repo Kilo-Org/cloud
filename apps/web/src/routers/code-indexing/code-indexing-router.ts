@@ -1,19 +1,27 @@
-import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { code_indexing_search, code_indexing_manifest } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, getTableName, sql, desc } from 'drizzle-orm';
 import {
   ensureOrganizationAccessAndFetchOrg,
   organizationMemberProcedure,
-} from '@/routers/organizations/utils';
-import { elevateViaKiloAdmin, organizationTarget, userTarget } from '@/lib/admin/admin-access-log';
-import { sentryLogger } from '@/lib/utils.server';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  elevateViaKiloAdmin,
+  organizationTarget,
+  userTarget,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { codeIndexingAdminRouter } from './code-indexing-admin-router';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
-import { getUserUUID } from '@/lib/user/server';
+import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
 import {

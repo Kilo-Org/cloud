@@ -1,4 +1,4 @@
-import { client } from '@/lib/stripe-client';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 
 export type PaymentMethodInfo = NonNullable<Awaited<ReturnType<typeof retrievePaymentMethodInfo>>>;
 /**

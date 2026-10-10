@@ -65,7 +65,7 @@ describe('glanceable live activity accessibility scoping', () => {
     const block = markAndRowsSource();
     const combined = combinedElement(block, block.indexOf(COMBINE));
 
-    expect(combined.body).toContain('countRows');
+    expect(combined.body).toContain('countRow(');
     expect(combined.body).toContain('accessibilityLabel(accessibility)');
     expect(combined.body).not.toContain('<Button');
     expect(combined.body).not.toContain(APPROVE_TARGET);

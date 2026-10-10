@@ -31,6 +31,7 @@ const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
   'common.working': 'Working',
+  'common.scheduled': 'Scheduled',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',
@@ -41,9 +42,7 @@ const COPY: Record<string, string> = {
   'glanceable.noneWaiting': 'No agents waiting',
   'glanceable.newAgent': 'New agent',
   'glanceable.approving': 'Approving…',
-  'common.starting': 'Starting…',
   'glanceable.couldNotApprove': 'Could not approve',
-  'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
   'common.approve': 'Approve',
 };
@@ -94,6 +93,7 @@ describe('iOS and Android widget props parity', () => {
       snapshotFor([{ status: 'busy' }, { status: 'permission' }, { status: 'idle' }]),
     ],
     ['idle-only', snapshotFor([{ status: 'idle' }])],
+    ['scheduled', snapshotFor([{ status: 'scheduled' }])],
     ['empty', snapshotFor([], 'empty')],
     ['waiting', snapshotFor([], 'waiting')],
     ['stale', snapshotFor([{ status: 'busy' }], 'stale')],
@@ -134,22 +134,10 @@ describe('iOS and Android widget props parity', () => {
       expected: 'Approving…',
     },
     {
-      label: 'starting',
-      feedback: 'starting',
-      title: 'Fix the flaky test',
-      expected: 'Starting…',
-    },
-    {
       label: 'could not approve',
       feedback: 'couldNotApprove',
       title: 'Fix the flaky test',
       expected: 'Could not approve',
-    },
-    {
-      label: 'could not start',
-      feedback: 'couldNotStart',
-      title: 'Fix the flaky test',
-      expected: 'Could not start',
     },
   ];
 
@@ -158,14 +146,5 @@ describe('iOS and Android widget props parity', () => {
     const seen = visible(snapshotFor([{ status: 'busy' }, { status: 'idle' }]));
     expect(seen.newestLine[0]).toBe(expected);
     expect(seen.newestLine[1]).toBe(expected);
-  });
-
-  it('offers the same reserved line on the empty surface, where New agent lives', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
-    const seen = visible(snapshotFor([], 'empty'));
-    expect(seen.newestLine[0]).toBe('Could not start');
-    expect(seen.newestLine[1]).toBe('Could not start');
-    expect(seen.actions[0]).toEqual({ approve: false, newAgent: true });
-    expect(seen.actions[1]).toEqual({ approve: false, newAgent: true });
   });
 });

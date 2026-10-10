@@ -63,12 +63,12 @@
 
 import { and, asc, desc, eq, inArray, isNotNull, isNull, notExists, or, sql } from 'drizzle-orm';
 
-import { TRIAL_DURATION_DAYS } from '@/lib/constants';
+import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import {
   KILOCLAW_EARLYBIRD_EXPIRY_DATE,
   KILOCLAW_TRIAL_DURATION_DAYS,
 } from '@/lib/kiloclaw/constants';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   LEGACY_KILOCLAW_PRICE_VERSION,
   insertKiloClawSubscriptionChangeLog,

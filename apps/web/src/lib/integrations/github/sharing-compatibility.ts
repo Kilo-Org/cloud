@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import { platform_integrations } from '@kilocode/db/schema';

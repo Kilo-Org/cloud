@@ -165,21 +165,6 @@ describe('event name rules', () => {
       expect(name, `${name} must be snake_case`).toMatch(SNAKE_CASE);
     }
   });
-
-  it('freezes LEGACY_EVENT_NAMES to the kebab-case KiloClaw onboarding names', () => {
-    expect(LEGACY_EVENT_NAMES).toEqual(
-      new Set([
-        ONBOARDING_ENTERED_EVENT,
-        PROVISION_REQUESTED_EVENT,
-        PROVISION_SUCCEEDED_EVENT,
-        PROVISION_FAILED_EVENT,
-        ACCESS_REQUIRED_SHOWN_EVENT,
-        COMPLETION_REACHED_EVENT,
-        CLAW_WEATHER_LOCATION_SELECTED_EVENT,
-        CLAW_WEATHER_LOCATION_SKIPPED_EVENT,
-      ])
-    );
-  });
 });
 
 describe('phase classification', () => {

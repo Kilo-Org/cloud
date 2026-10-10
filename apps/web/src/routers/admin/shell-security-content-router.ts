@@ -1,5 +1,5 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   security_advisor_check_catalog,
   security_advisor_kiloclaw_coverage,

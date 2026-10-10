@@ -17,9 +17,9 @@ import { NextResponse } from 'next/server';
 import { updateFixTicketStatus, getFixTicketById } from '@/lib/auto-fix/db/fix-tickets';
 import { tryDispatchPendingFixes } from '@/lib/auto-fix/dispatch/dispatch-pending-fixes';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import type { FixStatus } from '@/lib/auto-fix/core/schemas';
 import { formatAutoFixErrorMessage } from '@/lib/auto-fix/core/format-error-message';
 

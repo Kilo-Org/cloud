@@ -4,7 +4,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { UserDetailProps } from '@/types/admin';
-import type { GuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
+import type { GuiCreditCategory } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 import { UserAdminCreditGrant } from './UserAdminCreditGrant';
 import { UserAdminCreditTransactions } from './UserAdminCreditTransactions';
 import { UserAdminPaymentMethods } from './UserAdminPaymentMethods';

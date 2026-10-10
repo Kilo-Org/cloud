@@ -19,10 +19,6 @@ import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 import type { SessionActivity, AgentStatus, SessionInfo } from './types';
 import type { CloudAgentEvent } from './event-types';
 
-// ---------------------------------------------------------------------------
-// WebSocket mock
-// ---------------------------------------------------------------------------
-
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
   onmessage: ((ev: MessageEvent) => void) | null;
@@ -56,10 +52,6 @@ afterEach(() => {
   delete global.WebSocket;
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function sendRaw(event: CloudAgentEvent): void {
   mockWs.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
 }
@@ -71,6 +63,13 @@ const emptySnapshot = makeSnapshot({ id: 'test-session' });
 async function flushConnect(): Promise<void> {
   await Promise.resolve(); // resolveSession resolves
   await new Promise(r => setTimeout(r, 0)); // Promise.all([ticket, snapshot]).then settles
+  sendRaw({
+    eventId: 0,
+    sessionId: 'test-session',
+    streamEventType: 'connected',
+    timestamp: new Date().toISOString(),
+    data: {},
+  });
 }
 
 type StateCapture = { activity: SessionActivity; status: AgentStatus };
@@ -112,7 +111,6 @@ function createSessionWithStateCapture(
     onBranchChanged: (branch: string) => branches.push(branch),
   });
 
-  // Capture state changes
   const states: StateCapture[] = [];
   session.state.subscribe(() => {
     states.push({
@@ -123,10 +121,6 @@ function createSessionWithStateCapture(
 
   return { session, states, errors, branches, createEvent, kilocode, getTicketMock };
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('session state transitions', () => {
   it('connect() emits connecting activity', () => {
@@ -180,7 +174,6 @@ describe('session state transitions', () => {
     await flushConnect();
     sendRaw(kilocode('session.status', { sessionID: 'test-session', status: { type: 'busy' } }));
 
-    // First state: connecting (from connect()), later states include busy + idle status
     expect(states[0].activity).toEqual({ type: 'connecting' });
     const busyState = states.find(s => s.activity.type === 'busy');
     expect(busyState?.activity).toEqual({ type: 'busy' });
@@ -219,7 +212,6 @@ describe('session state transitions', () => {
     sendRaw(kilocode('session.status', { sessionID: 'test-session', status: { type: 'busy' } }));
     sendRaw(createEvent('complete', { currentBranch: 'main' }));
 
-    // After complete: activity = idle, status = idle
     const lastState = states[states.length - 1];
     expect(lastState.activity).toEqual({ type: 'idle' });
     expect(lastState.status).toEqual({ type: 'idle' });
@@ -305,7 +297,6 @@ describe('session state transitions', () => {
     sendRaw(kilocode('session.status', { sessionID: 'test-session', status: { type: 'busy' } }));
     sendRaw(createEvent('interrupted', {}));
 
-    // Clear errors accumulated from the stopped transition
     errors.length = 0;
 
     sendRaw(kilocode('session.error', { error: 'aftershock error', sessionID: 'test-session' }));
@@ -335,7 +326,6 @@ describe('session state transitions', () => {
     sendRaw(kilocode('session.status', { sessionID: 'test-session', status: { type: 'busy' } }));
     sendRaw(kilocode('session.status', { sessionID: 'test-session', status: { type: 'idle' } }));
 
-    // Root session idle status transitions activity from busy → idle
     const lastState = states[states.length - 1];
     expect(lastState.activity).toEqual({ type: 'idle' });
 
@@ -354,7 +344,6 @@ describe('session state transitions', () => {
     const activities = states.map(s => s.activity);
     expect(activities).toContainEqual({ type: 'busy' });
 
-    // The last state should be busy again
     const lastState = states[states.length - 1];
     expect(lastState.activity).toEqual({ type: 'busy' });
 
@@ -370,7 +359,6 @@ describe('session state transitions', () => {
     sendRaw(createEvent('interrupted', {}));
     errors.length = 0;
 
-    // New turn starts — resets from stopped
     sendRaw(kilocode('session.status', { sessionID: 'test-session', status: { type: 'busy' } }));
     sendRaw(kilocode('session.error', { error: 'new error', sessionID: 'test-session' }));
 
@@ -415,7 +403,6 @@ describe('session state transitions', () => {
     await flushConnect();
     sendRaw(kilocode('session.created', { info: sessionInfo('ses-1') }));
 
-    // Snapshot replay fires session.created for 'test-session', then WS event fires for 'ses-1'
     expect(sessions).toHaveLength(2);
     expect(sessions[1]).toEqual(expect.objectContaining({ id: 'ses-1' }));
 
@@ -720,7 +707,11 @@ describe('authoritative message failure settlement', () => {
         sendRaw(createEvent('cloud.message.sent', { messageId: 'active' }));
         sendRaw(kilocode('session.status', { sessionID: TEST_KILO_ID, status: { type: 'busy' } }));
         sendRaw(createEvent('cloud.status', { cloudStatus: { type } }));
-        expect(snapshot().canSend).toBe(false);
+        expect(snapshot()).toMatchObject({
+          cloudStatus: { type },
+          isStreaming: true,
+          canSend: true,
+        });
 
         sendRaw(
           createEvent('cloud.message.failed', {

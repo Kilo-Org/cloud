@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   AdminSlackNotificationError,
   type AdminSlackNotification,
-} from '@/lib/slack/admin-notifications';
+} from '@kilocode/web-shared/lib/slack/admin-notifications';
 import {
   assertServiceFeeAuditReadOnly,
   auditRestrictedCoupons,

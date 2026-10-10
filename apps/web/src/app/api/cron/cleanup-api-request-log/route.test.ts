@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
@@ -15,7 +15,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 }));
 
 import { api_request_log } from '@kilocode/db/schema';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
 
@@ -83,10 +83,10 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     });
   });
 
-  it('deletes records older than seven days and preserves recent records', async () => {
+  it('deletes records older than thirty days and preserves recent records', async () => {
     await insertApiRequestLogRecord(daysAgo(45));
-    await insertApiRequestLogRecord(daysAgo(8));
-    const recent = await insertApiRequestLogRecord(daysAgo(6));
+    await insertApiRequestLogRecord(daysAgo(31));
+    const recent = await insertApiRequestLogRecord(daysAgo(29));
 
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
 

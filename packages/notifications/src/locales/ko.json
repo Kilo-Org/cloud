@@ -7,7 +7,7 @@
       "instanceLifecycle": "인스턴스에 업데이트가 있습니다",
       "scheduledAction": "예약된 작업에 업데이트가 있습니다",
       "lowBalance": "잔액 확인이 필요합니다",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "지출 확인이 필요합니다",
       "securityFinding": "보안 발견 사항 확인이 필요합니다",
       "activeAgentsGlanceable": "활성 에이전트에 업데이트가 있습니다"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} 잔액이 ${{minimumBalanceUsd}} 미만으로 떨어졌습니다"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "지출 알림",
+      "body": "{{scopeName}} 지출이 ${{amountUsd}}를 초과했습니다"
     },
     "securityFindingNew": {
       "title": "새 보안 발견 사항 ({{severity}})",

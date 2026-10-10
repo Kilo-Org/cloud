@@ -9,12 +9,16 @@ import { DestructiveConfirmDialog } from './destructive-confirm-dialog';
 
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
-  Modal: 'Modal',
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+// The dialog reads the bottom inset for its padding; the native module cannot
+// load under this project's partial `react-native` mock.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 24, left: 0, right: 0, top: 0 }),
+}));
 vi.mock('@/components/ui/activity-indicator', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -133,13 +137,25 @@ describe('DestructiveConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('dismisses without confirming on the Android back request', () => {
+  // The confirm is a native sheet, not a portal dialog, so it stacks above the
+  // formSheet routes it is reached from. The sheet hands a dismissal — Android
+  // Back, a backdrop tap and a swipe all route through it — to `onCancel`.
+  it('presents the content-sized sheet without a drag handle', () => {
     const root = mount();
 
+    const sheet = root.find(node => isType(node, 'BottomSheet'));
+    expect(sheet.props.index).toBe(0);
+    expect(sheet.props.handleComponent).toBeNull();
+    expect(sheet.props.snapPoints).toBeUndefined();
+  });
+
+  it('dismisses without confirming when the native sheet closes', () => {
+    const root = mount();
+
+    // The sheet wires its own `onClose` to the caller's cancel.
+    const onClose = root.find(node => isType(node, 'BottomSheet')).props.onClose as () => void;
     act(() => {
-      (
-        root.find(node => isType(node, 'Modal')).props as { onRequestClose?: () => void }
-      ).onRequestClose?.();
+      onClose();
     });
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).not.toHaveBeenCalled();

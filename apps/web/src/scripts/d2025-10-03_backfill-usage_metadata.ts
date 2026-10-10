@@ -1,4 +1,4 @@
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { sql } from 'drizzle-orm';
 
 const BATCH_SIZE = 10_000;

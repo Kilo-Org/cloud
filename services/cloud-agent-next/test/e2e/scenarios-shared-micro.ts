@@ -160,8 +160,8 @@ async function runHot(args: LifecycleArgs, env: ScenarioEnvironment): Promise<Li
       return fail(`warmup ${session.messageId}: expected successful message completion`);
     }
 
-    // Send the follow-up prompt. It must land on the same warm container and
-    // create no extra one.
+    // Send the follow-up prompt. It must land on the same warm container.
+    // Another scenario's container may appear; that is not this session's.
     const containersBeforeFollowup = inventory ? await inventory.snapshotContainerIds() : undefined;
     stream = await openConnectedStream(config, session.cloudAgentSessionId, false);
     const sent = await sendMessage(
@@ -193,8 +193,7 @@ async function runHot(args: LifecycleArgs, env: ScenarioEnvironment): Promise<Li
     const sameContainers =
       containersBeforeFollowup === undefined ||
       containersAfter === undefined ||
-      (containersAfter.has(warmupContainer) &&
-        [...containersAfter].every(id => containersBeforeFollowup.has(id)));
+      containersAfter.has(warmupContainer);
     const inventoryMarker = inventory
       ? `sameContainers=${sameContainers}; before=${[...(containersBeforeFollowup ?? [])].join(',')}; after=${[...(containersAfter ?? [])].join(',')}`
       : 'containerInventory=unchecked(no-sandbox-capability)';

@@ -3,7 +3,7 @@
  * `sandbox_control` diagnostics.
  *
  * This module scrapes two production-owned log contracts:
- * `src/persistence/SandboxControl.ts` writes the `allocation_transition` line per
+ * The legacy control plane wrote the `allocation_transition` line per
  * committed allocation/health transition, and the provider adapters
  * (`cloudflare-provider.ts`, `vercel-provider.ts`) write `native_stop`. Keep
  * `LOG_FIELD_KEYS` and the event/field expectations below in sync with those

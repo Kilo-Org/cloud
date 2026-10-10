@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
+import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
@@ -24,6 +25,10 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
+  // The window width `ScreenHeader` reads to decide whether the header's
+  // controls share the title's row. Undefined by default keeps every other case
+  // on the single-row layout; a case that sets it exercises the reflow.
+  windowWidth: undefined as number | undefined,
   // Mutable so a case can put the tree on Android: the platform decides
   // whether the floating pull-to-refresh indicator is safe (device defect
   // uxs1) or the reserved band carries the in-flight state instead.
@@ -64,6 +69,10 @@ const state = vi.hoisted(() => ({
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
+// Mutable so a case can put the tree in an RTL interface: the header action's
+// letterspaced capitals are LTR-only and must drop under RTL, keeping the
+// Arabic label's joins.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
 }));
@@ -99,8 +108,46 @@ vi.mock('@shopify/flash-list', () => ({
       )
     ),
 }));
+// The screen reads the keyboard from `react-native-keyboard-controller`'s
+// provider, so the tests drive that store instead of React Native's `Keyboard`
+// events. `useKeyboardState` is selector-aware, as the real hook is.
+const keyboardStore = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboardStore.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardStore.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useKeyboardState: (selector?: (snapshot: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardStore.subscribe, heightOf, heightOf);
+      const snapshot = { height, isVisible: height > 0, progress: height > 0 ? 1 : 0, duration: 0 };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
+
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: i18nManager,
   Platform: state.platform,
   Modal: 'Modal',
   Pressable: 'Pressable',
@@ -109,7 +156,11 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
-  useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
+  useWindowDimensions: () => ({
+    fontScale: state.fontScale,
+    width: state.windowWidth,
+    height: 844,
+  }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -152,6 +203,8 @@ vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView' },
   LinearTransition: 'LinearTransition',
+  // `agent-sessions-section` builds the row entrance with `FadeIn.duration`.
+  FadeIn: { duration: () => ({}) },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({
@@ -227,9 +280,13 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', async () => {
+vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+vi.mock('@/components/ui/text', async importOriginal => {
   const { createContext } = await import('react');
-  return { Text: 'Text', TextClassContext: createContext('') };
+  // The real constant, so the header action's LTR letterspacing is asserted
+  // against the same class string the eyebrow variant uses (it cannot drift).
+  const { EYEBROW_LATIN_DISPLAY } = await importOriginal<typeof TextModule>();
+  return { EYEBROW_LATIN_DISPLAY, Text: 'Text', TextClassContext: createContext('') };
 });
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
 vi.mock('@/lib/organization-context', () => ({
@@ -274,6 +331,17 @@ vi.mock('@/lib/a11y/motion-context', async importOriginal => ({
     reducedMotion: state.reducedMotion,
     scrollAnimated: !state.reducedMotion,
   }),
+}));
+// `agent-sessions-section` (drawn by this screen) reads the motion policy, and
+// the real module reaches `expo-battery` -> `expo-modules-core`, which the
+// node-mounted harness cannot load. Keep the policy wired to the same state.
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: state.reducedMotion,
+    scrollAnimated: !state.reducedMotion,
+  }),
+  selectReducedMotionEntrance: (reducedMotion: boolean, crossfade: unknown) =>
+    reducedMotion ? undefined : crossfade,
 }));
 vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => state.tabBarHeight }));
 vi.mock('@/lib/hooks/use-agent-sessions', () => ({
@@ -362,30 +430,38 @@ type HeaderElement = {
 /** The header's `inlineActions` row, whose children are its section label and controls. */
 function headerRow() {
   return header().props.inlineActions as {
-    props: { className: string; children: (HeaderElement | null)[] };
+    props: { className: string; children: HeaderElement | null | (HeaderElement | null)[] };
   };
 }
-/** The row's controls, in order: the section label leads the row and is not one. */
+/** The row's children as a list: a row with a single child is not an array, and
+ *  the accepted-empty state withholds the row entirely. */
+function headerRowChildren() {
+  const inlineActions = header().props.inlineActions as
+    | { props: { children: HeaderElement | null | (HeaderElement | null)[] } }
+    | undefined;
+  if (!inlineActions) {
+    return [];
+  }
+  const children = inlineActions.props.children;
+  return Array.isArray(children) ? children : [children];
+}
+/** The row's controls, in order: the history link, then the filter button. */
 function headerActions() {
-  return headerRow().props.children.filter(
+  return headerRowChildren().filter(
     (child): child is HeaderElement => child !== null && typeof child.props.testID === 'string'
   );
 }
-/** The section label that owns the row start (see `headerActions`). */
-function headerRowLabel() {
-  const label = headerRow().props.children[0];
-  if (!label) {
-    throw new Error('Missing header row label');
-  }
-  return label as unknown as { props: { className: string; children: string } };
-}
 function headerAction(testID = 'agents-view-history') {
-  const button = headerActions().find(child => child.props.testID === testID);
-  const isMounted = nodes('Pressable').some(node => node.props.testID === testID);
-  if (!button || !isMounted) {
-    throw new Error(`Missing header action: ${testID}`);
+  const fromRow = headerActions().find(child => child.props.testID === testID);
+  const mounted = nodes('Pressable').find(node => node.props.testID === testID);
+  if (!mounted) {
+    throw new Error(`Missing action: ${testID}`);
   }
-  return button;
+  // The controls trail the header's `inlineActions` row while the live section
+  // shows. The accepted-empty state withholds that row and carries the history
+  // control in the body instead, so a control that is not in the row is read
+  // from the mounted node there.
+  return fromRow ?? (mounted as unknown as HeaderElement);
 }
 function filterButtonProps() {
   const button = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
@@ -429,36 +505,13 @@ function keyboardListeners(event: string) {
   return state.keyboard.get(event) ?? new Set();
 }
 function showKeyboard(height: number) {
-  for (const listener of keyboardListeners('keyboardDidShow')) {
-    listener({ endCoordinates: { height } });
-  }
+  keyboardStore.setHeight(height);
 }
 function hideKeyboard() {
-  for (const listener of keyboardListeners('keyboardDidHide')) {
-    listener({ endCoordinates: { height: 0 } });
-  }
+  keyboardStore.setHeight(0);
 }
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
-}
-/**
- * The padding the keyboard container applies to the region. The container
- * (`AppAwareKeyboardPaddingView` on Android, `KeyboardAvoidingView` on iOS)
- * already clears the IME, so the rows frame adds only the part of the rows band
- * the container does not cover; a case that asserts the rows viewport reads both
- * halves of that composition rather than the frame alone.
- */
-function keyboardContainerPadding() {
-  let padding = 0;
-  for (const node of nodes('View')) {
-    const styles = node.props.style as unknown;
-    if (Array.isArray(styles)) {
-      for (const style of styles as ({ paddingBottom?: number } | undefined)[]) {
-        padding = Math.max(padding, style?.paddingBottom ?? 0);
-      }
-    }
-  }
-  return padding;
 }
 /**
  * The band the composed app observes. The real `StateSurfaceInsets` resolves
@@ -474,14 +527,17 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
   state.fontScale = 1;
+  state.windowWidth = undefined;
   state.platform.OS = 'ios';
   state.reducedMotion = false;
+  i18nManager.isRTL = false;
   state.topInset = 0;
   state.leftInset = 0;
   state.rightInset = 0;
   state.tabBarHeight = 60;
   state.focusCallbacks.clear();
   state.keyboard.clear();
+  keyboardStore.setHeight(0);
   state.destination = '';
   state.sessionId = '';
   state.announcements = [];
@@ -511,6 +567,7 @@ afterEach(async () => {
   mountedRenderer = undefined;
   state.listeners.clear();
   state.keyboard.clear();
+  keyboardStore.setHeight(0);
   await i18n.changeLanguage('en');
 });
 
@@ -593,6 +650,15 @@ describe('AgentSessionListScreen live presentation', () => {
     const expectedInset = test.empty ? state.tabBarHeight : state.tabBarHeight + 64;
     expect(surface.props.bottomInset).toBe(expectedInset);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
+    if (test.empty) {
+      // An accepted empty live list carries the history route in its body, so
+      // the controls row is withheld there and the empty state draws exactly one
+      // history control instead of a duplicate in the header.
+      expect(header().props.inlineActions).toBeUndefined();
+      // The accepted-empty snapshot names no live sessions, so the count is
+      // withheld exactly as the tab badge hides at zero.
+      expect(header().props.eyebrow).toBeUndefined();
+    }
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
     headerAction().props.onPress();
@@ -606,20 +672,68 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(state.destination).toBe('/(app)/agent-chat/new');
   });
 
+  it('an accepted empty live list withholds the controls row but keeps the history route', async () => {
+    await renderScreen();
+    // The body carries the history route there, so the header withholds its
+    // controls row: the empty list draws no live-sessions row at all.
+    expect(header().props.inlineActions).toBeUndefined();
+    // The accepted-empty snapshot withholds the count as well: the count
+    // names live sessions, and there are none.
+    expect(header().props.eyebrow).toBeUndefined();
+    // The body carries exactly one history control — the one that opens the
+    // stored history, which has no other entry point in the app (review
+    // finding) — so the header cannot quietly grow a second one.
+    expect(
+      nodes('Pressable').filter(node => node.props.testID === 'agents-view-history')
+    ).toHaveLength(1);
+    expect(headerAction().props.testID).toBe('agents-view-history');
+    headerAction().props.onPress();
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+    expect(text()).toContain('Nothing running right now');
+    expect(action('New session')).toBeDefined();
+  });
+
+  it('names the accepted-empty history route by its destination instead of a bare See-all', async () => {
+    await renderScreen();
+    // The accepted-empty state withholds the header row, so the body's history
+    // control is the app's only route to stored sessions. A bare See-all does
+    // not say where it opens — the explorer's objectless See-all, now
+    // context-free — so the control names its destination instead.
+    const history = action('Session history');
+    expect(history.props.testID).toBe('agents-view-history');
+    expect(history.findByType(Text).children).toEqual(['Session history']);
+    // The non-empty live list keeps the history route in the header, under its
+    // own destination copy instead of this body label.
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(action(i18n.t('agents.sessionList.pastSessions')).props.testID).toBe(
+      'agents-view-history'
+    );
+    expect(
+      nodes('Pressable').filter(node => node.props.accessibilityLabel === 'Session history')
+    ).toHaveLength(0);
+  });
+
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
+    // The full controls row exists only over a non-empty live list (the
+    // accepted-empty state withholds the row and carries the history route in
+    // the body), so a populated render covers it before this case switches to
+    // the empty body it tests. The list controls share the title's row through
+    // `inlineActions`; the heading keeps `flex-1 min-w-0`, so the title keeps
+    // its tail ellipsis and nothing stacks the controls onto a second row.
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(header().props.inlineActions).toBeDefined();
+    state.live.activeSessions = [];
     await renderScreen();
     const viewport = requireNode('CenteredState');
     const emptyState = root().findByType(EmptyState);
 
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.className).toContain('px-[22px]');
-    // The list controls share the title's row through `inlineActions`; the
-    // heading keeps `flex-1 min-w-0`, so the title keeps its tail ellipsis and
-    // nothing stacks the controls onto a second row.
     expect(header().props.headerRight).toBeUndefined();
     expect(header().props.context).toBeUndefined();
-    expect(header().props.inlineActions).toBeDefined();
     expect(emptyState.props.placement).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
@@ -1187,7 +1301,7 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(nodes(type)).toHaveLength(0);
     }
     expect(headerAction().type).toBe('Pressable');
-    // The trailing See-all label is an eyebrow-scale label, the same element the
+    // The trailing history label is an eyebrow-scale label, the same element the
     // row's section label uses.
     expect(headerAction().props.children.type).toBe(Eyebrow);
   });
@@ -1209,7 +1323,7 @@ describe('AgentSessionListScreen header and admission', () => {
       { ...row, gitUrl: test.filterable ? 'https://github.com/kilo/cloud.git' : undefined },
     ];
     await renderScreen();
-    const history = action('Összes megtekintése');
+    const history = action(i18n.t('agents.sessionList.pastSessions'));
     const label = history.findByType(Text);
     const actionsRow = history.parent;
     const actionsWrapper = actionsRow?.parent;
@@ -1250,8 +1364,45 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(
       nodes('Pressable').filter(node => node.props.testID === 'agents-open-filters')
     ).toHaveLength(test.filterable ? 1 : 0);
-    press('Összes megtekintése');
+    press(i18n.t('agents.sessionList.pastSessions'));
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+  });
+
+  // Finding live-now-all: the header link opened the stored-session list while
+  // reading "See all", so it named a longer live list that is not on screen. The
+  // label names the surface it opens instead. The accepted-empty state carries
+  // its own destination copy in the body, because that state withholds the
+  // header row (see the accepted-empty case above).
+  it('names the stored-session list it opens, with the LTR-only display treatment', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const historyLabel = i18n.t('agents.sessionList.pastSessions');
+    const history = action(historyLabel);
+    // The live list's only history control is the header's: the body's copy
+    // belongs to the accepted-empty state.
+    expect(
+      nodes('Pressable').filter(node => node.props.testID === 'agents-view-history')
+    ).toHaveLength(1);
+    expect(history.props.testID).toBe('agents-view-history');
+    expect(history.props.accessibilityLabel).toBe(historyLabel);
+    expect(history.props.accessibilityLabel).not.toBe(i18n.t('home.seeAll'));
+    const label = history.findByType(Text);
+    expect(label.children).toEqual([historyLabel]);
+    expect(label.props.className).toContain('text-primary');
+    expect(label.props.className).toContain('uppercase');
+    expect(label.props.className).toContain('tracking-[1.5px]');
+    press(historyLabel);
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+
+    // The letterspaced capitals are LTR-only: an RTL label drops them (the
+    // gaps break a cursive script's joins) and keeps the mono family, size and
+    // color, exactly as the eyebrow variant and SectionHeader do.
+    i18nManager.isRTL = true;
+    await renderScreen();
+    const rtlClasses = (action(historyLabel).findByType(Text).props.className as string).split(' ');
+    expect(rtlClasses).not.toContain('uppercase');
+    expect(rtlClasses.some(name => name.startsWith('tracking'))).toBe(false);
+    expect(rtlClasses).toContain('text-primary');
   });
 
   it('withholds cached rows and the live count until membership resolves', async () => {
@@ -1311,6 +1462,25 @@ describe('AgentSessionListScreen header and admission', () => {
     ).toContain('absolute');
   });
 
+  it('reflows the live controls under the title on a phone that cannot hold them beside it', async () => {
+    state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
+    state.windowWidth = 320;
+    await renderScreen();
+    // The screen declares the controls row's laid-out width, which ScreenHeader
+    // reserves before deciding to reflow: on the narrowest phone the row would
+    // leave the 30px title below its readable minimum and break "Agenti"
+    // mid-word (owner capture, agents-header-hr-20260929).
+    expect(header().props.inlineActionsWidth).toBeGreaterThan(144);
+    const history = action(i18n.t('agents.sessionList.pastSessions'));
+    const actionsRow = history.parent;
+    const stackedRow = actionsRow?.parent;
+    const title = header().findByProps({ accessibilityRole: 'header' });
+    // The controls now sit beneath the title's row on their own full width
+    // instead of squeezing the title.
+    expect(stackedRow?.props.className).toContain('mt-2');
+    expect(stackedRow?.parent).not.toBe(title.parent?.parent?.parent);
+  });
+
   it('keeps the list unresolved until the organization restores', async () => {
     state.organization.isLoaded = false;
     state.boundary.orgs = [{ organizationId: 'org-1', organizationName: 'Agents organization' }];
@@ -1334,7 +1504,6 @@ describe('AgentSessionListScreen header and admission', () => {
 
 describe('AgentSessionListScreen live counts', () => {
   it.each([
-    { count: 0, label: '0 LIVE' },
     { count: 1, label: '1 LIVE' },
     { count: 3, label: '3 LIVE' },
     { count: 4, label: '4 LIVE' },
@@ -1348,6 +1517,20 @@ describe('AgentSessionListScreen live counts', () => {
 
     expect(header().props.eyebrow).toBe(label);
     expect(header().props.title).toBe('Agents');
+  });
+
+  it('withholds the live count for an accepted-empty snapshot while live rows keep it', async () => {
+    // The accepted-empty snapshot names no live sessions, so the eyebrow
+    // withholds the count exactly as the tab badge hides at zero, and the empty
+    // card below remains the sole live-session content. A live row keeps it.
+    await renderScreen();
+    expect(header().props.eyebrow).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(0);
+    expect(nodes('CenteredState')).toHaveLength(1);
+
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(header().props.eyebrow).toBe('1 LIVE');
   });
 
   it.each([
@@ -1476,27 +1659,18 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
     expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
 
-    // Android: edge-to-edge never resizes the window for the IME, so the
-    // app-aware container follows the keyboard events and pads its frame; the
-    // body re-centers inside the shrunken viewport.
+    // Android: edge-to-edge never resizes the window for the IME either, and the
+    // same native container owns the lift. The tree carries no JS padding, so
+    // the body stays inside the one container instead of a per-platform fork.
     state.platform.OS = 'android';
     await renderScreen();
     act(() => {
       showKeyboard(320);
     });
-    const padded = nodes('View').find(
-      node =>
-        Array.isArray(node.props.style) &&
-        node.props.style.some(
-          (part: { paddingBottom?: number } | undefined) => part?.paddingBottom === 320
-        )
-    );
-    expect(padded).toBeDefined();
-    if (!padded) {
-      throw new Error('Missing app-aware padding container');
-    }
-    expect(descendantsOf(padded, 'CenteredState')).toHaveLength(1);
-    expect(nodes('KeyboardAvoidingView')).toHaveLength(0);
+    const androidContainer = requireNode('KeyboardAvoidingView');
+    expect(androidContainer.props.behavior).toBe('padding');
+    expect(descendantsOf(androidContainer, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
   });
 
   it('reserves the keyboard height for the no-match body so its second line stays readable', async () => {
@@ -1529,9 +1703,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(surfaceBottomInset()).toBe(320);
 
     act(() => {
-      for (const listener of keyboardListeners('keyboardDidHide')) {
-        listener({ endCoordinates: { height: 0 } });
-      }
+      hideKeyboard();
     });
     expect(surfaceBottomInset()).toBe(state.tabBarHeight);
   });
@@ -1599,26 +1771,24 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
-    // Keyboard down the container pads nothing and the frame ends at the tab
-    // bar: the FAB clearance rides on the content, not the frame.
+    // Keyboard down the native container lifts nothing and the frame ends at the
+    // tab bar: the FAB clearance rides on the content, not the frame.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
-    expect(keyboardContainerPadding()).toBe(0);
 
     act(() => {
       showKeyboard(320);
     });
-    // The container already pads the IME's occlusion and the frame adds only the
-    // part it does not cover, so the two together end the viewport at the IME's
-    // top edge instead of a whole keyboard height above it. The IME is taller
-    // than the FAB band, so the frame contributes nothing.
-    expect(keyboardContainerPadding()).toBe(320);
+    // The native container owns the whole IME lift, so the frame adds nothing and
+    // the viewport ends at the IME's top edge instead of a whole keyboard height
+    // above it. The IME is taller than the FAB band, so the frame contributes
+    // nothing.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: 0 });
-    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(320);
 
     act(() => {
       hideKeyboard();
     });
-    expect(keyboardContainerPadding()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
@@ -1640,11 +1810,11 @@ describe('AgentSessionListScreen live filtering', () => {
     // The centered states still take the shorter IME band, so their copy clears
     // the keyboard rather than a phantom tab-bar band.
     expect(surfaceBottomInset()).toBe(100);
-    // The rows list cannot: the container covers the IME and the frame adds the
-    // rest of the FAB band, so a shorter frame never parks rows under the button.
-    expect(keyboardContainerPadding()).toBe(100);
+    // The rows list cannot: the native container lifts the IME's 100 and the
+    // frame adds the rest of the FAB band, so a shorter frame never parks rows
+    // under the button.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: fabBand - 100 });
-    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(fabBand);
 
     act(() => {
       hideKeyboard();
@@ -1653,18 +1823,18 @@ describe('AgentSessionListScreen live filtering', () => {
   });
 
   it('subscribes to the keyboard once for the bands, not once per band consumer', async () => {
-    // Review finding (session-list-screen.tsx:101): the screen called
-    // `useKeyboardOcclusion` directly while `useAgentsBottomBands` already
-    // subscribes to the same events, so every band consumer added a third
-    // listener beside the app-aware container's own. Both bands — including the
-    // rows frame band — now come out of that one hook call.
+    // Review finding (session-list-screen.tsx:101): the screen read the
+    // keyboard twice, once through the band hook and once through the container
+    // beside it. Both bands — including the rows frame band — come out of the
+    // one band hook call, and both the container and the band hook read the
+    // provider, so the screen registers no React Native keyboard listener at
+    // all.
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
 
-    // The band hook's own subscription plus the app-aware container's.
-    expect(keyboardListeners('keyboardDidShow').size).toBe(2);
-    expect(keyboardListeners('keyboardDidHide').size).toBe(2);
+    expect(keyboardListeners('keyboardDidShow').size).toBe(0);
+    expect(keyboardListeners('keyboardDidHide').size).toBe(0);
   });
 
   it('narrows the live list to the search text', async () => {
@@ -1684,20 +1854,23 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(header().props.eyebrow).toBe('2 LIVE');
   });
 
-  it('leads the controls row with the section label so section headers share one alignment', async () => {
+  it('packs the controls to the row end with no label between them and the title', async () => {
+    state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
     await renderScreen();
 
-    const label = headerRowLabel();
-    // The label owns the row start and grows, so the controls keep the row end —
-    // the Home live-sessions header's shape. A row holding only the trailing
-    // 'See all' read as a section header whose label was missing (e2, agents).
+    // The row holds the history link and the filter button only, packed to the
+    // row end: the live count beside the title is the header's one label, so
+    // nothing sits between the title and the controls.
     expect(headerRow().props.className).toContain('justify-end');
-    expect(label.props.className).toContain('grow');
-    expect(label.props.children).toBe(i18n.t('home.agentSessions'));
-    expect(headerActions().map(control => control.props.testID)).toEqual(['agents-view-history']);
+    expect(headerActions().map(control => control.props.testID)).toEqual([
+      'agents-view-history',
+      'agents-open-filters',
+    ]);
+    expect(text()).not.toContain(i18n.t('home.agentSessions'));
   });
 
-  it('keeps the header right to See-all alone while nothing is filterable', async () => {
+  it('keeps the controls row to the history link while nothing is filterable', async () => {
+    state.live.activeSessions = [row];
     await renderScreen();
 
     expect(headerActions()).toHaveLength(1);
@@ -2018,6 +2191,19 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
     expect(root().findByType(EmptyState).props.compact).toBe(false);
+
+    // The live empty form is a row taller than the single-action no-match form
+    // (the stacked history link), so a band that holds the shorter form must
+    // still compact it: the decision counts the secondary action.
+    const holdsLiveForm = getEmptyStateFullHeight({ secondaryAction: true }) + state.tabBarHeight;
+    act(() => {
+      layoutBody(holdsLiveForm - 1);
+    });
+    expect(compact()).toBe(true);
+    act(() => {
+      layoutBody(holdsLiveForm);
+    });
+    expect(compact()).toBe(false);
   });
 
   it('compacts the no-match state for the reserve reduced motion adds to the band', async () => {

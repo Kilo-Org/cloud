@@ -2,7 +2,11 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from './default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from './default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from './default-prompt-template-gitlab.json';
-import { generateReviewPrompt, PromptTemplateSchema } from './generate-prompt';
+import {
+  generateReviewPrompt,
+  PromptTemplateSchema,
+  FREE_MODEL_OUTPUT_BUDGET,
+} from './generate-prompt';
 import type { ExistingReviewState } from './generate-prompt';
 import {
   REVIEW_INSTRUCTIONS_FILE,
@@ -100,6 +104,15 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('gh pr diff 1');
     expect(prompt).toContain('Use the NEW file line number from the RIGHT side of the diff');
     expect(prompt).toContain('Line could not be resolved');
+  });
+
+  it('skips silently when custom instructions exclude the PR', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain(
+      'Post no comments or summary, and end with a one-line reply saying why.'
+    );
+    expect(prompt).not.toContain('the review was skipped');
   });
 
   it('does not include GitHub diff line-number safeguards for GitLab', async () => {
@@ -413,6 +426,19 @@ const existingReviewStateWithHistory: ExistingReviewState = {
 };
 
 describe('generateReviewPrompt (incremental review)', () => {
+  it('skips silently when custom instructions exclude the PR', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).toContain(
+      'Post no comments or summary, and end with a one-line reply saying why.'
+    );
+  });
+
   it('uses incremental workflow when previousHeadSha and summary comment are provided', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',
@@ -429,7 +455,7 @@ describe('generateReviewPrompt (incremental review)', () => {
     // Should contain the active comment count (1 active, 1 outdated)
     expect(prompt).toContain('1 active');
     // Should NOT contain the standard workflow step 1
-    expect(prompt).not.toContain('gh pr diff 42\n```');
+    expect(prompt).not.toContain('gh pr diff 42 --repo owner/repo --name-only');
   });
 
   it('uses standard workflow when previousHeadSha is null', async () => {
@@ -443,18 +469,34 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('gh pr diff 42');
   });
 
-  it('allows GitHub agents to pull latest changes in standard mode', async () => {
-    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
-      reviewId: 'review-123',
-      existingReviewState: existingReviewStateNoSummary,
-      previousHeadSha: null,
-    });
+  it('only instructs sandbox-allowlisted git and gh commands in bash blocks (GitHub)', async () => {
+    // Mirrors CODE_REVIEW_ALLOWED_COMMANDS / CODE_REVIEW_DENIED_COMMAND_PATTERNS in
+    // services/cloud-agent-next/src/session-service.ts. Any other command is rejected in
+    // non-interactive review mode, and a rejected Step 1 command used to end reviews unpublished.
+    const allowedGhLine =
+      /^gh (?:pr view 42 --repo owner\/repo --json |pr diff 42 --repo owner\/repo --(?:name-only|patch --color never)$|api repos\/owner\/repo\/(?:pulls\/42\/(?:comments|reviews)|issues\/42\/comments) --paginate --jq '|api repos\/owner\/repo\/(?:pulls\/42\/reviews|issues\/42\/comments) --input - << 'EOF'$|api repos\/owner\/repo\/issues\/comments\/\d+ -X PATCH --input - << 'EOF'$)/;
+    const allowedGitLine = /^git diff abc123prev\.\.HEAD$/;
 
-    expect(prompt).toContain('Before reading files, always fetch from remote');
-    expect(prompt).toContain('git pull origin $(git branch --show-current)');
-    expect(prompt).toContain('gh pr diff 42');
-    expect(prompt).not.toContain('DO NOT fetch or pull');
-    expect(prompt).not.toContain('Do not run `git fetch`');
+    for (const [existingReviewState, previousHeadSha] of [
+      [existingReviewStateNoSummary, null],
+      [existingReviewStateWithSummary, 'abc123prev'],
+    ] as const) {
+      const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+        reviewId: 'review-123',
+        existingReviewState,
+        previousHeadSha,
+      });
+
+      const commandLines = [...prompt.matchAll(/```bash\n([\s\S]*?)```/g)]
+        .flatMap(match => match[1].split('\n'))
+        .map(line => line.trim())
+        .filter(line => line.startsWith('gh ') || line.startsWith('git '));
+
+      expect(commandLines.length).toBeGreaterThan(0);
+      for (const line of commandLines) {
+        expect(line).toMatch(line.startsWith('gh ') ? allowedGhLine : allowedGitLine);
+      }
+    }
   });
 
   it('uses standard workflow when previousHeadSha is provided but no summary comment', async () => {
@@ -600,8 +642,10 @@ describe('generateReviewPrompt (incremental review)', () => {
     });
 
     expect(prompt).toContain('Before reading files, always fetch from remote');
-    expect(prompt).toContain('git fetch origin');
-    expect(prompt).toContain('git pull origin $(git branch --show-current)');
+    // GitLab checks out a tracking branch and may continue a previous session, so a bare pull
+    // updates the workspace; `git branch` is denied by the command guard.
+    expect(prompt).toContain('git fetch origin\ngit pull\n');
+    expect(prompt).not.toContain('git branch');
     expect(prompt).toContain('glab mr diff 10');
     expect(prompt).toContain(
       'glab api --method POST "projects/group%2Fproject/merge_requests/10/notes"'
@@ -662,5 +706,121 @@ describe('generateReviewPrompt (incremental review)', () => {
 
     expect(prompt).not.toContain('## Inline Comment Footer');
     expect(prompt).not.toContain('@kilocode-bot fix it');
+  });
+});
+
+describe('generateReviewPrompt (free model output budget)', () => {
+  const freeConfig = {
+    ...baseConfig,
+    model_slug: 'kilo-auto/free',
+  } satisfies CodeReviewAgentConfig;
+  const paidConfig = {
+    ...baseConfig,
+    model_slug: 'anthropic/claude-sonnet-4.6',
+  } satisfies CodeReviewAgentConfig;
+
+  it('adds the output budget block and -free version for kilo-auto/free', async () => {
+    const { prompt, version } = await generateReviewPrompt(freeConfig, 'owner/repo', 42);
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-free`);
+  });
+
+  it('adds the block for a concrete :free model slug', async () => {
+    const { prompt, version } = await generateReviewPrompt(
+      { ...baseConfig, model_slug: 'poolside/laguna-s-2.1:free' },
+      'owner/repo',
+      42
+    );
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-free`);
+  });
+
+  it('adds the block for openrouter/free', async () => {
+    const { prompt, version } = await generateReviewPrompt(
+      { ...baseConfig, model_slug: 'openrouter/free' },
+      'owner/repo',
+      42
+    );
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-free`);
+  });
+
+  it('omits the block and keeps the template version for a paid model', async () => {
+    const { prompt, version } = await generateReviewPrompt(paidConfig, 'owner/repo', 42);
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITHUB.version);
+  });
+
+  it('omits the block and keeps the template version for an empty slug', async () => {
+    const { prompt, version } = await generateReviewPrompt(
+      { ...baseConfig, model_slug: '' },
+      'owner/repo',
+      42
+    );
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITHUB.version);
+  });
+
+  it('differs from the paid prompt only by the output budget block', async () => {
+    const free = await generateReviewPrompt(freeConfig, 'owner/repo', 42);
+    const paid = await generateReviewPrompt(paidConfig, 'owner/repo', 42);
+
+    expect(free.prompt.replace(FREE_MODEL_OUTPUT_BUDGET + '\n\n', '')).toBe(paid.prompt);
+  });
+
+  it('omits the block when sub-agent guidance is omitted (council)', async () => {
+    const { prompt, version } = await generateReviewPrompt(freeConfig, 'owner/repo', 42, {
+      omitSubAgentGuidance: true,
+    });
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITHUB.version);
+  });
+
+  it('differs from the incremental paid prompt only by the output budget block', async () => {
+    const options = {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    };
+    const free = await generateReviewPrompt(freeConfig, 'owner/repo', 42, options);
+    const paid = await generateReviewPrompt(paidConfig, 'owner/repo', 42, options);
+
+    expect(free.prompt).toContain('INCREMENTAL REVIEW MODE');
+    expect(free.prompt.replace(FREE_MODEL_OUTPUT_BUDGET + '\n\n', '')).toBe(paid.prompt);
+  });
+
+  it('adds the block for GitLab free prompts', async () => {
+    const { prompt } = await generateReviewPrompt(freeConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
+  });
+
+  it('omits the block and keeps the -local version for local output mode', async () => {
+    const { prompt, version } = await generateReviewPrompt(freeConfig, 'owner/repo', 42, {
+      outputMode: 'kilo',
+    });
+
+    expect(prompt).not.toContain(FREE_MODEL_OUTPUT_BUDGET);
+    expect(version).toBe(`${DEFAULT_PROMPT_TEMPLATE_GITHUB.version}-local`);
+  });
+
+  it('adds the block in incremental mode', async () => {
+    const { prompt } = await generateReviewPrompt(freeConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).toContain(FREE_MODEL_OUTPUT_BUDGET);
   });
 });

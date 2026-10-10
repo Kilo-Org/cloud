@@ -11,7 +11,7 @@ import { UserTablePagination } from './UserTablePagination';
 import { UserFilters } from './UserFilters';
 import type { UsersApiResponse, SortConfig, SortableField } from '@/types/admin';
 import { ascendingFirstFields } from '@/types/admin';
-import type { PageSize } from '@/types/pagination';
+import type { PageSize } from '@kilocode/web-shared/types/pagination';
 
 function toSortedSearchParams(obj: Record<string, unknown>): URLSearchParams {
   const params = new URLSearchParams();

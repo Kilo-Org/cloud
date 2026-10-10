@@ -3,7 +3,7 @@ import 'server-only';
 import type Stripe from 'stripe';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   insertKiloClawSubscriptionChangeLog,
   isKiloClawPriceVersion,
@@ -17,7 +17,7 @@ import {
   getStripePriceIdForClawPlan,
   getStripePriceIdMetadata,
   isIntroPriceId,
-} from '@/lib/kiloclaw/stripe-price-ids.server';
+} from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
 import { classifyKiloClawInvoiceLine } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
 import { getStripeFundedKiloClawReportingFields } from '@/lib/kiloclaw/stripe-funded-reporting.server';
@@ -25,11 +25,11 @@ import {
   autoResumeIfSuspended,
   clearTrialInactivityStopAfterTrialTransition,
 } from '@/lib/kiloclaw/instance-lifecycle';
-import { sentryLogger } from '@/lib/utils.server';
-import PostHogClient from '@/lib/posthog';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { runAfterResponse } from '@/lib/after-response';
-import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';
-import { client as stripe } from '@/lib/stripe-client';
+import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,

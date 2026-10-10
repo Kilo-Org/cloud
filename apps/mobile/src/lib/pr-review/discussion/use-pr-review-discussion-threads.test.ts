@@ -68,15 +68,34 @@ describe('retainConversationAcrossMounts (remount survival)', () => {
 
   it('keeps the conversation after a remount over the trimmed cache', () => {
     const key = 'octocat/hello#1';
-    // First mount: the first page holds the conversation.
-    expect(retainConversationAcrossMounts(key, [{ conversation: [comment] }])).toEqual([comment]);
-    // Remount over the trimmed cache: pages[0] is a later page with [].
-    expect(retainConversationAcrossMounts(key, [{ conversation: [] }])).toEqual([comment]);
+    // First mount: page one is loaded and holds the conversation.
+    expect(retainConversationAcrossMounts(key, [{ conversation: [comment] }], true)).toEqual([
+      comment,
+    ]);
+    // Remount over the trimmed cache: pages[0] is a later page with [], so the
+    // first page is no longer loaded and the retained copy is the source.
+    expect(retainConversationAcrossMounts(key, [{ conversation: [] }], false)).toEqual([comment]);
   });
 
   it('does not leak the conversation across different PRs', () => {
-    retainConversationAcrossMounts('octocat/hello#1', [{ conversation: [comment] }]);
+    retainConversationAcrossMounts('octocat/hello#1', [{ conversation: [comment] }], true);
     // A different PR has never retained anything, so it stays empty.
-    expect(retainConversationAcrossMounts('octocat/hello#2', [{ conversation: [] }])).toEqual([]);
+    expect(
+      retainConversationAcrossMounts('octocat/hello#2', [{ conversation: [] }], false)
+    ).toEqual([]);
+  });
+
+  it('empties the conversation when the live first page loads with none (delete of the last comment)', () => {
+    const key = 'octocat/hello#1';
+    // Page one loaded with the comment.
+    expect(retainConversationAcrossMounts(key, [{ conversation: [comment] }], true)).toEqual([
+      comment,
+    ]);
+    // Deleting the last conversation comment leaves the live first page loaded
+    // and empty: the empty truth wins, so the Discussion reaches its empty
+    // state instead of resurrecting the deleted row.
+    expect(retainConversationAcrossMounts(key, [{ conversation: [] }], true)).toEqual([]);
+    // A later evicted read of the same key still returns that empty truth.
+    expect(retainConversationAcrossMounts(key, [{ conversation: [] }], false)).toEqual([]);
   });
 });

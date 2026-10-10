@@ -7,11 +7,11 @@ import {
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
 import { SOFT_DELETED_BLOCK_REASON_PREFIX } from '@kilocode/db/user-soft-delete-reasons';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { assertNoLiveSubscriptionsForSoftDelete, SoftDeletePreconditionError } from '@/lib/user';
 import { writeDeletionAudit } from '@/lib/user/deletion-queue/deletion-audit';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_ID_ONLY_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_ID_ONLY_CATALOG_VERSION } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   deletionAdvisoryLockKey,
   hmacDeletionEmail,

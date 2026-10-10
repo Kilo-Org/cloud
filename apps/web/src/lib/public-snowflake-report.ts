@@ -2,9 +2,9 @@ import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import type { ZodType } from 'zod';
 
-import { createCachedFetch } from '@/lib/cached-fetch';
-import { redisClient } from '@/lib/redis';
-import type { RedisKey } from '@/lib/redis-keys';
+import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import type { RedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import { executeSnowflakeStatement, resolveSnowflakeConfig } from '@/lib/snowflake';
 
 const CORS_HEADERS = {

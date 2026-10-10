@@ -7,7 +7,7 @@
       "instanceLifecycle": "Instance-kaagu wuxuu leeyahay cusboonaysiin",
       "scheduledAction": "Fal la qorsheeyay ayaa leh cusboonaysiin",
       "lowBalance": "Dheelitirkaagu wuxuu u baahan yahay feejignaan",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Kharashkaagu wuxuu u baahan yahay feejignaan",
       "securityFinding": "Natiijo amnigu wuxuu u baahan yahay feejignaan",
       "activeAgentsGlanceable": "Wakiillada firfircoon waxay leeyihiin cusboonaysiin"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} dheelitirku wuxuu hoos u dhacay ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Digniinta kharashka",
+      "body": "Kharashka {{scopeName}} wuxuu dhaafay ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Natiijo ammin cusub ({{severity}})",

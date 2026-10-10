@@ -6,7 +6,7 @@ import { describe, expect, it, beforeAll, beforeEach } from '@jest/globals';
 // (@types/jest). Importing `jest` from '@jest/globals' defeats hoisting: the
 // mocked modules load for real before registration. Same pattern as
 // github-pr-review-router.test.ts.
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import { BITBUCKET_ORGANIZATION_ONLY_MESSAGE } from '@/lib/provider-review/bitbucket-authorization';
 import { cloudAgentNextRouter } from './cloud-agent-next-router';
@@ -18,7 +18,7 @@ const USER_ID = 'user-1';
 // The cloud-agent router's heavy runtime deps, mocked exactly as
 // cloud-agent-next-router.test.ts does so the router module loads without
 // network, PostHog, or R2 clients.
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
   generateInternalServiceToken: jest.fn(),
   TOKEN_EXPIRY: 60,
@@ -29,18 +29,18 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   rethrowAsPaymentRequired: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({ createWorktreeChat: jest.fn() }));
-jest.mock('@/lib/trpc/min-version', () => ({
-  ...jest.requireActual('@/lib/trpc/min-version'),
+jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/trpc/min-version'),
   getMinimumVersions: jest.fn(async () => ({ ios: '0.0.0', android: '0.0.0' })),
   enforceMinimumVersion: jest.fn(() => ({ pass: true })),
 }));
 jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
   computeCloudAgentNextBalanceCheckEligibility: jest.fn(),
 }));
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: jest.fn(async () => false),
 }));
-jest.mock('@/lib/user/balance', () => ({ getBalanceForUser: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/user/balance', () => ({ getBalanceForUser: jest.fn() }));
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
   fetchGitHubRepositoriesForUser: jest.fn(),
 }));

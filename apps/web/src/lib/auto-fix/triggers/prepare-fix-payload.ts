@@ -7,15 +7,15 @@
 
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { getFixTicketById } from '../db/fix-tickets';
 import type { Owner } from '../core/schemas';
 import type { DispatchFixRequest } from '../core/schemas';
 import { AutoFixAgentConfigSchema, AUTO_FIX_CONSTANTS } from '../core/schemas';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export interface PreparePayloadParams {
   ticketId: string;

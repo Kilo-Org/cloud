@@ -4,17 +4,17 @@ import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { parseTimestamp } from '@/lib/utils';
 
 /**
- * The newest-active-session line, derived from the tray rows the publisher
- * already receives. Pure and React-free: the publisher stores the result in
- * `surface-extras.ts` and every platform widget reads it from there.
+ * The newest-active-session rule, shared by the Home card and every platform
+ * widget so the two surfaces always name the same session. Pure and
+ * React-free: the publisher stores the widget title in `surface-extras.ts`.
  */
 
 /**
- * The row fields the newest-session line reads. Every one is optional so the
+ * The row fields the newest-session rule reads. Every one is optional so the
  * minimal shared row (`status` + `statusUpdatedAt`) also fits: the publisher
- * hands over live `ActiveSession` rows, which carry all three.
+ * hands over live `ActiveSession` rows, which carry all of them.
  */
-export type NewestSessionRow = {
+export type NewestSessionRow = GlanceableSessionRow & {
   title?: string | null;
   /** ISO 8601; when the session row was created. */
   createdAt?: string | null;
@@ -24,52 +24,67 @@ export type NewestSessionRow = {
   lastActivityAt?: string | null;
 };
 
-/**
- * The row's own clock: its last activity, else its update, else its creation.
- * Null when the row carries none, or when the first one it carries is not a
- * parseable timestamp — the row then ranks below every timed row.
- *
- * `parseTimestamp` is the app's reader for these fields: the wire carries raw
- * PostgreSQL text, which Hermes' `Date` cannot parse without it.
- */
-function rowTimestamp(row: NewestSessionRow): number | null {
-  const value = row.updatedAt ?? row.lastActivityAt ?? row.createdAt;
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const at = parseTimestamp(value).getTime();
-  return Number.isNaN(at) ? null : at;
-}
-
-function titleOf(row: NewestSessionRow | null): string | null {
-  if (row === null) {
-    return null;
-  }
-  // A backend default title (`New session - <ISO>`) is machine output, and a
-  // blank title would draw an empty newest line; a session with no name a
-  // person wrote shows nothing rather than a label with no name (or the
-  // machine string) after it.
-  return sessionDisplayTitle(row.title) ?? null;
-}
+export type NewestSession<T> = {
+  row: T;
+  /** The timestamp that ranked the row, or null when the row carries none. */
+  at: string | null;
+};
 
 /**
- * The newest row's title, or null when the tray is empty (or every row has a
- * blank title). Newest ranks by `updatedAt ?? lastActivityAt ?? createdAt`;
- * an untimed row never displaces a timed one, and a tie keeps the earlier row
- * so the line does not flicker between equally new sessions.
+ * The newest row by one clock: the latest parseable value wins, and a tie
+ * keeps the earlier row so the line does not flicker between equally new
+ * sessions. `parseTimestamp` is the app's reader for these fields: the wire
+ * carries raw PostgreSQL text, which Hermes' `Date` cannot parse without it.
  */
-export function newestSessionTitle(
-  rows: readonly (GlanceableSessionRow & NewestSessionRow)[]
-): string | null {
-  let newestRow: NewestSessionRow | null = null;
-  let newestAt: number | null = null;
+function newestBy<T>(
+  rows: readonly T[],
+  clock: (row: T) => string | null | undefined
+): NewestSession<T> | null {
+  let newest: NewestSession<T> | null = null;
+  let newestAt = Number.NEGATIVE_INFINITY;
   for (const row of rows) {
-    const at = rowTimestamp(row);
-    const isNewer = newestRow === null || (at !== null && (newestAt === null || at > newestAt));
-    if (isNewer) {
-      newestRow = row;
+    const value = clock(row);
+    const at = value === undefined || value === null ? Number.NaN : parseTimestamp(value).getTime();
+    if (at > newestAt) {
+      newest = { row, at: value ?? null };
       newestAt = at;
     }
   }
-  return titleOf(newestRow);
+  return newest;
+}
+
+/**
+ * The newest active session, or null only for an empty tray.
+ *
+ * The status-change time ranks first, so the row matches the snapshot's
+ * newest result (`newestGlanceableResult`). Rows without one (never enriched,
+ * or an old row) rank by `updatedAt ?? lastActivityAt ?? createdAt`; when no
+ * row carries any time, the first row stands in. A tray with a session
+ * therefore always names one.
+ */
+export function pickNewestSession<T extends NewestSessionRow>(
+  rows: readonly T[]
+): NewestSession<T> | null {
+  const first = rows[0];
+  if (first === undefined) {
+    return null;
+  }
+  return (
+    newestBy(rows, row => row.statusUpdatedAt) ??
+    newestBy(rows, row => row.updatedAt ?? row.lastActivityAt ?? row.createdAt) ?? {
+      row: first,
+      at: null,
+    }
+  );
+}
+
+/**
+ * The widget line's title: the newest session's title, or null when the tray
+ * is empty or that session has no name a person wrote. A backend default
+ * title (`New session - <ISO>`) is machine output, so the widget shows nothing
+ * rather than the machine string.
+ */
+export function newestSessionTitle(rows: readonly NewestSessionRow[]): string | null {
+  const newest = pickNewestSession(rows);
+  return newest === null ? null : (sessionDisplayTitle(newest.row.title) ?? null);
 }

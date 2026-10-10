@@ -1,15 +1,8 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -17,8 +10,6 @@ import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SessionMessageList } from '@/components/agents/session-message-list';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { MessageCircle, Wrench } from '@/components/ui/icons';
@@ -33,6 +24,8 @@ import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
+import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
+import { rememberModelFacts } from '@/lib/chat/layers';
 import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
 import { resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
@@ -115,6 +108,13 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const [picked, setPicked] = useState<string | null>(null);
   const [variant, setVariant] = useState('');
   const model = picked ?? state.model;
+  const imagesSupported = useTargetSupportsImages(model);
+
+  // The attach control and the send path read image support from the gateway
+  // list this screen loads, not only from the one the chat list loaded.
+  useEffect(() => {
+    rememberModelFacts(models);
+  }, [models]);
 
   const selectModel = (modelId: string, variantId: string) => {
     const accept = () => {
@@ -202,7 +202,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // The question is on screen the moment it is asked, so the composer
       // empties now rather than when the answer lands.
       options?.onOptimisticSend?.();
-      void send(text, model);
+      void send(text, model, options?.images ?? []);
     },
     [backends, model, send, t]
   );
@@ -211,7 +211,6 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     void stop();
   }, [stop]);
 
-  const keyboardKind = getSessionKeyboardContainerKind(Platform.OS);
   const { bottom } = useSafeAreaInsets();
   // A conversation fills the screen: the tab bar is gone and the composer sits
   // on the home indicator, except while the keyboard covers it.
@@ -291,7 +290,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             variant={variant}
             modelOptions={availableOptions}
             onModelSelect={selectModel}
-            attachmentsEnabled={false}
+            attachmentsEnabled={imagesSupported}
+            attachmentDelivery="local"
             activeSessionType={null}
             organizationId={organizationId ?? undefined}
             disabled={modelsFailed && availableOptions.length === 0}
@@ -331,13 +331,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         }
         showBackButton
       />
-      {keyboardKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">{renderBody()}</AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {renderBody()}
-        </KeyboardAvoidingView>
-      )}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
+        {renderBody()}
+      </KeyboardAvoidingView>
       <McpSettingsSheet
         visible={mcpOpen}
         onClose={() => {

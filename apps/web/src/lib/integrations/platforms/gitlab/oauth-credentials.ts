@@ -3,8 +3,8 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { OAUTH_STATE_TTL_SECONDS } from '@/lib/integrations/oauth-state';
-import { redisClient } from '@/lib/redis';
-import { gitLabOAuthCredentialsRedisKey } from '@/lib/redis-keys';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { gitLabOAuthCredentialsRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 import type { GitLabOAuthCredentials } from './adapter';
 
 const GITLAB_OAUTH_CREDENTIAL_REF_BYTES = 16;

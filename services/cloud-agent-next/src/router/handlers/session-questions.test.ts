@@ -39,6 +39,7 @@ vi.mock('../../session-service.js', () => ({
 const handlers = createSessionQuestionHandlers();
 const router = t.router({
   getPendingInteractions: handlers.getPendingInteractions,
+  answerQuestion: handlers.answerQuestion,
 });
 
 const SESSION_ID = 'workspace_12345678-1234-1234-1234-123456789abc';
@@ -223,5 +224,49 @@ describe('getPendingInteractions', () => {
       harness.caller.getPendingInteractions({ cloudAgentSessionId: LEGACY_SESSION_ID })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(wrapper.getPendingInteractions).not.toHaveBeenCalled();
+  });
+});
+
+describe('answerQuestion', () => {
+  it('resolves a fresh control-plane stub for each retry of the answer RPC', async () => {
+    fetchSessionMetadataMock.mockResolvedValue({ identity: { sessionId: SESSION_ID } });
+    const firstAnswer = vi.fn().mockRejectedValueOnce(
+      Object.assign(new Error('retryable answer failure'), {
+        retryable: true,
+      })
+    );
+    const secondAnswer = vi.fn().mockResolvedValue('sent');
+    const sandboxSessions = {
+      idFromName: vi.fn((name: string) => name),
+      // A distinct stub per resolution, so the retry can only succeed through a
+      // freshly built stub rather than the failed one.
+      get: vi
+        .fn()
+        .mockReturnValueOnce({ answer: firstAnswer })
+        .mockReturnValueOnce({ answer: secondAnswer }),
+    };
+    const context = {
+      userId: 'user_owner',
+      authToken: 'test-auth-token',
+      request: new Request('https://worker.test/trpc'),
+      env: {
+        CLOUD_AGENT_SESSION: { idFromName: vi.fn(), get: vi.fn() },
+        SANDBOX_SESSION: sandboxSessions,
+      },
+    } as unknown as TRPCContext;
+    const caller = router.createCaller(context);
+
+    await expect(
+      caller.answerQuestion({ sessionId: SESSION_ID, questionId: 'q_1', answers: [['yes']] })
+    ).resolves.toEqual({ success: true });
+
+    expect(fetchSessionMetadataMock).toHaveBeenCalledWith(
+      expect.objectContaining({ SANDBOX_SESSION: sandboxSessions }),
+      'user_owner',
+      SESSION_ID
+    );
+    expect(sandboxSessions.get).toHaveBeenCalledTimes(2);
+    expect(firstAnswer).toHaveBeenCalledTimes(1);
+    expect(secondAnswer).toHaveBeenCalledTimes(1);
   });
 });

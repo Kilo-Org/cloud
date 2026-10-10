@@ -4,7 +4,7 @@ import { kilocode_users, organization_memberships, organizations } from '@kiloco
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { buildBitbucketOrganizationCredentialLockKey } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export type BitbucketWorkspaceAccessTokenAuthorizedActor = {
   id: string;

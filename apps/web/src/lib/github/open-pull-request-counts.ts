@@ -1,8 +1,8 @@
 import 'server-only';
 
 import * as z from 'zod';
-import { fetchWithBackoff } from '@/lib/fetchWithBackoff';
-import { GITHUB_ADMIN_STATS_TOKEN } from '@/lib/config.server';
+import { fetchWithBackoff } from '@kilocode/web-shared/lib/fetchWithBackoff';
+import { GITHUB_ADMIN_STATS_TOKEN } from '@kilocode/web-shared/lib/config.server';
 
 type OpenPullRequestCounts = {
   totalOpenPullRequests: number;

@@ -1,0 +1,345 @@
+import 'server-only';
+
+import {
+  credit_transactions,
+  kilo_pass_issuance_items,
+  kilo_pass_issuances,
+  kilocode_users,
+} from '@kilocode/db/schema';
+import { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  KiloPassCadence,
+  KiloPassIssuanceItemKind,
+  KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
+  type KiloPassWelcomePromoEligibilityReason,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import {
+  KILO_PASS_BONUS_LIKE_ITEM_KINDS,
+  computeIssueMonth,
+  createOrGetIssuanceHeader,
+  issueBonusCreditsForIssuance,
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import {
+  KILO_PASS_TIER_CONFIG,
+  KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { computeMonthlyKiloPassBonusDecision } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import {
+  getKiloPassStateForUser,
+  type KiloPassSubscriptionState,
+} from '@kilocode/web-shared/lib/kilo-pass/state';
+import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
+import {
+  getMonthlyWelcomePromoAccountContext,
+  type KiloPassWelcomePromoPolicy,
+} from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
+import { and, desc, eq, inArray, like } from 'drizzle-orm';
+
+type Db = typeof defaultDb;
+type Tx = Parameters<Db['transaction']>[0] extends (tx: infer T) => unknown ? T : never;
+
+export type UsageTriggeredMonthlyBonusDecision = {
+  bonusPercentApplied: number;
+  shouldIssueFirstMonthPromo: boolean;
+  description: string;
+  auditPayload: Record<string, unknown>;
+};
+
+export function computeUsageTriggeredMonthlyBonusDecision(params: {
+  tier: KiloPassSubscriptionState['tier'];
+  startedAtIso: string | null;
+  currentStreakMonths: number;
+  isFirstTimeSubscriberEver: boolean;
+  welcomePromoPolicy: KiloPassWelcomePromoPolicy;
+  welcomePromoEligibilityReason?: KiloPassWelcomePromoEligibilityReason | null;
+  issueMonth: string;
+}): UsageTriggeredMonthlyBonusDecision {
+  return computeMonthlyKiloPassBonusDecision({
+    tier: params.tier,
+    startedAtIso: params.startedAtIso,
+    streakMonths: params.currentStreakMonths,
+    isFirstTimeSubscriberEver: params.isFirstTimeSubscriberEver,
+    welcomePromoPolicy: params.welcomePromoPolicy,
+    welcomePromoEligibilityReason: params.welcomePromoEligibilityReason,
+    issueMonth: params.issueMonth,
+  });
+}
+
+export function computeUsageTriggeredYearlyIssueMonth(params: {
+  nextYearlyIssueAtIso: string | null;
+  startedAtIso: string | null;
+}): { currentPeriodStartIso: string | null; issueMonth: string | null } {
+  const currentPeriodStartIso =
+    params.nextYearlyIssueAtIso != null
+      ? dayjs(params.nextYearlyIssueAtIso).utc().subtract(1, 'month').toISOString()
+      : params.startedAtIso;
+
+  if (currentPeriodStartIso == null) {
+    return { currentPeriodStartIso: null, issueMonth: null };
+  }
+
+  const issueMonth = computeIssueMonth(dayjs(currentPeriodStartIso).utc());
+  return { currentPeriodStartIso, issueMonth };
+}
+
+async function clearKiloPassThreshold(tx: Tx, params: { kiloUserId: string }): Promise<void> {
+  await tx
+    .update(kilocode_users)
+    .set({ kilo_pass_threshold: null })
+    .where(eq(kilocode_users.id, params.kiloUserId));
+}
+
+async function issueBonusCredits(params: {
+  tx: Tx;
+  issuanceId: string;
+  subscriptionId: string;
+  kiloUserId: string;
+  baseAmountUsd: number;
+  bonusPercentApplied: number;
+  stripeInvoiceId: string | null;
+  description: string;
+  auditPayload?: Record<string, unknown>;
+}): Promise<{ wasIssued: boolean }> {
+  const bonusResult = await issueBonusCreditsForIssuance(params.tx, {
+    issuanceId: params.issuanceId,
+    subscriptionId: params.subscriptionId,
+    kiloUserId: params.kiloUserId,
+    baseAmountUsd: params.baseAmountUsd,
+    bonusPercentApplied: params.bonusPercentApplied,
+    stripeInvoiceId: params.stripeInvoiceId,
+    description: params.description,
+    auditPayload: params.auditPayload,
+  });
+
+  return { wasIssued: bonusResult.wasIssued };
+}
+
+type UsageTriggeredBonusDecision = {
+  bonusPercentApplied: number;
+  description: string;
+  auditPayload?: Record<string, unknown>;
+};
+
+async function getLatestIssuanceForMonthlyCadence(
+  tx: Tx,
+  params: { subscriptionId: string }
+): Promise<{
+  issuanceId: string;
+  issueMonth: string;
+  stripeInvoiceId: string | null;
+} | null> {
+  const issuanceRows = await tx
+    .select({
+      issuanceId: kilo_pass_issuances.id,
+      issueMonth: kilo_pass_issuances.issue_month,
+      stripeInvoiceId: kilo_pass_issuances.stripe_invoice_id,
+    })
+    .from(kilo_pass_issuances)
+    .where(eq(kilo_pass_issuances.kilo_pass_subscription_id, params.subscriptionId))
+    .orderBy(desc(kilo_pass_issuances.issue_month))
+    .limit(1);
+
+  const latestIssuance = issuanceRows[0];
+  if (!latestIssuance) return null;
+
+  return {
+    issuanceId: latestIssuance.issuanceId,
+    issueMonth: latestIssuance.issueMonth,
+    stripeInvoiceId: latestIssuance.stripeInvoiceId,
+  };
+}
+
+async function getOrCreateIssuanceForYearlyCadence(
+  tx: Tx,
+  params: {
+    subscriptionId: string;
+    nextYearlyIssueAtIso: string | null;
+    startedAtIso: string | null;
+  }
+): Promise<{
+  issuanceId: string;
+  issueMonth: string;
+  stripeInvoiceId: string | null;
+} | null> {
+  const { issueMonth } = computeUsageTriggeredYearlyIssueMonth({
+    nextYearlyIssueAtIso: params.nextYearlyIssueAtIso,
+    startedAtIso: params.startedAtIso,
+  });
+
+  if (issueMonth == null) return null;
+
+  const issuanceHeader = await createOrGetIssuanceHeader(tx, {
+    subscriptionId: params.subscriptionId,
+    issueMonth,
+    source: KiloPassIssuanceSource.Cron,
+    stripeInvoiceId: null,
+  });
+
+  const issuanceRow = await tx.query.kilo_pass_issuances.findFirst({
+    columns: { stripe_invoice_id: true },
+    where: eq(kilo_pass_issuances.id, issuanceHeader.issuanceId),
+  });
+
+  return {
+    issuanceId: issuanceHeader.issuanceId,
+    issueMonth,
+    stripeInvoiceId: issuanceRow?.stripe_invoice_id ?? null,
+  };
+}
+
+async function maybeIssueBonusFromUsageThreshold(
+  tx: Tx,
+  params: {
+    subscription: KiloPassSubscriptionState;
+    kiloUserId: string;
+  }
+): Promise<void> {
+  const { subscription, kiloUserId } = params;
+
+  const issuance =
+    subscription.cadence === KiloPassCadence.Monthly
+      ? await getLatestIssuanceForMonthlyCadence(tx, {
+          subscriptionId: subscription.subscriptionId,
+        })
+      : await getOrCreateIssuanceForYearlyCadence(tx, {
+          subscriptionId: subscription.subscriptionId,
+          nextYearlyIssueAtIso: subscription.nextYearlyIssueAt,
+          startedAtIso: subscription.startedAt,
+        });
+
+  if (!issuance) {
+    await clearKiloPassThreshold(tx, { kiloUserId });
+    return;
+  }
+
+  const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
+    columns: { id: true, credit_transaction_id: true, amount_usd: true },
+    where: and(
+      eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),
+      eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+    ),
+  });
+  if (!baseItem) {
+    await clearKiloPassThreshold(tx, { kiloUserId });
+    return;
+  }
+
+  // The bonus follows the base this issuance credited. A store plan switch can move the
+  // subscription tier above it before the new price is paid.
+  const baseAmountUsd = Math.min(
+    KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd,
+    baseItem.amount_usd
+  );
+
+  if (subscription.paymentProvider === KiloPassPaymentProvider.GooglePlay) {
+    const refund = await tx.query.credit_transactions.findFirst({
+      columns: { id: true },
+      where: and(
+        eq(credit_transactions.kilo_user_id, kiloUserId),
+        like(
+          credit_transactions.credit_category,
+          `kilo-pass-store-refund:google_play:%:base:${baseItem.credit_transaction_id}`
+        )
+      ),
+    });
+    if (refund) {
+      await clearKiloPassThreshold(tx, { kiloUserId });
+      return;
+    }
+  }
+
+  const alreadyIssuedItem = await tx.query.kilo_pass_issuance_items.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),
+      inArray(kilo_pass_issuance_items.kind, KILO_PASS_BONUS_LIKE_ITEM_KINDS)
+    ),
+  });
+  if (alreadyIssuedItem) {
+    await clearKiloPassThreshold(tx, { kiloUserId });
+    return;
+  }
+
+  const decision: UsageTriggeredBonusDecision = await (async () => {
+    if (subscription.cadence !== KiloPassCadence.Monthly) {
+      return {
+        bonusPercentApplied: KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
+        description: `Kilo Pass yearly monthly bonus (${subscription.tier}, ${issuance.issueMonth})`,
+      };
+    }
+
+    const welcomePromoAccountContext = await getMonthlyWelcomePromoAccountContext(tx, {
+      kiloUserId,
+      subscriptionId: subscription.subscriptionId,
+      paymentProvider: subscription.paymentProvider,
+    });
+    const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
+      tier: subscription.tier,
+      startedAtIso: subscription.startedAt,
+      currentStreakMonths: subscription.currentStreakMonths,
+      ...welcomePromoAccountContext,
+      issueMonth: issuance.issueMonth,
+    });
+
+    return {
+      bonusPercentApplied: monthlyDecision.bonusPercentApplied,
+      description: monthlyDecision.description,
+      auditPayload: monthlyDecision.auditPayload,
+    };
+  })();
+
+  await issueBonusCredits({
+    tx,
+    issuanceId: issuance.issuanceId,
+    subscriptionId: subscription.subscriptionId,
+    kiloUserId,
+    baseAmountUsd,
+    bonusPercentApplied: decision.bonusPercentApplied,
+    stripeInvoiceId: issuance.stripeInvoiceId,
+    description: decision.description,
+    auditPayload: decision.auditPayload,
+  });
+
+  await clearKiloPassThreshold(tx, { kiloUserId });
+}
+
+export async function maybeIssueKiloPassBonusFromUsageThreshold(params: {
+  kiloUserId: string;
+  nowIso: string;
+  db?: Db;
+}): Promise<void> {
+  const { kiloUserId } = params;
+  const db = params.db ?? defaultDb;
+
+  await db.transaction(async tx => {
+    const userRows = await tx
+      .select({
+        microdollarsUsed: kilocode_users.microdollars_used,
+        kiloPassThreshold: kilocode_users.kilo_pass_threshold,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, kiloUserId))
+      .for('update')
+      .limit(1);
+
+    const user = userRows[0];
+    if (!user) return;
+
+    const kiloPassThreshold = user.kiloPassThreshold;
+    const effectiveThreshold = getEffectiveKiloPassThreshold(kiloPassThreshold);
+    if (effectiveThreshold === null || user.microdollarsUsed < effectiveThreshold) return;
+
+    const subscriptionState = await getKiloPassStateForUser(tx, kiloUserId);
+    if (!subscriptionState || subscriptionState.status !== 'active') {
+      await clearKiloPassThreshold(tx, { kiloUserId });
+      return;
+    }
+
+    await maybeIssueBonusFromUsageThreshold(tx, {
+      subscription: subscriptionState,
+      kiloUserId,
+    });
+  });
+}

@@ -1,0 +1,32 @@
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  dropToolStrictProperties,
+  normalizeToolCallIds,
+} from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
+
+export const MISTRAL_LARGE_4_MODEL_ID = 'mistralai/mistral-large-4-0';
+
+export function isMistralModel(model: string) {
+  return model.includes('mistral');
+}
+export function isCodestralModel(model: string) {
+  return model.includes('codestral');
+}
+
+export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
+  if (requestToMutate.kind !== 'chat_completions') {
+    return;
+  }
+
+  // mistral recommends this
+  // https://kilo-code.slack.com/archives/C09PV151JMN/p1764597849596819
+  if (requestToMutate.body.temperature === undefined) {
+    requestToMutate.body.temperature = 0.2;
+  }
+
+  // mistral requires tool call ids to be of length 9
+  normalizeToolCallIds(requestToMutate.body, toolCallId => toolCallId.length !== 9, 9);
+
+  // mistral doesn't support strict for our schema
+  dropToolStrictProperties(requestToMutate.body);
+}

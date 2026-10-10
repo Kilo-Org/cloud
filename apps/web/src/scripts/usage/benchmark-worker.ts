@@ -1,8 +1,8 @@
 import { parentPort, workerData } from 'worker_threads';
-import { insertUsageRecord } from '@/lib/ai-gateway/processUsage';
+import { insertUsageRecord } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
-import { closeAllDrizzleConnections } from '@/lib/drizzle';
-import type { UsageMetaData } from '@/lib/ai-gateway/processUsage.types';
+import { closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
+import type { UsageMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
 type RecordPair = { core: MicrodollarUsage; metadata: UsageMetaData };
 

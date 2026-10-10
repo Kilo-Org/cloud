@@ -12,7 +12,7 @@ import {
   sessionIdSchema as kiloSessionIdSchema,
   type CloudAgentWorktreeId,
 } from '@kilocode/session-ingest-contracts';
-import { normalizeGitUrl } from '@kilocode/worker-utils';
+import { normalizeGitUrl, sha256Hex } from '@kilocode/worker-utils';
 import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
@@ -30,15 +30,15 @@ import {
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { generateSessionId } from '../../session-plane.js';
+import { buildControlPlaneSandboxSelection } from '../../session/control-plane-session-input.js';
 import {
   assertSessionOperationIdentity,
   assertRuntimeIsolationAdmission,
   SESSION_CREATE_INTENT_FINGERPRINT_KEY,
 } from '../../session/session-registration.js';
-import type { TRPCContext } from '../../types.js';
+import type { SandboxId, TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
-import { sha256Hex } from '../../utils/sha256.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -387,7 +387,7 @@ function buildRegistrationInput(
   ctx: TRPCContext,
   progress: OperationProgress,
   runtimeAuthorization: WorktreeRuntimeAuthorization
-): Parameters<ReturnType<typeof getSandboxSessionStub>['registerSession']>[0] {
+): Parameters<ReturnType<typeof getSandboxSessionStub>['registerSessionFromMetadata']>[0] {
   const repository = { ...source.repository };
   if ('token' in repository) delete repository.token;
 
@@ -395,17 +395,33 @@ function buildRegistrationInput(
   delete workspace.providerRuntime;
   workspace.branchName = sourceWorktreeBranchName(source);
 
-  return {
+  const now = Date.now();
+  // Explicit field list: a sibling session inherits route/agent/profile but not
+  // the parent's callback, clone source, devcontainer runtime or initial
+  // message. `workspace` is the resolved worktree placement.
+  const metadata: SessionMetadata = {
+    metadataSchemaVersion: 2,
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
     auth: {
+      ...source.metadata.auth,
       kiloSessionId: progress.kiloSessionId,
       kilocodeToken: runtimeAuthorization?.token ?? ctx.authToken,
     },
     agent: source.metadata.agent,
     repository,
-    workspace,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
     ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
+    workspace,
+    lifecycle: { version: now, timestamp: now },
+  };
+
+  return {
+    metadata,
+    sandboxSelection: buildControlPlaneSandboxSelection(
+      metadata,
+      ctx.env,
+      workspace.sandboxId as SandboxId
+    ),
     ...(runtimeAuthorization ? { runtimeAuthorizationSeal: runtimeAuthorization.seal } : {}),
   };
 }
@@ -420,7 +436,7 @@ async function assertDestinationRuntimeAuthorizationActive(
     stub => stub.getRuntimeAuthorizationStatus(),
     'getRuntimeAuthorizationStatus'
   );
-  if (status !== 'active') {
+  if (status.state !== 'active') {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
   }
 }
@@ -701,7 +717,7 @@ async function registerWorktreeSession(
           progress,
           source.ownership.organizationId ?? undefined
         );
-        return stub.registerSession(
+        return stub.registerSessionFromMetadata(
           buildRegistrationInput(source, ctx, progress, runtimeAuthorization)
         );
       },

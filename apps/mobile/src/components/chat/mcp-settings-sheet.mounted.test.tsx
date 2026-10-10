@@ -37,13 +37,19 @@ const h = vi.hoisted(() => {
       listener();
     }
   };
+  const confirmRequest: {
+    value: null | { title: string; message: string; confirmLabel: string; onConfirm: () => void };
+  } = { value: null };
   return {
     group,
     servers,
     hasLoaded,
     discovered,
     kilo,
-    alert: vi.fn<(...args: unknown[]) => void>(),
+    confirmRequest,
+    confirm: vi.fn((request: typeof confirmRequest.value) => {
+      confirmRequest.value = request;
+    }),
     toastError: vi.fn(),
     setSettingsToolsEnabled: vi.fn((next: boolean) => {
       group.value = next;
@@ -124,10 +130,16 @@ vi.mock('@/lib/chat/registry', () => ({
 }));
 
 vi.mock('react-native', () => ({
-  Alert: { alert: h.alert },
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   View: 'View',
+}));
+
+/* The sheet confirms through the app's dialog. The real one renders a native
+   sheet, which this DOM-free renderer cannot mount, so the test reads the
+   request instead and answers it. */
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 
 vi.mock('sonner-native', () => ({ toast: { error: h.toastError } }));
@@ -582,21 +594,15 @@ describe('the chat-tools sheet', () => {
       await Promise.resolve();
     });
 
-    const call = h.alert.mock.calls.at(0);
-    expect(h.alert).toHaveBeenCalledTimes(1);
-    expect(call?.[0]).toBe('Delete this server?');
-    expect(call?.[1]).toBe('Its tools leave every chat.');
-    const buttons = call?.[2] as { style?: string; onPress?: () => void }[] | undefined;
+    const request = h.confirmRequest.value;
+    expect(h.confirm).toHaveBeenCalledTimes(1);
+    expect(request?.title).toBe('Delete this server?');
+    expect(request?.message).toBe('Its tools leave every chat.');
+    expect(request?.confirmLabel).toBe(i18n.t('common.delete'));
     expect(h.deleteRemoteMcpServer).not.toHaveBeenCalled();
 
     await act(async () => {
-      buttons?.find(button => button.style === 'cancel')?.onPress?.();
-      await Promise.resolve();
-    });
-    expect(h.deleteRemoteMcpServer).not.toHaveBeenCalled();
-
-    await act(async () => {
-      buttons?.find(button => button.style === 'destructive')?.onPress?.();
+      request?.onConfirm();
       await Promise.resolve();
     });
     await flush();

@@ -47,8 +47,6 @@ import {
 import type { TRPCContext } from './init';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 
-// ── Helpers ────────────────────────────────────────────────────────────
-
 /** Look up a user's membership for a specific org from the JWT claims. */
 function getOrgMembership(
   memberships: JwtOrgMembership[],
@@ -252,11 +250,7 @@ async function requireOwnerAccess(env: Env, ctx: TRPCContext, wastelandId: strin
   return ownership;
 }
 
-// ── Router ─────────────────────────────────────────────────────────────
-
 export const wastelandRouter = router({
-  // ── Create ──────────────────────────────────────────────────────────
-
   createWasteland: procedure
     .input(
       z.object({
@@ -269,7 +263,6 @@ export const wastelandRouter = router({
     )
     .output(RpcWastelandOutput)
     .mutation(async ({ ctx, input }) => {
-      // Org ownership: verify membership (not billing_manager)
       if (input.ownerType === 'org') {
         if (!input.organizationId) {
           throw new TRPCError({
@@ -297,7 +290,6 @@ export const wastelandRouter = router({
       // maximum trust_level so they can manage members and configuration.
       await stub.addMember(ctx.userId, 'owner', 3);
 
-      // Register in the central wasteland registry for listing
       const registryStub = getWastelandRegistryStub(ctx.env);
       await registryStub.register({
         wasteland_id: wastelandId,
@@ -317,7 +309,6 @@ export const wastelandRouter = router({
       return config;
     }),
 
-  // ── Create Upstream (worker-side bootstrap of a new commons) ────────
   // Bootstraps a brand-new DoltHub commons repo: creates the database
   // via DoltHub's REST API, applies the wasteland commons schema, and
   // registers the caller as the first rig with `trust_level=1`.
@@ -420,7 +411,6 @@ export const wastelandRouter = router({
         });
       }
 
-      // Persist the upstream on the wasteland config now that the repo exists.
       await doStub.updateConfig({ dolthub_upstream: input.upstream });
 
       // Sync the new upstream onto the central registry so the
@@ -438,7 +428,6 @@ export const wastelandRouter = router({
       return { success: true, databaseCreated: result.databaseCreated };
     }),
 
-  // ── Join Wasteland (M2.7 explicit fork+register ceremony) ───────────
   // Runs `WlClient.join()` on behalf of the caller: forks the upstream
   // to the user's DoltHub account, writes the rig registration row to
   // `wl/register/<handle>`, and opens the registration PR. After the
@@ -489,8 +478,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── List ────────────────────────────────────────────────────────────
-
   listWastelands: procedure
     .input(
       z.object({
@@ -505,17 +492,14 @@ export const wastelandRouter = router({
         ? await registryStub.listByOrg(input.organizationId)
         : await registryStub.listByUser(ctx.userId);
 
-      // If listing org wastelands, verify the user has org membership
       if (input.organizationId) {
         verifyOrgAccess(ctx, input.organizationId);
       }
 
-      // Resolve each wasteland's full config from its DO
       const results = await Promise.all(
         entries.map(async entry => {
           const stub = getWastelandDOStub(ctx.env, entry.wasteland_id);
           const config = await stub.getConfig();
-          // Skip deleted or missing wastelands
           if (!config || config.status === 'deleted') return null;
           return config;
         })
@@ -523,8 +507,6 @@ export const wastelandRouter = router({
 
       return results.filter((r): r is NonNullable<typeof r> => r !== null);
     }),
-
-  // ── Get ─────────────────────────────────────────────────────────────
 
   getWasteland: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
@@ -539,7 +521,6 @@ export const wastelandRouter = router({
       return config;
     }),
 
-  // ── Resolve <owner>/<repo> → wastelandId ───────────────────────────
   // Powers the `/wasteland/:owner/:repo` route family in apps/web.
   // Tells you what wasteland (if any) is registered under that
   // upstream slug. Auth is intentionally NOT enforced here — the caller
@@ -578,15 +559,12 @@ export const wastelandRouter = router({
       };
     }),
 
-  // ── Delete ──────────────────────────────────────────────────────────
-
   deleteWasteland: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       const ownership = await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
 
-      // For org wastelands, only owners/admins can delete — not regular members
       if (ownership.type === 'org') {
         const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
         if (!membership || membership.role !== 'owner') {
@@ -597,11 +575,9 @@ export const wastelandRouter = router({
         }
       }
 
-      // Soft-delete: mark as deleted in the WastelandDO
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
       await stub.updateConfig({ status: 'deleted' });
 
-      // Remove from the central registry
       const registryStub = getWastelandRegistryStub(ctx.env);
       await registryStub.unregister(input.wastelandId);
 
@@ -613,8 +589,6 @@ export const wastelandRouter = router({
 
       return { success: true };
     }),
-
-  // ── Admin: List All ─────────────────────────────────────────────────
 
   adminListWastelands: adminProcedure.output(z.array(RpcWastelandOutput)).query(async ({ ctx }) => {
     const registryStub = getWastelandRegistryStub(ctx.env);
@@ -632,13 +606,10 @@ export const wastelandRouter = router({
     return results.filter((r): r is NonNullable<typeof r> => r !== null);
   }),
 
-  // ── Members ─────────────────────────────────────────────────────────
-
   listMembers: procedure
     .input(z.object({ wastelandId: z.string() }))
     .output(z.array(RpcWastelandMemberOutput))
     .query(async ({ ctx, input }) => {
-      // Any member or owner can list members
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
       return stub.listMembers();
@@ -664,7 +635,6 @@ export const wastelandRouter = router({
         input.trustLevel ?? 1
       );
 
-      // Fetch the newly created member record to return
       const members: WastelandMemberResult[] = await stub.listMembers();
       const member = members.find(m => m.member_id === memberId);
       if (!member) {
@@ -697,7 +667,6 @@ export const wastelandRouter = router({
 
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
 
-      // Owners cannot remove themselves — fetch members to check
       const members: WastelandMemberResult[] = await stub.listMembers();
       const target = members.find(m => m.member_id === input.memberId);
       if (!target) {
@@ -754,8 +723,6 @@ export const wastelandRouter = router({
       return updated;
     }),
 
-  // ── Config Update ──────────────────────────────────────────────────
-
   updateWastelandConfig: procedure
     .input(
       z.object({
@@ -766,7 +733,6 @@ export const wastelandRouter = router({
     )
     .output(RpcWastelandConfigOutput)
     .mutation(async ({ ctx, input }) => {
-      // Owner or org admin only
       await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
 
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
@@ -797,8 +763,6 @@ export const wastelandRouter = router({
       return config;
     }),
 
-  // ── Credential: Store ──────────────────────────────────────────────
-
   storeCredential: procedure
     .input(
       z.object({
@@ -811,10 +775,8 @@ export const wastelandRouter = router({
     )
     .output(RpcWastelandCredentialStatusOutput)
     .mutation(async ({ ctx, input }) => {
-      // Any member can store their own credential
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
 
-      // Derive encryption key from WASTELAND_ENCRYPTION_KEY secret
       const rawKey = await resolveSecret(ctx.env.WASTELAND_ENCRYPTION_KEY);
       if (!rawKey) {
         throw new TRPCError({
@@ -852,13 +814,10 @@ export const wastelandRouter = router({
       };
     }),
 
-  // ── Credential: Get Status ─────────────────────────────────────────
-
   getCredentialStatus: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(RpcWastelandCredentialStatusOutput.nullable())
     .query(async ({ ctx, input }) => {
-      // Any member can check their own credential status
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
 
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
@@ -876,7 +835,6 @@ export const wastelandRouter = router({
       };
     }),
 
-  // ── Credential: Set upstream-admin flag ─────────────────────────────
   // Lets a user flip the "I own this upstream" checkbox after connect.
 
   setUpstreamAdmin: procedure
@@ -901,8 +859,6 @@ export const wastelandRouter = router({
       };
     }),
 
-  // ── Credential: Delete ─────────────────────────────────────────────
-
   deleteCredential: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.object({ success: z.boolean() }))
@@ -925,8 +881,6 @@ export const wastelandRouter = router({
       return { success: true };
     }),
 
-  // ── Connected Towns ────────────────────────────────────────────────
-
   connectKiloTown: procedure
     .input(
       z.object({
@@ -936,7 +890,6 @@ export const wastelandRouter = router({
     )
     .output(RpcConnectedTownOutput)
     .mutation(async ({ ctx, input }) => {
-      // Verify user has access to this wasteland (owner, org member, or admin)
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
 
       // TODO: Add server-side town ownership validation once a Gastown service
@@ -949,13 +902,11 @@ export const wastelandRouter = router({
 
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
 
-      // Auto-register the user as a member if not already one
       const existingMember = await stub.getMember(ctx.userId);
       if (!existingMember) {
         await stub.addMember(ctx.userId, 'contributor', 1);
       }
 
-      // Store the town-wasteland association
       const connection = await stub.connectTown(input.townId, ctx.userId);
 
       meterEvent(ctx.env, {
@@ -977,7 +928,6 @@ export const wastelandRouter = router({
     )
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      // Only owners/admins can disconnect towns
       await requireOwnerAccess(ctx.env, ctx, input.wastelandId);
 
       const stub = getWastelandDOStub(ctx.env, input.wastelandId);
@@ -1005,8 +955,6 @@ export const wastelandRouter = router({
       return stub.listConnectedTownsForUser(ctx.userId);
     }),
 
-  // ── Wanted Board ──────────────────────────────────────────────────
-
   browseWantedBoard: procedure
     .input(WantedBoardBrowseInput)
     .output(z.array(RpcWantedBoardRowOutput))
@@ -1027,7 +975,6 @@ export const wastelandRouter = router({
           includeForkBranches: input.includeForkBranches,
         });
       } catch (err) {
-        // Browse degrades to empty list if not yet configured
         if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
           return [];
         }
@@ -1078,7 +1025,6 @@ export const wastelandRouter = router({
       try {
         loaded = await loadAdminContext(ctx.env, input.wastelandId, ctx.userId);
       } catch {
-        // No credential / no upstream configured → no pending claims.
         return { items: [] };
       }
       const { token, upstream, rigHandle } = loaded;
@@ -1114,7 +1060,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Workshop: list the user's fork branches ────────────────────────
   // Powers the fork (workshop) view. Returns one row per
   // `wl/<rigHandle>/*` branch on the caller's fork, cross-referenced
   // with upstream `main` and the branch tip so the UI can render
@@ -1128,14 +1073,12 @@ export const wastelandRouter = router({
         return await branchOps.listMyForkBranches(ctx.env, input.wastelandId, ctx.userId);
       } catch (err) {
         if (err instanceof WantedBoardOpError) {
-          // No upstream / no credential → empty workshop, not an error.
           if (err.code === 'PRECONDITION_FAILED') return [];
         }
         return wantedBoardErrorToTRPC(err);
       }
     }),
 
-  // ── Workshop: discard a branch ──────────────────────────────────────
   // Deletes the user's `wl/<rigHandle>/<wantedId>` branch on the fork.
   // Idempotent: a missing branch resolves successfully.
   discardBranch: procedure
@@ -1164,7 +1107,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Workshop: publish a branch ──────────────────────────────────────
   // Opens or updates a PR for the user's `wl/<rigHandle>/<wantedId>`
   // branch. Idempotent: returns the existing PR's URL when one is
   // already open against the upstream.
@@ -1194,7 +1136,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Pulls: list the user's PRs against upstream ────────────────────
   // Powers the Mine tab on the pulls page. Filters all upstream pulls
   // down to those whose source branch is owned by the caller's fork.
   listMyPulls: procedure
@@ -1206,14 +1147,11 @@ export const wastelandRouter = router({
         return await branchOps.listMyPulls(ctx.env, input.wastelandId, ctx.userId);
       } catch (err) {
         if (err instanceof WantedBoardOpError) {
-          // No upstream / no credential → empty list, not an error.
           if (err.code === 'PRECONDITION_FAILED') return [];
         }
         return wantedBoardErrorToTRPC(err);
       }
     }),
-
-  // ── Wanted Board Mutations ────────────────────────────────────────
 
   claimWantedItem: procedure
     .input(
@@ -1499,7 +1437,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Admin: Upstream PR management ──────────────────────────────────
   // Admins with `is_upstream_admin=true` can list/merge/close upstream PRs
   // using the stored DoltHub credential. Non-admins get FORBIDDEN since
   // the underlying DoltHub API would reject the write anyway.
@@ -1586,7 +1523,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Admin: Verify upstream write access ─────────────────────────────
   // Probes DoltHub by attempting a no-op write against a scratch branch.
   // Returns hasWriteAccess=true only when the write API reports success
   // (a DoltHub token without push rights returns 403 here).
@@ -1632,7 +1568,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Admin: Review inbox (typed view of open upstream PRs) ──────────
   // Replaces the raw `listPendingPRs` surface for UI clients. Classifies
   // each PR into a typed card kind by parsing commit subjects and
   // querying the branch tip for row-level context (item title, evidence,
@@ -1667,8 +1602,6 @@ export const wastelandRouter = router({
         throw err;
       }
     }),
-
-  // ── Admin: Post a comment on an upstream PR ────────────────────────
 
   commentOnUpstreamPR: procedure
     .input(
@@ -1712,8 +1645,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Admin: List rigs registered on upstream ─────────────────────────
-
   listUpstreamRigs: procedure
     .input(z.object({ wastelandId: z.string().uuid() }))
     .output(z.object({ rigs: z.array(RpcUpstreamRigOutput) }))
@@ -1754,7 +1685,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Admin: Single-entity fetchers (for drawer graph navigation) ──────
   // These are deliberately small, targeted reads against upstream `main`.
   // Drawer panels use them when a user clicks a cross-reference (e.g. a
   // rig handle in a PR drawer → push rig drawer) and we don't already
@@ -1961,7 +1891,6 @@ export const wastelandRouter = router({
       }
     }),
 
-  // ── Admin: Change rig trust level via direct upstream write ─────────
   // `wl` has no CLI command for trust-level changes, so we use the
   // DoltHub write API to update `rigs.trust_level` on a scratch branch,
   // then open + merge a PR to land the change on `main`. The DoltHub

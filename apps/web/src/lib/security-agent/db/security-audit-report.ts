@@ -23,7 +23,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import * as z from 'zod';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 
 export const SECURITY_AGENT_AUDIT_REPORT_VERSION = 1;
 export const SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE = 1000;

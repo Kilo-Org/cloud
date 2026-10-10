@@ -18,7 +18,9 @@ const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 export default function ApiRequestLogPage() {
   const [userId, setUserId] = useState('');
   const [startDate, setStartDate] = useState('');
+  const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [model, setModel] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [errorsOnly, setErrorsOnly] = useState(false);
@@ -33,9 +35,15 @@ export default function ApiRequestLogPage() {
     }
     if (startDate) {
       params.set('startDate', startDate);
+      if (startTime) {
+        params.set('startTime', startTime);
+      }
     }
     if (endDate) {
       params.set('endDate', endDate);
+      if (endTime) {
+        params.set('endTime', endTime);
+      }
     }
     if (model.trim()) {
       params.set('model', model.trim());
@@ -109,25 +117,51 @@ export default function ApiRequestLogPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date (optional)</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={e => setStartDate(e.target.value)}
-                />
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date (optional)</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={e => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="startTime">Start Time (optional)</Label>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    disabled={!startDate}
+                    onChange={e => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endDate">End Date (optional)</Label>
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={endDate}
+                    onChange={e => setEndDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endTime">End Time (optional)</Label>
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={endTime}
+                    disabled={!endDate}
+                    onChange={e => setEndTime(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="endDate">End Date (optional)</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={e => setEndDate(e.target.value)}
-                />
-              </div>
+              <p className="text-muted-foreground text-xs">
+                Dates and times are UTC. Without a time, the range covers the whole day. The end
+                time includes the full minute.
+              </p>
             </div>
 
             <div className="flex items-center gap-2">

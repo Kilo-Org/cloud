@@ -5,16 +5,16 @@ import { NextRequest } from 'next/server';
 import {
   getAutoRoutingMode,
   updateAutoRoutingMode,
-} from '@/lib/ai-gateway/auto-routing-admin-client';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
-import { getUserFromAuth } from '@/lib/user/server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { GET, PUT } from './route';
 
-jest.mock('@/lib/ai-gateway/auto-routing-admin-client');
-jest.mock('@/lib/organizations/trial-middleware');
-jest.mock('@/lib/user/server');
-jest.mock('@/routers/organizations/utils');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client');
+jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware');
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/routers/organizations/utils');
 
 const mockedGetAutoRoutingMode = jest.mocked(getAutoRoutingMode);
 const mockedUpdateAutoRoutingMode = jest.mocked(updateAutoRoutingMode);

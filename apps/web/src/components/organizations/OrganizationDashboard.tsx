@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useQuery } from '@tanstack/react-query';
 import { OrganizationInfoCard } from './OrganizationInfoCard';
 import { OrganizationAdminMembers } from './OrganizationMembersCard';
 import { OrganizationDataCollectionCard } from './OrganizationDataCollectionCard';
 import { SeatUsageCard } from './SeatUsageCard';
 import { KiloPassUsageCard } from './KiloPassUsageCard';
 import { SSOSignupCard } from './SSOSignupCard';
-import { VerifiedDomainsCard } from './VerifiedDomainsCard';
 import { LockableContainer } from './LockableContainer';
 import { OrganizationAdminContextProvider } from './OrganizationContextWrapper';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
@@ -18,7 +19,7 @@ import {
   canManageOrganization,
   canManageOrganizationBilling,
 } from '@kilocode/app-shared/organizations';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -77,6 +78,15 @@ export function OrganizationDashboard({
   // Use assumed role if available, otherwise use actual role
   const currentRole = assumedRole === 'KILO ADMIN' ? 'owner' : assumedRole || role;
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
+
+  const trpc = useTRPC();
+  const canBilling = canManageOrganizationBilling(currentRole);
+  const { data: activeKiloclaws, isError: activeKiloclawsError } = useQuery({
+    ...trpc.organizations.kiloclaw.listActiveInstances.queryOptions({ organizationId }),
+    enabled: canBilling,
+  });
+
+  const hasActiveKiloclaws = activeKiloclaws?.some(i => !i.isSuspended) ?? false;
 
   // Check localStorage on component mount to determine if welcome banners should be shown
   useEffect(() => {
@@ -181,14 +191,9 @@ export function OrganizationDashboard({
               organizationData?.parent_organization_id === null && (
                 <KiloPassUsageCard organizationId={organizationId} />
               )}
-            {canManageOrganizationBilling(currentRole) && (
+            {canBilling && (activeKiloclawsError || hasActiveKiloclaws) && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}
-            <VerifiedDomainsCard
-              organizationId={organizationId}
-              role={currentRole}
-              isKiloAdmin={isKiloAdmin}
-            />
             {organizationData?.plan === 'enterprise' && (
               <LockableContainer>
                 <SSOSignupCard organization={organizationData} role={currentRole} />

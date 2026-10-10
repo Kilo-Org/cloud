@@ -3,36 +3,33 @@ import {
   mutateOrganizationSettings,
   setOrganizationRecommendationsDigestEnabled,
   updateOrganizationSettings,
-} from '@/lib/organizations/organizations';
-import type {
-  OpenRouterModelsResponse,
-  OrganizationSettings,
-} from '@/lib/organizations/organization-types';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
-  organizationMemberProcedure,
   organizationAdminMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
+import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   MAX_ORGANIZATION_AUTO_ROUTES,
   assertOrganizationAutoEligible,
   assertOrganizationAutoWriteEnabled,
   validateOrganizationAutoTarget,
-} from '@/lib/organizations/organization-auto-model';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings
@@ -314,28 +311,7 @@ const SettingsResponseSchema = z.object({
 });
 
 export const organizationsSettingsRouter = createTRPCRouter({
-  listAvailableModels: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
-    .output(z.custom<OpenRouterModelsResponse>())
-    .query(async ({ input, ctx }) => {
-      const { organizationId } = input;
-
-      const result = await getAvailableModelsForOrganization(organizationId, {
-        type: 'member',
-        kiloUserId: ctx.user.id,
-        // `ensureOrganizationAccess` also admits Kilo admins and parent-organization
-        // owners, who hold no membership row and belong to no group; they resolve
-        // against organization-level policy instead of being rejected.
-        allowNonMember: true,
-      });
-      if (!result) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-      return result;
-    }),
+  listAvailableModels: listAvailableModelsProcedure,
 
   updateAllowLists: organizationAdminMutationProcedure
     .input(UpdateAllowListsInputSchema)

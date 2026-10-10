@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
 import { kilocode_users, organizations, provider_oauth_attempts } from '@kilocode/db/schema';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';

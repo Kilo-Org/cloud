@@ -8,7 +8,7 @@ import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -181,7 +181,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         title={t('codeReviewer.manualReview.title')}
         eyebrow={t('common.codeReviewer')}
       />
-      <AppAwareKeyboardPaddingView className="flex-1">
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           className="flex-1"
           contentContainerClassName="px-6 gap-6 pt-4 pb-4"
@@ -257,7 +257,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               // The shared single-line box supplies the touch floor
               // (`min-h-[44px]`, never a fixed height); the field keeps its
               // own chrome, horizontal inset and line box.
-              className="rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
+              className="rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground"
               placeholder={URL_PLACEHOLDER[platform]}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
@@ -333,7 +333,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             </Text>
           </Button>
         </ManualReviewActionFooter>
-      </AppAwareKeyboardPaddingView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

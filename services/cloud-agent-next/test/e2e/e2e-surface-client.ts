@@ -232,6 +232,8 @@ export function createLocalHttpScenarioEnvironment(options: {
   surfaceUrl: string;
   bearerToken?: string;
   internalApiSecret: string;
+  /** Read from the Worker `.dev.vars` by the driver, not a second flag. */
+  credentialContainmentEnabled?: boolean;
 }): ScenarioEnvironment {
   return {
     profile: 'local-http',
@@ -239,5 +241,10 @@ export function createLocalHttpScenarioEnvironment(options: {
     sessionSandbox: createHttpSessionSandbox(options),
     callbacks: createHttpCallbacks(options),
     deployedHttpAuthBoundary: { modelRoutesAuthenticated: true },
+    // V2 is inert until C1; the operator opts in explicitly, exactly as the
+    // Docker profile does. Without the flag V2 scenarios report `unsupported`.
+    // This profile has no Docker, so it never provides `controlPlaneRuntime`.
+    ...(process.env.E2E_CONTROL_PLANE_V2 === '1' ? { controlPlaneV2: { ready: true } } : {}),
+    ...(options.credentialContainmentEnabled ? { credentialContainment: { enabled: true } } : {}),
   };
 }

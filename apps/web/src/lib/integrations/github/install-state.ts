@@ -1,6 +1,6 @@
 import 'server-only';
 import crypto from 'node:crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sql, eq, and, isNull } from 'drizzle-orm';
 import { github_install_states, type GitHubInstallState } from '@kilocode/db/schema';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';

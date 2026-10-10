@@ -9,8 +9,8 @@ import {
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
-import { buildServiceFeeLineMetadata } from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/constants';
+import { buildServiceFeeLineMetadata } from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 
 function requiredEnv(key: string): string {
   const value = process.env[key];

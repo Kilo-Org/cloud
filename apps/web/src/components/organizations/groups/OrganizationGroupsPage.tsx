@@ -1,6 +1,6 @@
 'use client';
 
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, ShieldCheck, Trash2, UsersRound } from 'lucide-react';
 import { useState } from 'react';

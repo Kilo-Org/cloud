@@ -7,7 +7,7 @@
       "instanceLifecycle": "Contoh anda ada kemas kini",
       "scheduledAction": "Tindakan berjadual ada kemas kini",
       "lowBalance": "Baki anda memerlukan perhatian",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Perbelanjaan anda memerlukan perhatian",
       "securityFinding": "Penemuan keselamatan memerlukan perhatian",
       "activeAgentsGlanceable": "Ejen aktif ada kemas kini"
     }
@@ -44,8 +44,8 @@
       "body": "Baki {{organizationName}} jatuh di bawah ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Amaran perbelanjaan",
+      "body": "Perbelanjaan {{scopeName}} melebihi ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Penemuan keselamatan baharu ({{severity}})",

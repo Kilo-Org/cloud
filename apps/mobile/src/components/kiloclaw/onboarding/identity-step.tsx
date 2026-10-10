@@ -6,11 +6,12 @@ import { ChevronDown, ChevronUp, MapPin } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { BotAvatar } from '@/components/kiloclaw/bot-avatar';
 import { botAvatarName } from '@/components/kiloclaw/bot-avatar-options';
@@ -309,8 +310,16 @@ export function IdentityStep({
           >
             <BotAvatar emoji={selectedEmoji} size={24} color={colors.foreground} />
           </Pressable>
-          <TextInput
-            className="h-14 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-[normal] text-foreground"
+          {/* Same intended box as the avatar tile (`h-14` — 3.5rem at the app's
+              14pt rem is 49pt), as a `min-h-*` floor rather than a fixed
+              height so Dynamic Type still grows it. Drawn by the shared Input,
+              which supplies the `leading-[normal]` line box both the
+              placeholder and the value share and `textAlignVertical: 'center'`,
+              so the value centres instead of sitting top-aligned above a
+              centred placeholder on Android. The box's own `px-3` replaces
+              this call site's. */}
+          <Input
+            className="min-h-14 flex-1 rounded-xl border border-input bg-background text-base text-foreground"
             placeholder={t('kiloclaw.onboarding.identity.namePlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={initialName}
@@ -418,9 +427,16 @@ export function IdentityStep({
           {t('kiloclaw.onboarding.identity.location')}
         </Text>
         <View className="flex-row items-center gap-2">
-          <TextInput
+          {/* Same intended box as the GPS control (`h-11` — 2.75rem at the
+              app's 14pt rem is 38.5pt), as a `min-h-*` floor rather than a
+              fixed height. This `min-h-11` intentionally lands after the shared
+              box's `min-h-[44px]` in the merge, so the field keeps its designed
+              38.5pt next to the 38.5pt button; the typed value and the
+              placeholder still share the shared `leading-[normal]` line box
+              and both centre on Android. */}
+          <Input
             key={locationInputKey}
-            className="h-11 flex-1 rounded-xl border border-input bg-background px-3 text-base leading-[normal] text-foreground"
+            className="min-h-11 flex-1 rounded-xl border border-input bg-background text-base text-foreground"
             placeholder={t('kiloclaw.onboarding.identity.locationPlaceholder')}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={locationDefaultValue}

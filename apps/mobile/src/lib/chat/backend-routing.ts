@@ -3,15 +3,51 @@ import {
   type ModelClientService,
   ModelError,
   type ModelFacts,
+  type ModelRequest,
+  type PromptPart,
   type RetryPolicyService,
 } from '@kilocode/harness-sdk';
 import { remoteModelClient } from '@kilocode/harness-sdk/plugins/remote-model';
 import { Effect, Stream } from 'effect';
 
+import { resolvedTargetSupportsImages } from './backend-capabilities';
 import { type StoredChatBackend } from './backend-store';
 import { resolveChatTarget } from './backend-target';
 import { LocalModelError } from './local-model-error';
 import { localModelProvider } from './local-models';
+
+/**
+ * What a model that reads no images gets in place of one. A conversation can
+ * move from a model that read an image onto one that cannot, and a provider
+ * refuses the whole request over one image part. The model is told the image
+ * was there, so it does not answer as if nothing had been shared.
+ */
+export const IMAGE_OMITTED = '[An image was shared here. This model cannot read images.]';
+
+const hasImage = (parts: readonly PromptPart[]) => parts.some(part => part.kind === 'image');
+
+function withoutImages(request: ModelRequest): ModelRequest {
+  if (!request.prompt.messages.some(message => hasImage(message.parts))) {
+    return request;
+  }
+  return {
+    ...request,
+    prompt: {
+      ...request.prompt,
+      messages: request.prompt.messages.map(message =>
+        hasImage(message.parts)
+          ? {
+              ...message,
+              parts: message.parts.map(
+                (part): PromptPart =>
+                  part.kind === 'image' ? { kind: 'text', text: IMAGE_OMITTED } : part
+              ),
+            }
+          : message
+      ),
+    },
+  };
+}
 
 type ChatRoutingDependencies = {
   readonly kilo: ModelClientService;
@@ -52,8 +88,9 @@ export function routedModelClient({
           catch: cause => new ModelError({ reason: 'unsupported', cause }),
         }).pipe(
           Effect.map(target => {
+            const sent = resolvedTargetSupportsImages(target) ? request : withoutImages(request);
             if (target.kind === 'kilo') {
-              return kilo.stream(request);
+              return kilo.stream(sent);
             }
             if (target.kind === 'local') {
               // A build without this provider fails explicitly; it never falls back.
@@ -65,7 +102,7 @@ export function routedModelClient({
                       cause: new LocalModelError('unavailable'),
                     })
                   )
-                : local.client.stream({ ...request, model: target.modelId });
+                : local.client.stream({ ...sent, model: target.modelId });
             }
             const { backend } = target;
             const key = `${backend.id}:${backend.revision}`;
@@ -83,7 +120,7 @@ export function routedModelClient({
               );
               clients.set(key, client);
             }
-            return client.stream({ ...request, model: target.modelId });
+            return client.stream({ ...sent, model: target.modelId });
           })
         )
       ),

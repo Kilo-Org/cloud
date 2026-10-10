@@ -15,11 +15,13 @@ jest.mock('next/server', () => ({
   ...jest.requireActual('next/server'),
   after: (callback: () => Promise<void> | void) => afterCallbacks.push(callback),
 }));
-jest.mock('@/lib/config.server', () => ({
-  CALLBACK_TOKEN_SECRET: 'callback-secret',
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: '',
 }));
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@/lib/web-config.server', () => ({
+  CALLBACK_TOKEN_SECRET: 'callback-secret',
+}));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({
@@ -79,7 +81,7 @@ jest.mock('@/lib/bot/platforms', () => ({
   },
 }));
 jest.mock('@/lib/bot/agent-runner', () => ({ runBotAgent: jest.fn() }));
-jest.mock('@/lib/user', () => ({ findUserById: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({ findUserById: jest.fn() }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';

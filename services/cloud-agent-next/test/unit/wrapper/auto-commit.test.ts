@@ -611,6 +611,35 @@ describe('runAutoCommit', () => {
     expect(JSON.stringify(vi.mocked(logToFile).mock.calls)).not.toContain(secret);
   });
 
+  it('redacts a non-heuristic named secret from push failure events and logs', async () => {
+    const secret = 'postgres://user:pass@localhost:5432/prod';
+    mockGetCurrentBranch.mockResolvedValue('feature/worktree');
+    mockGit
+      .mockResolvedValueOnce(ok(' M file.ts'))
+      .mockResolvedValueOnce(ok())
+      .mockResolvedValueOnce(ok('[feature/worktree abc1234] test commit'))
+      .mockResolvedValueOnce(raw(`${commitHash}\n`))
+      .mockResolvedValueOnce(commitObject('test commit'))
+      .mockResolvedValueOnce({
+        stdout: '',
+        stderr: `fatal: cannot reach ${secret}`,
+        exitCode: 1,
+      });
+    const { opts, events } = createOpts({
+      env: { DATABASE_URL: secret },
+      secretEnvKeys: ['DATABASE_URL'],
+    });
+
+    await runAutoCommit(opts);
+
+    expect(
+      events.find(event => event.streamEventType === 'autocommit_completed')?.data.message
+    ).toContain('push failed');
+    expect(JSON.stringify(events)).toContain('[REDACTED]');
+    expect(JSON.stringify(events)).not.toContain(secret);
+    expect(JSON.stringify(vi.mocked(logToFile).mock.calls)).not.toContain(secret);
+  });
+
   it('redacts authenticated GitHub remotes from push failure events', async () => {
     mockGetCurrentBranch.mockResolvedValue('feature/cool-stuff');
     mockGit

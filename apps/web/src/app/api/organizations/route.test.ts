@@ -1,13 +1,13 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
-import { getProfileOrganizations } from '@/lib/organizations/organizations';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getProfileOrganizations: jest.fn(),
 }));
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 

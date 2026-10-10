@@ -20,7 +20,7 @@ import {
   type EventProcessor,
   type EventProcessorCallbacks,
 } from '@/lib/cloud-agent-next/processor';
-import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
+import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import type { V2SessionStore } from './store';
 import type { AppTRPCClient } from '../../types';

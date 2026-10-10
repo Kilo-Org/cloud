@@ -5,6 +5,9 @@
 import {
   BASE_PROPS,
   bottomPaddedViews,
+  confirmRequests,
+  connectivity,
+  deleteMutate,
   discussionState,
   expectCtaPresence,
   focusState,
@@ -14,6 +17,7 @@ import {
   replyScrollFns,
   rerenderTab,
   resetState,
+  toastError,
 } from './pr-review-discussion-tab.test-helpers';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -393,6 +397,118 @@ describe('PrReviewDiscussionTab merged list memoization (Fix 11)', () => {
 
     const provider = renderer.root.find(node => String(node.type) === 'CommentModerationProvider');
     expect(provider.find(node => String(node.type) === 'PrReviewDiscussionList')).toBeDefined();
+
+    renderer.unmount();
+  });
+});
+
+// s4: the tab owns the own-comment writes. Edit pushes the `comment-edit`
+// formSheet with the posted body; delete asks exactly one confirmation and
+// only its destructive button runs the optimistic mutation. On a GitLab /
+// Bitbucket scope both callbacks are withheld, so every row keeps today's
+// read-only affordances.
+describe('PrReviewDiscussionTab own-comment actions (s4)', () => {
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+
+  const comment = {
+    commentId: 42,
+    nodeId: 'c42',
+    author: { login: 'octocat', avatarUrl: null },
+    bodyMarkdown: 'the body',
+    createdAt: '2026-01-01T00:00:00Z',
+    reactions: [],
+  };
+
+  function happyList(scopeRef?: ProviderPrRef): ReactTestRenderer {
+    discussionState.conversation = [comment];
+    return mountTab(scopeRef);
+  }
+
+  beforeEach(() => {
+    confirmRequests.length = 0;
+  });
+
+  it('pushes the comment-edit route with the posted body and the kind', () => {
+    const renderer = happyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    (list.props.onEditComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
+
+    expect(pushMock).toHaveBeenCalledWith({
+      pathname: '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit',
+      params: {
+        owner: 'octocat',
+        repo: 'hello-world',
+        number: 7,
+        commentId: '42',
+        kind: 'review',
+        body: 'the body',
+      },
+    });
+
+    renderer.unmount();
+  });
+
+  it('asks exactly one confirmation and the destructive button runs the delete mutation', () => {
+    const renderer = happyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    (list.props.onDeleteComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
+
+    expect(confirmRequests).toHaveLength(1);
+    expect(confirmRequests[0]?.title).toBe('Delete comment?');
+    expect(confirmRequests[0]?.message).toBe('This comment will be deleted from the pull request.');
+    expect(confirmRequests[0]?.confirmLabel).toBe('Delete');
+    // The safe choice keeps the generic Cancel label.
+    expect(confirmRequests[0]?.cancelLabel).toBeUndefined();
+    // The confirmation itself writes nothing.
+    expect(deleteMutate).not.toHaveBeenCalled();
+
+    confirmRequests[0]?.onConfirm();
+
+    expect(deleteMutate).toHaveBeenCalledTimes(1);
+    expect(deleteMutate).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 7,
+      commentId: 42,
+      kind: 'review',
+    });
+
+    renderer.unmount();
+  });
+
+  it('does not start the delete while CONFIRMED offline — the row stays and the retryable failure is shown', () => {
+    // ux2 spot check: with the offline banner up, confirming Delete used to
+    // start a write React Query pauses — the row was optimistically removed
+    // (a false success, lost if the app was killed before reconnect) with no
+    // failure feedback. The gate rejects locally instead: the mutation never
+    // runs, so the row is never removed, and the same retryable copy the
+    // server-failure path uses is shown.
+    connectivity.value = 'offline';
+    const renderer = happyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    (list.props.onDeleteComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
+
+    expect(confirmRequests).toHaveLength(1);
+    confirmRequests[0]?.onConfirm();
+
+    expect(deleteMutate).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(
+      "Couldn't delete your comment. Check your connection and try again."
+    );
+
+    renderer.unmount();
+  });
+
+  it('withholds both callbacks from the rows on a provider scope', () => {
+    const renderer = happyList(GITLAB_REF);
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    expect(list.props.onEditComment).toBeUndefined();
+    expect(list.props.onDeleteComment).toBeUndefined();
 
     renderer.unmount();
   });

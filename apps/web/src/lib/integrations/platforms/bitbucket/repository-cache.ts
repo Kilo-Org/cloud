@@ -6,7 +6,7 @@ import { platform_integrations, platform_oauth_credentials } from '@kilocode/db/
 import { BitbucketOAuthCredentialRowSchema } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { after } from 'next/server';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import { BitbucketIntegrationMetadataSchema, type BitbucketWorkspace } from './metadata';

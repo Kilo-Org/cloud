@@ -7,7 +7,7 @@
       "instanceLifecycle": "A példányod frissítést kapott",
       "scheduledAction": "Egy ütemezett művelet frissítést kapott",
       "lowBalance": "Az egyenleged figyelmet igényel",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "A költésed figyelmet igényel",
       "securityFinding": "Egy biztonsági észlelés figyelmet igényel",
       "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} egyenlege a(z) ${{minimumBalanceUsd}} alá esett"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Költésfigyelmeztetés",
+      "body": "{{scopeName}} költése meghaladta a(z) ${{amountUsd}} összeget"
     },
     "securityFindingNew": {
       "title": "Új biztonsági észlelés ({{severity}})",

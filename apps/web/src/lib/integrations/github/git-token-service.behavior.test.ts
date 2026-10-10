@@ -1,5 +1,5 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';

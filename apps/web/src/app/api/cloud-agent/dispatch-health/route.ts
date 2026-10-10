@@ -1,6 +1,6 @@
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { evaluateDispatchHealth } from '@/lib/cloud-agent/dispatch-health/detector';
 import {
   buildCompletedHealthyResponse,

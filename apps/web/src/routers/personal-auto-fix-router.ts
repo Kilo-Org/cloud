@@ -1,4 +1,4 @@
-import { createTRPCRouter, baseProcedure } from '@/lib/trpc/init';
+import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { autoFixRouter } from '@/routers/auto-fix/auto-fix-router';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/lib/auto-fix/core/schemas';
 import { DEFAULT_AUTO_FIX_CONFIG } from '@/lib/auto-fix/core/defaults';
 import { z } from 'zod';
-import { successResult, failureResult } from '@/lib/maybe-result';
+import { successResult, failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 export const personalAutoFixRouter = createTRPCRouter({
   listGitHubRepositories: baseProcedure.query(async ({ ctx }) => {

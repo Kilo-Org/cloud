@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
+import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { type ChatPlace, chatPlaceOf } from './scope';
 import {
@@ -95,7 +96,7 @@ export function useChatList(place: ChatPlace | null): ChatList {
 /** One conversation, as a screen reads it. */
 export type OpenChat = {
   readonly state: ChatState;
-  readonly send: (text: string, model: string) => Promise<void>;
+  readonly send: (text: string, model: string, images?: readonly LocalImage[]) => Promise<void>;
   readonly stop: () => Promise<void>;
   readonly retry: () => Promise<void>;
 };
@@ -126,8 +127,8 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
 
   return {
     state,
-    send: async (text, model) => {
-      await say(sessionId, text, model);
+    send: async (text, model, images = []) => {
+      await say(sessionId, { text, images }, model);
     },
     stop: async () => {
       await stopChat(sessionId);

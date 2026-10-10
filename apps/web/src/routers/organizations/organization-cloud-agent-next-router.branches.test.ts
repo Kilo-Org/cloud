@@ -6,10 +6,10 @@ import { describe, expect, it, beforeAll, beforeEach } from '@jest/globals';
 // (@types/jest). Importing `jest` from '@jest/globals' defeats hoisting: the
 // mocked modules load for real before registration. Same pattern as
 // github-pr-review-router.test.ts.
-import type * as TrpcInitModule from '@/lib/trpc/init';
-import type * as OrganizationUtilsModule from '@/routers/organizations/utils';
+import type * as TrpcInitModule from '@kilocode/web-shared/lib/trpc/init';
+import type * as OrganizationUtilsModule from '@kilocode/web-shared/routers/organizations/utils';
 import type * as ZodModule from 'zod';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import { BitbucketReviewError } from '@/lib/provider-review/bitbucket-authorization';
 import { organizationCloudAgentNextRouter } from './organization-cloud-agent-next-router';
@@ -28,8 +28,8 @@ const mockEnsureOrganizationAccess = jest.fn<
   Parameters<typeof OrganizationUtilsModule.ensureOrganizationAccess>
 >();
 
-jest.mock('@/routers/organizations/utils', () => {
-  const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
+  const trpcInit = jest.requireActual<typeof TrpcInitModule>('@kilocode/web-shared/lib/trpc/init');
   const zod = jest.requireActual<typeof ZodModule>('zod');
   const organizationProcedure = trpcInit.baseProcedure
     .input(zod.object({ organizationId: zod.uuid() }))
@@ -38,7 +38,9 @@ jest.mock('@/routers/organizations/utils', () => {
       return next();
     });
   return {
-    ...jest.requireActual<typeof OrganizationUtilsModule>('@/routers/organizations/utils'),
+    ...jest.requireActual<typeof OrganizationUtilsModule>(
+      '@kilocode/web-shared/routers/organizations/utils'
+    ),
     // Lazy delegation: the factory runs while the router module is being
     // required (during the hoisted-import phase), before the const above is
     // initialized. Reading it eagerly throws a TDZ ReferenceError.
@@ -51,7 +53,7 @@ jest.mock('@/routers/organizations/utils', () => {
 
 // The org router's heavy runtime deps, mocked exactly as the existing
 // organization-cloud-agent-next-router.test.ts does.
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
   generateInternalServiceToken: jest.fn(),
   TOKEN_EXPIRY: 60,
@@ -62,18 +64,18 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   rethrowAsPaymentRequired: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({ createWorktreeChat: jest.fn() }));
-jest.mock('@/lib/trpc/min-version', () => ({
-  ...jest.requireActual('@/lib/trpc/min-version'),
+jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/trpc/min-version'),
   getMinimumVersions: jest.fn(async () => ({ ios: '0.0.0', android: '0.0.0' })),
   enforceMinimumVersion: jest.fn(() => ({ pass: true })),
 }));
 jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
   computeCloudAgentNextBalanceCheckEligibility: jest.fn(),
 }));
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: jest.fn(async () => false),
 }));
-jest.mock('@/lib/organizations/organization-usage', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceForOrganizationUser: jest.fn(),
 }));
 jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({

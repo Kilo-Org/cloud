@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the tab is the one surface that owns the Discussion state machine (merge/sort, expansion settle, pagination, reply-focus scroll) AND the single own-comment write path (edit route push + one-step delete confirm) this slice defines; moving the write out would scatter the one path the design keeps in one place. */
 // PR review Discussion tab body.
 //
 // State matrix (per S7b §6 Discussion + Batch F item 2):
@@ -78,10 +79,13 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   type ConversationComment,
   type DiscussionListItem,
   isDiscussionEmpty,
+  type PrCommentKind,
+  type ReviewComment,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
@@ -94,10 +98,13 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
+import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -128,6 +135,11 @@ const EMPTY_CONVERSATION: readonly ConversationComment[] = [];
 const CONVERSATION_COMMENT_PATH =
   '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment' as const;
 
+// The own-comment edit formSheet (s3/s4). The tab pushes it with the posted
+// comment's body, so the sheet opens as the READ surface and Save is the
+// UPDATE surface.
+const COMMENT_EDIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit' as const;
+
 export function PrReviewDiscussionTab({
   owner,
   repo,
@@ -142,12 +154,18 @@ export function PrReviewDiscussionTab({
     });
 
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   // GitLab calls this a merge request; GitHub and Bitbucket both say pull
   // request, so the three provider-named strings below switch on that term
   // alone rather than forking the tab per provider.
   const { ref } = useProviderPrScope({ owner, repo, number });
   const isMergeRequest = ref.platform === 'gitlab';
   const router = useRouter();
+
+  // s4: the tab is the only place that owns the own-comment writes. Edit pushes
+  // the `comment-edit` formSheet (which reads the body and saves the update);
+  // delete asks exactly one confirmation, then runs the optimistic mutation.
+  const deleteComment = useDeletePrCommentMutation();
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
   const [suppressContentPosition, setSuppressContentPosition] = useState(false);
@@ -319,6 +337,50 @@ export function PrReviewDiscussionTab({
     router.push(href);
   };
 
+  // Own-comment edit / delete are GitHub-only: the two procedures live on
+  // `githubPrReview` and no provider note-edit seam exists, so the provider
+  // arms withhold the callbacks entirely and their rows keep today's
+  // read-only affordances (s4).
+  const canWriteOwnComments = ref.platform === 'github';
+
+  const handleEditComment = (comment: ReviewComment, kind: PrCommentKind) => {
+    const href: Href = {
+      pathname: COMMENT_EDIT_PATH,
+      params: {
+        owner,
+        repo,
+        number,
+        commentId: String(comment.commentId),
+        kind,
+        body: comment.bodyMarkdown,
+      },
+    };
+    router.push(href);
+  };
+
+  const handleDeleteComment = (comment: ReviewComment, kind: PrCommentKind) => {
+    confirm({
+      title: t('prReview.discussion.deleteCommentTitle'),
+      message: t('prReview.discussion.deleteCommentMessage'),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        // Confirmed offline: fail the confirmed destructive action at once
+        // with the retryable copy instead of starting a write React Query
+        // pauses. Without this the row is optimistically removed while the
+        // write is paused (a false success, lost if the app is killed
+        // before reconnect, and the row reappears later), and the user gets
+        // no failure feedback from a confirmed delete (ux2 spot check).
+        // The row stays, nothing is pending, and the same row action
+        // retries once the banner clears.
+        if (getCommittedConnectivityStatus() === 'offline') {
+          announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
+          return;
+        }
+        deleteComment.mutate({ owner, repo, number, commentId: comment.commentId, kind });
+      },
+    });
+  };
+
   // The bottom CTA bar is static chrome for the two content-bearing views
   // only (happy list + empty). The loading skeleton and the four
   // terminal/error states render exactly as before — full-body, no bar.
@@ -326,6 +388,7 @@ export function PrReviewDiscussionTab({
     <View className="flex-1">
       <View className="flex-1">{body}</View>
       <PrCommentCta onPress={openConversationComment} keyboardLift={isFocused} />
+      {dialog}
     </View>
   );
 
@@ -358,46 +421,58 @@ export function PrReviewDiscussionTab({
 
   if (view.kind === 'permission') {
     return (
-      <QueryError
-        variant="permission"
-        message={
-          isMergeRequest
-            ? t('prReview.terms.discussionAccessDenied')
-            : t('prReview.discussion.accessDeniedMessage')
-        }
-      />
+      <>
+        <QueryError
+          variant="permission"
+          message={
+            isMergeRequest
+              ? t('prReview.terms.discussionAccessDenied')
+              : t('prReview.discussion.accessDeniedMessage')
+          }
+        />
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'not-found') {
     return (
-      <QueryError
-        variant="not-found"
-        title={t('prReview.discussion.unavailable')}
-        message={
-          isMergeRequest
-            ? t('prReview.terms.discussionUnavailableMessage')
-            : t('prReview.discussion.unavailableMessage')
-        }
-      />
+      <>
+        <QueryError
+          variant="not-found"
+          title={t('prReview.discussion.unavailable')}
+          message={
+            isMergeRequest
+              ? t('prReview.terms.discussionUnavailableMessage')
+              : t('prReview.discussion.unavailableMessage')
+          }
+        />
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'reconnect') {
     return (
-      <CenteredState className="px-6">
-        <PrReviewReconnectNotice />
-      </CenteredState>
+      <>
+        <CenteredState className="px-6">
+          <PrReviewReconnectNotice />
+        </CenteredState>
+        {dialog}
+      </>
     );
   }
   if (view.kind === 'retryable') {
     return (
-      <QueryError
-        variant="server"
-        title={t('prReview.discussion.couldNotLoad')}
-        onRetry={() => {
-          void query.refetch();
-        }}
-        isRetrying={query.isFetching}
-      />
+      <>
+        <QueryError
+          variant="server"
+          title={t('prReview.discussion.couldNotLoad')}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+        {dialog}
+      </>
     );
   }
 
@@ -422,6 +497,7 @@ export function PrReviewDiscussionTab({
             <Skeleton className="h-6 w-2/3" />
           </View>
         ))}
+        {dialog}
       </View>
     );
   }
@@ -464,6 +540,8 @@ export function PrReviewDiscussionTab({
         }}
         onReplyInputFocus={handleReplyInputFocus}
         onViewportLayout={handleViewportLayout}
+        onEditComment={canWriteOwnComments ? handleEditComment : undefined}
+        onDeleteComment={canWriteOwnComments ? handleDeleteComment : undefined}
       />
     </CommentModerationProvider>
   );

@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import {
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
-} from '@/lib/user/server';
+} from '@kilocode/web-shared/lib/user/server';
 import { createDeviceSession, issueSessionCredentials } from '@/lib/auth/device-sessions';
-import { APP_URL } from '@/lib/constants';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 /**
  * Token exchange endpoint. Authenticates with the existing long-lived bearer

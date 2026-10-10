@@ -21,7 +21,7 @@ export type PurchaseStorefront = (typeof PURCHASE_STOREFRONTS)[number];
 export const PURCHASE_PRODUCTS = ['kilo_pass', 'credits'] as const;
 export type PurchaseProduct = (typeof PURCHASE_PRODUCTS)[number];
 
-export const PURCHASE_PRESENTATION_KINDS = ['native_iap', 'web_management', 'unavailable'] as const;
+export const PURCHASE_PRESENTATION_KINDS = ['web_management', 'unavailable'] as const;
 export type PurchasePresentationKind = (typeof PURCHASE_PRESENTATION_KINDS)[number];
 
 export const PURCHASE_STATUS_CLASSES = [
@@ -54,7 +54,7 @@ export type PurchasePresentationCta = {
 
 export type PurchasePresentationReason =
   | 'credits_not_sold_on_ios'
-  | 'kilo_pass_not_available_on_android'
+  | 'kilo_pass_not_sold_in_app'
   | 'unsupported_combination'
   | null;
 
@@ -76,12 +76,6 @@ export type ResolvePurchasePresentationInput = {
    * ended. `unpaid` is ended, so it is false.
    */
   hasStripeManagedPass: boolean;
-  /**
-   * Old Android omits the field or sends false and keeps unavailable or Stripe
-   * web_management. New Android sends true and gets native_iap. Remove the
-   * field when every Android client mounts Play IAP.
-   */
-  supportsNativePlayKiloPass?: boolean;
 };
 
 const NO_CTA: PurchasePresentationCta = { action: 'none', webPath: null };
@@ -99,7 +93,7 @@ function webCta(webPath: string): PurchasePresentationCta {
 export function resolvePurchasePresentation(
   input: ResolvePurchasePresentationInput
 ): PurchasePresentation {
-  const { platform, storefront, product, hasStripeManagedPass, supportsNativePlayKiloPass } = input;
+  const { platform, product, hasStripeManagedPass } = input;
   const program = input.program ?? null;
 
   // Credits are not sold in the iOS app.
@@ -112,37 +106,19 @@ export function resolvePurchasePresentation(
     return { kind: 'web_management', reason: null, cta: webCta('/credits'), program };
   }
 
-  // Kilo Pass native IAP is allowed for iOS App Store.
-  if (product === 'kilo_pass' && platform === 'ios' && storefront === 'app_store') {
-    return { kind: 'native_iap', reason: null, cta: NO_CTA, program };
-  }
-
-  // Kilo Pass native IAP is allowed for Android Play when the client mounts Play IAP.
-  if (
-    product === 'kilo_pass' &&
-    platform === 'android' &&
-    storefront === 'play' &&
-    supportsNativePlayKiloPass === true
-  ) {
-    return { kind: 'native_iap', reason: null, cta: NO_CTA, program };
-  }
-
-  // Android Kilo Pass without native Play IAP support.
-  if (product === 'kilo_pass' && platform === 'android') {
-    if (hasStripeManagedPass) {
-      return {
-        kind: 'web_management',
-        reason: null,
-        cta: webCta('/subscriptions/kilo-pass'),
-        program,
-      };
-    }
+  // Kilo Pass is sold on the web only. An Android Stripe subscriber manages it on the web.
+  // iOS gets no web link: App Review restricts links to purchases outside the app.
+  if (product === 'kilo_pass' && platform === 'android' && hasStripeManagedPass) {
     return {
-      kind: 'unavailable',
-      reason: 'kilo_pass_not_available_on_android',
-      cta: NO_CTA,
+      kind: 'web_management',
+      reason: null,
+      cta: webCta('/subscriptions/kilo-pass'),
       program,
     };
+  }
+
+  if (product === 'kilo_pass' && (platform === 'ios' || platform === 'android')) {
+    return { kind: 'unavailable', reason: 'kilo_pass_not_sold_in_app', cta: NO_CTA, program };
   }
 
   // Any other combo, including a missing platform, is unavailable.

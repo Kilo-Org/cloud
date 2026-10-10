@@ -28,12 +28,13 @@ import {
   updateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing,
+  recordCodeReviewAttemptPublicationStatus,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
 import { codeReviewWorkerClient } from '@/lib/code-reviews/client/code-review-worker-client';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   addReactionToPR,
   createPRComment,
@@ -54,10 +55,15 @@ import {
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
+import {
+  classifyCodeReviewPublication,
+  type CodeReviewPublicationObservation,
+} from '@/lib/code-reviews/summary/publication-status';
+import { recordCodeReviewPublicationOutcome } from '@/lib/code-reviews/summary/record-publication-outcome';
 import {
   getGitLabInstanceUrl,
   resolveGitLabAccessToken,
@@ -68,7 +74,7 @@ import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
 } from '@/lib/code-reviews/summary/usage-footer';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type {
   CloudAgentCodeReview,
   CloudAgentCodeReviewAttempt,
@@ -1142,6 +1148,12 @@ export async function POST(
     const callbackCompletedAt = new Date();
     let attempt: CloudAgentCodeReviewAttempt;
     let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
+    // Publication eligibility uses the row state before updateCodeReviewAttemptForCallback
+    // writes session_id through the callback update.
+    const preUpdateAttemptId = latestAttempt?.id ?? null;
+    const preUpdateAttemptSessionId = latestAttempt?.session_id ?? null;
+    const preUpdateReviewSessionId = review.session_id;
+    let publicationWriteFailed = false;
     let analyticsCompletionApplied = false;
     // Code-owned council outcome for a completed council run. Set on whichever completion path
     // runs below, then used to drive the merge gate (the council LLM never sets `gateResult`).
@@ -1200,6 +1212,31 @@ export async function POST(
           terminalReason: review.terminal_reason,
           triggerSource: review.trigger_source,
         });
+        if (
+          (completionResult.outcome === 'duplicate' || completionResult.outcome === 'repaired') &&
+          status === 'completed' &&
+          review.status === 'completed' &&
+          review.platform === PLATFORM.GITHUB &&
+          preUpdateAttemptId
+        ) {
+          const publicationResult = await recordCodeReviewPublicationOutcome({
+            attemptId: preUpdateAttemptId,
+            reviewId,
+            platform: review.platform,
+            platformIntegrationId: review.platform_integration_id,
+            repoFullName: review.repo_full_name,
+            prNumber: review.pr_number,
+            previousSummaryBody: review.previous_summary_body,
+            previousSummaryObserved: review.previous_summary_observed,
+            shouldPublish: shouldPublishToProvider,
+          });
+          if (publicationResult === 'write_failed') {
+            return NextResponse.json(
+              { error: 'Failed to record code review publication outcome' },
+              { status: 500 }
+            );
+          }
+        }
         return NextResponse.json({
           success: true,
           message:
@@ -1282,6 +1319,38 @@ export async function POST(
         terminalReason: review.terminal_reason,
         triggerSource: review.trigger_source,
       });
+      const terminalUpdatesLatestAttemptSession =
+        !!sessionId && preUpdateAttemptId === attempt.id && preUpdateAttemptSessionId === sessionId;
+      const terminalSuperseded =
+        !!sessionId &&
+        !!preUpdateReviewSessionId &&
+        sessionId !== preUpdateReviewSessionId &&
+        !terminalUpdatesLatestAttemptSession;
+      if (
+        !terminalSuperseded &&
+        status === 'completed' &&
+        review.status === 'completed' &&
+        review.platform === PLATFORM.GITHUB &&
+        preUpdateAttemptId
+      ) {
+        const publicationResult = await recordCodeReviewPublicationOutcome({
+          attemptId: preUpdateAttemptId,
+          reviewId,
+          platform: review.platform,
+          platformIntegrationId: review.platform_integration_id,
+          repoFullName: review.repo_full_name,
+          prNumber: review.pr_number,
+          previousSummaryBody: review.previous_summary_body,
+          previousSummaryObserved: review.previous_summary_observed,
+          shouldPublish: shouldPublishToProvider,
+        });
+        if (publicationResult === 'write_failed') {
+          return NextResponse.json(
+            { error: 'Failed to record code review publication outcome' },
+            { status: 500 }
+          );
+        }
+      }
       return NextResponse.json({
         success: true,
         message: 'Review already in terminal state',
@@ -1319,6 +1388,20 @@ export async function POST(
         message: 'Stale callback from superseded session',
       });
     }
+
+    const recordPublication = async (
+      attemptId: string,
+      observation: CodeReviewPublicationObservation
+    ): Promise<void> => {
+      try {
+        await recordCodeReviewAttemptPublicationStatus(
+          attemptId,
+          classifyCodeReviewPublication(observation)
+        );
+      } catch {
+        // Recording is best-effort; it must not change the callback result.
+      }
+    };
 
     const modelNotFoundRuntimeDiagnostics = getModelNotFoundRuntimeDiagnostics(
       rawPayload,
@@ -1603,6 +1686,27 @@ export async function POST(
       shouldPublishToProvider && review.platform_integration_id
         ? await getIntegrationById(review.platform_integration_id)
         : null;
+
+    if (status === 'completed') {
+      if (review.platform === PLATFORM.GITHUB) {
+        const publicationResult = await recordCodeReviewPublicationOutcome({
+          attemptId: attempt.id,
+          reviewId,
+          platform: review.platform,
+          platformIntegrationId: review.platform_integration_id,
+          repoFullName: review.repo_full_name,
+          prNumber: review.pr_number,
+          previousSummaryBody: review.previous_summary_body,
+          previousSummaryObserved: review.previous_summary_observed,
+          shouldPublish: shouldPublishToProvider,
+        });
+        publicationWriteFailed = publicationResult === 'write_failed';
+      } else if (!shouldPublishToProvider) {
+        await recordPublication(attempt.id, { kind: 'not_applicable' });
+      } else if (!integration) {
+        await recordPublication(attempt.id, { kind: 'unknown' });
+      }
+    }
 
     // Resolve GitLab token once, shared between gate check and reaction/footer logic
     const reviewPlatform = parseCodeReviewPlatform(review.platform);
@@ -1890,6 +1994,12 @@ export async function POST(
                   review.pr_number,
                   instanceUrl
                 );
+                await recordPublication(attempt.id, {
+                  kind: 'summary',
+                  summaryBody: existing?.body ?? null,
+                  previousSummaryBody: review.previous_summary_body,
+                  previousSummaryObserved: review.previous_summary_observed,
+                });
                 if (existing) {
                   // Inject the code-owned Council Review section first (no-op for non-council),
                   // then history + footer, so the whole note updates in a single PUT.
@@ -1921,12 +2031,18 @@ export async function POST(
                 }
               }
             } else if (platform === PLATFORM.BITBUCKET) {
+              if (status === 'completed') {
+                await recordPublication(attempt.id, { kind: 'unknown' });
+              }
               logExceptInTest(
                 '[code-review-status] Skipping deferred Bitbucket provider completion actions',
                 { reviewId }
               );
             }
           } catch (postCompletionError) {
+            if (status === 'completed' && review.platform !== PLATFORM.GITHUB) {
+              await recordPublication(attempt.id, { kind: 'unknown' });
+            }
             // Non-blocking - log but don't fail the callback
             logExceptInTest(
               '[code-review-status] Failed to add completion reaction or summary metadata:',
@@ -1935,6 +2051,13 @@ export async function POST(
           }
         }
       }
+    }
+
+    if (publicationWriteFailed) {
+      return NextResponse.json(
+        { error: 'Failed to record code review publication outcome' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true });

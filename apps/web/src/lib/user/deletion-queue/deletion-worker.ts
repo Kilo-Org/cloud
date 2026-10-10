@@ -6,7 +6,7 @@ import {
   USER_DELETION_OUTCOME_PERSIST_RESERVE_MS,
   USER_DELETION_STOP_STARTING_RESERVE_MS,
   USER_DELETION_TASK_LEASE_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   persistHandlerOutcome,
   persistRejectedPreflight,

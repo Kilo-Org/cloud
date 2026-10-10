@@ -407,8 +407,6 @@ export async function handleNudgeDelivered(
   return c.json(resSuccess({ marked: true }));
 }
 
-// ── Request Changes ──────────────────────────────────────────────────
-
 const RequestChangesBody = z.object({
   feedback: z.string().min(1, 'Feedback is required'),
   files: z.array(z.string()).optional(),

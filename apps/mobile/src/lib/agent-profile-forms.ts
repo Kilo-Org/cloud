@@ -10,6 +10,9 @@
 /** Server bound: `ProfileNameSchema`'s `z.string().min(1).max(100)`. */
 const PROFILE_NAME_MAX_LENGTH = 100;
 
+/** Server bound: `ProfileDescriptionSchema`'s `z.string().max(500)`. */
+const PROFILE_DESCRIPTION_MAX_LENGTH = 500;
+
 /** Server bound: `VarSchema`'s `z.string().min(1).max(256)`. */
 export const VARIABLE_KEY_MAX_LENGTH = 256;
 
@@ -40,6 +43,17 @@ export function validateProfileName(value: string): ProfileNameError | null {
     return 'too-long';
   }
   return null;
+}
+
+export type ProfileDescriptionError = 'too-long';
+
+/**
+ * Validate a profile description against the server's `max(500)`. Descriptions
+ * are trimmed first, matching the form's trim on submit. Returns an error code,
+ * or `null` when valid.
+ */
+export function validateProfileDescription(value: string): ProfileDescriptionError | null {
+  return value.trim().length > PROFILE_DESCRIPTION_MAX_LENGTH ? 'too-long' : null;
 }
 
 /**

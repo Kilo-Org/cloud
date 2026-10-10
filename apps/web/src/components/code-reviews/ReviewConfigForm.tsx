@@ -64,7 +64,7 @@ import {
   type RepositoryModelOverrideValue,
 } from './RepositoryModelOverrides';
 import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {

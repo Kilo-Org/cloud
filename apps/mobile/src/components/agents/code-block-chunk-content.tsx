@@ -1,7 +1,9 @@
+import { UITextView } from '@bsky.app/react-native-uitextview';
 import { Fragment, type ReactNode } from 'react';
 
 import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
+import { tokenColorForScheme, type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 
 /**
  * A blank source line still occupies its line box; an `RNText` whose only
@@ -28,13 +30,13 @@ const CODE_LINE_BREAK = '\n';
  */
 function renderLineRuns(
   tokens: readonly HighlightToken[],
-  isDark: boolean,
+  scheme: TokenScheme,
   keepBlankLineBox: boolean
 ): ReactNode {
   if (keepBlankLineBox && tokens.every(token => token.text.length === 0)) {
     return BLANK_CODE_LINE;
   }
-  return highlightRunChildren(tokens, isDark);
+  return highlightRunChildren(tokens, scheme);
 }
 
 /**
@@ -47,13 +49,53 @@ function renderLineRuns(
  */
 export function renderChunkChildren(
   chunkLines: readonly (readonly HighlightToken[])[],
-  isDark: boolean,
+  scheme: TokenScheme,
   keepBlankLineBox: boolean
 ): ReactNode[] {
   return chunkLines.map((tokens, lineIndex) => (
     <Fragment key={`line-${lineIndex}`}>
       {lineIndex > 0 ? CODE_LINE_BREAK : null}
-      {renderLineRuns(tokens, isDark, keepBlankLineBox)}
+      {renderLineRuns(tokens, scheme, keepBlankLineBox)}
     </Fragment>
   ));
+}
+
+/**
+ * The same chunk as flat `UITextView` children for the iOS selectable fence.
+ * `UITextView` turns a raw string child into a native span and passes an
+ * element child through, so a `Fragment` would drop its strings: every run is
+ * either a string or a nested `UITextView` carrying its token color.
+ */
+export function renderSelectableChunkChildren(
+  chunkLines: readonly (readonly HighlightToken[])[],
+  scheme: TokenScheme,
+  keepBlankLineBox: boolean
+): ReactNode[] {
+  const children: ReactNode[] = [];
+  for (const [lineIndex, tokens] of chunkLines.entries()) {
+    const prefix = lineIndex > 0 ? CODE_LINE_BREAK : '';
+    if (keepBlankLineBox && tokens.every(token => token.text.length === 0)) {
+      children.push(prefix + BLANK_CODE_LINE);
+    } else {
+      if (prefix) {
+        children.push(prefix);
+      }
+      for (const [tokenIndex, token] of tokens.entries()) {
+        children.push(
+          token.className === null ? (
+            token.text
+          ) : (
+            <UITextView
+              key={`tok-${lineIndex}-${tokenIndex}`}
+              // eslint-disable-next-line react-native/no-inline-styles -- per-token syntax color
+              style={{ color: tokenColorForScheme(token.className, scheme) }}
+            >
+              {token.text}
+            </UITextView>
+          )
+        );
+      }
+    }
+  }
+  return children;
 }

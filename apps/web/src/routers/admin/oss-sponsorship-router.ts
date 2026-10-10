@@ -1,6 +1,6 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db, sql } from '@/lib/drizzle';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_invitations,
@@ -17,9 +17,9 @@ import {
   sendOssInviteNewUserEmail,
   sendOssInviteExistingUserEmail,
   sendOssExistingOrgProvisionedEmail,
-} from '@/lib/email';
-import { getAcceptInviteUrl } from '@/lib/organizations/organizations';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
+} from '@kilocode/web-shared/lib/email';
+import { getAcceptInviteUrl } from '@kilocode/web-shared/lib/organizations/organizations';
+import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import { TRPCError } from '@trpc/server';
 import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';

@@ -199,6 +199,29 @@ test('keeps auto routing workers in their own opt-in group', () => {
   assert.ok(!alwaysOn.includes('auto-routing-benchmark'));
 });
 
+test('keeps the AI gateway app in its own opt-in group', () => {
+  const service = getService('ai-gateway');
+
+  assert.equal(service.group, 'ai-gateway');
+  assert.equal(service.type, 'nextjs');
+  assert.equal(service.dir, 'apps/ai-gateway');
+  assert.equal(service.port, 3010 + portOffset);
+  assert.deepEqual(service.command, [
+    'env',
+    `AI_GATEWAY_PORT=${3010 + portOffset}`,
+    'pnpm',
+    'run',
+    'dev',
+  ]);
+  assert.deepEqual(resolveTargets(['ai-gateway']), [
+    'redis',
+    'postgres',
+    'redis-http',
+    'ai-gateway',
+  ]);
+  assert.ok(!resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+});
+
 test('registers user data export with worktree-aware ports and dependencies', () => {
   const service = getService('user-data-export');
 

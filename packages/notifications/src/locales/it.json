@@ -7,7 +7,7 @@
       "instanceLifecycle": "La tua istanza ha un aggiornamento",
       "scheduledAction": "Un'azione pianificata ha un aggiornamento",
       "lowBalance": "Il tuo saldo richiede attenzione",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "La tua spesa richiede attenzione",
       "securityFinding": "Un risultato di sicurezza richiede attenzione",
       "activeAgentsGlanceable": "Gli agenti attivi hanno un aggiornamento"
     }
@@ -44,8 +44,8 @@
       "body": "Il saldo di {{organizationName}} è sceso sotto ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Avviso di spesa",
+      "body": "La spesa di {{scopeName}} ha superato ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nuovo risultato di sicurezza ({{severity}})",

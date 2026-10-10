@@ -2,7 +2,7 @@ import { createLinearLinkToken } from '@/lib/bot/linear-link-token';
 import { sanitizeForDelimiters, truncate } from '@/lib/bot/platforms/shared';
 import type { BotPlatform, RequesterInfo } from '@/lib/bot/platforms/types';
 import { BOT_CONTEXT_MESSAGE_LIMIT } from '@/lib/bot/constants';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { LinearAdapter, LinearRawMessage } from '@chat-adapter/linear';
 import type { PlatformIntegration } from '@kilocode/db';

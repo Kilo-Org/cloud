@@ -3,6 +3,7 @@
 import type React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  Activity,
   Users,
   DollarSign,
   Building2,
@@ -240,6 +241,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Model Stats',
     url: '/admin/model-stats',
     icon: () => <BarChart />,
+  },
+  {
+    title: () => 'Model Traffic',
+    url: '/admin/model-traffic',
+    icon: () => <Activity />,
   },
   {
     title: () => 'Model Benchmarks',

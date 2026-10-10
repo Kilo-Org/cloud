@@ -1,16 +1,16 @@
 const mockGetFixTicketById = jest.fn();
 
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
   isResourceTokenIssuanceEnabled: () => true,
 }));
 
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateCloudAgentWorkflowToken: jest.fn(() => 'workflow-token'),
   TOKEN_EXPIRY: { default: 3600 },
 }));
@@ -22,7 +22,7 @@ jest.mock('../db/fix-tickets', () => ({
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { prepareFixPayload } from './prepare-fix-payload';
-import { generateCloudAgentWorkflowToken } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken } from '@kilocode/web-shared/lib/tokens';
 
 const mockGenerateCloudAgentWorkflowToken = jest.mocked(generateCloudAgentWorkflowToken);
 

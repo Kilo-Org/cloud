@@ -1,5 +1,5 @@
 import { hashKey, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
 import {
   buildActiveSessionsTrayInput,
@@ -13,6 +13,8 @@ import { useTRPC } from '@/lib/trpc';
 
 import { resolveAnsweredRaises } from './attention-rows';
 import { createGlanceablePublisher } from './create-publisher';
+import { getGlanceableFixtureReleases, subscribeGlanceableFixtureReleases } from './fixture-hold';
+import { setGlanceableFixtureScope } from './fixture-harness';
 import { persistGlanceableSink, restorePersistedGlanceable } from './persist';
 import { type GlanceablePublisher } from './publisher';
 import { registerGlanceableSink } from './sink-registry';
@@ -44,6 +46,14 @@ export function GlanceablePublisherMount(): null {
   const attentionRevision = useSessionAttentionRevision();
 
   const signedIn = token != null;
+
+  // Dev-only: a released fixture hold rebuilds the publisher below, seeded from
+  // the persisted fixture snapshot, so its first live write supersedes the
+  // fixture on every surface. Never changes in a release build.
+  const fixtureReleases = useSyncExternalStore(
+    subscribeGlanceableFixtureReleases,
+    getGlanceableFixtureReleases
+  );
 
   // The publisher of the current signed-in context, so an ack revision can
   // re-derive without rebuilding it (a rebuild would reset its activity state).
@@ -77,6 +87,9 @@ export function GlanceablePublisherMount(): null {
     const publisher = createGlanceablePublisher();
     const ctx = { userId, organizationId };
     live.current = { publisher, ctx };
+    if (__DEV__) {
+      setGlanceableFixtureScope(ctx);
+    }
     const derive = (sessions: CachedActiveSessionsData['sessions']) => {
       publisher.handleSessions(resolveAnsweredRaises(sessions), ctx);
     };
@@ -111,8 +124,21 @@ export function GlanceablePublisherMount(): null {
       unsubscribe();
       publisher.dispose();
       live.current = null;
+      if (__DEV__) {
+        setGlanceableFixtureScope(null);
+      }
     };
-  }, [queryClient, queryKey, targetHash, isLoaded, signedIn, userId, organizationId, restored]);
+  }, [
+    queryClient,
+    queryKey,
+    targetHash,
+    isLoaded,
+    signedIn,
+    userId,
+    organizationId,
+    restored,
+    fixtureReleases,
+  ]);
 
   useEffect(() => {
     const current = live.current;

@@ -1,7 +1,10 @@
 import { CreditCategoryUsersTable } from '../CreditCategoryUsers';
 import { CreditCategoryStats } from './CreditCategoryStats';
-import { promoCreditCategories } from '@/lib/promoCreditCategories';
-import { formatCategoryAsMarkdown, toGuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
+import { promoCreditCategories } from '@kilocode/web-shared/lib/promoCreditCategories';
+import {
+  formatCategoryAsMarkdown,
+  toGuiCreditCategory,
+} from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 import ReactMarkdown from 'react-markdown';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {

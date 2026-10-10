@@ -13,11 +13,26 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { formatMessageSentTime, getMessageDetailsContent } from './message-details-content';
 
-const performCopyMock = vi.fn().mockResolvedValue(undefined);
+const setStringAsync = vi.fn();
+const notificationAsync = vi.fn();
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
 const showActionSheetWithOptions = vi.fn();
 
-vi.mock('./use-message-copy', () => ({
-  performCopy: (...args: unknown[]) => performCopyMock(...args),
+// `message-details-copy` imports the native Expo modules directly; without these
+// stubs its module graph cannot load under the mobile-pure node project.
+vi.mock('expo-clipboard', () => ({
+  setStringAsync: (...args: unknown[]) => setStringAsync(...args),
+}));
+vi.mock('expo-haptics', () => ({
+  notificationAsync: (...args: unknown[]) => notificationAsync(...args),
+  NotificationFeedbackType: { Success: 'success' },
+}));
+vi.mock('sonner-native', () => ({
+  toast: {
+    success: (...args: unknown[]) => toastSuccess(...args),
+    error: (...args: unknown[]) => toastError(...args),
+  },
 }));
 
 vi.mock('react-native', () => ({
@@ -450,34 +465,63 @@ describe('getMessageDetailsContent — Copy message payload', () => {
   });
 });
 
-describe('MessageDetailsSheet copy button wiring (retryable unhappy)', () => {
+describe('handleMessageDetailsCopy inline clipboard contract', () => {
   beforeEach(() => {
-    performCopyMock.mockReset().mockResolvedValue(undefined);
+    setStringAsync.mockReset();
+    notificationAsync.mockReset();
+    toastSuccess.mockReset();
+    toastError.mockReset();
     showActionSheetWithOptions.mockReset();
   });
 
-  it('forwards copyable text to shared performCopy (no ActionSheet)', async () => {
-    // Contract: details Copy uses handleMessageDetailsCopy → shared performCopy.
-    // No ActionSheet (that path is for long-press message copy on iOS).
-    // Sheet onPress wires to this handler (see message-details-sheet.tsx).
+  it('writes copyable text straight to the clipboard and reports success', async () => {
+    // Contract: details Copy writes to expo-clipboard directly. No shared
+    // performCopy, no ActionSheet (that path is for long-press message copy on
+    // iOS), and no app-root toast: the sheet renders the outcome inline.
+    setStringAsync.mockResolvedValue(true);
     const message = storedMessage(userInfo(), [textPart('copy me')]);
     const content = getMessageDetailsContent(message, catalogOptions);
     expect(content.copyText).toBe('copy me');
 
     const { handleMessageDetailsCopy } = await import('./message-details-copy');
-    handleMessageDetailsCopy(content.copyText);
+    await expect(handleMessageDetailsCopy(content.copyText)).resolves.toBe(true);
 
-    expect(performCopyMock).toHaveBeenCalledWith('copy me');
-    expect(performCopyMock).toHaveBeenCalledTimes(1);
+    expect(setStringAsync).toHaveBeenCalledWith('copy me');
+    expect(setStringAsync).toHaveBeenCalledTimes(1);
+    expect(notificationAsync).toHaveBeenCalledWith('success');
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('no-ops when copyable text is absent', async () => {
+  it('returns false without touching the clipboard when the text is absent', async () => {
     const { handleMessageDetailsCopy } = await import('./message-details-copy');
-    handleMessageDetailsCopy(null);
-    handleMessageDetailsCopy(undefined);
-    handleMessageDetailsCopy('');
-    expect(performCopyMock).not.toHaveBeenCalled();
+    await expect(handleMessageDetailsCopy(null)).resolves.toBe(false);
+    await expect(handleMessageDetailsCopy(undefined)).resolves.toBe(false);
+    await expect(handleMessageDetailsCopy('')).resolves.toBe(false);
+
+    expect(setStringAsync).not.toHaveBeenCalled();
+    expect(notificationAsync).not.toHaveBeenCalled();
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('returns false for an absent or rejected clipboard write', async () => {
+    const { handleMessageDetailsCopy } = await import('./message-details-copy');
+
+    setStringAsync.mockResolvedValueOnce(undefined);
+    await expect(handleMessageDetailsCopy('copy me')).resolves.toBe(false);
+
+    setStringAsync.mockResolvedValueOnce(false);
+    await expect(handleMessageDetailsCopy('copy me')).resolves.toBe(false);
+
+    setStringAsync.mockRejectedValueOnce(new Error('denied'));
+    await expect(handleMessageDetailsCopy('copy me')).resolves.toBe(false);
+
+    expect(notificationAsync).not.toHaveBeenCalled();
+    expect(showActionSheetWithOptions).not.toHaveBeenCalled();
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

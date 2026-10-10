@@ -10,8 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/Button';
 import { Lock } from 'lucide-react';
-import type { OrganizationWithMembersResponse } from '@/lib/organizations/organization-types';
-import type { OrganizationTrialDisplayStatus } from '@/lib/organizations/trial-utils';
+import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { OrganizationTrialDisplayStatus } from '@kilocode/web-shared/lib/organizations/trial-utils';
 
 type FreeTrialWarningDialogProps = {
   trialStatus: OrganizationTrialDisplayStatus;

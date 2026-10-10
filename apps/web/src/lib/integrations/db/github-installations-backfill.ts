@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
 

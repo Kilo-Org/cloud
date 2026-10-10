@@ -86,18 +86,18 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   setCommitStatus: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type { SessionSnapshot } from '@/lib/session-ingest-client';
-import type { SuccessResult } from '@/lib/maybe-result';
+import type { SuccessResult } from '@kilocode/web-shared/lib/maybe-result';
 import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -586,6 +586,66 @@ describe('codeReviewRouter.get role-gated ids', () => {
       expect(ownerResult.attempts[0]?.cli_session_id).toBe('ses-attempt-get-ids');
       expect(ownerResult.attempts[0]?.execution_id).toBe('exec-attempt-get-ids');
     } finally {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
+
+  it('returns the billing-derived session cost for a terminal review', async () => {
+    const sessionId = `ses_get_cost_${crypto.randomUUID()}`;
+    const usageId = crypto.randomUUID();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: null,
+        owned_by_user_id: ownerUser.id,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/get-cost-repo',
+        pr_number: 2,
+        pr_url: 'https://github.com/test-org/get-cost-repo/pull/2',
+        pr_title: 'Get cost PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/get-cost',
+        head_sha: 'sha-get-cost',
+        status: 'completed',
+        session_id: `agent_${crypto.randomUUID()}`,
+        cli_session_id: sessionId,
+        // The orchestrator never accumulated usage for this review, so the review's
+        // own total is 0 and the billing aggregate is the only cost available.
+        total_cost_musd: 0,
+        created_at: '2026-06-18T09:00:00.000Z',
+        completed_at: '2026-06-18T11:00:00.000Z',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: ownerUser.id,
+      cost: 1234,
+      input_tokens: 1000,
+      output_tokens: 100,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-18T10:00:00.000Z',
+      model: 'anthropic/claude-sonnet-4.6',
+    });
+    await db.insert(microdollar_usage_metadata).values({
+      id: usageId,
+      message_id: `msg_${usageId}`,
+      session_id: sessionId,
+      created_at: '2026-06-18T10:00:00.000Z',
+    });
+
+    try {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.get({ reviewId: review.id });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner get success');
+      expect(ownerResult.sessionCostMusd).toBe(1234);
+      expect(ownerResult.review.total_cost_musd).toBe(0);
+    } finally {
+      await db.delete(microdollar_usage_metadata).where(eq(microdollar_usage_metadata.id, usageId));
+      await db.delete(microdollar_usage).where(eq(microdollar_usage.id, usageId));
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
     }
   });

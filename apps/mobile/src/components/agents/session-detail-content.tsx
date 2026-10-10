@@ -11,7 +11,8 @@ import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Haptics from 'expo-haptics';
-import { Alert, KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import { Platform, type Text as RNText, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -25,11 +26,9 @@ import {
 } from '@/components/agents/chat-composer';
 import {
   type AgentMode,
-  customModeOptionsFromRuntimeAgents,
-  dedupeCustomModeOptions,
-  ensureSelectedCustomOption,
   lockedModelOption,
   resolvePinnedAgentModel,
+  resolveSessionRoleView,
 } from '@/components/agents/mode-normalize';
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import {
@@ -46,12 +45,15 @@ import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-sel
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import {
   type ContextSheetIdentity,
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
+import {
+  resolveComposerSendDisabledReason,
+  resolveComposerSendDisabledReasonTone,
+} from '@/components/agents/session-composer-send-disabled-reason';
 import {
   resolveSessionConnectionDisplay,
   resolveSessionConnectionState,
@@ -92,9 +94,11 @@ import { useUserWebConnection } from '@/components/agents/user-web-connection-pr
 import { SessionStatusIndicator } from '@/components/agents/session-status-indicator';
 import { PreparationGroup } from '@/components/agents/preparation-group';
 import {
+  resolveSessionFooterRowItem,
+  SEND_REASON_MAX_FONT_SCALE,
+  SESSION_FOOTER_ROW_ITEM_PADDING,
   shouldShowAgentWorkingIndicator,
   shouldShowFooterWorkingIndicator,
-  shouldShowSessionFooterRow,
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
@@ -107,7 +111,6 @@ import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch'
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
   resolveLoadedCliSessionPresenceId,
   useCliSessionPresence,
@@ -118,6 +121,7 @@ import { useSessionConfigSync } from '@/components/agents/use-session-config-syn
 import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
 import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
+import { useEffectiveProfileCustomModes } from '@/components/agents/use-effective-profile-custom-modes';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
 import { profileOrganizationId } from '@/components/profiles/profile-owner-model';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
@@ -168,6 +172,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import {
   type AnalyticsSurface,
@@ -194,6 +199,7 @@ import {
   revalidateLegacyGatewayOverride,
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
+import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
 import {
   buildContinueHref,
   buildContinuePrefillParams,
@@ -263,6 +269,7 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  const { confirm, dialog } = useConfirmDialog();
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
   const sessionRouter = useStackSafeReplace();
@@ -312,11 +319,11 @@ export function SessionDetailContent({
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   // The accessor handed to the transcript's rows must keep one identity across
-  // streaming publishes: the SDK re-emits `childMessages` on every
-  // `partsRevision` bump, and a changing prop would defeat `MessageBubble`'s
-  // shallow memo for every visible row. The in-transcript subagent card
-  // subscribes to the atom itself (`LiveChildSessionSection`), so it stays live
-  // without this identity changing.
+  // root streaming publishes: the SDK only re-emits `childMessages` when
+  // non-root rows change or the storage/root session changes, and a changing
+  // prop would defeat `MessageBubble`'s shallow memo for every visible row. The
+  // in-transcript subagent card subscribes to the atom itself
+  // (`LiveChildSessionSection`), so it stays live without this identity changing.
   const getChildMessagesRef = useRef(getChildMessages);
   getChildMessagesRef.current = getChildMessages;
   const getChildMessagesForRows = useCallback(
@@ -570,6 +577,10 @@ export function SessionDetailContent({
     gatewayModelsLoading,
     organizationId,
   });
+  // A remote session's catalog can arrive empty or fail before the CLI is
+  // ready. Re-ask on attach, focus, and app-foreground while it is missing,
+  // empty, or errored; the hook bounds itself to those events.
+  useRemoteModelCatalogRetry({ activeSessionType, manager, remoteModelState });
   const modelOptions = sessionModels.options;
   const contextInfo = useMemo(
     () => resolveSessionContextInfo(contextUsage, sessionModels.options),
@@ -641,24 +652,33 @@ export function SessionDetailContent({
     spawnedMode,
   });
 
-  // Custom modes come from the session's `runtimeAgents` (slug + name). The
-  // selected slug is appended once when it is neither a built-in nor already
-  // listed, so an inherited custom slug stays visible in the picker.
+  // Custom modes: a remote session merges the session profile's visible custom
+  // agents (loaded for the session's own recorded/bound profile, not the
+  // context's effective default) with the session's runtime-reported agents, so
+  // the user's roles show even when the CLI has not reported them. Cloud-agent
+  // and read-only sessions use only `runtimeAgents`. The selected slug is
+  // appended once when it is neither a built-in nor already listed, so an
+  // inherited custom slug stays visible in the picker.
   const runtimeAgents = sessionConfig?.runtimeAgents;
-  const customOptions = useMemo(
+  const { profileAgents: effectiveProfileAgents } = useEffectiveProfileCustomModes(
+    organizationId,
+    activeSessionProfileId
+  );
+  const roleView = useMemo(
     () =>
-      ensureSelectedCustomOption(
-        dedupeCustomModeOptions(customModeOptionsFromRuntimeAgents(runtimeAgents)),
-        currentMode
-      ),
-    [runtimeAgents, currentMode]
+      resolveSessionRoleView({
+        sessionType: activeSessionType,
+        runtimeAgents,
+        profileAgents: effectiveProfileAgents,
+        selectedMode: currentMode,
+      }),
+    [activeSessionType, runtimeAgents, effectiveProfileAgents, currentMode]
   );
-  // A custom agent can pin a model (+ optional variant). Only Cloud Agent
-  // locks from `runtimeAgents`; remote sessions stay unlocked, as web does.
-  const pinned = useMemo(
-    () => resolvePinnedAgentModel({ slug: currentMode, runtimeAgents }),
-    [currentMode, runtimeAgents]
-  );
+  const customOptions = roleView.customOptions;
+  // A custom agent can pin a model (+ optional variant). The pin always comes
+  // from `runtimeAgents`, so a profile agent's pin never locks a cloud-agent
+  // toolbar or the send model, matching web's runtime-only lock.
+  const pinned = roleView.pinned;
   const modelLocked = activeSessionType === 'cloud-agent' && Boolean(pinned.model);
   const displayModel = modelLocked && pinned.model ? pinned.model : currentModel;
   const displayVariant = modelLocked && pinned.model ? (pinned.variant ?? '') : currentVariant;
@@ -1054,7 +1074,12 @@ export function SessionDetailContent({
     [getChildMessages, hideReasoningRows]
   );
 
-  const detailsMessage = displayedMessages.find(message => message.info.id === detailsMessageId);
+  // The details lookup runs on every render (including each composer
+  // keystroke), so memoize it against the two inputs that can change it.
+  const detailsMessage = useMemo(
+    () => displayedMessages.find(message => message.info.id === detailsMessageId),
+    [displayedMessages, detailsMessageId]
+  );
   const detailsDelivery =
     detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
   const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);
@@ -1641,6 +1666,7 @@ export function SessionDetailContent({
     userWebConnected,
     reconnectExhausted,
     everConnected: wasConnected,
+    agentStatusType: agentStatus.type,
     sessionRefresh: cachedMetadataRefresh ? { isLoading: statusIndicator === null } : undefined,
   });
   const retrySessionConnection = useCallback(() => {
@@ -1731,11 +1757,45 @@ export function SessionDetailContent({
     () => transcript.some(item => item.type === 'preparation' && item.attempt.status === 'running'),
     [transcript]
   );
-  const showSessionFooterRow = shouldShowSessionFooterRow({
+  // Why the send control cannot send, stated by the fixed footer row above the
+  // composer and announced to screen readers. `isComposerDisabled` is a
+  // structural lock on the whole composer; this reason covers the live send
+  // gate, which keeps the input editable. `messageCount` lets a terminal error
+  // on an empty transcript — the load-error state behind the full-screen Retry
+  // — resolve to the load-failure line instead of a runtime failure class.
+  //
+  // The indicator is the deduped one the row's own status line uses: the
+  // transcript's last row owns the failure it states and carries its action, so
+  // the reason must not restate that sentence beside it. Dropping it here keeps
+  // the reason's lower branches alive — a read-only session then names read-only
+  // instead of repeating the failed row.
+  const sendDisabledReason = resolveComposerSendDisabledReason({
+    canSend,
+    isReadOnly,
+    error,
+    statusIndicator: footerStatusIndicator,
+    cloudStatus,
+    messageCount: messages.length,
+  });
+  // The tone rides the same inputs, so a progress phase ("Setting up
+  // environment…") never renders in the destructive error color.
+  const sendDisabledReasonTone = resolveComposerSendDisabledReasonTone({
+    canSend,
+    isReadOnly,
+    error,
+    statusIndicator: footerStatusIndicator,
+    cloudStatus,
+    messageCount: messages.length,
+  });
+  // A read-only transcript ends in the continue section, which states the
+  // read-only fact once and replaces the composer and its send reason.
+  const isReadOnlyTranscript = isReadOnly && messages.length > 0;
+  const sessionFooterItem = resolveSessionFooterRowItem({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
     hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
+    hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
     messageCount: messages.length,
   });
 
@@ -1787,13 +1847,8 @@ export function SessionDetailContent({
       />
     </View>
   );
-  // The PR link shares the goal row so the header stays at two rows. The row
-  // mounts only once it holds data: while the fetch is in flight a no-goal,
-  // no-PR session reserves no row, so the transcript never jumps when the fetch
-  // lands with nothing. The wrapper's FadeIn reveals the PR when it lands.
   const associatedPr = fetchedData?.associatedPr ?? null;
-  const prBadge = <SessionPrBadge pr={associatedPr} loading={false} />;
-  const hasPrRow = associatedPr !== null;
+  const prBadge = associatedPr ? <SessionPrBadge pr={associatedPr} loading={false} /> : undefined;
   const blockingInteraction = getBlockingInteraction({ activeQuestion, activePermission });
   // A pending permission ask that the auto-reply is already answering is
   // suppressed: the card is gated out below (`suppressedRequestId`). Blocking
@@ -1832,14 +1887,17 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
-  // One condition for the composer and for the bottom BlurBar that reserves
-  // its space: if the bar claimed the space on a condition the composer does
-  // not share, the composer pops in and the layout jumps on every open.
-  // The strip is a pure full-bleed background/spacer: it hosts no controls,
-  // so it deliberately carries no horizontal safe-area padding — the
-  // composer's own content clears the landscape sensor insets.
-  const isComposerMounted = !isReadOnly || messages.length === 0;
-  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  // The composer stays mounted for every writable session. A read-only
+  // transcript replaces it with the continue section, which names the
+  // destination it opens.
+  // The bottom BlurBar reserves the composer's space and shares its visibility
+  // condition, so a blocking card or the continue section never leaves the bar
+  // claiming space the composer does not fill. The strip is a pure full-bleed
+  // background/spacer: it hosts no controls, so it deliberately carries no
+  // horizontal safe-area padding — the composer's own content clears the
+  // landscape sensor insets.
+  const isComposerVisible = !hasBlockingInteraction && !isReadOnlyTranscript;
+  const isReadOnlyContinueVisible = isReadOnlyTranscript && !hasBlockingInteraction;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -1861,7 +1919,6 @@ export function SessionDetailContent({
     }
     return t('common.message');
   }, [cloudStatus, t]);
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSendCommand = useCallback(
     async (command: string, argumentsText: string) => {
@@ -1979,26 +2036,20 @@ export function SessionDetailContent({
           return;
         }
         if (action === 'remove') {
-          Alert.alert(
-            t('agentChat.goal.removeConfirmTitle'),
-            t('agentChat.goal.removeConfirmMessage'),
-            [
-              { text: t('common.cancel'), style: 'cancel' },
-              {
-                text: t('agentChat.goal.remove'),
-                style: 'destructive',
-                onPress: () => {
-                  void runGoalAction('remove');
-                },
-              },
-            ]
-          );
+          confirm({
+            title: t('agentChat.goal.removeConfirmTitle'),
+            message: t('agentChat.goal.removeConfirmMessage'),
+            confirmLabel: t('agentChat.goal.remove'),
+            onConfirm: () => {
+              void runGoalAction('remove');
+            },
+          });
           return;
         }
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction, confirm]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {
@@ -2191,7 +2242,7 @@ export function SessionDetailContent({
               />
             </Animated.View>
           ) : null}
-          {sessionGoal !== null || hasPrRow ? (
+          {sessionGoal !== null ? (
             <Animated.View
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
@@ -2210,24 +2261,23 @@ export function SessionDetailContent({
           ) : null}
           {keepScreenAwake ? <ActiveSessionKeepAwake sessionId={sessionId} /> : null}
 
-          {keyboardContainerKind === 'app-aware-padding' ? (
-            // The trailing bottom-chrome spacer below reserves the navigation-
-            // bar inset outside this view, so the view must not add it again.
-            <AppAwareKeyboardPaddingView className="flex-1" containerReservesBottomInset>
-              {renderKeyboardBody()}
-            </AppAwareKeyboardPaddingView>
-          ) : (
-            <KeyboardAvoidingView className="flex-1" behavior="padding">
-              {renderKeyboardBody()}
-            </KeyboardAvoidingView>
-          )}
+          {/* The trailing bottom-chrome spacer below reserves the navigation-bar
+              inset outside this view. The native lift measures the keyboard
+              against this view's own bottom edge, so that inset is never
+              counted twice — the correction the app-aware padding needed. */}
+          <KeyboardAvoidingView className="flex-1" behavior="padding">
+            {renderKeyboardBody()}
+          </KeyboardAvoidingView>
 
           {isComposerVisible ? (
             <BlurBar className="border-t-0">
               <View style={{ height: bottom }} />
             </BlurBar>
           ) : (
-            <View style={{ height: bottom }} className="bg-background" />
+            <View
+              style={{ height: bottom }}
+              className={isReadOnlyContinueVisible ? 'bg-secondary' : 'bg-background'}
+            />
           )}
 
           {sheetMountState.mounted ? (
@@ -2348,6 +2398,7 @@ export function SessionDetailContent({
           ) : null}
         </View>
       </ToolRunSheetHost>
+      {dialog}
     </PartDetailSheetHost>
   );
 
@@ -2379,24 +2430,38 @@ export function SessionDetailContent({
             transcript rows it passes (profile-screen.tsx:275-277). It snaps in
             the same frame and stays opaque via `bg-background`, so a future
             layout change covers a transcript row instead of overprinting it.
-            Gated on has-messages so the empty/connecting path (which renders
-            the centered status indicator inside `renderContent`) does not
-            double-render. While preparing, suppressed when the transcript
-            already shows PreparationGroup (no duplicate). */}
-        {showSessionFooterRow ? (
+            One item renders at a time (working, then status, then the send
+            reason) and every item carries the same padding and text style, so a
+            swap between the one-line items cannot resize the flex-1 transcript
+            above it. The reason keeps its full copy — it wraps instead of
+            truncating — so a long translation can still add a line. The reason
+            outlives the has-messages and preparation gates: it states a send
+            gate no transcript surface carries, including the failed load on an
+            empty transcript. */}
+        {sessionFooterItem !== null ? (
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
             className="bg-background"
           >
-            {/* Raw list on purpose: working-indicator.tsx:50-59 derives the
-                label from the last assistant part, and compute-status.ts:33-35
-                maps a reasoning part to agentChat.partDetail.thinking, so the
-                spinner reads Thinking during a reasoning stream in both modes.
-                Feeding it displayedMessages would drop that label. */}
-            <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
-            {footerStatusIndicator ? (
+            {sessionFooterItem === 'working' ? (
+              /* Raw list on purpose: working-indicator.tsx derives the label
+                 from the last assistant part, and compute-status.ts maps a
+                 reasoning part to agentChat.partDetail.thinking, so the spinner
+                 reads Thinking during a reasoning stream in both modes. Feeding
+                 it displayedMessages would drop that label. */
+              <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
+            ) : null}
+            {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
               <SessionStatusIndicator indicator={footerStatusIndicator} />
+            ) : null}
+            {sessionFooterItem === 'reason' && sendDisabledReason !== null ? (
+              <AccessibleStatus
+                message={sendDisabledReason}
+                tone={sendDisabledReasonTone === 'neutral' ? 'status' : 'error'}
+                maxFontSizeMultiplier={SEND_REASON_MAX_FONT_SCALE}
+                className={cn(SESSION_FOOTER_ROW_ITEM_PADDING, 'text-right text-sm')}
+              />
             ) : null}
           </Animated.View>
         ) : null}
@@ -2436,7 +2501,7 @@ export function SessionDetailContent({
           />
         ) : null}
 
-        {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
+        {isReadOnlyContinueVisible ? (
           <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
             <Text className="text-center text-sm text-muted-foreground">
               {t('agentChat.session.readOnly')}
@@ -2444,15 +2509,15 @@ export function SessionDetailContent({
             <Button
               variant="outline"
               size="sm"
-              accessibilityLabel={t('common.continue')}
+              accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
             >
-              <Text>{t('common.continue')}</Text>
+              <Text>{t('agentChat.session.continueInNewSession')}</Text>
             </Button>
           </View>
         ) : null}
 
-        {isComposerMounted ? (
+        {isReadOnlyTranscript ? null : (
           <View
             className={cn(hasBlockingInteraction && 'hidden')}
             accessibilityElementsHidden={hasBlockingInteraction}
@@ -2485,6 +2550,7 @@ export function SessionDetailContent({
                 onStop={handleStop}
                 disabled={isComposerDisabled}
                 sendDisabled={!canSend}
+                sendDisabledReason={sendDisabledReason}
                 isStreaming={isStreaming}
                 placeholder={composerPlaceholder}
                 modeControl={{
@@ -2520,7 +2586,7 @@ export function SessionDetailContent({
               />
             </ModelPickerSelectionScopeProvider>
           </View>
-        ) : null}
+        )}
       </>
     );
   }
@@ -2649,7 +2715,7 @@ export function SessionDetailContent({
         <EmptyState
           icon={MessageSquare}
           title={t('agentChat.session.emptyTitle')}
-          description={t('agentChat.session.emptyDescription')}
+          description={isReadOnly ? undefined : t('agentChat.session.emptyDescription')}
         />
       );
     }

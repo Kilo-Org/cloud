@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createHmac } from 'node:crypto';
 
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 
 export function codingPlanCredentialFingerprint(apiKey: string): string {
   if (!BYOK_ENCRYPTION_KEY) {

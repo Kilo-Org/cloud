@@ -18,10 +18,13 @@ type SessionPrIndicatorProps = {
  * Tri-state behavior driven by `session.associatedPr`:
  *   - `undefined` + the session has a `branch` → render a fixed-width skeleton
  *     so the column does not jitter while the list query is in flight.
- *   - `null` → render nothing (server confirmed the session has no PR).
+ *   - `null` → render nothing (no stored link, or a stored link GitHub has not
+ *     verified).
  *   - `AssociatedPr` → render the badge wrapped in a hover card; clicking the
  *     badge opens the PR on GitHub and `stopPropagation` prevents the row's
- *     own click handler from selecting the session.
+ *     own click handler from selecting the session. Only a GitHub-verified link
+ *     reaches this branch; a verified link whose cache row has not synced
+ *     renders as a pending partial (state `unknown`) with a Refresh action.
  */
 export function SessionPrIndicator({ session }: SessionPrIndicatorProps) {
   const handleBadgeClick = useCallback(

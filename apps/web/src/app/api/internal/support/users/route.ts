@@ -9,7 +9,7 @@ import {
   routeFromHeaders,
   userTarget,
   type SupportServiceOutcome,
-} from '@/lib/admin/admin-access-log';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { findUserByEmailCaseInsensitive } from '@/lib/user';
 import {
   authorizeSupportRequest,

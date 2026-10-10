@@ -1,4 +1,4 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
   canOrganizationUseMultipleGitHubInstallations,
   canOrganizationCreateSharedGitHubConnection,
@@ -6,7 +6,7 @@ import {
   parseSharedGitHubInstallationOrganizationIds,
 } from './multiple-installations';
 
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: jest.fn(),
 }));
 

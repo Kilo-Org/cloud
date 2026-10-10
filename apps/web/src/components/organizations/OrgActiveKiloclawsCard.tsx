@@ -25,6 +25,10 @@ export function OrgActiveKiloclawsCard({ organizationId }: Props) {
 
   const activeEmails = [...new Set(data?.filter(i => !i.isSuspended).map(i => i.userEmail) ?? [])];
 
+  if (!isLoading && !isError && activeEmails.length === 0) {
+    return null;
+  }
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -53,10 +57,6 @@ export function OrgActiveKiloclawsCard({ organizationId }: Props) {
               Unable to load active KiloClaw instances. Please try again later.
             </p>
           </div>
-        ) : activeEmails.length === 0 ? (
-          <p className="text-muted-foreground px-4 pb-4 pt-2 text-sm">
-            No active KiloClaw instances in this organization.
-          </p>
         ) : (
           <Table className="table-fixed">
             <TableHeader>

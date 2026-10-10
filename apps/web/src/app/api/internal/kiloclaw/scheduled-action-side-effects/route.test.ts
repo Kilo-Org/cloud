@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
-import { send as sendEmail, RawHtml } from '@/lib/email';
+import { send as sendEmail, RawHtml } from '@kilocode/web-shared/lib/email';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'kc-internal-secret',
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   send: jest.fn(),
-  RawHtml: jest.requireActual('@/lib/email').RawHtml,
+  RawHtml: jest.requireActual('@kilocode/web-shared/lib/email').RawHtml,
 }));
 
 import { POST } from './route';

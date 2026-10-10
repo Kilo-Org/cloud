@@ -54,6 +54,18 @@ export function useAgentsListChrome({
       reservedHeight: refreshReserve,
       fontScale,
     }) === 'compact';
+  // The accepted-empty body stacks its See-all history link under the
+  // new-session button, so its full form is a row taller than the single-action
+  // no-match state: a band that holds one action can still be too short for two,
+  // and the decision must compact before the history link sits behind the bar.
+  const compactLiveEmptyState =
+    getEmptyStatePresentation({
+      available: bodyHeight,
+      bottomInset: centeredBottomInset,
+      reservedHeight: refreshReserve,
+      fontScale,
+      secondaryAction: true,
+    }) === 'compact';
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them. The inset rides on the list's frame as a
@@ -116,5 +128,6 @@ export function useAgentsListChrome({
     sidePadding,
     centeredBottomInset,
     compactEmptyState,
+    compactLiveEmptyState,
   };
 }

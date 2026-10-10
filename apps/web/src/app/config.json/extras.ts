@@ -50,6 +50,11 @@ export const kiloExtras = {
         'Small model to use for tasks like title generation in the format of provider/model',
       ...nullableModel,
     },
+    memory_model: {
+      description:
+        'Model for automatic project memory saves in the format of provider/model. If unset or unavailable, memory uses the session model.',
+      ...nullableModel,
+    },
     remote_control: {
       description:
         'Enable remote control of sessions via Kilo Cloud. Equivalent to running /remote on startup.',

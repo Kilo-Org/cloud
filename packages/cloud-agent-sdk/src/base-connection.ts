@@ -94,7 +94,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
   const maxReconnectAttempts = config.maxReconnectAttempts ?? MAX_RECONNECT_ATTEMPTS;
 
-  // Cleanup functions returned by lifecycle hooks
   const cleanupFns: Array<() => void> = [];
   let lifecycleListenersRegistered = false;
 
@@ -255,7 +254,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         return;
       }
 
-      // Any incoming message cancels an active staleness check
       clearStalenessTimeout();
       lastMessageTime = Date.now();
 
@@ -269,7 +267,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
         return;
       }
 
-      // Reset auth refresh flag on successful message
       authRefreshAttempted = false;
       reconnectAttempt = 0;
       mutationRecovery = 'idle';
@@ -291,7 +288,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     newWs.onerror = () => {};
 
     newWs.onclose = (event: CloseEvent) => {
-      // Ignore close events from replaced sockets
       if (ws !== newWs) {
         return;
       }
@@ -335,7 +331,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
 
       config.onUnexpectedDisconnect?.();
 
-      // Reset attempt counter if we were connected, otherwise continue count
       if (wasConnected || attempt === 0) {
         scheduleReconnect(0, expectedGeneration);
       } else {
@@ -362,7 +357,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function handleVisibilityResume(): void {
     if (destroyed || intentionalDisconnect) return;
 
-    // Tab became visible
     reconnectAttempt = 0;
     clearExhausted();
     const wasHiddenSince = hiddenAt;
@@ -431,7 +425,6 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   function handleOnline(): void {
     if (destroyed || intentionalDisconnect) return;
 
-    // If already connected with an open socket, nothing to do
     if (connected && ws !== null && ws.readyState === WebSocket.OPEN) return;
 
     reconnectAttempt = 0;

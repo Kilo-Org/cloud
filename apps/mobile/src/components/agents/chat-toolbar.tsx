@@ -125,10 +125,11 @@ export function ChatToolbar({
     // while the paste button keeps the trailing edge of the same line. Without
     // a mode chip, `modeSelector` is null in either `order` and the model chip
     // starts the row.
-    <View
-      onLayout={onLayout}
-      className={cn('flex-row items-center gap-2 px-3 py-2.5', disabled && 'opacity-50', className)}
-    >
+    // A disabled toolbar keeps its labels at full theme contrast: each chip
+    // dims only its chevron/icon (see ModeSelector/ModelSelector), so the pill
+    // label never drops below the WCAG AA 4.5:1 text ratio when the whole row
+    // is disabled (D2).
+    <View onLayout={onLayout} className={cn('flex-row items-center gap-2 px-3 py-2.5', className)}>
       {order === 'model-first' ? modelSelectorWithPaste : modeSelector}
       {order === 'model-first' ? modeSelector : modelSelectorWithPaste}
     </View>

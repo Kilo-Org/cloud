@@ -1,21 +1,17 @@
-import type { BenchmarkConfig, BenchmarkDeciderModel } from '@kilocode/auto-routing-contracts';
+import type { BenchmarkConfig, BenchmarkPlatformModel } from '@kilocode/auto-routing-contracts';
 import {
   getConfigRows,
   replaceConfig,
   type ConfigAutoDeciderModelRow,
   type ConfigDeciderModelRow,
 } from './db';
-import { parsePersistedReasoningEffort } from './reasoning-effort';
 
-/**
- * Config rows for the manual decider list. The contract already forbids both
- * variant and reasoningEffort on one model, so each row writes at most one.
- */
-export function toDeciderModelRows(models: BenchmarkDeciderModel[]): ConfigDeciderModelRow[] {
+// Retain nullable legacy columns for rolling deploys, but never read saved efforts.
+export function toDeciderModelRows(models: BenchmarkPlatformModel[]): ConfigDeciderModelRow[] {
   return models.map(m => ({
     model: m.id,
-    variant: m.variant ?? null,
-    reasoning_effort: m.reasoningEffort ?? null,
+    variant: null,
+    reasoning_effort: null,
   }));
 }
 
@@ -45,24 +41,16 @@ export function mapConfigRows(
   excludedAutoDeciderModels: string[] = []
 ): BenchmarkConfig | null {
   const excludedAuto = new Set(excludedAutoDeciderModels);
-  const manualDeciderModels: BenchmarkDeciderModel[] = deciderModelRows.map(r =>
-    r.variant != null && r.variant !== ''
-      ? // Canonical row: variant only, never both (contract rejects both-set).
-        { id: r.model, variant: r.variant, reasoningEffort: null }
-      : // Legacy row: leave `variant` ABSENT. Emitting `variant: null` here would
-        // make run.ts treat the entry as "no variant" and drop the saved effort.
-        { id: r.model, reasoningEffort: parsePersistedReasoningEffort(r.reasoning_effort) }
-  );
+  const manualDeciderModels = deciderModelRows.map(r => ({ id: r.model }));
   const manualIds = new Set(manualDeciderModels.map(model => model.id));
   const autoDeciderModels = autoDeciderModelRows.map(r => ({
     id: r.model,
-    reasoningEffort: parsePersistedReasoningEffort(r.reasoning_effort),
     avgAttemptCostUsd: r.avg_attempt_cost_usd,
   }));
   const effectiveAutoDeciderModels = autoDeciderModels
     .filter(model => !excludedAuto.has(model.id))
     .filter(model => !manualIds.has(model.id))
-    .map(model => ({ id: model.id, reasoningEffort: model.reasoningEffort }));
+    .map(model => ({ id: model.id }));
   const deciderModels = [...manualDeciderModels, ...effectiveAutoDeciderModels];
 
   if (configRow === null || classifierModels.length === 0 || deciderModels.length === 0) {

@@ -16,16 +16,39 @@ type FakeDbOptions = {
   authInvalidAt?: string | null;
   repositories?: string[];
   runtimeState?: Record<string, unknown>;
+  /** Default true; false makes the claim `returning()` yield zero rows. */
+  claimAcquired?: boolean;
+  /** Post-image of a successful claim; default `runtimeState`. */
+  claimRuntimeState?: Record<string, unknown>;
+  /** Default true; false makes the progress-write `returning()` yield zero rows. */
+  writeAccepted?: boolean;
+  /** Default true; false makes clear/freshness/release `returning()` yield zero rows. */
+  terminalAccepted?: boolean;
+  /** Runtime state returned by the deny/conflict read; default null (no row). */
+  conflictRuntimeState?: Record<string, unknown> | null;
+  /** Default false; true makes getOwnerConfig's first select return no row. */
+  configMissing?: boolean;
 };
 
 function createFakeDb(options: FakeDbOptions = {}) {
   const repositories = options.repositories ?? ['acme/widgets'];
   const sets: Array<Record<string, unknown>> = [];
+  const wheres: string[] = [];
   let selectCount = 0;
+  let updateCount = 0;
+  let conflictReadArmed = false;
+
   const selection = {
     limit: async () => {
+      if (conflictReadArmed) {
+        conflictReadArmed = false;
+        return options.conflictRuntimeState
+          ? [{ runtime_state: options.conflictRuntimeState }]
+          : [];
+      }
       selectCount++;
       if (selectCount === 1) {
+        if (options.configMissing) return [];
         return [
           {
             id: 'agent-config',
@@ -54,18 +77,58 @@ function createFakeDb(options: FakeDbOptions = {}) {
     orderBy: () => selection,
   };
 
+  const updateReturning = (
+    values: Record<string, unknown>,
+    isClaim: boolean
+  ): Array<Record<string, unknown>> => {
+    if (isClaim) {
+      if (options.claimAcquired === false) {
+        conflictReadArmed = true;
+        return [];
+      }
+      return [{ runtimeState: options.claimRuntimeState ?? options.runtimeState ?? {} }];
+    }
+    if (isProgressWrite(values)) {
+      if (options.writeAccepted === false) {
+        conflictReadArmed = true;
+        return [];
+      }
+      return [{}];
+    }
+    if (options.terminalAccepted === false) {
+      conflictReadArmed = true;
+      return [];
+    }
+    return [{}];
+  };
+
   const db = {
     select: () => ({
       from: () => ({
         where: () => selection,
       }),
     }),
-    update: () => ({
-      set: (values: Record<string, unknown>) => {
-        sets.push(values);
-        return { where: async () => undefined };
-      },
-    }),
+    update: () => {
+      updateCount++;
+      const isClaim = updateCount === 1;
+      return {
+        set: (values: Record<string, unknown>) => {
+          sets.push(values);
+          return {
+            where: (condition: unknown) => {
+              wheres.push(sqlToText(condition));
+              return {
+                returning: async () => updateReturning(values, isClaim),
+                then: (
+                  resolve: (value: undefined) => unknown,
+                  reject?: (error: unknown) => unknown
+                ) => Promise.resolve(undefined).then(resolve, reject),
+              };
+            },
+          };
+        },
+      };
+    },
     insert: () => ({
       values: () => ({
         onConflictDoUpdate: async () => undefined,
@@ -75,18 +138,56 @@ function createFakeDb(options: FakeDbOptions = {}) {
     transaction: async (callback: (transaction: unknown) => Promise<unknown>) => callback(db),
   };
 
-  return { db, sets };
+  return { db, sets, wheres, selectCount: () => selectCount };
+}
+
+function isProgressWrite(values: Record<string, unknown>): boolean {
+  return (
+    values.runtime_state != null &&
+    typeof values.runtime_state === 'object' &&
+    sqlToText(values.runtime_state).includes('jsonb_agg')
+  );
+}
+
+/** Flattens a Drizzle SQL object into text, including bound parameter values. */
+function sqlToText(node: unknown): string {
+  const parts: string[] = [];
+  collectSqlParts(node, parts);
+  return parts.join('');
+}
+
+function collectSqlParts(node: unknown, parts: string[]): void {
+  if (node == null) return;
+  if (typeof node === 'string' || typeof node === 'number' || typeof node === 'boolean') {
+    parts.push(String(node));
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const item of node) collectSqlParts(item, parts);
+    return;
+  }
+  if (typeof node === 'object') {
+    const record = node as { queryChunks?: unknown; value?: unknown; name?: unknown };
+    if (Array.isArray(record.queryChunks)) {
+      collectSqlParts(record.queryChunks, parts);
+      return;
+    }
+    if (Array.isArray(record.value)) {
+      collectSqlParts(record.value, parts);
+      return;
+    }
+    if ('value' in record && (record.value == null || typeof record.value !== 'object')) {
+      parts.push(String(record.value));
+      return;
+    }
+    if (typeof record.name === 'string') {
+      parts.push(record.name);
+    }
+  }
 }
 
 function runtimeStateSqlText(entry: Record<string, unknown>): string {
-  const value = entry.runtime_state;
-  if (value == null || typeof value !== 'object') return '';
-  const chunks = (value as { queryChunks?: Array<{ value?: unknown }> }).queryChunks;
-  if (!Array.isArray(chunks)) return '';
-  return chunks
-    .flatMap(chunk => (Array.isArray(chunk.value) ? chunk.value : []))
-    .filter(part => typeof part === 'string')
-    .join('');
+  return sqlToText(entry.runtime_state);
 }
 
 function createGitTokenService() {
@@ -180,7 +281,7 @@ describe('Worker GitHub auth-invalid sync', () => {
   });
 
   it('persists the first GitHub 401 and stops syncing remaining repos', async () => {
-    const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const { db, sets, wheres } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
     const gitTokenService = createGitTokenService();
     const fetchStub = stubFetch(new Response('Bad credentials', { status: 401 }));
 
@@ -208,7 +309,14 @@ describe('Worker GitHub auth-invalid sync', () => {
     expect(sets).toContainEqual(
       expect.objectContaining({ auth_invalid_reason: 'github_dependabot_401' })
     );
-    expect(sets).not.toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(false);
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+    expect(wheres[releaseIndex]).toContain('sync_lease');
+    expect(wheres[releaseIndex]).toContain("->>'runId'");
+    expect(wheres[releaseIndex]).toContain('chunkIndex');
   });
 
   it('short-circuits a recent invalid marker before token minting or GitHub fetch', async () => {
@@ -287,7 +395,7 @@ describe('Worker GitHub auth-invalid sync', () => {
   });
 
   it('does not advance freshness after mixed success then GitHub 401', async () => {
-    const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const { db, sets, wheres } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
     const gitTokenService = createGitTokenService();
     const fetchStub = vi
       .fn()
@@ -305,12 +413,20 @@ describe('Worker GitHub auth-invalid sync', () => {
     ).resolves.toMatchObject({ authInvalid: 1, reauthRequired: true });
 
     expect(fetchStub).toHaveBeenCalledTimes(2);
-    expect(sets).not.toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(false);
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+    expect(wheres[releaseIndex]).toContain('sync_lease');
+    expect(wheres[releaseIndex]).toContain("->>'runId'");
+    expect(wheres[releaseIndex]).toContain('chunkIndex');
   });
 
   it('records disabled Dependabot alerts as a repository sync failure', async () => {
     const { db } = createFakeDb();
     const gitTokenService = createGitTokenService();
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const upsertUpdates: Array<Record<string, unknown>> = [];
     const originalInsert = db.insert;
     db.insert = () => ({
@@ -320,7 +436,13 @@ describe('Worker GitHub auth-invalid sync', () => {
         },
       }),
     });
-    stubFetch(new Response('Dependabot alerts are disabled', { status: 422 }));
+    const longToken = `ghp_${'A'.repeat(250)}`;
+    stubFetch(
+      new Response(
+        `Dependabot alerts are disabled for this repository. Authorization: bearer ${longToken}`,
+        { status: 422 }
+      )
+    );
 
     await expect(
       syncOwner({
@@ -334,7 +456,52 @@ describe('Worker GitHub auth-invalid sync', () => {
     expect(upsertUpdates).toContainEqual(
       expect.objectContaining({ last_failure_code: 'DEPENDABOT_ALERTS_DISABLED' })
     );
+    const disabledLog = info.mock.calls.find(
+      ([message]) =>
+        typeof message === 'string' &&
+        message.includes('Dependabot alerts disabled for acme/widgets, skipping')
+    );
+    expect(disabledLog?.[1]).toMatchObject({ httpStatus: 422 });
+    const excerpt = (disabledLog?.[1] as { bodyExcerpt?: string } | undefined)?.bodyExcerpt ?? '';
+    expect(excerpt).toContain('Dependabot alerts are disabled');
+    expect(excerpt).not.toContain(longToken);
+    expect(excerpt).not.toContain('ghp_');
+    expect(excerpt.length).toBeLessThanOrEqual(200);
     db.insert = originalInsert;
+  });
+
+  it('redacts a bare ghp_ token in a disabled-alerts body', async () => {
+    const { db } = createFakeDb();
+    const gitTokenService = createGitTokenService();
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const bareToken = `ghp_${'B'.repeat(250)}`;
+    stubFetch(
+      new Response(`Dependabot alerts are disabled for this repository. token ${bareToken}`, {
+        status: 422,
+      })
+    );
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).resolves.toMatchObject({ skipped: 1 });
+
+    const disabledLog = info.mock.calls.find(
+      ([message]) =>
+        typeof message === 'string' &&
+        message.includes('Dependabot alerts disabled for acme/widgets, skipping')
+    );
+    const excerpt = (disabledLog?.[1] as { bodyExcerpt?: string } | undefined)?.bodyExcerpt ?? '';
+    expect(excerpt).toContain('Dependabot alerts are disabled');
+    expect(excerpt).toContain('[redacted]');
+    expect(excerpt).not.toContain(bareToken);
+    expect(excerpt).not.toContain('ghp_');
+    expect(excerpt.length).toBeLessThanOrEqual(200);
+    info.mockRestore();
   });
 
   it('throws non-401 GitHub errors', async () => {
@@ -547,7 +714,7 @@ describe('Worker GitHub auth-invalid sync', () => {
   });
 
   it('stops after the first repository when the owner budget is already exhausted', async () => {
-    const { db, sets } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
+    const { db, sets, wheres } = createFakeDb({ repositories: ['acme/widgets', 'acme/api'] });
     const gitTokenService = createGitTokenService();
     const fetchStub = stubFetch(new Response(JSON.stringify([]), { status: 200 }));
 
@@ -565,10 +732,14 @@ describe('Worker GitHub auth-invalid sync', () => {
     });
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
-    const progressWrite = sets.find(entry => entry.runtime_state != null)?.runtime_state;
-    expect(progressWrite).toBeDefined();
-    expect(progressWrite).not.toHaveProperty('sync_run');
-    expect(progressWrite).not.toHaveProperty('last_synced_at');
+    const writeIndex = sets.findIndex(entry => runtimeStateSqlText(entry).includes('jsonb_agg'));
+    expect(writeIndex).toBeGreaterThanOrEqual(0);
+    expect(runtimeStateSqlText(sets[writeIndex] ?? {}).includes('sync_run')).toBe(true);
+    expect(runtimeStateSqlText(sets[writeIndex] ?? {}).includes('last_synced_at')).toBe(false);
+    expect(wheres[writeIndex]).toContain("->>'runId'");
+    expect(wheres[writeIndex]).toContain('chunkIndex');
+    expect(wheres[writeIndex]).toContain('<=');
+    expect(wheres[writeIndex]).toContain('run-budget-1');
   });
 
   it('counts a fresh-run GitHub failure toward the owner budget and does not mark it complete', async () => {
@@ -594,7 +765,7 @@ describe('Worker GitHub auth-invalid sync', () => {
   });
 
   it('does not keep an incomplete GitHub failure as an error after a successful retry', async () => {
-    const { db, sets } = createFakeDb({
+    const { db, sets, wheres } = createFakeDb({
       repositories: ['acme/widgets', 'acme/api'],
       runtimeState: {
         sync_run: {
@@ -626,11 +797,17 @@ describe('Worker GitHub auth-invalid sync', () => {
       errors: 0,
     });
 
-    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(true);
+    const freshnessIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes('last_completed_run_id')
+    );
+    expect(freshnessIndex).toBeGreaterThanOrEqual(0);
+    expect(wheres[freshnessIndex]).toContain("->>'runId'");
+    expect(wheres[freshnessIndex]).toContain('chunkIndex');
+    expect(wheres[freshnessIndex]).toContain('run-budget-retry');
   });
 
   it('skips completed repositories and finalizes freshness on the last chunk', async () => {
-    const { db, sets } = createFakeDb({
+    const { db, sets, wheres } = createFakeDb({
       repositories: ['acme/widgets', 'acme/api'],
       runtimeState: {
         sync_run: {
@@ -663,7 +840,674 @@ describe('Worker GitHub auth-invalid sync', () => {
     });
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
-    expect(sets).toContainEqual(expect.objectContaining({ runtime_state: expect.anything() }));
+    const freshnessIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes('last_completed_run_id')
+    );
+    expect(freshnessIndex).toBeGreaterThanOrEqual(0);
+    expect(wheres[freshnessIndex]).toContain("->>'runId'");
+    expect(wheres[freshnessIndex]).toContain('chunkIndex');
+    expect(wheres[freshnessIndex]).toContain('run-budget-1');
+  });
+});
+
+describe('owner sync lease', () => {
+  it('denies a claim held by another run without fetching or minting a token', async () => {
+    const { db, sets, selectCount } = createFakeDb({
+      repositories: ['acme/widgets'],
+      claimAcquired: false,
+      conflictRuntimeState: {
+        sync_lease: {
+          runId: 'other-run',
+          chunkIndex: 0,
+          expiresAt: '2999-01-01T00:00:00.000Z',
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('unexpected'));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-1',
+    });
+
+    expect(result).toMatchObject({
+      claimDenied: true,
+      exhaustedBudget: false,
+      holderRunId: 'other-run',
+      commandResultCode: 'SYNC_ALREADY_RUNNING',
+    });
+    expect(result).not.toHaveProperty('staleChunk');
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(selectCount()).toBe(0);
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(false);
+  });
+
+  it('returns staleChunk when an older chunk of this run already holds the lease', async () => {
+    const { db } = createFakeDb({
+      claimAcquired: false,
+      conflictRuntimeState: {
+        sync_lease: {
+          runId: 'run-1',
+          chunkIndex: 2,
+          expiresAt: '2999-01-01T00:00:00.000Z',
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('unexpected'));
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-1',
+      chunkIndex: 1,
+    });
+
+    expect(result).toMatchObject({
+      staleChunk: true,
+      exhaustedBudget: false,
+      holderRunId: 'run-1',
+    });
+    expect(result).not.toHaveProperty('claimDenied');
+    expect(result).not.toHaveProperty('checkpointRejected');
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(
+      info.mock.calls.some(
+        ([, meta]) =>
+          typeof meta === 'object' &&
+          meta !== null &&
+          (meta as { reason?: string }).reason === 'stale_chunk'
+      )
+    ).toBe(true);
+    info.mockRestore();
+  });
+
+  it('treats a completed redelivery as a normal non-exhausted result', async () => {
+    const { db, selectCount } = createFakeDb({
+      repositories: ['acme/widgets'],
+      claimAcquired: false,
+      conflictRuntimeState: {
+        last_completed_run_id: 'run-1',
+        sync_lease: { runId: 'run-1', chunkIndex: 5 },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('unexpected'));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-1',
+    });
+
+    expect(result).not.toHaveProperty('claimDenied');
+    expect(result).not.toHaveProperty('staleChunk');
+    expect(result.exhaustedBudget).toBe(false);
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(selectCount()).toBe(0);
+  });
+
+  it('returns CONFIG_DISABLED without teardown when the claim finds no owner row', async () => {
+    const { db, sets } = createFakeDb({
+      claimAcquired: false,
+      conflictRuntimeState: null,
+      configMissing: true,
+    });
+    const gitTokenService = createGitTokenService();
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-1',
+    });
+
+    expect(result).toMatchObject({ commandResultCode: 'CONFIG_DISABLED' });
+    expect(result).not.toHaveProperty('claimDenied');
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes("- 'sync_lease'"))).toBe(false);
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes("- 'sync_run'"))).toBe(false);
+  });
+
+  it('clears then releases when a successful claim finds no enabled config', async () => {
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets'],
+      configMissing: true,
+    });
+    const gitTokenService = createGitTokenService();
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-config-disabled',
+    });
+
+    expect(result).toMatchObject({ commandResultCode: 'CONFIG_DISABLED' });
+    const clearIndex = sets.findIndex(entry => runtimeStateSqlText(entry).includes("- 'sync_run'"));
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(clearIndex).toBeGreaterThanOrEqual(0);
+    expect(releaseIndex).toBeGreaterThan(clearIndex);
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(false);
+  });
+
+  it('clears then releases on the auth-invalid short-circuit after a successful claim', async () => {
+    const { db, sets } = createFakeDb({
+      authInvalidAt: new Date().toISOString(),
+      repositories: ['acme/widgets', 'acme/api'],
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('unexpected'));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-auth-invalid',
+    });
+
+    expect(result).toMatchObject({ authInvalid: 2, reauthRequired: true });
+    expect(fetchStub).not.toHaveBeenCalled();
+    const clearIndex = sets.findIndex(entry => runtimeStateSqlText(entry).includes("- 'sync_run'"));
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(clearIndex).toBeGreaterThanOrEqual(0);
+    expect(releaseIndex).toBeGreaterThan(clearIndex);
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes('last_synced_at'))).toBe(false);
+  });
+
+  it('re-claims once and throws when a vanish-race deny leaves no visible holder', async () => {
+    const { db, selectCount } = createFakeDb({
+      claimAcquired: false,
+      conflictRuntimeState: {},
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('unexpected'));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId: 'run-1',
+      })
+    ).rejects.toThrow('lost its lease holder and could not re-claim');
+
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(selectCount()).toBe(0);
+  });
+
+  it('reports staleChunk without releasing when the terminal clear is owned by a newer chunk', async () => {
+    const { db, sets } = createFakeDb({
+      authInvalidAt: new Date().toISOString(),
+      terminalAccepted: false,
+      conflictRuntimeState: { sync_lease: { runId: 'run-auth-invalid', chunkIndex: 5 } },
+    });
+    const gitTokenService = createGitTokenService();
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-auth-invalid',
+    });
+
+    expect(result).toMatchObject({ staleChunk: true, exhaustedBudget: false });
+    expect(result).not.toHaveProperty('checkpointRejected');
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes("- 'sync_lease'"))).toBe(false);
+  });
+
+  it('reports checkpointRejected and releases when the terminal clear is superseded', async () => {
+    const { db, sets } = createFakeDb({
+      authInvalidAt: new Date().toISOString(),
+      terminalAccepted: false,
+      conflictRuntimeState: { sync_lease: { runId: 'other-run', chunkIndex: 0 } },
+    });
+    const gitTokenService = createGitTokenService();
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-auth-invalid',
+    });
+
+    expect(result).toMatchObject({ checkpointRejected: true, exhaustedBudget: false });
+    expect(result).not.toHaveProperty('staleChunk');
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns the completed result and releases when the terminal clear finds this run completed', async () => {
+    const runId = 'run-completed-teardown';
+    const { db, sets } = createFakeDb({
+      authInvalidAt: new Date().toISOString(),
+      terminalAccepted: false,
+      conflictRuntimeState: { last_completed_run_id: runId },
+    });
+    const gitTokenService = createGitTokenService();
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId,
+    });
+
+    // Exact empty result: dropping the completed-override would instead return the
+    // auth-invalid result for 'acme/widgets' (authInvalid 1, reauthRequired true).
+    expect(result).toEqual({
+      synced: 0,
+      errors: 0,
+      skipped: 0,
+      authInvalid: 0,
+      authInvalidRepos: [],
+      reauthRequired: false,
+      staleRepos: [],
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+    });
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it('clears and releases without a fetch when the acquired claim already completed this run', async () => {
+    const runId = 'run-completed-redelivery';
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets'],
+      claimRuntimeState: {
+        last_completed_run_id: runId,
+        sync_run: {
+          runId,
+          completedRepos: [],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+          noProgressChunks: 0,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(new Response('unexpected'));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId,
+    });
+
+    expect(result).not.toHaveProperty('claimDenied');
+    expect(result).not.toHaveProperty('staleChunk');
+    expect(result.exhaustedBudget).toBe(false);
+    expect(gitTokenService.getToken).not.toHaveBeenCalled();
+    expect(fetchStub).not.toHaveBeenCalled();
+    const clearIndex = sets.findIndex(entry => runtimeStateSqlText(entry).includes("- 'sync_run'"));
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(clearIndex).toBeGreaterThanOrEqual(0);
+    expect(releaseIndex).toBeGreaterThan(clearIndex);
+  });
+
+  it('throws a first-repo failure on a fresh skeleton claim that ignores a snapshot cursor', async () => {
+    const runId = 'run-fresh-throw';
+    const { db } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      claimRuntimeState: {
+        sync_run: {
+          runId,
+          completedRepos: [],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+          noProgressChunks: 0,
+        },
+      },
+      runtimeState: {
+        sync_run: {
+          runId,
+          completedRepos: ['acme/widgets'],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(() => new Response('Service unavailable', { status: 500 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId,
+      })
+    ).rejects.toThrow('GitHub API error 500 for acme/widgets');
+
+    // A snapshot cursor would skip acme/widgets and fetch once; a skeleton fetches both.
+    expect(fetchStub).toHaveBeenCalledTimes(2);
+  });
+
+  it('resumes only from the claim RETURNING and never from the returned skeleton', async () => {
+    const runId = 'run-skeleton';
+    const { db } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      claimRuntimeState: {
+        sync_run: {
+          runId,
+          completedRepos: [],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+          noProgressChunks: 0,
+        },
+      },
+      runtimeState: {
+        sync_run: {
+          runId,
+          completedRepos: ['acme/widgets'],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const fetchStub = stubFetch(() => new Response(JSON.stringify([]), { status: 200 }));
+
+    await expect(
+      syncOwner({
+        db: db as never,
+        gitTokenService,
+        owner: { userId: 'user-1' },
+        runId,
+      })
+    ).resolves.toMatchObject({ exhaustedBudget: false, remainingRepoCount: 0, errors: 0 });
+
+    // The same-runId cursor lives only on the getOwnerConfig snapshot; the claim
+    // RETURNING is a skeleton. Resuming from the snapshot would skip acme/widgets
+    // and fetch once. Reading only the RETURNING fetches both repos.
+    expect(fetchStub).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a checkpoint write superseded by another run', async () => {
+    const { db, selectCount } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      writeAccepted: false,
+      conflictRuntimeState: { sync_lease: { runId: 'other-run', chunkIndex: 0 } },
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-budget-1',
+      budgetMs: 0,
+    });
+
+    expect(result).toMatchObject({ checkpointRejected: true, exhaustedBudget: false });
+    expect(result).not.toHaveProperty('staleChunk');
+    expect(selectCount()).toBe(3);
+  });
+
+  it('reports staleChunk when a newer chunk of this run rejects a checkpoint write', async () => {
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      writeAccepted: false,
+      conflictRuntimeState: { sync_lease: { runId: 'run-budget-1', chunkIndex: 1 } },
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-budget-1',
+      budgetMs: 0,
+    });
+
+    expect(result).toMatchObject({ staleChunk: true, exhaustedBudget: false });
+    expect(result).not.toHaveProperty('checkpointRejected');
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes("- 'sync_lease'"))).toBe(false);
+  });
+
+  it('releases the lease and returns the empty result when a checkpoint write finds this run completed', async () => {
+    const runId = 'run-budget-1';
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      writeAccepted: false,
+      conflictRuntimeState: { last_completed_run_id: runId },
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId,
+      budgetMs: 0,
+    });
+
+    // The completed arm always releases and overrides the partial chunk result.
+    expect(result).toEqual({
+      synced: 0,
+      errors: 0,
+      skipped: 0,
+      authInvalid: 0,
+      authInvalidRepos: [],
+      reauthRequired: false,
+      staleRepos: [],
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+    });
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it('reports staleChunk without releasing when freshness is rejected by a newer chunk', async () => {
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets'],
+      terminalAccepted: false,
+      conflictRuntimeState: { sync_lease: { runId: 'run-fresh', chunkIndex: 1 } },
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-fresh',
+    });
+
+    expect(result).toMatchObject({ staleChunk: true, remainingRepoCount: 0 });
+    expect(sets.some(entry => runtimeStateSqlText(entry).includes("- 'sync_lease'"))).toBe(false);
+  });
+
+  it('stops with SYNC_NO_PROGRESS at the no-progress chunk limit', async () => {
+    const runId = 'run-noprogress';
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      runtimeState: {
+        sync_run: {
+          runId,
+          completedRepos: [],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+          noProgressChunks: 1,
+        },
+      },
+    });
+    const gitTokenService = createGitTokenService();
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    stubFetch(new Response('Service unavailable', { status: 500 }));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId,
+      budgetMs: 0,
+    });
+
+    expect(result).toMatchObject({
+      noProgress: true,
+      exhaustedBudget: false,
+      commandResultCode: 'SYNC_NO_PROGRESS',
+    });
+
+    const clearIndex = sets.findIndex(entry => runtimeStateSqlText(entry).includes("- 'sync_run'"));
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(clearIndex).toBeGreaterThanOrEqual(0);
+    expect(releaseIndex).toBeGreaterThan(clearIndex);
+    expect(
+      info.mock.calls.some(
+        ([message, meta]) =>
+          message === 'Security sync lease released' &&
+          (meta as { reason?: string } | undefined)?.reason === 'no_progress'
+      )
+    ).toBe(true);
+    expect(
+      info.mock.calls.some(
+        ([message]) => message === 'Security sync owner budget exhausted; continuation required'
+      )
+    ).toBe(false);
+    info.mockRestore();
+  });
+
+  it('releases the lease and returns the empty result when the no-progress clear finds this run completed', async () => {
+    const runId = 'run-noprogress-completed';
+    const { db, sets } = createFakeDb({
+      repositories: ['acme/widgets', 'acme/api'],
+      runtimeState: {
+        sync_run: {
+          runId,
+          completedRepos: [],
+          staleRepos: [],
+          authInvalidRepos: [],
+          synced: 0,
+          errors: 0,
+          skipped: 0,
+          authInvalid: 0,
+          reauthRequired: false,
+          noProgressChunks: 1,
+        },
+      },
+      terminalAccepted: false,
+      conflictRuntimeState: { last_completed_run_id: runId },
+    });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response('Service unavailable', { status: 500 }));
+
+    const result = await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId,
+      budgetMs: 0,
+    });
+
+    // Without the completed release this arm would leave the lease held.
+    expect(result).toEqual({
+      synced: 0,
+      errors: 0,
+      skipped: 0,
+      authInvalid: 0,
+      authInvalidRepos: [],
+      reauthRequired: false,
+      staleRepos: [],
+      exhaustedBudget: false,
+      remainingRepoCount: 0,
+    });
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it('binds the claim fence and skeleton in the SQL text', async () => {
+    const { db, sets, wheres } = createFakeDb({ repositories: ['acme/widgets'] });
+    const gitTokenService = createGitTokenService();
+    stubFetch(new Response(JSON.stringify([]), { status: 200 }));
+
+    await syncOwner({
+      db: db as never,
+      gitTokenService,
+      owner: { userId: 'user-1' },
+      runId: 'run-1',
+      chunkIndex: 0,
+    });
+
+    const claimWhere = wheres[0] ?? '';
+    const claimSet = runtimeStateSqlText(sets[0] ?? {});
+    expect(claimWhere).toContain('jsonb_exists');
+    expect(claimWhere).toContain('expiresAt');
+    expect(claimWhere).toContain('sync_lease');
+    expect(claimWhere).toContain('chunkIndex');
+    expect(claimWhere).toContain('<=');
+    expect(claimWhere).toContain('IS DISTINCT FROM');
+    expect(claimSet).toContain("'chunkIndex'");
+    expect(claimSet).not.toContain('"chunkIndex"');
+    expect(claimSet).toContain('noProgressChunks');
+
+    const releaseIndex = sets.findIndex(entry =>
+      runtimeStateSqlText(entry).includes("- 'sync_lease'")
+    );
+    expect(releaseIndex).toBeGreaterThanOrEqual(0);
+    expect(wheres[releaseIndex]).toContain("->>'runId'");
+    expect(wheres[releaseIndex]).toContain('<=');
+    expect(wheres[releaseIndex]).not.toContain(' OR ');
   });
 });
 

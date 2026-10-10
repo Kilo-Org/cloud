@@ -12,9 +12,9 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { kilo_pass_org_agreements, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import { KiloPassOrgPurchaseChannel, KiloPassPaymentProvider } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
-import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
-import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import {
   auditKiloPassClassifications,
   LIVE_ORG_KILO_PASS_STATES,
@@ -23,7 +23,7 @@ import {
   type StripeSubscriptionSnapshot,
 } from '@/lib/service-fees/kilo-pass-classification-audit';
 import { assertServiceFeeAuditReadOnly } from '@/lib/service-fees/read-only';
-import { client as stripe } from '@/lib/stripe-client';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 
 export function createDatabaseKiloPassClassificationStore(): KiloPassClassificationAuditStore {
   return {

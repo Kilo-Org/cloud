@@ -1,5 +1,5 @@
 import type { SlackAdapter } from '@chat-adapter/slack';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { PlatformIntegration } from '@kilocode/db';
 
 export type SlackWebApiPlatformError = {

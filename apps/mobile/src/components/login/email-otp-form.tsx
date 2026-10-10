@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -70,7 +69,7 @@ export function EmailOtpForm({
         // single-line line box; `min-h-[48px]` keeps the one-time-code
         // field's `h-12`-scale look as a floor (never a fixed height), so
         // Dynamic Type can still grow it.
-        className="min-h-[48px] rounded-md border border-input bg-background px-3 text-lg leading-[normal] tracking-widest text-foreground"
+        className="min-h-[48px] rounded-md border border-input bg-background pl-3 pr-3 text-lg leading-[normal] tracking-widest text-foreground"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above
@@ -99,17 +98,26 @@ export function EmailOtpForm({
         }}
         accessibilityLabel={t('login.verifyCode')}
       >
-        <Text className="flex-1 text-center">{t('login.verifyCode')}</Text>
+        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+          {t('login.verifyCode')}
+        </Text>
       </Button>
       <Button
         variant="outline"
         className="flex-row gap-2"
         disabled={authBusy}
+        loading={busy === 'otp-send'}
         onPress={onResend}
         accessibilityLabel={t('login.resendCode')}
       >
-        {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text className="flex-1 text-center">{t('login.resendCode')}</Text>
+        {/* One line, like every other label in this stack: the Arabic secondary
+            label ("إعادة إرسال الرمز") wrapped onto two lines inside the
+            full-width button, so the copy did not fit its control (2026-09-19
+            device finding). Longer locales ellipsize instead of growing a
+            second row; the full label stays the control's accessible name. */}
+        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+          {t('login.resendCode')}
+        </Text>
       </Button>
       <Button
         variant="ghost"

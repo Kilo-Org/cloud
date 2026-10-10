@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { and, count, eq, isNotNull, isNull, max } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { normalizeGitUrl } from '@kilocode/worker-utils/normalize-git-url';
 import { buildGitLabCloneUrl } from '@/lib/cloud-agent/gitlab-integration-helpers';

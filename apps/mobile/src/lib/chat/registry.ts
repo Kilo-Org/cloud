@@ -5,6 +5,7 @@ import {
   continueSession,
   type ModelEvent,
   openSession,
+  type PartDraft,
   type SessionHandle,
   ToolMissingError,
 } from '@kilocode/harness-sdk';
@@ -12,7 +13,7 @@ import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { KILO_MCP_URL } from '@/lib/config';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
-import { change, forgetState, moveState, NOTHING, snapshotOf } from './state';
+import { change, forgetState, moveState, NOTHING, type Question, snapshotOf } from './state';
 import { chatLayers, type ChatOrg, organizationIdOf } from './layers';
 import {
   ensureKiloMcp,
@@ -60,10 +61,13 @@ type ChatContext = ManagedRuntime.ManagedRuntime.Context<ChatRuntime>;
  * for. The model is carried because a person can change it between the two,
  * and the question was asked of the one that was on screen.
  */
-type Waiting = {
-  readonly text: string;
+type Waiting = Question & {
   readonly model: string;
 };
+
+/** What the screen draws of the line: the questions, without the models they go to. */
+const questionsIn = (waiting: readonly Waiting[]): readonly Question[] =>
+  waiting.map(one => ({ text: one.text, images: one.images }));
 
 /** A chat that is open: the session behind it, and what it is doing. */
 type Chat = {
@@ -320,6 +324,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     change(current, {
       model,
       asked: asked?.text ?? null,
+      askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
       status: 'idle',
       failed: null,
@@ -346,6 +351,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       turns,
       status: 'idle',
       asked: asked?.text ?? null,
+      askedImages: asked?.images ?? [],
       askedModel: asked?.model ?? null,
     });
   } catch (error) {
@@ -366,7 +372,8 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
  * does, and the state of the chat it moved off says where it went, so whoever
  * is watching follows without being told.
  */
-export async function say(sessionId: string, text: string, model: string): Promise<void> {
+export async function say(sessionId: string, question: Question, model: string): Promise<void> {
+  const { text, images } = question;
   /* Where the failure below belongs. It is the chat the move landed on, not
      the one it started from, or the report goes to a chat nobody is watching. */
   let current = snapshotOf(sessionId).sessionId;
@@ -381,8 +388,8 @@ export async function say(sessionId: string, text: string, model: string): Promi
          while it works. So a second question joins the line rather than racing
          the first, and it is on screen while it waits. It is held in memory
          only: an answer that is still arriving is not written down either. */
-      held.waiting.push({ text, model });
-      change(current, { waiting: held.waiting.map(one => one.text) });
+      held.waiting.push({ text, images, model });
+      change(current, { waiting: questionsIn(held.waiting) });
       return;
     }
     /* One move, not two: the question is asked on the model on screen, and a
@@ -394,8 +401,8 @@ export async function say(sessionId: string, text: string, model: string): Promi
     }
     /* Remember the requested target before the move can fail. The live model
        stays unchanged until onto installs the session that actually moved. */
-    change(current, { asked: text, askedModel: model });
-    await rememberAsked(current, text, model);
+    change(current, { asked: text, askedImages: images, askedModel: model });
+    await rememberAsked(current, { text, model, images });
     current = await ontoForUse(current, model, held);
     const chat = chats.get(current);
     if (chat === undefined) {
@@ -407,11 +414,12 @@ export async function say(sessionId: string, text: string, model: string): Promi
       status: 'working',
       answering: '',
       asked: text,
+      askedImages: images,
       askedModel: model,
       failed: null,
       failureKey: null,
     });
-    chat.answering = runtime.runFork(reading(current, text, runtime));
+    chat.answering = runtime.runFork(reading(current, { text, images }, runtime));
   } catch (error) {
     /* The open, the move, or the write that remembers the question failed. The
        question is not lost: it stays on screen with a Retry under it, the same
@@ -422,6 +430,7 @@ export async function say(sessionId: string, text: string, model: string): Promi
       status: 'idle',
       answering: '',
       asked: text,
+      askedImages: images,
       askedModel: model,
       failed: reason(error),
       failureKey: backendFailureKey(error),
@@ -439,9 +448,9 @@ const openReason = (error: unknown): string =>
 
 /** Asks again what was asked and never answered. */
 export async function retryChat(sessionId: string): Promise<void> {
-  const { sessionId: current, asked, askedModel } = snapshotOf(sessionId);
+  const { sessionId: current, asked, askedImages, askedModel } = snapshotOf(sessionId);
   if (asked !== null && askedModel !== null) {
-    await say(current, asked, askedModel);
+    await say(current, { text: asked, images: askedImages }, askedModel);
   } else {
     const chat = chats.get(current);
     if (chat !== undefined && chat.answering === undefined) {
@@ -450,14 +459,28 @@ export async function retryChat(sessionId: string): Promise<void> {
   }
 }
 
+/**
+ * What the session is asked. A question with images sends them first, the way
+ * the major vision models read best, and an empty text part is left out.
+ */
+function partsOf({ text, images }: Question): string | readonly PartDraft[] {
+  if (images.length === 0) {
+    return text;
+  }
+  return [
+    ...images.map((image): PartDraft => ({ kind: 'image', body: image.data, media: image.media })),
+    ...(text === '' ? [] : [{ kind: 'text', body: text } as const]),
+  ];
+}
+
 /** Reads one answer to the end, however it ends. */
-function reading(sessionId: string, text: string, runtime: ChatRuntime): Effect.Effect<void> {
+function reading(sessionId: string, question: Question, runtime: ChatRuntime): Effect.Effect<void> {
   const chat = chats.get(sessionId);
   if (chat === undefined) {
     return Effect.void;
   }
   let said = '';
-  return Stream.runForEach(chat.handle.ask(text), (event: ModelEvent) =>
+  return Stream.runForEach(chat.handle.ask(partsOf(question)), (event: ModelEvent) =>
     Effect.sync(() => {
       if (event.kind === 'delta') {
         said += event.text;
@@ -530,6 +553,7 @@ async function settle(
     answering: '',
     status: 'idle',
     asked: failed === null ? null : snapshotOf(sessionId).asked,
+    askedImages: failed === null ? [] : snapshotOf(sessionId).askedImages,
     askedModel: failed === null ? null : snapshotOf(sessionId).askedModel,
     failed,
     failureKey: failure?.key ?? null,
@@ -582,8 +606,8 @@ async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<vo
   if (next === undefined) {
     return;
   }
-  change(current, { waiting: chat.waiting.map(one => one.text) });
-  await say(current, next.text, next.model);
+  change(current, { waiting: questionsIn(chat.waiting) });
+  await say(current, { text: next.text, images: next.images }, next.model);
 }
 
 /** What a chat can be moved onto: another model, another tool set, or both. */

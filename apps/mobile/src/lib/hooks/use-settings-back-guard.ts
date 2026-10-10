@@ -1,8 +1,8 @@
 import { getSettingsBackGuardOptions } from '@kilocode/app-shared/security-agent';
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { Alert, type AlertButton } from 'react-native';
+import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
 
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { i18n } from '@/i18n';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getSecurityAgentPath } from '@/lib/security-agent';
@@ -28,15 +28,28 @@ const BUTTON_LABEL_KEY = {
 export function useSecurityAgentSettingsRedirect(
   scope: string,
   isEnabled: boolean | undefined,
-  skipRedirect = false
+  {
+    skipRedirect = false,
+    dirty = false,
+  }: Readonly<{ skipRedirect?: boolean; dirty?: boolean }> = {}
 ) {
   const router = useRouter();
+  // Undoing an edit must retry a disabled redirect that the dirty guard cancelled.
   useEffect(() => {
     if (isEnabled === false && !skipRedirect) {
       router.replace(getSecurityAgentPath(scope, 'settings'));
     }
-  }, [isEnabled, router, scope, skipRedirect]);
+  }, [isEnabled, router, scope, skipRedirect, dirty]);
 }
+
+export type SettingsBackGuardResult = {
+  /** Header back handler: replays the guarded leave through the navigator. */
+  onBack: () => void;
+  /** Set right before a successful header-Save so its own `router.back()` is not intercepted. */
+  skipNextGuardRef: RefObject<boolean>;
+  /** The confirmation to render; null while none is pending. */
+  dialog: ReactNode;
+};
 
 /**
  * Shared dirty-screen back handling for Security Agent settings screens.
@@ -45,9 +58,17 @@ export function useSecurityAgentSettingsRedirect(
  * hardware back, and the iOS swipe-back gesture — so all three paths get
  * the same confirmation instead of only the header button.
  *
- * Not a general form framework: it only classifies dirty/valid into an
- * alert with up to three buttons and replays the captured navigation
- * action once the user has resolved it.
+ * The confirmation is the app's in-app `ConfirmDialog`, never the native
+ * alert: Android's `AlertDialog` paints every button with the theme accent,
+ * so the native alert's destructive style would never reach the screen there
+ * and Discard would lose its red affordance. It offers Keep editing
+ * (the safe choice), Discard, and — while the draft is valid — Save, which
+ * persists the draft and then replays the captured navigation action. The
+ * caller renders the returned `dialog` node in its own tree.
+ *
+ * Not a general form framework: it only classifies dirty/valid into that
+ * confirmation and replays the captured navigation action once the user has
+ * resolved it.
  */
 export function useSettingsBackGuard({
   dirty,
@@ -57,8 +78,9 @@ export function useSettingsBackGuard({
   dirty: boolean;
   valid: boolean;
   onSave: () => Promise<void>;
-}>) {
+}>): SettingsBackGuardResult {
   const navigation = useNavigation();
+  const { confirm, dialog } = useConfirmDialog();
   // Keep the latest onSave in a ref so the callback below doesn't depend on it
   // directly — onSave is a fresh closure every render. usePreventRemove keeps
   // the callback itself fresh via useLatestCallback, but the ref keeps onSave
@@ -71,7 +93,7 @@ export function useSettingsBackGuard({
   // re-hydrates from a refetched query — which hasn't happened yet at that
   // point — so without this bypass the back navigation the Save button
   // itself triggers gets intercepted as if it were an unconfirmed exit,
-  // popping a spurious "Unsaved changes" alert whose own Save button would
+  // popping a spurious "Unsaved changes" confirm whose own Save button would
   // save a second time.
   const skipNextGuardRef = useRef(false);
 
@@ -83,39 +105,33 @@ export function useSettingsBackGuard({
     }
     const action = data.action;
     const options = getSettingsBackGuardOptions(valid ? 'dirty-valid' : 'dirty-invalid');
-    const buttons: AlertButton[] = options.map(option => {
-      if (option === 'keep-editing') {
-        return { text: i18n.t(BUTTON_LABEL_KEY[option]), style: 'cancel' };
-      }
-      if (option === 'discard') {
-        return {
-          text: i18n.t(BUTTON_LABEL_KEY[option]),
-          style: 'destructive',
-          onPress: () => {
-            navigation.dispatch(action);
-          },
-        };
-      }
-      return {
-        text: i18n.t(BUTTON_LABEL_KEY[option]),
-        onPress: () => {
-          void (async () => {
-            try {
-              await onSaveRef.current();
-              navigation.dispatch(action);
-            } catch {
-              // The save mutation's centralized onError already toasted —
-              // stay on the screen so the user can retry or discard.
-            }
-          })();
-        },
-      };
+    confirm({
+      title: i18n.t('securityAgent.settingsSave.unsavedTitle'),
+      message: i18n.t('securityAgent.settingsSave.unsavedMessage'),
+      cancelLabel: i18n.t(BUTTON_LABEL_KEY['keep-editing']),
+      extraAction: options.includes('save')
+        ? {
+            label: i18n.t(BUTTON_LABEL_KEY.save),
+            onPress: () => {
+              void (async () => {
+                try {
+                  await onSaveRef.current();
+                  navigation.dispatch(action);
+                } catch {
+                  // The save mutation's centralized onError already toasted —
+                  // stay on the screen so the user can retry or discard.
+                }
+              })();
+            },
+          }
+        : undefined,
+      confirmLabel: i18n.t(BUTTON_LABEL_KEY.discard),
+      onConfirm: () => {
+        navigation.dispatch(action);
+      },
+      // These settings screens are plain stack screens with no sheet or modal
+      // on them, so the portal dialog can never hide behind a presented surface.
     });
-    Alert.alert(
-      i18n.t('securityAgent.settingsSave.unsavedTitle'),
-      i18n.t('securityAgent.settingsSave.unsavedMessage'),
-      buttons
-    );
   });
 
   return {
@@ -123,5 +139,6 @@ export function useSettingsBackGuard({
       navigation.goBack();
     },
     skipNextGuardRef,
+    dialog,
   };
 }

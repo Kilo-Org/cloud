@@ -67,10 +67,11 @@ function hasTrpcErrorCode(error: unknown): boolean {
 /**
  * True when the error is already reported by the network layer: a tRPC client
  * error (by name, or any error carrying a tRPC `code` envelope), a react-query
- * `CancelledError`, or a request-deadline timeout. These are captured by the
- * tRPC links or the fetch wrapper, so reporting them again would duplicate
- * issues. A non-tRPC error that merely carries a top-level `code` is not
- * skipped — that would drop unrelated app errors.
+ * `CancelledError`, or a request-deadline timeout. The tRPC links or the fetch
+ * wrapper own these (a timeout is a breadcrumb there, not an event), so
+ * reporting them again would duplicate issues. A non-tRPC error that merely
+ * carries a top-level `code` is not skipped — that would drop unrelated app
+ * errors.
  */
 export function isAlreadyReportedNetworkError(error: unknown): boolean {
   try {

@@ -11,7 +11,7 @@ import {
 // Pick the slice of Drizzle's client this module actually needs. Repository
 // functions take a writer/reader subset so they compose with both the Worker
 // runtime client (`getWorkerDb`) and the Node test client (`db` in
-// apps/web/src/lib/drizzle.ts) without forcing either dependency on
+// packages/web-shared/src/lib/drizzle.ts) without forcing either dependency on
 // `@kilocode/db`. Both clients are produced by `drizzle(...)` and structurally
 // satisfy `Pick<WorkerDb, 'insert' | 'select' | 'update'>`.
 export type TerminalRenewalFailureRepository = Pick<WorkerDb, 'insert' | 'select' | 'update'>;

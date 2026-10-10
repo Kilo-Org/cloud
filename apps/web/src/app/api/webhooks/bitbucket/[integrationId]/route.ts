@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { agent_configs, platform_integrations } from '@kilocode/db/schema';
 import { CodeReviewAgentConfigSchema } from '@kilocode/db/schema-types';
-import { BITBUCKET_CODE_REVIEW_WEBHOOK_SIGNING_KEYS } from '@/lib/config.server';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { BITBUCKET_CODE_REVIEW_WEBHOOK_SIGNING_KEYS } from '@kilocode/web-shared/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { getUnblockedBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import {

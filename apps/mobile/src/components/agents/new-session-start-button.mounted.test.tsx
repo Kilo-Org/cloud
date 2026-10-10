@@ -15,6 +15,17 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+// The real status component reaches `announceForA11y` (an iOS-only imperative
+// bridge) and `Platform.OS`, neither of which this Node renderer provides; the
+// stub mirrors its null-renders-nothing contract while keeping `message`
+// inspectable.
+vi.mock('@/components/ui/accessible-status', async () => {
+  const { createElement: createHostElement } = await import('react');
+  return {
+    AccessibleStatus: ({ message }: { message: string | null }) =>
+      message == null ? null : createHostElement('AccessibleStatus', { message }),
+  };
+});
 // The real `@/components/ui/text` loads `@rn-primitives/slot`, whose node_modules
 // `.mjs` contains JSX this pipeline cannot transform. Provide a real context so
 // Button's `useContext(TextClassContext)` still resolves.
@@ -41,6 +52,7 @@ async function mountButton(props: {
   isRemote?: boolean;
   isStartDisabled?: boolean;
   isStarting?: boolean;
+  startBlockedReason?: string | null;
 }): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -50,6 +62,7 @@ async function mountButton(props: {
         isRemote: props.isRemote ?? false,
         isStartDisabled: props.isStartDisabled ?? false,
         isStarting: props.isStarting ?? false,
+        startBlockedReason: props.startBlockedReason ?? null,
         onStartSession: vi.fn<() => void>(),
       })
     );
@@ -101,6 +114,54 @@ describe('NewSessionStartButton', () => {
 
     expect(hostByType(renderer.root, 'ActivityIndicator')).toHaveLength(1);
     expect(hasTextLabel(renderer.root, 'Cloning session')).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('shows the blocked reason directly above Start for the ordinary entry', async () => {
+    const renderer = await mountButton({
+      isStartDisabled: true,
+      startBlockedReason: 'Select a repository to start.',
+    });
+
+    const statuses = hostByType(renderer.root, 'AccessibleStatus');
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('Select a repository to start.');
+
+    // The reason renders directly above the Start control, never below it.
+    const startOrder = renderer.root
+      .findAll(node => {
+        if (typeof node.type !== 'string') {
+          return false;
+        }
+        const type = node.type as string;
+        return type === 'AccessibleStatus' || type === 'Pressable';
+      })
+      .map(node => node.type as string);
+    expect(startOrder).toEqual(['AccessibleStatus', 'Pressable']);
+
+    renderer.unmount();
+  });
+
+  it('shows no reason when none is supplied', async () => {
+    const renderer = await mountButton({});
+
+    expect(hostByType(renderer.root, 'AccessibleStatus')).toHaveLength(0);
+    expect(hostByType(renderer.root, 'Pressable')).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('shows the blocked reason above Start for the clone entry too', async () => {
+    const renderer = await mountButton({
+      isCloneEntry: true,
+      isStartDisabled: true,
+      startBlockedReason: 'Connect a provider to start.',
+    });
+
+    const statuses = hostByType(renderer.root, 'AccessibleStatus');
+    expect(statuses).toHaveLength(1);
+    expect(statuses[0]?.props.message).toBe('Connect a provider to start.');
 
     renderer.unmount();
   });

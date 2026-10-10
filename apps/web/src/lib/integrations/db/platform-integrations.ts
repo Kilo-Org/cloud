@@ -1,4 +1,4 @@
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
 import type {

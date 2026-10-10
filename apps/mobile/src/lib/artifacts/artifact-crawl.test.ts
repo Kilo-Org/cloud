@@ -487,4 +487,40 @@ describe('buildSessionArtifacts', () => {
       { id: 's2', title: 'Named', updatedAt: UPDATED_AT, files: [] },
     ]);
   });
+
+  it('hides the backend placeholder title behind the fallback label', () => {
+    const sessions = buildSessionArtifacts(
+      [
+        rowOf('s1', 'New session - 2026-09-22T01:09:45.623Z'),
+        rowOf('s2', 'Child session - 2026-09-22T01:09:45.623Z'),
+      ],
+      new Map()
+    );
+
+    expect(sessions.map(session => session.title)).toEqual(['Session s1', 'Session s2']);
+  });
+
+  it('disambiguates artifacts that share a filename within a session', () => {
+    const artifacts = new Map([
+      [
+        's1',
+        [
+          { id: 'file-1', mime: 'application/pdf', filename: 'report.pdf', size: 1 },
+          { id: 'file-2', mime: 'application/pdf', filename: 'report.pdf', size: 2 },
+        ],
+      ],
+    ]);
+
+    expect(buildSessionArtifacts([rowOf('s1', 'Named')], artifacts)).toEqual([
+      {
+        id: 's1',
+        title: 'Named',
+        updatedAt: UPDATED_AT,
+        files: [
+          { id: 'file-1', name: 'report.pdf', mime: 'application/pdf', size: 1 },
+          { id: 'file-2', name: 'report (2).pdf', mime: 'application/pdf', size: 2 },
+        ],
+      },
+    ]);
+  });
 });

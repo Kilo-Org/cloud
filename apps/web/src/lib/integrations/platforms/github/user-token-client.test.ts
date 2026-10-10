@@ -7,14 +7,14 @@ const mockConfig = {
   apiUrl: 'https://git-token-service.example.com',
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GIT_TOKEN_SERVICE_API_URL() {
     return mockConfig.apiUrl;
   },
 }));
 
-jest.mock('@/lib/tokens', () => {
-  const actual = jest.requireActual('@/lib/tokens');
+jest.mock('@kilocode/web-shared/lib/tokens', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/tokens');
   return {
     ...actual,
     TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
@@ -77,7 +77,7 @@ describe('getGitHubUserAccessToken', () => {
     if (result.status !== 'connected') throw new Error('expected connected');
 
     const generateMock = (
-      jest.requireMock('@/lib/tokens') as {
+      jest.requireMock('@kilocode/web-shared/lib/tokens') as {
         generateBoundedInternalServiceToken: jest.Mock;
       }
     ).generateBoundedInternalServiceToken;

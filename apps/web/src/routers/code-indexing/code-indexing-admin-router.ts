@@ -1,9 +1,13 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { code_indexing_manifest, organizations, kilocode_users } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getTableName, sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { QDRANT_HOST, QDRANT_API_KEY, QDRANT_CLUSTER_RAM_GB } from '@/lib/config.server';
+import {
+  QDRANT_HOST,
+  QDRANT_API_KEY,
+  QDRANT_CLUSTER_RAM_GB,
+} from '@kilocode/web-shared/lib/config.server';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
 
 const PaginationInputSchema = z.object({

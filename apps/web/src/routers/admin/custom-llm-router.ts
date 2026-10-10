@@ -1,5 +1,5 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { custom_llm2 } from '@kilocode/db/schema';
 import {
   CustomLlmCredentialsSchema,
@@ -9,9 +9,9 @@ import {
 import { asc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 
 const publicIdSchema = z
   .string()

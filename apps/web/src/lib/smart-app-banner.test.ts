@@ -1,4 +1,4 @@
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { UNIVERSAL_LINK_ROUTES } from '@kilocode/app-shared/universal-links';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 

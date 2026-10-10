@@ -60,10 +60,6 @@ type SessionMessagesPageResult = Awaited<
 /** Shape of the `activeSessions.list` query result used for liveness rechecks. */
 type ActiveSessionsResult = Awaited<ReturnType<TrpcClient['activeSessions']['list']['query']>>;
 
-// ---------------------------------------------------------------------------
-// Error code extraction — extension-owned copy of the mobile classifier
-// ---------------------------------------------------------------------------
-
 const stringSchema = z.string();
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -104,10 +100,6 @@ export function readFetchSessionErrorCode(error: unknown): string | undefined {
   return asString(error['code']);
 }
 
-// ---------------------------------------------------------------------------
-// NOT_FOUND retry — extension-owned copy of the mobile retry loop
-// ---------------------------------------------------------------------------
-
 type SessionWithRuntimeState =
   inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];
 
@@ -144,10 +136,6 @@ async function defaultFetchSessionSleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
-
-// ---------------------------------------------------------------------------
-// Page-adapter helpers — extension-owned mirrors of the mobile page adapters
-// ---------------------------------------------------------------------------
 
 function isHistoryPage(history: KiloSdkMessageHistory): history is KiloSdkMessageHistoryPage {
   return 'messages' in history && Array.isArray(history.messages);
@@ -471,10 +459,6 @@ async function fetchExtensionSessionSnapshotPage(
   return history;
 }
 
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
-
 interface CreateExtensionAgentSessionManagerOptions {
   store: JotaiStore;
   trpcClient: TrpcClient;
@@ -506,7 +490,6 @@ export function createExtensionAgentSessionManager({
   userWebConnection,
 }: Readonly<CreateExtensionAgentSessionManagerOptions>): SessionManager {
   return createSessionManager({
-    // ---- api (personal/org twins) ----
     api: {
       answer: async payload => {
         const input = {
@@ -584,7 +567,6 @@ export function createExtensionAgentSessionManager({
       },
     },
 
-    // ---- fetchSession ----
     fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
       const sessionResult = await fetchSessionWithNotFoundRetry(kiloSessionId, {
         query: id => trpcClient.cliSessionsV2.getWithRuntimeState.query({ session_id: id }),
@@ -627,7 +609,6 @@ export function createExtensionAgentSessionManager({
       };
     },
 
-    // ---- fetchSnapshot ----
     fetchSnapshot: async (id: KiloSessionId) => {
       const [sessionData, messagesResult] = await Promise.all([
         trpcClient.cliSessionsV2.get.query({ session_id: id }),
@@ -646,14 +627,12 @@ export function createExtensionAgentSessionManager({
       } satisfies SessionSnapshot;
     },
 
-    // ---- fetchSnapshotPage ----
     fetchSnapshotPage: (kiloSessionId, options) =>
       fetchExtensionSessionSnapshotPage(trpcClient, kiloSessionId, {
         ...options,
         organizationId,
       }),
 
-    // ---- getTicket ----
     getTicket: async (
       sessionId: CloudAgentSessionId
     ): Promise<{ ticket: string; expiresAt: number }> => {
@@ -688,7 +667,6 @@ export function createExtensionAgentSessionManager({
       return { expiresAt: data.expiresAt, ticket: data.ticket };
     },
 
-    // ---- initiate ----
     initiate: async input => {
       if (organizationId !== null) {
         await trpcClient.organizations.cloudAgentNext.initiateFromPreparedSession.mutate(
@@ -708,7 +686,6 @@ export function createExtensionAgentSessionManager({
     // Tool attachment bytes are stripped before storage; keep the images here.
     onToolAttachment: rememberToolImage,
 
-    // ---- prepare ----
     prepare: async input => {
       // Reject initialPayload with a clear v1 error before any tRPC call.
       if (input.initialPayload) {
@@ -735,7 +712,6 @@ export function createExtensionAgentSessionManager({
       };
     },
 
-    // ---- resolveSession ----
     resolveSession: async (kiloSessionId: KiloSessionId): Promise<ResolvedSession> => {
       // CliSessionsV2.get first. A failed query propagates — it must NOT
       // Be silently classified as read-only.

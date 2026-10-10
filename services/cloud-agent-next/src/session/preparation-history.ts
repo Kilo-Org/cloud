@@ -321,6 +321,19 @@ export function readPreparationAttempt(
   return snapshot?.action === 'attempt_snapshot' ? snapshot.attempt : null;
 }
 
+/** Read the materialized step snapshots of one attempt. */
+export function readPreparationSteps(
+  eventQueries: EventQueries,
+  attemptId: string
+): PreparationStepSnapshot[] {
+  const steps: PreparationStepSnapshot[] = [];
+  for (const row of eventQueries.findByEntityPrefix(`${attemptEntityId(attemptId)}/step/`)) {
+    const snapshot = parseSnapshot(row.payload);
+    if (snapshot?.action === 'step_snapshot') steps.push(snapshot.stepSnapshot);
+  }
+  return steps;
+}
+
 export type PreparationOutcome = { status: 'completed' } | { status: 'failed'; safeError: string };
 
 /**

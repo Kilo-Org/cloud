@@ -1,11 +1,11 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_memberships,
   credit_transactions,
   organization_audit_logs,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
 import { eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';

@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation';
 
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { KiloPassDetail } from '@/components/subscriptions/kilo-pass/KiloPassDetail';
-import { db } from '@/lib/drizzle';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export default async function KiloPassSubscriptionPage() {
   const user = await getUserFromAuthOrRedirect(

@@ -4,7 +4,6 @@ import {
   GitMerge,
   GitPullRequest,
   type LucideIcon,
-  Plus,
 } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -191,14 +190,10 @@ export function PrRefsRow({
 export function PrCountsLine({
   commits,
   changedFiles,
-  additions,
-  deletions,
 }: Readonly<{
   /** Null where the provider reports no commit count; the chip is dropped. */
   commits: number | null;
   changedFiles: number;
-  additions: number;
-  deletions: number;
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -218,13 +213,6 @@ export function PrCountsLine({
         <Text variant="muted" className="text-sm">
           {formatNumber(changedFiles, i18n.language)}{' '}
           {t('prReview.overview.file', { count: changedFiles })}
-        </Text>
-      </View>
-      <View className="flex-row items-center gap-1.5">
-        <Plus size={14} color={colors.good} />
-        <Text className="text-sm text-good">{formatNumber(additions, i18n.language)}</Text>
-        <Text variant="muted" className="text-sm">
-          / −{formatNumber(deletions, i18n.language)}
         </Text>
       </View>
     </View>

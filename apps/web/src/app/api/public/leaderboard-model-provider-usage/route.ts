@@ -5,7 +5,7 @@ import {
   createPublicSnowflakeReport,
   publicSnowflakeReportOptions,
 } from '@/lib/public-snowflake-report';
-import { LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY } from '@/lib/redis-keys';
+import { LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 
 const MINIMUM_TOKENS = 10_000_000;
 const MAXIMUM_ERROR_RATE = 0.5;

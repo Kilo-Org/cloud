@@ -576,7 +576,7 @@ This report was compiled from repository sources, including the following intern
 
 - `AGENTS.md`
 - `apps/web/src/docs/network-compliance-diagram.md`
-- `apps/web/src/lib/user/server.ts`
+- `packages/web-shared/src/lib/user/server.ts`
 - `apps/web/src/lib/user/index.ts`
 - `apps/web/src/lib/security-headers.ts`
 - `apps/web/next.config.mjs`

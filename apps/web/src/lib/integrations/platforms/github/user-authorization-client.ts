@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
-import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
+import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 export async function disconnectStoredGitHubUserAuthorization(kiloUserId: string): Promise<void> {

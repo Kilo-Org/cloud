@@ -1,4 +1,4 @@
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(),
     update: jest.fn(),
@@ -6,16 +6,16 @@ jest.mock('@/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GOOGLE_WORKSPACE_OAUTH_CLIENT_ID: 'test-client-id',
   GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64'),
 }));
 
-jest.mock('@/lib/encryption', () => ({
+jest.mock('@kilocode/web-shared/lib/encryption', () => ({
   encryptWithSymmetricKey: jest.fn((value: string) => `enc:${value}`),
 }));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { upsertKiloClawGoogleOAuthConnection } from './google-oauth-connections';
 
 type MockDb = {

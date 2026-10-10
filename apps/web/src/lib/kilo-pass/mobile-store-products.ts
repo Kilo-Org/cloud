@@ -1,5 +1,5 @@
-import { getMonthlyPriceUsd } from './bonus';
-import { KiloPassCadence, KiloPassTier } from './enums';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 export type MobileStoreKiloPassProduct = {
   tier: KiloPassTier;

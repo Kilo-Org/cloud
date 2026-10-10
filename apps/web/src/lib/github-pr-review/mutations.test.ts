@@ -16,7 +16,9 @@ import {
   ReviewSideSchema,
   buildAddReactionVariables,
   buildCreateReviewCommentParams,
+  buildDeleteIssueCommentParams,
   buildDeleteRefParams,
+  buildDeleteReviewCommentParams,
   buildDisableAutoMergeVariables,
   buildEnableAutoMergeVariables,
   buildMergePullRequestParams,
@@ -26,6 +28,8 @@ import {
   buildSubmitReviewParams,
   buildUnresolveThreadVariables,
   buildUpdateBranchParams,
+  buildUpdateIssueCommentParams,
+  buildUpdateReviewCommentParams,
 } from './mutations';
 
 describe('GitHub PR review mutation enums', () => {
@@ -220,6 +224,74 @@ describe('buildReplyToCommentParams', () => {
       pull_number: 7,
       comment_id: 99,
       body: 'thanks',
+    });
+  });
+});
+
+describe('buildUpdateReviewCommentParams', () => {
+  it('maps to the REST field names', () => {
+    expect(
+      buildUpdateReviewCommentParams({
+        owner: 'octocat',
+        repo: 'hello',
+        commentId: 99,
+        body: 'edited',
+      })
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 99,
+      body: 'edited',
+    });
+  });
+});
+
+describe('buildUpdateIssueCommentParams', () => {
+  it('maps to the REST field names', () => {
+    expect(
+      buildUpdateIssueCommentParams({
+        owner: 'octocat',
+        repo: 'hello',
+        commentId: 99,
+        body: 'edited',
+      })
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 99,
+      body: 'edited',
+    });
+  });
+});
+
+describe('buildDeleteReviewCommentParams', () => {
+  it('maps to the REST field names', () => {
+    expect(
+      buildDeleteReviewCommentParams({
+        owner: 'octocat',
+        repo: 'hello',
+        commentId: 99,
+      })
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 99,
+    });
+  });
+});
+
+describe('buildDeleteIssueCommentParams', () => {
+  it('maps to the REST field names', () => {
+    expect(
+      buildDeleteIssueCommentParams({
+        owner: 'octocat',
+        repo: 'hello',
+        commentId: 99,
+      })
+    ).toEqual({
+      owner: 'octocat',
+      repo: 'hello',
+      comment_id: 99,
     });
   });
 });

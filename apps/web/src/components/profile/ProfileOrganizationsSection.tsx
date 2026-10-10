@@ -8,7 +8,7 @@ import {
 } from '@/lib/organizations/organization-shared-utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import Link from 'next/link';
-import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
+import type { UserOrganizationWithSeats } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type ProfileOrganizationsSectionProps = {
   orgs: UserOrganizationWithSeats[];

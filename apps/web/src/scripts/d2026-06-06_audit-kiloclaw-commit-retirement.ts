@@ -1,6 +1,6 @@
 import '@/lib/load-env';
 
-import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
+import { closeAllDrizzleConnections, db } from '@kilocode/web-shared/lib/drizzle';
 import { KILOCLAW_COMMIT_SALES_CUTOFF, isBeforeKiloClawCommitSalesCutoff } from '@kilocode/db';
 import { kiloclaw_subscription_change_log, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { and, inArray, isNull, sql } from 'drizzle-orm';

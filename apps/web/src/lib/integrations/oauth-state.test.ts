@@ -1,8 +1,10 @@
 import { createHmac } from 'node:crypto';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { createOAuthState, verifyOAuthState, verifyOAuthStateDetailed } from './oauth-state';
 
-jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret',
+}));
 
 function signPayload(payload: string, secret = NEXTAUTH_SECRET): string {
   const encoded = Buffer.from(payload).toString('base64url');

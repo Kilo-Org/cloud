@@ -4,7 +4,7 @@ import type { randomUUID as RandomUUID } from 'crypto';
 import type { captureException as CaptureException } from '@sentry/nextjs';
 import type { extractAndUploadAttachments as ExtractAndUploadAttachments } from './attachments';
 
-jest.mock('@/lib/r2/client', () => ({
+jest.mock('@kilocode/web-shared/lib/r2/client', () => ({
   r2Client: { send: jest.fn() },
   r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
 }));
@@ -64,7 +64,7 @@ describe('extractAndUploadAttachments', () => {
   beforeAll(async () => {
     const crypto = await import('crypto');
     const sentry = await import('@sentry/nextjs');
-    const r2 = await import('@/lib/r2/client');
+    const r2 = await import('@kilocode/web-shared/lib/r2/client');
     const uploader = await import('./attachments');
 
     mockRandomUUID = crypto.randomUUID as unknown as jest.MockedFunction<typeof RandomUUID>;

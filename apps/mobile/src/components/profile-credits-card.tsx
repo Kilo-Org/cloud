@@ -1,13 +1,15 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { type Href, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
-import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { AddCreditsRow } from '@/components/add-credits-row';
+import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -34,7 +36,12 @@ type CreditsCardProps = {
 export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const trpc = useTRPC();
   const colors = useThemeColors();
-  const { width } = useWindowDimensions();
+  const router = useRouter();
+  const { width, fontScale } = useWindowDimensions();
+  const [availableWidth, setAvailableWidth] = useState<number | null>(null);
+  // Reserve room for the amount, visibility toggle and purchase action in
+  // scaled text units, using the card's width rather than the display's.
+  const stackBalance = availableWidth === null || availableWidth / fontScale < 320;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
   // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
@@ -120,20 +127,21 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   const canPickContext = orgs !== undefined;
 
-  // Personal (non-org) credits are a consumable purchased directly by the end
-  // user, so Apple requires IAP for them — iOS can't show purchase language
-  // pointing at the web billing page. Org billing is exempt (business/seat
-  // billing), but only members who can manage billing should see the CTA —
-  // matching the money-role gate on the organization hub screen.
+  // Personal credits are a consumable bought in-app, so the personal row is
+  // shown on every platform and at any balance — a funded user must still be
+  // able to top up. Org billing stays a web flow and only members who can
+  // manage billing see the external CTA, matching the money-role gate on the
+  // organization hub screen.
   const selectedOrgRole = orgs?.find(o => o.organizationId === selectedOrgId)?.role;
-  const canShowZeroBalanceCta =
-    selectedOrgId != null ? isMoneyRole(selectedOrgRole) : Platform.OS !== 'ios';
-  const zeroBalanceUrl = selectedOrgId
-    ? `${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`
-    : `${WEB_BASE_URL}/credits`;
+  const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
   return (
-    <View className="gap-3">
+    <View
+      className="gap-3"
+      onLayout={event => {
+        setAvailableWidth(event.nativeEvent.layout.width);
+      }}
+    >
       <View
         className={cn(
           'min-h-11 gap-3',
@@ -211,16 +219,33 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
         </Pressable>
       )}
+      {balanceFailed && selectedOrgId == null && (
+        <AddCreditsButton
+          onPress={() => {
+            router.push('/(app)/credits' as Href);
+          }}
+        />
+      )}
       {!showBalanceSkeleton && !balanceFailed && (
-        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
+        <View
+          className={cn(
+            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
+            stackBalance ? 'items-stretch' : 'flex-row items-center'
+          )}
+        >
+          <Animated.View
+            className={cn('min-w-0 justify-center', !stackBalance && 'flex-1')}
+            layout={LinearTransition.duration(200)}
+          >
             <View className="flex-row items-center gap-1">
-              <Text
-                className="text-2xl font-bold tabular-nums"
-                accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
-              >
-                {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
-              </Text>
+              <ScrollView horizontal className="min-w-0 flex-1">
+                <Text
+                  className="text-2xl font-bold tabular-nums"
+                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+                >
+                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+                </Text>
+              </ScrollView>
               <Pressable
                 className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
                 onPress={() => {
@@ -259,30 +284,29 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                 )
               ))}
           </Animated.View>
-          {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+          <View className="max-w-full flex-row flex-wrap items-center gap-2">
+            {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+            {selectedOrgId == null && (
+              <AddCreditsButton
+                className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
+                onPress={() => {
+                  router.push('/(app)/credits' as Href);
+                }}
+              />
+            )}
+          </View>
         </View>
       )}
-      {!balanceLoading &&
+      {selectedOrgId != null &&
+        canManageOrgBilling &&
+        !balanceLoading &&
         !balancePending &&
         !balanceFailed &&
-        balanceDollars === 0 &&
-        canShowZeroBalanceCta && (
-          <AddCreditsRow url={zeroBalanceUrl} className="rounded-lg bg-secondary px-3 py-3" />
-        )}
-      {/* Personal-context IAP disclosure only — never show this personal "managed
-          outside the iOS app" copy under an org context (org billing isn't personal
-          IAP, and a non-money-role member just lacks access). */}
-      {!balanceLoading &&
-        !balancePending &&
-        !balanceFailed &&
-        balanceDollars === 0 &&
-        !canShowZeroBalanceCta &&
-        selectedOrgId == null && (
-          <View className="flex-row items-center justify-between rounded-lg bg-secondary px-3 py-3">
-            <Text className="flex-1 pr-3 text-xs text-muted-foreground">
-              {t('profile.creditBalanceEmpty')}
-            </Text>
-          </View>
+        balanceDollars === 0 && (
+          <AddCreditsRow
+            url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
+            className="rounded-lg bg-secondary px-3 py-3"
+          />
         )}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of

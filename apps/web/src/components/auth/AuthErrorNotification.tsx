@@ -96,6 +96,15 @@ export function AuthErrorNotification({ error }: { error: string }) {
       </div>
     );
 
+  if (error === 'SIGNUP-UNAVAILABLE')
+    return (
+      <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
+        <ErrorNotificationBox title="Signup Temporarily Unavailable">
+          We couldn&apos;t complete your signup right now. Please try again in a few moments.
+        </ErrorNotificationBox>
+      </div>
+    );
+
   if (error === 'EMAIL-ALREADY-USED')
     return (
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">

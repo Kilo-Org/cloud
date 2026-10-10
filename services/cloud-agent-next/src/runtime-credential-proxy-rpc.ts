@@ -14,6 +14,10 @@ import {
   type RuntimeProxyGrant,
 } from './runtime-credential-proxy.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
+import {
+  logRuntimeProxyRequestFailed,
+  type RuntimeProxyRejectionStage,
+} from './runtime-credential-proxy-diagnostics.js';
 import type { Env } from './types.js';
 
 type Storage = {
@@ -159,15 +163,47 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
 } | null> {
   const now = input.now ?? Date.now();
   const claims = await verifyRuntimeCredentialProxyHandle(input.env, input.handle);
-  if (!claims || !('sessionId' in claims)) return null;
+  if (!claims || !('sessionId' in claims)) {
+    logRuntimeProxyRequestFailed({ upstreamAttempted: false, rejectionStage: 'handle' });
+    return null;
+  }
   const [metadata, authorization, fence, grant] = await Promise.all([
     input.metadata(),
     input.authorization(),
     input.fence(),
     input.storage.get<unknown>(RUNTIME_PROXY_GRANT_KEY),
   ]);
+  const reject = (
+    stage: RuntimeProxyRejectionStage,
+    source: { metadata: SessionMetadata | null; fence: RuntimeProxyFence | null }
+  ): null => {
+    logRuntimeProxyRequestFailed({
+      upstreamAttempted: false,
+      rejectionStage: stage,
+      sessionId: source.metadata?.identity.sessionId || claims.sessionId,
+      kiloSessionId: source.metadata?.auth.kiloSessionId || claims.kiloSessionId,
+      allocationId: source.fence?.allocationId ?? null,
+      ...(source.fence?.plane === 'control'
+        ? {
+            wrapperInstanceId: source.fence.wrapperInstanceId,
+            connectionId: source.fence.connectionId,
+          }
+        : {}),
+    });
+    return null;
+  };
   const current = metadata && fence ? context(metadata, fence) : null;
-  if (!current || !authorization) return null;
+  if (!current || !authorization) {
+    if (!current) {
+      const stage: RuntimeProxyRejectionStage = !metadata?.auth.kiloSessionId
+        ? 'context'
+        : !fence
+          ? 'fence'
+          : 'context';
+      return reject(stage, { metadata, fence });
+    }
+    return reject('authorization', { metadata, fence });
+  }
   if (
     !matchesRuntimeProxyGrant(grant, claims, {
       ...current,
@@ -175,9 +211,9 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
       now,
     })
   )
-    return null;
+    return reject('grant', { metadata, fence });
   const backingToken = await input.token();
-  if (!backingToken) return null;
+  if (!backingToken) return reject('token', { metadata, fence });
   const resolved = await resolveRuntimeProxyCredential({
     env: input.env,
     handle: input.handle,
@@ -188,7 +224,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
     now,
     renew: async () => (await input.token()) ?? '',
   });
-  if (!resolved?.token) return null;
+  if (!resolved?.token) return reject('resolve', { metadata, fence });
 
   // Renewal awaits external I/O. Re-read all durable fences before exposing it.
   const [latestMetadata, latestAuthorization, latestFence, latestGrant] = await Promise.all([
@@ -210,7 +246,18 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
       now: latestNow,
     })
   ) {
-    return null;
+    const stage: RuntimeProxyRejectionStage = !latestMetadata?.auth.kiloSessionId
+      ? 'context'
+      : !latestFence
+        ? 'fence'
+        : !latest
+          ? 'context'
+          : !latestAuthorization ||
+              latestAuthorization.state !== 'active' ||
+              Date.parse(latestAuthorization.delegationExpiresAt) <= latestNow
+            ? 'authorization'
+            : 'grant';
+    return reject(stage, { metadata: latestMetadata, fence: latestFence });
   }
   return {
     token: resolved.token,

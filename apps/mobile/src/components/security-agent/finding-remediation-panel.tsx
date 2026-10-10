@@ -3,7 +3,7 @@ import { getRemediationStatusPresentation } from '@kilocode/app-shared/security-
 import { Wrench } from '@/components/ui/icons';
 import { useRouter } from 'expo-router';
 import { type TFunction } from 'i18next';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
@@ -14,6 +14,7 @@ import { FindingStatusBadge } from '@/components/security-agent/finding-status-b
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -171,6 +172,7 @@ export function FindingRemediationPanel({
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
@@ -190,21 +192,30 @@ export function FindingRemediationPanel({
       <View className="gap-3 px-6 pt-2">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-32 w-full rounded-lg" />
+        {dialog}
       </View>
     );
   }
 
   if (isError && !analysis) {
-    return <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />;
+    return (
+      <>
+        <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />
+        {dialog}
+      </>
+    );
   }
 
   if (!analysis) {
     return (
-      <EmptyState
-        icon={Wrench}
-        title={t('securityAgent.analysis.noAnalysisYet')}
-        description={t('securityAgent.analysis.noAnalysisYetDescription')}
-      />
+      <>
+        <EmptyState
+          icon={Wrench}
+          title={t('securityAgent.analysis.noAnalysisYet')}
+          description={t('securityAgent.analysis.noAnalysisYetDescription')}
+        />
+        {dialog}
+      </>
     );
   }
 
@@ -305,20 +316,15 @@ export function FindingRemediationPanel({
             if (!attemptId) {
               return;
             }
-            Alert.alert(
-              t('securityAgent.remediation.cancelTitle'),
-              t('securityAgent.remediation.cancelMessage'),
-              [
-                { text: t('common.keepRunning'), style: 'cancel' },
-                {
-                  text: t('securityAgent.remediation.cancelRemediation'),
-                  style: 'destructive',
-                  onPress: () => {
-                    cancelRemediation.mutate({ attemptId, findingId });
-                  },
-                },
-              ]
-            );
+            confirm({
+              title: t('securityAgent.remediation.cancelTitle'),
+              message: t('securityAgent.remediation.cancelMessage'),
+              confirmLabel: t('securityAgent.remediation.cancelRemediation'),
+              cancelLabel: t('common.keepRunning'),
+              onConfirm: () => {
+                cancelRemediation.mutate({ attemptId, findingId });
+              },
+            });
           }}
         >
           {cancelRemediation.isPending ? (
@@ -477,5 +483,10 @@ export function FindingRemediationPanel({
     </View>
   );
 
-  return <Body className="flex-1">{content}</Body>;
+  return (
+    <>
+      <Body className="flex-1">{content}</Body>
+      {dialog}
+    </>
+  );
 }

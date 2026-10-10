@@ -19,11 +19,7 @@ export const controlCancelReceiptSchema = z
 export type ControlCancelReceipt = z.infer<typeof controlCancelReceiptSchema>;
 
 type ControlCancelSession = {
-  interruptExecution: () => Promise<{
-    success: boolean;
-    message?: string;
-    unconfirmed?: boolean;
-  }>;
+  stop: () => Promise<{ interrupted: boolean }>;
 };
 
 type ControlSessionCancelDependencies = {
@@ -34,6 +30,12 @@ type ControlSessionCancelDependencies = {
   ) => Promise<T>;
 };
 
+/**
+ * Interrupts a control-plane session through the V2 Session DO. `stop()` is
+ * always called and reports whether it cancelled open work; a session with no
+ * accepted/queued message returns `undefined`, which the caller maps to the
+ * legacy "no session work to interrupt" outcome.
+ */
 export async function interruptControlSession(
   input: {
     env: Pick<Env, 'SANDBOX_SESSION'>;
@@ -49,9 +51,7 @@ export async function interruptControlSession(
     dependencies.retry ??
     (<T>(operation: (session: ControlCancelSession) => Promise<T>, operationName: string) =>
       withDORetry(stub, operation, operationName));
-  const result = await retry(session => session.interruptExecution(), 'interruptControlSession');
-  return controlCancelReceiptSchema.parse({
-    state: result.unconfirmed === true ? 'unconfirmed' : result.success ? 'confirmed' : 'rejected',
-    ...(result.message !== undefined ? { message: result.message } : {}),
-  });
+  const result = await retry(session => session.stop(), 'stop');
+  if (!result.interrupted) return undefined;
+  return controlCancelReceiptSchema.parse({ state: 'confirmed' });
 }

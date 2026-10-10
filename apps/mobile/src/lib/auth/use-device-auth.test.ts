@@ -356,6 +356,85 @@ describe('useDeviceAuth hook', () => {
     expect(resultRef.current?.resumed).toBe(false);
   });
 
+  it('clearError resets a terminal start error to idle so a retry starts clean', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('signin');
+    });
+
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.error).toBeTruthy();
+
+    act(() => {
+      resultRef.current?.clearError();
+    });
+
+    expect(resultRef.current?.status).toBe('idle');
+    expect(resultRef.current?.error).toBeUndefined();
+  });
+
+  it('clearError leaves a live pending flow untouched', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'LIVE', verificationUrl: 'https://live.example' })
+    );
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('signin');
+    });
+    expect(resultRef.current?.status).toBe('pending');
+
+    act(() => {
+      resultRef.current?.clearError();
+    });
+
+    expect(resultRef.current?.status).toBe('pending');
+    expect(resultRef.current?.code).toBe('LIVE');
+  });
+
+  it('clearError tears down the poll behind an open-browser error before resetting', async () => {
+    vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });
+    fetchMock.mockResolvedValue(
+      Response.json({ code: 'LIVE', verificationUrl: 'https://live.example' })
+    );
+    const pollCleanup = vi.fn<() => void>();
+    vi.mocked(startDeviceAuthPoll).mockReturnValue({
+      cleanup: pollCleanup,
+      pollNow: vi.fn<() => void>(),
+    });
+
+    const resultRef = await mountSettled();
+    const result = requireResult(resultRef);
+    await act(async () => {
+      await result.start('signin');
+    });
+    expect(resultRef.current?.status).toBe('pending');
+
+    // The pending screen's Open browser control fails: it sets an error state
+    // while the poll stays registered — an `error` that is not terminal.
+    vi.mocked(openBrowserAsync).mockRejectedValueOnce(new Error('browser failed'));
+    await act(async () => {
+      await requireResult(resultRef).openBrowser();
+    });
+    expect(resultRef.current?.status).toBe('error');
+    expect(resultRef.current?.code).toBe('LIVE');
+
+    act(() => {
+      resultRef.current?.clearError();
+    });
+
+    // Clearing the error must kill the still-live poll, not just drop its code.
+    expect(pollCleanup).toHaveBeenCalledTimes(1);
+    expect(resultRef.current?.status).toBe('idle');
+    expect(resultRef.current?.code).toBeUndefined();
+  });
+
   it('builds the SSO browser URL from start("sso", email) without the organization id', async () => {
     vi.mocked(openAuthSessionAsync).mockClear();
     vi.mocked(readPendingExternalAuth).mockResolvedValue({ kind: 'none' });

@@ -1,6 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cliSessions,
   sharedCliSessions,
@@ -30,8 +30,10 @@ jest.mock('@/lib/r2/cli-sessions', () => ({
   }),
 }));
 
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',

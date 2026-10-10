@@ -9,7 +9,7 @@
  *   pnpm script:run ai-attribution test-admin-attributions org-123 my-project src/index.ts main
  */
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 const AI_ATTRIBUTION_SERVICE_URL = 'https://ai-attribution.kiloapps.io';
 

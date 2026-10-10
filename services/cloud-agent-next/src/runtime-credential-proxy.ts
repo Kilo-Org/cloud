@@ -177,6 +177,18 @@ export async function verifyRuntimeCredentialProxyHandle(
   }
 }
 
+/**
+ * The grant id a handle was minted for, or null when the value is not a readable
+ * handle. Lets a caller tell whether a stored handle still belongs to the current
+ * allocation fence: the Session DO reuses a grant only while the fence matches,
+ * so a changed grant id means a changed fence (and a superseded handle).
+ */
+export function runtimeProxyHandleGrantId(handle: string): string | null {
+  const decoded = jwt.decode(handle);
+  const claims = sessionClaimsSchema.safeParse(decoded);
+  return claims.success ? claims.data.grantId : null;
+}
+
 export function matchesRuntimeProxyGrant(
   value: unknown,
   handle: RuntimeProxyHandleClaims,

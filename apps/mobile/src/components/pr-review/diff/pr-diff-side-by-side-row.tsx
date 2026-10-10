@@ -145,7 +145,7 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
         >
           {/* Untagged runs are raw strings inside this Text, so only the
               highlighter's tagged runs cost an Android span. */}
-          {highlightRunChildren(tokens, isDark)}
+          {highlightRunChildren(tokens, isDark ? 'onDark' : 'onLight')}
           {noNewlineLabel ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>

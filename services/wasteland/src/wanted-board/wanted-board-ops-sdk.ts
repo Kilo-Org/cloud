@@ -120,8 +120,6 @@ export async function loadSdkContext(
   };
 }
 
-// ── Public ops ──────────────────────────────────────────────────────────
-
 export async function browseWantedBoard(
   env: Env,
   wastelandId: string,

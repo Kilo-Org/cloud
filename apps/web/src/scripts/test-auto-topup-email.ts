@@ -1,4 +1,4 @@
-import { sendAutoTopUpFailedEmail } from '@/lib/email';
+import { sendAutoTopUpFailedEmail } from '@kilocode/web-shared/lib/email';
 
 async function main() {
   const email = process.argv[2];

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import {
   deleteRetainedSecurityAgentCommands,
   reconcileStaleSecurityAgentCommands,
+  type SecurityAgentCommand,
 } from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { discoverDueOwners, reconcileStaleAnalysisQueueRows } from './db/queries.js';
@@ -14,6 +15,40 @@ const DISPATCH_REMEDIATION_ATTEMPT_LIMIT = 100;
 const QUEUE_SEND_BATCH_LIMIT = 100;
 const DISPATCH_STAGE_SUCCEEDED_EVENT = 'security_auto_analysis.dispatcher_stage_succeeded';
 const DISPATCH_FAILED_EVENT = 'security_auto_analysis.dispatcher_failed';
+const COMMAND_STALLED_EVENT = 'security_auto_analysis.command_stalled';
+
+function logStalledCommands(reconciliation: {
+  staleAccepted: SecurityAgentCommand[];
+  staleRunning: SecurityAgentCommand[];
+}): void {
+  for (const [previousStatus, commands] of [
+    ['accepted', reconciliation.staleAccepted] as const,
+    ['running', reconciliation.staleRunning] as const,
+  ]) {
+    for (const command of commands) {
+      const timestamp =
+        previousStatus === 'running'
+          ? (command.started_at ?? command.accepted_at)
+          : command.accepted_at;
+      const parsed = timestamp ? Date.parse(timestamp) : Number.NaN;
+      logger
+        .withTags({
+          event_name: COMMAND_STALLED_EVENT,
+          command_id: command.id,
+          command_type: command.command_type,
+          owner_type: command.owned_by_organization_id ? 'org' : 'user',
+          owner_id: command.owned_by_organization_id ?? command.owned_by_user_id ?? undefined,
+          previous_status: previousStatus,
+          result_code: command.result_code ?? null,
+          started_at: command.started_at ?? null,
+          accepted_at: command.accepted_at ?? null,
+          age_ms: Number.isFinite(parsed) ? Date.now() - parsed : null,
+          repo_full_name: command.repo_full_name ?? null,
+        })
+        .info(COMMAND_STALLED_EVENT);
+    }
+  }
+}
 
 async function runDispatcherStage<T>(options: {
   stage: DispatcherStage;
@@ -99,6 +134,8 @@ export async function dispatchDueOwners(
       stale_running_command_count: commandReconciliation.staleRunning.length,
     }),
   });
+
+  logStalledCommands(commandReconciliation);
 
   const deletedCommandCount = await runDispatcherStage({
     stage: 'retained_command_deletion',

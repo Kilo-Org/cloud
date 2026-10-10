@@ -1,11 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  formatDollars,
-  formatIsoDateString_UsaDateOnlyFormat,
-  fromMicrodollars,
-} from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { subDays } from 'date-fns';
 import { Clock, ChevronRight } from 'lucide-react';
 import { CardLinkFooter } from '@/components/ui/card.client';

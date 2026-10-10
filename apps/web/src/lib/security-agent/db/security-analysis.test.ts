@@ -7,7 +7,7 @@ const mockWhere: jest.Mock = jest.fn(() => ({ returning: mockReturning }));
 const mockSet: jest.Mock = jest.fn(() => ({ where: mockWhere }));
 const mockUpdate: jest.Mock = jest.fn(() => ({ set: mockSet }));
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     update: mockUpdate,
   },

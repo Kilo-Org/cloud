@@ -9,6 +9,7 @@ import {
   parseSkillFrontmatter,
   removeCommand,
   replaceCommand,
+  validateProfileDescription,
   validateProfileName,
   validateSkillInput,
 } from '@/lib/agent-profile-forms';
@@ -27,6 +28,24 @@ describe('validateProfileName', () => {
   it('reports a name longer than 100 characters', () => {
     expect(validateProfileName('a'.repeat(100))).toBeNull();
     expect(validateProfileName('a'.repeat(101))).toBe('too-long');
+  });
+});
+
+describe('validateProfileDescription', () => {
+  it('accepts a trimmed description within the 500 bound', () => {
+    expect(validateProfileDescription('Reviews a diff')).toBeNull();
+    expect(validateProfileDescription('  padded  ')).toBeNull();
+    expect(validateProfileDescription('')).toBeNull();
+    expect(validateProfileDescription('a'.repeat(500))).toBeNull();
+  });
+
+  it('reports a description longer than 500 characters', () => {
+    expect(validateProfileDescription('a'.repeat(501))).toBe('too-long');
+  });
+
+  it('measures the trimmed length, not the raw length', () => {
+    expect(validateProfileDescription(`  ${'a'.repeat(500)}  `)).toBeNull();
+    expect(validateProfileDescription(`  ${'a'.repeat(501)}  `)).toBe('too-long');
   });
 });
 

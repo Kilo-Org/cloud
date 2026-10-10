@@ -1,0 +1,224 @@
+import { describe, expect, it } from '@jest/globals';
+import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
+import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import type { EffectiveOrganizationModelPolicy } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import {
+  candidateModelIdsFromSources,
+  collectDataCollectionRequiredAutoRoutingModelIds,
+  collectDeniedAutoRoutingModelIds,
+  deniedModelIdsForCandidates,
+  policyNeedsCandidateEvaluation,
+} from './auto-routing-denied-models';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
+  getAutoRoutingSettings: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
+  getCachedRoutingTable: jest.fn(),
+}));
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getDataCollectionRequiredModelIds: jest.fn(),
+  })
+);
+
+function policy(
+  overrides: Partial<EffectiveOrganizationModelPolicy> = {}
+): EffectiveOrganizationModelPolicy {
+  return {
+    requireModelInCurrentSnapshot: false,
+    organizationModelDenyList: [],
+    memberGrant: { mode: 'unrestricted' },
+    policyRevision: 1,
+    ...overrides,
+  };
+}
+
+const owner = { userId: 'user-1', organizationId: 'org-1' };
+
+describe('policyNeedsCandidateEvaluation', () => {
+  it('is false for an unrestricted policy with an inactive baseline deny list', () => {
+    expect(
+      policyNeedsCandidateEvaluation(policy({ organizationModelDenyList: ['openai/gpt-4o'] }))
+    ).toBe(false);
+  });
+
+  it('is true when a provider ceiling is set', () => {
+    expect(
+      policyNeedsCandidateEvaluation(policy({ organizationProviderCeiling: ['anthropic'] }))
+    ).toBe(true);
+  });
+
+  it('is true for a selected member grant', () => {
+    expect(
+      policyNeedsCandidateEvaluation(
+        policy({
+          memberGrant: {
+            mode: 'selected',
+            includeOrganizationBaseline: false,
+            modelAllowList: ['anthropic/claude'],
+            providerAllowList: [],
+          },
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('is true for an organization baseline grant', () => {
+    expect(
+      policyNeedsCandidateEvaluation(policy({ memberGrant: { mode: 'organization_baseline' } }))
+    ).toBe(true);
+  });
+
+  it('is true when the current snapshot is required', () => {
+    expect(policyNeedsCandidateEvaluation(policy({ requireModelInCurrentSnapshot: true }))).toBe(
+      true
+    );
+  });
+});
+
+describe('collectDeniedAutoRoutingModelIds', () => {
+  it('returns no denials without loading when the policy cannot deny anything', async () => {
+    await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
+  });
+});
+
+describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
+  it('returns routing candidates that cannot be served without data collection', async () => {
+    jest.mocked(getAutoRoutingSettings).mockResolvedValue({ status: 404, body: {} } as never);
+    jest.mocked(getCachedRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'meta/muse-spark-1.3-contributor' },
+          { model: 'meta/muse-spark-1.3' },
+          { model: 'stepfun/step-5-preview-free' },
+          { model: 'kilo-auto/balanced' },
+        ],
+      },
+    } as never);
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
+
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds(owner)).resolves.toEqual([
+      'meta/muse-spark-1.3-contributor',
+      'stepfun/step-5-preview-free',
+    ]);
+  });
+});
+
+describe('deniedModelIdsForCandidates', () => {
+  it('does not apply the organization deny list to an unrestricted grant', () => {
+    expect(
+      deniedModelIdsForCandidates(
+        policy({ organizationModelDenyList: ['openai/gpt-4o:free'] }),
+        ['anthropic/claude'],
+        () => true
+      )
+    ).toEqual([]);
+  });
+
+  it('adds models that fail the effective access policy', () => {
+    expect(
+      deniedModelIdsForCandidates(
+        policy({
+          organizationProviderCeiling: ['anthropic'],
+          organizationModelDenyList: ['openai/o3'],
+          memberGrant: { mode: 'organization_baseline' },
+        }),
+        ['anthropic/claude', 'google/gemini-2.5-flash', 'kilo-auto/efficient'],
+        modelId => modelId !== 'google/gemini-2.5-flash'
+      )
+    ).toEqual(['openai/o3', 'google/gemini-2.5-flash']);
+  });
+
+  it('keeps the exact denied candidate id, including suffixes', () => {
+    expect(
+      deniedModelIdsForCandidates(
+        policy({ organizationProviderCeiling: ['example'] }),
+        ['example/model', 'example/model:suffix'],
+        modelId => modelId !== 'example/model:suffix'
+      )
+    ).toEqual(['example/model:suffix']);
+  });
+
+  it('expands a normalized deny-list entry to matching suffixed candidates', () => {
+    expect(
+      deniedModelIdsForCandidates(
+        policy({
+          organizationModelDenyList: ['example/model'],
+          memberGrant: { mode: 'organization_baseline' },
+        }),
+        ['anthropic/claude', 'example/model:suffix'],
+        () => true
+      )
+    ).toEqual(['example/model', 'example/model:suffix']);
+  });
+
+  it('denies a custom-pool-only model excluded by a selected member grant', () => {
+    expect(
+      deniedModelIdsForCandidates(
+        policy({
+          memberGrant: {
+            mode: 'selected',
+            includeOrganizationBaseline: false,
+            modelAllowList: ['anthropic/claude'],
+            providerAllowList: [],
+          },
+        }),
+        ['pool/only-model', 'anthropic/claude'],
+        modelId => modelId === 'anthropic/claude'
+      )
+    ).toEqual(['pool/only-model']);
+  });
+});
+
+describe('candidateModelIdsFromSources', () => {
+  it('uses the custom pool instead of the platform table when a pool is configured', () => {
+    const ids = candidateModelIdsFromSources(
+      {
+        routes: {
+          'implementation/code_generation': [{ model: 'google/gemini-2.5-flash' }],
+        },
+      },
+      ['pool/only-model']
+    );
+    expect(ids).toEqual(expect.arrayContaining(['pool/only-model', MINIMAX_CURRENT_MODEL_ID]));
+    expect(ids).not.toContain('google/gemini-2.5-flash');
+  });
+
+  it('includes routing-table models plus coding-plan default ids', () => {
+    expect(
+      candidateModelIdsFromSources(
+        {
+          routes: {
+            'implementation/code_generation': [
+              { model: 'google/gemini-2.5-flash' },
+              { model: 'kilo-auto/balanced' },
+            ],
+          },
+        },
+        null
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        'google/gemini-2.5-flash',
+        MINIMAX_CURRENT_MODEL_ID,
+        'byteplus-coding/bytedance-seed-code',
+      ])
+    );
+    const ids = candidateModelIdsFromSources(
+      {
+        routes: {
+          'implementation/code_generation': [{ model: 'kilo-auto/balanced' }],
+        },
+      },
+      null
+    );
+    expect(ids).not.toContain('kilo-auto/balanced');
+    expect(ids).not.toContain('moonshotai/kimi-k3');
+  });
+});

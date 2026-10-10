@@ -316,7 +316,14 @@ async function legacy(
   options: LegacyOptions
 ): Promise<DirectIngestResponse> {
   try {
-    if (!(await stageAndEnqueue(request.env, legacyQueueParams(request, r2Key), body))) {
+    if (
+      !(await stageAndEnqueue(
+        request.env,
+        legacyQueueParams(request, r2Key),
+        body,
+        declaredBodyBytes(request)
+      ))
+    ) {
       return { status: 404, body: { success: false, error: 'session_not_found' } };
     }
   } catch (error) {
@@ -548,6 +555,17 @@ function parseContentLength(value: string | undefined): number | 'missing' | 'in
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed)) return 'invalid';
   return parsed === 0 ? 'empty' : parsed;
+}
+
+/**
+ * The length `toRpcBody` may treat as measured. `missing` and `invalid` leave the
+ * body unmeasured, so it stays a stream rather than counting against the RPC
+ * payload limit; `empty` is a measured zero.
+ */
+function declaredBodyBytes(request: DirectIngestRequest): number | undefined {
+  const parsed = parseContentLength(request.contentLength);
+  if (parsed === 'missing' || parsed === 'invalid') return undefined;
+  return parsed === 'empty' ? 0 : parsed;
 }
 
 function legacyQueueParams(request: DirectIngestRequest, r2Key: string) {

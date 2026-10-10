@@ -5,8 +5,8 @@
  * plus the user and org scope. We generate records with enough variety across
  * those dimensions that every breakdown chart has multiple slices.
  */
-import { FEATURE_VALUES } from '@/lib/feature-detection';
-import { GatewayApiKindSchema } from '@kilocode/db';
+import { FEATURE_VALUES } from '@kilocode/web-shared/lib/feature-detection';
+import { GatewayApiKindSchema } from '@kilocode/usage-contracts';
 
 export type ModelSpec = {
   id: string;

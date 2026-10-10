@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { APP_URL } from '@/lib/constants';
-import { getUserFromAuth } from '@/lib/user/server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { consumeGitHubConnectionOAuthState } from '@/lib/integrations/github/connection-state';
 import {
   completeGitHubConnectionAttempt,
@@ -12,10 +12,10 @@ import {
   discoverAuthorizedGitHubInstallations,
   verifyGitHubInstallationAuthorization,
 } from '@/lib/integrations/github/installation-authorization';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_connection_attempts } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import type { User } from '@kilocode/db/schema';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';

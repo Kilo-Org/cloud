@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
-import { DISCORD_BOT_TOKEN } from '@/lib/config.server';
-import { CRON_SECRET } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
-import { db, sql } from '@/lib/drizzle';
+import { DISCORD_BOT_TOKEN } from '@kilocode/web-shared/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { discord_gateway_listener } from '@kilocode/db';
 

@@ -24,6 +24,7 @@ import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys
 import {
   _setGlanceableSinksLoaderForTests,
   applyGlanceablePushData,
+  runGlanceableBackgroundRefresh,
   setupNotificationBackgroundHandler,
 } from './notifications';
 
@@ -55,6 +56,7 @@ const mocks = vi.hoisted(() => ({
   registerActivityToken: vi.fn(),
   unregisterActivityToken: vi.fn(),
   refreshActiveSessionsFromPush: vi.fn(),
+  activeSessionsList: vi.fn(),
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
@@ -62,6 +64,8 @@ const mocks = vi.hoisted(() => ({
   dismissNotificationAsync: vi.fn(),
   runNeedsInputInteraction: vi.fn(),
   requireOptionalNativeModule: vi.fn(),
+  whenLanguagePreferenceLoaded: vi.fn(),
+  languageResolved: 'en' as string,
 }));
 
 vi.mock('react-native', () => ({
@@ -120,6 +124,16 @@ vi.mock('expo-constants', () => ({
   default: { expoConfig: { extra: { eas: { projectId: 'proj-1' } } } },
 }));
 
+// The headless start applies the stored language before it writes channels
+// (`applyStoredLanguage`). Its real preference store pulls the RN / Sonner
+// toast graph the pure project does not mount, so the resolved language is
+// stubbed; `runBackgroundNotificationTask` then exercises the real
+// `i18n.changeLanguage` for whatever this returns.
+vi.mock('@/lib/hooks/use-language-preference', () => ({
+  whenLanguagePreferenceLoaded: mocks.whenLanguagePreferenceLoaded,
+  getResolvedLanguage: () => mocks.languageResolved,
+}));
+
 vi.mock('expo-secure-store', () => ({
   getItemAsync: mocks.getItemAsync,
   setItemAsync: mocks.setItemAsync,
@@ -168,6 +182,7 @@ vi.mock('@/lib/trpc', () => ({
       registerActivityToken: { mutate: mocks.registerActivityToken },
       unregisterActivityToken: { mutate: mocks.unregisterActivityToken },
     },
+    activeSessions: { list: { query: mocks.activeSessionsList } },
   },
 }));
 vi.mock('@/lib/query-client', () => ({ queryClient: {} }));
@@ -242,6 +257,8 @@ beforeEach(() => {
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.getExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token' });
   mocks.requireOptionalNativeModule.mockReturnValue({ isAgentProgressAllowed: () => true });
+  mocks.whenLanguagePreferenceLoaded.mockResolvedValue(undefined);
+  mocks.languageResolved = 'en';
   mocks.lastResponse = null;
   mocks.listeners.clear();
   mocks.clearLastNotificationResponse.mockImplementation(() => {
@@ -801,7 +818,9 @@ function glanceableSnapshot(
     running: 1,
     needsInput: 0,
     idle: 0,
+    scheduled: 0,
     needsInputSince: '2026-01-01T00:00:00.000Z',
+    scheduledAt: null,
     newestResultKind: 'running',
     newestResultAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -837,6 +856,9 @@ function makeFakeSink() {
     startOrUpdate: vi.fn((snapshot: GlanceableAgentsSnapshot, context: GlanceableSinkContext) => {
       surface.activity = snapshot;
       surface.context = context;
+    }),
+    waitForNativeStart: vi.fn(async () => {
+      await Promise.resolve();
     }),
   };
 }
@@ -1006,13 +1028,15 @@ describe('glanceable app badge sink', () => {
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
-        request: { content: { data: unknown } };
+        request: { content: { data: unknown; title?: string | null; body?: string | null } };
       }) => Promise<{ shouldSetBadge: boolean }>;
     };
 
     const ordinary = await registration.handleNotification({
       request: {
         content: {
+          title: 'Kilo',
+          body: 'A message arrived',
           data: {
             type: 'chat.message',
             sandboxId: 'sandbox-1',
@@ -1074,7 +1098,7 @@ describe('glanceable app badge sink', () => {
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
-        request: { content: { data: unknown } };
+        request: { content: { data: unknown; title?: string | null; body?: string | null } };
       }) => Promise<{ shouldSetBadge: boolean }>;
     };
 
@@ -1099,6 +1123,8 @@ describe('glanceable app badge sink', () => {
     await registration.handleNotification({
       request: {
         content: {
+          title: 'Kilo',
+          body: 'A message arrived',
           data: {
             type: 'chat.message',
             sandboxId: 'sandbox-1',
@@ -1140,7 +1166,9 @@ describe('glanceable app badge sink', () => {
 
 // The registered foreground handler, as `setupNotificationHandler` passes it to
 // expo-notifications.
-type ForegroundHandler = (notification: { request: { content: { data: unknown } } }) => Promise<{
+type ForegroundHandler = (notification: {
+  request: { content: { data: unknown; title?: string | null; body?: string | null } };
+}) => Promise<{
   shouldPlaySound: boolean;
   shouldSetBadge: boolean;
   shouldShowBanner: boolean;
@@ -1200,7 +1228,15 @@ describe('per-Focus agent-progress suppression', () => {
     const handleNotification = await loadForegroundHandler();
 
     await expect(
-      handleNotification({ request: { content: { data: progressPush } } })
+      handleNotification({
+        request: {
+          content: {
+            title: 'Agent progress',
+            body: 'Session session-1 is running',
+            data: progressPush,
+          },
+        },
+      })
     ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 
@@ -1210,7 +1246,15 @@ describe('per-Focus agent-progress suppression', () => {
     const handleNotification = await loadForegroundHandler();
 
     await expect(
-      handleNotification({ request: { content: { data: needsInputPush } } })
+      handleNotification({
+        request: {
+          content: {
+            title: 'Needs input',
+            body: 'Session session-1 needs you',
+            data: needsInputPush,
+          },
+        },
+      })
     ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 
@@ -1220,7 +1264,15 @@ describe('per-Focus agent-progress suppression', () => {
     const handleNotification = await loadForegroundHandler();
 
     await expect(
-      handleNotification({ request: { content: { data: progressPush } } })
+      handleNotification({
+        request: {
+          content: {
+            title: 'Agent progress',
+            body: 'Session session-1 is running',
+            data: progressPush,
+          },
+        },
+      })
     ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 
@@ -1247,6 +1299,64 @@ describe('per-Focus agent-progress suppression', () => {
 
     expect(behavior.shouldSetBadge).toBe(true);
     expect(mocks.refreshActiveSessionsFromPush).toHaveBeenCalledOnce();
+  });
+});
+
+describe('contentless notification suppression', () => {
+  it.each(['android', 'ios'] as const)(
+    'suppresses a delivered push with neither a title nor a body on %s',
+    async platform => {
+      mocks.platform.OS = platform;
+      const handleNotification = await loadForegroundHandler();
+
+      await expect(handleNotification({ request: { content: { data: null } } })).resolves.toEqual(
+        SUPPRESSED_BEHAVIOR
+      );
+    }
+  );
+
+  it('suppresses a bodyless push whose title is empty', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { title: '', body: '', data: null } } })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+
+  it.each([
+    ['both fields whitespace-only', { title: '   ', body: '\n\t ' }],
+    ['a whitespace-only title with no body', { title: '  ' }],
+    ['a whitespace-only body with no title', { body: '\t\n' }],
+  ])('suppresses a push whose %s', async (_name, content) => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { ...content, data: null } } })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+
+  it('still shows a push whose title has visible content around whitespace', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { title: '  Kilo  ', body: '  ', data: null } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('still shows a push that carries only a title', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { title: 'Kilo', data: null } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('still shows a push that carries only a body', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { body: 'Session is running', data: null } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 });
 
@@ -1769,6 +1879,90 @@ describe('setupNotificationBackgroundHandler', () => {
     expect(await applying).toBe(0);
   });
 
+  it('keeps the background task alive until the sink submits the card', async () => {
+    // A headless task resolves when the executor returns and its process is torn
+    // down shortly after, so a fire-and-forget sink submission could lose the
+    // ongoing card. The executor must await each sink's native submission.
+    const persisted = glanceableSnapshot({
+      scopeKey: SCOPE_KEY,
+      revision: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    secureStore.set('glanceable-snapshot', JSON.stringify(persisted));
+    secureStore.set('glanceable-scope-key', SCOPE_KEY);
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const submission = deferred();
+    const sink = makeFakeSink();
+    sink.waitForNativeStart.mockImplementation(async () => {
+      await submission.promise;
+    });
+    registerGlanceableSink(sink);
+
+    setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    let completed = false;
+    const applying = (async () => {
+      const result = await executor({
+        data: {
+          notification: null,
+          data: {
+            dataString: JSON.stringify(
+              activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-02T00:00:00.000Z' })
+            ),
+          },
+        },
+        error: null,
+        executionInfo: {
+          eventId: 'e-submit',
+          taskName: 'active-agents-glanceable-background-task',
+        },
+      });
+      completed = true;
+      return result;
+    })();
+    await flushMicrotasks();
+
+    expect(sink.startOrUpdate).toHaveBeenCalledTimes(1);
+    expect(completed).toBe(false);
+
+    submission.resolve();
+    expect(await applying).toBe(0);
+    unregisterGlanceableSink(sink);
+  });
+
+  it('rejects the background task when a sink submission fails so the OS retries', async () => {
+    const persisted = glanceableSnapshot({
+      scopeKey: SCOPE_KEY,
+      revision: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+    secureStore.set('glanceable-snapshot', JSON.stringify(persisted));
+    secureStore.set('glanceable-scope-key', SCOPE_KEY);
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    sink.waitForNativeStart.mockRejectedValue(new Error('native start failed'));
+    registerGlanceableSink(sink);
+
+    setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    await expect(
+      executor({
+        data: {
+          notification: null,
+          data: {
+            dataString: JSON.stringify(
+              activeGlanceablePush({ scopeKey: SCOPE_KEY, updatedAt: '2026-01-03T00:00:00.000Z' })
+            ),
+          },
+        },
+        error: null,
+        executionInfo: { eventId: 'e-fail', taskName: 'active-agents-glanceable-background-task' },
+      })
+    ).rejects.toThrow('native start failed');
+
+    unregisterGlanceableSink(sink);
+  });
+
   it('ignores a headless payload that is not a glanceable push', async () => {
     _setGlanceableSinksLoaderForTests(() => undefined);
 
@@ -1866,6 +2060,156 @@ describe('setupNotificationBackgroundHandler', () => {
   });
 });
 
+describe('runBackgroundNotificationTask', () => {
+  it('creates the Android channels before it dispatches a headless payload', async () => {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+
+    const result = await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+      },
+      error: null,
+      executionInfo: {
+        eventId: 'e-channels',
+        taskName: 'active-agents-glanceable-background-task',
+      },
+    });
+
+    // A headless start never evaluates the root layout, so the entry executor
+    // must create the channels the server routes pushes to before it runs
+    // anything else: Android drops a notification addressed to a channel the
+    // app never created, and FirebaseMessaging logs the miss on every message.
+    expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toContain(
+      'agent-progress'
+    );
+    // A non-glanceable payload still reports NoData.
+    expect(result).toBe(1);
+  });
+
+  it('creates the Android channels in the stored language on a headless start', async () => {
+    // A killed process starts on the bundled English catalog, and the headless
+    // start applies the stored language before it writes channel names. Without
+    // that step the create pass would rewrite the translated names a foreground
+    // start installed back to English until the app is next opened.
+    mocks.languageResolved = 'de';
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+
+    await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+      },
+      error: null,
+      executionInfo: {
+        eventId: 'e-language',
+        taskName: 'active-agents-glanceable-background-task',
+      },
+    });
+
+    const optionsFor = (id: string): Record<string, unknown> | undefined =>
+      mocks.setNotificationChannelAsync.mock.calls.find(call => call[0] === id)?.[1];
+    expect(optionsFor('agent-progress')).toMatchObject({ name: 'Agentenfortschritt' });
+    expect(optionsFor('needs-input')).toMatchObject({ name: 'Eingabe erforderlich' });
+  });
+
+  it('reads a granted notification permission before the sinks see a headless push', async () => {
+    // A headless start never runs the root layout's permission gate. Without
+    // this read, a granted install would keep its Live Activity unstarted.
+    mocks.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    const { getNotificationPermissionGranted } = await import('./glanceable/live-activity-switch');
+    expect(getNotificationPermissionGranted()).toBe(false);
+
+    await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+      },
+      error: null,
+      executionInfo: {
+        eventId: 'e-permission',
+        taskName: 'active-agents-glanceable-background-task',
+      },
+    });
+
+    expect(getNotificationPermissionGranted()).toBe(true);
+  });
+});
+
+describe('runGlanceableBackgroundRefresh', () => {
+  const SUCCESS = 1;
+  const FAILED = 2;
+
+  it('publishes the tray it reads to every sink for the stored scope', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockResolvedValue({
+      sessions: [
+        { id: 'ses_ask', status: 'question' },
+        { id: 'ses_run', status: 'busy' },
+      ],
+    });
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(SUCCESS);
+    expect(mocks.activeSessionsList).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org-9', includeCloudAgentSessions: true })
+    );
+    expect(sink.surface.activity).toMatchObject({ needsInput: 1 });
+    expect(sink.surface.context).toEqual({ userId: 'u1', organizationId: 'org-9' });
+    unregisterGlanceableSink(sink);
+  });
+
+  it('reads nothing and writes nothing while signed out', async () => {
+    mocks.getItemAsync.mockImplementation(() => null);
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(SUCCESS);
+    expect(mocks.activeSessionsList).not.toHaveBeenCalled();
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+    unregisterGlanceableSink(sink);
+  });
+
+  it('keeps the last snapshot and reports a failed run when the tray read fails', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockRejectedValue(new Error('offline'));
+
+    const result = await runGlanceableBackgroundRefresh();
+
+    expect(result).toBe(FAILED);
+    expect(sink.publish).not.toHaveBeenCalled();
+    expect(sink.startOrUpdate).not.toHaveBeenCalled();
+    unregisterGlanceableSink(sink);
+  });
+
+  it('reports a failed run when the native surface rejects the write', async () => {
+    mockSecureStoreKeys();
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const sink = makeFakeSink();
+    sink.waitForNativeStart.mockRejectedValue(new Error('native start failed'));
+    registerGlanceableSink(sink);
+    mocks.activeSessionsList.mockResolvedValue({ sessions: [{ id: 'ses_run', status: 'busy' }] });
+
+    expect(await runGlanceableBackgroundRefresh()).toBe(FAILED);
+    unregisterGlanceableSink(sink);
+  });
+});
+
 describe('foreground attention-push suppression', () => {
   async function loadHandler() {
     const loaded = await loadNotifications();
@@ -1875,7 +2219,10 @@ describe('foreground attention-push suppression', () => {
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
-        request: { identifier?: string; content: { data: unknown } };
+        request: {
+          identifier?: string;
+          content: { data: unknown; title?: string | null; body?: string | null };
+        };
       }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
     };
     return { loaded, needsInput, registration };
@@ -1926,7 +2273,7 @@ describe('foreground attention-push suppression', () => {
     const behavior = await registration.handleNotification({
       request: {
         identifier: needsInput.notificationIdentifierForSession('ses_1'),
-        content: { data: attentionPush },
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
     expect(behavior.shouldShowBanner).toBe(true);
@@ -1941,7 +2288,7 @@ describe('foreground attention-push suppression', () => {
     const behavior = await registration.handleNotification({
       request: {
         identifier: 'needs-input:ses_1',
-        content: { data: attentionPush },
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
     expect(behavior.shouldShowBanner).toBe(true);
@@ -1951,7 +2298,9 @@ describe('foreground attention-push suppression', () => {
     const { registration } = await loadHandler();
 
     const behavior = await registration.handleNotification({
-      request: { content: { data: attentionPush } },
+      request: {
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
     });
     expect(behavior.shouldShowBanner).toBe(true);
   });
@@ -1967,7 +2316,9 @@ describe('foreground attention-push suppression', () => {
     needsInput.clearPostedNeedsInputNotification('ses_1');
 
     const behavior = await registration.handleNotification({
-      request: { content: { data: attentionPush } },
+      request: {
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
     });
     expect(behavior.shouldShowBanner).toBe(true);
   });
@@ -1983,6 +2334,8 @@ describe('foreground attention-push suppression', () => {
     const progress = await registration.handleNotification({
       request: {
         content: {
+          title: 'Agent progress',
+          body: 'Session ses_1 is running',
           data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
         },
       },
@@ -2385,6 +2738,8 @@ describe('cold iOS background delivery', () => {
       needsApproval: 0,
       idle: 0,
       needsInputSince: null,
+      scheduled: 0,
+      scheduledAt: null,
       // No ask is recorded for this cold push, so the app-built state says so
       // explicitly; the layout gates Approve on this flag.
       canApprove: false,

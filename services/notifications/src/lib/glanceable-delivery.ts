@@ -8,10 +8,12 @@
  */
 
 import {
+  isEligibleGlanceableWork,
+  isStartableGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
   type GlanceableLiveActivityContentState,
   type PushData,
-  agentNotificationKindForGlanceableSnapshot,
-  androidChannelIdForAgentKind,
   translatePush,
 } from '@kilocode/notifications';
 
@@ -56,9 +58,10 @@ export type ExpoPushToken = { token: string; locale: string | null };
  * other activity row is an abandoned card: it gets `end` and its row is retired
  * once that end is confirmed, so two rows can never leave two stacked cards.
  *
- * `startable` is the narrower rule the iOS sink starts on: an agent working or
- * waiting on the user. Idle work keeps a card alive but must never raise one,
- * or a push-to-start resurrects the card the sink just retired for idleness.
+ * `startable` is the narrower rule the iOS sink starts on: an agent working,
+ * waiting on the user, or scheduled to wake. Idle work keeps a card alive but
+ * must never raise one, or a push-to-start resurrects the card the sink just
+ * retired for idleness.
  */
 export function apnsSendsForTokens(
   tokens: readonly IosActivityToken[],
@@ -92,6 +95,8 @@ export function toGlanceableContentState(
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
+    scheduled: snapshot.scheduled,
+    scheduledAt: snapshot.scheduledAt,
   };
   return {
     name: ACTIVE_AGENTS_LIVE_ACTIVITY_NAME,
@@ -104,17 +109,19 @@ export function buildGlanceableExpoMessages(
   snapshot: ActiveAgentsGlanceable,
   priority: 'default' | 'high'
 ): ExpoPushMessage[] {
-  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
   return tokens.map(
     ({ token }) =>
       ({
         to: token,
         data: snapshot,
-        // Data-only wake: `_contentAvailable` makes the OS deliver the message to
-        // the background task while the app is backgrounded/killed, and omitting
-        // title/body keeps it from becoming a visible FCM notification that skips
-        // the task. The ongoing notification and widget content come from the local
-        // `applyGlanceablePushData` path, so the push never rings or interrupts.
+        // Strictly data-only wake: `_contentAvailable` makes the OS deliver the
+        // message to the background task while the app is backgrounded/killed,
+        // and omitting title/body keeps it from becoming a visible FCM
+        // notification that skips the task. The ongoing notification and widget
+        // content come from the local `applyGlanceablePushData` path, so the push
+        // never rings or interrupts. A `channelId`/`tag` would let Expo/FCM
+        // surface a bare app-name "Kilo" row when a remote prompt starts a
+        // session, so this wake must not carry any presentation field.
         _contentAvailable: true,
         sound: null,
         // FCM defers normal-priority data messages while Android is
@@ -123,13 +130,11 @@ export function buildGlanceableExpoMessages(
         // iOS stays `default`: APNs background `content-available` pushes use
         // priority 5, and Live Activity freshness rides the direct APNs path.
         priority,
-        // The wake names the kind's channel because the ongoing card is posted
-        // locally on that same channel; the legacy `active-agents` id is deleted
-        // on startup and no client creates it, so posting to it would be dropped.
-        channelId: androidChannelIdForAgentKind(kind),
         // Android collapse key = the opaque scope key, so every aggregate update
-        // for one user+org collapses into the same ongoing notification.
-        tag: snapshot.scopeKey,
+        // for one user+org collapses into the same data message. `collapseId` is
+        // the FCM data-message collapse field; it does not create a notification
+        // and replaces the presentation `tag` this wake used to carry.
+        collapseId: snapshot.scopeKey,
       }) satisfies ExpoPushMessage
   );
 }
@@ -197,12 +202,8 @@ export async function deliverGlanceableSnapshot(
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
-  const iosSends = apnsSendsForTokens(
-    iosTokens,
-    eligible,
-    snapshot.running + snapshot.needsInput > 0
-  );
+  const eligible = isEligibleGlanceableWork(snapshot);
+  const iosSends = apnsSendsForTokens(iosTokens, eligible, isStartableGlanceableWork(snapshot));
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,

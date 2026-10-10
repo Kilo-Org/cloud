@@ -1,10 +1,10 @@
 import 'server-only';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Deployment } from '@kilocode/db/schema';
 import { deployment_env_vars, deployments } from '@kilocode/db/schema';
 import { sql, eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { encryptWithPublicKey } from '@/lib/encryption';
+import { encryptWithPublicKey } from '@kilocode/web-shared/lib/encryption';
 import {
   type PlaintextEnvVar,
   type EncryptedEnvVar,
@@ -12,7 +12,7 @@ import {
   markAsEncrypted,
 } from '@/lib/user-deployments/env-vars-validation';
 import type { Owner } from '@/lib/user-deployments/router-types';
-import { USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY } from '@/lib/config.server';
+import { USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Encrypts plaintext env vars, producing encrypted env vars.

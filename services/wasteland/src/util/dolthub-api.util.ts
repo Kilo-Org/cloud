@@ -141,8 +141,6 @@ async function doltFetch(
   return { status: res.status, data };
 }
 
-// ── List PRs ──────────────────────────────────────────────────────────
-
 export const DoltHubPull = z
   .object({
     pull_id: z.union([z.string(), z.number()]).transform(v => String(v)),
@@ -180,8 +178,6 @@ export async function listPulls(
   const want = opts.state.toLowerCase();
   return parsed.data.pulls.filter(p => p.state.toLowerCase() === want);
 }
-
-// ── PR detail ──────────────────────────────────────────────────────────
 
 // DoltHub's REST API returns PR detail with inconsistent field names —
 // the older `from_branch` / `from_branch_owner` / `from_branch_database`
@@ -237,7 +233,6 @@ export async function getPull(
     throw new DoltHubApiError(`Get pull ${pullId} failed (${status})`, status);
   }
   const raw = DoltHubPullDetailRaw.parse(data);
-  // Normalize the two shapes DoltHub returns into one stable output.
   return {
     pull_id: raw.pull_id,
     title: raw.title,
@@ -252,8 +247,6 @@ export async function getPull(
     updated_at: raw.updated_at ?? null,
   };
 }
-
-// ── Create PR ──────────────────────────────────────────────────────────
 
 const CreatePullResponse = z
   .object({
@@ -312,8 +305,6 @@ export async function createPull(
   }
   return { pullId: parsed.data.pull_id };
 }
-
-// ── Merge PR ───────────────────────────────────────────────────────────
 
 const MergeResponse = z
   .object({
@@ -413,8 +404,6 @@ export async function waitForMergeCompletion(
   throw new DoltHubApiError(`Timed out waiting for merge ${pullId} after ${timeoutMs}ms`, 504);
 }
 
-// ── Close PR (no merge) ────────────────────────────────────────────────
-
 export async function closePull(
   upstream: string,
   token: string,
@@ -436,8 +425,6 @@ export async function closePull(
   const parsed = MergeResponse.safeParse(data);
   return { state: parsed.success && parsed.data.state ? parsed.data.state : 'closed' };
 }
-
-// ── Comment on PR ──────────────────────────────────────────────────────
 
 const CommentResponse = z
   .object({
@@ -474,8 +461,6 @@ export async function commentOnPull(
   }
   CommentResponse.safeParse(data);
 }
-
-// ── SQL query (for admin verification & rig trust-level writes) ─────────
 
 const SqlResponse = z
   .object({
@@ -531,8 +516,6 @@ export async function runWrite(
   return SqlResponse.parse(data);
 }
 
-// ── Branch-name ↔ item mapping ─────────────────────────────────────────
-
 /**
  * `wl` creates one PR per contribution with branch name `wl/{rig-handle}/{item-id}`.
  * Parse the branch name back out to associate a PR with a wanted item.
@@ -543,8 +526,6 @@ export function parseWlBranch(branch: string | null): { rigHandle: string; itemI
   if (!match) return null;
   return { rigHandle: match[1], itemId: match[2] };
 }
-
-// ── Branch management ──────────────────────────────────────────────────
 
 /**
  * Delete a branch on the upstream. Used to clean up scratch branches
@@ -560,8 +541,6 @@ export async function deleteBranch(upstream: string, token: string, branch: stri
     // best-effort
   }
 }
-
-// ── Concurrency helper ─────────────────────────────────────────────────
 
 /**
  * Map with a bounded concurrency pool. Useful for batch DoltHub calls

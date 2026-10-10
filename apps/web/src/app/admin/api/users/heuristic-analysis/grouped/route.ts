@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sql } from 'drizzle-orm';
 import type { GroupByDimension, GroupedData, HeuristicAnalysisResponse } from '../types';
-import { ABUSE_CLASSIFICATION } from '@/types/AbuseClassification';
+import { ABUSE_CLASSIFICATION } from '@kilocode/usage-contracts';
 import { parseTimeWindow, timeWindowToInterval } from '../timeWindow';
 
 const DIMENSION_MAPPINGS = {

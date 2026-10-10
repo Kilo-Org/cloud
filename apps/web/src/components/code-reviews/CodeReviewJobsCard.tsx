@@ -46,7 +46,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { CodeReviewStreamView } from './CodeReviewStreamView';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Switch } from '@/components/ui/switch';
 import {

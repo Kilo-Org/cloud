@@ -1,8 +1,8 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { deployments, deployment_threat_detections } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { APP_URL } from '@/lib/constants';
-import { SLACK_DEPLOY_THREAT_WEBHOOK_URL } from '@/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { SLACK_DEPLOY_THREAT_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
 import type { CheckUrlResult, ThreatType } from './web-risk-client';
 
 type Deployment = typeof deployments.$inferSelect;

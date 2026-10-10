@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { EXA_API_KEY } from '@/lib/config.server';
+import { EXA_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { after } from 'next/server';
-import { wrapInSafeNextResponse } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { wrapInSafeNextResponse } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import {
   getExaMonthlyUsage,
   getExaFreeAllowanceMicrodollars,
   recordExaUsage,
 } from '@/lib/exa-usage';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { readDb } from '@/lib/drizzle';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
 import { z } from 'zod';
 

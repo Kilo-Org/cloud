@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { sessionResumeSignInPath } from '@/lib/cloud-agent/session-resume-target';
 import { LegacySessionViewer } from '@/components/cloud-agent-next/LegacySessionViewer';

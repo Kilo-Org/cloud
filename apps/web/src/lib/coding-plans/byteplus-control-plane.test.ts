@@ -1,4 +1,4 @@
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID: 'test-access',
   BYTEPLUS_CODING_PLAN_SECRET_ACCESS_KEY: 'test-secret',
 }));

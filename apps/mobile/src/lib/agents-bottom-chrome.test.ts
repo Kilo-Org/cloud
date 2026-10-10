@@ -86,6 +86,24 @@ describe('getEmptyStateFullHeight', () => {
       getEmptyStateFullHeight({ fontScale: 1 })
     );
   });
+
+  it('counts the live empty state’s stacked history link under the primary action', () => {
+    // The accepted-empty body renders the See-all history link under the New
+    // session button: a gap-3 block gap (10.5) plus one eyebrow line (17.5 at
+    // scale 1). A band that holds the single-action no-match state is then too
+    // short for the live one, and the estimate must say so.
+    expect(getEmptyStateFullHeight({ secondaryAction: true })).toBe(212);
+    expect(getEmptyStateFullHeight({ secondaryAction: true })).toBeGreaterThan(
+      getEmptyStateFullHeight()
+    );
+    expect(
+      getEmptyStatePresentation({
+        available: getEmptyStateFullHeight() + TAB_BAR,
+        bottomInset: TAB_BAR,
+        secondaryAction: true,
+      })
+    ).toBe('compact');
+  });
 });
 
 describe('getEmptyStatePresentation', () => {

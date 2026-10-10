@@ -11,8 +11,8 @@ import {
   resolveAuthorizedOwner,
   resolveOwner,
 } from '@/lib/integrations/resolve-owner';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 const SelectWorkspaceInputSchema = z
   .object({

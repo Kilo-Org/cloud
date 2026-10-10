@@ -1,9 +1,13 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
-import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
-import { readDb } from '@/lib/drizzle';
-import { getEnvVariable } from '@/lib/dotenvx';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
   executeSnowflakeStatement,
   resolveSnowflakeConfig,
@@ -21,7 +25,7 @@ import {
   ensureOrganizationAccess,
   ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import {
   BreakdownInputSchema,
   BreakdownOutputSchema,

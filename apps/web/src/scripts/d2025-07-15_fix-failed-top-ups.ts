@@ -1,7 +1,7 @@
 import { kilocode_users, user_admin_notes } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
-import { client } from '@/lib/stripe-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { findUserByStripeCustomerId } from '@/lib/user';
 import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';

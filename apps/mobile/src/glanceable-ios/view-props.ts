@@ -8,6 +8,7 @@ import { type GlanceableLiveActivityContentState } from '@kilocode/notifications
 import {
   type GlanceableCountKind,
   glanceableCountLines,
+  glanceableScheduledAt,
   glanceableSpokenLabel,
   type GlanceableStatus,
   glanceableStatusCopyKey,
@@ -28,7 +29,7 @@ type GlanceableCount = { label: string; kind: GlanceableCountKind; count: number
 export type GlanceableViewProps = {
   /** Translated locked copy; null while counts show (happy). Stale carries both. */
   statusLine: string | null;
-  /** Non-zero count lines in rank order (needs-input, running, idle). */
+  /** Non-zero count lines in rank order (needs-input, running, scheduled, idle). */
   countLines: GlanceableCount[];
   /** Top-ranked count label for compact surfaces; null when no eligible work. */
   primaryLabel: string | null;
@@ -44,6 +45,13 @@ export type GlanceableViewProps = {
    * surface-extras), and the props builder owns the translated copy.
    */
   newestTitle: string | null;
+  /**
+   * The in-flight action's progress or failure line alone (the same copy
+   * `newestTitle` carries while an Approve is answered), or null. The large
+   * card has no reserved slot — its footer already names the newest result —
+   * so it draws only this line, under its header.
+   */
+  actionLine: string | null;
   /** The two in-place actions the state offers. Disabled actions draw no button. */
   actions: { approve: boolean; newAgent: boolean };
   /**
@@ -53,6 +61,13 @@ export type GlanceableViewProps = {
    * draw it.
    */
   needsInputSince: string | null;
+  /**
+   * ISO timestamp of the soonest scheduled wake, or null when nothing is
+   * scheduled or no scheduled row carried a wake time. Only the scheduled
+   * count row carries it; the medium and large Home Screen cards are wide
+   * enough to draw it.
+   */
+  scheduledAt: string | null;
   /**
    * Kind of the most recent agent state change, or null while no counts show.
    * The locked frames (waiting/empty/expired/signed-out/privacy) report no
@@ -73,51 +88,37 @@ export type GlanceableViewProps = {
 
 /**
  * The marker a widget button's App Intent patches into the pressed entry's
- * props, until the app answers: `pendingAction` names the action to run and
- * `pendingActionVisible` holds the "Approving…" line in place of the newest
- * line. The app clears both the moment it picks the press up, so a crash or a
- * second sweep can never run the same press twice.
+ * props, until the app answers: `pendingAction` names the action to run. The
+ * app clears it the moment it picks the press up, so a crash or a second sweep
+ * can never run the same press twice.
  */
 export type GlanceableWidgetAction = 'approve' | 'new-agent';
 
 export type GlanceableWidgetProps = Partial<GlanceableViewProps> & {
   pendingAction?: GlanceableWidgetAction;
-  pendingActionVisible?: boolean;
 };
 
 /**
  * The reserved slot line: the newest session's title, or the in-flight action's
  * progress or failure while one is being answered.
  *
- * The slot is visible on every surface that offers an in-place action — the two
- * count statuses, including an idle-only tray, and the empty one — because a
- * create's progress and failure have nowhere else to appear, and the empty
- * surface and an idle-only tray are the ones that offer `New agent`. The
- * newest-session *title* still draws only where the counts do, so a locked or
- * empty surface stays titleless.
+ * The slot is visible on the two count statuses, the ones that can offer the
+ * in-place Approve, because its progress and failure have nowhere else to
+ * appear. A locked or empty surface stays titleless.
  */
 function newestTitleFor(
   extras: GlanceableSurfaceExtras,
   status: GlanceableStatus,
   translate: (key: string) => string
 ): string | null {
-  if (status !== 'happy' && status !== 'stale' && status !== 'empty') {
+  if (status !== 'happy' && status !== 'stale') {
     return null;
   }
   if (extras.actionFeedback === 'approving') {
     return translate('glanceable.approving');
   }
-  if (extras.actionFeedback === 'starting') {
-    return translate('common.starting');
-  }
   if (extras.actionFeedback === 'couldNotApprove') {
     return translate('glanceable.couldNotApprove');
-  }
-  if (extras.actionFeedback === 'couldNotStart') {
-    return translate('glanceable.couldNotStart');
-  }
-  if (status !== 'happy' && status !== 'stale') {
-    return null;
   }
   const title = extras.newestSessionTitle;
   if (title === null) {
@@ -159,13 +160,15 @@ export function buildGlanceableViewProps(
   const copy = (key: string): string =>
     key === 'glanceable.empty' ? translate('glanceable.noneWaiting') : translate(key);
 
+  const newestTitle = newestTitleFor(getSurfaceExtras(), status, translate);
   return {
     statusLine: statusKey === null ? null : copy(statusKey),
     countLines,
     primaryLabel: primary === null ? null : translate(primary.key),
     primaryKind: primary === null ? null : primary.kind,
     primaryCount: primary === null ? 0 : primary.count,
-    newestTitle: newestTitleFor(getSurfaceExtras(), status, translate),
+    newestTitle,
+    actionLine: getSurfaceExtras().actionFeedback === null ? null : newestTitle,
     actions: {
       // Only a permission wait can be answered from the widget, so the button
       // gates on `needsApproval` (the count the Live Activity's own Approve
@@ -178,6 +181,9 @@ export function buildGlanceableViewProps(
       newAgent: status === 'empty' || (showCounts && isIdleOnlyGlanceableWork(snapshot)),
     },
     needsInputSince: showCounts && snapshot.needsInput > 0 ? snapshot.needsInputSince : null,
+    // The shared helper decides the wake, so a scheduled count with no usable
+    // time is represented the same way on this surface as on every other.
+    scheduledAt: showCounts ? glanceableScheduledAt(snapshot) : null,
     newestResultKind,
     newestResultLabel,
     newestResultAt: newestResultKind === null ? null : snapshot.newestResultAt,
@@ -239,7 +245,16 @@ export function buildExpiredWidgetProps(
 ): Partial<GlanceableViewProps> {
   return toWidgetProps(
     buildGlanceableViewProps(
-      { ...snapshot, status: 'expired', running: 0, needsInput: 0, idle: 0, needsInputSince: null },
+      {
+        ...snapshot,
+        status: 'expired',
+        running: 0,
+        needsInput: 0,
+        idle: 0,
+        scheduled: 0,
+        needsInputSince: null,
+        scheduledAt: null,
+      },
       {},
       translate
     )
@@ -320,6 +335,8 @@ export function buildGlanceableLiveActivityContentState(
     needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
+    scheduled: snapshot.scheduled,
+    scheduledAt: snapshot.scheduledAt,
     ...(canApprove === undefined ? {} : { canApprove }),
     ...(notice === undefined ? {} : { notice }),
   };

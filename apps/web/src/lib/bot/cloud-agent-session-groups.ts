@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import {
   bot_request_cloud_agent_sessions,

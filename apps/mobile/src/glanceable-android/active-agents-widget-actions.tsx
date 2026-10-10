@@ -8,17 +8,24 @@ import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
 
 import { glyph, plusStrokes } from './active-agents-widget-glyphs';
 import {
+  CARD_PAD,
   estimateWidth,
   type Frame,
+  PAD,
   place,
   type Rect,
   textAlign,
 } from './active-agents-widget-parts';
 
-/** Every action keeps a 48dp touch target, whatever size its glyph draws at. */
+/** Android's minimum touch target; a target keeps it wherever the split leaves room. */
 const ACTION_TARGET = 48;
+/** The visible gap between the Approve control and `+`, on every class. */
+const ACTION_GAP = 4;
 
-/** An invisible 48dp-or-wider touch target over an action, placed apart from its glyph. */
+/** The Small/Medium/Large header's round glyphs: 24dp, their tops on the cards' padding line. */
+export const HEADER_GLYPH = { cy: CARD_PAD + 12, r: 12, pad: CARD_PAD } as const;
+
+/** An invisible touch target over an action; it may reach into the padding band. */
 function target(f: Frame, key: 'create' | 'approve', rect: Rect) {
   const approvalKey = f.props.home?.approvalKey ?? null;
   return (
@@ -35,8 +42,25 @@ function target(f: Frame, key: 'create' | 'approve', rect: Rect) {
   );
 }
 
+/** A target's 48dp-tall band (the cell's height when shorter) centred on `cy`, kept in the cell. */
+function band(f: Frame, cy: number) {
+  const height = Math.min(ACTION_TARGET, f.height);
+  return { y: Math.min(Math.max(0, cy - height / 2), f.height - height), height };
+}
+
+/**
+ * The trailing action slots for a `+` glyph of radius `r`: `+` ends on the
+ * class's padding line and the Approve control ends 4dp before it. The two
+ * targets split at the middle of that gap, so they never overlap: `+` owns the
+ * rest of the trailing edge, Approve the room before the split.
+ */
+function slots(f: Frame, r: number, pad: number) {
+  const plusX = f.width - pad - 2 * r;
+  return { plusX, approveEnd: plusX - ACTION_GAP, split: plusX - ACTION_GAP / 2 };
+}
+
 /** What the Approve slot shows: nothing, a ready Approve, or the in-flight state. */
-export function approveSlot(f: Frame): 'approve' | 'approving' | null {
+function approveSlot(f: Frame): 'approve' | 'approving' | null {
   if (f.copy.statusKind !== 'content') {
     return null;
   }
@@ -53,35 +77,39 @@ export function canCreate(f: Frame): boolean {
 }
 
 /**
- * Approve then `+`, round glyphs at the trailing edge. Each owns a fixed 48dp
- * target: `+` at `plusTarget`, Approve immediately before it. A hidden action
- * leaves its slot empty, so `+` never moves.
+ * Where the round actions of radius `r` begin: the Approve slot when it draws,
+ * else `+`. Content ends a gap before it.
+ */
+export function actionsStart(f: Frame, r: number): number {
+  const { plusX, approveEnd } = slots(f, r, PAD);
+  return approveSlot(f) === null ? plusX : approveEnd - 2 * r;
+}
+
+/**
+ * Approve then `+`, round glyphs of radius `r` at the trailing edge, centred on
+ * `cy`, inside a `pad` band (14dp unless given). A hidden action leaves its
+ * slot empty, so `+` never moves.
  */
 export function roundActions(
   f: Frame,
-  spec: {
-    cy: number;
-    r: number;
-    plus: number;
-    approve: number;
-    plusTarget: number;
-    create: boolean;
-  }
+  spec: { cy: number; r: number; create: boolean; pad?: number }
 ) {
-  const y = Math.min(Math.max(0, spec.cy - ACTION_TARGET / 2), f.height - ACTION_TARGET);
+  const { cy, r } = spec;
+  const { plusX, approveEnd, split } = slots(f, r, spec.pad ?? PAD);
+  const { y, height } = band(f, cy);
   const slot = approveSlot(f);
   const nodes: ReactNode[] = [];
   if (slot !== null) {
-    nodes.push(glyph(f, slot, { cx: spec.approve, cy: spec.cy, r: spec.r }));
+    nodes.push(glyph(f, slot, { cx: approveEnd - r, cy, r }));
   }
   if (slot === 'approve') {
-    const x = spec.plusTarget - ACTION_TARGET;
-    nodes.push(target(f, 'approve', { x, y, width: ACTION_TARGET, height: ACTION_TARGET }));
+    const width = Math.max(ACTION_TARGET, 2 * r + ACTION_GAP / 2);
+    nodes.push(target(f, 'approve', { x: split - width, y, width, height }));
   }
   if (spec.create) {
     nodes.push(
-      glyph(f, 'create', { cx: spec.plus, cy: spec.cy, r: spec.r }),
-      target(f, 'create', { x: spec.plusTarget, y, width: ACTION_TARGET, height: ACTION_TARGET })
+      glyph(f, 'create', { cx: plusX + r, cy, r }),
+      target(f, 'create', { x: split, y, width: f.width - split, height })
     );
   }
   return nodes;
@@ -122,35 +150,37 @@ function pill(
   );
 }
 
-/** Medium/Large: the Approve pill (86x24, wider for long copy) ends where `+`'s target begins. */
+/** Medium/Large: the Approve pill (86x24, wider for long copy) ends 4dp before the header `+`. */
 export function pillActions(f: Frame, create: boolean) {
+  const { cy, r, pad } = HEADER_GLYPH;
+  const { plusX, approveEnd, split } = slots(f, r, pad);
+  const { y, height } = band(f, cy);
   const slot = approveSlot(f);
   const nodes: ReactNode[] = [];
-  const end = f.width - ACTION_TARGET;
   if (slot !== null) {
     const value = slot === 'approve' ? f.props.actions.approveLabel : (f.copy.actionLine ?? '');
     const natural = Math.ceil(estimateWidth(value, 12, true)) + 28;
-    // Never into "Kilo": the brand ends at 78dp.
-    const width = Math.min(end - 78, Math.max(slot === 'approve' ? 86 : 96, natural));
-    const x = end - width;
+    // Never into "Kilo": the brand ends at 80dp.
+    const width = Math.min(approveEnd - 80, Math.max(slot === 'approve' ? 86 : 96, natural));
+    const x = approveEnd - width;
     nodes.push(
       pill(f, 'approve-pill', {
         x,
-        y: 12,
+        y: cy - r,
         width,
-        height: 24,
+        height: 2 * r,
         value,
         fill: slot === 'approve' ? 'primary' : 'secondary',
       })
     );
     if (slot === 'approve') {
-      nodes.push(target(f, 'approve', { x, y: 0, width, height: ACTION_TARGET }));
+      nodes.push(target(f, 'approve', { x, y, width: split - x, height }));
     }
   }
   if (create) {
     nodes.push(
-      glyph(f, 'create', { cx: f.width - 28, cy: 24, r: 12 }),
-      target(f, 'create', { x: end, y: 0, width: ACTION_TARGET, height: ACTION_TARGET })
+      glyph(f, 'create', { cx: plusX + r, cy, r }),
+      target(f, 'create', { x: split, y, width: f.width - split, height })
     );
   }
   return nodes;
@@ -164,7 +194,7 @@ export function newAgentPill(
   const value = f.props.actions.newAgentLabel;
   const lead = spec.height;
   const natural = Math.ceil(estimateWidth(value, spec.size, true)) + lead + 12;
-  const width = Math.min(f.width - 32, Math.max(spec.centred ? 120 : 104, natural));
+  const width = Math.min(f.width - 2 * CARD_PAD, Math.max(spec.centred ? 120 : 104, natural));
   const x = spec.centred ? (f.width - width) / 2 : spec.x;
   const children = [
     <OverlapWidget key="glyph" style={{ width: lead, height: spec.height }}>
@@ -204,11 +234,6 @@ export function newAgentPill(
     >
       {f.paint.rtl ? children.toReversed() : children}
     </FlexWidget>,
-    target(f, 'create', {
-      x,
-      y: Math.max(0, spec.y + spec.height / 2 - ACTION_TARGET / 2),
-      width,
-      height: ACTION_TARGET,
-    }),
+    target(f, 'create', { x, width, ...band(f, spec.y + spec.height / 2) }),
   ];
 }

@@ -57,6 +57,14 @@ export function dotInk(kind: Copy['primaryKind']): keyof Palette {
   return kind === null ? 'idle' : DOT_INK[kind];
 }
 
+/**
+ * The empty band every cell keeps on all four sides; no ink enters it. The
+ * short classes (Row, Narrow, Landscape) keep 14dp, the cards (Small, Medium,
+ * Large) the approved 16dp.
+ */
+export const PAD = 14;
+export const CARD_PAD = 16;
+
 const TALL_SCRIPT = /[\u0600-\u08FF\u0900-\u0DFF]/u;
 
 /** Roboto's ascent plus font padding above the baseline, per unit of font size. */
@@ -75,6 +83,16 @@ export function lineBox(value: string, size: number): number {
 /** Top of the box whose Latin baseline sits at `baseline`; a taller script keeps the same centre. */
 export function boxTop(value: string, size: number, baseline: number): number {
   return baseline - BASELINE * size - (lineBox(value, size) - Math.ceil(size * LATIN_LINE)) / 2;
+}
+
+/** The baseline whose line box (Latin or taller script) ends at `bottom`. */
+export function baselineAbove(value: string, size: number, bottom: number): number {
+  return bottom - lineBox(value, size) - boxTop(value, size, 0);
+}
+
+/** The baseline that centres a line of `size` on `cy`; a taller script grows evenly about it. */
+export function centredBaseline(size: number, cy: number): number {
+  return cy + BASELINE * size - Math.ceil(size * LATIN_LINE) / 2;
 }
 
 /** Rough advance width, only for choices with slack (pill widths, one line or two). */
@@ -96,12 +114,14 @@ export function estimateWidth(value: string, size: number, bold = false): number
 
 export const tenth = (value: number) => Math.round(value * 10) / 10;
 
-/** The native placement of an LTR design rectangle. */
+/** The native placement of an LTR design rectangle; RTL mirrors the rounded rectangle exactly. */
 export function place(f: Frame, rect: Rect) {
+  const x = tenth(rect.x);
+  const width = tenth(rect.width);
   return {
-    marginLeft: tenth(f.paint.rtl ? f.width - rect.x - rect.width : rect.x),
+    marginLeft: f.paint.rtl ? tenth(f.width - x - width) : x,
     marginTop: tenth(rect.y),
-    width: tenth(rect.width),
+    width,
     height: tenth(rect.height),
   };
 }
@@ -146,9 +166,10 @@ export function dot(
   });
 }
 
-/** A grey placeholder bar, its width clamped to the content edge. */
-export function bar(f: Frame, key: string, rect: Rect) {
-  const width = Math.max(8, Math.min(rect.width, f.width - rect.x - 16));
+/** A grey placeholder bar, its width clamped to the class's content edge (`pad`, 14dp unless given). */
+export function bar(f: Frame, key: string, spec: Rect & { pad?: number }) {
+  const { pad = PAD, ...rect } = spec;
+  const width = Math.max(8, Math.min(rect.width, f.width - rect.x - pad));
   return shape(f, key, { ...rect, width, fill: 'secondary', radius: rect.height / 2 });
 }
 

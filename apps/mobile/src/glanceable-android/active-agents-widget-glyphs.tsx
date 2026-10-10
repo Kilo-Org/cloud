@@ -1,34 +1,25 @@
 /* eslint-disable react-native/no-inline-styles -- the Android widget host requires native style objects */
 'use no memo';
 
+// Metro turns a static image import into the asset id the widget host resolves,
+// the same value `require` would give; vitest resolves it to a URL instead.
+import LOGO from '../../assets/images/logo-widget.png';
 import { type ReactNode } from 'react';
-import { FlexWidget, type HexColor, OverlapWidget } from 'react-native-android-widget';
+import { FlexWidget, type HexColor, ImageWidget, OverlapWidget } from 'react-native-android-widget';
 
 import { type Frame, place, shape, tenth } from './active-agents-widget-parts';
 
-/** The brand tile: a foreground square (22% corners) with a background inner square. */
+/** The Kilo mark (yellow tile, black glyphs) with 22% corners, the same in both palettes. */
 export function logo(f: Frame, spec: { x: number; y: number; size: number }) {
-  const inner = tenth(spec.size * 0.44);
   return (
-    <FlexWidget
+    <ImageWidget
       key="logo"
-      style={{
-        ...place(f, { x: spec.x, y: spec.y, width: spec.size, height: spec.size }),
-        borderRadius: tenth(spec.size * 0.22),
-        backgroundColor: f.paint.palette.foreground,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <FlexWidget
-        style={{
-          width: inner,
-          height: inner,
-          borderRadius: 1,
-          backgroundColor: f.paint.palette.background,
-        }}
-      />
-    </FlexWidget>
+      image={LOGO}
+      imageWidth={spec.size}
+      imageHeight={spec.size}
+      radius={tenth(spec.size * 0.22)}
+      style={place(f, { x: spec.x, y: spec.y, width: spec.size, height: spec.size })}
+    />
   );
 }
 

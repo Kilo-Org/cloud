@@ -5,6 +5,7 @@ import { type ReactNode } from 'react';
 import { canCreate, newAgentPill, pillActions } from './active-agents-widget-actions';
 import {
   brand,
+  CARD_DESIGN_BOTTOM,
   cardEdges,
   countLines,
   entries,
@@ -13,19 +14,19 @@ import {
   HEADER_BOTTOM,
   locked,
 } from './active-agents-widget-card';
-import { bar, boxTop, dot, type Frame, label } from './active-agents-widget-parts';
+import { bar, boxTop, CARD_PAD, dot, type Frame, label } from './active-agents-widget-parts';
 import { stackedStatus } from './active-agents-widget-status';
 import { fitRows, phaseOf, stack } from './active-agents-widget-stack';
 
 /** Medium (3x2, 4x2) at the 364x170 design; its right column starts at 172dp and scales. */
 
-const DESIGN = { top: HEADER_BOTTOM, bottom: 140.4 };
+const DESIGN = { top: HEADER_BOTTOM, bottom: CARD_DESIGN_BOTTOM };
 
 /** A Medium row: dot, 13dp title, 11dp reason or time, 42dp apart. */
 function mediumRow(f: Frame, entry: Entry, spec: { index: number; x: number; baseline: number }) {
   const { index, baseline } = spec;
   const x = spec.x + 12;
-  const width = f.width - 16 - x;
+  const width = f.width - CARD_PAD - x;
   return [
     dot(f, `row-${index}-dot`, { cx: spec.x, cy: baseline - 4, r: 4, fill: entry.ink }),
     label(f, `row-${index}-title`, { x, baseline, width, value: entry.title, size: 13 }),
@@ -52,12 +53,12 @@ function placeholders(f: Frame, x: number) {
         bottom: 138,
         shrink: 10,
         draw: dy => [
-          bar(f, 'bar-count', { x: 16, y: 62 + dy, width: 44, height: 34 }),
-          bar(f, 'bar-label', { x: 16, y: 104 + dy, width: 96, height: 12 }),
-          bar(f, 'bar-row-0', { x: x + 4, y: 66 + dy, width: 150, height: 12 }),
-          bar(f, 'bar-row-0-sub', { x: x + 4, y: 86 + dy, width: 100, height: 10 }),
-          bar(f, 'bar-row-1', { x: x + 4, y: 108 + dy, width: 140, height: 12 }),
-          bar(f, 'bar-row-1-sub', { x: x + 4, y: 128 + dy, width: 90, height: 10 }),
+          bar(f, 'bar-count', { x: CARD_PAD, y: 62 + dy, width: 44, height: 34, pad: CARD_PAD }),
+          bar(f, 'bar-label', { x: CARD_PAD, y: 104 + dy, width: 96, height: 12, pad: CARD_PAD }),
+          bar(f, 'bar-row-0', { x: x + 4, y: 66 + dy, width: 150, height: 12, pad: CARD_PAD }),
+          bar(f, 'bar-row-0-sub', { x: x + 4, y: 86 + dy, width: 100, height: 10, pad: CARD_PAD }),
+          bar(f, 'bar-row-1', { x: x + 4, y: 108 + dy, width: 140, height: 12, pad: CARD_PAD }),
+          bar(f, 'bar-row-1-sub', { x: x + 4, y: 128 + dy, width: 90, height: 10, pad: CARD_PAD }),
         ],
       },
     ],
@@ -76,14 +77,21 @@ function empty(f: Frame) {
         shrink: 12,
         draw: dy => [
           label(f, 'status', {
-            x: 16,
+            x: CARD_PAD,
             baseline: 92 + dy,
-            width: f.width - 32,
+            width: f.width - 2 * CARD_PAD,
             value,
             size: 20,
             weight: '600',
           }),
-          ...newAgentPill(f, { x: 16, y: 106 + dy, height: 28, size: 13, arm: 6, centred: false }),
+          ...newAgentPill(f, {
+            x: CARD_PAD,
+            y: 106 + dy,
+            height: 28,
+            size: 13,
+            arm: 6,
+            centred: false,
+          }),
         ],
       },
     ],
@@ -107,12 +115,17 @@ function column(
       .flatMap((entry, index) => mediumRow(f, entry, { index, x, baseline: 74 + index * 42 + dy }));
   }
   if (copy.secondaryCounts.length > 0) {
-    return countLines(f, { x: x + 4, baseline: 78 + dy, step: 24, width: f.width - 16 - (x + 16) });
+    return countLines(f, {
+      x: x + 4,
+      baseline: 78 + dy,
+      step: 24,
+      width: f.width - CARD_PAD - (x + 16),
+    });
   }
   if (copy.title === null) {
     return [];
   }
-  const width = f.width - 16 - (x + 4);
+  const width = f.width - CARD_PAD - (x + 4);
   return [
     label(f, 'recent-heading', {
       x: x + 4,
@@ -162,7 +175,7 @@ export function medium(f: Frame): ReactNode[] {
           shrink: 8,
           draw: dy => [
             ...stackedStatus(f, {
-              x: 16,
+              x: CARD_PAD,
               countBaseline: 92 + dy,
               countSize: 44,
               labelBaseline: 112 + dy,

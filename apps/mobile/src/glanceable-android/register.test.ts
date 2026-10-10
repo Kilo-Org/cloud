@@ -73,6 +73,7 @@ vi.mock('react-native-android-widget', () => ({
   requestWidgetUpdateById: mocks.requestById,
   getWidgetInfo: mocks.getWidgetInfo,
   FlexWidget: () => null,
+  ImageWidget: () => null,
   OverlapWidget: () => null,
   TextWidget: () => null,
 }));

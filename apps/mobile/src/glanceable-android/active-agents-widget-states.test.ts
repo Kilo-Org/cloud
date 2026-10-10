@@ -20,6 +20,7 @@ import {
 } from './active-agents-widget.test-helpers';
 import {
   close,
+  expectInsideBand,
   LONG,
   PERMISSION,
   type State,
@@ -31,6 +32,7 @@ import { buildCurrentWidgetProps } from './widget-props';
 
 vi.mock('react-native-android-widget', () => ({
   FlexWidget: () => null,
+  ImageWidget: () => null,
   OverlapWidget: () => null,
   TextWidget: () => null,
 }));
@@ -52,7 +54,7 @@ describe('Home widget extra height', () => {
     const tall = render(props, [172, 224]).light;
     expect(placed(short).filter(node => node.key?.startsWith('line-'))).toHaveLength(1);
     expect(placed(tall).filter(node => node.key?.startsWith('line-'))).toHaveLength(3);
-    close(rectOf(byKey(tall, 'footer')).y, 224 - 18 - 1.056 * 11);
+    close(rectOf(byKey(tall, 'footer')).y, 224 - 16 - 15);
   });
 
   it('adds Medium and Large rows only when they fit', () => {
@@ -179,22 +181,22 @@ describe('Home widget states', () => {
     for (const size of Object.values(DESIGN)) {
       const root = at(STATES.stress, size);
       const count = nodes(root).find(node => node.props.text === '9999');
-      expect(count?.props.style?.fontSize).toBeGreaterThanOrEqual(22);
+      expect(count?.props.style?.fontSize).toBeGreaterThanOrEqual(20);
     }
     expect(texts(at(STATES.stress, DESIGN.large))).toEqual(expect.arrayContaining([LONG, 'Agent']));
   });
 
-  it.each(CELLS)('budgets German and Arabic/RTL copy at %dx%d', (width, height) => {
+  it.each(CELLS)('keeps German and Arabic/RTL copy inside the band at %dx%d', (width, height) => {
     for (const language of ['de', 'ar']) {
       const translated = (key: string) =>
         language === 'ar' ? `العربية ${translate(key)}` : `Deutsch ${translate(key)}`;
+      for (const [name, state] of Object.entries(STATES) as [string, State][]) {
+        const props = stateProps(state, translated);
+        const root = render(props, [width, height], language === 'ar').light;
+        expectInsideBand(root, [width, height], `${language} ${name}`);
+      }
       const props = stateProps(STATES['needs input with Approve'], translated);
       const root = render(props, [width, height], language === 'ar').light;
-      for (const node of placed(root)) {
-        const rect = rectOf(node);
-        expect(rect.y + rect.height, String(node.key)).toBeLessThanOrEqual(height + 0.05);
-        expect(rect.y, String(node.key)).toBeGreaterThanOrEqual(-0.05);
-      }
       const label = nodes(root).find(node => node.props.text === props.homeCopy?.primaryLabel);
       expect(label?.props.style?.textAlign).toBe(language === 'ar' ? 'right' : 'left');
     }

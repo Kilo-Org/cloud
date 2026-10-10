@@ -2,6 +2,7 @@
 
 import { countLines, type Entry } from './active-agents-widget-card';
 import {
+  CARD_PAD,
   dot,
   estimateWidth,
   type Frame,
@@ -12,6 +13,10 @@ import {
 import { stackedStatus } from './active-agents-widget-status';
 
 /** The Large cell's building blocks: its status with the other counts, headings and list rows. */
+
+/** A list row's dot centre and the start of its copy. */
+const ROW_DOT_CX = CARD_PAD + 5;
+const ROW_TEXT_X = CARD_PAD + 17;
 
 export type Status = {
   countBaseline: number;
@@ -27,39 +32,45 @@ export function largeStatus(
   spec: Status & { countsBaseline: number; step: number },
   dy: number
 ) {
-  const clear = Math.ceil(16 + estimateWidth(f.copy.primaryCount, spec.countSize, true) + 16);
+  const clear = Math.ceil(CARD_PAD + estimateWidth(f.copy.primaryCount, spec.countSize, true) + 16);
   const x = Math.max(Math.round(f.width * 0.621), clear);
-  const counts = f.copy.secondaryCounts.length > 0 && f.width - 16 - (x + 12) >= 48;
+  const counts = f.copy.secondaryCounts.length > 0 && f.width - CARD_PAD - (x + 12) >= 48;
   return [
     ...stackedStatus(f, {
-      x: 16,
+      x: CARD_PAD,
       countBaseline: spec.countBaseline + dy,
       countSize: spec.countSize,
       labelBaseline: spec.labelBaseline + dy,
       labelSize: spec.labelSize,
       r: spec.r,
-      width: (counts ? x - 10 : f.width - 16) - 16,
+      width: (counts ? x - 10 : f.width - CARD_PAD) - CARD_PAD,
     }),
     ...(counts
       ? countLines(f, {
           x,
           baseline: spec.countsBaseline + dy,
           step: spec.step,
-          width: f.width - 16 - (x + 12),
+          width: f.width - CARD_PAD - (x + 12),
         })
       : []),
   ];
 }
 
 export function divider(f: Frame, y: number) {
-  return shape(f, 'divider', { x: 16, y, width: f.width - 32, height: 1, fill: 'divider' });
+  return shape(f, 'divider', {
+    x: CARD_PAD,
+    y,
+    width: f.width - 2 * CARD_PAD,
+    height: 1,
+    fill: 'divider',
+  });
 }
 
 export function heading(f: Frame, key: string, spec: { value: string; baseline: number }) {
   return label(f, key, {
     ...spec,
-    x: 16,
-    width: f.width - 32,
+    x: CARD_PAD,
+    width: f.width - 2 * CARD_PAD,
     size: 12,
     weight: '600',
     ink: 'muted',
@@ -70,11 +81,11 @@ export function heading(f: Frame, key: string, spec: { value: string; baseline: 
 export function waitRow(f: Frame, entry: Entry, spec: { index: number; baseline: number }) {
   const { index, baseline } = spec;
   return [
-    dot(f, `row-${index}-dot`, { cx: 21, cy: baseline - 5, r: 4, fill: entry.ink }),
+    dot(f, `row-${index}-dot`, { cx: ROW_DOT_CX, cy: baseline - 5, r: 4, fill: entry.ink }),
     label(f, `row-${index}-title`, {
-      x: 33,
+      x: ROW_TEXT_X,
       baseline,
-      width: f.width - 49,
+      width: f.width - ROW_TEXT_X - CARD_PAD,
       value: entry.title,
       size: 14,
     }),
@@ -82,9 +93,9 @@ export function waitRow(f: Frame, entry: Entry, spec: { index: number; baseline:
       ? []
       : [
           label(f, `row-${index}-sub`, {
-            x: 33,
+            x: ROW_TEXT_X,
             baseline: baseline + 17,
-            width: f.width - 49,
+            width: f.width - ROW_TEXT_X - CARD_PAD,
             value: entry.sub,
             size: 12,
             ink: 'muted',
@@ -97,11 +108,11 @@ export function waitRow(f: Frame, entry: Entry, spec: { index: number; baseline:
 export function runRow(f: Frame, entry: Entry, spec: { index: number; baseline: number }) {
   const { index, baseline } = spec;
   return [
-    dot(f, `row-${index}-dot`, { cx: 21, cy: baseline - 5, r: 4, fill: 'info' }),
+    dot(f, `row-${index}-dot`, { cx: ROW_DOT_CX, cy: baseline - 5, r: 4, fill: 'info' }),
     textRow(f, `row-${index}`, {
-      x: 33,
+      x: ROW_TEXT_X,
       baseline,
-      width: f.width - 49,
+      width: f.width - ROW_TEXT_X - CARD_PAD,
       size: 14,
       gap: 8,
       fill: true,

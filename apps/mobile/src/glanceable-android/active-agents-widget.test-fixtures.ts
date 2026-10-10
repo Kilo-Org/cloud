@@ -6,12 +6,14 @@ import { expect } from 'vitest';
 
 import { type GlanceableActionFeedback, setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 
+import { sizeClassFor } from './active-agents-widget';
 import {
   type Element,
   NOW,
   placed,
   propsFor,
   type Rect,
+  rectOf,
   translate,
   WAKE,
 } from './active-agents-widget.test-helpers';
@@ -97,4 +99,23 @@ export function ltr(rect: Rect, frame: { width: number; rtl: boolean }): Rect {
 }
 export function targets(root: Element) {
   return placed(root).filter(node => node.key === 'create-target' || node.key === 'approve-target');
+}
+
+/** The empty band on every side: 16dp on the cards (Small, Medium, Large), 14dp on the short classes. */
+export function padFor(width: number, height: number): number {
+  return ['small', 'medium', 'large'].includes(sizeClassFor(width, height)) ? 16 : 14;
+}
+
+/** Every drawn rectangle (logo, glyphs, pills, text boxes, dividers, bars) sits inside the band. */
+export function expectInsideBand(root: Element, size: readonly [number, number], name: string) {
+  const [width, height] = size;
+  const pad = padFor(width, height);
+  for (const node of placed(root).filter(child => child.key?.endsWith('-target') !== true)) {
+    const rect = rectOf(node);
+    const where = `${name} ${String(node.key)} ${JSON.stringify(rect)}`;
+    expect(rect.x, where).toBeGreaterThanOrEqual(pad - 0.05);
+    expect(rect.y, where).toBeGreaterThanOrEqual(pad - 0.05);
+    expect(rect.x + rect.width, where).toBeLessThanOrEqual(width - pad + 0.05);
+    expect(rect.y + rect.height, where).toBeLessThanOrEqual(height - pad + 0.05);
+  }
 }

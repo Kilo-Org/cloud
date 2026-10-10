@@ -19,13 +19,20 @@ import {
   type Status,
   waitRow,
 } from './active-agents-widget-large-rows';
-import { bar, boxTop, estimateWidth, type Frame, label } from './active-agents-widget-parts';
+import {
+  bar,
+  boxTop,
+  CARD_PAD,
+  estimateWidth,
+  type Frame,
+  label,
+} from './active-agents-widget-parts';
 import { stackedStatus } from './active-agents-widget-status';
 import { type Block, fitRows, phaseOf, stack } from './active-agents-widget-stack';
 
 /** Large (3x3, 4x3, 4x4) at the 364x382 design. */
 
-const DESIGN = { top: HEADER_BOTTOM, bottom: 352.4 };
+const DESIGN = { top: HEADER_BOTTOM, bottom: 382 - CARD_PAD - 15 };
 
 /** Needs input (rounds 2/6) and scheduled (round 4): the count block, then a titled list. */
 function listed(f: Frame) {
@@ -53,9 +60,9 @@ function listed(f: Frame) {
               ? []
               : [
                   label(f, 'short', {
-                    x: 16,
+                    x: CARD_PAD,
                     baseline: 182 + dy,
-                    width: f.width - 32,
+                    width: f.width - 2 * CARD_PAD,
                     value: short,
                     size: 13,
                     ink: 'muted',
@@ -108,9 +115,9 @@ function latest(f: Frame) {
               baseline: headingBaseline + dy,
             }),
             label(f, 'recent-title', {
-              x: 16,
+              x: CARD_PAD,
               baseline: titleBaseline + dy,
-              width: f.width - 32,
+              width: f.width - 2 * CARD_PAD,
               value: copy.title ?? '',
               size: 15,
             }),
@@ -167,13 +174,13 @@ function latest(f: Frame) {
           shrink: 14,
           draw: dy =>
             stackedStatus(f, {
-              x: 16,
+              x: CARD_PAD,
               countBaseline: 168 + dy,
               countSize: 88,
               labelBaseline: 203 + dy,
               labelSize: 20,
               r: 5,
-              width: f.width - 32,
+              width: f.width - 2 * CARD_PAD,
             }),
         },
         recent(238, 268, 292),
@@ -197,7 +204,9 @@ function placeholders(f: Frame) {
         bottom: 295,
         shrink: 20,
         draw: dy =>
-          bars.map(([key, y, width, height]) => bar(f, key, { x: 16, y: y + dy, width, height })),
+          bars.map(([key, y, width, height]) =>
+            bar(f, key, { x: CARD_PAD, y: y + dy, width, height, pad: CARD_PAD })
+          ),
       },
     ],
     design: DESIGN,
@@ -208,7 +217,7 @@ function placeholders(f: Frame) {
 
 function empty(f: Frame) {
   const value = f.copy.status ?? '';
-  const lines = estimateWidth(value, 22, true) > f.width - 32 ? 2 : 1;
+  const lines = estimateWidth(value, 22, true) > f.width - 2 * CARD_PAD ? 2 : 1;
   const extra = (lines - 1) * 26;
   return stack({
     blocks: [
@@ -218,9 +227,9 @@ function empty(f: Frame) {
         shrink: 40,
         draw: dy => [
           label(f, 'status', {
-            x: 16,
+            x: CARD_PAD,
             baseline: 176 + dy,
-            width: f.width - 32,
+            width: f.width - 2 * CARD_PAD,
             value,
             size: 22,
             weight: '600',

@@ -25,7 +25,6 @@ import {
 
 import {
   getActionNotice,
-  isActionApproving,
   pruneActionNotice,
   setGlanceableActionApproving,
   setGlanceableActionNotice,
@@ -46,7 +45,7 @@ import {
   start as startLiveUpdate,
   update as updateLiveUpdate,
 } from './live-update';
-import { cardFor } from './notification-card';
+import { cardAction, cardFor } from './notification-card';
 import { isNotificationPermissionGranted } from './permission';
 import { type AndroidWidgetProps, buildCurrentWidgetProps } from './widget-props';
 
@@ -90,8 +89,16 @@ let terminalExpiresAt: number | null = null;
  * task for an OS retry.
  */
 let inflightStart: Promise<void> | null = null;
-/** Whether the posted card reads "Approving…", so settling the answer redraws it. */
-let postedApproving = false;
+/**
+ * The approve state the posted card draws ("Approving…", a failure line, or
+ * neither), so a change in it — from either Approve — redraws the card.
+ */
+const NO_ACTION = JSON.stringify({ approving: false, failure: null });
+let postedAction = NO_ACTION;
+
+function actionKey(snapshot: GlanceableAgentsSnapshot): string {
+  return JSON.stringify(cardAction(snapshot));
+}
 
 /**
  * A needs-input card is the kind that asks the user a question, so its first
@@ -122,7 +129,7 @@ function postNotification(
   }
   notificationKind = kind;
   revision = snapshot.revision;
-  postedApproving = terminalText === undefined && isActionApproving();
+  postedAction = terminalText === undefined ? actionKey(snapshot) : NO_ACTION;
 }
 
 /** The widget props for `snapshot`, with the deadline and staleness checks every redraw runs. */
@@ -174,7 +181,7 @@ function endNotification(): void {
   pending = null;
   startEpoch += 1;
   terminalExpiresAt = null;
-  postedApproving = false;
+  postedAction = NO_ACTION;
 }
 
 /**
@@ -207,7 +214,7 @@ async function tryStartOrUpdate(
     notificationActive &&
     snapshot.revision <= revision &&
     getActionNotice() === null &&
-    postedApproving === isActionApproving()
+    postedAction === actionKey(snapshot)
   ) {
     return;
   }
@@ -364,7 +371,7 @@ export const androidSink: GlanceableSink = {
     }
     if (
       notificationActive &&
-      (snapshot.revision > revision || postedApproving !== isActionApproving())
+      (snapshot.revision > revision || postedAction !== actionKey(snapshot))
     ) {
       postNotification(
         snapshot,
@@ -399,7 +406,7 @@ export function _resetAndroidSinkForTests(): void {
   startEpoch += 1;
   terminalExpiresAt = null;
   inflightStart = null;
-  postedApproving = false;
+  postedAction = NO_ACTION;
   setGlanceableActionNotice(null);
   setGlanceableActionApproving(false);
 }

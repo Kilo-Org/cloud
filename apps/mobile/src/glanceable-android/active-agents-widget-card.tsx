@@ -2,11 +2,14 @@
 
 import { type ReactNode } from 'react';
 
-import { canCreate, roundActions } from './active-agents-widget-actions';
+import { canCreate, HEADER_GLYPH, roundActions } from './active-agents-widget-actions';
 import { lock, logo } from './active-agents-widget-glyphs';
 import {
   bar,
+  baselineAbove,
   boxTop,
+  CARD_PAD,
+  centredBaseline,
   type Copy,
   dot,
   dotInk,
@@ -21,26 +24,36 @@ import { fitRows, phaseOf, stack } from './active-agents-widget-stack';
 
 /**
  * Small (2x2, 2x3), plus what Medium and Large share. Cards draw at the design
- * coordinates of a 170x170 / 364x170 / 364x382 widget. A taller cell keeps the
- * layout: the extra height first buys agent rows (up to 3), then splits evenly
- * across the gaps; the footer stays 18dp above the bottom edge.
+ * coordinates of a 170x170 / 364x170 / 364x382 widget inside a 14dp band on
+ * every side. A taller cell keeps the layout: the extra height first buys agent
+ * rows (up to 3), then splits evenly across the gaps; the footer's box ends on
+ * the bottom padding line.
  */
 
-/** Header ink ends at 36dp (the 24dp glyphs centred on y=24). */
-export const HEADER_BOTTOM = 36;
+/** Header ink ends where the 24dp glyphs, their tops on the padding line, end. */
+export const HEADER_BOTTOM = HEADER_GLYPH.cy + HEADER_GLYPH.r;
 
+/** The Kilo mark and "Kilo", centred on the header glyphs. */
 export function brand(f: Frame) {
+  const size = 18;
   return [
-    logo(f, { x: 16, y: 15, size: 18 }),
-    label(f, 'brand', { x: 40, baseline: 29, width: 40, value: 'Kilo', size: 13, weight: '600' }),
+    logo(f, { x: CARD_PAD, y: HEADER_GLYPH.cy - size / 2, size }),
+    label(f, 'brand', {
+      x: CARD_PAD + size + 6,
+      baseline: centredBaseline(13, HEADER_GLYPH.cy),
+      width: 40,
+      value: 'Kilo',
+      size: 13,
+      weight: '600',
+    }),
   ];
 }
 
-/** The content edges: under the header, down to the top of the footer line 18dp above the bottom. */
+/** The content edges: under the header, down to the top of the footer line on the padding. */
 export function cardEdges(f: Frame) {
   return {
     top: HEADER_BOTTOM,
-    bottom: boxTop(f.copy.footer ?? f.copy.status ?? '', 11, f.height - 18),
+    bottom: f.height - CARD_PAD - lineBox(f.copy.footer ?? f.copy.status ?? '', 11),
   };
 }
 
@@ -58,9 +71,9 @@ export function footer(f: Frame, long: boolean) {
     return null;
   }
   return label(f, 'footer', {
-    x: 16,
-    baseline: f.height - 18,
-    width: f.width - 32,
+    x: CARD_PAD,
+    baseline: baselineAbove(value, 11, f.height - CARD_PAD),
+    width: f.width - 2 * CARD_PAD,
     value,
     size: 11,
     ...(failed ? { weight: '600' as const, ink: 'warn' as const } : { ink: 'muted' as const }),
@@ -84,7 +97,7 @@ export function locked(
   }
 ) {
   const value = f.copy.status ?? '';
-  const lines = spec.wrap || estimateWidth(value, spec.size, true) > f.width - 32 ? 2 : 1;
+  const lines = spec.wrap || estimateWidth(value, spec.size, true) > f.width - 2 * CARD_PAD ? 2 : 1;
   const { nodes } = stack({
     blocks: [
       {
@@ -94,9 +107,9 @@ export function locked(
         draw: dy => [
           ...lock(f, { cx: f.width / 2, cy: spec.lockY + dy, size: spec.lockSize }),
           label(f, 'status', {
-            x: 16,
+            x: CARD_PAD,
             baseline: spec.baseline + dy,
-            width: f.width - 32,
+            width: f.width - 2 * CARD_PAD,
             value,
             size: spec.size,
             weight: '600',
@@ -106,8 +119,8 @@ export function locked(
         ],
       },
     ],
-    design: { top: HEADER_BOTTOM, bottom: spec.height - 15 },
-    edges: { top: HEADER_BOTTOM, bottom: f.height - 15 },
+    design: { top: HEADER_BOTTOM, bottom: spec.height - CARD_PAD },
+    edges: { top: HEADER_BOTTOM, bottom: f.height - CARD_PAD },
     tailShrink: 10,
   });
   return [...brand(f), ...nodes];
@@ -188,11 +201,15 @@ function smallLines(f: Frame): Line[] {
   return lines.slice(0, 3);
 }
 
+/** The cards' design content bottom: the footer box top at the 170dp frame. */
+export const CARD_DESIGN_BOTTOM = 170 - CARD_PAD - 15;
+
 function smallBody(f: Frame): ReactNode[] {
   const { width: W, copy } = f;
-  const design = { top: HEADER_BOTTOM, bottom: 140.4 };
+  const design = { top: HEADER_BOTTOM, bottom: CARD_DESIGN_BOTTOM };
   const edges = cardEdges(f);
   const phase = phaseOf(copy);
+  const width = W - 2 * CARD_PAD;
   if (phase === 'updating') {
     return stack({
       blocks: [
@@ -201,8 +218,8 @@ function smallBody(f: Frame): ReactNode[] {
           bottom: 114,
           shrink: 10,
           draw: dy => [
-            bar(f, 'bar-count', { x: 16, y: 62 + dy, width: 44, height: 30 }),
-            bar(f, 'bar-label', { x: 16, y: 102 + dy, width: 96, height: 12 }),
+            bar(f, 'bar-count', { x: CARD_PAD, y: 62 + dy, width: 44, height: 30, pad: CARD_PAD }),
+            bar(f, 'bar-label', { x: CARD_PAD, y: 102 + dy, width: 96, height: 12, pad: CARD_PAD }),
           ],
         },
       ],
@@ -214,9 +231,9 @@ function smallBody(f: Frame): ReactNode[] {
   if (phase === 'empty') {
     const value = copy.status ?? '';
     const status = {
-      x: 16,
+      x: CARD_PAD,
       baseline: 104,
-      width: W - 32,
+      width,
       value,
       size: 17,
       weight: '600',
@@ -247,13 +264,13 @@ function smallBody(f: Frame): ReactNode[] {
           shrink: 4,
           draw: dy =>
             stackedStatus(f, {
-              x: 16,
+              x: CARD_PAD,
               countBaseline: 78 + dy,
               countSize: 44,
               labelBaseline: 98 + dy,
               labelSize: 14,
               r: 4,
-              width: W - 32,
+              width,
             }),
         },
         {
@@ -266,9 +283,9 @@ function smallBody(f: Frame): ReactNode[] {
                 draw: (dy: number) =>
                   lines.slice(0, count).map((line, index) =>
                     label(f, `line-${index}`, {
-                      x: 16,
+                      x: CARD_PAD,
                       baseline: 117 + index * 19 + dy,
-                      width: W - 32,
+                      width,
                       value: line.value,
                       size: 13,
                       ink: line.ink,
@@ -289,13 +306,6 @@ export function small(f: Frame): ReactNode[] {
   if (phaseOf(f.copy) === 'locked') {
     return locked(f, { height: 170, lockY: 76, lockSize: 26, baseline: 108, size: 13, wrap: true });
   }
-  const actions = roundActions(f, {
-    cy: 24,
-    r: 12,
-    plus: f.width - 28,
-    approve: f.width - 56,
-    plusTarget: f.width - 48,
-    create: canCreate(f),
-  });
+  const actions = roundActions(f, { ...HEADER_GLYPH, create: canCreate(f) });
   return [...brand(f), ...actions, ...smallBody(f), footer(f, false)];
 }

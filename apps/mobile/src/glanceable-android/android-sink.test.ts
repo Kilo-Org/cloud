@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlanceablePublisher } from '@/lib/glanceable/publisher';
 import { _resetHomeWidgetDataForTests } from '@/lib/glanceable/home-widget-data';
 import { setGlanceableDelivery } from '@/lib/glanceable/sink-registry';
+import { setSurfaceExtras } from '@/lib/glanceable/surface-extras';
 import {
   _resetWaitingAskForTests,
   recordWaitingAsk,
@@ -1109,6 +1110,34 @@ describe('renderStoredSnapshotWithNotice', () => {
     expect(mocks.native.getWidgetSnapshot).toHaveBeenCalled();
     expect(mocks.native.start).not.toHaveBeenCalled();
     expect(mocks.native.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('the Home widget Approve on the ongoing card', () => {
+  afterEach(() => {
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
+  });
+
+  it('reads Approving… without Approve while the widget answers, then the retry line', async () => {
+    recordWaitingAsk(waitingAsk({ kiloSessionId: 'ses_widget' }));
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'approving' });
+    androidSink.publish(MIXED);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toMatchObject({
+      title: '2 Needs input',
+      text: i18n.t('glanceable.approving'),
+      textIsError: false,
+      approveLabel: null,
+    });
+
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'couldNotApprove' });
+    await renderStoredSnapshotWithNotice(CTX);
+    expect(mocks.getNotification()).toMatchObject({
+      text: i18n.t('glanceable.approveFailed'),
+      textIsError: true,
+      approveLabel: i18n.t('common.approve'),
+    });
   });
 });
 

@@ -50,6 +50,20 @@ async function settleCurrentOperation<T>(epoch: number, operation: Promise<T>): 
   }
 }
 
+// NOT_FOUND means the session is already gone (deleted on another device, or
+// a stale row the user deleted twice). The delete reached its goal, so it
+// resolves with `deleted` and the row stays removed.
+async function treatMissingAsDeleted<T>(deletion: Promise<T>, deleted: T): Promise<T> {
+  try {
+    return await deletion;
+  } catch (error) {
+    if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
+      return deleted;
+    }
+    throw error;
+  }
+}
+
 const onError = (error: { message: string }) => {
   announcingToast.error(error.message || i18n.t('common.somethingWentWrong'));
 };
@@ -138,16 +152,13 @@ export function useSessionMutations() {
       if (!deleteOptions.mutationFn) {
         throw new Error('No mutationFn found');
       }
-      // NOT_FOUND means the session is already gone (deleted on another
-      // device, or a stale row the user deleted twice). The delete reached
-      // its goal: keep the row removed and report success.
-      const deletion = deleteOptions.mutationFn(input, context).catch((error: unknown) => {
-        if (readTrpcErrorField(error, 'code') === 'NOT_FOUND') {
-          return { success: true, session_id: input.session_id };
-        }
-        throw error;
-      });
-      const result = await settleCurrentOperation(epoch, deletion);
+      const result = await settleCurrentOperation(
+        epoch,
+        treatMissingAsDeleted(deleteOptions.mutationFn(input, context), {
+          success: true,
+          session_id: input.session_id,
+        })
+      );
       return result;
     },
   });

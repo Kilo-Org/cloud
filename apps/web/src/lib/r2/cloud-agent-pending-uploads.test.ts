@@ -184,28 +184,50 @@ describe('cloud-agent pending-upload ledger', () => {
     expect(rows).toHaveLength(CLOUD_AGENT_ATTACHMENT_MAX_COUNT);
   });
 
-  it.each(['linked', 'reaped'] as const)(
-    'refuses to admit a key whose row is already %s',
-    async status => {
-      const kiloUserId = `ca-user-${crypto.randomUUID()}`;
-      const messageUuid = crypto.randomUUID();
-      const attachmentId = crypto.randomUUID();
-      const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
-      const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      await insertPendingRow({ kiloUserId, messageUuid, attachmentId, expiresAt: future, status });
+  it('re-admits a key after the client released it before a retry', async () => {
+    mockSend.mockResolvedValue({});
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentId = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+    await admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 42 });
+    await releasePendingUploads(kiloUserId, [objectKey]);
 
-      await expect(
-        admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 })
-      ).rejects.toMatchObject({ code: 'CONFLICT' });
+    await admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 });
 
-      const rows = await db
-        .select()
-        .from(cloud_agent_pending_uploads)
-        .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ status, byte_size: 42 });
-    }
-  );
+    const rows = await db
+      .select()
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'pending', byte_size: 99 });
+  });
+
+  it('refuses to admit a key already linked to a sent message', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentId = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId,
+      expiresAt: future,
+      status: 'linked',
+    });
+
+    await expect(
+      admitPendingUpload({ kiloUserId, messageUuid, attachmentId, objectKey, byteSize: 99 })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const rows = await db
+      .select()
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'linked', byte_size: 42 });
+  });
 
   it('links only the supplied object keys and leaves unmatched rows pending', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;

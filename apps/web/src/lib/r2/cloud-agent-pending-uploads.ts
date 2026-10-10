@@ -15,8 +15,7 @@ const CLOUD_AGENT_PENDING_UPLOAD_TTL_MS = 24 * 60 * 60 * 1000;
 /** Objects purged per reaper run, so one cron invocation always finishes. */
 const CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH = 500;
 
-const CLOUD_AGENT_UPLOAD_CONFLICT_MESSAGE =
-  'Attachment was already sent or removed; attach the file again';
+const CLOUD_AGENT_UPLOAD_CONFLICT_MESSAGE = 'Attachment was already sent; attach the file again';
 
 export type AdmitPendingUploadParams = {
   kiloUserId: string;
@@ -30,12 +29,13 @@ export type AdmitPendingUploadParams = {
  * Admit a presigned upload into the pending-upload ledger. Runs in one
  * transaction: take the per-(user, message) advisory lock, count pending rows,
  * reject at the file-count bound, reject oversized uploads, then insert the
- * pending row with a 24-hour lease. A retry presigns the same object key
- * again: a still-pending row for that key is refreshed rather than inserted
- * and does not count against the bound. A key already 'linked' to a sent
- * message or 'reaped' is refused. The row is later flipped to 'linked' by
- * linkPendingUploads when the message is actually sent, or to 'reaped' once
- * its object is deleted.
+ * pending row with a 24-hour lease. A client Retry presigns the same object
+ * key again, usually after releasing it: a 'pending' or 'reaped' row for that
+ * key is reset to 'pending' with a fresh lease rather than inserted, and does
+ * not count against the bound. A key already 'linked' to a sent message is
+ * refused so its object is never overwritten. The row is later flipped to
+ * 'linked' by linkPendingUploads when the message is actually sent, or to
+ * 'reaped' once its object is deleted.
  */
 export async function admitPendingUpload({
   kiloUserId,
@@ -60,7 +60,7 @@ export async function admitPendingUpload({
       .from(cloud_agent_pending_uploads)
       .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
 
-    if (existing && (existing.kilo_user_id !== kiloUserId || existing.status !== 'pending')) {
+    if (existing && (existing.kilo_user_id !== kiloUserId || existing.status === 'linked')) {
       throw new TRPCError({ code: 'CONFLICT', message: CLOUD_AGENT_UPLOAD_CONFLICT_MESSAGE });
     }
 
@@ -94,15 +94,15 @@ export async function admitPendingUpload({
     const expiresAt = new Date(Date.now() + CLOUD_AGENT_PENDING_UPLOAD_TTL_MS).toISOString();
 
     if (existing) {
-      // The reaper and release claim rows without this lock, so refresh only
-      // a row that is still 'pending'.
+      // linkPendingUploads does not take this lock, so never revive a row it
+      // linked after the read above.
       const refreshed = await tx
         .update(cloud_agent_pending_uploads)
-        .set({ byte_size: byteSize, expires_at: expiresAt })
+        .set({ status: 'pending', byte_size: byteSize, expires_at: expiresAt })
         .where(
           and(
             eq(cloud_agent_pending_uploads.object_key, objectKey),
-            eq(cloud_agent_pending_uploads.status, 'pending')
+            ne(cloud_agent_pending_uploads.status, 'linked')
           )
         )
         .returning({ id: cloud_agent_pending_uploads.id });

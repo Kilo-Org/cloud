@@ -4,7 +4,7 @@ import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandb
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
-  rethrowAsPaymentRequired,
+  rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
@@ -239,8 +239,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
         return result;
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -278,8 +277,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
           cloudAgentSessionId: input.cloudAgentSessionId,
         });
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -352,8 +350,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
         return result;
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 

@@ -36,7 +36,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
     getSession: mockGetSession,
     deleteSession: mockDeleteCloudAgentSession,
   })),
-  rethrowAsPaymentRequired: jest.fn(),
+  rethrowCloudAgentError: jest.fn(),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
     constructor(message = 'Insufficient credits') {
       super(message);

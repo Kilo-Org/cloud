@@ -69,7 +69,7 @@ jest.mock('./cloud-agent-client', () => {
           ? createAppBuilderCloudAgentNextClient(token)
           : createCloudAgentNextClient(token)
     ),
-    rethrowAsPaymentRequired: jest.fn(),
+    rethrowCloudAgentError: jest.fn(),
   };
 });
 

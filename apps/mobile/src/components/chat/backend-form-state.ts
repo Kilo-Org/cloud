@@ -23,6 +23,7 @@ export type BackendModelFields = {
   contextWindow: string;
   maxOutputTokens: string;
   tools: boolean;
+  images: boolean;
 };
 export type BackendFormFields = {
   name: string;
@@ -42,6 +43,7 @@ export function modelFields(model?: BackendModel): BackendModelFields {
     contextWindow: model?.contextWindow?.toString() ?? '',
     maxOutputTokens: model?.maxOutputTokens?.toString() ?? '',
     tools: model?.tools ?? false,
+    images: model?.images ?? false,
   };
 }
 
@@ -62,6 +64,7 @@ export function backendDraftFromFields(
     id: model.id,
     name: model.name,
     tools: model.tools,
+    images: model.images,
     contextWindow: optionalTokenLimit(model.contextWindow),
     maxOutputTokens: optionalTokenLimit(model.maxOutputTokens),
   }));

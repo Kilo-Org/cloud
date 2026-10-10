@@ -298,3 +298,19 @@ export function pickAgentPicture(
     themedSheet,
   });
 }
+
+/**
+ * Image entry point: Camera and the multi-select Photo Library, with no Files
+ * source, for a composer that accepts images only.
+ */
+export function pickAgentImages(
+  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
+  context: AttachmentPickerContext,
+  themedSheet: ThemedActionSheetOptions
+): Promise<AgentAttachmentCandidate[]> {
+  return showAttachmentSourceSheet(showActionSheetWithOptions, context, {
+    sources: ['camera', 'library'],
+    libraryMultipleSelection: true,
+    themedSheet,
+  });
+}

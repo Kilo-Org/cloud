@@ -23,6 +23,8 @@ export type LocalModelProvider = {
   /** Limits from the last availability answer. Empty until one arrives. */
   readonly facts: (modelId: string) => ModelFacts;
   readonly supportsTools: (modelId: string) => boolean;
+  /** Image parts reach `client` only when this is true for the model. */
+  readonly supportsImages: (modelId: string) => boolean;
 };
 
 type SystemProvider = Exclude<LocalProvider, 'gguf'>;
@@ -114,6 +116,7 @@ function systemModelProvider(
     facts: () => systemFacts(known.get(provider)),
     // The module says whether it runs the tool loop. Until it answers, no tools are sent.
     supportsTools: () => known.get(provider)?.tools === true,
+    supportsImages: () => false,
   };
 }
 

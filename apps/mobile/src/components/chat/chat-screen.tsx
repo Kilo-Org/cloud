@@ -34,6 +34,8 @@ import { chatPlaceOf, useChat } from '@/lib/chat/use-chat';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
+import { useTargetSupportsImages } from '@/lib/chat/backend-capabilities';
+import { rememberModelFacts } from '@/lib/chat/layers';
 import { requiresBackendDisclosure } from '@/lib/chat/backend-model-options';
 import { resolveChatTarget } from '@/lib/chat/backend-target';
 import { useLocalModels } from '@/lib/chat/local-models';
@@ -117,6 +119,13 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const [picked, setPicked] = useState<string | null>(null);
   const [variant, setVariant] = useState('');
   const model = picked ?? state.model;
+  const imagesSupported = useTargetSupportsImages(model);
+
+  // The attach control and the send path read image support from the gateway
+  // list this screen loads, not only from the one the chat list loaded.
+  useEffect(() => {
+    rememberModelFacts(models);
+  }, [models]);
 
   const selectModel = (modelId: string, variantId: string) => {
     const accept = () => {
@@ -186,7 +195,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       // The question is on screen the moment it is asked, so the composer
       // empties now rather than when the answer lands.
       options?.onOptimisticSend?.();
-      void send(text, model);
+      void send(text, model, options?.images ?? []);
     },
     [backends, model, send, t]
   );
@@ -279,7 +288,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             variant={variant}
             modelOptions={availableOptions}
             onModelSelect={selectModel}
-            attachmentsEnabled={false}
+            attachmentsEnabled={imagesSupported}
+            attachmentDelivery="local"
             activeSessionType={null}
             organizationId={organizationId ?? undefined}
             disabled={modelsFailed && availableOptions.length === 0}

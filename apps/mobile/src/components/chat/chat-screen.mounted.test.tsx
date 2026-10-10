@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- every chat screen behavior shares this one mocked harness */
 /* eslint-disable typescript-eslint/no-deprecated -- the DOM-free `test-renderer` mounts React/RN trees under vitest (see src/test/render-with-providers.tsx) */
 /* eslint-disable max-lines -- the screen's states share one mounted fixture: opening, backend approval, failure, and message actions. */
 import { createElement } from 'react';
@@ -28,6 +29,7 @@ const state = vi.hoisted(() => ({
   retry: vi.fn(),
   send: vi.fn(),
   model: 'm1',
+  images: false,
 }));
 
 type AlertAction = { onPress?: () => void };
@@ -119,6 +121,10 @@ vi.mock('@/lib/chat/backend-store', () => ({
   useChatBackends: () => backendUi.profiles,
   getChatBackendsHasLoaded: () => backendUi.loaded,
 }));
+vi.mock('@/lib/chat/backend-capabilities', () => ({
+  useTargetSupportsImages: () => state.images,
+}));
+vi.mock('@/lib/chat/layers', () => ({ rememberModelFacts: () => undefined }));
 vi.mock('@/lib/chat/local-models', () => ({ useLocalModels: () => [] }));
 vi.mock('@/lib/chat/gguf-models', () => ({
   useGgufModels: () => ({ models: [], download: null, failure: null }),
@@ -186,6 +192,7 @@ beforeEach(() => {
   backendUi.alert.mockClear();
   backendUi.loaded = true;
   state.model = 'm1';
+  state.images = false;
   state.send.mockClear();
 });
 afterEach(() => {
@@ -257,7 +264,7 @@ describe('backend context-transfer approval', () => {
       apiKind: 'responses',
       apiKey: '',
       headers: {},
-      models: [{ id: 'shared', name: 'Shared', tools: false }],
+      models: [{ id: 'shared', name: 'Shared', tools: false, images: false }],
       allowLocalHttp: false,
     };
     backendUi.profiles = [backend];
@@ -301,7 +308,39 @@ describe('sending before stored backends load', () => {
       onSend('Question');
     });
     expect(backendUi.alert).not.toHaveBeenCalled();
-    expect(state.send).toHaveBeenCalledWith('Question', 'backend:server:1:model');
+    expect(state.send).toHaveBeenCalledWith('Question', 'backend:server:1:model', []);
+  });
+});
+
+describe('images in a chat', () => {
+  it.each([false, true])(
+    'offers the attach control only for a model that reads images (%s)',
+    async images => {
+      state.status = 'idle';
+      state.images = images;
+      const tree = await mount();
+      const composer = tree.root.find(node => (node.type as string) === 'ChatComposer');
+
+      expect(composer.props).toMatchObject({
+        attachmentsEnabled: images,
+        attachmentDelivery: 'local',
+      });
+    }
+  );
+
+  it('sends the images the composer read with the question', async () => {
+    state.status = 'idle';
+    state.images = true;
+    const tree = await mount();
+    const { onSend } = tree.root.find(node => (node.type as string) === 'ChatComposer').props;
+    if (!isHandler(onSend)) {
+      throw new TypeError('Composer has no send handler');
+    }
+    const image = { media: 'image/jpeg', data: 'AAAA' };
+    act(() => {
+      onSend('What is this?', { images: [image] });
+    });
+    expect(state.send).toHaveBeenCalledWith('What is this?', 'm1', [image]);
   });
 });
 

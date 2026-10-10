@@ -323,7 +323,6 @@ test('create workflow, approve card, and dry-run', async () => {
       await sidePanel.getByLabel('Message agent').fill('Dry run the interactive workflow');
       await sidePanel.getByLabel('Message agent').press('Enter');
 
-      // Assert the dry-run recorded actions in the tool exchange.
       // The save_workflow details body also mentions run_workflow (nextStep guidance).
       // Filter on the summary suffix so the bare-name match stays unambiguous.
       await expect(sidePanel.getByText('run_workflow completed')).toBeVisible();
@@ -412,7 +411,6 @@ test('run multi-page workflow from list with safe-mode toggle', async () => {
       await expect(runButton).toBeEnabled();
       await runButton.click();
 
-      // Assert the combined multi-page result in the tool exchange.
       await expect(sidePanel.getByText('run_workflow completed')).toBeVisible();
       const wfDetails = sidePanel.locator('details').filter({ hasText: 'run_workflow' });
       await wfDetails.locator('summary').click();
@@ -636,7 +634,6 @@ test('workflow uses fewer requests and fewer body bytes than eval rounds', async
       await expect(workflowRegion2).toBeVisible();
       await workflowRegion2.getByRole('button', { name: 'Run workflow "Inspect page"' }).click();
 
-      // Wait for the auto-turn to fire and be captured.
       await expect.poll(() => workflowBodies.length, { timeout: 10_000 }).toBeGreaterThan(0);
 
       const wfRequestCount = workflowBodies.length;
@@ -656,7 +653,6 @@ test('workflow uses fewer requests and fewer body bytes than eval rounds', async
         wfBodyBytes
       );
 
-      // Assert: workflow run uses strictly fewer gateway requests and fewer body bytes.
       expect(wfRequestCount).toBeLessThan(evalRequestCount);
       expect(wfBodyBytes).toBeLessThan(evalBodyBytes);
     } finally {
@@ -754,7 +750,6 @@ test('memory and workflow can be used together', async () => {
       await expect(workflowRegion).toBeVisible();
       await workflowRegion.getByRole('button', { name: 'Run workflow "Price check"' }).click();
 
-      // Assert the workflow tool result shows the price.
       await expect(sidePanel.getByText('run_workflow completed')).toBeVisible();
 
       // The auto-turn fires and the save_memory tool call triggers the approval card.
@@ -777,7 +772,6 @@ test('memory and workflow can be used together', async () => {
       await workflowDetails.locator('summary').click();
       await expect(workflowDetails.getByText('"$42"')).toBeVisible();
 
-      // Assert the new memory row exists in settings with the current price.
       await openSettings(sidePanel);
       const memoriesRegion = sidePanel.getByRole('region', { name: 'Memories' });
       await expect(memoriesRegion).toBeVisible();

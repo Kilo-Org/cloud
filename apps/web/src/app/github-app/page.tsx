@@ -6,7 +6,7 @@ import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegr
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { checkInstallState } from '@/lib/integrations/github/install-state';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export const metadata: Metadata = {
   title: 'Connect GitHub',

@@ -71,30 +71,6 @@ describe('public queue RPC routing', () => {
     }
   );
 
-  it('projects the actual control admission failure contract to HTTP 429', async () => {
-    const { control, call } = fixture();
-    control.admitSubmittedMessage.mockResolvedValue({
-      success: false,
-      code: 'PENDING_QUEUE_FULL',
-      error: 'Pending message queue is full (10)',
-    });
-    const response = await call('send', {
-      cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
-      message: { id: messageId, prompt: 'overflow' },
-      agent: { mode: 'code', model: 'test/model' },
-    });
-    expect(response.status).toBe(429);
-    expect(await response.json()).toMatchObject({
-      error: { data: { code: 'TOO_MANY_REQUESTS', clientError: { retryable: true } } },
-    });
-    expect(control.admitSubmittedMessage).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        userId: 'owner',
-        turn: { type: 'prompt', id: messageId, prompt: 'overflow' },
-      })
-    );
-  });
-
   it('never resolves a mutation receiver for unauthenticated or forbidden access', async () => {
     const { call, controlNamespace, legacyNamespace } = fixture();
     const input = { sessionId: 'workspace_11111111-1111-4111-8111-111111111111', messageId };

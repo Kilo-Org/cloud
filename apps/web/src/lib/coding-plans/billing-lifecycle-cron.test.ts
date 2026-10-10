@@ -1,8 +1,8 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
 
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
   processCodingPlanCancellationAtPeriodEnd,
   processCodingPlanRenewal,
@@ -10,9 +10,9 @@ import {
 } from '@/lib/coding-plans/billing-lifecycle-cron';
 import { subscribeToCodingPlan, uploadKeysToInventory } from '@/lib/coding-plans';
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   byok_api_keys,
   coding_plan_key_inventory,
@@ -22,7 +22,7 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
-jest.mock('@/lib/autoTopUp', () => ({
+jest.mock('@kilocode/web-shared/lib/autoTopUp', () => ({
   maybePerformAutoTopUp: jest.fn(async () => undefined),
 }));
 const MAX_PLAN_ID = 'minimax-token-plan-max';

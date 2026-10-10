@@ -6,9 +6,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearMarkdownImageConfirmMemory } from './markdown-image-confirm';
 import { MarkdownImage } from './markdown-image';
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+const alertMock = vi.hoisted(() => vi.fn());
+const secureStoreMock = vi.hoisted(() => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
+
+vi.mock('react-native', () => ({
+  Alert: { alert: alertMock },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
+// The trusted-image-host store reaches SecureStore, Sentry and the toast
+// bridge on import; stub that chain so the mounted render does not pull it in.
+vi.mock('expo-secure-store', () => secureStoreMock);
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', Download: 'Download' }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -22,7 +38,7 @@ beforeEach(() => {
 
 function viewerCount(root: TestRenderer.ReactTestInstance): number {
   return root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'ImageViewerModal'
+    node => typeof node.type === 'string' && (node.type as string) === 'ImageViewer'
   ).length;
 }
 
@@ -32,7 +48,7 @@ function imageCount(root: TestRenderer.ReactTestInstance): number {
 }
 
 describe('MarkdownImage viewer mounting', () => {
-  it('mounts ImageViewerModal only after the image is confirmed and pressed', async () => {
+  it('mounts ImageViewer only after the image is confirmed and pressed', async () => {
     const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };
@@ -59,6 +75,19 @@ describe('MarkdownImage viewer mounting', () => {
     await act(async () => {
       await Promise.resolve();
       (loadButton.props.onPress as () => void)();
+    });
+    // The first press only opens the native trust dialog; choosing Load once
+    // is what confirms the URI and mounts the Image.
+    const buttons = alertMock.mock.calls.at(-1)?.[2] as
+      | { text: string; onPress?: () => void }[]
+      | undefined;
+    const loadOnce = buttons?.find(button => button.text === 'Load once');
+    if (!loadOnce?.onPress) {
+      throw new Error('Load once action not found');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      loadOnce.onPress?.();
     });
     expect(imageCount(renderer.root)).toBe(1);
 

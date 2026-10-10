@@ -7,7 +7,7 @@
       "instanceLifecycle": "อินสแตนซ์ของคุณมีการอัปเดต",
       "scheduledAction": "การดำเนินการที่กำหนดไว้มีการอัปเดต",
       "lowBalance": "ยอดคงเหลือของคุณต้องได้รับการดูแล",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "ค่าใช้จ่ายของคุณต้องได้รับการดูแล",
       "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล",
       "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
     }
@@ -44,8 +44,8 @@
       "body": "ยอดคงเหลือของ {{organizationName}} ลดลงต่ำกว่า ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "การแจ้งเตือนค่าใช้จ่าย",
+      "body": "ค่าใช้จ่ายของ {{scopeName}} เกิน ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "พบปัญหาความปลอดภัยใหม่ ({{severity}})",

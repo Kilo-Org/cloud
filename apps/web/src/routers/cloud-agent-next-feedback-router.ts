@@ -1,11 +1,11 @@
 import 'server-only';
 
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cloud_agent_feedback } from '@kilocode/db/schema';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import * as z from 'zod';
-import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@/lib/config.server';
+import { SLACK_USER_FEEDBACK_WEBHOOK_URL } from '@kilocode/web-shared/lib/config.server';
 
 const recentMessageSchema = z.object({
   role: z.string().max(50),

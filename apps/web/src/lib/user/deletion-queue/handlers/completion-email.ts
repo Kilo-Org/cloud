@@ -5,12 +5,12 @@ import {
   UserDeletionStepStatus,
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
-import { sendAccountDeletionCompletedEmail } from '@/lib/email';
-import { db } from '@/lib/drizzle';
+import { sendAccountDeletionCompletedEmail } from '@kilocode/web-shared/lib/email';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   USER_DELETION_PROVIDER_TIMEOUT_MS,
   USER_DELETION_STOP_STARTING_RESERVE_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import type {
   DeletionHandlerContext,
   DeletionHandlerOutcome,

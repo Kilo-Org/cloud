@@ -60,7 +60,7 @@ jest.mock('@/lib/security-agent/posthog-tracking', () => ({
   trackSecurityAgentAutoDismiss: mockTrackAutoDismiss,
 }));
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({

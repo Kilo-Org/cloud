@@ -4,7 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import { z } from 'zod';
-import type { Part, SessionStatus, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
+import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
   SessionGoal,
@@ -52,6 +52,7 @@ import {
   cloudMessageCompletedDataSchema,
   cloudMessageFailedDataSchema,
   type CloudAgentEvent,
+  type SessionStatus,
 } from './schemas';
 
 /** Chat events — data mutations for messages and parts. */

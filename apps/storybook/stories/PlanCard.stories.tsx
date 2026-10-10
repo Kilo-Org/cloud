@@ -7,7 +7,7 @@ import {
 import {
   TEAM_SEAT_PRICE_MONTHLY_USD,
   ENTERPRISE_SEAT_PRICE_MONTHLY_USD,
-} from '@/lib/organizations/constants';
+} from '@kilocode/web-shared/lib/organizations/constants';
 
 const meta: Meta<typeof PlanCard> = {
   title: 'Organizations/Components/Plan Card',

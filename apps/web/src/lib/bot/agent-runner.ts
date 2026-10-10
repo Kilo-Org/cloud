@@ -12,8 +12,8 @@ import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
 import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
-import { APP_URL } from '@/lib/constants';
-import { FEATURE_HEADER } from '@/lib/feature-detection';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import {
@@ -24,8 +24,8 @@ import {
   formatGitLabRepositoriesForPrompt,
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { generateApiToken } from '@/lib/tokens';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';

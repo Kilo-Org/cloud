@@ -1,0 +1,273 @@
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+const mockedWarnExceptInTest = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  AUTO_ROUTING_WORKER_URL: '',
+  INTERNAL_API_SECRET: '',
+}));
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
+}));
+
+import { EFFICIENT_DECISION_TIMEOUT_MS, fetchEfficientAutoDecision } from './auto-routing-decision';
+import type { EfficientDecisionParams } from './auto-routing-decision';
+import {
+  detectRequiredInputModalities,
+  estimateRoutingTokens,
+} from '@kilocode/auto-routing-contracts';
+
+const originalFetch = globalThis.fetch;
+const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
+
+function makeParams(): EfficientDecisionParams {
+  return {
+    apiKind: 'chat_completions',
+    body: {
+      model: 'kilo-auto/efficient',
+      stream: true,
+      messages: [
+        { role: 'system', content: 'You are Kilo Code.' },
+        { role: 'user', content: 'Fix the parser bug.' },
+      ],
+    },
+    requestedModel: 'kilo-auto/efficient',
+    providerHints: { provider: null, providerOptions: null },
+    bodyBytes: 512,
+    userId: 'user-1',
+    organizationId: 'org-1',
+    sessionId: 'task-123',
+    machineId: 'machine-1',
+    clientRequestId: 'req-1',
+    mode: 'code',
+    userAgent: 'Kilo-Code/1.2.3',
+  };
+}
+
+const options = {
+  workerUrl: 'https://auto-routing.example.com',
+  authToken: 'classifier-token',
+};
+
+const validDecision = {
+  model: 'anthropic/claude-haiku-4',
+  taskType: 'implementation' as const,
+  subtaskType: 'feature_development' as const,
+  source: 'benchmark' as const,
+  tableVersion: 'v1',
+  sticky: false,
+};
+
+const validResponse = {
+  cost: 0.001,
+  decision: validDecision,
+  classifierResult: null,
+};
+
+describe('fetchEfficientAutoDecision', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    globalThis.fetch = mockedFetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('returns the decision on a 200 response with valid body', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    const result = await fetchEfficientAutoDecision(makeParams(), options);
+
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const [url, init] = mockedFetch.mock.calls[0];
+    expect(url).toBe('https://auto-routing.example.com/decide');
+    expect(init).toMatchObject({ method: 'POST' });
+    const headers = init?.headers as Headers;
+    expect(headers.get('authorization')).toBe('Bearer classifier-token');
+    expect(headers.get('content-type')).toBe('application/json');
+    expect(result).toEqual({ decision: validDecision, costUsd: 0.001 });
+  });
+
+  it('allows the current worker miss path five seconds to complete', () => {
+    expect(EFFICIENT_DECISION_TIMEOUT_MS).toBe(5_000);
+  });
+
+  it('includes denied model ids in the worker payload', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(
+      { ...makeParams(), deniedModelIds: ['openai/gpt-4o'] },
+      options
+    );
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+    });
+  });
+
+  it('includes the organization id in the worker payload when present', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(makeParams(), options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      userId: 'user-1',
+      organizationId: 'org-1',
+    });
+  });
+
+  it('returns null and calls onError on a non-OK response', async () => {
+    const onError = jest.fn();
+    mockedFetch.mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }));
+
+    const result = await fetchEfficientAutoDecision(makeParams(), { ...options, onError });
+
+    expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith('Efficient auto decision request failed', {
+      error: 'status 500',
+    });
+  });
+
+  it('returns null and calls onError when fetch rejects (timeout/abort)', async () => {
+    const onError = jest.fn();
+    mockedFetch.mockRejectedValueOnce(new Error('The operation was aborted'));
+
+    const result = await fetchEfficientAutoDecision(makeParams(), { ...options, onError });
+
+    expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith('Efficient auto decision request failed', {
+      error: 'The operation was aborted',
+    });
+  });
+
+  it('returns null and calls onError on a schema-invalid response body', async () => {
+    const onError = jest.fn();
+    mockedFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ unexpected: 'shape' }), { status: 200 })
+    );
+
+    const result = await fetchEfficientAutoDecision(makeParams(), { ...options, onError });
+
+    expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith('Efficient auto decision response invalid', {
+      error: 'invalid_response',
+    });
+  });
+
+  it('returns null when normalization fails (unclassifiable body)', async () => {
+    const result = await fetchEfficientAutoDecision(
+      { ...makeParams(), body: { stream: true } },
+      options
+    );
+
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  it('returns null when workerUrl is not configured', async () => {
+    const result = await fetchEfficientAutoDecision(makeParams(), {
+      ...options,
+      workerUrl: '',
+    });
+
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  it('returns null when authToken is not configured', async () => {
+    const result = await fetchEfficientAutoDecision(makeParams(), {
+      ...options,
+      authToken: '',
+    });
+
+    expect(mockedFetch).not.toHaveBeenCalled();
+    expect(result).toBeNull();
+  });
+
+  it('returns decision: null with costUsd when the worker returns a null decision', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ cost: 0.001, decision: null, classifierResult: null }), {
+        status: 200,
+      })
+    );
+
+    const result = await fetchEfficientAutoDecision(makeParams(), options);
+
+    expect(result).toEqual({ decision: null, costUsd: 0.001 });
+  });
+
+  it('forwards requiredInputModalities=["image"] into constraints for an image-bearing body', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    const imageBody = {
+      model: 'kilo-auto/efficient',
+      stream: true,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What is in this picture?' },
+            {
+              type: 'image_url',
+              image_url: { url: 'https://example.com/cat.png' },
+            },
+          ],
+        },
+      ],
+    };
+
+    await fetchEfficientAutoDecision({ ...makeParams(), body: imageBody }, options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const body = JSON.parse(init?.body as string);
+    expect(body.constraints?.requiredInputModalities).toEqual(['image']);
+    expect(detectRequiredInputModalities(imageBody)).toEqual(['image']);
+  });
+
+  it('omits requiredInputModalities from constraints (and the whole constraints key when no other field is present) for a text-only body', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    await fetchEfficientAutoDecision(makeParams(), options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const body = JSON.parse(init?.body as string);
+    // The default `makeParams()` body is short text that may or may not
+    // produce a positive token estimate. We only assert the modality
+    // contract here: the key must never be `[]` (i.e. empty), and when
+    // there's no prompt-token estimate either the whole `constraints`
+    // key must be absent.
+    if ('constraints' in body) {
+      expect(body.constraints.requiredInputModalities).toBeUndefined();
+    } else {
+      expect(body.constraints).toBeUndefined();
+    }
+  });
+
+  it('forwards the promptTokensEstimate returned by estimateRoutingTokens unchanged', async () => {
+    mockedFetch.mockResolvedValueOnce(new Response(JSON.stringify(validResponse), { status: 200 }));
+
+    const longText =
+      'Please summarize this long document. ' +
+      'The quick brown fox jumps over the lazy dog. '.repeat(200);
+    const body = {
+      model: 'kilo-auto/efficient',
+      stream: true,
+      messages: [
+        { role: 'system', content: 'You are Kilo Code.' },
+        { role: 'user', content: longText },
+      ],
+    };
+
+    await fetchEfficientAutoDecision({ ...makeParams(), body }, options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const sent = JSON.parse(init?.body as string);
+    const expected = estimateRoutingTokens(body);
+    expect(expected).toBeGreaterThan(0);
+    expect(sent.constraints?.promptTokensEstimate).toBe(expected);
+  });
+});

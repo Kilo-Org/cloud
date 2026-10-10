@@ -1,14 +1,14 @@
-import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { validateAuthorizationHeader } from '@/lib/tokens';
+import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const mockSharedResourceTokens = { enabled: false };
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
   NEXTAUTH_SECRET: 'benchmark-token-secret',
   isResourceTokenIssuanceEnabled: jest.fn(() => mockSharedResourceTokens.enabled),
@@ -17,7 +17,7 @@ jest.mock('@/lib/config.server', () => ({
 const mockRows: unknown[] = [];
 const mockMembershipRows: unknown[] = [];
 let mockSelectCallCount = 0;
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => {
       const callIndex = mockSelectCallCount++;

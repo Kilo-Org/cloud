@@ -33,12 +33,17 @@ const config: StorybookConfig = {
   staticDirs: ['../../web/public', '../public'],
   webpackFinal: async config => {
     const srcDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../web/src');
+    const webSharedSrcDir = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../packages/web-shared/src'
+    );
     const mocksDir = resolve(dirname(fileURLToPath(import.meta.url)), '../src/mocks');
 
     if (config.resolve) {
       config.resolve.alias = {
         ...config.resolve.alias,
         '@': srcDir,
+        '@kilocode/web-shared': webSharedSrcDir,
         '@/lib/utils': resolve(mocksDir, 'utils.ts'),
       };
     }

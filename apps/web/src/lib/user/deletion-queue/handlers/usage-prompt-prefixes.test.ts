@@ -13,12 +13,12 @@ import {
   UserDeletionStepStatus,
   type UserDeletionTaskProgress,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { USER_DELETION_USAGE_PREFIX_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { USER_DELETION_USAGE_PREFIX_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { handleUsagePromptPrefixes } from '@/lib/user/deletion-queue/handlers/usage-prompt-prefixes';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('handleUsagePromptPrefixes', () => {
   beforeEach(async () => {

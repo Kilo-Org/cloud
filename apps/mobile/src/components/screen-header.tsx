@@ -3,14 +3,13 @@ import { ChevronDown } from '@/components/ui/icons';
 import { DirectionalChevronLeft } from '@/components/ui/directional-icons';
 import { I18nManager, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
-import { useSideInsetStyle } from '@/lib/screen-insets';
+import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
 import { cn } from '@/lib/utils';
 
 /**
@@ -58,10 +57,9 @@ const HEADER_ACTIONS_GAP = 12;
  * `headerRightWidth` is the width the caller's trailing cluster lays out at, in
  * dp — the widths the caller renders, not a worst case it may never show. A
  * cluster wide enough to leave the title below its readable minimum reflows
- * too: at 320 dp with a font scale of 2 the PR review header's Share, Submit
- * review and Merge controls left the title a few characters. Fixed-size
- * children (icon buttons, a label capped at its own max-w) do not grow with the
- * font scale, so this width is taken as laid out and is not scaled.
+ * too. Fixed-size children (icon buttons, a label capped at its own max-w) do
+ * not grow with the font scale, so this width is taken as laid out and is not
+ * scaled.
  */
 export function shouldStackHeaderActions(
   width: number,
@@ -114,6 +112,8 @@ type ScreenHeaderProps = {
    * a cluster no wider than a single icon button.
    */
   headerRightWidth?: number;
+  /** Keep compact fixed-width controls beside the title even on narrow screens. */
+  allowHeaderRightStacking?: boolean;
   /**
    * The `headerRight` cluster shrinks and truncates on its own (the session
    * header's context pill: `min-w-0 shrink`, one-line cost). The slot then
@@ -126,8 +126,19 @@ type ScreenHeaderProps = {
   /** Controls rendered at the trailing edge of the title row, in the
    * leading-aligned row and beside a centered title alike. The heading keeps
    * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
-   * their full width instead of the `headerRight` half-row cap wrapping them. */
+   * their full width instead of the `headerRight` half-row cap wrapping them.
+   * Pass `inlineActionsWidth` for a cluster wide enough to squeeze the title:
+   * the row then drops beneath the title once the two cannot share. */
   inlineActions?: React.ReactNode;
+  /**
+   * Width the `inlineActions` cluster lays out at, in dp. The stacking decision
+   * reserves it (see `shouldStackHeaderActions`) exactly as `headerRightWidth`
+   * does for `headerRight`: on a phone the Agents controls are as wide as the
+   * title's readable minimum, so without this the 30px title broke mid-word
+   * beside them (Croatian "Agenti" → "Age" / "nti"). Omit it for a cluster no
+   * wider than the title can spare.
+   */
+  inlineActionsWidth?: number;
   /** Home, Quick Chat, and session headers supply context below the title.
    * Other callers keep their existing title-only layout when this slot is absent. */
   context?: React.ReactNode;
@@ -182,8 +193,10 @@ export function ScreenHeader({
   size = 'default',
   headerRight,
   headerRightWidth,
+  allowHeaderRightStacking = true,
   headerRightShrinks = false,
   inlineActions,
+  inlineActionsWidth,
   context,
   modal,
   centerTitle = modal ?? false,
@@ -196,7 +209,7 @@ export function ScreenHeader({
   safeAreaTop = true,
   className,
 }: Readonly<ScreenHeaderProps>) {
-  const insets = useSafeAreaInsets();
+  const insets = useScreenInsets();
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -209,7 +222,15 @@ export function ScreenHeader({
   // that declares its cluster's width reflows before that cluster eats the
   // title's readable minimum (see `headerRightWidth`).
   const stackActions =
-    headerRight != null && shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
+    allowHeaderRightStacking &&
+    headerRight != null &&
+    shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
+  // The inline controls row reflows the same way: a caller that declares its
+  // width drops it beneath the title before it squeezes the title's own
+  // readable minimum, so the 30px Agents title never breaks inside a word.
+  const stackInlineActions =
+    inlineActions != null &&
+    shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
 
   // A modal is a native sheet that owns its own top inset; the header keeps the
   // fixed grabber clearance on both platforms. A pinned header adds the app
@@ -229,17 +250,9 @@ export function ScreenHeader({
   // vertical padding through `className`.
   const safeAreaStyle = safeAreaTop ? { paddingTop } : undefined;
 
-  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // whole chrome off the sensor. The one shared hook serves both platforms and
-  // every caller: the brand mark on a page root and the sections, cards and
-  // actions below it then share one leading edge. It goes on an inner wrapper so
-  // it ADDS to the `px-4` gutter: an inline padding on the container would beat
-  // the className (inline style wins in React Native) and swallow the gutter,
-  // pulling the back control's `-ms-4` chevron back inside the sensor area. Zero
-  // insets collapse the wrapper style to `undefined`, so portrait geometry is
-  // byte-identical and a rotation never moves anything vertically. Side padding
-  // applies to every caller — a sheet with `safeAreaTop={false}` still runs
-  // edge-to-edge horizontally and must clear the cutout too.
+  // The shared inset hook keeps the chrome and body clear of side status areas
+  // and rounded corners. The inner wrapper adds this clearance to the gutter
+  // instead of replacing its className padding.
   const sideInsetStyle = useSideInsetStyle();
 
   // When `backIcon` isn't specified, fall back to the historical behaviour
@@ -382,10 +395,9 @@ export function ScreenHeader({
   // cut off (device capture, session-compose-kbup). Content sizing moves the
   // squeeze to the title: `heading` is `min-w-0 flex-1`, so a long title
   // truncates in place and the controls stay whole inside the screen's own
-  // padding. A window too narrow to hold both drops the actions to their own
-  // row (`stackActions`), and a variable-width button caps itself: PR review's
-  // Submit review (pr-review-screen.tsx) and the Security Agent settings Save
-  // button (settings-save-button.tsx) each carry a 140 dp max-w.
+  // padding. By default, a window too narrow to hold both drops the actions to
+  // their own row (`stackActions`). A variable-width button caps itself, as the
+  // Security Agent settings Save button does with a 140 dp max-w.
   //
   // A cluster that shrinks on its own (`headerRightShrinks`) keeps the
   // half-row cap: its unbounded text truncates inside the cap, and the title
@@ -394,8 +406,24 @@ export function ScreenHeader({
     ? 'ms-3 max-w-[50%] min-w-0 shrink'
     : 'ms-3 shrink-0';
   const centeredControls =
-    separateHeading && backControl && !inlineActions && (!headerRight || stackActions) ? (
+    separateHeading &&
+    backControl &&
+    (!inlineActions || stackInlineActions) &&
+    (!headerRight || stackActions) ? (
       <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
+    ) : null;
+  // The inline controls keep the title's row only while it can still hold a
+  // readable title; below that they take a row of their own. On their own row
+  // they keep the header's full width, so a long translation (Croatian
+  // "TRENUTAČNO AKTIVNO" / "PRETHODNE SESIJE" beside the filter) stays legible
+  // instead of squeezing the 30px title into a mid-word break.
+  const inlineActionsSlot =
+    inlineActions && !stackInlineActions ? (
+      <View className="ms-3 min-w-0 shrink">{inlineActions}</View>
+    ) : null;
+  const stackedInlineActionsRow =
+    inlineActions && stackInlineActions ? (
+      <View className="mt-2 min-w-0">{inlineActions}</View>
     ) : null;
 
   return (
@@ -411,7 +439,7 @@ export function ScreenHeader({
               ) : (
                 centeredControls
               )}
-              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
+              {inlineActionsSlot}
             </View>
             {headerRight && stackActions ? (
               // The actions keep the title's own row only while it can hold a
@@ -420,6 +448,7 @@ export function ScreenHeader({
               // inside it instead of running off the edge.
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
+            {stackedInlineActionsRow}
           </>
         ) : (
           <>
@@ -431,11 +460,12 @@ export function ScreenHeader({
               {headerRight && !stackActions ? (
                 <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : null}
-              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
+              {inlineActionsSlot}
             </View>
             {headerRight && stackActions ? (
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
+            {stackedInlineActionsRow}
           </>
         )}
       </View>

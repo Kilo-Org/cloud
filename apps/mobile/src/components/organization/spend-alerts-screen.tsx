@@ -161,14 +161,17 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.channel.spend')} />
       <TabScreenScrollView
+        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
+        automaticallyAdjustKeyboardInsets
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
-        automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <SpendAlertsForm
           organizationId={organizationId}
+          scope={query.data.scope}
+          scopeName={query.data.scopeName}
           enabled={query.data.enabled ?? false}
           rules={query.data.rules}
           spend={query.data.spend}
@@ -182,6 +185,10 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
 
 type SpendAlertsFormProps = Readonly<{
   organizationId?: string;
+  /** The scope the router read: the caller's own account or an organization. */
+  scope: SpendAlertSettings['scope'];
+  /** The owner's display name for that scope (the caller's name, or the org's). */
+  scopeName: string;
   enabled: boolean;
   rules: SpendAlertRules;
   spend: SpendAlertSpend;
@@ -191,6 +198,8 @@ type SpendAlertsFormProps = Readonly<{
 
 function SpendAlertsForm({
   organizationId,
+  scope,
+  scopeName,
   enabled: storedEnabled,
   rules,
   spend,
@@ -200,6 +209,11 @@ function SpendAlertsForm({
   const router = useRouter();
   const { t } = useTranslation();
   const save = useSaveSpendAlerts();
+
+  // The screen serves both the caller's own account and an organization; the
+  // copy alone never says which one an alert watches, so the scope line names
+  // the owner. The labels are the shared Account / Organization keys.
+  const scopeLabel = scope === 'organization' ? t('common.organization') : t('preferences.account');
 
   const threshold = rules?.find(rule => rule.kind === 'threshold');
   const anomaly = rules?.find(rule => rule.kind === 'anomaly');
@@ -411,13 +425,14 @@ function SpendAlertsForm({
       </Text>
 
       <View className="rounded-lg bg-secondary px-3">
-        <KvRow label={t('spendAlerts.spend24h')} value={spendValue} last />
+        <KvRow label={scopeLabel} value={scopeName} selectable />
+        <KvRow label={t('spendAlerts.spend24h')} value={spendValue} last selectable />
       </View>
 
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('common.enabled')}</Text>
+        <Text className="text-sm font-medium">{t('notifications.channel.spend')}</Text>
         <Switch
-          accessibilityLabel={t('spendAlerts.enable')}
+          accessibilityLabel={t('notifications.channel.spend')}
           value={enabled}
           onValueChange={value => {
             void Haptics.selectionAsync();
@@ -659,7 +674,10 @@ function SpendAlertsSkeleton() {
       <ScreenHeader title={t('notifications.channel.spend')} />
       <ScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pb-8 pt-4">
         <Skeleton className="h-4 w-64 rounded" />
-        <Skeleton className="h-[52px] rounded-lg" />
+        {/* The scope group holds two KvRows now (the scope owner and the 24 h
+            spend); each row is py-3 (24) plus a text-sm line (20) = 44, so the
+            block reserves 88 and the loaded rows swap in without moving Save. */}
+        <Skeleton className="h-[88px] rounded-lg" />
         <Skeleton className="h-[56px] rounded-lg" />
         <RuleCardSkeleton />
         <RuleCardSkeleton />

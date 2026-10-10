@@ -5,7 +5,7 @@ import type Stripe from 'stripe';
 import {
   sendMissedServiceFeeAlert,
   type MissedServiceFeeAlertInput,
-} from '@/lib/service-fees/alerts';
+} from '@kilocode/web-shared/lib/service-fees/alerts';
 import {
   linkServiceFeeAssessmentStripeIds,
   markServiceFeeAssessmentCharged,
@@ -15,13 +15,13 @@ import {
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
   type ServiceFeeStripeIds,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   calculateServiceFeeMinor,
   getNetPretaxLineAmountMinor,
-} from '@/lib/service-fees/calculation';
-import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
-import { createInvoiceServiceFeeAssessmentKey } from '@/lib/service-fees/checkout';
+} from '@kilocode/web-shared/lib/service-fees/calculation';
+import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@kilocode/web-shared/lib/service-fees/constants';
+import { createInvoiceServiceFeeAssessmentKey } from '@kilocode/web-shared/lib/service-fees/checkout';
 import { applyDeferredServiceFeeRefunds } from '@/lib/service-fees/refunds';
 import {
   getInvoiceLineInvoiceItemId,
@@ -29,8 +29,8 @@ import {
   listAllInvoiceLineItems,
   sumEligibleKiloPassSubtotalMinor,
   type InvoiceLineItemListClient,
-} from '@/lib/service-fees/stripe-lines';
-import { SERVICE_FEE_SUPPORTED_CURRENCY } from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/stripe-lines';
+import { SERVICE_FEE_SUPPORTED_CURRENCY } from '@kilocode/web-shared/lib/service-fees/types';
 
 export const SERVICE_FEE_RATE_DEVIATION_THRESHOLD_MINOR = 1;
 export const SERVICE_FEE_FAILURE_RATE_DEVIATION = 'service_fee_rate_deviation' as const;

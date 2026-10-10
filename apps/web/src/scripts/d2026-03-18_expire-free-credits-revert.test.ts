@@ -16,10 +16,10 @@ import { execSync } from 'node:child_process';
 import { readdirSync, writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 // ── Test user IDs ────────────────────────────────────────────────────────────
 

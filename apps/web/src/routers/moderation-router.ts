@@ -4,8 +4,8 @@ import * as z from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   content_moderation_reports,
   user_github_app_tokens,

@@ -7,7 +7,7 @@ import { Providers } from '../components/Providers';
 import { DataLayerProvider } from '../components/DataLayerProvider';
 import { ImpactIdentify } from '@/components/ImpactIdentify';
 import { StagingEnvironmentBanner } from '@/components/shared/StagingEnvironmentBanner';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 
 const inter = Inter({

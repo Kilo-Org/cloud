@@ -23,12 +23,16 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
 ];
 
 /**
- * Returns a human-readable relative time string like "3 days ago". Uses
- * `Intl.RelativeTimeFormat` with the active i18n language (or the passed
- * locale) so the unit words and direction are localized. The shared formatter
- * loads the Hermes polyfill and active locale on demand. Sub-minute ages use
- * the catalog's `common.justNow` because RelativeTimeFormat has no sub-minute
- * bucket.
+ * Returns a human-readable relative time string like "3 days ago" or "in 2
+ * hours". Uses `Intl.RelativeTimeFormat` with the active i18n language (or the
+ * passed locale) so the unit words and direction are localized. The shared
+ * formatter loads the Hermes polyfill and active locale on demand. Sub-minute
+ * gaps use the catalog's `common.justNow` because RelativeTimeFormat has no
+ * sub-minute bucket.
+ *
+ * The sign decides the direction: an instant ahead of the clock is a wait the
+ * user is looking forward to (a scheduled wake reads "in 2 hours"), so the
+ * magnitude picks the unit and a future value is formatted positive.
  *
  * `nowMs` is the caller's clock. A relative label must be derived from a value
  * the render traces (the ticker's `now`), never from a live `Date.now()` read:
@@ -39,15 +43,16 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
  */
 function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): string {
   const seconds = Math.floor((nowMs - date.getTime()) / 1000);
-  if (seconds < 60) {
+  const magnitude = Math.abs(seconds);
+  if (magnitude < 60) {
     return i18n.t('common.justNow');
   }
   const resolvedLocale = locale ?? i18n.language;
   const formatter = relativeTimeFormat(resolvedLocale, { numeric: 'auto' });
   for (const { unit, seconds: unitSeconds } of RELATIVE_TIME_UNITS) {
-    const value = Math.floor(seconds / unitSeconds);
+    const value = Math.floor(magnitude / unitSeconds);
     if (value >= 1) {
-      return formatter.format(-value, unit);
+      return formatter.format(seconds < 0 ? value : -value, unit);
     }
   }
   return i18n.t('common.justNow');

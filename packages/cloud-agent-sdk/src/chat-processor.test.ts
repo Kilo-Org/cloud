@@ -204,8 +204,6 @@ describe('createChatProcessor', () => {
       expect(storedFile.source?.text.value).toBe('');
     });
 
-    // --- onFilePart callback gates ---
-
     it('calls onFilePart for a top-level FilePart with a non-blank url', () => {
       const storage = createMemoryStorage();
       const onFilePart = jest.fn();
@@ -266,8 +264,6 @@ describe('createChatProcessor', () => {
       expect(storedFile.url).toBe('');
     });
 
-    // --- onToolAttachment callback gates ---
-
     it('calls onToolAttachment for image attachments from any tool', () => {
       const storage = createMemoryStorage();
       const onToolAttachment = jest.fn();
@@ -320,7 +316,6 @@ describe('createChatProcessor', () => {
       processor.process({ type: 'message.part.updated', part });
 
       expect(onToolAttachment).not.toHaveBeenCalled();
-      // Still strips the URL from storage
       const stored = storage.getParts('msg-1');
       const storedTool = stored[0] satisfies Part as ToolPart;
       if (storedTool.state.status !== 'completed') return;
@@ -418,7 +413,6 @@ describe('createChatProcessor', () => {
       const storage = createMemoryStorage();
       const processor = createChatProcessor(storage);
 
-      // Add synthetic optimistic part with text
       const syntheticPart = {
         id: 'part-1',
         sessionID: 'ses-1',
@@ -432,7 +426,6 @@ describe('createChatProcessor', () => {
         'user message text'
       );
 
-      // Server sends non-synthetic part with empty text
       const nonSyntheticEmptyPart = {
         id: 'part-1',
         sessionID: 'ses-1',
@@ -443,7 +436,6 @@ describe('createChatProcessor', () => {
       };
       processor.process({ type: 'message.part.updated', part: nonSyntheticEmptyPart });
 
-      // Should preserve the existing text
       const stored = storage.getParts('msg-1');
       expect(stored).toHaveLength(1);
       expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
@@ -941,13 +933,10 @@ describe('createChatProcessor', () => {
       const user = makeUserMsg('msg-1');
       const assistant = makeAssistantMsg('msg-2', 'msg-1');
 
-      // 1. User message arrives
       processor.process({ type: 'message.updated', info: user });
 
-      // 2. Assistant message arrives
       processor.process({ type: 'message.updated', info: assistant });
 
-      // 3. Text part with streaming deltas
       processor.process({
         type: 'message.part.delta',
         sessionId: 'ses-1',
@@ -965,13 +954,11 @@ describe('createChatProcessor', () => {
         delta: 'world',
       });
 
-      // 4. Full part update replaces the delta-seeded part
       processor.process({
         type: 'message.part.updated',
         part: makeTextPart('part-1', 'msg-2', 'Hello world!'),
       });
 
-      // 5. Second part arrives then gets removed
       processor.process({
         type: 'message.part.updated',
         part: makeTextPart('part-2', 'msg-2', 'ephemeral'),
@@ -983,7 +970,6 @@ describe('createChatProcessor', () => {
         partId: 'part-2',
       });
 
-      // Verify final state
       expect(storage.getMessageIds()).toEqual(['msg-1', 'msg-2']);
       expect(storage.getMessageInfo('msg-1')).toEqual(user);
       expect(storage.getMessageInfo('msg-2')).toEqual(assistant);

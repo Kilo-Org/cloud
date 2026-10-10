@@ -1203,6 +1203,9 @@ export const AuditLogAction = z.enum([
   'organization.domain_claim.verify',
   'organization.domain_claim.lose_verification',
   'organization.domain_claim.remove',
+  'organization.domain_claim.cleanup_started',
+  'organization.domain_claim.cleanup_completed',
+  'organization.domain_claim.cleanup_failed',
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
@@ -1245,31 +1248,6 @@ export type AuthProviderId =
   | 'openai'
   | 'fake-login'
   | 'workos';
-
-// --- AbuseClassification ---
-
-export type AbuseClassification = (typeof ABUSE_CLASSIFICATION)[keyof typeof ABUSE_CLASSIFICATION];
-export const ABUSE_CLASSIFICATION = {
-  NOT_ABUSE: -100,
-  CLASSIFICATION_ERROR: -50,
-  NOT_CLASSIFIED: 0,
-  LIKELY_ABUSE: 200,
-} as const;
-
-// --- Microdollar Usage --
-
-export const GatewayApiKindSchema = z.enum([
-  'chat_completions',
-  'embeddings',
-  'fim_completions',
-  'edit_completions',
-  'messages',
-  'responses',
-  'audio_transcriptions',
-  'systemone',
-]);
-
-export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
 
 // --- Integration types ---
 
@@ -1330,6 +1308,17 @@ export const CodeReviewAnalyticsCaptureStatus = {
 
 export type CodeReviewAnalyticsCaptureStatus =
   (typeof CodeReviewAnalyticsCaptureStatus)[keyof typeof CodeReviewAnalyticsCaptureStatus];
+
+export const CodeReviewPublicationStatus = {
+  Published: 'published',
+  Unchanged: 'unchanged',
+  Missing: 'missing',
+  Unknown: 'unknown',
+  NotApplicable: 'not_applicable',
+} as const;
+
+export type CodeReviewPublicationStatus =
+  (typeof CodeReviewPublicationStatus)[keyof typeof CodeReviewPublicationStatus];
 
 export const CodeReviewAnalyticsChangeType = {
   BugFix: 'bug_fix',
@@ -2252,15 +2241,70 @@ export const CustomLlmDefinitionSchema = z.object({
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
+export const AutoFreeModelSchema = z.object({
+  model: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9./:~-]+$/,
+      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
+    ),
+  weight: z.number().int().positive(),
+  reasoning: z.object({
+    enabled: z.boolean().optional(),
+    effort: ReasoningEffortSchema.optional(),
+  }),
+});
+
+export type AutoFreeModelConfig = z.infer<typeof AutoFreeModelSchema>;
+
+export const AutoFreeConfigSchema = z.object({
+  models: z.array(AutoFreeModelSchema).superRefine((models, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { model }] of models.entries()) {
+      if (seen.has(model)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate model "${model}"`,
+          path: [index, 'model'],
+        });
+      }
+      seen.add(model);
+    }
+  }),
+});
+
+export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  // The model types listed by Vercel AI Gateway; OpenRouter does not set a type.
+  type: z
+    .enum([
+      'language',
+      'embedding',
+      'image',
+      'video',
+      'speech',
+      'transcription',
+      'reranking',
+      'realtime',
+      'evaluation',
+    ])
+    .optional()
+    .catch(undefined),
   alias_target: z
     .object({
       slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
+  architecture: z
+    .object({
+      output_modalities: z.array(z.string()),
     })
     .optional()
     .catch(undefined),
@@ -2363,6 +2407,14 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_rate_limited_byok',
   'assistant_rate_limited_managed',
   'assistant_unavailable',
+  // `assistant_unavailable` collapsed two different gateway outcomes under one
+  // label: a real upstream provider connection failure, and the gateway's own
+  // `temporarily_unavailable` (our over-limit guard or our managed-provider
+  // payment failure). The gateway tags the origin in `error_type` on the
+  // response body; cloud-agent-next now maps it to a distinct reason so the
+  // admin split reflects which component actually failed.
+  'assistant_provider_disconnect',
+  'assistant_gateway_unavailable',
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',

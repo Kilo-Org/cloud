@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { APP_URL } from '@/lib/constants';
-import { db, sql } from '@/lib/drizzle';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   evaluateErrorSpike,
   evaluateSlowReviews,

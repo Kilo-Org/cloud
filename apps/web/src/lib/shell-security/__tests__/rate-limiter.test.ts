@@ -8,7 +8,7 @@ const mockWhere = jest.fn();
 const mockInsert = jest.fn();
 const mockValues = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: (...args: unknown[]) => {
       mockSelect(...args);

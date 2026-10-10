@@ -244,7 +244,7 @@ async function runFileTurn(
  * key returns the same session; that is the recovery route, not a claim of
  * universal cleanup safety.
  */
-async function prepareWorktreeChat(
+export async function prepareWorktreeChat(
   creations: InFlightCreations<WorktreeSessionResult>,
   config: DriverConfig,
   input: { prompt: string; operationKey: string }
@@ -258,7 +258,7 @@ async function prepareWorktreeChat(
   );
 }
 
-async function createSiblingChat(
+export async function createSiblingChat(
   creations: InFlightCreations<WorktreeSessionResult>,
   config: DriverConfig,
   source: WorktreeSessionResult,
@@ -307,7 +307,7 @@ function requireOwnScopeAndNullParent(
  * (`workspace_<uuid>` -> `worktree_<uuid>`), the session's own scope id and a
  * null parent; `autoCommit=false` is asserted by the caller.
  */
-async function verifyWorktreeChat(
+export async function verifyWorktreeChat(
   deadline: ScenarioDeadline,
   config: DriverConfig,
   session: WorktreeSessionResult,
@@ -355,7 +355,7 @@ function kilocodeTextParts(events: readonly StreamEvent[]): string[] {
  * container. The caller must pass each chat's current live events, not a
  * snapshot taken before the other chat's second turn.
  */
-function assertChatContentIsolation(
+export function assertChatContentIsolation(
   chatLabel: string,
   chatEvents: readonly StreamEvent[],
   otherMessageIds: readonly string[],

@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { ENKRYPT_API_KEY, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { ENKRYPT_API_KEY, ENKRYPT_SYNC_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { enkrypt_sync_state } from '@kilocode/db/schema';
 import {
   ENKRYPT_STALE_AFTER_MS,

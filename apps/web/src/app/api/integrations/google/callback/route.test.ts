@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getInstanceById } from '@/lib/kiloclaw/instance-registry';
 import {
   exchangeGoogleOAuthCode,
@@ -9,11 +9,11 @@ import {
 import { upsertKiloClawGoogleOAuthConnection } from '@/lib/kiloclaw/google-oauth-connections';
 import { verifyGoogleOAuthState } from '@/lib/integrations/google/oauth-state';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { failureResult } from '@/lib/maybe-result';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 const mockedEnsureOrganizationAccess = jest.fn();
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: mockedEnsureOrganizationAccess,
 }));
 const mockedRequireKiloClawAccess = jest.fn();
@@ -21,7 +21,7 @@ jest.mock('@/lib/kiloclaw/access-gate', () => ({
   requireKiloClawAccess: mockedRequireKiloClawAccess,
 }));
 const mockedRequireOrganizationKiloClawComputeEntitlement = jest.fn();
-jest.mock('@/lib/organizations/trial-middleware', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware', () => ({
   requireOrganizationKiloClawComputeEntitlement:
     mockedRequireOrganizationKiloClawComputeEntitlement,
 }));

@@ -668,17 +668,44 @@ function createDeletionProviderMockState(): {
       }
     }
 
-    if (method === 'GET' && path === '/api/v1/subscriber') {
-      const offsetRaw = Number(url.searchParams.get('offset') ?? 0);
-      const limitRaw = Number(url.searchParams.get('limit') ?? 50);
-      const offset = Number.isFinite(offsetRaw) && offsetRaw > 0 ? offsetRaw : 0;
-      const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 50;
-      const rows = [...subscribers.values()].filter(subscriber => !subscriber.deleted);
+    if (method === 'POST' && path === '/api/v1/subscriber-stats') {
+      const body = await readBody(req);
+      if (
+        !req.headers['content-type']?.startsWith('application/json') ||
+        !isRecord(body) ||
+        !isRecord(body.filters) ||
+        typeof body.filters.search !== 'string' ||
+        body.filters.order_by_desc_nulls_last !== 'subscription_created_at' ||
+        body.includeTags !== true ||
+        typeof body.offset !== 'number' ||
+        !Number.isSafeInteger(body.offset) ||
+        body.offset < 0 ||
+        typeof body.limit !== 'number' ||
+        !Number.isSafeInteger(body.limit) ||
+        body.limit < 1
+      ) {
+        json(res, 400, { error: 'invalid subscriber search' });
+        return;
+      }
+      const search = body.filters.search.trim().toLowerCase();
+      const rows = [...subscribers.values()].filter(
+        subscriber => !subscriber.deleted && subscriber.email.includes(search)
+      );
       json(res, 200, {
-        subscribers: rows.slice(offset, offset + limit).map(subscriber => ({
-          id: subscriber.id,
-          email: subscriber.email,
+        subscribers: rows.slice(body.offset, body.offset + body.limit).map(subscriber => ({
+          user_id: [...subscribers.keys()].indexOf(subscriber.id) + 1,
+          subscription_id: [...subscribers.keys()].indexOf(subscriber.id) + 1,
+          user_email_address: subscriber.email,
+          is_subscribed: false,
         })),
+        count: rows.length,
+        pendingImports: [],
+        pendingCRMImportsCount: 0,
+        order: { by: 'subscription_created_at', direction: 'desc' },
+        chartCounts: {},
+        batchSubscriberActions: [],
+        lastSync: '2026-10-05T00:00:00Z',
+        ...(rows.length > 0 ? { tagAssignments: {} } : {}),
       });
       return;
     }

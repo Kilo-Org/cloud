@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { user_deletion_requests } from '@kilocode/db/schema';
 import { UserDeletionRequestStatus } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 export type SelectedDeletionRequest = {
   id: string;

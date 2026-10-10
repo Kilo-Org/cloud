@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, asc, desc, isNull } from 'drizzle-orm';
@@ -19,7 +19,7 @@ import {
   fetchGitHubBranches,
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
-import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 /**
  * List all integrations for an owner

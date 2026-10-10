@@ -14,7 +14,7 @@ import {
   DEFAULT_VERCEL_PERCENTAGE_FREE,
   NOTE_MAX_LENGTH,
   RoutingPercentageSchema,
-} from '@/lib/ai-gateway/gateway-config';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-config';
 
 export function RoutingContent() {
   const trpc = useTRPC();

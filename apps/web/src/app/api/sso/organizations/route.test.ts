@@ -2,13 +2,13 @@ import { captureMessage } from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { isNewAccountEligibleForMagicLink } from '@/lib/auth/email-signin-eligibility';
 
 jest.mock('@sentry/nextjs');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
 jest.mock('@/lib/user');
-jest.mock('@/lib/organizations/organization-sso-policy');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy');
 jest.mock('@/lib/auth/email-signin-eligibility');
 
 import { POST } from './route';

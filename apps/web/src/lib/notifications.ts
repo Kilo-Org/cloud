@@ -1,12 +1,15 @@
 import { type User } from '@kilocode/db/schema';
-import { type BalanceForUser, getBalanceForUser } from '@/lib/user/balance';
-import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@/lib/constants';
-import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations';
-import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
-import { summarizeUserPayments } from '@/lib/creditTransactions';
-import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
+import { type BalanceForUser, getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { FIRST_TOPUP_BONUS_AMOUNT, APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
+import type { UserOrganizationWithSeats } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
+import {
+  hasOrganizationEverPaid,
+  hasUserEverPaid,
+} from '@kilocode/web-shared/lib/creditTransactions';
 
-import { fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -47,7 +50,7 @@ export function passesLegacyExtensionGate(
   return isLegacyExtension;
 }
 
-const normalUnconditionalNotifications: KiloNotification[] = [
+export const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
@@ -99,17 +102,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     showIn: ['extension', 'cli'],
   },
   {
-    id: 'kilo-console-beta',
-    title: 'Try Kilo Console (Beta)',
-    message: 'Manage git worktrees, sessions, and all CLI settings from a browser-based UI.',
-    action: {
-      actionText: 'How to install',
-      actionURL:
-        'https://blog.kilo.ai/p/kilo-console-beta-is-live?utm_source=kilo-cli&utm_medium=notifications&utm_campaign=cli-tips',
-    },
-    showIn: ['cli'],
-  },
-  {
     id: 'app-builder-promo-mar-6',
     title: 'Try App Builder',
     message: "Don't feel like coding? Try App Builder to build with natural language from the web",
@@ -134,14 +126,13 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     expiresAt: '2026-03-25T08:00:00Z',
   },
   {
-    id: 'minimax-byteplus-credits-aug-6',
-    title: 'Buy Coding Plans with Kilo Credits',
-    message: 'Buy coding plans from MiniMax & Byteplus directly with your Kilo credits.',
-    action: {
-      actionText: 'View Subscriptions',
-      actionURL: 'https://app.kilo.ai/subscriptions',
-    },
+    id: 'stepfun-step-5-preview-free-oct-8',
+    title: 'StepFun Step 5 Preview is free in Kilo!',
+    message:
+      'StepFun Step 5 Preview is now free to use in Kilo — a flagship agentic coding model with a 1M-token context window, tool calling, and image and video input.',
+    suggestModelId: 'stepfun/step-5-preview-free',
     showIn: ['extension', 'cli'],
+    expiresAt: '2026-10-22T08:00:00Z',
   },
 ];
 

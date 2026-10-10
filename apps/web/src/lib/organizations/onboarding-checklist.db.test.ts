@@ -7,9 +7,12 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   connectVerifiedGitHubInstallation,
   disconnectGitHubInstallation,

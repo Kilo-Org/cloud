@@ -1,8 +1,8 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import type { JWTTokenExtraPayload } from '@/lib/tokens';
-import { generateApiToken } from '@/lib/tokens';
+import type { JWTTokenExtraPayload } from '@kilocode/web-shared/lib/tokens';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 
 /**
  * Fetches the first user in the organization and generates an auth token

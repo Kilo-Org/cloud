@@ -43,6 +43,8 @@ import {
   getBaseWorkspacePath,
   getSessionWorkspacePath,
   getWorktreeWorkspacePath,
+  getControlPlaneSessionDirectory,
+  ISOLATED_CONTAINER_WORKSPACE_PATH,
   getSessionHomePath,
   sanitizeIdForPath,
   LOW_DISK_THRESHOLD_MB,
@@ -1455,5 +1457,95 @@ describe('workspace path construction', () => {
     ['a session id containing a separator', 'x/y'],
   ])('rejects %s for the session home path too', (_label, sessionId) => {
     expect(() => getSessionHomePath(sessionId)).toThrow(/invalid session id/);
+  });
+
+  it('uses the isolated container directory for isolated single-session sandboxes', () => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: 'ses-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId: 'istd-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['empty', ''],
+    ['shared', `usr-${'a'.repeat(48)}`],
+    ['code-review', `crv-${'a'.repeat(48)}`],
+    ['devcontainer', `dind-${'a'.repeat(48)}`],
+  ])('falls back to the per-session path when the sandbox id is %s', (_label, sandboxId) => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: undefined,
+        sandboxId,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(getSessionWorkspacePath(ORG_ID, 'user-1', SESSION_ID));
+  });
+
+  it('uses the isolated container directory over an explicit worktree path', () => {
+    const explicit = getWorktreeWorkspacePath(ORG_ID, 'user-1', WORKTREE_ID);
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: explicit,
+        sandboxId: 'ses-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
+  });
+
+  it.each([
+    ['shared', `usr-${'a'.repeat(48)}`],
+    ['code-review', `crv-${'a'.repeat(48)}`],
+    ['devcontainer', `dind-${'a'.repeat(48)}`],
+  ])('keeps an explicit worktree path on a %s sandbox', (_label, sandboxId) => {
+    const explicit = getWorktreeWorkspacePath(ORG_ID, 'user-1', WORKTREE_ID);
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: explicit,
+        sandboxId,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(explicit);
+  });
+
+  it('treats an empty workspace path as explicit on a shared sandbox but not on an isolated one', () => {
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: '',
+        sandboxId: `usr-${'a'.repeat(48)}`,
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe('');
+    expect(
+      getControlPlaneSessionDirectory({
+        workspacePath: '',
+        sandboxId: 'ses-0123456789abcdef',
+        orgId: ORG_ID,
+        userId: 'user-1',
+        sessionId: SESSION_ID,
+      })
+    ).toBe(ISOLATED_CONTAINER_WORKSPACE_PATH);
   });
 });

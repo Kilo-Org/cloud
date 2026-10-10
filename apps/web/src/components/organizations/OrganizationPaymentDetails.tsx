@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
-import type { OrganizationRole, TimePeriod } from '@/lib/organizations/organization-types';
+import type {
+  OrganizationRole,
+  TimePeriod,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { OrganizationContextProvider } from './OrganizationContext';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationInvoicesCard } from './OrganizationInvoicesCard';
@@ -15,7 +18,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { AnimatedDollars } from './AnimatedDollars';
-import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
 import { PiggyBank, Bell, Clock } from 'lucide-react';
 import { useExpiringCredits } from './useExpiringCredits';

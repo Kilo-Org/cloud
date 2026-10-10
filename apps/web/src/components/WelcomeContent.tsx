@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { YouTubeEmbed } from '@/components/YouTubeEmbed';
-import { FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import { FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Check, Copy, Terminal } from 'lucide-react';

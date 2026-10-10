@@ -1,11 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
-import { createSignInCode, deleteSignInCode } from '@/lib/auth/magic-link-tokens';
-import { sendSignInCodeEmail } from '@/lib/email';
+import {
+  createSignInCode,
+  deleteSignInCode,
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import * as z from 'zod';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const requestSchema = z.object({
   email: z.string().email(),

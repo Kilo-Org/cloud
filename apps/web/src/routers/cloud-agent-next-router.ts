@@ -1,5 +1,5 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   createCloudAgentNextClient,
@@ -12,7 +12,6 @@ import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
-import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getGitLabInstanceUrlForUser,
@@ -71,12 +70,12 @@ import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
-import { getBalanceForUser } from '@/lib/user/balance';
-import { isMobileClient } from '@/lib/trpc/min-version';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
@@ -170,11 +169,9 @@ export const cloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: baseProcedure
     .input(z.object({ devcontainer: z.boolean().optional() }))
     .output(sandboxSelectionCapabilitiesSchema)
-    .query(async ({ ctx, input }) => {
+    .query(async ({ ctx }) => {
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
-      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
-        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
-      });
+      return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({});
     }),
 
   /**
@@ -188,16 +185,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(personalPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      if (
-        input.devcontainer &&
-        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', ctx.user.id))
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Dev container sessions are not available',
-        });
-      }
-
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const eligibility = await computeCloudAgentNextBalanceCheckEligibility({
         fromDb: db,

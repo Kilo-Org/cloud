@@ -15,7 +15,7 @@ import { UserSearchInput } from '../components/UserSearchInput';
 import type {
   CreditCategoriesApiResponse,
   GuiCreditCategoryStatistics,
-} from '@/lib/PromoCreditCategoryConfig';
+} from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 import type { CreditCategorySortableField, CreditCategorySortConfig } from '@/types/admin';
 import { CreditCategoriesTableHeader } from './CreditCategoriesTableHeader';
 

@@ -511,11 +511,11 @@ describe('expanded reviewed Enkrypt identities', () => {
     })
   );
 
-  it('contains exactly all 70 independently enumerated identities and canonical targets', () => {
-    expect(ENKRYPT_REVIEWED_CASES).toHaveLength(70);
+  it('contains exactly all 89 independently enumerated identities and canonical targets', () => {
+    expect(ENKRYPT_REVIEWED_CASES).toHaveLength(89);
     expect(ENKRYPT_MODEL_MAPPINGS).toStrictEqual(expectedMappings);
-    expect(new Set(expectedMappings.map(({ identity }) => JSON.stringify(identity))).size).toBe(70);
-    expect(new Set(expectedMappings.map(({ modelId }) => modelId)).size).toBe(70);
+    expect(new Set(expectedMappings.map(({ identity }) => JSON.stringify(identity))).size).toBe(89);
+    expect(new Set(expectedMappings.map(({ modelId }) => modelId)).size).toBe(89);
     expect(records.every(record => record.risk_score === 0 && record.safety_score === null)).toBe(
       true
     );
@@ -616,7 +616,7 @@ describe('expanded reviewed Enkrypt identities', () => {
     [false, true],
     [true, true],
   ])(
-    'matches all 70 without collisions with reversed scores %s and catalog %s',
+    'matches all 89 without collisions with reversed scores %s and catalog %s',
     (scores, models) => {
       const result = matchEnkryptScores(
         scores ? records.toReversed() : records,
@@ -674,7 +674,7 @@ describe('expanded reviewed Enkrypt identities', () => {
     }
   );
 
-  it('rejects all 70 canonical targets if they share a storage ID', () => {
+  it('rejects all 89 canonical targets if they share a storage ID', () => {
     const result = matchEnkryptScores(
       records,
       catalog.map(record => ({ ...record, id: 'same-storage-id' }))
@@ -687,21 +687,21 @@ describe('expanded reviewed Enkrypt identities', () => {
         identity,
         modelIds: [modelId],
       })),
-      ambiguousCount: 70,
+      ambiguousCount: 89,
       missingRequiredModelIds: ENKRYPT_REQUIRED_MODEL_IDS,
     });
   });
 
-  it('reports all 70 exact identities without exposing synthetic metrics or expanding the required gate', () => {
+  it('reports all 89 exact identities without exposing synthetic metrics or expanding the required gate', () => {
     const report = buildEnkryptCoverageReport(
       parseEnkryptScores(envelope(records)),
       catalog,
       'fullinput'
     );
     expect(report.counters).toStrictEqual({
-      fetchedCount: 70,
-      acceptedCount: 70,
-      matchedCount: 70,
+      fetchedCount: 89,
+      acceptedCount: 89,
+      matchedCount: 89,
       unmatchedCount: 0,
       ambiguousCount: 0,
       rejectedCount: 0,
@@ -720,7 +720,7 @@ describe('expanded reviewed Enkrypt identities', () => {
   });
 
   it.each(['scores', 'catalog'] as const)(
-    'does not require the 67 optional mappings when their %s are absent',
+    'does not require the 86 optional mappings when their %s are absent',
     absent => {
       const result = matchEnkryptScores(
         absent === 'scores' ? records.slice(0, 3) : records,
@@ -741,7 +741,7 @@ describe('expanded reviewed Enkrypt identities', () => {
   );
 
   it.each(reviewedMappings)(
-    'still fails the required $modelId gate with all 67 optional identities present',
+    'still fails the required $modelId gate with all 86 optional identities present',
     ({ modelId }) => {
       const result = matchEnkryptScores(
         ENKRYPT_REVIEWED_CASES.filter(record => record.modelId !== modelId).map(
@@ -749,7 +749,7 @@ describe('expanded reviewed Enkrypt identities', () => {
         ),
         catalog
       );
-      expect(result.matches).toHaveLength(69);
+      expect(result.matches).toHaveLength(88);
       expect(result.missingRequiredModelIds).toEqual([modelId]);
       expect(result.ambiguousCount).toBe(0);
     }

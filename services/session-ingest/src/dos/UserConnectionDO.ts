@@ -6,6 +6,7 @@ import { getSessionIngestDO } from './SessionIngestDO';
 import { hoistedAttentionChanges, hoistedChildAttention } from './child-attention';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import { refreshGlanceableSessions } from '../remote-session-notifications';
+import { prUrlMatchesGitUrl } from '../ingest/metadata';
 import {
   CLIOutboundMessageSchema,
   type CLIInboundMessage,
@@ -20,6 +21,10 @@ import {
 type HeartbeatSession = {
   id: string;
   status: string;
+  // Wake time for a `scheduled` session (ISO-8601). Optional: absent for every
+  // other status and on legacy CLIs that predate scheduling. `aggregateSessions`
+  // spreads the session through, so it reaches `sessions.list` untouched.
+  scheduledAt?: string;
   title: string;
   gitUrl?: string;
   gitBranch?: string;
@@ -36,6 +41,10 @@ type HeartbeatSession = {
     platform: string;
     prUrl: string;
     prNumber: number;
+    // Branch the session pushed and the commit it pushed to that branch.
+    // Optional for older CLIs.
+    headRef?: string;
+    headSha?: string;
   };
 };
 
@@ -651,6 +660,20 @@ export class UserConnectionDO extends DurableObject<Env> {
     instance: Instance | undefined
   ): void {
     sessions = sessions.filter(session => !this.isSessionDeleted(session.id));
+    // Per-session evidence gate: a heartbeat prLink whose URL names a repo other
+    // than the session's own repo is a wrong link, and a wrong link is worse
+    // than no link. Drop it before it reaches the attachment or `sessions.list`.
+    sessions = sessions.map(session => {
+      if (!session.prLink || prUrlMatchesGitUrl(session.prLink.prUrl, session.gitUrl)) {
+        return session;
+      }
+      console.warn('Dropping heartbeat PR link whose repository does not match the session', {
+        sessionId: session.id,
+        connectionId: attachment.connectionId,
+      });
+      const { prLink: _dropped, ...rest } = session;
+      return rest;
+    });
     const { connectionId } = attachment;
     const previousStatuses = new Map(
       this.aggregateSessions().map(session => [session.id, session.status])

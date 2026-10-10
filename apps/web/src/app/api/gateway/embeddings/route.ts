@@ -1,1 +1,1 @@
-export { POST } from '@/app/api/openrouter/embeddings/route';
+export { handleEmbeddingsRequest as POST } from '@kilocode/web-shared/lib/ai-gateway/handlers/embeddings';

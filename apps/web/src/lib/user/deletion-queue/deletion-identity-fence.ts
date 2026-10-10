@@ -1,8 +1,8 @@
 import { captureException } from '@sentry/nextjs';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { user_deletion_requests } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import { normalizeDeletionEmail } from '@/lib/user/deletion-queue/deletion-intake';
 import { ACTIVE_REQUEST_STATUSES } from '@/lib/user/deletion-queue/deletion-types';

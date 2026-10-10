@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import GitHubAppPage from './page';
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
 import { checkInstallState } from '@/lib/integrations/github/install-state';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 jest.mock('@/components/integrations/GitHubIntegrationDetails', () => ({
   GitHubIntegrationDetails: jest.fn(() => React.createElement('button', null, 'Open GitHub setup')),
@@ -11,7 +11,7 @@ jest.mock('@/components/integrations/GitHubIntegrationDetails', () => ({
 jest.mock('@/lib/integrations/github/install-state', () => ({
   checkInstallState: jest.fn(),
 }));
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuthOrRedirect: jest.fn(),
 }));
 

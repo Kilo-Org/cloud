@@ -4,7 +4,7 @@
  * This module handles the re-calculation of a user's balance based on their credit transactions
  * and usage history, ensuring the denormalized user record matches the ledger.
  */
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   credit_transactions,
@@ -14,9 +14,9 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, asc } from 'drizzle-orm';
-import { type Result, failureResult, successResult } from '@/lib/maybe-result';
+import { type Result, failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { bulkUpdate } from '@/lib/utils/bulkUpdate';
-import { computeExpiration } from '@/lib/creditExpiration';
+import { computeExpiration } from '@kilocode/web-shared/lib/creditExpiration';
 
 export type MigrationResult = Result<UserBalanceUpdates, string>;
 

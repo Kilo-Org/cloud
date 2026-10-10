@@ -1,13 +1,7 @@
 /**
- * TownDO — The single source of truth for all control-plane data.
- *
- * After the town-centric refactor (#419), ALL gastown state lives here:
+ * TownDO — The single source of truth for all control-plane data:
  * rigs, agents, beads, mail, review queues, molecules, bead events,
  * convoys, escalations, and configuration.
- *
- * After the beads-centric refactor (#441), all object types are unified
- * into the beads table with satellite metadata tables. Separate tables
- * for mail, molecules, review queue, convoys, and escalations are eliminated.
  *
  * Agent events (high-volume SSE/streaming data) are delegated to per-agent
  * AgentDOs to stay within the 10GB DO SQLite limit.
@@ -772,7 +766,6 @@ export class TownDO extends DurableObject<Env> {
 
     beadOps.initBeadTables(this.sql);
 
-    // These are no-ops now but kept for clarity
     agents.initAgentTables(this.sql);
     mail.initMailTables(this.sql);
     reviewQueue.initReviewQueueTables(this.sql);
@@ -3669,10 +3662,10 @@ export class TownDO extends DurableObject<Env> {
         'convoy',
         'open',
         input.convoyTitle,
-        null, // body
+        null,
         null, // rig_id — intentionally null; a convoy is a town-level grouping that can span multiple rigs
-        null, // parent_bead_id
-        null, // assignee_agent_bead_id
+        null,
+        null,
         'medium',
         JSON.stringify(['gt:convoy']),
         JSON.stringify(convoyBeadMetadata),
@@ -5263,8 +5256,6 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  // ── Alarm helpers ─────────────────────────────────────────────────
-
   private async armAlarmIfNeeded(): Promise<void> {
     // Don't resurrect the alarm on a destroyed DO. After destroy(),
     // town:id is wiped — if it's missing, the town was deleted.
@@ -5293,10 +5284,6 @@ export class TownDO extends DurableObject<Env> {
       await this.ctx.storage.setAlarm(target);
     }
   }
-
-  // ══════════════════════════════════════════════════════════════════
-  // Cleanup
-  // ══════════════════════════════════════════════════════════════════
 
   /**
    * Health check: verify the alarm is set and return basic town status.

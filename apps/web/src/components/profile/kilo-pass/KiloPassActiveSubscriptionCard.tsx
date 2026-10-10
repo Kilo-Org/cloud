@@ -11,9 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KiloPassIcon } from '@/components/icons/KiloPassIcon';
 import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { useTRPC } from '@/lib/trpc/utils';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 
 import { KiloPassReferralButton } from '@/components/referrals/KiloPassReferralButton';
 
@@ -23,7 +23,7 @@ import {
   KiloPassSubscriptionInfoProvider,
   useKiloPassSubscriptionInfo,
 } from './useKiloPassSubscriptionInfo';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { getTierName } from './utils';
 import {
   computeCurrentPeriodBonusModel,

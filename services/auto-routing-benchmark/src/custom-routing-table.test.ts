@@ -41,6 +41,7 @@ function summary(
     cases: 5,
     errors: 0,
     timeouts: 0,
+    routeAccuracy: null,
     runId,
   };
 }

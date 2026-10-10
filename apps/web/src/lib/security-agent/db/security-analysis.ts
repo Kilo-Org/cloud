@@ -1,4 +1,4 @@
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   security_findings,
   security_analysis_queue,
@@ -536,7 +536,6 @@ export async function resetOwnerAutoAnalysisEnabledAt(
       : eq(security_analysis_owner_state.owned_by_user_id, ownerConverted.id);
   const executor = tx ?? db;
 
-  // Upsert: insert if missing, update unconditionally if present
   await executor
     .insert(security_analysis_owner_state)
     .values({

@@ -13,7 +13,6 @@ import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
   InteractionManager,
   Keyboard,
   Platform,
@@ -37,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   focusAfterPendingCommentRemoval,
   PendingQueueHint,
@@ -54,7 +54,10 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
+import {
+  mutationErrorDisplay,
+  type MutationErrorDisplayKind,
+} from '@/lib/pr-review/mutation-error-display';
 import {
   buildProviderSubmitInput,
   type ProviderReviewEventOption,
@@ -180,6 +183,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const router = useRouter();
   const pending = usePendingReview();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const submitReview = useSubmitReviewMutation(prRef ?? { owner, repo, number });
   const { userId } = useCurrentUserId();
   // The post-submit prompt's surface is platform-specific
@@ -196,9 +200,9 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [hasSummary, setHasSummary] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
-  >(null);
+  // Same union the display helper returns, so a new display kind can never
+  // silently drift from this surface's state.
+  const [inlineErrorKind, setInlineErrorKind] = useState<MutationErrorDisplayKind | null>(null);
   const [partialResult, setPartialResult] = useState<string | null>(null);
 
   const bodyRef = useRef<string>('');
@@ -377,25 +381,19 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   }
 
   function confirmDelete(item: PendingReviewItem) {
-    Alert.alert(
-      t('prReview.submit.deletePendingTitle'),
-      t('prReview.submit.deletePendingMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => {
-            // Announce/focus only when the remove is confirmed synchronous:
-            // the provider's removeComment filters by id and returns nothing,
-            // so the item must still be queued at delete-confirm time.
-            const removed = pending.items.some(queued => queued.id === item.id);
-            pending.removeComment(item.id);
-            focusAfterPendingCommentRemoval(bodyInputRef, removed);
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('prReview.submit.deletePendingTitle'),
+      message: t('prReview.submit.deletePendingMessage'),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        // Announce/focus only when the remove is confirmed synchronous:
+        // the provider's removeComment filters by id and returns nothing,
+        // so the item must still be queued at delete-confirm time.
+        const removed = pending.items.some(queued => queued.id === item.id);
+        pending.removeComment(item.id);
+        focusAfterPendingCommentRemoval(bodyInputRef, removed);
+      },
+    });
   }
 
   const submitDisabled =
@@ -547,6 +545,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           </Button>
         </PrFormSheetFooter>
       </ScrollView>
+      {dialog}
     </>
   );
 }

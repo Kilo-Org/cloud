@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 export const platformAdminDomains = [
   hosted_domain_specials.kilocode_admin,

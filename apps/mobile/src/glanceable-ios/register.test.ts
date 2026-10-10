@@ -54,7 +54,12 @@ vi.mock('./widget-logo', () => ({ ensureWidgetLogo: vi.fn() }));
 vi.mock('@/i18n', () => ({ i18n: { on: vi.fn(), t: (key: string) => key } }));
 vi.mock('@/lib/glanceable/live-activity-switch', () => ({
   getLiveActivityEnabled: () => true,
+  getNotificationPermissionGranted: () => true,
   subscribeLiveActivityEnabled: vi.fn(),
+  subscribeNotificationPermissionGranted: vi.fn(),
+}));
+vi.mock('@/lib/glanceable/activity-kit-prompt', () => ({
+  replayGlanceableLiveActivity: vi.fn(),
 }));
 
 describe('glanceable-ios register', () => {

@@ -9,6 +9,8 @@ import { inlineSqlPlugin } from './vitest.sql-plugin';
 // unaffected by the mounted-test harness.
 export default defineProject({
   plugins: [inlineSqlPlugin()],
+  // Vendored text assets resolve to a URL, like images, instead of being run as JS.
+  assetsInclude: ['**/*.txt'],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('src', import.meta.url)),
@@ -52,10 +54,15 @@ export default defineProject({
       'src/glanceable-ios/**/*.test.ts',
       'src/glanceable-android/**/*.test.ts',
       'src/lib/hooks/**/*.test.ts',
+      'src/lib/iap/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
       // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
       // this directory holds both kinds, and a file in both projects runs twice.
       'src/lib/kilo-pass/**/!(*.mounted).test.tsx',
+      'src/lib/credits/**/*.test.ts',
+      // `!(*.mounted)` keeps `*.mounted.test.tsx` in the mounted project only:
+      // this directory holds both kinds, and a file in both projects runs twice.
+      'src/lib/credits/**/!(*.mounted).test.tsx',
       'src/lib/navigation/**/*.test.ts',
       'src/lib/onboarding/**/*.test.ts',
       'src/lib/persist/**/*.test.ts',

@@ -27,7 +27,7 @@
 
 import '../lib/load-env';
 
-import { closeAllDrizzleConnections } from '@/lib/drizzle';
+import { closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { assertGooglePlayServiceAccountConfigured } from '@/lib/kilo-pass/google-play-sdk';
 import {
   backfillGooglePlayPurchaseAmounts,

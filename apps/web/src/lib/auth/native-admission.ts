@@ -1,9 +1,9 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureMessage } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
-import type { DrizzleTransaction } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { native_admission_challenges, native_attested_keys } from '@kilocode/db/schema';
 import { eq, and, lt, isNull, gt } from 'drizzle-orm';
 import { checkRateLimit } from '@vercel/firewall';

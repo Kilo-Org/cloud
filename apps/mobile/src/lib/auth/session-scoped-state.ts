@@ -12,6 +12,7 @@ import { clearChatBackends } from '@/lib/chat/backend-store';
 import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
 import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearSettingsToolsEnabled } from '@/lib/chat/settings-tools-switch';
+import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -93,12 +94,12 @@ function clearRecentPrsBestEffort(): void {
 
 /**
  * Clear the session-scoped local state that must not leak across an account
- * boundary: trusted hosts, confirmed markdown images, media caches, per-session
- * auto-approve and goal-disclosure flags, the remote MCP connection and the
- * stored servers behind it, the app-settings-tools group switch, the browsable
- * artifact mirror, app-owned temp copies, the stored PR recents, and the
- * phone's own search index. Every member is best-effort; one member's throw
- * falls through to the members after it, and to the caller's own
+ * boundary: trusted hosts, trusted image hosts, confirmed markdown images, media
+ * caches, per-session auto-approve and goal-disclosure flags, the remote MCP
+ * connection and the stored servers behind it, the app-settings-tools group
+ * switch, the browsable artifact mirror, app-owned temp copies, the stored PR
+ * recents, and the phone's own search index. Every member is best-effort; one
+ * member's throw falls through to the members after it, and to the caller's own
  * sign-in/sign-out state reset. The recents delete and OS search clear are
  * fired without awaiting, so the function stays synchronous; a rejection is
  * reported through telemetry, and the signed-out-launch re-clear retries the
@@ -109,7 +110,11 @@ function clearRecentPrsBestEffort(): void {
  * account the previous one's choice.
  */
 export function clearSessionScopedState(): void {
+  // The link allowlist and the separate image-host trust are both SecureStore
+  // preferences. An account boundary must drop both, or a host trusted by the
+  // previous account keeps auto-loading its images for the next one.
   runClear(clearTrustedHosts);
+  runClear(clearTrustedImageHosts);
   runClear(clearMarkdownImageConfirmMemory);
   runClear(clearToolCardImageCache);
   runClear(clearFilePartCache);

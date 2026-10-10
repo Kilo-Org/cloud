@@ -342,6 +342,52 @@ describe('ScreenHeader mounted', () => {
     expect(title.props.className).toContain('text-center');
   });
 
+  it('keeps the inlineActions on the title row when the cluster fits beside it', () => {
+    // 390 - 44 - 12 - 92 leaves the title 242dp, above its 120dp minimum, so
+    // the row is untouched.
+    const renderer = renderHeader({
+      title: 'Agenti',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      inlineActionsWidth: 92,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+  });
+
+  it('drops inlineActions to their own full-width row when they squeeze the title', () => {
+    // A cluster this wide takes its own row: 390 - 44 - 12 - 333 leaves the
+    // 30px title below its 120dp minimum. The Agents header took that shape
+    // while its controls squeezed "Agenti" mid-word (owner capture,
+    // agents-header-hr-20260929).
+    const renderer = renderHeader({
+      title: 'Agenti',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      inlineActionsWidth: 333,
+    });
+
+    const stacked = renderer.root.findAll(isStackedActionsRow);
+    expect(stacked).toHaveLength(1);
+    const [stackedRow] = stacked;
+    expect(stackedRow?.children).toEqual(['ACTIONS']);
+    // The title row no longer carries the inline slot, and the heading keeps
+    // its full-width `min-w-0 flex-1` box, so the title cannot be squeezed.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.props.className).toContain('min-w-0 flex-1');
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          /(^|\s)ms-3(\s|$)/.test(String(node.props.className ?? ''))
+      )
+    ).toHaveLength(0);
+  });
+
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
@@ -905,13 +951,11 @@ describe('header actions row', () => {
   });
 
   it('drops a declared trailing cluster to its own row before it squeezes the title', () => {
-    // PR review at 320dp with a font scale of 2: Share, Submit review and
-    // Merge (236dp of fixed-width controls) left the title a few characters
-    // while the width-only rule kept them all on one row.
+    // A wide fixed-width cluster leaves too little room for a readable title.
     layout.width = 320;
     layout.fontScale = 2;
     const renderer = renderHeader({
-      title: 'PR review #7',
+      title: 'Detail',
       eyebrow: 'owner/repo',
       headerRight: 'RIGHT',
       headerRightWidth: 236,
@@ -925,9 +969,9 @@ describe('header actions row', () => {
     // describe, and the test above leaves a 320dp / scale 2 window behind.
     layout.width = 390;
     layout.fontScale = 1;
-    // Share and Merge alone: 44 + 44 + the `gap-1` between them.
+    // Two fixed-size icon controls with a 4dp gap.
     const renderer = renderHeader({
-      title: 'PR review #7',
+      title: 'Detail',
       eyebrow: 'owner/repo',
       headerRight: 'RIGHT',
       headerRightWidth: 92,
@@ -935,6 +979,29 @@ describe('header actions row', () => {
 
     expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
   });
+
+  it.each([false, true])(
+    'keeps compact actions beside the title when opted out (centered: %s)',
+    centerTitle => {
+      layout.width = 320;
+      layout.fontScale = 3;
+      const renderer = renderHeader({
+        title: 'PR review #7',
+        titleNumberOfLines: 1,
+        centerTitle,
+        headerRight: 'SHARE REVIEW MERGE',
+        headerRightWidth: 140,
+        allowHeaderRightStacking: false,
+      });
+
+      expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+      const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+      expect(title.props.numberOfLines).toBe(1);
+      expect(title.props.ellipsizeMode).toBe('tail');
+      const controls = findHeaderRight(renderer.root);
+      expect(controls.children).toEqual(['SHARE REVIEW MERGE']);
+    }
+  );
 });
 
 describe('header status line', () => {
@@ -970,14 +1037,10 @@ describe('shouldStackHeaderActions', () => {
   });
 
   it('reflows for a declared trailing cluster the title cannot share the row with', () => {
-    // The PR review header at 320dp with a font scale of 2: the width-only
-    // rule kept Share, Submit review and Merge on the title's row, which left
-    // the title a few characters. The declared cluster width reflows it.
+    // Declaring a wide cluster makes it reflow before the title is squeezed.
     expect(shouldStackHeaderActions(320, 2)).toBe(false);
     expect(shouldStackHeaderActions(320, 2, 236)).toBe(true);
-    // A cluster the title still fits beside keeps the single row, and the PR
-    // review cluster stacks even at a normal phone width: 390 - 44 - 12 - 236
-    // leaves the title 98dp, below its 120dp minimum.
+    // A narrower cluster still fits beside the title at a normal phone width.
     expect(shouldStackHeaderActions(390, 1, 92)).toBe(false);
     expect(shouldStackHeaderActions(390, 1, 236)).toBe(true);
   });

@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import { buildBitbucketOAuthUrl } from '@/lib/integrations/platforms/bitbucket/adapter';
@@ -11,9 +11,9 @@ import {
   redirectToSignInForOAuthConnect,
 } from '@/lib/integrations/oauth/common';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 
 function detailPath(organizationId: string | null): string {
   return organizationId

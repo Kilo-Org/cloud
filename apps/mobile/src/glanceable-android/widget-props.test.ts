@@ -12,6 +12,7 @@ import {
   buildAndroidWidgetProps,
   buildCompactNotificationText,
   buildCurrentWidgetProps,
+  buildGenericWidgetProps,
   buildOngoingNotificationText,
 } from './widget-props';
 import widgetConfig from './widget-config.json';
@@ -25,6 +26,7 @@ const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
   'common.working': 'Working',
+  'common.scheduled': 'Scheduled',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.stale': 'Updates delayed',
@@ -36,23 +38,23 @@ const COPY: Record<string, string> = {
   'glanceable.noneWaiting': 'No agents waiting',
   'glanceable.newAgent': 'New agent',
   'glanceable.approving': 'Approving…',
-  'common.starting': 'Starting…',
   'glanceable.couldNotApprove': 'Could not approve',
-  'glanceable.couldNotStart': 'Could not start',
   'glanceable.newestSession': 'Newest: {{title}}',
   'common.approve': 'Approve',
+  'glanceable.scheduledWakes': 'wakes {{time}}',
 };
 const translate = (key: string): string => COPY[key] ?? key;
 
 /**
- * The two formatters the app injects. The builder stays free of i18n and of
+ * The three formatters the app injects. The builder stays free of i18n and of
  * `Intl`, so the suite hands it the same shapes `count-format.ts` supplies.
  *
- * `formatAgo` echoes its argument: the age the props carry is the timestamp the
- * builder forwarded, so a regression that passed `updatedAt` or any other field
- * would produce a different string and fail every `newestResultAgo` assertion.
+ * `formatAgo` and `formatClock` echo their argument: the time the props carry
+ * is the timestamp the builder forwarded, so a regression that passed
+ * `updatedAt` or any other field would produce a different string and fail.
  */
 const formatAgo = (at: string): string => `ago:${at}`;
+const formatClock = (at: string): string => `clock:${at}`;
 const AGO = formatAgo(NEWEST_AT);
 
 // The extras are module state shared by the publisher and every surface; a
@@ -62,7 +64,7 @@ afterEach(() => {
 });
 
 function snapshotFor(
-  sessions: { status: string; statusUpdatedAt?: string }[],
+  sessions: { status: string; statusUpdatedAt?: string; scheduledAt?: string }[],
   revision = 0,
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
@@ -93,8 +95,10 @@ describe('buildAndroidWidgetProps', () => {
     expect(props.countLines).toEqual([
       { label: 'Needs input', kind: 'needsInput', count: '2' },
       { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Scheduled', kind: 'scheduled', count: '0' },
       { label: 'Idle', kind: 'idle', count: '3' },
     ]);
+    expect(props.zeroKinds).toEqual(['scheduled']);
   });
 
   it.each([
@@ -122,7 +126,7 @@ describe('buildAndroidWidgetProps', () => {
       ['empty', [], 'No agents waiting', 0, false],
       // Counts show for stale, and all three rows draw whenever they show, so
       // the widget's rows never reflow as work moves between states.
-      ['stale', [{ status: 'busy' }], 'Updates delayed', 3, true],
+      ['stale', [{ status: 'busy' }], 'Updates delayed', 4, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Open Kilo to see agents', 0, false],
@@ -153,6 +157,7 @@ describe('buildAndroidWidgetProps', () => {
 
     expect(Object.keys(props).toSorted()).toEqual([
       'accessibilityLabel',
+      'actionFeedback',
       'actions',
       'countLines',
       'newestLine',
@@ -161,7 +166,9 @@ describe('buildAndroidWidgetProps', () => {
       'newestResultLabel',
       'newestResultTitle',
       'primaryLabel',
+      'scheduledTime',
       'statusLine',
+      'zeroKinds',
     ]);
     expect(json).not.toContain('user-9f3a-leak');
     expect(json).not.toContain('org-acme-7-leak');
@@ -233,7 +240,7 @@ describe('newest-result props', () => {
     );
 
     expect(props.statusLine).toBe('Updates delayed');
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
     expect(props.newestResultTitle).toBe('Newest result');
     expect(props.newestResultLabel).toBe('Needs input');
     expect(props.newestResultAgo).toBe(AGO);
@@ -251,6 +258,85 @@ describe('newest-result props', () => {
   });
 });
 
+describe('scheduled wake props', () => {
+  /** Two hours ahead of the suite's clock, so the stub formatter echoes it. */
+  const WAKE = new Date(NOW + 7_200_000).toISOString();
+
+  it('carries the scheduled row and the wake as a clock time beside it', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0),
+      {},
+      translate,
+      String,
+      formatAgo,
+      formatClock
+    );
+
+    // The count line exists whether or not a wake is known, so the surface
+    // never reflows when the CLI reports a wake for a session it had none for;
+    // only the time beside the row is conditional.
+    expect(props.countLines.find(line => line.kind === 'scheduled')).toEqual({
+      label: 'Scheduled',
+      kind: 'scheduled',
+      count: '1',
+    });
+    expect(props.scheduledTime).toBe(formatClock(WAKE));
+    expect(props.primaryLabel).toBe('Scheduled');
+  });
+
+  it('keeps the scheduled row but no wake when the CLI reported none', () => {
+    const props = buildAndroidWidgetProps(
+      snapshotFor([{ status: 'scheduled' }], 0),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+
+    expect(props.countLines.find(line => line.kind === 'scheduled')?.count).toBe('1');
+    expect(props.scheduledTime).toBeNull();
+  });
+
+  it('carries no wake when nothing is scheduled', () => {
+    expect(
+      buildAndroidWidgetProps(MIXED, {}, translate, String, formatAgo, formatClock).scheduledTime
+    ).toBeNull();
+  });
+
+  it.each(['waiting', 'empty', 'expired', 'signed_out', 'privacy'] as const)(
+    'drops the wake on the locked %s frame that keeps no counts',
+    status => {
+      const props = buildAndroidWidgetProps(
+        snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0, status),
+        {},
+        translate,
+        String,
+        formatAgo,
+        formatClock
+      );
+
+      expect(props.scheduledTime).toBeNull();
+    }
+  );
+
+  it('drops the wake with the counts at the data deadline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW + 28_800_000);
+    const props = buildCurrentWidgetProps(
+      snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0),
+      translate,
+      String,
+      formatAgo,
+      formatClock
+    );
+    vi.useRealTimers();
+
+    expect(props.statusLine).toBe('Status expired');
+    expect(props.countLines).toEqual([]);
+    expect(props.scheduledTime).toBeNull();
+  });
+});
+
 describe('current widget deadline rendering', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -259,7 +345,13 @@ describe('current widget deadline rendering', () => {
   it.each(['happy', 'stale'] as const)('hides expired %s counts', status => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW + 28_800_000);
-    const props = buildCurrentWidgetProps({ ...MIXED, status }, translate, String, formatAgo);
+    const props = buildCurrentWidgetProps(
+      { ...MIXED, status },
+      translate,
+      String,
+      formatAgo,
+      formatClock
+    );
     expect(props.statusLine).toBe('Status expired');
     expect(props.countLines).toEqual([]);
     expect(props.accessibilityLabel).toBe('Status expired, Open agents');
@@ -273,7 +365,13 @@ describe('current widget deadline rendering', () => {
   ] as const)('preserves %s copy beyond an old deadline', (status, expected) => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW + 28_800_001);
-    const props = buildCurrentWidgetProps({ ...MIXED, status }, translate, String, formatAgo);
+    const props = buildCurrentWidgetProps(
+      { ...MIXED, status },
+      translate,
+      String,
+      formatAgo,
+      formatClock
+    );
     expect(props.statusLine).toBe(expected);
     expect(props.accessibilityLabel).toBe(`${expected}, Open agents`);
     expect(props.countLines).toEqual([]);
@@ -284,7 +382,8 @@ describe('current widget deadline rendering', () => {
       { ...MIXED, expiresAt: 'invalid' },
       translate,
       String,
-      formatAgo
+      formatAgo,
+      formatClock
     );
     expect(props.statusLine).toBe('Status expired');
     expect(props.countLines).toEqual([]);
@@ -297,7 +396,8 @@ describe('current widget deadline rendering', () => {
       { ...MIXED, newestResultKind: 'running', newestResultAt: NEWEST_AT },
       translate,
       String,
-      formatAgo
+      formatAgo,
+      formatClock
     );
     expect(props.newestResultTitle).toBeNull();
     expect(props.newestResultLabel).toBeNull();
@@ -323,7 +423,8 @@ describe('current widget lapsed frame', () => {
       { ...MIXED, newestResultKind: 'running', newestResultAt: NEWEST_AT },
       translate,
       String,
-      formatAgo
+      formatAgo,
+      formatClock
     );
 
     expect(props.statusLine).toBe('Updates delayed');
@@ -332,6 +433,7 @@ describe('current widget lapsed frame', () => {
     expect(props.countLines).toEqual([
       { label: 'Needs input', kind: 'needsInput', count: '2' },
       { label: 'Working', kind: 'running', count: '4' },
+      { label: 'Scheduled', kind: 'scheduled', count: '0' },
       { label: 'Idle', kind: 'idle', count: '3' },
     ]);
     expect(props.primaryLabel).toBe('Needs input');
@@ -345,12 +447,13 @@ describe('current widget lapsed frame', () => {
       { ...MIXED, newestResultKind: 'running', newestResultAt: NEWEST_AT },
       translate,
       String,
-      formatAgo
+      formatAgo,
+      formatClock
     );
 
     expect(props.statusLine).toBeNull();
     expect(props.newestResultAgo).toBe(AGO);
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   // The deadline keeps its precedence: a lapsed snapshot past `expiresAt` still
@@ -362,7 +465,8 @@ describe('current widget lapsed frame', () => {
       { ...MIXED, newestResultKind: 'running', newestResultAt: NEWEST_AT },
       translate,
       String,
-      formatAgo
+      formatAgo,
+      formatClock
     );
 
     expect(props.statusLine).toBe('Status expired');
@@ -376,7 +480,13 @@ describe('current widget lapsed frame', () => {
     status => {
       vi.useFakeTimers();
       vi.setSystemTime(NOW + 31 * 60_000);
-      const props = buildCurrentWidgetProps({ ...MIXED, status }, translate, String, formatAgo);
+      const props = buildCurrentWidgetProps(
+        { ...MIXED, status },
+        translate,
+        String,
+        formatAgo,
+        formatClock
+      );
       expect(props.statusLine).not.toBe('Updates delayed');
       expect(props.countLines).toEqual([]);
     }
@@ -395,6 +505,24 @@ describe('widget config', () => {
     const widget = widgetConfig.widgets.find(entry => entry.name === 'ActiveAgentsWidget');
 
     expect(widget?.updatePeriodMillis).toBeLessThanOrEqual(GLANCEABLE_STALE_MS);
+  });
+});
+
+describe('buildGenericWidgetProps', () => {
+  // A placed widget with no snapshot has no account behind it — a fresh install
+  // or a signed-out one — so it must not claim "No work in progress", which
+  // asserts a signed-in empty tray. It reads the sign-in copy instead.
+  it('reads the sign-in copy with no counts and no actions', () => {
+    const props = buildGenericWidgetProps(translate);
+
+    expect(props.statusLine).toBe('Sign in to see agents');
+    expect(props.accessibilityLabel).toBe('Sign in to see agents');
+    expect(props.countLines).toEqual([]);
+    expect(props.primaryLabel).toBeNull();
+    expect(props.newestResultTitle).toBeNull();
+    expect(props.newestLine).toBeNull();
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
   });
 });
 
@@ -427,6 +555,30 @@ describe('buildOngoingNotificationText', () => {
     expect(buildOngoingNotificationText(MIXED, {}, translate, String, 'Approval failed')).toBe(
       'Approval failed 2 Needs input, 4 Working, 3 Idle'
     );
+  });
+
+  /** Two hours ahead of the suite's clock, so the stub formatter echoes it. */
+  const WAKE = new Date(NOW + 7_200_000).toISOString();
+
+  it('appends the wake time to a scheduled count', () => {
+    const snapshot = snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0);
+    expect(buildOngoingNotificationText(snapshot, {}, translate, String, null, formatAgo)).toBe(
+      `1 Scheduled wakes ${formatAgo(WAKE)}`
+    );
+  });
+
+  it('leaves the scheduled count bare when the CLI reported no wake', () => {
+    const snapshot = snapshotFor([{ status: 'scheduled' }], 0);
+    expect(buildOngoingNotificationText(snapshot, {}, translate, String, null, formatAgo)).toBe(
+      '1 Scheduled'
+    );
+  });
+
+  it('keeps the stale warning and the pending notice around the wake', () => {
+    const snapshot = snapshotFor([{ status: 'scheduled', scheduledAt: WAKE }], 0, 'stale');
+    expect(
+      buildOngoingNotificationText(snapshot, {}, translate, String, 'Approval failed', formatAgo)
+    ).toBe(`Approval failed Updates delayed, 1 Scheduled wakes ${formatAgo(WAKE)}`);
   });
 
   it('prefixes the notice to the stale warning and to the locked copy', () => {
@@ -526,6 +678,13 @@ describe('widget actions and the newest line', () => {
     expect(props.actions.approve).toBe(true);
   });
 
+  it('does not offer New agent when a session is scheduled', () => {
+    const props = buildAndroidWidgetProps(snapshotFor([{ status: 'scheduled' }]), {}, translate);
+    expect(props.actions.approve).toBe(false);
+    expect(props.actions.newAgent).toBe(false);
+    expect(props.primaryLabel).toBe('Scheduled');
+  });
+
   it('offers New agent when every connected agent is idle and nothing waits', () => {
     // The idle-only tray has status happy: it keeps a card alive, and nothing
     // waiting means the only action the surface can offer is a new agent. The
@@ -538,7 +697,7 @@ describe('widget actions and the newest line', () => {
       newAgentLabel: 'New agent',
     });
     expect(props.statusLine).toBeNull();
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
   it('offers New agent when nothing is eligible, instead of Approve', () => {
@@ -596,50 +755,34 @@ describe('widget actions and the newest line', () => {
     expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBeNull();
   });
 
-  it('shows the action state ahead of the newest session', () => {
+  it('shows the action state ahead of the newest session, and says which it is', () => {
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'approving' });
-    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Approving…');
+    const approving = buildAndroidWidgetProps(MIXED, {}, translate);
+    expect(approving.newestLine).toBe('Approving…');
+    expect(approving.actionFeedback).toBe('approving');
 
     setSurfaceExtras({
       newestSessionTitle: 'Fix the flaky test',
       actionFeedback: 'couldNotApprove',
     });
-    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Could not approve');
+    const failed = buildAndroidWidgetProps(MIXED, {}, translate);
+    expect(failed.newestLine).toBe('Could not approve');
+    expect(failed.actionFeedback).toBe('couldNotApprove');
 
-    // The create's own progress and failure lines, on a surface that shows the
-    // newest session too: the action owns the slot while it runs or failed.
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
-    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Starting…');
-
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
-    expect(buildAndroidWidgetProps(MIXED, {}, translate).newestLine).toBe('Could not start');
+    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
+    expect(buildAndroidWidgetProps(MIXED, {}, translate).actionFeedback).toBeNull();
   });
 
-  it('draws a create’s progress and failure in the empty surface’s reserved line', () => {
-    const empty = snapshotFor([], 0, 'empty');
-
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'starting' });
-    const running = buildAndroidWidgetProps(empty, {}, translate);
-    expect(running.newestLine).toBe('Starting…');
-    // The empty surface is the one that offers New agent, so it keeps that row
-    // as the retry while no counts draw.
-    expect(running.actions).toEqual({
-      approve: false,
-      newAgent: true,
-      approveLabel: 'Approve',
-      newAgentLabel: 'New agent',
-    });
-
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
-    const failed = buildAndroidWidgetProps(empty, {}, translate);
-    expect(failed.newestLine).toBe('Could not start');
-    expect(failed.countLines).toEqual([]);
-    expect(failed.actions.newAgent).toBe(true);
+  it('carries no action feedback on a surface without counts', () => {
+    setSurfaceExtras({ newestSessionTitle: null, actionFeedback: 'couldNotApprove' });
+    expect(
+      buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate).actionFeedback
+    ).toBeNull();
   });
 
   it('never shows the newest-session title on the empty surface', () => {
-    // Empty offers the create, so the slot carries the create's feedback; with
-    // none in flight the slot is blank rather than a stale title.
+    // Empty offers no in-place action, so its slot stays blank rather than
+    // carrying a stale title.
     setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: null });
     expect(
       buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate).newestLine
@@ -655,11 +798,14 @@ describe('widget actions and the newest line', () => {
     );
     expect(props.newestLine).toBe('Could not approve');
     expect(props.actions.approve).toBe(true);
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
   });
 
-  it('draws the reserved line only where an action is offered', () => {
-    setSurfaceExtras({ newestSessionTitle: 'Fix the flaky test', actionFeedback: 'couldNotStart' });
+  it('draws the reserved line only on the count surfaces', () => {
+    setSurfaceExtras({
+      newestSessionTitle: 'Fix the flaky test',
+      actionFeedback: 'couldNotApprove',
+    });
     expect(
       buildAndroidWidgetProps(snapshotFor([], 0, 'signed_out'), {}, translate).newestLine
     ).toBeNull();
@@ -669,10 +815,10 @@ describe('widget actions and the newest line', () => {
     expect(
       buildAndroidWidgetProps(snapshotFor([], 0, 'waiting'), {}, translate).newestLine
     ).toBeNull();
-    // The empty surface is the one that offers New agent, so its reserved slot
-    // carries that action's feedback even though no counts draw.
-    expect(buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate).newestLine).toBe(
-      'Could not start'
-    );
+    // Empty offers New agent, which opens the app instead of answering in
+    // place, so a leftover Approve failure has no business in its slot.
+    expect(
+      buildAndroidWidgetProps(snapshotFor([], 0, 'empty'), {}, translate).newestLine
+    ).toBeNull();
   });
 });

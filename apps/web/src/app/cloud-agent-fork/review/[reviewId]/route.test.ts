@@ -88,7 +88,7 @@ const mockCaller = {
 const mockCreateCaller = jest.fn((_: TrpcContextFixture) => mockCaller);
 const mockCreateCallerFactory = jest.fn(() => mockCreateCaller);
 
-jest.mock('@/lib/trpc/init', () => ({
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => ({
   createTRPCContext: () => mockCreateTRPCContext(),
   createCallerFactory: () => mockCreateCallerFactory(),
 }));

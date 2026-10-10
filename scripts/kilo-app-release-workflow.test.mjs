@@ -260,6 +260,14 @@ function validate(workflow) {
     'the PR must not be opened when the section did not land'
   );
   assert.match(pr.run, /\bgh pr edit\b/, 'an already open PR must be refreshed, not duplicated');
+  // This job checks out main, and `gh pr create` reads the head from the
+  // checked-out branch when --head is absent: the API then refuses the PR with
+  // "No commits between main and main" and the version bump is never offered.
+  assert.match(
+    pr.run,
+    /gh pr create[\s\S]*?--head "\$BRANCH"/,
+    'the version-bump PR must name the branch it carries, not the checked-out main'
+  );
   assert.equal(
     pr.env?.BRANCH,
     '${{ needs.bump-version.outputs.branch }}',
@@ -431,6 +439,10 @@ const mutations = {
   'the changelog never refreshes an open PR': workflow => {
     const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
     pr.run = pr.run.replace(/\bgh pr edit\b/, 'true');
+  },
+  'the changelog opens the PR on the checked-out branch': workflow => {
+    const pr = workflow.jobs.changelog.steps.find(item => /\bgh pr create\b/.test(item.run ?? ''));
+    pr.run = pr.run.replace(/(gh pr create[\s\S]*?)--head "\$BRANCH" \\\n/, '$1');
   },
   'the changelog drops the pending carry': workflow => {
     const write = workflow.jobs.changelog.steps.find(item =>

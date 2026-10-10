@@ -136,8 +136,18 @@ describe('Cloud Agent session report writes', () => {
     await ensureCloneSessionReport(metadata, env);
 
     expect(reportStore.createSessionReport.mock.calls.map(([input]) => input)).toEqual([
-      { cloudAgentSessionId, kiloSessionId, initialMessageId, occurredAt: reportingCreatedAt },
-      { cloudAgentSessionId, kiloSessionId, initialMessageId, occurredAt: reportingCreatedAt },
+      {
+        cloudAgentSessionId,
+        kiloSessionId,
+        initialMessageId,
+        occurredAt: reportingCreatedAt,
+      },
+      {
+        cloudAgentSessionId,
+        kiloSessionId,
+        initialMessageId,
+        occurredAt: reportingCreatedAt,
+      },
     ]);
   });
 

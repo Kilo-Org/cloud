@@ -1,4 +1,4 @@
-import { allow_fake_login } from '@/lib/constants';
+import { allow_fake_login } from '@kilocode/web-shared/lib/constants';
 import { getAuthPageProps } from '@/lib/auth/auth-page-wrapper';
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';

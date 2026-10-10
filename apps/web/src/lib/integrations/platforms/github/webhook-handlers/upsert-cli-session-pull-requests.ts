@@ -1,12 +1,15 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
 import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
-import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import {
+  parsePullRequestUrl,
+  parseRepoReference,
+  pullRequestUrlMatchesRepo,
+} from '@/lib/integrations/platforms/github/pr-link-identity';
 import type { PullRequestPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
-import { REVIEW_DECISION_SUPPORTED_PLATFORMS } from './supported-platforms';
 
 /**
  * Identity of the GitHub installation that delivered a webhook. The cache
@@ -18,11 +21,23 @@ export type WebhookInstallationOwner =
   | { kind: 'user'; userId: string };
 
 /**
- * Result of the matching-session gate check.
- * - `no_session`: no session on a supported platform found — skip the upsert entirely.
- * - `session`: at least one session on a supported platform found.
+ * Result of the per-session verified gate check.
+ * - `no_session`: no session verifiably links this PR — nothing is written.
+ * - `session`: at least one session verifiably links this PR and was marked
+ *   verified.
  */
 export type SessionGateResult = { kind: 'no_session' } | { kind: 'session' };
+
+/**
+ * The evidence a pull request webhook carries about the PR it names. `gitUrl`
+ * is the canonical `https://host/owner/repo` of the (same) base and head repo.
+ */
+export type PullRequestSessionEvidence = {
+  gitUrl: string;
+  prNumber: number;
+  headRef: string | null;
+  headSha: string | null;
+};
 
 const UPSERT_ACTIONS: ReadonlySet<string> = new Set([
   GITHUB_ACTION.OPENED,
@@ -52,60 +67,144 @@ function derivePrState(pr: PullRequestPayload['pull_request'], action: string): 
   return pr.draft === true ? 'draft' : 'open';
 }
 
+function tenantPredicateForOwner(owner: WebhookInstallationOwner) {
+  return owner.kind === 'organization'
+    ? eq(cli_sessions_v2.organization_id, owner.organizationId)
+    : and(isNull(cli_sessions_v2.organization_id), eq(cli_sessions_v2.kilo_user_id, owner.userId));
+}
+
 /**
- * Checks whether at least one `cli_sessions_v2` row on a supported platform
- * exists in this tenant for `(git_url, git_branch)`.
+ * Per-session verified gate: mark every `cli_sessions_v2` row in the tenant
+ * that verifiably links this pull request as verified, and report whether any
+ * matched.
+ *
+ * A session verifiably links the PR only when it stored a link to the same PR
+ * number on the same repository — its `git_url` and the stored `pr_url` itself
+ * both name the webhook's repository and PR number — and the evidence the
+ * session itself reported agrees with the payload:
+ *
+ *   - the stored `pr_head_sha` equals the payload head SHA, or
+ *   - the session stored no head SHA (older CLI) and its `pr_head_ref` equals
+ *     the payload head ref, or
+ *   - the session stored neither head field (pre-headRef CLI) and its
+ *     `git_branch` equals the payload head ref.
+ *
+ * In every case a stored `pr_head_ref` or `git_branch` that names another
+ * branch than the payload head ref blocks the match. This is the same rule as
+ * `verifySessionPullRequestLink`, so a link the webhook verifies is never
+ * revoked by the next refresh.
+ *
+ * A branch name (with repo and tenant) is never on its own enough: a PR opened
+ * by someone else on a reused branch name does not carry this session's PR
+ * number and does not match.
+ *
+ * Verification is platform-agnostic. Every surface that shows a session (web
+ * session list/detail, mobile Agents list, extension side panel, the CLI) must
+ * be able to have the session's own reported PR verified, so
+ * `created_on_platform` is not part of the gate. A cloud-agent-only gate left
+ * `cli`/`vscode`/`agent-manager` sessions unverifiable, and because the only
+ * manual recovery (the hover-card refresh) requires an already-verified link,
+ * those sessions could never display their own PR.
  */
-export async function checkMatchingSession(
-  gitUrl: string,
-  branch: string,
+export async function markSessionsVerifyingPullRequest(
+  evidence: PullRequestSessionEvidence,
   owner: WebhookInstallationOwner
 ): Promise<SessionGateResult> {
-  const tenantPredicate =
-    owner.kind === 'organization'
-      ? eq(cli_sessions_v2.organization_id, owner.organizationId)
-      : and(
-          isNull(cli_sessions_v2.organization_id),
-          eq(cli_sessions_v2.kilo_user_id, owner.userId)
-        );
+  const payloadHeadSha = evidence.headSha ? evidence.headSha.trim().toLowerCase() : null;
+  const payloadHeadRef = evidence.headRef;
 
-  const platformInList = sql.join(
-    [...REVIEW_DECISION_SUPPORTED_PLATFORMS].map(p => sql`${p}`),
-    sql`, `
+  // `(stored head SHA = payload head SHA) OR (stored head SHA absent AND
+  // stored head ref = payload head ref) OR (both head fields absent AND the
+  // session branch = payload head ref)`. The last disjunct is the fallback for
+  // a legacy CLI that reported a link before the head fields existed: it still
+  // requires the session's own PR number and repo to match above, and its
+  // branch to be the ref the webhook names, so branch alone is never enough.
+  const headEvidence = or(
+    payloadHeadSha ? sql`lower(${cli_sessions_v2.pr_head_sha}) = ${payloadHeadSha}` : sql`false`,
+    payloadHeadRef !== null
+      ? and(isNull(cli_sessions_v2.pr_head_sha), eq(cli_sessions_v2.pr_head_ref, payloadHeadRef))
+      : sql`false`,
+    payloadHeadRef !== null
+      ? and(
+          isNull(cli_sessions_v2.pr_head_sha),
+          isNull(cli_sessions_v2.pr_head_ref),
+          eq(cli_sessions_v2.git_branch, payloadHeadRef)
+        )
+      : sql`false`
   );
 
-  const result = await db.execute<{ has_session: boolean }>(
-    sql`
-      SELECT EXISTS (
-        SELECT 1 FROM cli_sessions_v2
-        WHERE git_url = ${gitUrl}
-          AND git_branch = ${branch}
-          AND ${tenantPredicate}
-          AND created_on_platform IN (${platformInList})
-      ) AS has_session
-    `
+  // A stored head ref or session branch that contradicts the payload head ref
+  // rejects the session, and at least one of them must name the payload head
+  // ref, as `verifySessionPullRequestLink` requires on refresh.
+  const noContradictingRef =
+    payloadHeadRef !== null
+      ? and(
+          or(isNull(cli_sessions_v2.pr_head_ref), eq(cli_sessions_v2.pr_head_ref, payloadHeadRef)),
+          or(isNull(cli_sessions_v2.git_branch), eq(cli_sessions_v2.git_branch, payloadHeadRef)),
+          or(isNotNull(cli_sessions_v2.pr_head_ref), isNotNull(cli_sessions_v2.git_branch))
+        )
+      : sql`false`;
+
+  const candidatePredicate = and(
+    eq(cli_sessions_v2.git_url, evidence.gitUrl),
+    eq(cli_sessions_v2.pr_number, evidence.prNumber),
+    isNotNull(cli_sessions_v2.pr_url),
+    tenantPredicateForOwner(owner),
+    headEvidence,
+    noContradictingRef
   );
 
-  const row = result.rows[0];
-  if (!row?.has_session) return { kind: 'no_session' };
-  return { kind: 'session' };
+  // The stored link itself must name this PR: a `pr_url` on another repository
+  // (or another PR number) is no evidence even when the session's repo, PR
+  // number, and head fields agree with the payload.
+  const candidates = await db
+    .select({ session_id: cli_sessions_v2.session_id, pr_url: cli_sessions_v2.pr_url })
+    .from(cli_sessions_v2)
+    .where(candidatePredicate);
+  const linking = candidates.flatMap(candidate =>
+    candidate.pr_url !== null &&
+    parsePullRequestUrl(candidate.pr_url)?.number === evidence.prNumber &&
+    pullRequestUrlMatchesRepo(candidate.pr_url, evidence.gitUrl)
+      ? [
+          and(
+            eq(cli_sessions_v2.session_id, candidate.session_id),
+            eq(cli_sessions_v2.pr_url, candidate.pr_url)
+          ),
+        ]
+      : []
+  );
+  if (linking.length === 0) return { kind: 'no_session' };
+
+  // Re-apply the gate and pin each checked `pr_url` so a link changed after the
+  // read is never marked verified.
+  const marked = await db
+    .update(cli_sessions_v2)
+    .set({ pr_link_verified_at: sql`now()` })
+    .where(and(candidatePredicate, or(...linking)))
+    .returning({ session_id: cli_sessions_v2.session_id });
+
+  return marked.length > 0 ? { kind: 'session' } : { kind: 'no_session' };
 }
 
 /**
  * Side-effect: when a pull_request webhook arrives for one of the tracked
- * actions and at least one cli_sessions_v2 row on a supported platform in this
- * tenant references the same `(git_url, git_branch)`, upsert a single row into
- * `github_branch_pull_requests` keyed on `(normalized git_url, git_branch,
- * tenant)`. One delivery = one row written, regardless of how many sessions
- * reference the same `(repo, branch)`.
+ * actions, a session that verifiably links the PR is marked verified and the
+ * `github_branch_pull_requests` state/review cache row is upserted keyed on PR
+ * identity `(normalized git_url, PR number, tenant)`.
+ *
+ * The cache is never the source of the link: it only carries the state and
+ * review decision for a PR a session already verifiably links. A branch name
+ * is not identity — a reused branch name opened by someone else must never
+ * populate or overwrite the row.
  *
  * The review decision is NOT fetched here. Instead `review_decision_pending` is
  * flipped to `true` for actions that can affect it (opened, reopened,
  * synchronize). The background batch in `batch-review-decisions.ts` picks it up
  * on the next user-facing read.
  *
- * Returns 1 when a row was written and 0 otherwise (no matching session,
- * unrelated action, missing fields, or db error).
+ * Returns 1 when a row was written and 0 otherwise (no session verifiably
+ * links the PR, unrelated action, missing fields, fork/other-repo PR, or db
+ * error).
  */
 export async function upsertCliSessionPullRequestsFromWebhook(
   payload: PullRequestPayload,
@@ -120,19 +219,43 @@ export async function upsertCliSessionPullRequestsFromWebhook(
 
   const headRepo = pull_request.head.repo;
   if (!headRepo?.clone_url) {
-    // Cross-fork PR with a null head.repo — skip per v1 out-of-scope note.
+    // Cross-fork PR with a null head.repo — skip.
+    return 0;
+  }
+
+  // Only a PR whose base and head repositories are the same repository can be
+  // a session's own PR. A fork or another repo that happens to share the
+  // branch name is never a match.
+  const baseRepoRef = parseRepoReference(repository.full_name);
+  const headRepoRef = parseRepoReference(headRepo.clone_url);
+  if (!baseRepoRef || !headRepoRef || baseRepoRef.key !== headRepoRef.key) {
+    logExceptInTest('pull_request upsert: base and head repos differ, skipping', {
+      action,
+      pr_number: pull_request.number,
+      base_repo: repository.full_name,
+      head_repo: headRepo.full_name,
+      owner_kind: owner.kind,
+    });
     return 0;
   }
 
   const prUrl = pull_request.html_url;
   if (!prUrl) return 0;
 
-  const gitUrl = normalizeGitUrl(headRepo.clone_url);
+  const gitUrl = baseRepoRef.url;
 
   try {
-    const gateResult = await checkMatchingSession(gitUrl, branch, owner);
+    const gateResult = await markSessionsVerifyingPullRequest(
+      {
+        gitUrl,
+        prNumber: pull_request.number,
+        headRef: branch,
+        headSha: pull_request.head.sha ?? null,
+      },
+      owner
+    );
     if (gateResult.kind === 'no_session') {
-      logExceptInTest('pull_request upsert: no matching session, skipping', {
+      logExceptInTest('pull_request upsert: no session verifiably links this PR, skipping', {
         action,
         pr_number: pull_request.number,
         repo: repository.full_name,
@@ -185,23 +308,22 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         ? { owned_by_organization_id: owner.organizationId, owned_by_user_id: null }
         : { owned_by_organization_id: null, owned_by_user_id: owner.userId };
 
+    // Identity is the PR, never the branch: the partial unique indexes are
+    // keyed on `(git_url, pr_number, owner)`.
     const conflictTarget =
       owner.kind === 'organization'
         ? [
             github_branch_pull_requests.git_url,
-            github_branch_pull_requests.git_branch,
+            github_branch_pull_requests.pr_number,
             github_branch_pull_requests.owned_by_organization_id,
           ]
         : [
             github_branch_pull_requests.git_url,
-            github_branch_pull_requests.git_branch,
+            github_branch_pull_requests.pr_number,
             github_branch_pull_requests.owned_by_user_id,
           ];
 
-    const conflictTargetWhere =
-      owner.kind === 'organization'
-        ? sql`${github_branch_pull_requests.owned_by_organization_id} IS NOT NULL`
-        : sql`${github_branch_pull_requests.owned_by_user_id} IS NOT NULL`;
+    const conflictTargetWhere = sql`${github_branch_pull_requests.pr_number} IS NOT NULL`;
 
     await db
       .insert(github_branch_pull_requests)
@@ -222,6 +344,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
         target: conflictTarget,
         targetWhere: conflictTargetWhere,
         set: {
+          git_branch: sql`excluded.git_branch`,
           pr_url: sql`excluded.pr_url`,
           pr_number: sql`excluded.pr_number`,
           pr_state: prStateSet,

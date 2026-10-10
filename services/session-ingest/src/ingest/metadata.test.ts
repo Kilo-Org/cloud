@@ -51,6 +51,8 @@ import {
   CLI_DISCONNECT_ATTENTION_RESET_STATUS,
   CLI_DISCONNECT_STALE_BUSY_WINDOW_MS,
   computeSessionMetadataUpdates,
+  prUrlMatchesGitUrl,
+  repoUrlFromPrUrl,
   resetAttentionStatusOnCliDisconnect,
 } from './metadata';
 
@@ -550,6 +552,19 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     }
   );
 
+  it('leaves an unknown stored status untouched without throwing', async () => {
+    const db = createTransactionDb({ initialStatus: 'scheduled' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await expect(
+      resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1')
+    ).resolves.toBeUndefined();
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
   it('no-ops when the session row is missing', async () => {
     const db = createTransactionDb({ initialStatus: 'question', rowMissing: true });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -601,15 +616,41 @@ describe('applyMetadataChanges', () => {
   it.each([
     { parentCloudAgentScopeId: 'workspace_root' },
     { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
-  ])('does not let public parent metadata claim a Cloud Agent root: %j', identity => {
-    const db = createApplyMetadataDb({ parentExists: true, ...identity });
+  ])(
+    'records owned Cloud Agent parent lineage without claiming its scope or worktree: %j',
+    identity => {
+      const db = createApplyMetadataDb({ parentExists: true, ...identity });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      return applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['parentId', 'ses_parent']])
+      ).then(() => {
+        expect(db.updateSets).toEqual([{ parent_session_id: 'ses_parent' }]);
+        expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+          env,
+          'usr_1',
+          expect.objectContaining({
+            type: 'session.updated',
+            data: expect.objectContaining({
+              session: expect.objectContaining({ parentSessionId: 'ses_parent', worktreeId: null }),
+            }),
+          }),
+          undefined
+        );
+      });
+    }
+  );
+
+  it('refuses parent lineage when the authenticated user does not own the parent', async () => {
+    const db = createApplyMetadataDb({ parentExists: false });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    return applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']])).then(
-      () => {
-        expect(db.updateSets).toEqual([]);
-        expect(notifyUserSessionEvent).not.toHaveBeenCalled();
-      }
-    );
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_other_owner']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
   describe('glanceable aggregate refresh', () => {
@@ -803,6 +844,39 @@ describe('applyMetadataChanges', () => {
       expect(delivery.messages).toEqual([]);
     });
   });
+
+  it.each(['scheduled', 'some-future-status'])(
+    'relays a stored %s status without throwing and reports it as the previous status',
+    async initialStatus => {
+      const db = createApplyMetadataDb({ initialStatus });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+
+      await expect(
+        applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']]),
+          delivery.ctx
+        )
+      ).resolves.toBeUndefined();
+      await Promise.all(delivery.tasks);
+
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        delivery.env,
+        'usr_1',
+        expect.objectContaining({
+          type: 'session.status.updated',
+          data: expect.objectContaining({
+            previousStatus: initialStatus,
+            status: 'busy',
+          }),
+        }),
+        delivery.ctx
+      );
+    }
+  );
 
   it('persists organization_id and invalidates access cache when the user is a member', async () => {
     const db = createApplyMetadataDb({ membershipRows: 1 });
@@ -1302,7 +1376,7 @@ describe('applyMetadataChanges', () => {
   });
 
   it('persists the PR-link triple and emits session.updated', async () => {
-    const db = createApplyMetadataDb();
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets.git' });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
 
     await applyMetadataChanges(
@@ -1331,6 +1405,114 @@ describe('applyMetadataChanges', () => {
       expect.objectContaining({ type: 'session.updated' }),
       undefined
     );
+  });
+
+  it('stores head ref and SHA and clears prior verification for the link', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'abc123'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        pr_head_ref: 'fix/typo',
+        pr_head_sha: 'abc123',
+        pr_link_verified_at: null,
+      }),
+    ]);
+  });
+
+  it('drops a link whose PR URL names another repo and stores nothing', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/someone-else/widgets/pull/42'],
+        ['prNumber', '42'],
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'abc123'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('drops a link whose same-named branch lives in another repo', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: 'https://github.com/acme/widgets' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/other/repo/pull/1'],
+        ['prNumber', '1'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([]);
+  });
+
+  it('drops a link when the session reports no repository', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: null });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([]);
+  });
+
+  it('keeps the link when the session git_url arrives in the same write', async () => {
+    const db = createApplyMetadataDb({ initialGitUrl: null });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await applyMetadataChanges(
+      env,
+      'usr_1',
+      'ses_1',
+      new Map([
+        ['gitUrl', 'https://github.com/acme/widgets.git'],
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+      ])
+    );
+
+    expect(db.updateSets).toEqual([
+      expect.objectContaining({
+        git_url: 'https://github.com/acme/widgets',
+        pr_url: 'https://github.com/acme/widgets/pull/42',
+        pr_number: 42,
+      }),
+    ]);
   });
 
   it('clears the PR-link triple and emits session.updated', async () => {
@@ -1480,6 +1662,36 @@ describe('computeSessionMetadataUpdates PR link', () => {
     expect(updates.pr_number).toBe(42);
   });
 
+  it('maps head evidence and clears the verification timestamp', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([
+        ['prPlatform', 'github'],
+        ['prUrl', 'https://github.com/acme/widgets/pull/42'],
+        ['prNumber', '42'],
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'abc123'],
+      ]),
+      fixedNow
+    );
+    expect(updates.pr_head_ref).toBe('fix/typo');
+    expect(updates.pr_head_sha).toBe('abc123');
+    expect(updates.pr_link_verified_at).toBeNull();
+  });
+
+  it('clears the verification timestamp when only head evidence changes', () => {
+    const updates = computeSessionMetadataUpdates(
+      new Map([
+        ['prHeadRef', 'fix/typo'],
+        ['prHeadSha', 'def456'],
+      ]),
+      fixedNow
+    );
+    expect(updates.pr_head_ref).toBe('fix/typo');
+    expect(updates.pr_head_sha).toBe('def456');
+    expect(updates.pr_link_verified_at).toBeNull();
+    expect('pr_url' in updates).toBe(false);
+  });
+
   it('clears all three columns on a clear triple', () => {
     const updates = computeSessionMetadataUpdates(
       new Map([
@@ -1499,11 +1711,52 @@ describe('computeSessionMetadataUpdates PR link', () => {
     expect('platform' in updates).toBe(false);
     expect('pr_url' in updates).toBe(false);
     expect('pr_number' in updates).toBe(false);
+    expect('pr_head_ref' in updates).toBe(false);
+    expect('pr_head_sha' in updates).toBe(false);
+    expect('pr_link_verified_at' in updates).toBe(false);
   });
 
   it('does not touch created_on_platform from prPlatform', () => {
     const updates = computeSessionMetadataUpdates(new Map([['prPlatform', 'github']]), fixedNow);
     expect(updates.platform).toBe('github');
     expect('created_on_platform' in updates).toBe(false);
+  });
+});
+
+describe('prUrlMatchesGitUrl', () => {
+  it('reduces a GitHub PR URL to its repository URL', () => {
+    expect(repoUrlFromPrUrl('https://github.com/acme/widgets/pull/42')).toBe(
+      'https://github.com/acme/widgets'
+    );
+    expect(repoUrlFromPrUrl('https://github.com/acme/widgets/pull/42/files')).toBe(
+      'https://github.com/acme/widgets'
+    );
+  });
+
+  it('reduces a GitLab merge-request URL to its repository URL', () => {
+    expect(repoUrlFromPrUrl('https://gitlab.com/group/sub/repo/-/merge_requests/7')).toBe(
+      'https://gitlab.com/group/sub/repo'
+    );
+  });
+
+  it('matches a PR URL to the same repo across URL forms and casing', () => {
+    expect(
+      prUrlMatchesGitUrl(
+        'https://github.com/Acme/Widgets/pull/42',
+        'git@github.com:acme/widgets.git'
+      )
+    ).toBe(true);
+  });
+
+  it('rejects a same-named branch in another repo', () => {
+    expect(
+      prUrlMatchesGitUrl('https://github.com/other/repo/pull/42', 'https://github.com/acme/widgets')
+    ).toBe(false);
+  });
+
+  it('rejects when either URL is missing or unparseable', () => {
+    expect(prUrlMatchesGitUrl(null, 'https://github.com/acme/widgets')).toBe(false);
+    expect(prUrlMatchesGitUrl('https://github.com/acme/widgets/pull/42', null)).toBe(false);
+    expect(prUrlMatchesGitUrl('not-a-url', 'https://github.com/acme/widgets')).toBe(false);
   });
 });

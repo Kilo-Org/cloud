@@ -1,4 +1,5 @@
 import { ExecutionError } from '../execution/errors.js';
+import { isContainerConcurrencyLimitError } from '../container-concurrency.js';
 import { ExecutionOrchestrator } from '../execution/orchestrator.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import {
@@ -21,7 +22,7 @@ import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { WrapperCommand } from '../shared/protocol.js';
 import type { Env as WorkerEnv } from '../types.js';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import { resolveLegacySessionStub } from '../sandbox-session/session-stub.js';
 import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 import { RUNTIME_AUTHORIZATION_RECOVERY_KEY } from './runtime-authorization-persistence.js';
 import {
@@ -159,7 +160,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     if (!orchestrator) {
       orchestrator = new ExecutionOrchestrator({
         getAgentSandbox: plan => resolveAgentSandbox(plan.workspace.metadata),
-        getSessionStub: (userId, sessionId) => resolveSessionStub(env, userId, sessionId),
+        getSessionStub: (userId, sessionId) => resolveLegacySessionStub(env, userId, sessionId),
         env,
       });
     }
@@ -184,9 +185,16 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
 
     const observeWrappers = async (): Promise<WrapperObservation> => {
       try {
-        return await (dependencies.discoverSessionWrappers
+        const observation = await (dependencies.discoverSessionWrappers
           ? dependencies.discoverSessionWrappers(plan.workspace.metadata)
           : resolveAgentSandbox(plan.workspace.metadata).discoverSessionWrappers());
+        if (
+          observation.status === 'inspection-failed' &&
+          isContainerConcurrencyLimitError(observation.error)
+        ) {
+          throw new Error(observation.error);
+        }
+        return observation;
       } catch (error) {
         if (error instanceof AgentSandboxUnavailableError) {
           throw ExecutionError.sandboxCapabilityUnavailable(
@@ -471,6 +479,20 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       return buildRuntimeAcceptanceResult(turn.messageId, wrapperRuntimeState.wrapperRunId);
     } catch (error) {
       await clearWrapperDispatchingMessage(storage, wrapperRuntimeState, turn.messageId);
+      if (isContainerConcurrencyLimitError(error)) {
+        if (allocatedPhysicalInstance && !wrapperReady) {
+          const physicalLease = await getWrapperLease(storage);
+          await putWrapperLease(
+            storage,
+            reduceWrapperLease(physicalLease, {
+              type: 'owned_absent',
+              instanceId: leasedInstance.instanceId,
+            })
+          );
+          await clearAllocatedWrapperRuntimeState(storage, wrapperRuntimeState);
+        }
+        throw error;
+      }
       if (error instanceof WrapperFinalizingError) {
         if (
           error.wrapperRunId === undefined ||
